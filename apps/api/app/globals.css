@@ -1,0 +1,51 @@
+:root {
+  --color-primary: #fcd303;
+  --color-primary-hover: #e6be00;
+  --color-primary-fg: #000000;
+
+  --color-background: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #111111;
+  --color-deep-grey: #4c4c4c;
+
+  --color-foreground: #ffffff;
+  --color-foreground-muted: #9ca3af;
+  --color-foreground-dim: #6b7280;
+
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-muted: rgba(255, 255, 255, 0.05);
+  --color-border-primary: rgba(252, 211, 3, 0.4);
+
+  --color-glass-bg: rgba(76, 76, 76, 0.2);
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--color-foreground);
+  background: var(--color-background);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
