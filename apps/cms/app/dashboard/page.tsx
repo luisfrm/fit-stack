@@ -1,0 +1,190 @@
+import {
+  Users,
+  Wallet,
+  CalendarCheck,
+  AlertTriangle,
+  Download,
+  Plus,
+  TriangleAlert,
+  AlertCircle,
+  BadgeCheck,
+} from "lucide-react";
+
+import { Button } from "@workspace/ui/components/button";
+import { Card } from "@workspace/ui/components/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
+import { Text } from "@workspace/ui/components/text";
+import {
+  AppSidebar,
+  KpiCard,
+  OccupancyBar,
+  ClassStatusBadge,
+  ActivityItem,
+  AlertItem,
+  type ClassStatus,
+  type MemberPlan,
+} from "@/components/dashboard/dashboard-ui";
+
+/* ─────────────────────────────────────────────
+   STATIC DATA
+   ───────────────────────────────────────────── */
+
+const CLASSES_TODAY = [
+  { time: "08:00 AM", name: "CrossFit Advance",  trainer: "Carlos Ruiz",   occupancy: 85, status: "live"      as ClassStatus },
+  { time: "10:30 AM", name: "Hatha Yoga",         trainer: "Ana López",     occupancy: 45, status: "scheduled" as ClassStatus },
+  { time: "12:00 PM", name: "Boxeo Recreativo",   trainer: "Marcos Sanz",   occupancy: 0,  status: "cancelled" as ClassStatus },
+  { time: "04:00 PM", name: "Pilates Reformer",   trainer: "Elena Gomez",   occupancy: 60, status: "scheduled" as ClassStatus },
+];
+
+const RECENT_REGISTRATIONS = [
+  { name: "Juan Pérez",   time: "Hace 15 min",  plan: "vip"   as MemberPlan },
+  { name: "Lucía Méndez", time: "Hace 45 min",  plan: "pro"   as MemberPlan },
+  { name: "Roberto Diaz", time: "Hace 1 hora",  plan: "basic" as MemberPlan },
+  { name: "Sofía Castro", time: "Hace 3 horas", plan: "vip"   as MemberPlan },
+  { name: "Marco Polo",   time: "Ayer",          plan: "pro"   as MemberPlan },
+];
+
+/* ─────────────────────────────────────────────
+   PAGE
+   ───────────────────────────────────────────── */
+
+export default function DashboardPage() {
+  return (
+    <div className="flex min-h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
+      <AppSidebar user={{ name: "Alex Rivera", role: "Super Admin" }} />
+
+      <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
+        {/* ── Header ── */}
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-100">Panel de Control</h2>
+            <Text variant="muted">Bienvenido de nuevo, aquí está el resumen de hoy.</Text>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="glass" size="sm" leftIcon={<Download className="w-4 h-4" />}>
+              Reporte
+            </Button>
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+              Nuevo Miembro
+            </Button>
+          </div>
+        </header>
+
+        {/* ── KPI Cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <KpiCard
+            label="Miembros Activos"
+            value="1,250"
+            icon={Users}
+            trend={{ value: "+5%", direction: "up" }}
+          />
+          <KpiCard
+            label="Ingresos del Mes"
+            value="$45,280"
+            icon={Wallet}
+            trend={{ value: "-2%", direction: "down" }}
+          />
+          <KpiCard
+            label="Clases Hoy"
+            value="24"
+            icon={CalendarCheck}
+            trend={{ value: "Hoy", direction: "neutral" }}
+          />
+          <KpiCard
+            label="Membresías por Vencer"
+            value="12"
+            icon={AlertTriangle}
+            trend={{ value: "Próx. 7 días", direction: "neutral" }}
+            accent
+          />
+        </div>
+
+        {/* ── Central Grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+
+          {/* Classes Table */}
+          <Card className="lg:col-span-2 bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden">
+            <div className="p-6 border-b border-border-dark flex justify-between items-center">
+              <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
+              <button className="text-primary text-sm font-medium hover:underline">Ver todas</button>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-white/5 border-b-0">
+                  <TableRow className="border-border-dark hover:bg-transparent">
+                    {["Hora", "Clase", "Entrenador", "Ocupación", "Estado"].map((h) => (
+                      <TableHead key={h} className="px-6 py-4 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                        {h}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border-dark">
+                  {CLASSES_TODAY.map((cls) => (
+                    <TableRow key={cls.time} className="hover:bg-white/2 transition-colors border-border-dark">
+                      <TableCell className="px-6 py-4">
+                        <Text as="span" size="base" variant="muted">{cls.time}</Text>
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Text as="span" size="base" weight="medium">{cls.name}</Text>
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Text as="span" size="base" variant="muted">{cls.trainer}</Text>
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <OccupancyBar percentage={cls.occupancy} />
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <ClassStatusBadge status={cls.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+
+          {/* Recent Registrations */}
+          <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-border-dark">
+              <Text as="p" size="lg" weight="bold">Últimos Registros</Text>
+            </div>
+            <div className="flex flex-col flex-1 p-2 gap-1">
+              {RECENT_REGISTRATIONS.map((member) => (
+                <ActivityItem key={member.name} {...member} />
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Alerts ── */}
+        <section>
+          <Text as="p" size="lg" weight="bold" className="mb-4">Alertas Recientes</Text>
+          <div className="flex flex-wrap gap-4">
+            <AlertItem
+              severity="warning"
+              icon={TriangleAlert}
+              title="5 membresías vencen esta semana"
+              description="Revisar lista de renovación para contactar miembros."
+              actionLabel="Revisar"
+            />
+            <AlertItem
+              severity="danger"
+              icon={AlertCircle}
+              title="Pago rechazado: Terminal 04"
+              description="Error de comunicación con el banco emisor."
+              actionLabel="Ver"
+            />
+            <AlertItem
+              severity="success"
+              icon={BadgeCheck}
+              title="Inventario actualizado"
+              description="Suplementos deportivos recibidos y cargados."
+              actionLabel="Ok"
+            />
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
