@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgSchema,
   serial,
   text,
   timestamp,
@@ -7,7 +8,11 @@ import {
   integer,
   jsonb,
   pgEnum,
+  uuid,
 } from 'drizzle-orm/pg-core';
+
+// --- SCHEMAS ---
+export const neonAuthSchema = pgSchema('neon_auth');
 
 // --- ENUMS ---
 export const roleEnum = pgEnum('role', ['admin', 'manager', 'trainer', 'client']);
@@ -17,23 +22,29 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', '
 // --- CORE: USERS & MEMBERS ---
 
 // User: Personas que pueden hacer LOGIN (Admins, Managers, Trainers, o Clientes usando la app)
-export const user = pgTable('user', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
+// IMPORTANTE: Esta tabla es gestionada por Neon Auth (Better Auth).
+// Los nombres de columna siguen el formato de Better Auth (camelCase en DB).
+// Vive en el esquema 'neon_auth', por lo que usamos neonAuthSchema.table
+export const user = neonAuthSchema.table('user', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
   email: text('email').notNull().unique(),
-  username: text('username').notNull().unique(), // Nuevo: Soporte para login por username
-  emailVerified: boolean('email_verified').default(false).notNull(),
+  emailVerified: boolean('emailVerified').notNull(),
   image: text('image'),
-  passwordHash: text('password_hash'),
-  role: roleEnum('role').default('client').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow().notNull(),
+  role: text('role'),
+  banned: boolean('banned'),
+  banReason: text('banReason'),
+  banExpires: timestamp('banExpires', { withTimezone: true }),
 });
 
 // Members: Los clientes reales del gimnasio a los que se les factura
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => user.id), // Vínculo opcional si usan la app
+  userId: uuid('user_id').references(() => user.id), // UUID del usuario en Neon Auth
+  username: text('username').unique(),
+  role: roleEnum('role').default('client').notNull(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   documentId: text('document_id'), // DNI/Cédula para validación presencial
@@ -70,7 +81,7 @@ export const subscriptions = pgTable('subscriptions', {
 // Perfiles de Entrenadores (Conectados a su cuenta de login)
 export const trainerProfiles = pgTable('trainer_profiles', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => user.id).notNull().unique(), 
+  userId: uuid('user_id').references(() => user.id).notNull().unique(), 
   specialities: text('specialities'), // Ej: "Hipertrofia, Powerlifting"
 });
 
