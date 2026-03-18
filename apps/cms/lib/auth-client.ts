@@ -1,3 +1,5 @@
 import { createAuthClient } from '@neondatabase/neon-js/auth';
 
-export const auth: ReturnType<typeof createAuthClient> = createAuthClient("http://localhost:3000");
+type NeonAuthClient = ReturnType<typeof createAuthClient>;
+
+export const auth: any = createAuthClient(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth`);
