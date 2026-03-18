@@ -44,14 +44,25 @@ const RECENT_REGISTRATIONS = [
   { name: "Marco Polo",   time: "Ayer",          plan: "pro"   as MemberPlan },
 ];
 
+import { sessionService } from "@/lib/session-service";
+
 /* ─────────────────────────────────────────────
    PAGE
    ───────────────────────────────────────────── */
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const { data: session } = await sessionService.getSession();
+  const user = session?.user;
+
   return (
     <div className="flex min-h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
-      <AppSidebar user={{ name: "Alex Rivera", role: "Super Admin" }} />
+      <AppSidebar 
+        user={{ 
+          name: user?.name || "Usuario", 
+          role: (user as any)?.role || "Miembro",
+          avatarUrl: user?.image || undefined
+        }} 
+      />
 
       <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
         {/* ── Header ── */}
