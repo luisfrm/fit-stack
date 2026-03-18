@@ -1,68 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, UserPlus, Mail, Lock, Dumbbell, User } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
+import { Eye, EyeOff, UserPlus, Mail, Lock, User } from "lucide-react";
+import Link from "next/link";
 import { auth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
-/* ─────────────────────────────────────────────
-   INLINE INPUT — scoped to Register page
-   ───────────────────────────────────────────── */
-interface RegisterInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size"> {
-  label?: string;
-  leftIcon?: React.ReactNode;
-  rightElement?: React.ReactNode;
-}
-
-const RegisterInput = React.forwardRef<HTMLInputElement, RegisterInputProps>(
-  ({ label, leftIcon, rightElement, id, className, ...props }, ref) => {
-    const generatedId = React.useId();
-    const inputId = id ?? generatedId;
-
-    return (
-      <div className="flex flex-col gap-1.5 w-full">
-        {label && (
-          <label
-            htmlFor={inputId}
-            className="text-xs font-semibold uppercase tracking-wider text-gray-400"
-          >
-            {label}
-          </label>
-        )}
-        <div
-          className={cn(
-            "relative flex items-center h-12 rounded-md border border-[#333333] transition-all duration-200 bg-[#111111]",
-            "focus-within:ring-1 focus-within:ring-[#fcd303] focus-within:border-[#fcd303]"
-          )}
-        >
-          {leftIcon && (
-            <span className="pl-4 shrink-0 flex items-center" style={{ color: "rgba(255,255,255,0.35)" }}>
-              {leftIcon}
-            </span>
-          )}
-          <input
-            ref={ref}
-            id={inputId}
-            className={cn(
-              "flex-1 bg-transparent outline-none px-4 h-full text-sm text-white placeholder-gray-600",
-              leftIcon && "pl-2",
-              rightElement && "pr-2",
-              className
-            )}
-            {...props}
-          />
-          {rightElement && (
-            <span className="pr-4 shrink-0 flex items-center" style={{ color: "rgba(255,255,255,0.35)" }}>
-              {rightElement}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-);
-RegisterInput.displayName = "RegisterInput";
+import { Input } from "@workspace/ui/components/input";
+import { Title } from "@workspace/ui/components/title";
+import { Text } from "@workspace/ui/components/text";
+import { Button } from "@workspace/ui/components/button";
 
 /* ─────────────────────────────────────────────
    REGISTER PAGE
@@ -74,7 +21,7 @@ export default function RegisterPage() {
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg(null);
     setIsLoading(true);
@@ -94,25 +41,25 @@ export default function RegisterPage() {
     }
 
     try {
-      // Bypassing complex TS inference error for the Neon Auth SDK in this PNPM setup
-      const signUpClient = auth.signUp as any;
-      const { data, error } = await signUpClient.email({
+      const signUpClient = auth.signUp;
+
+      await signUpClient.email({
         email,
         password,
-        name: `${firstName} ${lastName}`,
-        username,
-        // Optional callbackURL if you want auto-redirect via Neon Auth config
-        // callbackURL: "/dashboard" 
+        name: `${firstName.toLocaleLowerCase()}_${lastName.toLocaleLowerCase()}`,
       });
 
-      if (error) {
-        setErrorMsg(error.message || "Error al registrar el usuario");
-      } else {
-        // Registro exitoso
-        router.push("/dashboard"); // Ajusta esta ruta según tu CMS
-      }
+      router.push('/login');
     } catch (err: any) {
-      setErrorMsg("Ocurrió un error inesperado al conectar con el servidor.");
+      console.error("Registration error:", err);
+
+      if (err.message.includes("already registered")) {
+        setErrorMsg("El correo electrónico ya está registrado");
+      } else if (err.message.includes("Password too short")) {
+        setErrorMsg("La contraseña es muy corta");
+      } else {
+        setErrorMsg("Ocurrió un error inesperado al conectar con el servidor.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -127,24 +74,29 @@ export default function RegisterPage() {
       `}} />
 
       {/* ── LEFT: Form ── */}
-      <section className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto custom-scrollbar h-screen">
+      <section
+        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto custom-scrollbar h-screen"
+        style={{ paddingBlock: "clamp(2rem, 6vw, 3rem)", paddingInline: "clamp(2rem, 6vw, 6rem)" }}
+      >
         {/* Logo Section */}
         <div className="mb-12">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#fcd303] rotate-45 flex items-center justify-center">
-              <div className="w-4 h-4 bg-black -rotate-45"></div>
+            <div className="w-8 h-8 bg-[--color-primary] rotate-45 flex items-center justify-center">
+              <div className="w-4 h-4 bg-black -rotate-45" />
             </div>
-            <span className="text-xl font-extrabold tracking-tighter">PREMIUM GYM</span>
+            <Text as="span" size="lg" weight="bold" uppercase className="tracking-tighter">
+              PREMIUM GYM
+            </Text>
           </div>
         </div>
 
         {/* Main Form Content */}
-        <div className="max-w-md w-full mx-auto my-auto">
+        <div className="max-w-md">
           <header className="mb-8">
-            <h1 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter mb-2">
+            <Title as="h1" size="section" className="mb-2">
               CREA TU CUENTA
-            </h1>
-            <p className="text-gray-400 text-lg">Únete al equipo de gestión</p>
+            </Title>
+            <Text variant="muted" size="md">Únete al equipo de gestión</Text>
           </header>
 
           {errorMsg && (
@@ -155,14 +107,14 @@ export default function RegisterPage() {
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <RegisterInput
+              <Input
                 id="first-name"
                 name="first-name"
                 label="Nombre"
                 placeholder="Introduce tu nombre"
                 required
               />
-              <RegisterInput
+              <Input
                 id="last-name"
                 name="last-name"
                 label="Apellido"
@@ -171,38 +123,38 @@ export default function RegisterPage() {
               />
             </div>
 
-            <RegisterInput
+            <Input
               id="username"
               name="username"
               label="Nombre de usuario"
               placeholder="Nombre de usuario"
-              leftIcon={<User size={15} />}
+              leftIcon={<User size={16} />}
               required
             />
 
-            <RegisterInput
+            <Input
               type="email"
               id="email"
               name="email"
               label="Email"
               placeholder="ejemplo@gym.com"
-              leftIcon={<Mail size={15} />}
+              leftIcon={<Mail size={16} />}
               required
             />
 
-            <RegisterInput
+            <Input
               type={showPassword ? "text" : "password"}
               id="password"
               name="password"
               label="Contraseña"
               placeholder="********"
-              leftIcon={<Lock size={15} />}
+              leftIcon={<Lock size={16} />}
               required
               rightElement={
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-gray-400 hover:text-white"
+                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
                   aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -210,19 +162,19 @@ export default function RegisterPage() {
               }
             />
 
-            <RegisterInput
+            <Input
               type={showConfirmPassword ? "text" : "password"}
               id="confirm-password"
               name="confirm-password"
               label="Confirmar Contraseña"
               placeholder="********"
-              leftIcon={<Lock size={15} />}
+              leftIcon={<Lock size={16} />}
               required
               rightElement={
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-gray-400 hover:text-white"
+                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
                   aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -232,55 +184,66 @@ export default function RegisterPage() {
 
             {/* Submit Button */}
             <div className="pt-4">
-              <button
+              <Button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-[#fcd303] text-black font-extrabold py-4 rounded-md flex items-center justify-center gap-2 hover:bg-yellow-500 transition-colors uppercase tracking-tight disabled:opacity-70 disabled:cursor-not-allowed"
+                variant="primary"
+                size="xl"
+                rounded="lg"
+                fullWidth
+                loading={isLoading}
+                rightIcon={!isLoading && <UserPlus size={20} />}
               >
                 {isLoading ? "REGISTRANDO..." : "REGISTRARSE"}
-                {!isLoading && <UserPlus size={20} />}
-              </button>
+              </Button>
             </div>
           </form>
 
           <footer className="mt-8 text-center md:text-left">
-            <p className="text-gray-400 text-sm">
+            <Text variant="muted" size="sm">
               ¿Ya tienes una cuenta?{" "}
-              <a href="/login" className="text-[#fcd303] font-bold hover:underline transition-all">
+              <Link href="/login" className="text-primary font-bold hover:underline transition-all">
                 Inicia sesión
-              </a>
-            </p>
+              </Link>
+            </Text>
           </footer>
         </div>
 
         {/* Copyright Section */}
-        <div className="mt-12 text-xs text-gray-600 text-center md:text-left">
-          © {new Date().getFullYear()} Premium Gym CMS. Todos los derechos reservados.
+        <div className="mt-12 text-center md:text-left">
+          <Text variant="muted" size="xs">
+            © {new Date().getFullYear()} Premium Gym CMS. Todos los derechos reservados.
+          </Text>
         </div>
       </section>
 
       {/* ── RIGHT: Image & Inspiration Panel ── */}
-      <section 
-        className="hidden md:flex md:w-1/2 relative items-end p-16 bg-cover bg-center"
-        style={{ 
-          backgroundImage: "linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url('https://lh3.googleusercontent.com/aida-public/AB6AXuBvaCw3_CFbCdZrCcElOfOhfOWgmJLga7M1y3OxqOJ3jw6jvpU_CyMarTyIlJkoxu68KjSnexKrT6RAL-4gtFtZvRlB1RbJlOGMpy0z266YScYaRzhvVWdwpuGzVTuF0WFgMUYWPthV6CN7jPxZntfcMN2XkjDod3lSp9zGccJZXuGJux_RDT3-R4WEHp0rHi97GRhp3HQLK2aQAylqpY0UYJ9rq_Ro852lTxzz9y4JPBomArf92j70_M6aop2MNiKUM9-Ds3i356Y')" 
-        }}
-      >
-        <div className="relative z-20 max-w-lg">
-          <div className="w-16 h-1 bg-[#fcd303] mb-8"></div>
-          <h2 className="text-6xl font-black italic uppercase tracking-tighter mb-4 text-white">
-            SIN LÍMITES
-          </h2>
-          <p className="text-xl text-gray-200 italic font-light leading-relaxed mb-4">
-            "La excelencia no es un acto, sino un hábito."
-          </p>
-          <p className="text-lg text-gray-300 font-normal">
-            Optimiza el rendimiento de tu centro deportivo con tecnología de vanguardia.
-          </p>
+      <section className="hidden lg:block w-1/2 relative overflow-hidden">
+        {/* Background */}
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: "url('/gym-login-bg.png')" }}
+          role="img"
+          aria-label="Atleta profesional entrenando en un gimnasio oscuro"
+        />
+        {/* Fade from left */}
+        <div
+          className="absolute inset-0 z-10"
+          style={{ background: "linear-gradient(to right, #0a0a0a 0%, rgba(10,10,10,0.4) 50%, transparent 100%)" }}
+        />
+        {/* Overall dark tint */}
+        <div className="absolute inset-0 z-10" style={{ background: "rgba(0,0,0,0.45)" }} />
+
+        {/* Floating quote */}
+        <div className="absolute bottom-16 left-16 z-20 max-w-[360px]">
+          <div className="mb-6 rounded-full h-[3px] w-12 bg-[--color-primary]" />
+          <Title as="h3" size="card" className="text-white mb-3">
+            Sin Límites
+          </Title>
+          <Text variant="subtle" className="text-[rgba(255,255,255,0.55)] font-light leading-relaxed">
+            "La excelencia no es un acto, sino un hábito." Optimiza el
+            rendimiento de tu centro deportivo con tecnología de vanguardia.
+          </Text>
         </div>
-        
-        {/* Subtle overlay for text readability at the bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80 pointer-events-none z-10"></div>
       </section>
     </main>
   );
