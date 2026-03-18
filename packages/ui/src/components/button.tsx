@@ -23,11 +23,9 @@ const buttonVariants = cva(
          * Use for main CTA actions
          */
         primary: [
-          "bg-[--color-primary] text-[--color-primary-fg]",
-          "hover:bg-[--color-primary-hover]",
-          "hover:scale-[1.03]",
-          "shadow-[0_4px_20px_rgba(252,211,3,0.3)]",
-          "hover:shadow-[0_6px_28px_rgba(252,211,3,0.5)]",
+          "bg-primary text-black",
+          "hover:bg-yellow-400",
+          "active:scale-[0.98]",
         ],
 
         /**

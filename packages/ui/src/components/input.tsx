@@ -1,5 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
+import { CircleX } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 
 /* ─────────────────────────────────────────────
@@ -8,7 +9,7 @@ import { cn } from "@workspace/ui/lib/utils"
 const inputWrapperVariants = cva(
   [
     "relative flex items-center",
-    "border rounded-lg",
+    "border rounded-md",
     "transition-all duration-200",
     "focus-within:outline-none",
   ],
@@ -19,8 +20,8 @@ const inputWrapperVariants = cva(
          * default — glass/dark surface, border glows on focus (used for CMS forms)
          */
         default: [
-          "bg-transparent border-white/20",
-          "focus-within:border-[--color-primary] focus-within:ring-1 focus-within:ring-[--color-primary]",
+          "bg-[#111111] border-[#333333]",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
         /**
          * filled — slightly elevated surface
@@ -33,6 +34,7 @@ const inputWrapperVariants = cva(
 
       inputSize: {
         sm: "h-10",
+        base: "h-12",
         md: "h-14",
         lg: "h-16",
       },
@@ -46,7 +48,7 @@ const inputWrapperVariants = cva(
 
     defaultVariants: {
       variant:   "default",
-      inputSize: "md",
+      inputSize: "base",
       state:     "default",
     },
   }
@@ -104,13 +106,28 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const generatedId = React.useId()
     const inputId = id ?? generatedId
 
+    let renderRightElement = null
+    if (state === "error") {
+      renderRightElement = (
+        <span className="pr-4 shrink-0 flex items-center text-red-500">
+          <CircleX size={16} />
+        </span>
+      )
+    } else if (rightElement) {
+      renderRightElement = (
+        <span className="pr-4 shrink-0 flex items-center text-white/30">
+          {rightElement}
+        </span>
+      )
+    }
+
     return (
       <div className="flex flex-col gap-1.5 w-full">
         {/* Label */}
         {label && (
           <label
             htmlFor={inputId}
-            className="text-sm font-medium tracking-wide text-white/70 select-none"
+            className="text-xs font-semibold uppercase tracking-wider text-gray-400"
           >
             {label}
           </label>
@@ -126,7 +143,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         >
           {/* Left icon */}
           {leftIcon && (
-            <span className="pl-4 shrink-0 text-white/40 flex items-center">
+            <span className="pl-4 shrink-0 flex items-center text-white/30">
               {leftIcon}
             </span>
           )}
@@ -137,23 +154,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             disabled={disabled}
             className={cn(
-              "flex-1 bg-transparent outline-none",
-              "px-4 h-full",
-              "text-white placeholder:text-white/30",
-              "text-sm",
+              "flex-1 bg-transparent outline-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
               leftIcon  && "pl-2",
-              rightElement && "pr-2",
+              renderRightElement && "pr-2",
               className
             )}
             {...props}
           />
 
-          {/* Right element */}
-          {rightElement && (
-            <span className="pr-4 shrink-0 text-white/40 flex items-center">
-              {rightElement}
-            </span>
-          )}
+          {/* Right element / Error Icon */}
+          {renderRightElement}
         </div>
 
         {/* Hint / error message */}

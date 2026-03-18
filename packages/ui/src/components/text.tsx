@@ -63,9 +63,10 @@ const textVariants = cva(["leading-normal"], {
 type TextElement = "p" | "span" | "label" | "div" | "small";
 
 export interface TextProps
-  extends React.HTMLAttributes<HTMLElement>,
+  extends Omit<React.HTMLAttributes<HTMLElement>, "color">,
     VariantProps<typeof textVariants> {
   as?: TextElement;
+  htmlFor?: string;
 }
 
 /* ─────────────────────────────────────────────
