@@ -11,7 +11,6 @@ import {
   Dumbbell,
   CreditCard,
   Settings,
-  LogOut,
   TrendingUp,
   TrendingDown,
   type LucideIcon,
@@ -22,6 +21,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { cn } from "@workspace/ui/lib/utils";
+import SignOutButton from "../SignOutButton";
 
 /* ─────────────────────────────────────────────
    SIDEBAR
@@ -91,12 +91,7 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
               {user.role}
             </Text>
           </div>
-          <button
-            aria-label="Cerrar sesión"
-            className="ml-auto text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <SignOutButton />
         </div>
       </div>
     </aside>
