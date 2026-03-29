@@ -1,6 +1,5 @@
 import {
   pgTable,
-  pgSchema,
   serial,
   text,
   timestamp,
@@ -8,11 +7,59 @@ import {
   integer,
   jsonb,
   pgEnum,
-  uuid,
 } from 'drizzle-orm/pg-core';
 
-// --- SCHEMAS ---
-export const neonAuthSchema = pgSchema('neon_auth');
+// --- BETTER AUTH TABLES ---
+
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const session = pgTable('session', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expires_at').notNull(),
+  token: text('token').notNull().unique(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+});
+
+export const account = pgTable('account', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
 
 // --- ENUMS ---
 export const roleEnum = pgEnum('role', ['admin', 'manager', 'trainer', 'client']);
@@ -21,38 +68,18 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', '
 
 // --- CORE: USERS & MEMBERS ---
 
-// User: Personas que pueden hacer LOGIN (Admins, Managers, Trainers, o Clientes usando la app)
-// IMPORTANTE: Esta tabla es gestionada por Neon Auth (Better Auth).
-// Los nombres de columna siguen el formato de Better Auth (camelCase en DB).
-// Vive en el esquema 'neon_auth', por lo que usamos neonAuthSchema.table
-export const user = neonAuthSchema.table('user', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull().unique(),
-  email: text('email').notNull().unique(),
-  emailVerified: boolean('emailVerified').notNull(),
-  image: text('image'),
-  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow().notNull(),
-  role: text('role'),
-  banned: boolean('banned'),
-  banReason: text('banReason'),
-  banExpires: timestamp('banExpires', { withTimezone: true }),
-});
-
-// Members: Los clientes reales del gimnasio a los que se les factura
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
-  userId: uuid('user_id').references(() => user.id), // UUID del usuario en Neon Auth
+  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }), // ← text, no uuid
   email: text('email').notNull().unique(),
   username: text('username').unique(),
   role: roleEnum('role').default('client').notNull(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
-  documentId: text('document_id'), // DNI/Cédula para validación presencial
+  documentId: text('document_id'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
-
 
 // --- GYM MANAGEMENT: MEMBRESÍAS ---
 
@@ -76,87 +103,78 @@ export const subscriptions = pgTable('subscriptions', {
   status: subscriptionStatusEnum('status').default('active').notNull(),
 });
 
-
 // --- FITNESS APP: TRAINERS, EJERCICIOS Y RUTINAS ---
 
-// Perfiles de Entrenadores (Conectados a su cuenta de login)
 export const trainerProfiles = pgTable('trainer_profiles', {
   id: serial('id').primaryKey(),
-  userId: uuid('user_id').references(() => user.id).notNull().unique(),
-  specialities: text('specialities'), // Ej: "Hipertrofia, Powerlifting"
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull().unique(), // ← text, no uuid
+  specialities: text('specialities'),
 });
 
-// Catálogo Base de Ejercicios
 export const exercises = pgTable('exercises', {
   id: serial('id').primaryKey(),
-  name: text('name').notNull(), // Ej: "Press de Banca Plano"
-  type: exerciseTypeEnum('type').notNull(), // 'compound' o 'isolated'
-  primaryMuscle: text('primary_muscle').notNull(), // Ej: "Pectoral Mayor"
-  secondaryMuscles: text('secondary_muscles').array(), // Matriz nativa PostgreSQL ["Tríceps", "Deltoides"]
-  mediaUrl: text('media_url'), // URL de Cloudflare R2 (video MP4 o imagen)
-  executionNotes: text('execution_notes'), // Notas técnicas para el movimiento
-  metadata: jsonb('metadata'), // Extensible: {"equipment": "barbell", "difficulty": "intermediate"}
+  name: text('name').notNull(),
+  type: exerciseTypeEnum('type').notNull(),
+  primaryMuscle: text('primary_muscle').notNull(),
+  secondaryMuscles: text('secondary_muscles').array(),
+  mediaUrl: text('media_url'),
+  executionNotes: text('execution_notes'),
+  metadata: jsonb('metadata'),
 });
 
 // Rutinas Definidas (Plantillas armadas por trainers o default del gym)
 export const routineTemplates = pgTable('routine_templates', {
   id: serial('id').primaryKey(),
-  trainerId: integer('trainer_id').references(() => trainerProfiles.id), // Null si es rutina general del sistema
-  name: text('name').notNull(), // Ej: "Pecho y Tríceps Básico"
+  trainerId: integer('trainer_id').references(() => trainerProfiles.id),
+  name: text('name').notNull(),
   description: text('description'),
 });
 
-// Los ejercicios específicos que componen una plantilla de rutina
 export const routineTemplateItems = pgTable('routine_template_items', {
   id: serial('id').primaryKey(),
   routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id).notNull(),
   exerciseId: integer('exercise_id').references(() => exercises.id).notNull(),
   sets: integer('sets').notNull(),
-  reps: text('reps').notNull(), // Text para permitir "8-12" o "Al fallo"
-  restSeconds: integer('rest_seconds'), // Segundos de descanso (ej: 90)
-  orderIndex: integer('order_index').notNull(), // Asegura el orden secuencial de la rutina
+  reps: text('reps').notNull(),
+  restSeconds: integer('rest_seconds'),
+  orderIndex: integer('order_index').notNull(),
 });
 
-// Sesiones de Entrenamiento (El check-in del usuario indicando que empezó a hacer ejercicio hoy)
 export const workoutSessions = pgTable('workout_sessions', {
   id: serial('id').primaryKey(),
   memberId: integer('member_id').references(() => members.id).notNull(),
-  routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id), // Opcional (quizá entrenó libre)
+  routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id),
   date: timestamp('date').defaultNow().notNull(),
-  durationMinutes: integer('duration_minutes'), // Tiempo total de la sesión
-  notes: text('notes'), // Sensaciones del usuario
+  durationMinutes: integer('duration_minutes'),
+  notes: text('notes'),
 });
 
-// Logs de la Sesión: Lo que realmente levantó el cliente ese día
 export const workoutSessionLogs = pgTable('workout_session_logs', {
   id: serial('id').primaryKey(),
   sessionId: integer('session_id').references(() => workoutSessions.id).notNull(),
   exerciseId: integer('exercise_id').references(() => exercises.id).notNull(),
   setsCompleted: integer('sets_completed').notNull(),
-  weightUsed: jsonb('weight_used'), // Array: [100, 105, 105] (Kilos/Libras por cada set)
-  repsCompleted: jsonb('reps_completed'), // Array: [10, 8, 7] (Reps hechas por cada set)
+  weightUsed: jsonb('weight_used'),
+  repsCompleted: jsonb('reps_completed'),
 });
-
 
 // --- CMS & MARKETING WEBSITE ---
 
-// Coaches que se muestran como "Vitrina" en la web (Totalmente desacoplado de los Trainers de la App)
 export const cmsCoaches = pgTable('cms_coaches', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
-  role: text('role').notNull(), // Ej: "Yoga Expert"
-  specialities: jsonb('specialities'), // Ej: ["Vinyasa", "Meditation"]
-  imageUrl: text('image_url'), // URL de Cloudflare R2
+  role: text('role').notNull(),
+  specialities: jsonb('specialities'),
+  imageUrl: text('image_url'),
   isVisible: boolean('is_visible').default(true).notNull(),
-  displayOrder: integer('display_order').default(0).notNull(), // Para controlar quién sale primero
+  displayOrder: integer('display_order').default(0).notNull(),
 });
 
-// Horarios y Clases Grupales publicados en la web
 export const cmsClasses = pgTable('cms_classes', {
   id: serial('id').primaryKey(),
-  name: text('name').notNull(), // Ej: "Power Tour"
-  timeInfo: text('time_info').notNull(), // Ej: "10:00 AM"
+  name: text('name').notNull(),
+  timeInfo: text('time_info').notNull(),
   description: text('description'),
-  trainerName: text('trainer_name'), // Simple texto, no es una FK, es solo para display
+  trainerName: text('trainer_name'),
   isVisible: boolean('is_visible').default(true).notNull(),
 });
