@@ -155,6 +155,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             disabled={disabled}
             className={cn(
               "flex-1 bg-transparent outline-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
+              "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:white]",
               leftIcon  && "pl-2",
               renderRightElement && "pr-2",
               className

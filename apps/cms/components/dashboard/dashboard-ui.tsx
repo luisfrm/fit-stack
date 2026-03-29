@@ -1,9 +1,12 @@
+"use client";
+
 /**
  * Dashboard-specific UI primitives built on top of @workspace/ui base components.
  * Scoped to the CMS admin dashboard — keeps page.tsx thin and readable.
  */
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -15,6 +18,12 @@ import {
   TrendingDown,
   Inbox,
   Menu,
+  Wallet,
+  CalendarCheck,
+  AlertTriangle,
+  AlertCircle,
+  BadgeCheck,
+  Dumbbell as DumbbellIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,16 +56,15 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  active?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",     href: "/dashboard",   icon: LayoutDashboard, active: true },
-  { label: "Miembros",      href: "/members",     icon: Users },
-  { label: "Clases",        href: "/classes",     icon: CalendarDays },
-  { label: "Entrenadores",  href: "/trainers",    icon: Dumbbell },
-  { label: "Pagos",         href: "/payments",    icon: CreditCard },
-  { label: "Configuración", href: "/settings",    icon: Settings },
+  { label: "Dashboard",     href: "/dashboard",           icon: LayoutDashboard },
+  { label: "Miembros",      href: "/dashboard/members",   icon: Users },
+  { label: "Clases",        href: "/dashboard/classes",   icon: CalendarDays },
+  { label: "Entrenadores",  href: "/dashboard/trainers",  icon: Dumbbell },
+  { label: "Pagos",         href: "/dashboard/payments",  icon: CreditCard },
+  { label: "Configuración", href: "/dashboard/settings",  icon: Settings },
 ];
 
 interface SidebarUser {
@@ -82,7 +90,7 @@ export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
     <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
-          <Dumbbell className="text-background w-4 h-4" />
+          <DumbbellIcon className="text-background w-4 h-4" />
         </div>
         <Text as="p" size="sm" weight="bold" className="leading-none">
           Gym CMS
@@ -112,13 +120,15 @@ export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
  * Shared sidebar content used by both Desktop Sidebar and Mobile Drawer.
  */
 function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
+  const pathname = usePathname();
+
   return (
     <>
       <div className="px-6 flex flex-col gap-8">
         {/* Logo (Hidden on mobile as it's in the top nav, but kept for full view consistency) */}
         <div className="hidden lg:flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <Dumbbell className="text-background-dark w-5 h-5" />
+            <DumbbellIcon className="text-background-dark w-5 h-5" />
           </div>
           <div>
             <Text as="p" size="md" weight="bold" variant="default" className="leading-none">
@@ -132,9 +142,16 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
 
         {/* Navigation */}
         <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => (
-            <SidebarNavItem key={item.href} {...item} />
-          ))}
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <SidebarNavItem 
+                key={item.href} 
+                {...item} 
+                active={isActive} 
+              />
+            );
+          })}
         </nav>
       </div>
 
@@ -160,18 +177,18 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
   );
 }
 
-function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<NavItem>) {
+function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<NavItem & { active?: boolean }>) {
   return (
     <Link
       href={href}
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium",
         active
-          ? "bg-primary/10 text-primary"
+          ? "bg-primary text-background-dark font-bold shadow-[0_0_15px_rgba(var(--primary),0.3)]"
           : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
       )}
     >
-      <Icon className="w-5 h-5 shrink-0" />
+      <Icon className={cn("w-5 h-5 shrink-0", active ? "text-background-dark" : "")} />
       {label}
     </Link>
   );
@@ -181,18 +198,31 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<NavItem>) 
    KPI CARD
    ───────────────────────────────────────────── */
 
+const ICON_MAP = {
+  users: Users,
+  wallet: Wallet,
+  calendar: CalendarCheck,
+  alert: AlertTriangle,
+  trendingUp: TrendingUp,
+  trendingDown: TrendingDown,
+  inbox: Inbox,
+} as const;
+
+type IconName = keyof typeof ICON_MAP;
 type TrendDirection = "up" | "down" | "neutral";
 
 interface KpiCardProps {
   label: string;
   value: string;
-  icon: LucideIcon;
+  icon: IconName;
   trend?: { value: string; direction: TrendDirection };
   /** Adds a coloured left accent border and primary-coloured value text */
   accent?: boolean;
 }
 
-export function KpiCard({ label, value, icon: Icon, trend, accent }: Readonly<KpiCardProps>) {
+export function KpiCard({ label, value, icon, trend, accent }: Readonly<KpiCardProps>) {
+  const Icon = ICON_MAP[icon] || Inbox;
+
   return (
     <Card
       className={cn(
@@ -421,22 +451,22 @@ export function RecentRegistrationsList({ registrations }: Readonly<{ registrati
 
 export type AlertSeverity = "warning" | "danger" | "success";
 
-const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string }> = {
-  warning: { borderClass: "border-l-primary",      iconBg: "bg-primary/20",      iconClass: "text-primary",    buttonClass: "text-primary" },
-  danger:  { borderClass: "border-l-rose-500",     iconBg: "bg-rose-500/20",     iconClass: "text-rose-500",   buttonClass: "text-rose-400" },
-  success: { borderClass: "border-l-emerald-500",  iconBg: "bg-emerald-500/20",  iconClass: "text-emerald-500",buttonClass: "text-emerald-400" },
+const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string; icon: LucideIcon }> = {
+  warning: { icon: AlertTriangle, borderClass: "border-l-primary",      iconBg: "bg-primary/20",      iconClass: "text-primary",    buttonClass: "text-primary" },
+  danger:  { icon: AlertCircle,   borderClass: "border-l-rose-500",     iconBg: "bg-rose-500/20",     iconClass: "text-rose-500",   buttonClass: "text-rose-400" },
+  success: { icon: BadgeCheck,   borderClass: "border-l-emerald-500",  iconBg: "bg-emerald-500/20",  iconClass: "text-emerald-500",buttonClass: "text-emerald-400" },
 };
 
 interface AlertItemProps {
   severity: AlertSeverity;
-  icon: LucideIcon;
   title: string;
   description: string;
   actionLabel: string;
 }
 
-export function AlertItem({ severity, icon: Icon, title, description, actionLabel }: Readonly<AlertItemProps>) {
+export function AlertItem({ severity, title, description, actionLabel }: Readonly<AlertItemProps>) {
   const config = ALERT_CONFIG[severity];
+  const Icon = config.icon;
   return (
     <Card
       className={cn(

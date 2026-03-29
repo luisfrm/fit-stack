@@ -46,6 +46,14 @@ interface ModalProps {
    * Custom classes for the content wrapper (useful for scrollable area)
    */
   contentClassName?: string;
+  /**
+   * Programmatic control over the modal's open state
+   */
+  open?: boolean;
+  /**
+   * Callback triggered when the open state changes
+   */
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function Modal({
@@ -57,9 +65,11 @@ export function Modal({
   isScrollable = true,
   className,
   contentClassName,
-}: ModalProps) {
+  open,
+  onOpenChange,
+}: Readonly<ModalProps>) {
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className={cn("sm:max-w-[525px]", className)}>
         <DialogHeader>

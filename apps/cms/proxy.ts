@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
   // Rutas protegidas
   if (pathname.startsWith('/dashboard')) {
     if (!session) {
-      return NextResponse.redirect(new URL('/', request.url));
+      return NextResponse.redirect(new URL('/login', request.url));
     }
   }
 

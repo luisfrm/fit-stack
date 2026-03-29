@@ -37,6 +37,18 @@ export type TrendDirection = "up" | "down" | "neutral";
 export type Role = "admin" | "manager" | "trainer" | "client";
 
 /**
+ * Interface for a class in the CMS.
+ */
+export interface ICmsClass {
+  id?: number;
+  name: string;
+  timeInfo: string;
+  description?: string;
+  trainerName?: string;
+  isVisible: boolean;
+}
+
+/**
  * Interface for a gym member.
  */
 export interface IMember {

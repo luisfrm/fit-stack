@@ -40,6 +40,8 @@ export function MemberModal({ member, trigger }: MemberModalProps) {
 
   return (
     <Modal
+      open={isOpen}
+      onOpenChange={setIsOpen}
       trigger={trigger}
       title={isEdit ? "Editar Miembro" : "Nuevo Miembro"}
       description={

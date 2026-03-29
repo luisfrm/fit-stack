@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Rutas completamente públicas (sin autenticación)
 const PUBLIC_ROUTES = [
   '/api/health',
   '/api/auth',
@@ -14,7 +15,7 @@ export default async function proxy(request: NextRequest) {
   const origin = request.headers.get('origin') ?? '';
   const isAllowedOrigin = allowedOrigins.includes(origin);
 
-  // 1. Manejar OPTIONS para CORS
+  // 1. Manejar OPTIONS para CORS preflight
   if (request.method === 'OPTIONS') {
     const responseHeaders: Record<string, string> = {
       'Access-Control-Allow-Origin': isAllowedOrigin ? origin : (allowedOrigins[0] || '*'),
@@ -28,21 +29,30 @@ export default async function proxy(request: NextRequest) {
     });
   }
 
-  // 2. Lógica de Auth / Publicidad
-  const isPublic = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
-  let response: NextResponse;
-
-  if (isPublic) {
-    response = NextResponse.next();
-  } else {
-    // Para rutas privadas, usamos el middleware de Neon
-    const authRes = await auth.middleware({
-      loginUrl: '/auth/sign-in',
-    })(request);
-    response = (authRes as NextResponse) || NextResponse.next();
+  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+    const response = NextResponse.next();
+    if (isAllowedOrigin) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+      response.headers.set('Access-Control-Allow-Credentials', 'true');
+    }
+    return response;
   }
 
-  // 3. Inyectar headers de CORS en la respuesta final
+  const authRes = await auth.middleware({})(request) as NextResponse;
+
+  if (authRes && authRes.status >= 300 && authRes.status < 400) {
+    const errorResponse = NextResponse.json(
+      { error: 'Unauthorized — no active session' },
+      { status: 401 }
+    );
+    if (isAllowedOrigin) {
+      errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+      errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+    }
+    return errorResponse;
+  }
+
+  const response = authRes || NextResponse.next();
   if (isAllowedOrigin) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -52,5 +62,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*']
+  matcher: ['/api/:path*'],
 };
