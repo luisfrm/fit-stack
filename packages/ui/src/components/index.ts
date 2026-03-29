@@ -49,3 +49,4 @@ export { Spinner } from "@workspace/ui/components/spinner";
 export { Modal } from "@workspace/ui/components/modal";
 export { Checkbox } from "@workspace/ui/components/checkbox";
 export * from "@workspace/ui/components/select";
+export * from "@workspace/ui/components/sheet";

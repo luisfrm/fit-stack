@@ -12,10 +12,10 @@ import {
 
 import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Text } from "@workspace/ui/components/text";
 import { 
   AppSidebar, 
+  MobileNav,
   KpiCard, 
   TodayClassesTable, 
   RecentRegistrationsList, 
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
   const user = session?.user;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-background text-slate-100 font-display">
       <AppSidebar 
         user={{ 
           name: user?.name || "Usuario", 
@@ -62,12 +62,20 @@ export default async function DashboardPage() {
           avatarUrl: user?.image || undefined
         }} 
       />
+      
+      <MobileNav 
+        user={{ 
+          name: user?.name || "Usuario", 
+          role: (user as any)?.role || "Miembro",
+          avatarUrl: user?.image || undefined
+        }} 
+      />
 
-      <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-8">
+      <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-4 lg:p-8">
         {/* ── Header ── */}
-        <header className="flex justify-between items-center mb-10">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
           <div>
-            <h2 className="text-3xl font-bold text-slate-100">Panel de Control</h2>
+            <h2 className="text-2xl lg:text-3xl font-bold text-slate-100">Panel de Control</h2>
             <Text variant="muted">Bienvenido de nuevo, aquí está el resumen de hoy.</Text>
           </div>
           <div className="flex gap-3">

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Inbox,
+  Menu,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +30,13 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { cn } from "@workspace/ui/lib/utils";
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetTrigger,
+  SheetTitle,
+  SheetHeader 
+} from "@workspace/ui/components/sheet";
 import SignOutButton from "../SignOutButton";
 
 /* ─────────────────────────────────────────────
@@ -59,10 +67,56 @@ interface SidebarUser {
 
 export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
   return (
-    <aside className="w-64 bg-background-dark border-r border-border-dark flex flex-col justify-between py-6 shrink-0 h-screen sticky top-0">
+    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col justify-between py-6 shrink-0 h-screen sticky top-0">
+      <SidebarContent user={user} />
+    </aside>
+  );
+}
+
+/**
+ * Mobile-specific top navigation with a hamburger menu.
+ * Only visible on screens smaller than 1024px.
+ */
+export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
+  return (
+    <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+          <Dumbbell className="text-background w-4 h-4" />
+        </div>
+        <Text as="p" size="sm" weight="bold" className="leading-none">
+          Gym CMS
+        </Text>
+      </div>
+
+      <Sheet>
+        <SheetTrigger asChild>
+          <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
+            <Menu className="w-6 h-6" />
+          </button>
+        </SheetTrigger>
+        <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark">
+          <SheetHeader className="sr-only">
+             <SheetTitle>Navegación del Panel</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col h-full py-6">
+            <SidebarContent user={user} />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </header>
+  );
+}
+
+/**
+ * Shared sidebar content used by both Desktop Sidebar and Mobile Drawer.
+ */
+function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
+  return (
+    <>
       <div className="px-6 flex flex-col gap-8">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
+        {/* Logo (Hidden on mobile as it's in the top nav, but kept for full view consistency) */}
+        <div className="hidden lg:flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
             <Dumbbell className="text-background-dark w-5 h-5" />
           </div>
@@ -85,7 +139,7 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
       </div>
 
       {/* Profile */}
-      <div className="px-4">
+      <div className="px-4 mt-auto">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
           <Avatar size="default">
             {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
@@ -102,7 +156,7 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
           <SignOutButton />
         </div>
       </div>
-    </aside>
+    </>
   );
 }
 
@@ -267,7 +321,7 @@ export function ClassStatusBadge({ status, className, ...props }: Readonly<Class
 
 const PLAN_CONFIG: Record<MemberPlan, { label: string; className: string }> = {
   vip:   { label: "VIP",   className: "bg-primary text-background-dark" },
-  pro:   { label: "Pro",   className: "bg-slate-200 text-background-dark" },
+  pro:   { label: "Pro",   className: "bg-primary/50 text-background-dark" },
   basic: { label: "Basic", className: "bg-slate-500 text-slate-100" },
 };
 
