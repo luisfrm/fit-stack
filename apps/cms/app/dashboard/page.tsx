@@ -14,29 +14,28 @@ import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Text } from "@workspace/ui/components/text";
-import {
-  AppSidebar,
-  KpiCard,
-  OccupancyBar,
-  ClassStatusBadge,
-  ActivityItem,
-  AlertItem,
-  type ClassStatus,
-  type MemberPlan,
+import { 
+  AppSidebar, 
+  KpiCard, 
+  TodayClassesTable, 
+  RecentRegistrationsList, 
+  AlertItem 
 } from "@/components/dashboard/dashboard-ui";
+import { MemberModal } from "@/components/members/member-modal";
+import { type IClassToday, type IRecentRegistration, type MemberPlan } from "@/types/dashboard";
 
 /* ─────────────────────────────────────────────
    STATIC DATA
    ───────────────────────────────────────────── */
 
-const CLASSES_TODAY = [
-  { time: "08:00 AM", name: "CrossFit Advance",  trainer: "Carlos Ruiz",   occupancy: 85, status: "live"      as ClassStatus },
-  { time: "10:30 AM", name: "Hatha Yoga",         trainer: "Ana López",     occupancy: 45, status: "scheduled" as ClassStatus },
-  { time: "12:00 PM", name: "Boxeo Recreativo",   trainer: "Marcos Sanz",   occupancy: 0,  status: "cancelled" as ClassStatus },
-  { time: "04:00 PM", name: "Pilates Reformer",   trainer: "Elena Gomez",   occupancy: 60, status: "scheduled" as ClassStatus },
+const CLASSES_TODAY: IClassToday[] = [
+  { time: "08:00 AM", name: "CrossFit Advance",  trainer: "Carlos Ruiz",   occupancy: 85, status: "live"      },
+  { time: "10:30 AM", name: "Hatha Yoga",         trainer: "Ana López",     occupancy: 45, status: "scheduled" },
+  { time: "12:00 PM", name: "Boxeo Recreativo",   trainer: "Marcos Sanz",   occupancy: 0,  status: "cancelled" },
+  { time: "04:00 PM", name: "Pilates Reformer",   trainer: "Elena Gomez",   occupancy: 60, status: "scheduled" },
 ];
 
-const RECENT_REGISTRATIONS = [
+const RECENT_REGISTRATIONS: IRecentRegistration[] = [
   { name: "Juan Pérez",   time: "Hace 15 min",  plan: "vip"   as MemberPlan },
   { name: "Lucía Méndez", time: "Hace 45 min",  plan: "pro"   as MemberPlan },
   { name: "Roberto Diaz", time: "Hace 1 hora",  plan: "basic" as MemberPlan },
@@ -55,7 +54,7 @@ export default async function DashboardPage() {
   const user = session?.user;
 
   return (
-    <div className="flex min-h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
+    <div className="flex h-screen overflow-hidden bg-background-dark text-slate-100 font-display">
       <AppSidebar 
         user={{ 
           name: user?.name || "Usuario", 
@@ -75,9 +74,13 @@ export default async function DashboardPage() {
             <Button variant="glass" size="sm" leftIcon={<Download className="w-4 h-4" />}>
               Reporte
             </Button>
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
-              Nuevo Miembro
-            </Button>
+            <MemberModal 
+              trigger={
+                <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+                  Nuevo Miembro
+                </Button>
+              }
+            />
           </div>
         </header>
 
@@ -119,40 +122,7 @@ export default async function DashboardPage() {
               <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
               <button className="text-primary text-sm font-medium hover:underline">Ver todas</button>
             </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-white/5 border-b-0">
-                  <TableRow className="border-border-dark hover:bg-transparent">
-                    {["Hora", "Clase", "Entrenador", "Ocupación", "Estado"].map((h) => (
-                      <TableHead key={h} className="px-6 py-4 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                        {h}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody className="divide-y divide-border-dark">
-                  {CLASSES_TODAY.map((cls) => (
-                    <TableRow key={cls.time} className="hover:bg-white/2 transition-colors border-border-dark">
-                      <TableCell className="px-6 py-4">
-                        <Text as="span" size="base" variant="muted">{cls.time}</Text>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Text as="span" size="base" weight="medium">{cls.name}</Text>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Text as="span" size="base" variant="muted">{cls.trainer}</Text>
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <OccupancyBar percentage={cls.occupancy} />
-                      </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <ClassStatusBadge status={cls.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <TodayClassesTable classes={CLASSES_TODAY} />
           </Card>
 
           {/* Recent Registrations */}
@@ -160,11 +130,7 @@ export default async function DashboardPage() {
             <div className="p-6 border-b border-border-dark">
               <Text as="p" size="lg" weight="bold">Últimos Registros</Text>
             </div>
-            <div className="flex flex-col flex-1 p-2 gap-1">
-              {RECENT_REGISTRATIONS.map((member) => (
-                <ActivityItem key={member.name} {...member} />
-              ))}
-            </div>
+            <RecentRegistrationsList registrations={RECENT_REGISTRATIONS} />
           </Card>
         </div>
 

@@ -13,8 +13,16 @@ import {
   Settings,
   TrendingUp,
   TrendingDown,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
+
+import { 
+  type ClassStatus, 
+  type MemberPlan, 
+  type IClassToday, 
+  type IRecentRegistration 
+} from "@/types/dashboard";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
@@ -201,10 +209,31 @@ export function OccupancyBar({ percentage }: Readonly<{ percentage: number }>) {
 }
 
 /* ─────────────────────────────────────────────
-   CLASS STATUS BADGE
+   EMPTY STATE HELPER
    ───────────────────────────────────────────── */
 
-export type ClassStatus = "live" | "scheduled" | "cancelled";
+interface NoDataProps {
+  message: string;
+  className?: string;
+  icon?: LucideIcon;
+}
+
+export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDataProps>) {
+  return (
+    <div className={cn("flex flex-col items-center justify-center p-12 text-center gap-3", className)}>
+      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
+        <Icon className="w-6 h-6 text-slate-500" />
+      </div>
+      <Text variant="muted" size="sm" className="max-w-[200px]">
+        {message}
+      </Text>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   CLASS STATUS BADGE
+   ───────────────────────────────────────────── */
 
 const STATUS_CONFIG: Record<ClassStatus, { label: string; className: string }> = {
   live:      { label: "En Vivo",    className: "bg-primary/20 text-primary hover:bg-primary/30" },
@@ -235,8 +264,6 @@ export function ClassStatusBadge({ status, className, ...props }: Readonly<Class
 /* ─────────────────────────────────────────────
    MEMBER ACTIVITY ITEM (Últimos Registros)
    ───────────────────────────────────────────── */
-
-export type MemberPlan = "vip" | "pro" | "basic";
 
 const PLAN_CONFIG: Record<MemberPlan, { label: string; className: string }> = {
   vip:   { label: "VIP",   className: "bg-primary text-background-dark" },
@@ -270,6 +297,66 @@ export function ActivityItem({ name, time, plan, avatarUrl }: Readonly<ActivityI
       <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded uppercase shrink-0", planConfig.className)}>
         {planConfig.label}
       </span>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   DASHBOARD DATA CONTAINERS (W/ EMPTY STATES)
+   ───────────────────────────────────────────── */
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
+
+export function TodayClassesTable({ classes }: Readonly<{ classes: IClassToday[] }>) {
+  if (classes.length === 0) {
+    return <NoData message="No hay clases programadas para hoy." className="py-20" />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader className="bg-white/5 border-b-0">
+          <TableRow className="border-border-dark hover:bg-transparent">
+            {["Hora", "Clase", "Entrenador", "Estado"].map((h) => (
+              <TableHead key={h} className="px-6 py-4 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                {h}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody className="divide-y divide-border-dark">
+          {classes.map((cls) => (
+            <TableRow key={cls.time} className="hover:bg-white/2 transition-colors border-border-dark">
+              <TableCell className="px-6 py-4">
+                <Text as="span" size="base" variant="muted">{cls.time}</Text>
+              </TableCell>
+              <TableCell className="px-6 py-4">
+                <Text as="span" size="base" weight="medium">{cls.name}</Text>
+              </TableCell>
+              <TableCell className="px-6 py-4">
+                <Text as="span" size="base" variant="muted">{cls.trainer}</Text>
+              </TableCell>
+              <TableCell className="px-6 py-4">
+                <ClassStatusBadge status={cls.status} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+export function RecentRegistrationsList({ registrations }: Readonly<{ registrations: IRecentRegistration[] }>) {
+  if (registrations.length === 0) {
+    return <NoData message="No se han registrado nuevos miembros recientemente." className="py-12" />;
+  }
+
+  return (
+    <div className="flex flex-col flex-1 p-2 gap-1">
+      {registrations.map((member) => (
+        <ActivityItem key={member.name} {...member} />
+      ))}
     </div>
   );
 }

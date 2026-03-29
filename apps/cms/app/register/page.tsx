@@ -62,15 +62,9 @@ export default function RegisterPage() {
 
   return (
     <main className="flex flex-col md:flex-row min-h-screen w-full font-sans text-white bg-black overflow-hidden relative">
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #000; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-      `}} />
-
       {/* ── LEFT: Form ── */}
       <section
-        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto custom-scrollbar h-screen"
+        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto h-screen"
         style={{ paddingBlock: "clamp(2rem, 6vw, 3rem)", paddingInline: "clamp(2rem, 6vw, 6rem)" }}
       >
         {/* Logo Section */}

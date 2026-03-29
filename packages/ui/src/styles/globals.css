@@ -82,7 +82,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
+  --color-muted-foreground: var(--foreground-muted);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -111,6 +111,8 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-2) transparent;
   }
 
   body {
@@ -119,5 +121,31 @@
     button {
       cursor: pointer;
     }
+  }
+
+  /* ── CUSTOM SCROLLBARS (WEBKIT) ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-muted);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+    border: 1px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--deep-grey);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: var(--primary);
   }
 }
