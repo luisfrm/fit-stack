@@ -3,13 +3,14 @@
 import * as React from "react";
 import { Eye, EyeOff, UserPlus, Mail, Lock, User } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 import { Input } from "@workspace/ui/components/input";
 import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
+import { toast } from "@workspace/ui/components";
+import { signUp } from "@/lib/auth-client";
 
 /* ─────────────────────────────────────────────
    REGISTER PAGE
@@ -18,51 +19,45 @@ export default function RegisterPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrorMsg(null);
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const firstName = formData.get("first-name") as string;
     const lastName = formData.get("last-name") as string;
-    const username = formData.get("username") as string;
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirm-password") as string;
 
     if (password !== confirmPassword) {
-      setErrorMsg("Las contraseñas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       setIsLoading(false);
       return;
     }
 
-    try {
-      const signUpClient = auth.signUp;
+    const { error } = await signUp({
+      email,
+      password,
+      name: `${firstName.toLocaleLowerCase()}_${lastName.toLocaleLowerCase()}`,
+    });
 
-      await signUpClient.email({
-        email,
-        password,
-        name: `${firstName.toLocaleLowerCase()}_${lastName.toLocaleLowerCase()}`,
-      });
-
-      router.push('/login');
-    } catch (err: any) {
-      console.error("Registration error:", err);
-
-      if (err.message.includes("already registered")) {
-        setErrorMsg("El correo electrónico ya está registrado");
-      } else if (err.message.includes("Password too short")) {
-        setErrorMsg("La contraseña es muy corta");
+    if (error) {
+      if (error.message?.includes("already registered")) {
+        toast.error("El correo electrónico ya está registrado");
+      } else if (error.message?.includes("Password too short")) {
+        toast.error("La contraseña es muy corta");
       } else {
-        setErrorMsg("Ocurrió un error inesperado al conectar con el servidor.");
+        toast.error("Ocurrió un error inesperado al conectar con el servidor.");
       }
-    } finally {
       setIsLoading(false);
+      return;
     }
+
+    router.push('/login');
+    setIsLoading(false);
   };
 
   return (
@@ -98,12 +93,6 @@ export default function RegisterPage() {
             </Title>
             <Text variant="muted" size="md">Únete al equipo de gestión</Text>
           </header>
-
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded bg-red-950 border border-red-900 text-red-200 text-sm">
-              {errorMsg}
-            </div>
-          )}
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

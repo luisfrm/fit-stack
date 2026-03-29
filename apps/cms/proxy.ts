@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from "@/lib/auth-client";
+import { getSession } from "@/lib/auth-client";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // En el middleware, pasamos las cabeceras de la petición actual
-  const { data: session } = await auth.getSession({
+  const { data: session } = await getSession({
     fetchOptions: {
       headers: request.headers
     }

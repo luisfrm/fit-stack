@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth-client";
+import { getSession, signOut } from "@/lib/auth-client";
 
 /**
  * Service to handle session-related operations in the CMS.
@@ -7,35 +7,27 @@ import { auth } from "@/lib/auth-client";
 export const sessionService = {
   /**
    * Gets the current session.
-   * On the server, it automatically handles headers.
    * @param customHeaders Optional headers (useful for Middleware)
    */
   async getSession(customHeaders?: Headers) {
-    try {
-      let fetchOptions = {};
+    let fetchOptions = {};
 
-      if (globalThis.window === undefined) {
-        // SERVER SIDE: Dinamic import to avoid client-side crashes
-        const { headers: nextHeaders } = await import("next/headers");
-        const headers = customHeaders || await nextHeaders();
-        fetchOptions = { headers };
-      }
-
-      return await auth.getSession({
-        fetchOptions
-      });
-    } catch (error) {
-      console.error("Error fetching session in sessionService:", error);
-      return { data: null, error };
+    if (globalThis.window === undefined) {
+      // SERVER SIDE: Dynamic import
+      const { headers: nextHeaders } = await import("next/headers");
+      const headers = customHeaders || await nextHeaders();
+      fetchOptions = { headers };
     }
+
+    // Since our lib's getSession already catches, we just pass the options
+    return await getSession({ fetchOptions });
   },
 
   /**
    * Signs out the current user.
-   * @param onSuccess Callback to run after successful sign-out (e.g., redirect)
    */
   async signOut(onSuccess?: () => void) {
-    return await auth.signOut({
+    return await signOut({
       fetchOptions: {
         onSuccess: () => {
           if (onSuccess) onSuccess();
