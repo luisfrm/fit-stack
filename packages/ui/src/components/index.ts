@@ -41,3 +41,8 @@ export * from "@workspace/ui/components/table";
 export * from "@workspace/ui/components/avatar";
 export * from "@workspace/ui/components/badge";
 export * from "@workspace/ui/components/text";
+
+// Feedback
+export { Toaster } from "@workspace/ui/components/sonner";
+export { toast } from "sonner";
+export { Spinner } from "@workspace/ui/components/spinner";
