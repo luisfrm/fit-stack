@@ -9,6 +9,7 @@ export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
+    "x-requested-with": "XMLHttpRequest",
   },
   // If we're using cookie-based auth, this ensures cookies are sent
   withCredentials: true,

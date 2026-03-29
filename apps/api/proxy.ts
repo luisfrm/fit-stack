@@ -38,9 +38,9 @@ export default async function proxy(request: NextRequest) {
     return response;
   }
 
-  const authRes = await auth.middleware({})(request) as NextResponse;
+  const session = await auth.getSession();
 
-  if (authRes && authRes.status >= 300 && authRes.status < 400) {
+  if (!session) {
     const errorResponse = NextResponse.json(
       { error: 'Unauthorized — no active session' },
       { status: 401 }
@@ -52,7 +52,7 @@ export default async function proxy(request: NextRequest) {
     return errorResponse;
   }
 
-  const response = authRes || NextResponse.next();
+  const response = NextResponse.next();
   if (isAllowedOrigin) {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Credentials', 'true');
