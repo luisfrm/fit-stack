@@ -57,6 +57,20 @@
       "when": 1773766403734,
       "tag": "0007_heavy_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774757465267,
+      "tag": "0008_talented_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774757491571,
+      "tag": "0009_lying_barracuda",
+      "breakpoints": true
     }
   ]
 }

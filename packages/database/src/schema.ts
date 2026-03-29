@@ -43,6 +43,7 @@ export const user = neonAuthSchema.table('user', {
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
   userId: uuid('user_id').references(() => user.id), // UUID del usuario en Neon Auth
+  email: text('email').notNull().unique(),
   username: text('username').unique(),
   role: roleEnum('role').default('client').notNull(),
   firstName: text('first_name').notNull(),
@@ -81,7 +82,7 @@ export const subscriptions = pgTable('subscriptions', {
 // Perfiles de Entrenadores (Conectados a su cuenta de login)
 export const trainerProfiles = pgTable('trainer_profiles', {
   id: serial('id').primaryKey(),
-  userId: uuid('user_id').references(() => user.id).notNull().unique(), 
+  userId: uuid('user_id').references(() => user.id).notNull().unique(),
   specialities: text('specialities'), // Ej: "Hipertrofia, Powerlifting"
 });
 
