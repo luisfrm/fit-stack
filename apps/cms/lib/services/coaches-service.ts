@@ -9,7 +9,7 @@ export const coachesService = {
    * Fetches all coaches from the API with optional filters and pagination.
    */
   async getCoaches(filters: CoachFilter = {}): Promise<PaginatedCoaches> {
-    const response = await apiClient.get<PaginatedCoaches>("/api/coaches", {
+    const response = await apiClient.get<PaginatedCoaches>("/coaches", {
       params: filters,
     });
     return response.data;
@@ -19,14 +19,14 @@ export const coachesService = {
    * Deletes a coach by its ID.
    */
   async deleteCoach(id: number): Promise<void> {
-    await apiClient.delete(`/api/coaches/${id}`);
+    await apiClient.delete(`/coaches/${id}`);
   },
 
   /**
    * Creates a new coach.
    */
   async createCoach(data: Partial<ICoach>): Promise<ICoach> {
-    const response = await apiClient.post<ICoach>("/api/coaches", data);
+    const response = await apiClient.post<ICoach>("/coaches", data);
     return response.data;
   },
 
@@ -34,7 +34,7 @@ export const coachesService = {
    * Updates an existing coach.
    */
   async updateCoach(id: number, data: Partial<ICoach>): Promise<ICoach> {
-    const response = await apiClient.put<ICoach>(`/api/coaches/${id}`, data);
+    const response = await apiClient.put<ICoach>(`/coaches/${id}`, data);
     return response.data;
   },
 
@@ -43,7 +43,7 @@ export const coachesService = {
    * Returns the `key` of the uploaded file.
    */
   async uploadImage(file: File): Promise<string> {
-    const response = await apiClient.post<{ presignedUrl: string; key: string }>("/api/upload/presigned", {
+    const response = await apiClient.post<{ presignedUrl: string; key: string }>("/upload/presigned", {
       filename: file.name,
       contentType: file.type,
       folder: "coaches"

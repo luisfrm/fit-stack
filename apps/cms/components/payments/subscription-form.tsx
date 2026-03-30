@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components";
 import { Search } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { Label } from "@workspace/ui/components/label";
 
 interface SubscriptionFormProps {
   readonly onSubmit: (data: Omit<ISubscription, "id" | "memberName" | "planName">) => Promise<void>;
@@ -93,10 +94,11 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
       
       {/* Selector de Miembro */}
       <div className="space-y-3 relative">
-        <label className="text-sm font-medium">Buscar Miembro</label>
+        <Label htmlFor="member-search" className="text-sm font-medium">Buscar Miembro</Label>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute z-10 left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input 
+            id="member-search"
             placeholder="Escribe el nombre o email..." 
             value={memberSearch}
             onChange={(e) => {
@@ -104,6 +106,7 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
               if (memberId) setMemberId(null);
             }}
             className="pl-9"
+            state={isSearching ? "loading" : "default"}
           />
         </div>
         
@@ -123,18 +126,18 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
           </div>
         )}
 
-        {isSearching && <p className="text-xs text-slate-500">Buscando...</p>}
       </div>
 
       {/* Planes Toggle Group */}
       <div className="space-y-3">
-        <label className="text-sm font-medium">Plan de Membresía</label>
+        <Label id="plan-selection-label" className="text-sm font-medium">Plan de Membresía</Label>
         {plans.length === 0 ? (
           <p className="text-sm text-yellow-500 bg-yellow-500/10 p-3 rounded-lg">Carga planes primero en el módulo de Membresías.</p>
         ) : (
           <ToggleGroup 
             type="single" 
             value={planId ? String(planId) : ""}
+            aria-labelledby="plan-selection-label"
             onValueChange={(val) => {
               if (val) setPlanId(Number(val));
             }}
@@ -156,8 +159,9 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Fecha de Inicio</label>
+          <Label htmlFor="start-date" className="text-sm font-medium">Fecha de Inicio</Label>
           <Input 
+            id="start-date"
             type="date" 
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
@@ -165,10 +169,11 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Estado del Alta</label>
+          <Label id="status-selection-label" className="text-sm font-medium">Estado del Alta</Label>
           <ToggleGroup 
             type="single" 
             value={status}
+            aria-labelledby="status-selection-label"
             onValueChange={(v) => { 
                if(v === "active" || v === "canceled") setStatus(v); 
             }}

@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { CircleX } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
+import { Spinner } from "@workspace/ui/components/spinner"
 
 /* ─────────────────────────────────────────────
    WRAPPER VARIANTS
@@ -43,6 +44,7 @@ const inputWrapperVariants = cva(
         default: "",
         error:   "border-red-500 focus-within:border-red-500 focus-within:ring-red-500",
         success: "border-green-500 focus-within:border-green-500 focus-within:ring-green-500",
+        loading: "",
       },
     },
 
@@ -111,6 +113,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       renderRightElement = (
         <span className="pr-4 shrink-0 flex items-center text-red-500">
           <CircleX size={16} />
+        </span>
+      )
+    } else if (state === "loading") {
+      renderRightElement = (
+        <span className="pr-4 shrink-0 flex items-center text-white/30">
+          <Spinner className="size-4" />
         </span>
       )
     } else if (rightElement) {

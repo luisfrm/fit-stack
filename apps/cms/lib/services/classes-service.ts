@@ -25,7 +25,7 @@ export const classesService = {
    * Fetches all classes from the API with optional filters and pagination.
    */
   async getClasses(filters: ClassesFilter = {}): Promise<PaginatedClasses> {
-    const response = await apiClient.get<PaginatedClasses>("/api/classes", {
+    const response = await apiClient.get<PaginatedClasses>("/classes", {
       params: filters,
     });
     return response.data;
@@ -37,7 +37,7 @@ export const classesService = {
    * whose daysOfWeek includes the respective day-of-week.
    */
   async getClassesByDate(date: string): Promise<ICmsClass[]> {
-    const response = await apiClient.get<ICmsClass[]>('/api/classes', {
+    const response = await apiClient.get<ICmsClass[]>('/classes', {
       params: { date },
     });
     return response.data;
@@ -47,14 +47,14 @@ export const classesService = {
    * Deletes a class by its ID.
    */
   async deleteClass(id: number): Promise<void> {
-    await apiClient.delete(`/api/classes/${id}`);
+    await apiClient.delete(`/classes/${id}`);
   },
 
   /**
    * Creates a new class.
    */
   async createClass(data: Partial<ICmsClass>): Promise<ICmsClass> {
-    const response = await apiClient.post<ICmsClass>("/api/classes", data);
+    const response = await apiClient.post<ICmsClass>("/classes", data);
     return response.data;
   },
 
@@ -62,7 +62,7 @@ export const classesService = {
    * Updates an existing class.
    */
   async updateClass(id: number, data: Partial<ICmsClass>): Promise<ICmsClass> {
-    const response = await apiClient.put<ICmsClass>(`/api/classes/${id}`, data);
+    const response = await apiClient.put<ICmsClass>(`/classes/${id}`, data);
     return response.data;
   },
 };

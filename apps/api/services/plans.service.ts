@@ -1,5 +1,5 @@
-import { plansRepository, type IMembershipPlan } from '../repositories/plans.repository'
-export type { IMembershipPlan }
+import { plansRepository, IMembershipPlan } from '../repositories/plans.repository'
+export type { IMembershipPlan } from '../repositories/plans.repository'
 
 export const plansService = {
   async getAll(): Promise<IMembershipPlan[]> {

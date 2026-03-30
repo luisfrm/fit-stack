@@ -33,7 +33,8 @@ export const membersRepository = {
         or(
           ilike(members.firstName, `%${query}%`),
           ilike(members.lastName, `%${query}%`),
-          ilike(members.email, `%${query}%`)
+          ilike(members.email, `%${query}%`),
+          ilike(members.documentId, `%${query}%`)
         )
       );
     }
