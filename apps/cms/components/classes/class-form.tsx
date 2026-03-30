@@ -5,6 +5,8 @@ import {
   Input,
   Button,
   Checkbox,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@workspace/ui/components";
 import { type ICmsClass, type FrequencyType } from "@/types/dashboard";
 import { Calendar, Clock, User, FileText, Globe, Repeat } from "lucide-react";
@@ -45,13 +47,6 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleDay = (day: number) => {
-    const current = formData.daysOfWeek ?? [];
-    const updated = current.includes(day)
-      ? current.filter((d) => d !== day)
-      : [...current, day].sort((a, b) => a - b);
-    handleChange("daysOfWeek", updated);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,50 +99,42 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Tipo de Frecuencia
         </label>
-        <div className="flex gap-3">
-          {(["weekly", "once"] as FrequencyType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => handleChange("frequencyType", type)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border text-sm font-medium transition-all ${
-                formData.frequencyType === type
-                  ? "border-primary bg-primary/15 text-primary"
-                  : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
-              }`}
-            >
-              {type === "weekly" ? <Repeat size={14} /> : <Calendar size={14} />}
-              {type === "weekly" ? "Semanal" : "Fecha Específica"}
-            </button>
-          ))}
-        </div>
+        <ToggleGroup
+          type="single"
+          value={formData.frequencyType ?? "weekly"}
+          onValueChange={(val) => handleChange("frequencyType", val)}
+        >
+          <ToggleGroupItem value="weekly">
+            <Repeat size={14} /> Semanal
+          </ToggleGroupItem>
+          <ToggleGroupItem value="once">
+            <Calendar size={14} /> Fecha Específica
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {/* ── Condicional: días de la semana o fecha puntual ── */}
       {formData.frequencyType === "weekly" ? (
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
             Días de la Semana *
-          </label>
-          <div className="grid grid-cols-4 gap-2">
-            {DAYS_OF_WEEK.map(({ label, value }) => {
-              const selected = formData.daysOfWeek?.includes(value);
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => toggleDay(value)}
-                  className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
-                    selected
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          </p>
+          <ToggleGroup
+            type="multiple"
+            value={formData.daysOfWeek ?? []}
+            onValueChange={(val) => handleChange("daysOfWeek", val)}
+            className="grid grid-cols-4 gap-2"
+          >
+            {DAYS_OF_WEEK.map(({ label, value }) => (
+              <ToggleGroupItem
+                key={value}
+                value={value}
+                className="py-2 px-3 text-xs"
+              >
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
           {formData.daysOfWeek?.length === 0 && (
             <p className="text-xs text-red-400/80">Selecciona al menos un día.</p>
           )}

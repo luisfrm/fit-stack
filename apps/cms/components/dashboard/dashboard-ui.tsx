@@ -197,7 +197,7 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<NavItem & 
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium",
         active
-          ? "bg-primary text-background-dark font-bold shadow-[0_0_15px_rgba(var(--primary),0.3)]"
+          ? "bg-primary text-black font-bold shadow-[0_0_15px_rgba(var(--primary),0.3)]"
           : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
       )}
     >
