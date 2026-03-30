@@ -15,7 +15,8 @@
     "@workspace/database": "workspace:*",
     "better-auth": "^1.5.5",
     "jose": "^6.2.1",
-    "next": "16.1.6"
+    "next": "16.1.6",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",

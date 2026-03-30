@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   date,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 // --- BETTER AUTH TABLES ---
@@ -232,3 +233,38 @@ export const gymSettings = pgTable('gym_settings', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// --- CMS PÁGINAS Y BLOQUES DINÁMICOS ---
+
+export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
+  'hero',
+  'services',
+  'classes_info',
+  'testimonials',
+  'gallery',
+  'contact',
+  'team_info'
+]);
+
+export const cmsPages = pgTable('cms_pages', {
+  id:          serial('id').primaryKey(),
+  slug:        text('slug').notNull().unique(),
+  title:       text('title').notNull(),
+  description: text('description'),
+  isActive:    boolean('is_active').default(true).notNull(),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+  updatedAt:   timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const cmsPageBlocks = pgTable('cms_page_blocks', {
+  id:           serial('id').primaryKey(),
+  pageId:       integer('page_id').references(() => cmsPages.id, { onDelete: 'cascade' }).notNull(),
+  blockType:    cmsBlockTypeEnum('block_type').notNull(),
+  data:         jsonb('data').notNull(), // Estructura validada por Zod en la App
+  isVisible:    boolean('is_visible').default(true).notNull(),
+  displayOrder: integer('display_order').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+  updatedAt:    timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  pageOrderIdx: uniqueIndex('page_order_idx').on(table.pageId, table.displayOrder),
+}));
