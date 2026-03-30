@@ -15,6 +15,7 @@ export const env = {
 
   // Better-Auth
   betterAuthSecret: process.env.BETTER_AUTH_SECRET ?? "default-secret-development-only",
+  cookieDomain: process.env.COOKIE_DOMAIN ?? "localhost",
 
   // JWT
   jwtSecret: process.env.JWT_SECRET ?? "default-secret-change-me",

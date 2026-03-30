@@ -16,7 +16,9 @@
         "R2_BUCKET_NAME",
         "R2_PUBLIC_URL",
         "NEXT_PUBLIC_API_BASE_URL",
-        "NEXT_PUBLIC_R2_URL"
+        "NEXT_PUBLIC_R2_URL",
+        "FRONTEND_URL",
+        "COOKIE_DOMAIN"
       ]
     },
     "lint": {

@@ -22,12 +22,12 @@ export async function proxy(request: NextRequest) {
 
   if (request.method === "OPTIONS") {
     const res = new NextResponse(null, { status: 200 });
-    if (origin === env.frontendUrl) setCorsHeaders(res, origin);
+    if (origin?.startsWith(env.frontendUrl)) setCorsHeaders(res, origin);
     return res;
   }
 
   const response = NextResponse.next();
-  if (origin === env.frontendUrl) setCorsHeaders(response, origin);
+  if (origin?.startsWith(env.frontendUrl)) setCorsHeaders(response, origin);
 
   if (isPublicRoute(pathname)) return response;
 
