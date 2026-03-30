@@ -7,11 +7,11 @@ import { CoachForm } from "./coach-form";
 import { coachesService } from "@/lib/services/coaches-service";
 
 interface CoachModalProps {
-  initialData?: ICoach;
-  onSuccess?: () => void;
-  trigger?: React.ReactNode;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  readonly initialData?: ICoach;
+  readonly onSuccess?: () => void;
+  readonly trigger?: React.ReactNode;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 export function CoachModal({
