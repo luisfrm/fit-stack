@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,7 +15,7 @@ import { signUp } from "@/lib/auth-client";
 import { capitalize } from "@/lib/helper";
 import { membersService } from "@/lib/services/members-service";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -269,5 +270,20 @@ export default function RegisterPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex flex-col md:flex-row min-h-screen w-full font-sans text-white bg-black items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
+          <p className="text-gray-400 animate-pulse">Cargando...</p>
+        </div>
+      </main>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
