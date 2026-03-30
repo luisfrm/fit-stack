@@ -1,0 +1,116 @@
+"use client";
+
+import * as React from "react";
+import { Table, ColumnDef, Button, Badge } from "@workspace/ui/components";
+import { type IMember, type Role } from "@/types/dashboard";
+import { Edit2, Trash2 } from "lucide-react";
+import { MemberModal } from "./member-modal";
+
+interface MembersTableProps {
+  readonly members: IMember[];
+  readonly onDelete: (id: number) => void;
+  readonly onSuccess: () => void;
+}
+
+const getRoleBadgeColor = (role: Role) => {
+  switch (role) {
+    case "admin": return "bg-red-500/10 text-red-500 border-red-500/20";
+    case "manager": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+    case "trainer": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+    case "client": return "bg-green-500/10 text-green-500 border-green-500/20";
+    default: return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+  }
+};
+
+const getRoleText = (role: Role) => {
+  switch (role) {
+    case "admin": return "Admin";
+    case "manager": return "Manager";
+    case "trainer": return "Entrenador";
+    case "client": return "Cliente";
+    default: return role;
+  }
+};
+
+const getColumns = (
+  onDelete: (id: number) => void,
+  onSuccess: () => void
+): ColumnDef<IMember>[] => [
+  {
+    header: "Miembro",
+    className: "pl-6",
+    headerClassName: "pl-6",
+    cell: (m) => (
+      <div className="flex flex-col">
+        <span className="font-semibold text-white truncate max-w-[200px]">
+          {m.firstName} {m.lastName}
+        </span>
+        <span className="text-xs text-gray-400 truncate max-w-[200px]">
+          {m.email}
+        </span>
+      </div>
+    )
+  },
+  {
+    header: "Rol",
+    cell: (m) => (
+      <Badge variant="outline" className={getRoleBadgeColor(m.role)}>
+        {getRoleText(m.role)}
+      </Badge>
+    )
+  },
+  {
+    header: "Identificación",
+    cell: (m) => (
+      <span className="text-sm text-gray-400">
+        {m.documentId || "—"}
+      </span>
+    )
+  },
+  {
+    header: "Sesión",
+    cell: (m) => (
+      <Badge variant={m.userId ? "default" : "outline"} className={m.userId ? "border-primary text-primary" : "text-gray-500"}>
+        {m.userId ? "Vinculado" : "Pendiente"}
+      </Badge>
+    )
+  },
+  {
+    header: "Acciones",
+    className: "pr-6 text-right",
+    headerClassName: "pr-6 text-right",
+    cell: (m) => (
+      <div className="flex justify-end gap-2">
+        <MemberModal
+          member={m}
+          onSuccess={onSuccess}
+          trigger={
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/10" title="Editar">
+              <Edit2 size={16} />
+            </Button>
+          }
+        />
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (globalThis.confirm(`¿Seguro que deseas eliminar a ${m.firstName}?`)) {
+              if (m.id) onDelete(m.id);
+            }
+          }}
+          title="Eliminar"
+        >
+          <Trash2 size={16} />
+        </Button>
+      </div>
+    )
+  }
+];
+
+export function MembersTable({ members, onDelete, onSuccess }: MembersTableProps) {
+  const columns = React.useMemo(() => getColumns(onDelete, onSuccess), [onDelete, onSuccess]);
+
+  return <Table columns={columns} data={members} />;
+}

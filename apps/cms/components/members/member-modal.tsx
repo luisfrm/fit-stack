@@ -4,38 +4,43 @@ import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
 import { MemberForm } from "./member-form";
 import { type IMember } from "@/types/dashboard";
+import { membersService } from "@/lib/services/members-service";
 
 interface MemberModalProps {
-  /**
-   * Optional member data. If provided, the modal acts as "Edit Member".
-   */
-  member?: IMember;
-  /**
-   * The button or element that opens the modal
-   */
-  trigger: React.ReactNode;
+  readonly member?: IMember;
+  readonly trigger: React.ReactNode;
+  readonly onSuccess?: () => void;
 }
 
-export function MemberModal({ member, trigger }: MemberModalProps) {
+export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const isEdit = !!member?.id;
 
-  const handleSubmit = async (formData: any) => {
+  const handleSubmit = async (formData: Partial<IMember>, sendInvite: boolean) => {
     setIsLoading(true);
     
-    // MOCKED SUBMIT
-    console.log("Submitting Member Data:", formData);
-    
-    // Simulation
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    const action = isEdit ? "actualizado" : "creado";
-    toast.success(`Miembro ${action} correctamente.`);
-    
-    setIsLoading(false);
-    setIsOpen(false);
+    try {
+      if (isEdit && member?.id) {
+        await membersService.updateMember(member.id, formData);
+        toast.success("Miembro actualizado correctamente.");
+      } else {
+        await membersService.createMember(formData, sendInvite);
+        toast.success("Miembro creado exitosamente.");
+        if (sendInvite) {
+          toast.success("Se ha programado el envío de la invitación.", { description: "Revisa la consola (o bandeja de correo) para ver el link mágico." });
+        }
+      }
+      
+      onSuccess?.();
+      setIsOpen(false);
+    } catch (error: any) {
+      const message = error.response?.data?.error ?? error.message ?? "Algo salió mal";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

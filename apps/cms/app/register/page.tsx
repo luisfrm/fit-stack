@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, UserPlus, Mail, Lock, User } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Input } from "@workspace/ui/components/input";
 import { Title } from "@workspace/ui/components/title";
@@ -12,24 +12,56 @@ import { Button } from "@workspace/ui/components/button";
 import { toast } from "@workspace/ui/components";
 import { signUp } from "@/lib/auth-client";
 import { capitalize } from "@/lib/helper";
+import { membersService } from "@/lib/services/members-service";
 
-/* ─────────────────────────────────────────────
-   REGISTER PAGE
-   ───────────────────────────────────────────── */
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  
+  // Validation State
+  const [isValidating, setIsValidating] = React.useState(true);
+  const [tokenError, setTokenError] = React.useState<string | null>(null);
+  
+  // Prefilled Data
+  const [memberData, setMemberData] = React.useState({
+    firstName: "",
+    lastName: "",
+    email: ""
+  });
+
+  React.useEffect(() => {
+    if (!token) {
+      setIsValidating(false);
+      setTokenError("No se proporcionó un token de invitación válido.");
+      return;
+    }
+
+    membersService.validateToken(token)
+      .then((res) => {
+        setMemberData({
+          firstName: res.firstName,
+          lastName: res.lastName,
+          email: res.email
+        });
+      })
+      .catch((err) => {
+        setTokenError(err.response?.data?.error || "Token inválido o expirado");
+      })
+      .finally(() => setIsValidating(false));
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!token) return;
+    
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const firstName = formData.get("first-name") as string;
-    const lastName = formData.get("last-name") as string;
-    const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     const confirmPassword = formData.get("confirm-password") as string;
 
@@ -39,10 +71,10 @@ export default function RegisterPage() {
       return;
     }
 
-    const { error } = await signUp({
-      email,
+    const { data: authData, error } = await signUp({
+      email: memberData.email, // Using pre-validated email to prevent mutation
       password,
-      name: `${capitalize(firstName.toLocaleLowerCase().trim())} ${capitalize(lastName.toLocaleLowerCase().trim())}`,
+      name: `${capitalize(memberData.firstName.toLocaleLowerCase().trim())} ${capitalize(memberData.lastName.toLocaleLowerCase().trim())}`,
     });
 
     if (error) {
@@ -57,21 +89,27 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push('/login');
-    setIsLoading(false);
+    // Si Better-Auth creó el usuario exitosamente, vinculamos la cuenta
+    try {
+      await membersService.linkUser(token);
+      toast.success("Cuenta configurada correctamente.");
+      router.push('/dashboard'); // Go directly to dashboard instead of login since they are authenticated
+    } catch (linkError: any) {
+      toast.error(linkError.response?.data?.error || "Error al vincular el usuario al miembro.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <main className="flex flex-col md:flex-row min-h-screen w-full font-sans text-white bg-black overflow-hidden relative">
-      {/* ── LEFT: Form ── */}
       <section
         className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto h-screen"
         style={{ paddingBlock: "clamp(2rem, 6vw, 3rem)", paddingInline: "clamp(2rem, 6vw, 6rem)" }}
       >
-        {/* Logo Section */}
         <div className="mb-12">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[--color-primary] rotate-45 flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary rotate-45 flex items-center justify-center">
               <div className="w-4 h-4 bg-black -rotate-45" />
             </div>
             <Text as="span" size="lg" weight="bold" uppercase className="tracking-tighter">
@@ -80,144 +118,154 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Main Form Content */}
         <div className="max-w-md">
           <header className="mb-8">
             <Title as="h1" size="section" className="mb-2">
               CREA TU CUENTA
             </Title>
-            <Text variant="muted" size="md">Únete al equipo de gestión</Text>
+            <Text variant="muted" size="md">Completa tu registro para acceder a la plataforma</Text>
           </header>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                id="first-name"
-                name="first-name"
-                label="Nombre"
-                placeholder="Introduce tu nombre"
-                required
-              />
-              <Input
-                id="last-name"
-                name="last-name"
-                label="Apellido"
-                placeholder="Introduce tu apellido"
-                required
-              />
+          {isValidating ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-4 text-gray-500">
+              <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
+              <p>Validando invitación...</p>
             </div>
-
-            <Input
-              type="email"
-              id="email"
-              name="email"
-              label="Email"
-              placeholder="ejemplo@gym.com"
-              leftIcon={<Mail size={16} />}
-              required
-            />
-
-            <Input
-              type={showPassword ? "text" : "password"}
-              id="password"
-              name="password"
-              label="Contraseña"
-              placeholder="********"
-              leftIcon={<Lock size={16} />}
-              required
-              rightElement={
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
-                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              }
-            />
-
-            <Input
-              type={showConfirmPassword ? "text" : "password"}
-              id="confirm-password"
-              name="confirm-password"
-              label="Confirmar Contraseña"
-              placeholder="********"
-              leftIcon={<Lock size={16} />}
-              required
-              rightElement={
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword((v) => !v)}
-                  className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
-                  aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              }
-            />
-
-            {/* Submit Button */}
-            <div className="pt-4">
-              <Button
-                type="submit"
-                variant="primary"
-                size="xl"
-                rounded="lg"
-                fullWidth
-                loading={isLoading}
-                rightIcon={!isLoading && <UserPlus size={20} />}
-              >
-                {isLoading ? "REGISTRANDO..." : "REGISTRARSE"}
-              </Button>
+          ) : tokenError ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center px-4">
+              <AlertCircle className="text-red-500 w-12 h-12" />
+              <div>
+                <h3 className="text-lg font-bold text-red-500">Invitación Inválida</h3>
+                <p className="text-sm text-red-400 mt-1">{tokenError}</p>
+              </div>
             </div>
-          </form>
+          ) : (
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Nombre"
+                  value={memberData.firstName}
+                  readOnly
+                  disabled
+                  className="bg-white/5 opacity-70"
+                />
+                <Input
+                  label="Apellido"
+                  value={memberData.lastName}
+                  readOnly
+                  disabled
+                  className="bg-white/5 opacity-70"
+                />
+              </div>
 
-          <footer className="mt-8 text-center md:text-left">
+              <Input
+                label="Email"
+                value={memberData.email}
+                leftIcon={<Mail size={16} />}
+                readOnly
+                disabled
+                className="bg-white/5 opacity-70"
+                hint="Tu email está vinculado a tu invitación y no puede ser cambiado."
+              />
+
+              <Input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                name="password"
+                label="Contraseña"
+                placeholder="********"
+                leftIcon={<Lock size={16} />}
+                required
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                }
+              />
+
+              <Input
+                type={showConfirmPassword ? "text" : "password"}
+                id="confirm-password"
+                name="confirm-password"
+                label="Confirmar Contraseña"
+                placeholder="********"
+                leftIcon={<Lock size={16} />}
+                required
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
+                  >
+                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                }
+              />
+
+              <div className="pt-4">
+                <Button
+                  type="submit"
+                  size="xl"
+                  fullWidth
+                  loading={isLoading}
+                  disabled={isLoading}
+                  leftIcon={!isLoading && <ShieldCheck size={20} />}
+                >
+                  FINALIZAR REGISTRO
+                </Button>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-8 text-center sm:text-left">
             <Text variant="muted" size="sm">
-              ¿Ya tienes una cuenta?{" "}
-              <Link href="/login" className="text-primary font-bold hover:underline transition-all">
-                Inicia sesión
+              ¿Ya tienes cuenta?{" "}
+              <Link href="/login" className="text-primary hover:text-primary-light font-semibold hover:underline transition-colors focus-visible:outline-none">
+                Inicia sesión aquí
               </Link>
             </Text>
-          </footer>
+          </div>
         </div>
 
-        {/* Copyright Section */}
-        <div className="mt-12 text-center md:text-left">
-          <Text variant="muted" size="xs">
-            © {new Date().getFullYear()} Premium Gym CMS. Todos los derechos reservados.
+        <footer className="mt-8">
+          <Text as="p" size="xs" variant="muted" className="text-center md:text-left opacity-60 flex flex-col md:flex-row gap-2">
+            <span>&copy; {new Date().getFullYear()} Premium Gym. &nbsp;Todos los derechos reservados.</span>
           </Text>
-        </div>
+        </footer>
       </section>
 
-      {/* ── RIGHT: Image & Inspiration Panel ── */}
-      <section className="hidden lg:block w-1/2 relative overflow-hidden">
-        {/* Background */}
-        <div
-          className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('/gym-login-bg.png')" }}
-          role="img"
-          aria-label="Atleta profesional entrenando en un gimnasio oscuro"
-        />
-        {/* Fade from left */}
-        <div
-          className="absolute inset-0 z-10"
-          style={{ background: "linear-gradient(to right, #0a0a0a 0%, rgba(10,10,10,0.4) 50%, transparent 100%)" }}
-        />
-        {/* Overall dark tint */}
-        <div className="absolute inset-0 z-10" style={{ background: "rgba(0,0,0,0.45)" }} />
-
-        {/* Floating quote */}
-        <div className="absolute bottom-16 left-16 z-20 max-w-[360px]">
-          <div className="mb-6 rounded-full h-[3px] w-12 bg-[--color-primary]" />
-          <Title as="h3" size="card" className="text-white mb-3">
-            Sin Límites
-          </Title>
-          <Text variant="subtle" className="text-[rgba(255,255,255,0.55)] font-light leading-relaxed">
-            "La excelencia no es un acto, sino un hábito." Optimiza el
-            rendimiento de tu centro deportivo con tecnología de vanguardia.
-          </Text>
+      {/* ── RIGHT: Banner ── */}
+      <section className="hidden md:flex w-1/2 bg-zinc-900 border-l border-white/10 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center brightness-50 contrast-125 transition-transform duration-[10s] ease-out group-hover:scale-110" />
+        <div className="absolute inset-0 bg-linear-to-t from-black via-black/40 to-transparent" />
+        
+        <div className="relative z-10 p-16 flex flex-col justify-end h-full">
+          <div className="mb-6 flex gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <svg key={star} className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+            ))}
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold font-sans text-white mb-6 uppercase tracking-tight leading-[1.1]">
+            El Mejor Software<br />de Entrenamiento
+          </h2>
+          <p className="text-lg text-slate-300 max-w-lg mb-8">
+            "Desde que implementamos esta plataforma, la administración de nuestras sedes es impecable y la satisfacción de los miembros subió al máximo."
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30">
+              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704z" alt="Avatar Director" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-md">Alejandro Marín</p>
+              <p className="text-slate-400 text-sm">Director en Premium Gym</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>

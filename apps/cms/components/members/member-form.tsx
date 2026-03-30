@@ -5,42 +5,39 @@ import {
   Input, 
   Button, 
   Checkbox,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@workspace/ui/components";
 import { type IMember, type Role } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send } from "lucide-react";
 
 interface MemberFormProps {
   readonly initialData?: IMember;
-  readonly onSubmit: (data: any) => void;
+  readonly onSubmit: (data: Partial<IMember>, sendInvite: boolean) => void;
   readonly isLoading?: boolean;
 }
 
 export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
   const isEdit = !!initialData?.id;
 
-  // Form State
-  const [formData, setFormData] = React.useState({
-    firstName: initialData?.firstName || "",
-    lastName: initialData?.lastName || "",
-    email: initialData?.email || "",
-    documentId: initialData?.documentId || "",
-    role: (initialData?.role as Role) || "client",
+  const [formData, setFormData] = React.useState<Partial<IMember>>({
+    firstName: initialData?.firstName ?? "",
+    lastName: initialData?.lastName ?? "",
+    email: initialData?.email ?? "",
+    documentId: initialData?.documentId ?? "",
+    role: initialData?.role ?? "client",
     isActive: initialData?.isActive ?? true,
-    sendEmail: false,
   });
 
-  const handleChange = (field: string, value: any) => {
+  const [sendInvite, setSendInvite] = React.useState(!isEdit);
+
+  const handleChange = (field: keyof IMember, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit(formData, sendInvite);
   };
 
   return (
@@ -60,52 +57,46 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           value={formData.lastName}
           onChange={(e) => handleChange("lastName", e.target.value)}
           required
+          leftIcon={<User size={16} />}
         />
       </div>
 
-      <Input
-        label="Correo Electrónico"
-        type="email"
-        placeholder="Ej: juan.perez@empresa.com"
-        value={formData.email}
-        onChange={(e) => handleChange("email", e.target.value)}
-        required
-        leftIcon={<Mail size={16} />}
-        hint="Se usará para la facturación y acceso a la App"
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Correo Electrónico"
+          type="email"
+          placeholder="Ej: juan.perez@empresa.com"
+          value={formData.email}
+          onChange={(e) => handleChange("email", e.target.value)}
+          required
+          leftIcon={<Mail size={16} />}
+        />
 
-      <Input
-        label="Identificación / DNI"
-        placeholder="Nº de documento"
-        value={formData.documentId}
-        onChange={(e) => handleChange("documentId", e.target.value)}
-        leftIcon={<CreditCard size={16} />}
-      />
+        <Input
+          label="Identificación / DNI"
+          placeholder="Nº de documento"
+          value={formData.documentId ?? ""}
+          onChange={(e) => handleChange("documentId", e.target.value)}
+          leftIcon={<CreditCard size={16} />}
+        />
+      </div>
 
       <div className="flex flex-col gap-1.5">
-        <label 
-          htmlFor="role-select"
-          className="text-xs font-semibold uppercase tracking-wider text-gray-400"
-        >
+        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Rol del Miembro
         </label>
-        <Select 
-          value={formData.role} 
-          onValueChange={(val: Role) => handleChange("role", val)}
+        <ToggleGroup 
+          type="single" 
+          value={formData.role ?? "client"}
+          onValueChange={(val) => {
+            if (val) handleChange("role", val as Role);
+          }}
         >
-          <SelectTrigger id="role-select" className="w-full h-12 bg-[#111111] border-[#333333] text-white">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={16} className="text-white/30" />
-              <SelectValue placeholder="Selecciona un rol" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="client">Cliente</SelectItem>
-            <SelectItem value="trainer">Entrenador</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
-            <SelectItem value="admin">Administrador</SelectItem>
-          </SelectContent>
-        </Select>
+          <ToggleGroupItem value="client">Cliente</ToggleGroupItem>
+          <ToggleGroupItem value="trainer">Entrenador</ToggleGroupItem>
+          <ToggleGroupItem value="manager">Manager</ToggleGroupItem>
+          <ToggleGroupItem value="admin">Administrador</ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       <div className="flex flex-col gap-4 pt-2">
@@ -118,7 +109,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           <div className="grid gap-1.5 leading-none">
             <label
               htmlFor="isActive"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="text-sm font-medium leading-none text-white"
             >
               Estado Activo
             </label>
@@ -132,18 +123,18 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           <div className="flex items-center space-x-3 rounded-lg border border-primary/10 bg-primary/5 p-4">
             <Checkbox 
               id="sendEmail" 
-              checked={formData.sendEmail}
-              onCheckedChange={(checked) => handleChange("sendEmail", checked)}
+              checked={sendInvite}
+              onCheckedChange={(checked) => setSendInvite(!!checked)}
             />
             <div className="grid gap-1.5 leading-none">
               <label
                 htmlFor="sendEmail"
-                className="text-sm font-medium leading-none text-primary"
+                className="text-sm font-bold leading-none text-primary"
               >
                 Enviar correo de registro
               </label>
               <p className="text-xs text-primary/60">
-                Se enviarán las credenciales de acceso al correo vinculado.
+                Se enviarán las credenciales de acceso al correo vinculado para crear su contraseña.
               </p>
             </div>
           </div>
