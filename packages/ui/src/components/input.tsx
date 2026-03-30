@@ -21,7 +21,7 @@ const inputWrapperVariants = cva(
          * default — glass/dark surface, border glows on focus (used for CMS forms)
          */
         default: [
-          "bg-[#111111] border-[#333333]",
+          "bg-surface border-border",
           "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
         /**

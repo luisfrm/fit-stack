@@ -27,6 +27,8 @@
   --border-primary: oklch(0.853 0.199 91.26 / 0.4);
 
   --glass-bg: oklch(0.4 0 0 / 0.2);
+  --primary-glow: oklch(0.853 0.199 91.26 / 0.08);
+  --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.15);
 
   --card: var(--surface);
   --card-foreground: var(--foreground);
@@ -76,6 +78,8 @@
   --color-border-primary: var(--border-primary);
 
   --color-glass-bg: var(--glass-bg);
+  --color-primary-glow: var(--primary-glow);
+  --color-primary-glow-hover: var(--primary-glow-hover);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);

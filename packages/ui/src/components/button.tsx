@@ -53,7 +53,7 @@ const buttonVariants = cva(
          */
         glass: [
           "bg-[--color-glass-bg] backdrop-blur-md",
-          "border border-[--color-border]",
+          "border border-border",
           "text-white",
           "hover:border-[--color-primary] hover:bg-white/10",
         ],
