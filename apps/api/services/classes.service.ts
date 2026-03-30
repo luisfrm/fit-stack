@@ -1,8 +1,12 @@
-import { classesRepository, type NewCmsClass } from '@/repositories/classes.repository'
+import { classesRepository, type NewCmsClass, type ClassesFilter } from '@/repositories/classes.repository'
 
 export const classesService = {
-  async getAll() {
-    return classesRepository.findAll()
+  async getAll(filters: ClassesFilter = {}) {
+    return classesRepository.findAll(filters)
+  },
+
+  async getByDate(date: string) {
+    return classesRepository.findByDate(date)
   },
 
   async getById(id: number) {
@@ -12,8 +16,8 @@ export const classesService = {
   },
 
   async create(data: NewCmsClass) {
-    if (!data.name || !data.timeInfo) {
-      throw new Error('Name and timeInfo are required')
+    if (!data.name || !data.startTime) {
+      throw new Error('Name and startTime are required')
     }
     return classesRepository.create(data)
   },
