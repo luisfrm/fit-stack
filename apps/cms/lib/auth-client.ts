@@ -1,6 +1,11 @@
-import { createAuthClient } from '@neondatabase/neon-js/auth';
+import { createAuthClient } from 'better-auth/react';
 
-const auth: any = createAuthClient(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/auth`);
+const auth = createAuthClient({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!, // http://localhost:3000
+  fetchOptions: {
+    credentials: 'include', // ← indispensable para enviar cookies cross-origin
+  },
+});
 
 interface SignInParams {
   email: string;
@@ -54,3 +59,5 @@ export const getSession = async (options?: any) => {
     return { data: null, error: err };
   }
 };
+
+export const { useSession } = auth;

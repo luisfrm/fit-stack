@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgEnum,
+  date,
 } from 'drizzle-orm/pg-core';
 
 // --- BETTER AUTH TABLES ---
@@ -72,7 +73,6 @@ export const members = pgTable('members', {
   id: serial('id').primaryKey(),
   userId: text('user_id').references(() => user.id, { onDelete: 'set null' }), // ← text, no uuid
   email: text('email').notNull().unique(),
-  username: text('username').unique(),
   role: roleEnum('role').default('client').notNull(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
@@ -170,11 +170,24 @@ export const cmsCoaches = pgTable('cms_coaches', {
   displayOrder: integer('display_order').default(0).notNull(),
 });
 
+export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
+
 export const cmsClasses = pgTable('cms_classes', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  timeInfo: text('time_info').notNull(),
-  description: text('description'),
-  trainerName: text('trainer_name'),
-  isVisible: boolean('is_visible').default(true).notNull(),
+  id:            serial('id').primaryKey(),
+  name:          text('name').notNull(),
+  description:   text('description'),
+  trainerName:   text('trainer_name'),
+  isVisible:     boolean('is_visible').default(true).notNull(),
+
+  // Horario estructurado (reemplaza timeInfo)
+  startTime:     text('start_time').notNull(),     // "HH:MM" — ej: "09:00"
+  endTime:       text('end_time'),                 // opcional — ej: "10:00"
+
+  // Frecuencia
+  frequencyType: frequencyTypeEnum('frequency_type').default('weekly').notNull(),
+  scheduledDate: date('scheduled_date'),           // solo cuando frequencyType = 'once'
+  daysOfWeek:    integer('days_of_week').array(),  // solo cuando frequencyType = 'weekly'
+                                                   // [0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb]
+  // Capacidad
+  capacity:      integer('capacity'),
 });

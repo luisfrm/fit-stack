@@ -37,8 +37,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
     setIsLoading(false);
+    router.push('/dashboard');
+    console.log("Login exitoso");
   };
 
   return (

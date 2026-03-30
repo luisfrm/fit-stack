@@ -2,18 +2,18 @@
    DASHBOARD TYPES
    ───────────────────────────────────────────── */
 
-export type ClassStatus = "live" | "scheduled" | "cancelled";
 export type MemberPlan = "vip" | "pro" | "basic";
 
 /**
  * Interface for a class scheduled for today.
  */
 export interface IClassToday {
-  time: string;
+  id?: number;
   name: string;
-  trainer: string;
-  occupancy: number;
-  status: ClassStatus;
+  startTime: string;    // stored as HH:MM (24 h)
+  endTime?: string;     // stored as HH:MM (24 h), optional
+  trainerName?: string;
+  capacity?: number;
 }
 
 /**
@@ -36,16 +36,29 @@ export type TrendDirection = "up" | "down" | "neutral";
  */
 export type Role = "admin" | "manager" | "trainer" | "client";
 
+export type FrequencyType = 'once' | 'weekly';
+
 /**
  * Interface for a class in the CMS.
  */
 export interface ICmsClass {
   id?: number;
   name: string;
-  timeInfo: string;
   description?: string;
   trainerName?: string;
   isVisible: boolean;
+
+  // Horario
+  startTime: string;       // "HH:MM"
+  endTime?: string;        // "HH:MM" opcional
+
+  // Frecuencia
+  frequencyType: FrequencyType;
+  scheduledDate?: string;  // ISO date, solo para 'once'
+  daysOfWeek?: number[];   // [0-6], solo para 'weekly'
+
+  // Capacidad
+  capacity?: number;
 }
 
 /**

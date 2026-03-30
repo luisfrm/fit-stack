@@ -8,6 +8,20 @@
       "when": 1774773501802,
       "tag": "0000_aromatic_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774820520648,
+      "tag": "0001_glamorous_giant_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774825928076,
+      "tag": "0002_concerned_wiccan",
+      "breakpoints": true
     }
   ]
 }

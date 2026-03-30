@@ -11,6 +11,7 @@ import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast } from "@workspace/ui/components";
 import { signUp } from "@/lib/auth-client";
+import { capitalize } from "@/lib/helper";
 
 /* ─────────────────────────────────────────────
    REGISTER PAGE
@@ -41,7 +42,7 @@ export default function RegisterPage() {
     const { error } = await signUp({
       email,
       password,
-      name: `${firstName.toLocaleLowerCase()}_${lastName.toLocaleLowerCase()}`,
+      name: `${capitalize(firstName.toLocaleLowerCase().trim())} ${capitalize(lastName.toLocaleLowerCase().trim())}`,
     });
 
     if (error) {
@@ -105,15 +106,6 @@ export default function RegisterPage() {
                 required
               />
             </div>
-
-            <Input
-              id="username"
-              name="username"
-              label="Nombre de usuario"
-              placeholder="Nombre de usuario"
-              leftIcon={<User size={16} />}
-              required
-            />
 
             <Input
               type="email"
