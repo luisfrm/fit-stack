@@ -78,8 +78,9 @@ export default function DashboardPage() {
             Reporte
           </Button>
           <MemberModal
+            onSuccess={() => { /* Opción de recargar KPIs si fuera necesario */ }}
             trigger={
-              <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />}>
                 Nuevo Miembro
               </Button>
             }

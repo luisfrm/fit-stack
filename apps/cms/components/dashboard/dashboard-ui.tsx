@@ -59,6 +59,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard",     href: "/dashboard",           icon: LayoutDashboard },
+  { label: "Membresías",    href: "/dashboard/memberships", icon: Wallet },
   { label: "Miembros",      href: "/dashboard/members",   icon: Users },
   { label: "Clases",        href: "/dashboard/classes",   icon: CalendarDays },
   { label: "Entrenadores",  href: "/dashboard/trainers",  icon: Dumbbell },
@@ -373,50 +374,43 @@ export function ActivityItem({ name, time, plan, avatarUrl }: Readonly<ActivityI
    DASHBOARD DATA CONTAINERS (W/ EMPTY STATES)
    ───────────────────────────────────────────── */
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
+import { Table, type ColumnDef } from "@workspace/ui/components";
+
+const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
+  {
+    header: "Hora",
+    className: "pl-6",
+    headerClassName: "pl-6",
+    cell: (cls) => (
+      <Text as="span" size="base" variant="muted">
+        {formatTimeRange(cls.startTime, cls.endTime)}
+      </Text>
+    )
+  },
+  {
+    header: "Clase",
+    cell: (cls) => <Text as="span" size="base" weight="medium">{cls.name}</Text>
+  },
+  {
+    header: "Entrenador",
+    cell: (cls) => <Text as="span" size="base" variant="muted">{cls.trainerName ?? 'Sin asignar'}</Text>
+  },
+  {
+    header: "Cupos",
+    cell: (cls) => (
+      <Text as="span" size="base" variant="muted">
+        {cls.capacity ? `${cls.capacity} cupos` : '—'}
+      </Text>
+    )
+  }
+];
 
 export function TodayClassesTable({ classes }: Readonly<{ classes: IClassToday[] }>) {
   if (classes.length === 0) {
     return <NoData message="No hay clases programadas para hoy." className="py-20" />;
   }
 
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader className="bg-white/5 border-b-0">
-          <TableRow className="border-border-dark hover:bg-transparent">
-            {["Hora", "Clase", "Entrenador", "Cupos"].map((h) => (
-              <TableHead key={h} className="px-6 py-4 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                {h}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody className="divide-y divide-border-dark">
-          {classes.map((cls) => (
-            <TableRow key={`${cls.id}-${cls.startTime}`} className="hover:bg-white/2 transition-colors border-border-dark">
-              <TableCell className="px-6 py-4">
-                <Text as="span" size="base" variant="muted">
-                  {formatTimeRange(cls.startTime, cls.endTime)}
-                </Text>
-              </TableCell>
-              <TableCell className="px-6 py-4">
-                <Text as="span" size="base" weight="medium">{cls.name}</Text>
-              </TableCell>
-              <TableCell className="px-6 py-4">
-                <Text as="span" size="base" variant="muted">{cls.trainerName ?? 'Sin asignar'}</Text>
-              </TableCell>
-              <TableCell className="px-6 py-4">
-                <Text as="span" size="base" variant="muted">
-                  {cls.capacity ? `${cls.capacity} cupos` : '—'}
-                </Text>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+  return <Table columns={TODAY_CLASSES_COLUMNS} data={classes} />;
 }
 
 export function RecentRegistrationsList({ registrations }: Readonly<{ registrations: IRecentRegistration[] }>) {
