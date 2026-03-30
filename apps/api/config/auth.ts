@@ -9,6 +9,7 @@ export const auth = betterAuth({
     provider: "pg",
     schema: schema,
   }),
+  secret: env.betterAuthSecret,
 
   trustedOrigins: [env.frontendUrl],
 

@@ -13,6 +13,9 @@ export const env = {
   r2BucketName: process.env.R2_BUCKET_NAME ?? "",
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? "",
 
+  // Better-Auth
+  betterAuthSecret: process.env.BETTER_AUTH_SECRET ?? "default-secret-development-only",
+
   // JWT
   jwtSecret: process.env.JWT_SECRET ?? "default-secret-change-me",
 };

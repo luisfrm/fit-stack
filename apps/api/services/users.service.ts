@@ -5,15 +5,19 @@ export const usersService = {
     return usersRepository.findAll()
   },
 
-  async getById(id: number) {
+  async getById(id: string) {
     const user = await usersRepository.findById(id)
     if (!user) throw new Error('User not found')
     return user
   },
 
-  async create(data: { email: string; name: string; username: string }) {
+  async create(data: { email: string; name: string }) {
     const existing = await usersRepository.findByEmail(data.email)
     if (existing) throw new Error('Email already in use')
-    return usersRepository.create(data)
+
+    return usersRepository.create({
+      ...data,
+      id: crypto.randomUUID(),
+    })
   },
 }

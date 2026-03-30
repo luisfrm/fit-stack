@@ -10,7 +10,7 @@ export const usersRepository = {
     return db.select().from(user);
   },
 
-  async findById(id: number) {
+  async findById(id: string) {
     const [result] = await db.select().from(user).where(eq(user.id, id));
     return result; // Retorna User | undefined
   },
@@ -25,7 +25,7 @@ export const usersRepository = {
     return newUser;
   },
 
-  async update(id: number, data: Partial<NewUser>) {
+  async update(id: string, data: Partial<NewUser>) {
     const [updatedUser] = await db
       .update(user)
       .set(data)
@@ -34,7 +34,7 @@ export const usersRepository = {
     return updatedUser;
   },
 
-  async delete(id: number) {
+  async delete(id: string) {
     await db.delete(user).where(eq(user.id, id));
   }
 };
