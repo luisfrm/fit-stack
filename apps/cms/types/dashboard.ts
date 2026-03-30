@@ -66,12 +66,29 @@ export interface ICmsClass {
  */
 export interface IMember {
   id?: number;
+  userId?: string | null;
   firstName: string;
   lastName: string;
   email: string;
   role: Role;
   documentId?: string;
   isActive: boolean;
+}
+
+export interface MemberFilter {
+  query?: string;
+  role?: Role;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedMembers {
+  data: IMember[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export interface CoachFilter {
@@ -102,3 +119,35 @@ export interface ICoach {
   isVisible: boolean;
   displayOrder: number;
 }
+
+/**
+ * Interface for a Membership Plan.
+ */
+export interface IMembershipPlan {
+  id?: number;
+  name: string;
+  price: number; // in cents
+  features: string[] | null;
+  isPopular: boolean;
+  isVisibleOnSite: boolean;
+}
+
+export type SubscriptionStatus = 'active' | 'canceled' | 'expired';
+
+/**
+ * Interface for a Member's Subscription.
+ */
+export interface ISubscription {
+  id?: number;
+  memberId: number;
+  planId: number;
+  startDate: string;
+  endDate: string;
+  status: SubscriptionStatus;
+  
+  // Optional joined fields for CMS Table display
+  memberName?: string;
+  planName?: string;
+  price?: number;
+}
+

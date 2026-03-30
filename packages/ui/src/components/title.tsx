@@ -22,6 +22,7 @@ const titleVariants = cva(
         section: "text-4xl md:text-5xl",
         card:    "text-2xl",
         sm:      "text-xl",
+        lg:      "text-3xl",
       },
 
       /**

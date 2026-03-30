@@ -37,7 +37,8 @@ export { OurServices } from "@workspace/ui/components/our-services";
 export type { OurServicesProps, ServiceItem } from "@workspace/ui/components/our-services";
 
 export * from "@workspace/ui/components/card";
-export * from "@workspace/ui/components/table";
+export { Table } from "@workspace/ui/components/table";
+export type { TableProps, ColumnDef } from "@workspace/ui/components/table";
 export * from "@workspace/ui/components/avatar";
 export * from "@workspace/ui/components/badge";
 export * from "@workspace/ui/components/text";
