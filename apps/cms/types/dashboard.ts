@@ -73,3 +73,32 @@ export interface IMember {
   documentId?: string;
   isActive: boolean;
 }
+
+export interface CoachFilter {
+  name?: string;
+  role?: string;
+  isVisible?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedCoaches {
+  data: ICoach[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/**
+ * Interface for a Coach (Trainer) in the CMS.
+ */
+export interface ICoach {
+  id?: number;
+  name: string;
+  role: string;
+  specialities: string[] | null;
+  imageUrl: string | null;
+  isVisible: boolean;
+  displayOrder: number;
+}

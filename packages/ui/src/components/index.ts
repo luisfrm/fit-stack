@@ -50,3 +50,4 @@ export { Modal } from "@workspace/ui/components/modal";
 export { Checkbox } from "@workspace/ui/components/checkbox";
 export * from "@workspace/ui/components/select";
 export * from "@workspace/ui/components/sheet";
+export * from "@workspace/ui/components/toggle-group";
