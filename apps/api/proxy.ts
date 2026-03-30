@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
 
-const publicRoutes = ["/api/auth"];
+const publicRoutes = ["/api/auth", "/api/health"];
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
