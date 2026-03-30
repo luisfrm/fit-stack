@@ -33,7 +33,7 @@ import {
   type IRecentRegistration 
 } from "@/types/dashboard";
 import { formatTimeRange } from "@/lib/config/display";
-
+import { getMediaUrl } from "@/lib/utils/media-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
@@ -174,7 +174,7 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
       <div className="px-4 mt-auto">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
           <Avatar size="default">
-            {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
+            {user.avatarUrl && <AvatarImage src={getMediaUrl(user.avatarUrl)} alt={user.name} />}
             <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col min-w-0 flex-1">
@@ -353,7 +353,7 @@ export function ActivityItem({ name, time, plan, avatarUrl }: Readonly<ActivityI
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
       <Avatar size="default">
-        {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
+        {avatarUrl && <AvatarImage src={getMediaUrl(avatarUrl)} alt={name} />}
         <AvatarFallback>{name.charAt(0)}</AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">

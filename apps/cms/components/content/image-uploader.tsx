@@ -4,6 +4,7 @@ import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Text } from "@workspace/ui/components/text";
 import { cmsContentService } from "@/lib/services/cms-content-service";
+import { getMediaUrl } from "@/lib/utils/media-utils";
 import axios from "axios";
 import { toast } from "@workspace/ui/components";
 
@@ -20,9 +21,7 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Generar la URL de visualización (Para R2, usualmente es un dominio público o el worker/proxy)
-  // Por ahora, asumimos una estructura base. Si tienes un dominio de R2, úsalo aquí.
-  const imageUrl = value ? `https://pub-your-r2-hash.r2.dev/${value}` : null; 
+  const imageUrl = value ? getMediaUrl(value) : null; 
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -37,8 +36,8 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
     try {
       setIsUploading(true);
       
-      // 1. Obtener Presigned URL desde nuestra API
-      const { presignedUrl, key } = await cmsContentService.getPresignedUrl(file.name, file.type);
+      // 1. Obtener Presigned URL desde nuestra API (carpeta 'cms' por defecto)
+      const { presignedUrl, key } = await cmsContentService.getPresignedUrl(file.name, file.type, 'cms');
       
       // 2. Subir directamente a R2 usando la URL firmada
       await axios.put(presignedUrl, file, {

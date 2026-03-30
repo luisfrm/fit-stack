@@ -62,9 +62,9 @@ export const cmsContentService = {
 
   // --- MEDIA ---
 
-  getPresignedUrl: async (filename: string, contentType: string): Promise<{ presignedUrl: string, key: string }> => {
-    const { data } = await apiClient.get('/upload/presigned', {
-      params: { filename, contentType }
+  getPresignedUrl: async (filename: string, contentType: string, folder: string = 'cms'): Promise<{ presignedUrl: string, key: string }> => {
+    const { data } = await apiClient.post('/upload/presigned', {
+      filename, contentType, folder
     })
     return data
   }
