@@ -119,7 +119,7 @@ export function SubscriptionForm({ onSubmit, isLoading }: SubscriptionFormProps)
                 className="w-full text-left px-4 py-3 hover:bg-white/5 flex flex-col transition-colors border-b border-white/5 last:border-0"
                 onClick={() => member.id && handleSelectMember(member.id, `${member.firstName} ${member.lastName}`)}
               >
-                <span className="text-sm font-semibold text-white">{member.firstName} {member.lastName}</span>
+                <span className="text-sm font-semibold text-white">{member.firstName} {member.lastName} - {member.documentId}</span>
                 <span className="text-xs text-slate-400">{member.email}</span>
               </button>
             ))}
