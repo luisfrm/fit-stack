@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1019.0",
+    "@aws-sdk/s3-request-presigner": "^3.1019.0",
     "@workspace/database": "workspace:*",
     "better-auth": "^1.5.5",
     "next": "16.1.6"
