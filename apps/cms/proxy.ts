@@ -8,7 +8,6 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith('/dashboard')) {
     if (!sessionCookie?.value) {
-      console.log("No hay sesion");
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }
