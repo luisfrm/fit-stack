@@ -22,6 +22,9 @@ export const auth = betterAuth({
       enabled: !env.isLocal,
       domain: env.cookieDomain,
     },
+    cookieOptions: {
+      domain: env.cookieDomain,
+    },
     defaultCookieAttributes: {
       sameSite: env.isLocal ? "lax" : "none",
       secure: !env.isLocal,
