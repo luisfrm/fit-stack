@@ -35,7 +35,7 @@ export default async function DashboardLayout({
         }} 
       />
 
-      <main className="flex-1 overflow-y-auto bg-[#0a0a0a] p-4 lg:p-8">
+      <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">
         {children}
       </main>
     </div>

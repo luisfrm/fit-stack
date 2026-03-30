@@ -33,8 +33,8 @@ const serviceCardVariants = cva(
         featured: [
           "border-[--color-border-primary]",
           "hover:border-[--color-primary]",
-          "shadow-[0_0_40px_rgba(252,211,3,0.08)]",
-          "hover:shadow-[0_0_60px_rgba(252,211,3,0.15)]",
+          "shadow-[0_0_40px_var(--color-primary-glow)]",
+          "hover:shadow-[0_0_60px_var(--color-primary-glow-hover)]",
         ],
         solid: [
           "bg-[--color-surface-2] border-[--color-border-muted]",

@@ -74,13 +74,13 @@ export default function DashboardPage() {
           <Text variant="muted">Bienvenido de nuevo, aquí está el resumen de hoy.</Text>
         </div>
         <div className="flex gap-3">
-          <Button variant="glass" size="sm" leftIcon={<Download className="w-4 h-4" />}>
+          <Button variant="glass" size="sm" leftIcon={<Download size={18} />}>
             Reporte
           </Button>
           <MemberModal
             onSuccess={() => { /* Opción de recargar KPIs si fuera necesario */ }}
             trigger={
-              <Button size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
                 Nuevo Miembro
               </Button>
             }

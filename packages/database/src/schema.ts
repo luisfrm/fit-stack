@@ -66,6 +66,8 @@ export const verification = pgTable('verification', {
 export const roleEnum = pgEnum('role', ['admin', 'manager', 'trainer', 'client']);
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
+export const currencyEnum = pgEnum('currency', ['USD', 'VES', 'EUR']);
+export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'zelle', 'pago_movil', 'pos', 'other']);
 
 // --- CORE: USERS & MEMBERS ---
 
@@ -88,9 +90,12 @@ export const membershipPlans = pgTable('membership_plans', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   price: integer('price').notNull(), // Guardado en centavos (ej: $45.00 -> 4500)
+  currency: currencyEnum('currency').default('USD').notNull(),
   features: jsonb('features'), // Array: ["Acceso 24/7", "Zonas VIP"]
   isPopular: boolean('is_popular').default(false).notNull(),
-  isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
+  isActive: boolean('is_active').default(true).notNull(), // Si es false, es un 'Borrador' / Inactivo en CMS
+  isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(), // Solo afecta web pública
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // Suscripciones: Relaciona a un Miembro con un Plan que pagó
@@ -101,6 +106,31 @@ export const subscriptions = pgTable('subscriptions', {
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date').notNull(),
   status: subscriptionStatusEnum('status').default('active').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// --- FACTURACIÓN Y PAGOS ---
+
+export const payments = pgTable('payments', {
+  id: serial('id').primaryKey(),
+  memberId: integer('member_id').references(() => members.id).notNull(),
+  subscriptionId: integer('subscription_id').references(() => subscriptions.id),
+  
+  // Snapshots para historial histórico invariable
+  planSnapshotName: text('plan_snapshot_name').notNull(), 
+  planSnapshotPrice: integer('plan_snapshot_price').notNull(),
+  planSnapshotCurrency: currencyEnum('plan_snapshot_currency').notNull(),
+  
+  // Datos del Pago (Lo que realmente entró en caja)
+  amountPaid: integer('amount_paid').notNull(), 
+  currencyPaid: currencyEnum('currency_paid').notNull(), 
+  exchangeRateApplied: text('exchange_rate_applied'), // Guardamos como texto para ser flexibles o numérico? numeric es mejor
+  
+  paymentMethod: paymentMethodEnum('payment_method').notNull(),
+  paymentMethodDetails: text('payment_method_details'), // Referencia, banco o texto libre si es 'other'
+  
+  paymentDate: timestamp('payment_date').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // --- FITNESS APP: TRAINERS, EJERCICIOS Y RUTINAS ---
@@ -190,4 +220,15 @@ export const cmsClasses = pgTable('cms_classes', {
                                                    // [0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb]
   // Capacidad
   capacity:      integer('capacity'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+});
+
+// --- CONFIGURACIÓN GLOBAL ---
+
+export const gymSettings = pgTable('gym_settings', {
+  id: serial('id').primaryKey(),
+  key: text('key').notNull().unique(), // Ej: 'allow_price_override', 'timezone', etc.
+  value: text('value').notNull(),       // Guardamos como string, parseamos según key
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

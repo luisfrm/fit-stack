@@ -8,6 +8,7 @@ export interface ISubscriptionDTO {
   startDate: Date
   endDate: Date
   status: 'active' | 'cancelled' | 'expired'
+  createdAt?: Date
 }
 
 export const subscriptionsRepository = {
@@ -38,6 +39,7 @@ export const subscriptionsRepository = {
       startDate: data.startDate,
       endDate: data.endDate,
       status: data.status,
+      createdAt: data.createdAt ?? new Date(),
     }).returning()
     return inserted[0]
   },

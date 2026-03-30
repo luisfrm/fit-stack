@@ -5,9 +5,12 @@ export interface IMembershipPlan {
   id?: number
   name: string
   price: number
+  currency: 'USD' | 'VES' | 'EUR'
   features: string[] | null
   isPopular: boolean
+  isActive: boolean
   isVisibleOnSite: boolean
+  createdAt?: Date
 }
 
 export const plansRepository = {
@@ -25,8 +28,10 @@ export const plansRepository = {
     const inserted = await db.insert(membershipPlans).values({
       name: data.name,
       price: data.price,
+      currency: data.currency,
       features: data.features,
       isPopular: data.isPopular,
+      isActive: data.isActive,
       isVisibleOnSite: data.isVisibleOnSite,
     }).returning()
     return inserted[0] as IMembershipPlan
@@ -38,8 +43,10 @@ export const plansRepository = {
       .set({
         name: data.name,
         price: data.price,
+        currency: data.currency,
         features: data.features,
         isPopular: data.isPopular,
+        isActive: data.isActive,
         isVisibleOnSite: data.isVisibleOnSite,
       })
       .where(eq(membershipPlans.id, id))

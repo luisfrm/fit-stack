@@ -47,7 +47,7 @@ export default function MembershipsPage() {
         <PlanModal 
           onSuccess={() => loadPlans()}
           trigger={
-            <Button size="lg" className="rounded-xl w-full md:w-auto font-bold tracking-wider" rightIcon={<Plus size={18} />}>
+            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               NUEVO PLAN
             </Button>
           }

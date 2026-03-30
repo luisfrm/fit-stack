@@ -8,6 +8,8 @@
 // ─── Timezone ──────────────────────────────────────────────────
 /** IANA timezone identifier used across the CMS for display and calculations. */
 export const DEFAULT_TIMEZONE = 'America/Caracas' as const;
+/** UTC Offset equivalent for the default timezone to create stable Dates natively in JS */
+export const DEFAULT_TIMEZONE_OFFSET = '-04:00' as const;
 
 // ─── Time Format ───────────────────────────────────────────────
 /** '12h' renders as  "8:30 AM"  | '24h' renders as  "08:30" */
@@ -55,4 +57,14 @@ export function formatTimeRange(
   const start = formatTime(startTime, format);
   if (!endTime) return start;
   return `${start} – ${formatTime(endTime, format)}`;
+}
+
+/**
+ * Creates a stable Date object directly targeting midnight in the default timezone
+ * to prevent off-by-one day bugs with basic "YYYY-MM-DD" inputs.
+ * @param dateStr "YYYY-MM-DD"
+ */
+export function parseDateAsConfigTimezone(dateStr: string): Date {
+  // Ej: "2026-03-30T00:00:00-04:00" -> creates a local JS Date matching exactly that UTC point
+  return new Date(`${dateStr}T00:00:00${DEFAULT_TIMEZONE_OFFSET}`);
 }

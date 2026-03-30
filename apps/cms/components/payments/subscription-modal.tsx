@@ -40,9 +40,9 @@ export function SubscriptionModal({ trigger, onSuccess }: SubscriptionModalProps
       trigger={trigger}
       title="Registrar Nuevo Pago (Suscripción)"
       description="Vincula un miembro a un nivel de membresía activo para gestionar su ingreso y ciclo de facturación mensual."
-      isScrollable={false}
+      isScrollable={true}
     >
-      <div className="pt-2">
+      <div className="pt-3">
         <SubscriptionForm 
           onSubmit={handleSubmit} 
           isLoading={isLoading} 

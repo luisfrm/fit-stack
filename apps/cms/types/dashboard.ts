@@ -120,6 +120,8 @@ export interface ICoach {
   displayOrder: number;
 }
 
+export type Currency = 'USD' | 'VES' | 'EUR';
+
 /**
  * Interface for a Membership Plan.
  */
@@ -127,9 +129,12 @@ export interface IMembershipPlan {
   id?: number;
   name: string;
   price: number; // in cents
+  currency: Currency;
   features: string[] | null;
   isPopular: boolean;
+  isActive: boolean;
   isVisibleOnSite: boolean;
+  createdAt?: string;
 }
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired';
@@ -144,10 +149,38 @@ export interface ISubscription {
   startDate: string;
   endDate: string;
   status: SubscriptionStatus;
+  createdAt?: string;
   
   // Optional joined fields for CMS Table display
   memberName?: string;
   planName?: string;
   price?: number;
+}
+
+export type PaymentMethod = 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other';
+
+/**
+ * Interface for a Payment record.
+ */
+export interface IPayment {
+  id?: number;
+  memberId: number;
+  subscriptionId?: number;
+  
+  // Snapshots
+  planSnapshotName: string;
+  planSnapshotPrice: number;
+  planSnapshotCurrency: Currency;
+  
+  // Payment Data
+  amountPaid: number;
+  currencyPaid: Currency;
+  exchangeRateApplied?: string;
+  
+  paymentMethod: PaymentMethod;
+  paymentMethodDetails?: string;
+  
+  paymentDate: string;
+  createdAt?: string;
 }
 

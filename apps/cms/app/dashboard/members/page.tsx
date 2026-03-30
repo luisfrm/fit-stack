@@ -67,7 +67,7 @@ export default function MembersPage() {
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     setQuery(tempQuery);
     setPage(1);
@@ -87,7 +87,7 @@ export default function MembersPage() {
         
         <MemberModal
           trigger={
-            <Button size="lg" className="rounded-xl w-full md:w-auto" rightIcon={<Plus size={18} />}>
+            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               NUEVO MIEMBRO
             </Button>
           }
