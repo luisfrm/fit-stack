@@ -35,7 +35,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     onSubmit(formData, sendInvite);
   };

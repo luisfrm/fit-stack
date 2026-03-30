@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { type ICmsClass, type FrequencyType } from "@/types/dashboard";
 import { Calendar, Clock, User, FileText, Globe, Repeat } from "lucide-react";
+import { parseDateAsConfigTimezone } from "@/lib/config/display";
 
 const DAYS_OF_WEEK = [
   { label: "Domingo",   value: 0 },
@@ -30,6 +31,12 @@ interface ClassFormProps {
 export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) {
   const isEdit = !!initialData?.id;
 
+  const initialDateStr = initialData?.scheduledDate 
+    ? (initialData.scheduledDate.includes("T") 
+        ? new Date(initialData.scheduledDate).toISOString().split("T")[0] 
+        : initialData.scheduledDate)
+    : "";
+
   const [formData, setFormData] = React.useState<Partial<ICmsClass>>({
     name:          initialData?.name          ?? "",
     description:   initialData?.description   ?? "",
@@ -38,7 +45,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
     startTime:     initialData?.startTime     ?? "",
     endTime:       initialData?.endTime       ?? "",
     frequencyType: initialData?.frequencyType ?? "weekly",
-    scheduledDate: initialData?.scheduledDate ?? "",
+    scheduledDate: initialDateStr,
     daysOfWeek:    initialData?.daysOfWeek    ?? [],
     capacity:      initialData?.capacity      ?? undefined,
   });
@@ -48,13 +55,17 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
   };
 
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
 
     // Clean up unused frequency fields before sending
     const payload: Partial<ICmsClass> = { ...formData };
     if (payload.frequencyType === "once") {
       delete payload.daysOfWeek;
+      // Send as predictable ISO to backend if needed, or simply string if API handles string well
+      if (payload.scheduledDate) {
+        payload.scheduledDate = parseDateAsConfigTimezone(payload.scheduledDate).toISOString();
+      }
     } else {
       delete payload.scheduledDate;
     }
@@ -178,7 +189,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         <div className="relative">
           <FileText className="absolute left-3 top-3 text-white/30" size={16} />
           <textarea
-            className="w-full min-h-[100px] bg-[#111111] border border-[#333333] rounded-lg p-3 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
+            className="w-full min-h-[100px] bg-surface border border-border rounded-lg p-3 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
             placeholder="Describe brevemente la clase..."
             value={formData.description ?? ""}
             onChange={(e) => handleChange("description", e.target.value)}
@@ -187,7 +198,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
       </div>
 
       {/* ── Visibilidad ── */}
-      <div className="flex items-center space-x-3 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
+      <div className="flex items-center space-x-3 rounded-lg border border-muted bg-surface-2 p-4 transition-colors hover:bg-white/[0.07]">
         <Checkbox
           id="isVisible"
           checked={formData.isVisible}

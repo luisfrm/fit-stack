@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -43,7 +43,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: "#0a0a0a", fontFamily: "var(--font-sans, sans-serif)" }}>
+    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>
 
       {/* ── LEFT: Form ── */}
       <div
@@ -87,12 +87,12 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between items-center px-1">
-                <Text as="label" htmlFor="password" size="sm" weight="medium" className="tracking-wide text-[rgba(255,255,255,0.65)]">
+                <Text as="label" htmlFor="password" size="sm" weight="medium" className="tracking-wide text-foreground-muted opacity-80">
                   Contraseña
                 </Text>
                 <Link
                   href="#"
-                  className="text-xs text-[rgba(255,255,255,0.35)] hover:text-[--color-primary] transition-colors"
+                  className="text-xs text-foreground-dim hover:text-[--color-primary] transition-colors"
                 >
                   ¿Olvidaste tu contraseña?
                 </Link>
@@ -156,10 +156,10 @@ export default function LoginPage() {
         {/* Fade from left */}
         <div
           className="absolute inset-0 z-10"
-          style={{ background: "linear-gradient(to right, #0a0a0a 0%, rgba(10,10,10,0.4) 50%, transparent 100%)" }}
+          style={{ background: "linear-gradient(to right, var(--background) 0%, oklch(from var(--background) l c h / 0.4) 50%, transparent 100%)" }}
         />
         {/* Overall dark tint */}
-        <div className="absolute inset-0 z-10" style={{ background: "rgba(0,0,0,0.45)" }} />
+        <div className="absolute inset-0 z-10" style={{ background: "oklch(from var(--background) l c h / 0.45)" }} />
 
         {/* Floating quote */}
         <div className="absolute bottom-16 left-16 z-20 max-w-[360px]">
@@ -167,7 +167,7 @@ export default function LoginPage() {
           <Title as="h3" size="card" className="text-white mb-3">
             Sin Límites
           </Title>
-          <Text variant="subtle" className="text-[rgba(255,255,255,0.55)] font-light leading-relaxed">
+          <Text variant="subtle" className="text-foreground-muted font-light leading-relaxed">
             "La excelencia no es un acto, sino un hábito." Optimiza el
             rendimiento de tu centro deportivo con tecnología de vanguardia.
           </Text>

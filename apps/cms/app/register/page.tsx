@@ -55,7 +55,7 @@ export default function RegisterPage() {
       .finally(() => setIsValidating(false));
   }, [token]);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!token) return;
     
