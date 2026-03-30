@@ -31,7 +31,8 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicRoute(pathname)) return response;
 
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  const sessionCookie = request.cookies.get("better-auth.session_token") || 
+    request.cookies.get("__Secure-better-auth.session_token");
 
   if (!sessionCookie?.value) {
     return Response.json({ error: "No autorizado" }, { status: 401 });
