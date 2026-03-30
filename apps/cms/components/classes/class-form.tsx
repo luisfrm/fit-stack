@@ -1,43 +1,76 @@
 "use client";
 
 import * as React from "react";
-import { 
-  Input, 
-  Button, 
+import {
+  Input,
+  Button,
   Checkbox,
 } from "@workspace/ui/components";
-import { type ICmsClass } from "@/types/dashboard";
-import { Calendar, Clock, User, FileText, Globe } from "lucide-react";
+import { type ICmsClass, type FrequencyType } from "@/types/dashboard";
+import { Calendar, Clock, User, FileText, Globe, Repeat } from "lucide-react";
+
+const DAYS_OF_WEEK = [
+  { label: "Domingo",   value: 0 },
+  { label: "Lunes",     value: 1 },
+  { label: "Martes",    value: 2 },
+  { label: "Miércoles", value: 3 },
+  { label: "Jueves",    value: 4 },
+  { label: "Viernes",   value: 5 },
+  { label: "Sábado",    value: 6 },
+];
 
 interface ClassFormProps {
   readonly initialData?: ICmsClass;
-  readonly onSubmit: (data: any) => void;
+  readonly onSubmit: (data: Partial<ICmsClass>) => void;
   readonly isLoading?: boolean;
 }
 
 export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) {
   const isEdit = !!initialData?.id;
 
-  // Form State
-  const [formData, setFormData] = React.useState({
-    name: initialData?.name || "",
-    timeInfo: initialData?.timeInfo || "",
-    trainerName: initialData?.trainerName || "",
-    description: initialData?.description || "",
-    isVisible: initialData?.isVisible ?? true,
+  const [formData, setFormData] = React.useState<Partial<ICmsClass>>({
+    name:          initialData?.name          ?? "",
+    description:   initialData?.description   ?? "",
+    trainerName:   initialData?.trainerName   ?? "",
+    isVisible:     initialData?.isVisible     ?? true,
+    startTime:     initialData?.startTime     ?? "",
+    endTime:       initialData?.endTime       ?? "",
+    frequencyType: initialData?.frequencyType ?? "weekly",
+    scheduledDate: initialData?.scheduledDate ?? "",
+    daysOfWeek:    initialData?.daysOfWeek    ?? [],
+    capacity:      initialData?.capacity      ?? undefined,
   });
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: keyof ICmsClass, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleDay = (day: number) => {
+    const current = formData.daysOfWeek ?? [];
+    const updated = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    handleChange("daysOfWeek", updated);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+
+    // Clean up unused frequency fields before sending
+    const payload: Partial<ICmsClass> = { ...formData };
+    if (payload.frequencyType === "once") {
+      delete payload.daysOfWeek;
+    } else {
+      delete payload.scheduledDate;
+    }
+
+    onSubmit(payload);
   };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
+
+      {/* ── Nombre ── */}
       <Input
         label="Nombre de la Clase"
         placeholder="Ej: Power Yoga, Boxeo..."
@@ -47,24 +80,110 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         leftIcon={<Calendar size={16} />}
       />
 
+      {/* ── Horario ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
-          label="Horario / Info de Tiempo"
-          placeholder="Ej: 10:00 AM"
-          value={formData.timeInfo}
-          onChange={(e) => handleChange("timeInfo", e.target.value)}
+          label="Hora de Inicio *"
+          type="time"
+          value={formData.startTime}
+          onChange={(e) => handleChange("startTime", e.target.value)}
           required
           leftIcon={<Clock size={16} />}
         />
         <Input
-          label="Entrenador"
-          placeholder="Ej: Carlos Ruiz"
-          value={formData.trainerName}
-          onChange={(e) => handleChange("trainerName", e.target.value)}
-          leftIcon={<User size={16} />}
+          label="Hora de Fin"
+          type="time"
+          value={formData.endTime ?? ""}
+          onChange={(e) => handleChange("endTime", e.target.value)}
+          leftIcon={<Clock size={16} />}
         />
       </div>
 
+      {/* ── Frecuencia ── */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          Tipo de Frecuencia
+        </label>
+        <div className="flex gap-3">
+          {(["weekly", "once"] as FrequencyType[]).map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => handleChange("frequencyType", type)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border text-sm font-medium transition-all ${
+                formData.frequencyType === type
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
+              }`}
+            >
+              {type === "weekly" ? <Repeat size={14} /> : <Calendar size={14} />}
+              {type === "weekly" ? "Semanal" : "Fecha Específica"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Condicional: días de la semana o fecha puntual ── */}
+      {formData.frequencyType === "weekly" ? (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Días de la Semana *
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {DAYS_OF_WEEK.map(({ label, value }) => {
+              const selected = formData.daysOfWeek?.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => toggleDay(value)}
+                  className={`py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
+                    selected
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {formData.daysOfWeek?.length === 0 && (
+            <p className="text-xs text-red-400/80">Selecciona al menos un día.</p>
+          )}
+        </div>
+      ) : (
+        <Input
+          label="Fecha Programada *"
+          type="date"
+          value={formData.scheduledDate ?? ""}
+          onChange={(e) => handleChange("scheduledDate", e.target.value)}
+          required
+          leftIcon={<Calendar size={16} />}
+        />
+      )}
+
+      {/* ── Entrenador + Capacidad ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Entrenador"
+          placeholder="Ej: Carlos Ruiz"
+          value={formData.trainerName ?? ""}
+          onChange={(e) => handleChange("trainerName", e.target.value)}
+          leftIcon={<User size={16} />}
+        />
+        <Input
+          label="Capacidad Máxima"
+          type="number"
+          placeholder="Ej: 20"
+          value={formData.capacity ?? ""}
+          onChange={(e) =>
+            handleChange("capacity", e.target.value ? Number(e.target.value) : undefined)
+          }
+        />
+      </div>
+
+      {/* ── Descripción ── */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Descripción
@@ -74,15 +193,16 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
           <textarea
             className="w-full min-h-[100px] bg-[#111111] border border-[#333333] rounded-lg p-3 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
             placeholder="Describe brevemente la clase..."
-            value={formData.description}
+            value={formData.description ?? ""}
             onChange={(e) => handleChange("description", e.target.value)}
           />
         </div>
       </div>
 
+      {/* ── Visibilidad ── */}
       <div className="flex items-center space-x-3 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
-        <Checkbox 
-          id="isVisible" 
+        <Checkbox
+          id="isVisible"
           checked={formData.isVisible}
           onCheckedChange={(checked) => handleChange("isVisible", checked)}
         />
@@ -95,18 +215,14 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
             Visible en la Web
           </label>
           <p className="text-xs text-muted-foreground">
-            Determina si los clientes pueden ver esta clase en la aplicación móvil o sitio web.
+            Determina si los clientes pueden ver esta clase en la aplicación.
           </p>
         </div>
       </div>
 
+      {/* ── Submit ── */}
       <div className="pt-4">
-        <Button 
-          type="submit" 
-          fullWidth 
-          size="lg" 
-          loading={isLoading}
-        >
+        <Button type="submit" fullWidth size="lg" loading={isLoading}>
           {isEdit ? "GUARDAR CAMBIOS" : "CREAR CLASE"}
         </Button>
       </div>

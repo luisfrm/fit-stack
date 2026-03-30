@@ -1,15 +1,45 @@
 import { apiClient } from "../api-client";
 import { ICmsClass } from "@/types/dashboard";
 
+export interface ClassesFilter {
+  name?: string;
+  trainerName?: string;
+  isVisible?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedClasses {
+  data: ICmsClass[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 /**
  * Service to handle class-related API operations.
  */
 export const classesService = {
   /**
-   * Fetches all classes from the API.
+   * Fetches all classes from the API with optional filters and pagination.
    */
-  async getClasses(): Promise<ICmsClass[]> {
-    const response = await apiClient.get<ICmsClass[]>("/api/classes");
+  async getClasses(filters: ClassesFilter = {}): Promise<PaginatedClasses> {
+    const response = await apiClient.get<PaginatedClasses>("/api/classes", {
+      params: filters,
+    });
+    return response.data;
+  },
+
+  /**
+   * Fetches classes for a specific date (for the dashboard 'Today' widget).
+   * Returns 'once' classes whose scheduledDate matches and 'weekly' classes
+   * whose daysOfWeek includes the respective day-of-week.
+   */
+  async getClassesByDate(date: string): Promise<ICmsClass[]> {
+    const response = await apiClient.get<ICmsClass[]>('/api/classes', {
+      params: { date },
+    });
     return response.data;
   },
 

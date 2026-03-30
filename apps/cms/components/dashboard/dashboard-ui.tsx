@@ -28,14 +28,13 @@ import {
 } from "lucide-react";
 
 import { 
-  type ClassStatus, 
   type MemberPlan, 
   type IClassToday, 
   type IRecentRegistration 
 } from "@/types/dashboard";
+import { formatTimeRange } from "@/lib/config/display";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
-import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { cn } from "@workspace/ui/lib/utils";
@@ -86,18 +85,28 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
  * Only visible on screens smaller than 1024px.
  */
 export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
+  const [open, setOpen] = React.useState(false);
+  const pathname = usePathname();
+
+  // Close sheet on route change
+  React.useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
   return (
     <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
           <DumbbellIcon className="text-background w-4 h-4" />
         </div>
-        <Text as="p" size="sm" weight="bold" className="leading-none">
-          Gym CMS
-        </Text>
+        <Link href="/dashboard">
+          <Text as="p" size="sm" weight="bold" className="leading-none">
+            Gym CMS
+          </Text>
+        </Link>
       </div>
 
-      <Sheet>
+      <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
             <Menu className="w-6 h-6" />
@@ -128,12 +137,14 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
         {/* Logo (Hidden on mobile as it's in the top nav, but kept for full view consistency) */}
         <div className="hidden lg:flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <DumbbellIcon className="text-background-dark w-5 h-5" />
+            <DumbbellIcon className="text-black w-5 h-5" />
           </div>
           <div>
-            <Text as="p" size="md" weight="bold" variant="default" className="leading-none">
-              Gym CMS
-            </Text>
+            <Link href="/dashboard">
+              <Text as="p" size="md" weight="bold" className="leading-none">
+                Gym CMS
+              </Text>
+            </Link>
             <Text as="span" size="xs" variant="subtle">
               Admin Panel
             </Text>
@@ -143,7 +154,9 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
         {/* Navigation */}
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const isActive = item.href === "/dashboard" 
+              ? pathname === "/dashboard" 
+              : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <SidebarNavItem 
                 key={item.href} 
@@ -315,35 +328,6 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
   );
 }
 
-/* ─────────────────────────────────────────────
-   CLASS STATUS BADGE
-   ───────────────────────────────────────────── */
-
-const STATUS_CONFIG: Record<ClassStatus, { label: string; className: string }> = {
-  live:      { label: "En Vivo",    className: "bg-primary/20 text-primary hover:bg-primary/30" },
-  scheduled: { label: "Programada", className: "bg-white/10 text-slate-300 hover:bg-white/20" },
-  cancelled: { label: "Cancelada",  className: "bg-rose-500/20 text-rose-400 hover:bg-rose-500/30" },
-};
-
-interface ClassStatusBadgeProps extends Omit<React.ComponentProps<"span">, "children"> {
-  status: ClassStatus;
-}
-
-export function ClassStatusBadge({ status, className, ...props }: Readonly<ClassStatusBadgeProps>) {
-  const config = STATUS_CONFIG[status];
-  return (
-    <Badge
-      className={cn(
-        "text-[10px] uppercase rounded-full border-none font-bold tracking-wide",
-        config.className,
-        className
-      )}
-      {...props}
-    >
-      {config.label}
-    </Badge>
-  );
-}
 
 /* ─────────────────────────────────────────────
    MEMBER ACTIVITY ITEM (Últimos Registros)
@@ -401,7 +385,7 @@ export function TodayClassesTable({ classes }: Readonly<{ classes: IClassToday[]
       <Table>
         <TableHeader className="bg-white/5 border-b-0">
           <TableRow className="border-border-dark hover:bg-transparent">
-            {["Hora", "Clase", "Entrenador", "Estado"].map((h) => (
+            {["Hora", "Clase", "Entrenador", "Cupos"].map((h) => (
               <TableHead key={h} className="px-6 py-4 text-slate-400 font-semibold text-xs uppercase tracking-wider">
                 {h}
               </TableHead>
@@ -410,18 +394,22 @@ export function TodayClassesTable({ classes }: Readonly<{ classes: IClassToday[]
         </TableHeader>
         <TableBody className="divide-y divide-border-dark">
           {classes.map((cls) => (
-            <TableRow key={cls.time} className="hover:bg-white/2 transition-colors border-border-dark">
+            <TableRow key={`${cls.id}-${cls.startTime}`} className="hover:bg-white/2 transition-colors border-border-dark">
               <TableCell className="px-6 py-4">
-                <Text as="span" size="base" variant="muted">{cls.time}</Text>
+                <Text as="span" size="base" variant="muted">
+                  {formatTimeRange(cls.startTime, cls.endTime)}
+                </Text>
               </TableCell>
               <TableCell className="px-6 py-4">
                 <Text as="span" size="base" weight="medium">{cls.name}</Text>
               </TableCell>
               <TableCell className="px-6 py-4">
-                <Text as="span" size="base" variant="muted">{cls.trainer}</Text>
+                <Text as="span" size="base" variant="muted">{cls.trainerName ?? 'Sin asignar'}</Text>
               </TableCell>
               <TableCell className="px-6 py-4">
-                <ClassStatusBadge status={cls.status} />
+                <Text as="span" size="base" variant="muted">
+                  {cls.capacity ? `${cls.capacity} cupos` : '—'}
+                </Text>
               </TableCell>
             </TableRow>
           ))}
@@ -449,12 +437,13 @@ export function RecentRegistrationsList({ registrations }: Readonly<{ registrati
    ALERT ITEM
    ───────────────────────────────────────────── */
 
-export type AlertSeverity = "warning" | "danger" | "success";
+export type AlertSeverity = "warning" | "danger" | "success" | "info";
 
 const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string; icon: LucideIcon }> = {
-  warning: { icon: AlertTriangle, borderClass: "border-l-primary",      iconBg: "bg-primary/20",      iconClass: "text-primary",    buttonClass: "text-primary" },
-  danger:  { icon: AlertCircle,   borderClass: "border-l-rose-500",     iconBg: "bg-rose-500/20",     iconClass: "text-rose-500",   buttonClass: "text-rose-400" },
-  success: { icon: BadgeCheck,   borderClass: "border-l-emerald-500",  iconBg: "bg-emerald-500/20",  iconClass: "text-emerald-500",buttonClass: "text-emerald-400" },
+  warning: { icon: AlertTriangle, borderClass: "border-l-primary",      iconBg: "bg-primary/20",      iconClass: "text-primary",     buttonClass: "text-primary" },
+  danger:  { icon: AlertCircle,   borderClass: "border-l-rose-500",     iconBg: "bg-rose-500/20",     iconClass: "text-rose-500",    buttonClass: "text-rose-400" },
+  success: { icon: BadgeCheck,    borderClass: "border-l-emerald-500",  iconBg: "bg-emerald-500/20",  iconClass: "text-emerald-500", buttonClass: "text-emerald-400" },
+  info:    { icon: AlertCircle,   borderClass: "border-l-sky-500",      iconBg: "bg-sky-500/20",      iconClass: "text-sky-400",     buttonClass: "text-sky-400" },
 };
 
 interface AlertItemProps {

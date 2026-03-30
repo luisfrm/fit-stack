@@ -1,30 +1,30 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
 import {
   Download,
   Plus,
+  Loader2,
 } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
-import { 
-  KpiCard, 
-  TodayClassesTable, 
-  RecentRegistrationsList, 
-  AlertItem 
+import {
+  KpiCard,
+  TodayClassesTable,
+  RecentRegistrationsList,
+  AlertItem,
 } from "@/components/dashboard/dashboard-ui";
 import { MemberModal } from "@/components/members/member-modal";
 import { type IClassToday, type IRecentRegistration, type MemberPlan } from "@/types/dashboard";
+import { classesService } from "@/lib/services/classes-service";
+import { DEFAULT_TIMEZONE } from "@/lib/config/display";
 
 /* ─────────────────────────────────────────────
-   STATIC DATA
+   STATIC DATA (will be replaced as modules grow)
    ───────────────────────────────────────────── */
-
-const CLASSES_TODAY: IClassToday[] = [
-  { time: "08:00 AM", name: "CrossFit Advance",  trainer: "Carlos Ruiz",   occupancy: 85, status: "live"      },
-  { time: "10:30 AM", name: "Hatha Yoga",         trainer: "Ana López",     occupancy: 45, status: "scheduled" },
-  { time: "12:00 PM", name: "Boxeo Recreativo",   trainer: "Marcos Sanz",   occupancy: 0,  status: "cancelled" },
-  { time: "04:00 PM", name: "Pilates Reformer",   trainer: "Elena Gomez",   occupancy: 60, status: "scheduled" },
-];
 
 const RECENT_REGISTRATIONS: IRecentRegistration[] = [
   { name: "Juan Pérez",   time: "Hace 15 min",  plan: "vip"   as MemberPlan },
@@ -34,7 +34,37 @@ const RECENT_REGISTRATIONS: IRecentRegistration[] = [
   { name: "Marco Polo",   time: "Ayer",          plan: "pro"   as MemberPlan },
 ];
 
-export default async function DashboardPage() {
+/* ─────────────────────────────────────────────
+   PAGE
+   ───────────────────────────────────────────── */
+
+export default function DashboardPage() {
+  const [todayClasses, setTodayClasses] = React.useState<IClassToday[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = React.useState(true);
+
+  React.useEffect(() => {
+    // Use the configured timezone so "today" matches the gym's local date.
+    const today = new Intl.DateTimeFormat('en-CA', { // en-CA gives YYYY-MM-DD
+      timeZone: DEFAULT_TIMEZONE,
+    }).format(new Date());
+
+    classesService.getClassesByDate(today)
+      .then((raw) => {
+        const mapped: IClassToday[] = raw.map((cls) => ({
+          id: cls.id,
+          name: cls.name,
+          startTime: cls.startTime,
+          endTime: cls.endTime,
+          trainerName: cls.trainerName,
+          capacity: cls.capacity,
+        }));
+        mapped.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        setTodayClasses(mapped);
+      })
+      .catch(() => setTodayClasses([]))
+      .finally(() => setIsLoadingClasses(false));
+  }, []);
+
   return (
     <>
       {/* ── Header ── */}
@@ -47,7 +77,7 @@ export default async function DashboardPage() {
           <Button variant="glass" size="sm" leftIcon={<Download className="w-4 h-4" />}>
             Reporte
           </Button>
-          <MemberModal 
+          <MemberModal
             trigger={
               <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
                 Nuevo Miembro
@@ -58,24 +88,24 @@ export default async function DashboardPage() {
       </header>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         <KpiCard
           label="Miembros Activos"
-          value="1,250"
+          value="248"
           icon="users"
-          trend={{ value: "+5%", direction: "up" }}
-        />
-        <KpiCard
-          label="Ingresos del Mes"
-          value="$45,280"
-          icon="wallet"
-          trend={{ value: "-2%", direction: "down" }}
+          trend={{ value: "+12 este mes", direction: "up" }}
         />
         <KpiCard
           label="Clases Hoy"
-          value="24"
+          value={isLoadingClasses ? "—" : String(todayClasses.length)}
           icon="calendar"
-          trend={{ value: "Hoy", direction: "neutral" }}
+          trend={{ value: "programadas", direction: "neutral" }}
+        />
+        <KpiCard
+          label="Ingresos del Mes"
+          value="$12,430"
+          icon="wallet"
+          trend={{ value: "+8% vs mes anterior", direction: "up" }}
         />
         <KpiCard
           label="Membresías por Vencer"
@@ -93,9 +123,18 @@ export default async function DashboardPage() {
         <Card className="lg:col-span-2 bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden">
           <div className="p-6 border-b border-border-dark flex justify-between items-center">
             <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
-            <button className="text-primary text-sm font-medium hover:underline">Ver todas</button>
+            <Link href="/dashboard/classes" className="text-primary text-sm font-medium hover:underline">
+              Ver todas
+            </Link>
           </div>
-          <TodayClassesTable classes={CLASSES_TODAY} />
+          {isLoadingClasses ? (
+            <div className="flex items-center justify-center py-16 gap-3 text-slate-500">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <Text>Cargando clases...</Text>
+            </div>
+          ) : (
+            <TodayClassesTable classes={todayClasses} />
+          )}
         </Card>
 
         {/* Recent Registrations */}
@@ -118,16 +157,10 @@ export default async function DashboardPage() {
             actionLabel="Revisar"
           />
           <AlertItem
-            severity="danger"
-            title="Pago rechazado: Terminal 04"
-            description="Error de comunicación con el banco emisor."
-            actionLabel="Ver"
-          />
-          <AlertItem
-            severity="success"
-            title="Inventario actualizado"
-            description="Suplementos deportivos recibidos y cargados."
-            actionLabel="Ok"
+            severity="info"
+            title="Nueva clase disponible"
+            description="La clase de Pilates Avanzado ya está activa."
+            actionLabel="Ver clase"
           />
         </div>
       </section>

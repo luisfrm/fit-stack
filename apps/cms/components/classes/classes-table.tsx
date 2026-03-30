@@ -15,6 +15,7 @@ import {
 import { type ICmsClass } from "@/types/dashboard";
 import { Edit2, Trash2, Eye, EyeOff, Calendar } from "lucide-react";
 import { ClassModal } from "./class-modal";
+import { formatTimeRange } from "@/lib/config/display";
 
 interface ClassesTableProps {
   readonly classes: ICmsClass[];
@@ -65,7 +66,9 @@ export function ClassesTable({ classes, onDelete, onUpdate }: ClassesTableProps)
                 </div>
               </TableCell>
               <TableCell className="py-4">
-                <Text size="sm" className="text-slate-300">{cls.timeInfo}</Text>
+                <Text size="sm" className="text-slate-300">
+                  {formatTimeRange(cls.startTime, cls.endTime)}
+                </Text>
               </TableCell>
               <TableCell className="py-4">
                 <Text size="sm" className="text-slate-300">{cls.trainerName || "Sin asignar"}</Text>
