@@ -14,6 +14,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1019.0",
     "@workspace/database": "workspace:*",
     "better-auth": "^1.5.5",
+    "jose": "^6.2.1",
     "next": "16.1.6"
   },
   "devDependencies": {
