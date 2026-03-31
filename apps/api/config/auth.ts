@@ -25,6 +25,7 @@ export const auth = betterAuth({
     defaultCookieAttributes: {
       sameSite: env.isLocal ? "lax" : "none",
       secure: !env.isLocal,
+      domain: env.isLocal ? undefined : env.cookieDomain,
     },
   },
 });
