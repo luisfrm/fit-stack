@@ -13,13 +13,11 @@ export const sessionService = {
     let fetchOptions = {};
 
     if (globalThis.window === undefined) {
-      // SERVER SIDE: Dynamic import
       const { headers: nextHeaders } = await import("next/headers");
       const headers = customHeaders || await nextHeaders();
       fetchOptions = { headers };
     }
 
-    // Since our lib's getSession already catches, we just pass the options
     return await getSession({ fetchOptions });
   },
 

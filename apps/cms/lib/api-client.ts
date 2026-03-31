@@ -20,7 +20,11 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // We can centralize some error logic here if needed
+    if (error.response?.status === 401) {
+      if (typeof globalThis !== "undefined") {
+        globalThis.location.href = "/login";
+      }
+    }
     return Promise.reject(error);
   }
 );
