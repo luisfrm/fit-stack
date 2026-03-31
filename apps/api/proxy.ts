@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
+import { auth } from "@/config/auth";
 
 const publicRoutes = ["/api/auth", "/api/health"];
 
@@ -31,10 +32,11 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicRoute(pathname)) return response;
 
-  const sessionCookie = request.cookies.get("better-auth.session_token") || 
-    request.cookies.get("__Secure-better-auth.session_token");
+  const session = await auth.api.getSession({
+    headers: request.headers,
+  });
 
-  if (!sessionCookie?.value) {
+  if (!session) {
     return Response.json({ error: "No autorizado" }, { status: 401 });
   }
 

@@ -20,7 +20,7 @@ export const auth = betterAuth({
   advanced: {
     crossSubdomainCookies: {
       enabled: !env.isLocal,
-      domain: env.cookieDomain,
+      domain: env.isLocal ? undefined : env.cookieDomain,
     },
     cookieOptions: {
       domain: env.cookieDomain,

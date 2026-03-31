@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getSessionCookie } from 'better-auth/cookies';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const sessionCookie = request.cookies.get('better-auth.session_token') || 
-    request.cookies.get('__Secure-better-auth.session_token');
+  const sessionCookie = getSessionCookie(request);
 
   if (pathname.startsWith('/dashboard')) {
-    if (!sessionCookie?.value) {
+    if (!sessionCookie) {
       return NextResponse.redirect(new URL('/login', request.url));
     }
   }
