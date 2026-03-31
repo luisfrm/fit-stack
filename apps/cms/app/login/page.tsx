@@ -59,7 +59,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form body */}
-        <div className="max-w-md">
+        <div className="lg:max-w-md">
           <div className="mb-10">
             <Title as="h1" size="section" className="mb-3">
               ACCEDE A TU <br />
@@ -123,12 +123,12 @@ export default function LoginPage() {
 
             {/* CTA */}
             <div className="pt-2">
-              <Button 
-                type="submit" 
-                variant="primary" 
-                size="xl" 
-                rounded="lg" 
-                fullWidth 
+              <Button
+                type="submit"
+                variant="primary"
+                size="xl"
+                rounded="lg"
+                fullWidth
                 loading={isLoading}
                 rightIcon={!isLoading && <LogIn size={18} />}
               >

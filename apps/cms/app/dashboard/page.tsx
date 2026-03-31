@@ -11,11 +11,11 @@ import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import {
-  KpiCard,
   TodayClassesTable,
   RecentRegistrationsList,
   AlertItem,
 } from "@/components/dashboard/dashboard-ui";
+import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { MemberModal } from "@/components/members/member-modal";
 import { type IClassToday, type IRecentRegistration, type MemberPlan } from "@/types/dashboard";
 import { classesService } from "@/lib/services/classes-service";
@@ -88,33 +88,7 @@ export default function DashboardPage() {
       </header>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-        <KpiCard
-          label="Miembros Activos"
-          value="248"
-          icon="users"
-          trend={{ value: "+12 este mes", direction: "up" }}
-        />
-        <KpiCard
-          label="Clases Hoy"
-          value={isLoadingClasses ? "—" : String(todayClasses.length)}
-          icon="calendar"
-          trend={{ value: "programadas", direction: "neutral" }}
-        />
-        <KpiCard
-          label="Ingresos del Mes"
-          value="$12,430"
-          icon="wallet"
-          trend={{ value: "+8% vs mes anterior", direction: "up" }}
-        />
-        <KpiCard
-          label="Membresías por Vencer"
-          value="12"
-          icon="alert"
-          trend={{ value: "Próx. 7 días", direction: "neutral" }}
-          accent
-        />
-      </div>
+      <DashboardStats />
 
       {/* ── Central Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">

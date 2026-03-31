@@ -228,7 +228,7 @@ type TrendDirection = "up" | "down" | "neutral";
 
 interface KpiCardProps {
   label: string;
-  value: string;
+  value: React.ReactNode;
   icon: IconName;
   trend?: { value: string; direction: TrendDirection };
   /** Adds a coloured left accent border and primary-coloured value text */
@@ -253,7 +253,7 @@ export function KpiCard({ label, value, icon, trend, accent }: Readonly<KpiCardP
       </div>
       <div className="flex items-end justify-between">
         <Text
-          as="p"
+          as="div"
           className="text-3xl"
           weight="bold"
           variant={accent ? "primary" : "default"}
