@@ -1,27 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
-
-const isLocal = process.env.APP_ENV === "development" || !process.env.APP_ENV;
+import { env } from '@/lib/config/envs';
 
 export async function proxy(request: NextRequest) {
-  // const { pathname } = request.nextUrl;
+  const { pathname } = request.nextUrl;
 
-  // console.log("Expected cookie:", isLocal ? "better-auth.session_token" : "__Secure-better-auth.session_token");
-  // console.log("Available cookies:", request.cookies.getAll().map(c => c.name));
+  console.log("Expected cookie:", env.isLocal ? "better-auth.session_token" : "__Secure-better-auth.session_token");
+  console.log("Available cookies:", request.cookies.getAll().map(c => c.name));
 
-  // const sessionCookie = getSessionCookie(request, {
-  //   cookiePrefix: isLocal ? "better-auth" : "__Secure-better-auth",
-  // });
+  const sessionCookie = getSessionCookie(request, {
+    cookiePrefix: env.isLocal ? "better-auth" : "__Secure-better-auth",
+  });
 
-  // if (pathname.startsWith('/dashboard')) {
-  //   if (!sessionCookie) {
-  //     return NextResponse.redirect(new URL('/login', request.url));
-  //   }
-  // }
-
-  console.log("Host:", request.headers.get('host'));
-  console.log("Cookies:", request.cookies.getAll());
+  if (pathname.startsWith('/dashboard')) {
+    if (!sessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+  }
 
   return NextResponse.next();
 }

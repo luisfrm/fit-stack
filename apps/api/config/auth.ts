@@ -11,7 +11,7 @@ export const auth = betterAuth({
   }),
   secret: env.betterAuthSecret,
 
-  trustedOrigins: [env.frontendUrl],
+  trustedOrigins: [env.frontendUrl!],
 
   emailAndPassword: {
     enabled: true,
@@ -20,10 +20,7 @@ export const auth = betterAuth({
   advanced: {
     crossSubdomainCookies: {
       enabled: !env.isLocal,
-      domain: env.isLocal ? undefined : env.cookieDomain,
-    },
-    cookieOptions: {
-      domain: env.cookieDomain,
+      domain: env.isLocal ? undefined : env.cookieDomain!,
     },
     defaultCookieAttributes: {
       sameSite: env.isLocal ? "lax" : "none",
