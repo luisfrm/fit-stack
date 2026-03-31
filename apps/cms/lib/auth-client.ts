@@ -1,9 +1,9 @@
 import { createAuthClient } from 'better-auth/react';
 
 const auth = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!, // http://localhost:3000
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
   fetchOptions: {
-    credentials: 'include', // ← indispensable para enviar cookies cross-origin
+    credentials: 'include',
   },
 });
 
