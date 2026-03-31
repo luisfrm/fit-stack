@@ -27,10 +27,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { 
-  type MemberPlan, 
-  type IClassToday, 
-  type IRecentRegistration 
+import {
+  type MemberPlan,
+  type IClassToday,
+  type IRecentRegistration
 } from "@/types/dashboard";
 import { formatTimeRange } from "@/lib/config/display";
 import { getMediaUrl } from "@/lib/utils/media-utils";
@@ -38,12 +38,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/av
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { cn } from "@workspace/ui/lib/utils";
-import { 
-  Sheet, 
-  SheetContent, 
+import {
+  Sheet,
+  SheetContent,
   SheetTrigger,
   SheetTitle,
-  SheetHeader 
+  SheetHeader
 } from "@workspace/ui/components/sheet";
 import SignOutButton from "../SignOutButton";
 
@@ -58,14 +58,14 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",     href: "/dashboard",           icon: LayoutDashboard },
-  { label: "Contenido",     href: "/dashboard/content",   icon: LayoutDashboard }, // O 'Files' si lo prefieres
-  { label: "Membresías",    href: "/dashboard/memberships", icon: Wallet },
-  { label: "Miembros",      href: "/dashboard/members",   icon: Users },
-  { label: "Clases",        href: "/dashboard/classes",   icon: CalendarDays },
-  { label: "Entrenadores",  href: "/dashboard/trainers",  icon: Dumbbell },
-  { label: "Pagos",         href: "/dashboard/payments",  icon: CreditCard },
-  { label: "Configuración", href: "/dashboard/settings",  icon: Settings },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard }, // O 'Files' si lo prefieres
+  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
+  { label: "Miembros", href: "/dashboard/members", icon: Users },
+  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays },
+  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell },
+  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
+  { label: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
 
 interface SidebarUser {
@@ -76,7 +76,7 @@ interface SidebarUser {
 
 export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
   return (
-    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col justify-between py-6 shrink-0 h-screen sticky top-0">
+    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col justify-between py-6 shrink-0 h-svh sticky top-0">
       <SidebarContent user={user} />
     </aside>
   );
@@ -116,7 +116,7 @@ export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
         </SheetTrigger>
         <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark">
           <SheetHeader className="sr-only">
-             <SheetTitle>Navegación del Panel</SheetTitle>
+            <SheetTitle>Navegación del Panel</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col h-full py-6">
             <SidebarContent user={user} />
@@ -156,14 +156,14 @@ function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
         {/* Navigation */}
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
-            const isActive = item.href === "/dashboard" 
-              ? pathname === "/dashboard" 
+            const isActive = item.href === "/dashboard"
+              ? pathname === "/dashboard"
               : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
-              <SidebarNavItem 
-                key={item.href} 
-                {...item} 
-                active={isActive} 
+              <SidebarNavItem
+                key={item.href}
+                {...item}
+                active={isActive}
               />
             );
           })}
@@ -336,8 +336,8 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
    ───────────────────────────────────────────── */
 
 const PLAN_CONFIG: Record<MemberPlan, { label: string; className: string }> = {
-  vip:   { label: "VIP",   className: "bg-primary text-background-dark" },
-  pro:   { label: "Pro",   className: "bg-primary/50 text-background-dark" },
+  vip: { label: "VIP", className: "bg-primary text-background-dark" },
+  pro: { label: "Pro", className: "bg-primary/50 text-background-dark" },
   basic: { label: "Basic", className: "bg-slate-500 text-slate-100" },
 };
 
@@ -408,9 +408,9 @@ const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
 
 export function TodayClassesTable({ classes, loading }: Readonly<{ classes: IClassToday[]; loading?: boolean }>) {
   return (
-    <Table 
-      columns={TODAY_CLASSES_COLUMNS} 
-      data={classes} 
+    <Table
+      columns={TODAY_CLASSES_COLUMNS}
+      data={classes}
       loading={loading}
       emptyState={<NoData message="No hay clases programadas para hoy." className="py-20" />}
     />
@@ -438,10 +438,10 @@ export function RecentRegistrationsList({ registrations }: Readonly<{ registrati
 export type AlertSeverity = "warning" | "danger" | "success" | "info";
 
 const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string; icon: LucideIcon }> = {
-  warning: { icon: AlertTriangle, borderClass: "border-l-primary",      iconBg: "bg-primary/20",      iconClass: "text-primary",     buttonClass: "text-primary" },
-  danger:  { icon: AlertCircle,   borderClass: "border-l-rose-500",     iconBg: "bg-rose-500/20",     iconClass: "text-rose-500",    buttonClass: "text-rose-400" },
-  success: { icon: BadgeCheck,    borderClass: "border-l-emerald-500",  iconBg: "bg-emerald-500/20",  iconClass: "text-emerald-500", buttonClass: "text-emerald-400" },
-  info:    { icon: AlertCircle,   borderClass: "border-l-sky-500",      iconBg: "bg-sky-500/20",      iconClass: "text-sky-400",     buttonClass: "text-sky-400" },
+  warning: { icon: AlertTriangle, borderClass: "border-l-primary", iconBg: "bg-primary/20", iconClass: "text-primary", buttonClass: "text-primary" },
+  danger: { icon: AlertCircle, borderClass: "border-l-rose-500", iconBg: "bg-rose-500/20", iconClass: "text-rose-500", buttonClass: "text-rose-400" },
+  success: { icon: BadgeCheck, borderClass: "border-l-emerald-500", iconBg: "bg-emerald-500/20", iconClass: "text-emerald-500", buttonClass: "text-emerald-400" },
+  info: { icon: AlertCircle, borderClass: "border-l-sky-500", iconBg: "bg-sky-500/20", iconClass: "text-sky-400", buttonClass: "text-sky-400" },
 };
 
 interface AlertItemProps {

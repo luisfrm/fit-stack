@@ -18,21 +18,21 @@ export default async function DashboardLayout({
   const user = session.user;
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-background text-slate-100 font-display">
-      <AppSidebar 
-        user={{ 
-          name: user?.name || "Usuario", 
+    <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
+      <AppSidebar
+        user={{
+          name: user?.name || "Usuario",
           role: (user as any)?.role || "Administrador",
           avatarUrl: user?.image || undefined
-        }} 
+        }}
       />
-      
-      <MobileNav 
-        user={{ 
-          name: user?.name || "Usuario", 
+
+      <MobileNav
+        user={{
+          name: user?.name || "Usuario",
           role: (user as any)?.role || "Administrador",
           avatarUrl: user?.image || undefined
-        }} 
+        }}
       />
 
       <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">

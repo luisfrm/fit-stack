@@ -23,11 +23,11 @@ function RegisterForm() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   // Validation State
   const [isValidating, setIsValidating] = React.useState(true);
   const [tokenError, setTokenError] = React.useState<string | null>(null);
-  
+
   // Prefilled Data
   const [memberData, setMemberData] = React.useState({
     firstName: "",
@@ -59,7 +59,7 @@ function RegisterForm() {
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!token) return;
-    
+
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -103,9 +103,9 @@ function RegisterForm() {
   };
 
   return (
-    <main className="flex flex-col md:flex-row min-h-screen w-full font-sans text-white bg-black overflow-hidden relative">
+    <main className="flex flex-col md:flex-row min-h-svh w-full font-sans text-white bg-black overflow-hidden relative">
       <section
-        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto h-screen"
+        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto h-svh"
         style={{ paddingBlock: "clamp(2rem, 6vw, 3rem)", paddingInline: "clamp(2rem, 6vw, 6rem)" }}
       >
         <div className="mb-12">
@@ -206,7 +206,7 @@ function RegisterForm() {
                     onClick={() => setShowConfirmPassword((v) => !v)}
                     className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
                   >
-                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 }
               />
@@ -247,7 +247,7 @@ function RegisterForm() {
       <section className="hidden md:flex w-1/2 bg-zinc-900 border-l border-white/10 relative overflow-hidden group">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1540497077202-7c8a3999166f?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center brightness-50 contrast-125 transition-transform duration-[10s] ease-out group-hover:scale-110" />
         <div className="absolute inset-0 bg-linear-to-t from-black via-black/40 to-transparent" />
-        
+
         <div className="relative z-10 p-16 flex flex-col justify-end h-full">
           <div className="mb-6 flex gap-1">
             {[1, 2, 3, 4, 5].map((star) => (
