@@ -406,12 +406,15 @@ const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
   }
 ];
 
-export function TodayClassesTable({ classes }: Readonly<{ classes: IClassToday[] }>) {
-  if (classes.length === 0) {
-    return <NoData message="No hay clases programadas para hoy." className="py-20" />;
-  }
-
-  return <Table columns={TODAY_CLASSES_COLUMNS} data={classes} />;
+export function TodayClassesTable({ classes, loading }: Readonly<{ classes: IClassToday[]; loading?: boolean }>) {
+  return (
+    <Table 
+      columns={TODAY_CLASSES_COLUMNS} 
+      data={classes} 
+      loading={loading}
+      emptyState={<NoData message="No hay clases programadas para hoy." className="py-20" />}
+    />
+  );
 }
 
 export function RecentRegistrationsList({ registrations }: Readonly<{ registrations: IRecentRegistration[] }>) {

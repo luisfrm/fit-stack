@@ -53,7 +53,7 @@ export default function CMSPageListPage() {
       cell: (page) => (
         <div className="flex flex-col">
           <Text weight="bold">{page.title}</Text>
-          <Text variant="muted" size="xs">/{page.slug}</Text>
+          <Text variant="muted" size="xs">{page.slug}</Text>
         </div>
       )
     },
@@ -84,9 +84,9 @@ export default function CMSPageListPage() {
               Editar
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
             onClick={() => handleDelete(page.id)}
           >
@@ -104,7 +104,7 @@ export default function CMSPageListPage() {
           <h2 className="text-2xl lg:text-3xl font-bold text-slate-100">Gestión de Contenido</h2>
           <Text variant="muted">Administra las páginas y secciones de tu sitio web.</Text>
         </div>
-        <PageCreationModal 
+        <PageCreationModal
           onSuccess={fetchPages}
           trigger={
             <Button variant="primary" leftIcon={<Plus size={18} />}>
@@ -115,24 +115,18 @@ export default function CMSPageListPage() {
       </header>
 
       <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden">
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin" />
-            <Text>Cargando páginas...</Text>
-          </div>
-        )}
-        {pages.length === 0 && (
+        {!isLoading && pages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
             <Globe className="w-12 h-12 opacity-20" />
             <Text>No hay páginas creadas aún.</Text>
-            <PageCreationModal 
+            <PageCreationModal
               onSuccess={fetchPages}
               trigger={<Button variant="outlined" size="sm">Crear mi primera página</Button>}
             />
           </div>
         )}
         {pages.length > 0 && (
-          <Table columns={columns} data={pages} />
+          <Table columns={columns} data={pages} loading={isLoading} />
         )}
       </Card>
     </div>
@@ -168,12 +162,12 @@ function PageCreationModal({
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let newSlug = e.target.value.toLowerCase();
-    
+
     if (newSlug === "") {
       setSlug("/");
       return;
     }
-    
+
     if (!newSlug.startsWith("/")) {
       newSlug = "/" + newSlug;
     }
@@ -188,7 +182,7 @@ function PageCreationModal({
       toast.error("El título y el slug son obligatorios");
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
       const newPage = await cmsContentService.createPage({
@@ -218,25 +212,25 @@ function PageCreationModal({
       description="Completa los datos para crear una nueva página en el sistema."
     >
       <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-        <Input 
-          label="Título de la Página" 
-          placeholder="ej. Nosotros" 
-          value={title} 
-          onChange={handleTitleChange} 
-          required 
-        />
-        <Input 
-          label="Slug (URL)" 
-          placeholder="/ (para la página de inicio)" 
-          value={slug} 
-          onChange={handleSlugChange} 
+        <Input
+          label="Título de la Página"
+          placeholder="ej. Nosotros"
+          value={title}
+          onChange={handleTitleChange}
           required
         />
-        <Input 
-          label="Descripción (Opcional)" 
-          placeholder="Breve resumen de la página..." 
-          value={description} 
-          onChange={(e) => setDescription(e.target.value)} 
+        <Input
+          label="Slug (URL)"
+          placeholder="/ (para la página de inicio)"
+          value={slug}
+          onChange={handleSlugChange}
+          required
+        />
+        <Input
+          label="Descripción (Opcional)"
+          placeholder="Breve resumen de la página..."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
         <div className="flex justify-end gap-2 pt-4 border-t border-white/5">
           <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>

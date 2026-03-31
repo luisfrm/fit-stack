@@ -11,6 +11,7 @@ interface ClassesTableProps {
   readonly classes: ICmsClass[];
   readonly onDelete?: (id: number) => void;
   readonly onUpdate?: () => void;
+  readonly loading?: boolean;
 }
 
 const getColumns = (
@@ -95,7 +96,7 @@ const getColumns = (
   },
 ];
 
-export function ClassesTable({ classes, onDelete, onUpdate }: ClassesTableProps) {
+export function ClassesTable({ classes, onDelete, onUpdate, loading }: ClassesTableProps) {
   const columns = React.useMemo(() => getColumns(onDelete, onUpdate), [onDelete, onUpdate]);
 
   const emptyState = (
@@ -115,6 +116,7 @@ export function ClassesTable({ classes, onDelete, onUpdate }: ClassesTableProps)
       columns={columns} 
       data={classes} 
       emptyState={emptyState}
+      loading={loading}
     />
   );
 }

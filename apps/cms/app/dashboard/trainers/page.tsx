@@ -156,18 +156,12 @@ export default function TrainersPage() {
           )}
         </div>
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <Text>Cargando entrenadores...</Text>
-          </div>
-        ) : (
-          <>
-            <CoachesTable
-              coaches={result.data}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
+        <CoachesTable
+          coaches={result.data}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          loading={isLoading}
+        />
 
             {/* ── Pagination ── */}
             {result.totalPages > 1 && (
@@ -196,8 +190,6 @@ export default function TrainersPage() {
                 </div>
               </div>
             )}
-          </>
-        )}
       </section>
 
       {/* ── Modal de Edición ── */}

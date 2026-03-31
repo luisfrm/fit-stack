@@ -3,13 +3,14 @@
 import * as React from "react";
 import { Table, ColumnDef, Button, Badge } from "@workspace/ui/components";
 import { type IMember, type Role } from "@/types/dashboard";
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, ShieldCheck } from "lucide-react";
 import { MemberModal } from "./member-modal";
 
 interface MembersTableProps {
   readonly members: IMember[];
   readonly onDelete: (id: number) => void;
   readonly onSuccess: () => void;
+  readonly loading?: boolean;
 }
 
 const getRoleBadgeColor = (role: Role) => {
@@ -109,8 +110,25 @@ const getColumns = (
   }
 ];
 
-export function MembersTable({ members, onDelete, onSuccess }: MembersTableProps) {
+import { NoData } from "@/components/dashboard/dashboard-ui";
+
+export function MembersTable({ members, onDelete, onSuccess, loading }: MembersTableProps) {
   const columns = React.useMemo(() => getColumns(onDelete, onSuccess), [onDelete, onSuccess]);
 
-  return <Table columns={columns} data={members} />;
+  const emptyState = (
+    <NoData
+      icon={ShieldCheck}
+      message="No se encontraron miembros. Intenta ajustando los filtros o crea un nuevo miembro."
+      className="py-12"
+    />
+  );
+
+  return (
+    <Table 
+      columns={columns} 
+      data={members} 
+      loading={loading}
+      emptyState={emptyState}
+    />
+  );
 }

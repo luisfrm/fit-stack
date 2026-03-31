@@ -43,7 +43,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>
+    <div className="flex h-svh w-full overflow-hidden" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>
 
       {/* ── LEFT: Form ── */}
       <div

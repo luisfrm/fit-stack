@@ -52,3 +52,4 @@ export { Checkbox } from "@workspace/ui/components/checkbox";
 export * from "@workspace/ui/components/select";
 export * from "@workspace/ui/components/sheet";
 export * from "@workspace/ui/components/toggle-group";
+export { Skeleton } from "@workspace/ui/components/skeleton";

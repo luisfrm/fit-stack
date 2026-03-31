@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   Download,
   Plus,
-  Loader2,
 } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
@@ -128,14 +127,7 @@ export default function DashboardPage() {
               Ver todas
             </Link>
           </div>
-          {isLoadingClasses ? (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-500">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <Text>Cargando clases...</Text>
-            </div>
-          ) : (
-            <TodayClassesTable classes={todayClasses} />
-          )}
+          <TodayClassesTable classes={todayClasses} loading={isLoadingClasses} />
         </Card>
 
         {/* Recent Registrations */}

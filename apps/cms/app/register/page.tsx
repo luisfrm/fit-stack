@@ -127,12 +127,14 @@ function RegisterForm() {
             <Text variant="muted" size="md">Completa tu registro para acceder a la plataforma</Text>
           </header>
 
-          {isValidating ? (
+          {isValidating && (
             <div className="flex flex-col items-center justify-center py-10 gap-4 text-gray-500">
               <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
               <p>Validando invitación...</p>
             </div>
-          ) : tokenError ? (
+          )}
+
+          {tokenError && (
             <div className="flex flex-col items-center justify-center py-10 gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center px-4">
               <AlertCircle className="text-red-500 w-12 h-12" />
               <div>
@@ -140,7 +142,9 @@ function RegisterForm() {
                 <p className="text-sm text-red-400 mt-1">{tokenError}</p>
               </div>
             </div>
-          ) : (
+          )}
+
+          {!isValidating && !tokenError && (
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input
@@ -276,7 +280,7 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <main className="flex flex-col md:flex-row min-h-screen w-full font-sans text-white bg-black items-center justify-center">
+      <main className="flex flex-col md:flex-row min-h-svh w-full font-sans text-white bg-black items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
           <p className="text-gray-400 animate-pulse">Cargando...</p>

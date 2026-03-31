@@ -6,9 +6,6 @@ import { env } from '@/lib/config/envs';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  console.log("Expected cookie:", env.isLocal ? "better-auth.session_token" : "__Secure-better-auth.session_token");
-  console.log("Available cookies:", request.cookies.getAll().map(c => c.name));
-
   const sessionCookie = getSessionCookie(request, {
     cookiePrefix: env.isLocal ? "better-auth" : "__Secure-better-auth",
   });

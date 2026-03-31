@@ -90,17 +90,12 @@ export default function PaymentsPage() {
       </section>
 
       <section className="bg-black/20 border border-white/5 rounded-3xl overflow-hidden p-[clamp(1rem,3vw,2rem)]">
-        {loading ? (
-          <div className="flex items-center justify-center p-12 text-gray-500">
-            Cargando suscripciones...
-          </div>
-        ) : (
-          <SubscriptionsTable 
-            subscriptions={filteredSubs} 
-            onDelete={handleDelete}
-            onStatusChange={handleStatusChange}
-          />
-        )}
+        <SubscriptionsTable 
+          subscriptions={filteredSubs} 
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+          loading={loading}
+        />
       </section>
     </div>
   );

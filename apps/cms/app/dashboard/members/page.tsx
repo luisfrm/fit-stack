@@ -128,26 +128,17 @@ export default function MembersPage() {
 
       {/* Tabla */}
       <section className="bg-black/20 border border-white/5 rounded-3xl overflow-hidden p-[clamp(1rem,3vw,2rem)]">
-        {loading ? (
-          <div className="flex items-center justify-center p-12 text-gray-500">
-            Cargando miembros...
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="flex items-center justify-center p-12 text-red-400 bg-red-500/10 rounded-xl">
             {error}
           </div>
-        ) : members.length === 0 ? (
-          <NoData
-            icon={ShieldCheck}
-            message="No se encontraron miembros. Intenta ajustando los filtros o crea un nuevo miembro."
-            className="py-12"
-          />
         ) : (
           <div className="space-y-6">
             <MembersTable 
               members={members} 
               onDelete={handleDelete} 
               onSuccess={() => loadMembers()} 
+              loading={loading}
             />
 
             {/* Paginación */}

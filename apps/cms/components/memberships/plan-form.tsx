@@ -206,8 +206,8 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         </div>
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full h-12 text-sm uppercase tracking-widest font-bold shadow-lg shadow-primary/10">
-        {isLoading ? (isEdit ? "Guardando..." : "Creando...") : (isEdit ? "Guardar Cambios" : "Crear Plan")}
+      <Button type="submit" loading={isLoading} className="w-full h-12 text-sm uppercase tracking-widest font-bold shadow-lg shadow-primary/10">
+        {isEdit ? "Guardar Cambios" : "Crear Plan"}
       </Button>
     </form>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CalendarDays, Plus, Filter, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Text, toast } from "@workspace/ui/components";
 import { ClassesTable } from "@/components/classes/classes-table";
 import { ClassModal } from "@/components/classes/class-modal";
@@ -141,48 +141,40 @@ export default function ClassesPage() {
           )}
         </div>
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-500">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <Text>Cargando clases...</Text>
-          </div>
-        ) : (
-          <>
-            <ClassesTable
-              classes={result.data}
-              onDelete={handleDelete}
-              onUpdate={() => fetchClasses(filters)}
-            />
+        <ClassesTable
+          classes={result.data}
+          onDelete={handleDelete}
+          onUpdate={() => fetchClasses(filters)}
+          loading={isLoading}
+        />
 
-            {/* ── Pagination ── */}
-            {result.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6 px-1">
-                <Text size="sm" variant="muted">
-                  Página {result.page} de {result.totalPages}
-                </Text>
-                <div className="flex gap-2">
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={result.page <= 1}
-                    leftIcon={<ChevronLeft className="w-4 h-4" />}
-                    onClick={() => handlePageChange(result.page - 1)}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={result.page >= result.totalPages}
-                    onClick={() => handlePageChange(result.page + 1)}
-                  >
-                    Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
+          {/* ── Pagination ── */}
+          {result.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 px-1">
+              <Text size="sm" variant="muted">
+                Página {result.page} de {result.totalPages}
+              </Text>
+              <div className="flex gap-2">
+                <Button
+                  variant="glass"
+                  size="sm"
+                  disabled={result.page <= 1}
+                  leftIcon={<ChevronLeft className="w-4 h-4" />}
+                  onClick={() => handlePageChange(result.page - 1)}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="glass"
+                  size="sm"
+                  disabled={result.page >= result.totalPages}
+                  onClick={() => handlePageChange(result.page + 1)}
+                >
+                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
               </div>
-            )}
-          </>
-        )}
+            </div>
+          )}
       </section>
     </>
   );

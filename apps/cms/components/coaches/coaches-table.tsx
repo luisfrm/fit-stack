@@ -14,6 +14,7 @@ interface CoachesTableProps {
   readonly coaches: ICoach[];
   readonly onEdit: (coach: ICoach) => void;
   readonly onDelete: (coach: ICoach) => void;
+  readonly loading?: boolean;
 }
 
 const getColumns = (
@@ -82,12 +83,15 @@ const getColumns = (
   }
 ];
 
-export function CoachesTable({ coaches, onEdit, onDelete }: CoachesTableProps) {
+export function CoachesTable({ coaches, onEdit, onDelete, loading }: CoachesTableProps) {
   const columns = React.useMemo(() => getColumns(onEdit, onDelete), [onEdit, onDelete]);
 
-  if (coaches.length === 0) {
-    return <NoData message="No hay entrenadores registrados." className="py-20" />;
-  }
-
-  return <Table columns={columns} data={coaches} />;
+  return (
+    <Table 
+      columns={columns} 
+      data={coaches} 
+      loading={loading}
+      emptyState={<NoData message="No hay entrenadores registrados. Intenta ajustando los filtros o añade uno nuevo." className="py-20" />}
+    />
+  );
 }

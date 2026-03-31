@@ -116,18 +116,27 @@ interface SubscriptionsTableProps {
   readonly subscriptions: ISubscription[];
   readonly onDelete: (id: number) => void;
   readonly onStatusChange: (id: number, status: 'active'|'canceled'|'expired') => void;
+  readonly loading?: boolean;
 }
 
-export function SubscriptionsTable({ subscriptions, onDelete, onStatusChange }: SubscriptionsTableProps) {
+import { NoData } from "../dashboard/dashboard-ui";
+import { CreditCard } from "lucide-react";
+
+export function SubscriptionsTable({ subscriptions, onDelete, onStatusChange, loading }: SubscriptionsTableProps) {
   const columns = React.useMemo(() => getColumns(onStatusChange, onDelete), [onStatusChange, onDelete]);
 
-  if (subscriptions.length === 0) {
-    return (
-      <div className="py-20 text-center flex flex-col items-center justify-center">
-        <Text variant="muted">No hay cobros registrados. Genera una nueva suscripción.</Text>
-      </div>
-    );
-  }
-
-  return <Table columns={columns} data={subscriptions} />;
+  return (
+    <Table 
+      columns={columns} 
+      data={subscriptions} 
+      loading={loading}
+      emptyState={
+        <NoData 
+          icon={CreditCard}
+          message="No hay cobros registrados. Genera una nueva suscripción para comenzar." 
+          className="py-20" 
+        />
+      }
+    />
+  );
 }
