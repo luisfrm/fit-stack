@@ -8,18 +8,19 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@workspace/ui/components";
-import { type ICmsClass, type FrequencyType } from "@/types/dashboard";
+import { type ICmsClass } from "@/types/dashboard";
 import { Calendar, Clock, User, FileText, Globe, Repeat } from "lucide-react";
 import { parseDateAsConfigTimezone } from "@/lib/config/display";
+import { Label } from "@workspace/ui/components/label";
 
 const DAYS_OF_WEEK = [
-  { label: "Domingo",   value: 0 },
-  { label: "Lunes",     value: 1 },
-  { label: "Martes",    value: 2 },
+  { label: "Domingo", value: 0 },
+  { label: "Lunes", value: 1 },
+  { label: "Martes", value: 2 },
   { label: "Miércoles", value: 3 },
-  { label: "Jueves",    value: 4 },
-  { label: "Viernes",   value: 5 },
-  { label: "Sábado",    value: 6 },
+  { label: "Jueves", value: 4 },
+  { label: "Viernes", value: 5 },
+  { label: "Sábado", value: 6 },
 ];
 
 interface ClassFormProps {
@@ -31,23 +32,25 @@ interface ClassFormProps {
 export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) {
   const isEdit = !!initialData?.id;
 
-  const initialDateStr = initialData?.scheduledDate 
-    ? (initialData.scheduledDate.includes("T") 
-        ? new Date(initialData.scheduledDate).toISOString().split("T")[0] 
-        : initialData.scheduledDate)
-    : "";
+  const initialDateStr = (() => {
+    const raw = initialData?.scheduledDate;
+    if (!raw) return "";
+    return raw.includes("T")
+      ? new Date(raw).toISOString().split("T")[0]
+      : raw;
+  })();
 
   const [formData, setFormData] = React.useState<Partial<ICmsClass>>({
-    name:          initialData?.name          ?? "",
-    description:   initialData?.description   ?? "",
-    trainerName:   initialData?.trainerName   ?? "",
-    isVisible:     initialData?.isVisible     ?? true,
-    startTime:     initialData?.startTime     ?? "",
-    endTime:       initialData?.endTime       ?? "",
+    name: initialData?.name ?? "",
+    description: initialData?.description ?? "",
+    trainerName: initialData?.trainerName ?? "",
+    isVisible: initialData?.isVisible ?? true,
+    startTime: initialData?.startTime ?? "",
+    endTime: initialData?.endTime ?? "",
     frequencyType: initialData?.frequencyType ?? "weekly",
     scheduledDate: initialDateStr,
-    daysOfWeek:    initialData?.daysOfWeek    ?? [],
-    capacity:      initialData?.capacity      ?? undefined,
+    daysOfWeek: initialData?.daysOfWeek ?? [],
+    capacity: initialData?.capacity ?? undefined,
   });
 
   const handleChange = (field: keyof ICmsClass, value: unknown) => {
@@ -107,9 +110,9 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
 
       {/* ── Frecuencia ── */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Tipo de Frecuencia
-        </label>
+        </Label>
         <ToggleGroup
           type="single"
           value={formData.frequencyType ?? "weekly"}
@@ -183,9 +186,9 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
 
       {/* ── Descripción ── */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Descripción
-        </label>
+        </Label>
         <div className="relative">
           <FileText className="absolute left-3 top-3 text-white/30" size={16} />
           <textarea
@@ -205,13 +208,13 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
           onCheckedChange={(checked) => handleChange("isVisible", checked)}
         />
         <div className="grid gap-1.5 leading-none">
-          <label
+          <Label
             htmlFor="isVisible"
             className="text-sm font-medium leading-none flex items-center gap-2"
           >
             <Globe size={14} className="text-primary" />
             Visible en la Web
-          </label>
+          </Label>
           <p className="text-xs text-muted-foreground">
             Determina si los clientes pueden ver esta clase en la aplicación.
           </p>

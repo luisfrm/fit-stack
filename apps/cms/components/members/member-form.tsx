@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { 
-  Input, 
-  Button, 
+import {
+  Input,
+  Button,
   Checkbox,
   ToggleGroup,
   ToggleGroupItem,
+  Label,
 } from "@workspace/ui/components";
 import { type IMember, type Role } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send } from "lucide-react";
@@ -82,11 +83,11 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Rol del Miembro
-        </label>
-        <ToggleGroup 
-          type="single" 
+        </Label>
+        <ToggleGroup
+          type="single"
           value={formData.role ?? "client"}
           onValueChange={(val) => {
             if (val) handleChange("role", val as Role);
@@ -101,18 +102,18 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
 
       <div className="flex flex-col gap-4 pt-2">
         <div className="flex items-center space-x-3 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
-          <Checkbox 
-            id="isActive" 
+          <Checkbox
+            id="isActive"
             checked={formData.isActive}
             onCheckedChange={(checked) => handleChange("isActive", checked)}
           />
           <div className="grid gap-1.5 leading-none">
-            <label
+            <Label
               htmlFor="isActive"
               className="text-sm font-medium leading-none text-white"
             >
               Estado Activo
-            </label>
+            </Label>
             <p className="text-xs text-muted-foreground">
               Determina si el miembro tiene acceso actual al gimnasio.
             </p>
@@ -121,18 +122,18 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
 
         {!isEdit && (
           <div className="flex items-center space-x-3 rounded-lg border border-primary/10 bg-primary/5 p-4">
-            <Checkbox 
-              id="sendEmail" 
+            <Checkbox
+              id="sendEmail"
               checked={sendInvite}
               onCheckedChange={(checked) => setSendInvite(!!checked)}
             />
             <div className="grid gap-1.5 leading-none">
-              <label
+              <Label
                 htmlFor="sendEmail"
                 className="text-sm font-bold leading-none text-primary"
               >
                 Enviar correo de registro
-              </label>
+              </Label>
               <p className="text-xs text-primary/60">
                 Se enviarán las credenciales de acceso al correo vinculado para crear su contraseña.
               </p>
@@ -142,10 +143,10 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
       </div>
 
       <div className="pt-4">
-        <Button 
-          type="submit" 
-          fullWidth 
-          size="lg" 
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
           loading={isLoading}
           rightIcon={!isLoading && (isEdit ? <ShieldCheck size={18} /> : <Send size={18} />)}
         >
