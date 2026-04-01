@@ -44,7 +44,12 @@ export default function ClassesPage() {
   // Search with debounce — fires 400ms after user stops typing
   React.useEffect(() => {
     const timeout = setTimeout(() => {
-      setFilters(prev => ({ ...prev, name: searchInput || undefined, page: 1 }));
+      setFilters(prev => {
+        const nextName = searchInput || undefined;
+        // Solo actualizar si el nombre realmente ha cambiado respecto al filtro actual
+        if (prev.name === nextName) return prev;
+        return { ...prev, name: nextName, page: 1 };
+      });
     }, 400);
     return () => clearTimeout(timeout);
   }, [searchInput]);
