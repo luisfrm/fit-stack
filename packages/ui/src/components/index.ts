@@ -49,6 +49,7 @@ export { toast } from "sonner";
 export { Spinner } from "@workspace/ui/components/spinner";
 export { Modal } from "@workspace/ui/components/modal";
 export { Checkbox } from "@workspace/ui/components/checkbox";
+export { Label } from "@workspace/ui/components/label";
 export * from "@workspace/ui/components/select";
 export * from "@workspace/ui/components/sheet";
 export * from "@workspace/ui/components/toggle-group";

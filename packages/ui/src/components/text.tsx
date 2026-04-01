@@ -46,6 +46,10 @@ const textVariants = cva(["leading-normal"], {
       true:  "truncate",
       false: "",
     },
+    italic: {
+      true:  "italic",
+      false: "",
+    },
   },
   defaultVariants: {
     size:      "base",
@@ -53,6 +57,7 @@ const textVariants = cva(["leading-normal"], {
     weight:    "normal",
     uppercase: false,
     truncate:  false,
+    italic:    false,
   },
 });
 
@@ -87,13 +92,14 @@ function Text({
   weight,
   uppercase,
   truncate,
+  italic,
   className,
   children,
   ...props
 }: Readonly<TextProps>) {
   return (
     <Tag
-      className={cn(textVariants({ size, variant, weight, uppercase, truncate }), className)}
+      className={cn(textVariants({ size, variant, weight, uppercase, truncate, italic }), className)}
       {...(props as React.HTMLAttributes<HTMLElement>)}
     >
       {children}

@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { CircleX } from "lucide-react"
 import { cn } from "@workspace/ui/lib/utils"
 import { Spinner } from "@workspace/ui/components/spinner"
+import { Label } from "@workspace/ui/components/label"
 
 /* ─────────────────────────────────────────────
    WRAPPER VARIANTS
@@ -42,16 +43,16 @@ const inputWrapperVariants = cva(
 
       state: {
         default: "",
-        error:   "border-red-500 focus-within:border-red-500 focus-within:ring-red-500",
+        error: "border-red-500 focus-within:border-red-500 focus-within:ring-red-500",
         success: "border-green-500 focus-within:border-green-500 focus-within:ring-green-500",
         loading: "",
       },
     },
 
     defaultVariants: {
-      variant:   "default",
+      variant: "default",
       inputSize: "base",
-      state:     "default",
+      state: "default",
     },
   }
 )
@@ -61,7 +62,7 @@ const inputWrapperVariants = cva(
    ───────────────────────────────────────────── */
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
-    VariantProps<typeof inputWrapperVariants> {
+  VariantProps<typeof inputWrapperVariants> {
   /**
    * Icon rendered on the left side of the input.
    * Pass any React node, e.g. a Lucide icon: <Mail size={16} />
@@ -133,12 +134,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div className="flex flex-col gap-1.5 w-full">
         {/* Label */}
         {label && (
-          <label
+          <Label
             htmlFor={inputId}
             className="text-xs font-semibold uppercase tracking-wider text-gray-400"
           >
             {label}
-          </label>
+          </Label>
         )}
 
         {/* Wrapper */}
@@ -164,7 +165,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className={cn(
               "flex-1 bg-transparent outline-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
               "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:white]",
-              leftIcon  && "pl-2",
+              leftIcon && "pl-2",
               renderRightElement && "pr-2",
               className
             )}
@@ -180,7 +181,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <p
             className={cn(
               "text-xs",
-              state === "error"   && "text-red-400",
+              state === "error" && "text-red-400",
               state === "success" && "text-green-400",
               (!state || state === "default") && "text-white/40"
             )}

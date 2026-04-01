@@ -83,6 +83,15 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 // GENERIC TABLE COMPONENT (EXPORTED)
 // ==========================================
 
+/**
+ * ⚠️ NOTA TÉCNICA (SonarQube S6478):
+ * Para evitar problemas de rendimiento y pérdida de foco en los inputs dentro de las tablas,
+ * NO definas el array 'columns' ni las funciones 'cell' dentro del cuerpo del componente padre.
+ *
+ * ✅ CORRECTO: Define las columnas fuera del componente o usa React.useMemo(() => [...], []).
+ * ❌ INCORRECTO: Definir const columns = [...] directamente en el componente funcional.
+ */
+
 export interface ColumnDef<T> {
   id?: string
   header: React.ReactNode | string
@@ -101,13 +110,15 @@ export interface TableProps<T> {
 }
 
 function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: TableProps<T>) {
+  const tableId = React.useId();
+
   return (
     <div className="bg-zinc-900/50 rounded-xl border border-white/5 overflow-hidden">
       <TablePrimitive>
         <TableHeader className="bg-black/20">
           <TableRow className="border-white/5 hover:bg-transparent">
             {columns.map((col, i) => {
-              const colKey = col.id ?? (typeof col.header === "string" ? col.header : `col-${i}`);
+              const colKey = col.id ?? (typeof col.header === "string" ? col.header : `col-${tableId}-${i}`);
               return (
                 <TableHead
                   key={colKey}
@@ -126,12 +137,15 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: Ta
         <TableBody>
           {loading && (
             Array.from({ length: 5 }).map((_, rowIndex) => (
-              <TableRow key={`loading-row-${rowIndex}`} className="border-white/5 hover:bg-transparent">
-                {columns.map((col, colIndex) => (
-                  <TableCell key={`loading-cell-${colIndex}`} className={cn("py-4", col.className)}>
-                    <Skeleton className="h-4 w-4/5" />
-                  </TableCell>
-                ))}
+              <TableRow key={`${tableId}-loading-row-${rowIndex}`} className="border-white/5 hover:bg-transparent">
+                {columns.map((col, colIndex) => {
+                  const cellKey = col.id ?? (typeof col.header === "string" ? col.header : `loading-cell-${colIndex}`);
+                  return (
+                    <TableCell key={`${tableId}-${cellKey}`} className={cn("py-4", col.className)}>
+                      <Skeleton className="h-4 w-4/5" />
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))
           )}
@@ -144,8 +158,8 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: Ta
           )}
 
           {!loading && data.map((item, rowIndex) => {
-            // Intenta usar la prop rowKey, sino busca un .id, sino usa string del índice.
-            const itemKey = rowKey ? rowKey(item) : ((item as Record<string, unknown>).id as string | number | undefined ?? `row-${rowIndex}`);
+            // Intenta usar la prop rowKey, sino busca un .id, sino usa string del índice con tableId.
+            const itemKey = rowKey ? rowKey(item) : ((item as Record<string, unknown>).id as string | number | undefined ?? `${tableId}-row-${rowIndex}`);
 
             return (
               <TableRow
