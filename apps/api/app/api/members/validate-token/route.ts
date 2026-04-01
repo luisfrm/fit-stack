@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Miembro no encontrado' }, { status: 404 });
     }
     
-    if (member.userId) {
+    if (member.user) {
       return NextResponse.json({ error: 'Esta invitación ya fue utilizada' }, { status: 400 });
     }
 

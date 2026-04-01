@@ -14,6 +14,15 @@ export const rbacRepository = {
     });
   },
 
+  async findPermissionsByRoleId(roleId: number) {
+    return db.query.rolePermissions.findMany({
+      where: eq(schema.rolePermissions.roleId, roleId),
+      with: {
+        permission: true
+      }
+    });
+  },
+
   // --- Roles ---
   async findAllRoles() {
     return db.query.roles.findMany({
@@ -87,5 +96,13 @@ export const rbacRepository = {
 
   async assignRoleToUser(userId: string, roleId: number) {
     await db.insert(schema.userRoles).values({ userId, roleId }).onConflictDoNothing();
+  },
+
+  async updateUserRoleId(userId: string, roleId: number | null) {
+    await db.update(schema.user).set({ roleId }).where(eq(schema.user.id, userId));
+  },
+
+  async updateUserMemberId(userId: string, memberId: number | null) {
+    await db.update(schema.user).set({ memberId }).where(eq(schema.user.id, userId));
   }
 };

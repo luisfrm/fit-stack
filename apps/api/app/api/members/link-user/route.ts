@@ -3,6 +3,7 @@ import { tokenService } from '@/services/token.service';
 import { membersRepository } from '@/repositories/members.repository';
 import { getSession } from '@/config/get-session';
 import { rbacService } from '@/services/rbac.service';
+import { rbacRepository } from '@/repositories/rbac.repository';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,17 +24,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Miembro no encontrado' }, { status: 404 });
     }
     
-    if (member.userId) {
+    if (member.user) {
       return NextResponse.json({ error: 'Este miembro ya está vinculado' }, { status: 400 });
     }
-
-    // 1. Vinculamos el userID al registro del miembro
-    await membersRepository.update(member.id, { userId: session.user.id });
 
     // 2. Asignamos el rol dinámico (RBAC) si está pre-definido en la invitación
     if (member.roleId) {
       await rbacService.updateUserRoles(session.user.id, [member.roleId]);
     }
+
+    // 3. Vinculamos el memberId en la tabla user
+    await rbacRepository.updateUserMemberId(session.user.id, member.id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -43,6 +43,13 @@
       "when": 1775044871968,
       "tag": "0005_careful_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775076623843,
+      "tag": "0006_rainy_nemesis",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,6 @@ export default async function DashboardLayout({
 
   // If no session, redirect to login
   if (!session) {
-    console.log('❌ No session found in dashboard layout');
     redirect("/login");
   }
 
@@ -23,7 +22,7 @@ export default async function DashboardLayout({
       <AppSidebar
         user={{
           name: user?.name || "Usuario",
-          role: (user as any)?.role || "Administrador",
+          role: (user as any)?.role || "Manager",
           avatarUrl: user?.image || undefined
         }}
       />

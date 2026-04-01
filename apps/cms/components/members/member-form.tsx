@@ -8,9 +8,11 @@ import {
   ToggleGroup,
   ToggleGroupItem,
   Label,
+  Skeleton,
 } from "@workspace/ui/components";
-import { type IMember, type Role } from "@/types/dashboard";
+import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send } from "lucide-react";
+import { rbacService } from "@/lib/services/rbac-service";
 
 interface MemberFormProps {
   readonly initialData?: IMember;
@@ -20,15 +22,41 @@ interface MemberFormProps {
 
 export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
   const isEdit = !!initialData?.id;
+  const [roles, setRoles] = React.useState<{ id: number; name: string }[]>([]);
+  const [isLoadingRoles, setIsLoadingRoles] = React.useState(true);
 
   const [formData, setFormData] = React.useState<Partial<IMember>>({
     firstName: initialData?.firstName ?? "",
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    role: initialData?.role ?? "client",
+    roleId: initialData?.roleId ?? 0,
     isActive: initialData?.isActive ?? true,
   });
+
+  React.useEffect(() => {
+    const fetchRoles = async () => {
+      setIsLoadingRoles(true);
+      try {
+        const data = await rbacService.getRoles();
+        setRoles(data);
+        
+        // Si es nuevo y no tiene roleId, asignar el primero por defecto (ej: Cliente)
+        if (!isEdit && !formData.roleId && data.length > 0) {
+          const defaultRole = data.find((r) => r.name.toLowerCase() === "client") || data[0];
+          if (defaultRole) {
+            setFormData(prev => ({ ...prev, roleId: defaultRole.id }));
+          }
+        }
+      } catch (error) {
+        console.error("Error cargando roles:", error);
+      } finally {
+        setIsLoadingRoles(false);
+      }
+    };
+    fetchRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit]);
 
   const [sendInvite, setSendInvite] = React.useState(!isEdit);
 
@@ -36,7 +64,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.SubmitEvent) => {
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     onSubmit(formData, sendInvite);
   };
@@ -86,18 +114,35 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
         <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Rol del Miembro
         </Label>
-        <ToggleGroup
-          type="single"
-          value={formData.role ?? "client"}
-          onValueChange={(val) => {
-            if (val) handleChange("role", val as Role);
-          }}
-        >
-          <ToggleGroupItem value="client">Cliente</ToggleGroupItem>
-          <ToggleGroupItem value="trainer">Entrenador</ToggleGroupItem>
-          <ToggleGroupItem value="manager">Manager</ToggleGroupItem>
-          <ToggleGroupItem value="admin">Administrador</ToggleGroupItem>
-        </ToggleGroup>
+        
+        {isLoadingRoles ? (
+          <div className="grid grid-cols-4 gap-2 w-full">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <ToggleGroup
+            type="single"
+            value={formData.roleId ? formData.roleId.toString() : ""}
+            onValueChange={(val: any) => {
+              if (val && typeof val === "string") {
+                handleChange("roleId", Number.parseInt(val, 10));
+              }
+            }}
+            className="grid grid-cols-4 gap-2 w-full"
+          >
+            {roles.map((r) => (
+              <ToggleGroupItem
+                key={r.id}
+                value={r.id.toString()}
+                className="h-10 w-full text-xs capitalize justify-center"
+              >
+                {r.name}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 pt-2">

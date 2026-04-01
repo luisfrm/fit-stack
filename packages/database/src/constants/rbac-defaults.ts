@@ -46,5 +46,10 @@ export const DEFAULT_ROLES = [
       'members:read', 
       'classes:manage'
     ],
+  },
+  {
+    name: 'client',
+    description: 'Miembro del gimnasio con acceso limitado a su propio perfil y rutinas',
+    permissions: [],
   }
 ];

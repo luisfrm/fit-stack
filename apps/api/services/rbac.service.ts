@@ -6,18 +6,39 @@ export const rbacService = {
   /**
    * Fetches all unique permissions for a user (from roles and direct assignments)
    */
-  async getUserPermissions(userId: string): Promise<string[]> {
-    const userRoles = await rbacRepository.findUserRoles(userId);
-    const directPermissions = await rbacRepository.findUserDirectPermissions(userId);
-
+  async getUserPermissions(userId: string, roleId?: number): Promise<string[]> {
     const permissionsSet = new Set<string>();
 
+    let activeRoleId = roleId;
+
+    // Si no viene roleId, intentamos sacarlo del usuario (columna directa)
+    if (!activeRoleId) {
+      const [u] = await db
+        .select({ roleId: schema.user.roleId })
+        .from(schema.user)
+        .where(eq(schema.user.id, userId))
+        .limit(1);
+      activeRoleId = u?.roleId ?? undefined;
+    }
+
+    // 1. Permisos del rol principal (columna user.role_id)
+    if (activeRoleId) {
+      const rolePerms = await rbacRepository.findPermissionsByRoleId(activeRoleId);
+      rolePerms.forEach((rp: any) => {
+        permissionsSet.add(rp.permission.slug);
+      });
+    }
+
+    // 2. Roles de la tabla puente (user_roles) - Legacy/Soporte multi-rol
+    const userRoles = await rbacRepository.findUserRoles(userId);
     userRoles.forEach((ur: any) => {
       ur.role.rolePermissions.forEach((rp: any) => {
         permissionsSet.add(rp.permission.slug);
       });
     });
 
+    // 3. Permisos directos
+    const directPermissions = await rbacRepository.findUserDirectPermissions(userId);
     directPermissions.forEach((dp: any) => {
       permissionsSet.add(dp.permission.slug);
     });
@@ -62,13 +83,17 @@ export const rbacService = {
   },
 
   async updateUserRoles(userId: string, roleIds: number[]) {
-    // 1. Delete current roles
+    // 1. Delete current roles in junction table
     await db.delete(schema.userRoles).where(eq(schema.userRoles.userId, userId));
 
-    // 2. Add new ones
+    // 2. Add new ones in junction table
     for (const roleId of roleIds) {
       await rbacRepository.assignRoleToUser(userId, roleId);
     }
+
+    // 3. Sincronizar el rol principal en la tabla user (tomamos el primero)
+    const primaryRoleId = roleIds.length > 0 ? (roleIds[0] as number) : null;
+    await rbacRepository.updateUserRoleId(userId, primaryRoleId);
 
     return { success: true };
   }

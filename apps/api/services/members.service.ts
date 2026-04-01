@@ -56,8 +56,8 @@ export const membersService = {
   async resendInvite(id: number) {
     const member = await this.getMemberById(id);
 
-    if (member.userId) {
-      throw new Error('El miembro ya tiene una cuenta vinculada');
+    if (member.user) {
+      throw new Error('El usuario ya tiene una cuenta vinculada');
     }
 
     const token = await tokenService.signInviteToken(member.id, member.email);

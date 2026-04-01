@@ -4,9 +4,14 @@ import { members } from '@workspace/database/schema';
 export type DbMember = typeof members.$inferSelect;
 export type NewDbMember = typeof members.$inferInsert;
 
+export type MemberWithRelations = DbMember & {
+  role?: { id: number; name: string } | null;
+  user?: { id: string; email: string } | null;
+};
+
 export interface MembersFilter {
   query?: string;
-  role?: string;
+  roleId?: number;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -14,7 +19,7 @@ export interface MembersFilter {
 }
 
 export interface PaginatedMembersResult {
-  data: DbMember[];
+  data: MemberWithRelations[];
   total: number;
   page: number;
   limit: number;
@@ -23,7 +28,7 @@ export interface PaginatedMembersResult {
 
 export const membersRepository = {
   async findAll(filters: MembersFilter = {}): Promise<PaginatedMembersResult> {
-    const { query, role, isActive, page = 1, limit = 10, requireTotal = true } = filters;
+    const { query, roleId, isActive, page = 1, limit = 10, requireTotal = true } = filters;
     const offset = (page - 1) * limit;
 
     const conditions = [];
@@ -39,8 +44,8 @@ export const membersRepository = {
       );
     }
     
-    if (role) {
-      conditions.push(eq(members.role, role as any));
+    if (roleId) {
+      conditions.push(eq(members.roleId, roleId));
     }
 
     if (isActive !== undefined) {
@@ -49,13 +54,16 @@ export const membersRepository = {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const rowsQuery = db
-      .select()
-      .from(members)
-      .where(whereClause)
-      .orderBy(desc(members.createdAt))
-      .limit(limit)
-      .offset(offset);
+    const rowsQuery = db.query.members.findMany({
+      where: whereClause,
+      with: {
+        role: true,
+        user: true
+      },
+      orderBy: desc(members.createdAt),
+      limit: limit,
+      offset: offset
+    });
 
     if (!requireTotal) {
       const rows = await rowsQuery;
@@ -78,9 +86,14 @@ export const membersRepository = {
     };
   },
 
-  async findById(id: number) {
-    const [result] = await db.select().from(members).where(eq(members.id, id));
-    return result;
+  async findById(id: number): Promise<MemberWithRelations | undefined> {
+    return db.query.members.findFirst({
+      where: eq(members.id, id),
+      with: {
+        role: true,
+        user: true
+      }
+    });
   },
 
   async findByEmail(email: string) {

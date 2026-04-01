@@ -24,9 +24,9 @@ export interface IRecentRegistration {
 export type TrendDirection = "up" | "down" | "neutral";
 
 /**
- * Valid roles for members.
+ * Valid roles for members (Dynamic from DB)
  */
-export type Role = "admin" | "manager" | "trainer" | "client";
+// Dynamic roles are handled via string names and numeric IDs
 
 export type FrequencyType = 'once' | 'weekly';
 
@@ -58,18 +58,25 @@ export interface ICmsClass {
  */
 export interface IMember {
   id?: number;
-  userId?: string | null;
   firstName: string;
   lastName: string;
   email: string;
-  role: Role;
+  roleId: number;
+  role?: {
+    id: number;
+    name: string;
+  };
+  user?: {
+    id: string;
+    email: string;
+  } | null;
   documentId?: string;
   isActive: boolean;
 }
 
 export interface MemberFilter {
   query?: string;
-  role?: Role;
+  roleId?: number;
   isActive?: boolean;
   page?: number;
   limit?: number;

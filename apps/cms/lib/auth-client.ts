@@ -1,10 +1,20 @@
 import { createAuthClient } from 'better-auth/react';
+import { customSessionClient } from "better-auth/client/plugins";
 
 const auth = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
   fetchOptions: {
     credentials: 'include',
   },
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutos
+    },
+  },
+  plugins: [
+    customSessionClient()
+  ]
 });
 
 interface SignInParams {
