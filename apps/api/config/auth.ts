@@ -35,10 +35,7 @@ export const auth = betterAuth({
     rbacPlugin(),
     customSession(async ({ user, session }) => {
       try {
-        // Aprovechamos que roleId ya viene en el objeto user centralizado
         const permissions = await rbacService.getUserPermissions(user.id, (user as any).roleId);
-
-        console.log("user", user);
 
         return {
           user: {
