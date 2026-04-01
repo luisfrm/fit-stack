@@ -36,7 +36,7 @@ export const membersService = {
   },
 
   async updateMember(id: number, data: Partial<NewDbMember>) {
-    await this.getMemberById(id);
+    const member = await this.getMemberById(id);
 
     if (data.email) {
       const existing = await membersRepository.findByEmail(data.email);
@@ -45,7 +45,15 @@ export const membersService = {
       }
     }
 
-    return membersRepository.update(id, data);
+    const updated = await membersRepository.update(id, data);
+
+    // 🔄 Sincronizar roleId con el User si existe y el rol ha cambiado
+    if (data.roleId && member.user?.id) {
+      const { rbacRepository } = await import('../repositories/rbac.repository');
+      await rbacRepository.updateUserRoleId(member.user.id, data.roleId);
+    }
+
+    return updated;
   },
 
   async deleteMember(id: number) {
