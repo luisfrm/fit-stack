@@ -56,5 +56,13 @@ export const membersService = {
   async linkUser(token: string): Promise<{ success: boolean }> {
     const response = await apiClient.post("/members/link-user", { token });
     return response.data;
+  },
+
+  /**
+   * Resends the registration email for a member.
+   */
+  async resendInvite(id: number): Promise<{ success: boolean }> {
+    const response = await apiClient.post(`/members/${id}/resend-invite`);
+    return response.data;
   }
 };

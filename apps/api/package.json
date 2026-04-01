@@ -16,10 +16,13 @@
     "better-auth": "^1.5.5",
     "jose": "^6.2.1",
     "next": "16.1.6",
+    "nodemailer": "^8.0.4",
+    "resend": "^6.10.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^25.1.0",
+    "@types/nodemailer": "^7.0.11",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.2",

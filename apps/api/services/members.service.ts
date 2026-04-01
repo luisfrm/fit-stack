@@ -51,5 +51,18 @@ export const membersService = {
   async deleteMember(id: number) {
     await this.getMemberById(id);
     await membersRepository.delete(id);
+  },
+
+  async resendInvite(id: number) {
+    const member = await this.getMemberById(id);
+
+    if (member.userId) {
+      throw new Error('El miembro ya tiene una cuenta vinculada');
+    }
+
+    const token = await tokenService.signInviteToken(member.id, member.email);
+    await emailService.sendRegistrationInvite(member.email, token);
+
+    return { success: true };
   }
 };

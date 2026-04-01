@@ -60,11 +60,11 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard }, // O 'Files' si lo prefieres
-  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
+  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
   { label: "Miembros", href: "/dashboard/members", icon: Users },
+  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
   { label: "Clases", href: "/dashboard/classes", icon: CalendarDays },
   { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell },
-  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
   { label: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
 

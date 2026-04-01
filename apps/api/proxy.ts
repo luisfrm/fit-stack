@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
 import { auth } from "@/config/auth";
 
-const publicRoutes = ["/api/auth", "/api/health"];
+const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token"];
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
@@ -37,7 +37,9 @@ export async function proxy(request: NextRequest) {
   });
 
   if (!session) {
-    return Response.json({ error: "No autorizado" }, { status: 401 });
+    const errorResponse = NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    if (origin?.startsWith(env.frontendUrl!)) setCorsHeaders(errorResponse, origin);
+    return errorResponse;
   }
 
   return response;
