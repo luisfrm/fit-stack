@@ -10,6 +10,7 @@ import {
   date,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 // --- BETTER AUTH TABLES ---
 
@@ -77,6 +78,7 @@ export const members = pgTable('members', {
   userId: text('user_id').references(() => user.id, { onDelete: 'set null' }), // ← text, no uuid
   email: text('email').notNull().unique(),
   role: roleEnum('role').default('client').notNull(),
+  roleId: integer('role_id').references(() => roles.id), // Nueva columna para roles dinámicos (RBAC)
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   documentId: text('document_id'),
@@ -233,6 +235,72 @@ export const gymSettings = pgTable('gym_settings', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// --- RBAC: ROLES & PERMISSIONS ---
+
+export const roles = pgTable('roles', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(), // admin, manager, trainer, client, coach, custom
+  description: text('description'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const permissions = pgTable('permissions', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(), // e.g., 'members:delete'
+  description: text('description'),
+});
+
+export const rolePermissions = pgTable('role_permissions', {
+  id: serial('id').primaryKey(),
+  roleId: integer('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
+  permissionId: integer('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+});
+
+export const userRoles = pgTable('user_roles', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull(),
+  roleId: integer('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
+});
+
+export const userPermissions = pgTable('user_permissions', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull(),
+  permissionId: integer('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+});
+
+// --- RELATIONS ---
+
+export const userRelations = relations(user, ({ many }) => ({
+  userRoles: many(userRoles),
+  userPermissions: many(userPermissions),
+}));
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+  userRoles: many(userRoles),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
+  userPermissions: many(userPermissions),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
+  permission: one(permissions, { fields: [rolePermissions.permissionId], references: [permissions.id] }),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(user, { fields: [userRoles.userId], references: [user.id] }),
+  role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
+}));
+
+export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
+  user: one(user, { fields: [userPermissions.userId], references: [user.id] }),
+  permission: one(permissions, { fields: [userPermissions.permissionId], references: [permissions.id] }),
+}));
 
 // --- CMS PÁGINAS Y BLOQUES DINÁMICOS ---
 
