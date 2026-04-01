@@ -2,13 +2,15 @@ import * as React from "react";
 import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
+import { type Session } from "@/lib/auth-client";
+import { canAccessCMS, getRoleName } from "@/lib/utils/auth";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { data: session } = await sessionService.getSession();
+  const { data: session } = await sessionService.getSession() as { data: Session | null; error: any };
 
   // If no session, redirect to login
   if (!session) {
@@ -17,12 +19,19 @@ export default async function DashboardLayout({
 
   const user = session.user;
 
+  // 🛡️ Security Check: Validate CMS access permission
+  if (!canAccessCMS(user)) {
+    redirect("/unauthorized");
+  }
+
+  const userRole = getRoleName(user.roleId);
+
   return (
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
       <AppSidebar
         user={{
           name: user?.name || "Usuario",
-          role: (user as any)?.role || "Manager",
+          role: userRole,
           avatarUrl: user?.image || undefined
         }}
       />
@@ -30,7 +39,7 @@ export default async function DashboardLayout({
       <MobileNav
         user={{
           name: user?.name || "Usuario",
-          role: (user as any)?.role || "Administrador",
+          role: userRole,
           avatarUrl: user?.image || undefined
         }}
       />

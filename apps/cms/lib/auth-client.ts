@@ -12,6 +12,16 @@ const auth = createAuthClient({
       maxAge: 5 * 60, // 5 minutos
     },
   },
+  user: {
+    additionalFields: {
+      roleId: {
+        type: "number",
+      },
+      memberId: {
+        type: "number",
+      },
+    },
+  },
   plugins: [
     customSessionClient()
   ]
@@ -71,3 +81,30 @@ export const getSession = async (options?: any) => {
 };
 
 export const { useSession } = auth;
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  roleId: number;
+  memberId?: number | null;
+  permissions: string[];
+}
+
+export interface Session {
+  user: User;
+  session: {
+    id: string;
+    userId: string;
+    expiresAt: Date;
+    token: string;
+    createdAt: Date;
+    updatedAt: Date;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+  };
+}

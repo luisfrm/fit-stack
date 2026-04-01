@@ -1,4 +1,4 @@
-import { getSession, signOut } from "@/lib/auth-client";
+import { getSession, signOut, type Session } from "@/lib/auth-client";
 
 /**
  * Service to handle session-related operations in the CMS.
@@ -9,7 +9,7 @@ export const sessionService = {
    * Gets the current session.
    * @param customHeaders Optional headers (useful for Middleware)
    */
-  async getSession(customHeaders?: Headers) {
+  async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: any }> {
     let fetchOptions = {};
 
     if (globalThis.window === undefined) {
@@ -18,7 +18,7 @@ export const sessionService = {
       fetchOptions = { headers };
     }
 
-    return await getSession({ fetchOptions });
+    return await getSession({ fetchOptions }) as { data: Session | null; error: any };
   },
 
   /**
