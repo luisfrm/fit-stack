@@ -19,5 +19,12 @@ export const subscriptionsService = {
 
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/subscriptions/${id}`)
+  },
+
+  getRecent: async (limit: number = 5): Promise<Array<{ name: string; createdAt: string }>> => {
+    const { data } = await apiClient.get<Array<{ name: string; createdAt: string }>>('/subscriptions/recent', {
+      params: { limit }
+    })
+    return data
   }
 }

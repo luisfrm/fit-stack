@@ -32,6 +32,20 @@ export const subscriptionsRepository = {
       .orderBy(desc(subscriptions.id))
   },
 
+  async findRecent(limit: number) {
+    return db
+      .select({
+        id: subscriptions.id,
+        memberName: members.firstName,
+        memberLastName: members.lastName,
+        createdAt: subscriptions.createdAt,
+      })
+      .from(subscriptions)
+      .innerJoin(members, eq(subscriptions.memberId, members.id))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(limit)
+  },
+
   async create(data: Omit<ISubscriptionDTO, 'id'>) {
     const inserted = await db.insert(subscriptions).values({
       memberId: data.memberId,

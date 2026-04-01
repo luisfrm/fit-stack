@@ -1,8 +1,4 @@
-/* ─────────────────────────────────────────────
-   DASHBOARD TYPES
-   ───────────────────────────────────────────── */
-
-export type MemberPlan = "vip" | "pro" | "basic";
+/* ── DASHBOARD TYPES ── */
 
 /**
  * Interface for a class scheduled for today.
@@ -16,13 +12,9 @@ export interface IClassToday {
   capacity?: number;
 }
 
-/**
- * Interface for a recently registered member.
- */
 export interface IRecentRegistration {
   name: string;
   time: string;
-  plan: MemberPlan;
   avatarUrl?: string;
 }
 

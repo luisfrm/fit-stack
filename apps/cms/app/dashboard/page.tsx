@@ -17,32 +17,36 @@ import {
 } from "@/components/dashboard/dashboard-ui";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { MemberModal } from "@/components/members/member-modal";
-import { type IClassToday, type IRecentRegistration, type MemberPlan } from "@/types/dashboard";
+import { type IClassToday, type IRecentRegistration } from "@/types/dashboard";
 import { classesService } from "@/lib/services/classes-service";
+import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { DEFAULT_TIMEZONE } from "@/lib/config/display";
 
-/* ─────────────────────────────────────────────
-   STATIC DATA (will be replaced as modules grow)
-   ───────────────────────────────────────────── */
+/* ── PAGE ── */
 
-const RECENT_REGISTRATIONS: IRecentRegistration[] = [
-  { name: "Juan Pérez",   time: "Hace 15 min",  plan: "vip"   as MemberPlan },
-  { name: "Lucía Méndez", time: "Hace 45 min",  plan: "pro"   as MemberPlan },
-  { name: "Roberto Diaz", time: "Hace 1 hora",  plan: "basic" as MemberPlan },
-  { name: "Sofía Castro", time: "Hace 3 horas", plan: "vip"   as MemberPlan },
-  { name: "Marco Polo",   time: "Ayer",          plan: "pro"   as MemberPlan },
-];
+function getRelativeTime(dateStr: string) {
+  const now = new Date();
+  const past = new Date(dateStr);
+  const diffInMs = now.getTime() - past.getTime();
+  const diffInMins = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
-/* ─────────────────────────────────────────────
-   PAGE
-   ───────────────────────────────────────────── */
+  if (diffInMins < 2) return "Ahora mismo";
+  if (diffInMins < 60) return `Hace ${diffInMins} min`;
+  if (diffInHours < 24) return `Hace ${diffInHours} ${diffInHours === 1 ? 'hora' : 'horas'}`;
+  if (diffInDays === 1) return 'Ayer';
+  return past.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
 
 export default function DashboardPage() {
   const [todayClasses, setTodayClasses] = React.useState<IClassToday[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = React.useState(true);
+  const [recentRegistrations, setRecentRegistrations] = React.useState<IRecentRegistration[]>([]);
+  const [isLoadingRegistrations, setIsLoadingRegistrations] = React.useState(true);
 
   React.useEffect(() => {
-    // Use the configured timezone so "today" matches the gym's local date.
+    // Fetch classes
     const today = new Intl.DateTimeFormat('en-CA', { // en-CA gives YYYY-MM-DD
       timeZone: DEFAULT_TIMEZONE,
     }).format(new Date());
@@ -62,6 +66,18 @@ export default function DashboardPage() {
       })
       .catch(() => setTodayClasses([]))
       .finally(() => setIsLoadingClasses(false));
+
+    // Fetch recent registrations
+    subscriptionsService.getRecent(5)
+      .then((data) => {
+        const mapped: IRecentRegistration[] = data.map(sub => ({
+          name: sub.name,
+          time: getRelativeTime(sub.createdAt),
+        }));
+        setRecentRegistrations(mapped);
+      })
+      .catch(() => setRecentRegistrations([]))
+      .finally(() => setIsLoadingRegistrations(false));
   }, []);
 
   return (
@@ -109,7 +125,7 @@ export default function DashboardPage() {
           <div className="p-6 border-b border-border-dark">
             <Text as="p" size="lg" weight="bold">Últimos Registros</Text>
           </div>
-          <RecentRegistrationsList registrations={RECENT_REGISTRATIONS} />
+          <RecentRegistrationsList registrations={recentRegistrations} />
         </Card>
       </div>
 

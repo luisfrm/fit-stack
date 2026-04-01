@@ -28,6 +28,15 @@ export const subscriptionsService = {
     }))
   },
 
+  async getRecent(limit: number) {
+    const records = await subscriptionsRepository.findRecent(limit)
+    return records.map(r => ({
+      id: r.id,
+      name: `${r.memberName} ${r.memberLastName}`,
+      createdAt: r.createdAt.toISOString(),
+    }))
+  },
+
   async create(payload: ICreateSubscriptionPayload) {
     // 1. Obtener datos del plan para el snapshot histórico
     const plan = await plansRepository.findById(payload.planId)

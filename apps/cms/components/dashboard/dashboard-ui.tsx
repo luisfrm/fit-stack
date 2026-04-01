@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 
 import {
-  type MemberPlan,
   type IClassToday,
   type IRecentRegistration
 } from "@/types/dashboard";
@@ -331,25 +330,13 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
 }
 
 
-/* ─────────────────────────────────────────────
-   MEMBER ACTIVITY ITEM (Últimos Registros)
-   ───────────────────────────────────────────── */
-
-const PLAN_CONFIG: Record<MemberPlan, { label: string; className: string }> = {
-  vip: { label: "VIP", className: "bg-primary text-background-dark" },
-  pro: { label: "Pro", className: "bg-primary/50 text-background-dark" },
-  basic: { label: "Basic", className: "bg-slate-500 text-slate-100" },
-};
-
 interface ActivityItemProps {
   name: string;
   time: string;
-  plan: MemberPlan;
   avatarUrl?: string;
 }
 
-export function ActivityItem({ name, time, plan, avatarUrl }: Readonly<ActivityItemProps>) {
-  const planConfig = PLAN_CONFIG[plan];
+export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemProps>) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
       <Avatar size="default">
@@ -364,9 +351,6 @@ export function ActivityItem({ name, time, plan, avatarUrl }: Readonly<ActivityI
           {time}
         </Text>
       </div>
-      <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded uppercase shrink-0", planConfig.className)}>
-        {planConfig.label}
-      </span>
     </div>
   );
 }
