@@ -29,7 +29,7 @@ export default function PaymentsPage() {
     loadSubs();
   }, []);
 
-  const handleStatusChange = async (id: number, status: 'active'|'canceled'|'expired') => {
+  const handleStatusChange = async (id: number, status: 'active' | 'canceled' | 'expired') => {
     try {
       await subscriptionsService.updateStatus(id, status);
       toast.success(`Suscripción ${status === 'active' ? 'activada' : 'revocada'}.`);
@@ -49,8 +49,8 @@ export default function PaymentsPage() {
     }
   };
 
-  const filteredSubs = subs.filter(s => 
-    s.memberName?.toLowerCase().includes(search.toLowerCase()) || 
+  const filteredSubs = subs.filter(s =>
+    s.memberName?.toLowerCase().includes(search.toLowerCase()) ||
     s.planName?.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -59,15 +59,15 @@ export default function PaymentsPage() {
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 uppercase">
-            <CreditCard className="text-primary w-8 h-8" /> 
+            <CreditCard className="text-primary w-8 h-8" />
             Suscripciones y Pagos
           </h1>
           <p className="text-slate-400 mt-2 text-sm">
             Controla las facturas, renovaciones y vinculaciones de usuarios a sus planes.
           </p>
         </div>
-        
-        <SubscriptionModal 
+
+        <SubscriptionModal
           onSuccess={() => loadSubs()}
           trigger={
             <Button size="lg" className="rounded-xl w-full md:w-auto font-bold tracking-wider" rightIcon={<Plus size={18} />}>
@@ -80,7 +80,7 @@ export default function PaymentsPage() {
       <section className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input 
+          <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por usuario o nivel de plan..."
@@ -89,9 +89,9 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      <section className="bg-black/20 border border-white/5 rounded-3xl overflow-hidden p-[clamp(1rem,3vw,2rem)]">
-        <SubscriptionsTable 
-          subscriptions={filteredSubs} 
+      <section>
+        <SubscriptionsTable
+          subscriptions={filteredSubs}
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
           loading={loading}

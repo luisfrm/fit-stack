@@ -84,7 +84,7 @@ export default function MembersPage() {
             Administra los usuarios registrados en tu plataforma, asignado roles y accesos.
           </p>
         </div>
-        
+
         <MemberModal
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
@@ -98,18 +98,18 @@ export default function MembersPage() {
       {/* Panel de Filtros */}
       <section className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
         <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full md:w-[350px]">
-          <Input 
+          <Input
             value={tempQuery}
             onChange={(e) => setTempQuery(e.target.value)}
-            placeholder="Buscar por nombre, email..." 
-            leftIcon={<Search size={16} />} 
+            placeholder="Buscar por nombre, email..."
+            leftIcon={<Search size={16} />}
           />
           <Button type="submit" variant="outlined" className="h-[46px]">Buscar</Button>
         </form>
 
-        <ToggleGroup 
-          type="single" 
-          value={role} 
+        <ToggleGroup
+          type="single"
+          value={role}
           onValueChange={(val) => {
             if (val) {
               setRole(val as Role | "all");
@@ -127,17 +127,17 @@ export default function MembersPage() {
       </section>
 
       {/* Tabla */}
-      <section className="bg-black/20 border border-white/5 rounded-3xl overflow-hidden p-[clamp(1rem,3vw,2rem)]">
+      <section>
         {error ? (
           <div className="flex items-center justify-center p-12 text-red-400 bg-red-500/10 rounded-xl">
             {error}
           </div>
         ) : (
           <div className="space-y-6">
-            <MembersTable 
-              members={members} 
-              onDelete={handleDelete} 
-              onSuccess={() => loadMembers()} 
+            <MembersTable
+              members={members}
+              onDelete={handleDelete}
+              onSuccess={() => loadMembers()}
               loading={loading}
             />
 

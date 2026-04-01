@@ -1,6 +1,6 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { Slot } from "@radix-ui/react-slot"
+import { Slot, Slottable } from "@radix-ui/react-slot"
 import { Spinner } from "@workspace/ui/components/spinner"
 
 import { cn } from "@workspace/ui/lib/utils"
@@ -154,15 +154,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading ? (
-          <Spinner className="size-4" />
-        ) : (
-          <>
-            {leftIcon && <span className="shrink-0">{leftIcon}</span>}
-            {children}
-            {rightIcon && <span className="shrink-0">{rightIcon}</span>}
-          </>
-        )}
+        {loading && <Spinner className="size-4" />}
+        {!loading && leftIcon && <span className="shrink-0">{leftIcon}</span>}
+        {!loading && <Slottable>{children}</Slottable>}
+        {!loading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
       </Comp>
     );
   }
