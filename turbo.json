@@ -18,7 +18,13 @@
         "NEXT_PUBLIC_API_BASE_URL",
         "NEXT_PUBLIC_R2_URL",
         "FRONTEND_URL",
-        "COOKIE_DOMAIN"
+        "COOKIE_DOMAIN",
+        "EMAIL_PROVIDER",
+        "SMTP_USER",
+        "SMTP_PASS",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "APP_ENV"
       ]
     },
     "lint": {

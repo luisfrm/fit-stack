@@ -24,9 +24,9 @@ export interface IRecentRegistration {
 export type TrendDirection = "up" | "down" | "neutral";
 
 /**
- * Valid roles for members (Dynamic from DB)
+ * Valid roles for members (Dynamic from DB slugs)
  */
-// Dynamic roles are handled via string names and numeric IDs
+export type Role = 'admin' | 'manager' | 'trainer' | 'client';
 
 export type FrequencyType = 'once' | 'weekly';
 

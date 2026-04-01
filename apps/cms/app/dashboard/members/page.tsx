@@ -9,7 +9,6 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@workspace/ui/components";
-import { NoData } from "@/components/dashboard/dashboard-ui";
 import { type IMember, type Role } from "@/types/dashboard";
 import { MembersTable } from "@/components/members/members-table";
 import { MemberModal } from "@/components/members/member-modal";
@@ -112,7 +111,7 @@ export default function MembersPage() {
           value={role}
           onValueChange={(val) => {
             if (val) {
-              setRole(val as Role | "all");
+              setRole(val as Role);
               setPage(1);
             }
           }}
