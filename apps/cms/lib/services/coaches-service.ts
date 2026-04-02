@@ -65,3 +65,70 @@ export const coachesService = {
   },
 };
 
+/**
+ * ─────────────────────────────────────────────
+ * COACH MUTATION HOOKS
+ * ─────────────────────────────────────────────
+ */
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@workspace/ui/components";
+
+/**
+ * Hook to create a coach.
+ */
+export function useCreateCoachMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Partial<ICoach>) => coachesService.createCoach(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      toast.success("Entrenador creado correctamente");
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error ?? error.message ?? "Error al crear entrenador";
+      toast.error(message);
+    }
+  });
+}
+
+/**
+ * Hook to update a coach (including visibility).
+ */
+export function useUpdateCoachMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<ICoach> }) => 
+      coachesService.updateCoach(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      toast.success("Entrenador actualizado correctamente");
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error ?? error.message ?? "Error al actualizar entrenador";
+      toast.error(message);
+    }
+  });
+}
+
+/**
+ * Hook to delete a coach.
+ */
+export function useDeleteCoachMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => coachesService.deleteCoach(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      toast.success("Entrenador eliminado correctamente");
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error ?? error.message ?? "Error al eliminar entrenador";
+      toast.error(message);
+    }
+  });
+}
+

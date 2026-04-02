@@ -18,12 +18,15 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "@workspace/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
-    "drizzle-orm": "^0.45.1"
+    "drizzle-orm": "^0.45.1",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^25.1.0",
+    "@types/ws": "^8.18.1",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "drizzle-kit": "^0.31.9",

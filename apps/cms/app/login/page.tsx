@@ -7,7 +7,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Title, TitleAccent } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
-import { toast } from "@workspace/ui/components";
+import { toast, Checkbox, Label } from "@workspace/ui/components";
 import { signIn } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
@@ -18,10 +18,24 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [rememberMe, setRememberMe] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
+  // ── MOUNT: Check localStorage ──
+  React.useEffect(() => {
+    const savedEmail = localStorage.getItem("remember_email");
+    const savedPassword = localStorage.getItem("remember_password");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+    if (savedPassword) {
+      setPassword(savedPassword);
+    }
+  }, []);
+
+  const handleLogin = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -35,6 +49,15 @@ export default function LoginPage() {
       }
       setIsLoading(false);
       return;
+    }
+
+    // ── SUCCESS: Persist if checked ──
+    if (rememberMe) {
+      localStorage.setItem("remember_email", email);
+      localStorage.setItem("remember_password", password); // NOTE: Storing password in plain text is not recommended for production
+    } else {
+      localStorage.removeItem("remember_email");
+      localStorage.removeItem("remember_password");
     }
 
     setIsLoading(false);
@@ -118,6 +141,21 @@ export default function LoginPage() {
                   </button>
                 }
               />
+            </div>
+
+            {/* Remember Me */}
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="remember"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(!!checked)}
+              />
+              <Label
+                htmlFor="remember"
+                className="text-xs text-foreground-dim cursor-pointer hover:text-foreground transition-colors select-none font-medium"
+              >
+                Recuérdame
+              </Label>
             </div>
 
             {/* CTA */}

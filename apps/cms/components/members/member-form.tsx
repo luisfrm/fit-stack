@@ -5,14 +5,11 @@ import {
   Input,
   Button,
   Checkbox,
-  ToggleGroup,
-  ToggleGroupItem,
   Label,
-  Skeleton,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send } from "lucide-react";
-import { useRoles } from "@/lib/hooks/use-rbac";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar } from "lucide-react";
+import { ROLE_IDS } from "@workspace/shared/constants";
 
 interface MemberFormProps {
   readonly initialData?: IMember;
@@ -22,7 +19,6 @@ interface MemberFormProps {
 
 export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
   const isEdit = !!initialData?.id;
-  const { data: roles = [], isLoading: isLoadingRoles } = useRoles();
   const [sendInvite, setSendInvite] = React.useState(!isEdit);
 
   const [formData, setFormData] = React.useState<Partial<IMember>>({
@@ -30,19 +26,13 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    roleId: initialData?.roleId ?? 0,
+    roleId: initialData?.roleId ?? ROLE_IDS.CLIENT,
     isActive: initialData?.isActive ?? true,
+    phoneNumber: initialData?.phoneNumber ?? "",
+    birthday: initialData?.birthday ?? "",
   });
 
-  // Asignar rol por defecto si es nuevo y cargan los roles
-  React.useEffect(() => {
-    if (!isEdit && !formData.roleId && roles.length > 0) {
-      const defaultRole = roles.find((r) => r.name.toLowerCase() === "client") || roles[0];
-      if (defaultRole) {
-        setFormData(prev => ({ ...prev, roleId: defaultRole.id }));
-      }
-    }
-  }, [isEdit, roles, formData.roleId]);
+  // Note: Role selection removed as requested. Defaulting to CLIENT.
 
   const handleChange = (field: keyof IMember, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -94,39 +84,22 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Rol del Miembro
-        </Label>
-        
-        {isLoadingRoles ? (
-          <div className="grid grid-cols-4 gap-2 w-full">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-10 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <ToggleGroup
-            type="single"
-            value={formData.roleId ? formData.roleId.toString() : ""}
-            onValueChange={(val: any) => {
-              if (val && typeof val === "string") {
-                handleChange("roleId", Number.parseInt(val, 10));
-              }
-            }}
-            className="grid grid-cols-4 gap-2 w-full"
-          >
-            {roles.map((r) => (
-              <ToggleGroupItem
-                key={r.id}
-                value={r.id.toString()}
-                className="h-10 w-full text-xs capitalize justify-center"
-              >
-                {r.name}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Teléfono"
+          placeholder="Ej: +58 412 1234567"
+          value={formData.phoneNumber ?? ""}
+          onChange={(e) => handleChange("phoneNumber", e.target.value)}
+          leftIcon={<Phone size={16} />}
+        />
+
+        <Input
+          label="Fecha de Nacimiento"
+          type="date"
+          value={formData.birthday ?? ""}
+          onChange={(e) => handleChange("birthday", e.target.value)}
+          leftIcon={<Calendar size={16} />}
+        />
       </div>
 
       <div className="flex flex-col gap-4 pt-2">

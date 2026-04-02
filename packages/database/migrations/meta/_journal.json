@@ -50,6 +50,20 @@
       "when": 1775076623843,
       "tag": "0006_rainy_nemesis",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775125710036,
+      "tag": "0007_silky_gwen_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775126865499,
+      "tag": "0008_striped_madrox",
+      "breakpoints": true
     }
   ]
 }

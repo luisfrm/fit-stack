@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    if (!body.name || !body.role) {
-      return NextResponse.json({ error: 'Name and role are required' }, { status: 400 })
+    if (!body.firstName || !body.email) {
+      return NextResponse.json({ error: 'First name and email are required' }, { status: 400 })
     }
 
     const newCoach = await coachesService.createCoach(body)

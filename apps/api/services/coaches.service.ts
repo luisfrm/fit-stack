@@ -1,4 +1,4 @@
-import { coachesRepository, CoachesFilter, NewCmsCoach } from '../repositories/coaches.repository';
+import { coachesRepository, CoachesFilter, CreateCoachDTO, UpdateCoachDTO } from '../repositories/coaches.repository';
 
 export const coachesService = {
   async getAllCoaches(filters: CoachesFilter) {
@@ -13,11 +13,11 @@ export const coachesService = {
     return coach;
   },
 
-  async createCoach(data: NewCmsCoach) {
+  async createCoach(data: CreateCoachDTO) {
     return coachesRepository.create(data);
   },
 
-  async updateCoach(id: number, data: Partial<NewCmsCoach>) {
+  async updateCoach(id: number, data: UpdateCoachDTO) {
     await this.getCoachById(id); // Verify existence
     return coachesRepository.update(id, data);
   },

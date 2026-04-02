@@ -2,9 +2,12 @@
 
 import * as React from "react";
 import { type ICoach } from "@/types/dashboard";
-import { Modal, toast } from "@workspace/ui/components";
+import { Modal } from "@workspace/ui/components";
 import { CoachForm } from "./coach-form";
-import { coachesService } from "@/lib/services/coaches-service";
+import { 
+  useCreateCoachMutation, 
+  useUpdateCoachMutation 
+} from "@/lib/services/coaches-service";
 
 interface CoachModalProps {
   readonly initialData?: ICoach;
@@ -23,29 +26,29 @@ export function CoachModal({
 }: CoachModalProps) {
   const isEdit = !!initialData?.id;
   const [internalOpen, setInternalOpen] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(false);
+  
+  const createMutation = useCreateCoachMutation();
+  const updateMutation = useUpdateCoachMutation();
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
 
   const handleSubmit = async (data: Partial<ICoach>) => {
-    setIsLoading(true);
     try {
       if (isEdit && initialData.id) {
-        await coachesService.updateCoach(initialData.id, data);
-        toast.success("Entrenador actualizado exitosamente.");
+        await updateMutation.mutateAsync({ id: initialData.id, data });
       } else {
-        await coachesService.createCoach(data);
-        toast.success("Entrenador creado exitosamente.");
+        await createMutation.mutateAsync(data);
       }
       setOpen(false);
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || "Error al guardar el entrenador.");
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      // Error handling is managed by the mutation hooks (toasts)
+      console.error("Error submitting coach form:", error);
     }
   };
+
+  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Modal

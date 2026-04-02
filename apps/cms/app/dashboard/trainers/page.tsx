@@ -2,19 +2,21 @@
 
 import * as React from "react";
 import { Dumbbell, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Text, toast } from "@workspace/ui/components";
-import { CoachesTable } from "@/components/coaches/coaches-table";
+import { Button, Text, CoachCard, AddCoachCard, Skeleton, ConfirmationModal } from "@workspace/ui/components";
 import { CoachModal } from "@/components/coaches/coach-modal";
-import { coachesService } from "@/lib/services/coaches-service";
+import {
+  useDeleteCoachMutation,
+  useUpdateCoachMutation
+} from "@/lib/services/coaches-service";
 import { type CoachFilter, type ICoach } from "@/types/dashboard";
 import { useCoaches } from "@/lib/hooks/use-trainers";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { getMediaUrl } from "@/lib/utils/media-utils";
+import { NoData } from "@/components/dashboard/dashboard-ui";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function TrainersPage() {
-  const queryClient = useQueryClient();
   const [filters, setFilters] = React.useState<CoachFilter>({
     page: 1,
     limit: ITEMS_PER_PAGE,
@@ -23,7 +25,9 @@ export default function TrainersPage() {
 
   // For editing
   const [coachToEdit, setCoachToEdit] = React.useState<ICoach | undefined>(undefined);
+  const [coachToDelete, setCoachToDelete] = React.useState<ICoach | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
 
   // React Query fetch
   const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useCoaches(filters);
@@ -36,24 +40,12 @@ export default function TrainersPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  // Mutations
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => coachesService.deleteCoach(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["coaches"] });
-      toast.success("Entrenador eliminado correctamente");
-    },
-    onError: (error: any) => {
-      const message = error.response?.data?.error ?? error.message ?? "Error al eliminar entrenador";
-      toast.error(message);
-    }
-  });
+  // Mutations from service
+  const deleteMutation = useDeleteCoachMutation();
+  const updateMutation = useUpdateCoachMutation();
 
-  const handleDelete = async (coach: ICoach) => {
-    if (!coach.id) return;
-    if (!confirm(`¿Estás seguro de que deseas eliminar al entrenador ${coach.name}?`)) return;
-
-    deleteMutation.mutate(coach.id);
+  const handlePageChange = (newPage: number) => {
+    setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
   const handleEdit = (coach: ICoach) => {
@@ -61,8 +53,76 @@ export default function TrainersPage() {
     setIsEditModalOpen(true);
   };
 
-  const handlePageChange = (newPage: number) => {
-    setFilters((prev) => ({ ...prev, page: newPage }));
+  const handleToggleVisibility = (coach: ICoach, isVisible: boolean) => {
+    if (!coach.id) return;
+    updateMutation.mutate({ id: coach.id, data: { isVisible } });
+  };
+
+  const handleDelete = (coach: ICoach) => {
+    setCoachToDelete(coach);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!coachToDelete?.id) return;
+    try {
+      await deleteMutation.mutateAsync(coachToDelete.id);
+    } catch (error) {
+      console.error("Error deleting coach:", error);
+    } finally {
+      setIsDeleteModalOpen(false);
+      setCoachToDelete(undefined);
+    }
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="aspect-4/5 w-full rounded-xl" />
+          ))}
+        </div>
+      );
+    }
+
+    if (result.data.length === 0) {
+      if (!searchInput) {
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <CoachModal trigger={<AddCoachCard />} />
+          </div>
+        );
+      }
+      return (
+        <NoData
+          message="No hay entrenadores registrados. Intenta ajustando los filtros o añade uno nuevo."
+          className="py-20"
+        />
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {result.data.map((coach) => (
+          <CoachCard
+            key={coach.id}
+            firstName={coach.firstName}
+            lastName={coach.lastName}
+            role={coach.role?.name}
+            specialities={coach.specialities}
+            imageUrl={coach.imageUrl ? getMediaUrl(coach.imageUrl) : null}
+            isVisible={coach.isVisible}
+            onEdit={() => handleEdit(coach)}
+            onDelete={() => handleDelete(coach)}
+            onToggleVisibility={(visible) => handleToggleVisibility(coach, visible)}
+          />
+        ))}
+        {filters.page === 1 && !searchInput && !filters.isVisible && (
+          <CoachModal trigger={<AddCoachCard />} />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -74,7 +134,6 @@ export default function TrainersPage() {
         iconName="Dumbbell"
       >
         <CoachModal
-          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["coaches"] })}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
               Nuevo Entrenador
@@ -142,12 +201,7 @@ export default function TrainersPage() {
           )}
         </div>
 
-        <CoachesTable
-          coaches={result.data}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          loading={isLoading}
-        />
+        {renderContent()}
 
         {/* ── Pagination ── */}
         {result.totalPages > 1 && (
@@ -178,12 +232,23 @@ export default function TrainersPage() {
         )}
       </section>
 
+      {/* ── Modal de Eliminación ── */}
+      <ConfirmationModal
+        open={isDeleteModalOpen}
+        onOpenChange={setIsDeleteModalOpen}
+        title="¿Eliminar entrenador?"
+        description={`Esta acción eliminará permanentemente a ${coachToDelete?.firstName} y todos sus datos asociados (perfil, suscripciones, pagos y rutinas). Esta acción no se puede deshacer.`}
+        confirmText="Eliminar permanentemente"
+        variant="danger"
+        onConfirm={confirmDelete}
+      />
+
       {/* ── Modal de Edición ── */}
       <CoachModal
         initialData={coachToEdit}
         open={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
-        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["coaches"] })}
+        onSuccess={() => { }}
       />
     </>
   );

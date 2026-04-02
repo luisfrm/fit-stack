@@ -45,7 +45,7 @@ export const user = pgTable('user', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   roleId: integer('role_id').references(() => roles.id),
-  memberId: integer('member_id').references(() => members.id),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
 });
 
 export const session = pgTable('session', {
@@ -104,6 +104,9 @@ export const members = pgTable('members', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   documentId: text('document_id'),
+  phoneNumber: text('phone_number'),
+  birthday: date('birthday'),
+  imageUrl: text('image_url'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -126,7 +129,7 @@ export const membershipPlans = pgTable('membership_plans', {
 // Suscripciones: Relaciona a un Miembro con un Plan que pagó
 export const subscriptions = pgTable('subscriptions', {
   id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id).notNull(),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
   planId: integer('plan_id').references(() => membershipPlans.id).notNull(),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date').notNull(),
@@ -138,7 +141,7 @@ export const subscriptions = pgTable('subscriptions', {
 
 export const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id).notNull(),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
   subscriptionId: integer('subscription_id').references(() => subscriptions.id),
 
   // Snapshots para historial histórico invariable
@@ -180,7 +183,7 @@ export const exercises = pgTable('exercises', {
 // Rutinas Definidas (Plantillas armadas por trainers o default del gym)
 export const routineTemplates = pgTable('routine_templates', {
   id: serial('id').primaryKey(),
-  trainerId: integer('trainer_id').references(() => trainerProfiles.id),
+  trainerId: integer('trainer_id').references(() => trainerProfiles.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
 });
@@ -197,7 +200,7 @@ export const routineTemplateItems = pgTable('routine_template_items', {
 
 export const workoutSessions = pgTable('workout_sessions', {
   id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id).notNull(),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
   routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id),
   date: timestamp('date').defaultNow().notNull(),
   durationMinutes: integer('duration_minutes'),
@@ -215,14 +218,20 @@ export const workoutSessionLogs = pgTable('workout_session_logs', {
 
 // --- CMS & MARKETING WEBSITE ---
 
-export const cmsCoaches = pgTable('cms_coaches', {
+export const coachProfiles = pgTable('coach_profiles', {
   id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  role: text('role').notNull(),
-  specialities: jsonb('specialities'),
-  imageUrl: text('image_url'),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull().unique(),
+  specialities: jsonb('specialities'), // array de strings: ["Fuerza", "Yoga"]
+  bio: text('bio'),
   isVisible: boolean('is_visible').default(true).notNull(),
   displayOrder: integer('display_order').default(0).notNull(),
+});
+
+export const coachAssignments = pgTable('coach_assignments', {
+  id: serial('id').primaryKey(),
+  coachId: integer('coach_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  clientId: integer('client_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
+  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
 });
 
 export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
@@ -280,9 +289,21 @@ export const userRelations = relations(user, ({ one, many }) => ({
   role: one(roles, { fields: [user.roleId], references: [roles.id] }),
 }));
 
-export const membersRelations = relations(members, ({ one }) => ({
+export const membersRelations = relations(members, ({ one, many }) => ({
   user: one(user, { fields: [members.id], references: [user.memberId] }),
   role: one(roles, { fields: [members.roleId], references: [roles.id] }),
+  coachProfile: one(coachProfiles, { fields: [members.id], references: [coachProfiles.memberId] }),
+  asCoachAssignments: many(coachAssignments, { relationName: 'coach_assignments_coach' }),
+  asClientAssignments: many(coachAssignments, { relationName: 'coach_assignments_client' }),
+}));
+
+export const coachProfilesRelations = relations(coachProfiles, ({ one }) => ({
+  member: one(members, { fields: [coachProfiles.memberId], references: [members.id] }),
+}));
+
+export const coachAssignmentsRelations = relations(coachAssignments, ({ one }) => ({
+  coach: one(members, { fields: [coachAssignments.coachId], references: [members.id], relationName: 'coach_assignments_coach' }),
+  client: one(members, { fields: [coachAssignments.clientId], references: [members.id], relationName: 'coach_assignments_client' }),
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({

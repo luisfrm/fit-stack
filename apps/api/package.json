@@ -13,6 +13,7 @@
     "@aws-sdk/client-s3": "^3.1019.0",
     "@aws-sdk/s3-request-presigner": "^3.1019.0",
     "@workspace/database": "workspace:*",
+    "@workspace/shared": "workspace:*",
     "better-auth": "^1.5.5",
     "jose": "^6.2.1",
     "next": "16.1.6",

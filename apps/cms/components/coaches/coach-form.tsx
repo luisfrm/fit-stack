@@ -5,14 +5,16 @@ import {
   Input,
   Button,
   Checkbox,
+  toast,
+  Textarea
 } from "@workspace/ui/components";
 import { type ICoach } from "@/types/dashboard";
-import { User, Briefcase, Star, Globe, Image as ImageIcon, Hash, Upload, X } from "lucide-react";
+import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar } from "lucide-react";
 import { coachesService } from "@/lib/services/coaches-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
-import { toast } from "@workspace/ui/components";
 import { Label } from "@workspace/ui/components/label";
+import { ROLE_IDS } from "@workspace/shared/constants";
 
 interface CoachFormProps {
   readonly initialData?: ICoach;
@@ -29,11 +31,17 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
   );
 
   const [formData, setFormData] = React.useState<Partial<ICoach>>({
-    name:         initialData?.name         ?? "",
-    role:         initialData?.role         ?? "",
-    imageUrl:     initialData?.imageUrl     ?? "",
-    isVisible:    initialData?.isVisible    ?? true,
+    firstName: initialData?.firstName ?? "",
+    lastName: initialData?.lastName ?? "",
+    email: initialData?.email ?? "",
+    documentId: initialData?.documentId ?? "",
+    phoneNumber: initialData?.phoneNumber ?? "",
+    birthday: initialData?.birthday ?? "",
+    imageUrl: initialData?.imageUrl ?? "",
+    bio: initialData?.bio ?? "",
+    isVisible: initialData?.isVisible ?? true,
     displayOrder: initialData?.displayOrder ?? 0,
+    roleId: initialData?.roleId ?? ROLE_IDS.TRAINER,
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -89,16 +97,37 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
-      const payload: Partial<ICoach> = { 
+      const payload: Partial<ICoach> = {
         ...formData,
         imageUrl: finalImageUrl,
         specialities: specialitiesArray.length > 0 ? specialitiesArray : null
       };
 
       onSubmit(payload);
+
+      // Reset form if it was a creation (not edit) or if specifically needed
+      if (!isEdit) {
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          documentId: "",
+          phoneNumber: "",
+          birthday: "",
+          imageUrl: "",
+          bio: "",
+          isVisible: true,
+          displayOrder: 0,
+          roleId: ROLE_IDS.TRAINER,
+        });
+        setSpecialitiesText("");
+        setPreviewUrl("");
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Error al subir la imagen. Por favor, revisa tu conexión.");
+      toast.error(error.message || "Error al procesar el formulario. Por favor, revisa los datos.");
     } finally {
       setIsUploading(false);
     }
@@ -107,23 +136,62 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
 
-      {/* ── Nombre y Rol ── */}
+      {/* ── Nombre y Apellido ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
-          label="Nombre del Entrenador"
-          placeholder="Ej: Carlos Ruiz"
-          value={formData.name}
-          onChange={(e) => handleChange("name", e.target.value)}
+          label="Nombre"
+          placeholder="Ej: Carlos"
+          value={formData.firstName}
+          onChange={(e) => handleChange("firstName", e.target.value)}
           required
           leftIcon={<User size={16} />}
         />
         <Input
-          label="Rol"
-          placeholder="Ej: Head Coach"
-          value={formData.role}
-          onChange={(e) => handleChange("role", e.target.value)}
+          label="Apellido"
+          placeholder="Ej: Ruiz"
+          value={formData.lastName}
+          onChange={(e) => handleChange("lastName", e.target.value)}
           required
-          leftIcon={<Briefcase size={16} />}
+          leftIcon={<User size={16} />}
+        />
+      </div>
+
+      {/* ── Email e Identificación ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Correo Electrónico"
+          type="email"
+          placeholder="Ej: coach@empresa.com"
+          value={formData.email}
+          onChange={(e) => handleChange("email", e.target.value)}
+          required
+          leftIcon={<Mail size={16} />}
+        />
+        <Input
+          label="Identificación / DNI"
+          placeholder="Nº de documento"
+          value={formData.documentId ?? ""}
+          onChange={(e) => handleChange("documentId", e.target.value)}
+          leftIcon={<CreditCard size={16} />}
+        />
+      </div>
+
+      {/* ── Teléfono y Fecha de Nacimiento ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Teléfono"
+          placeholder="Ej: +58 412 1234567"
+          value={formData.phoneNumber ?? ""}
+          onChange={(e) => handleChange("phoneNumber", e.target.value)}
+          leftIcon={<Phone size={16} />}
+        />
+
+        <Input
+          label="Fecha de Nacimiento"
+          type="date"
+          value={formData.birthday ?? ""}
+          onChange={(e) => handleChange("birthday", e.target.value)}
+          leftIcon={<Calendar size={16} />}
         />
       </div>
 
@@ -136,18 +204,27 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
         leftIcon={<Star size={16} />}
       />
 
+      {/* ── Biografía ── */}
+      <Textarea
+        label="Biografía / Perfil Profesional"
+        placeholder="Cuéntanos un poco sobre la trayectoria y enfoque del entrenador..."
+        value={formData.bio ?? ""}
+        onChange={(e) => handleChange("bio", e.target.value)}
+        rows={4}
+      />
+
       {/* ── Imagen y Orden ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div className="md:col-span-2 space-y-2">
           <Label className="text-sm font-medium text-slate-300 ml-1 block">Foto de Perfil</Label>
           <div className="flex items-center gap-4">
             <Avatar size="lg" className="border-2 border-white/10 shrink-0">
-               <AvatarImage src={previewUrl} />
-               <AvatarFallback className="bg-white/5">
-                 <ImageIcon className="w-8 h-8 text-white/20" />
-               </AvatarFallback>
+              <AvatarImage src={previewUrl} />
+              <AvatarFallback className="bg-white/5">
+                <ImageIcon className="w-8 h-8 text-white/20" />
+              </AvatarFallback>
             </Avatar>
-            
+
             <div className="flex flex-col gap-2 w-full">
               <input
                 type="file"
@@ -157,10 +234,10 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
                 className="hidden"
               />
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="glass" 
-                  size="sm" 
+                <Button
+                  type="button"
+                  variant="glass"
+                  size="sm"
                   className="flex-1"
                   onClick={() => fileInputRef.current?.click()}
                   leftIcon={<Upload size={14} />}
@@ -168,10 +245,10 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
                   {previewUrl ? "Cambiar Foto" : "Subir Foto"}
                 </Button>
                 {previewUrl && (
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={removeImage}
                     className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
                   >

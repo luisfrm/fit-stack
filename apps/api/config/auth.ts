@@ -7,7 +7,7 @@ import { customSession } from "better-auth/plugins";
 
 import { rbacService } from "../services/rbac.service";
 import { rbacPlugin } from "./rbac-plugin";
-import { ROLE_IDS } from "@workspace/database/constants";
+import { ROLE_IDS } from "@workspace/shared/constants";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

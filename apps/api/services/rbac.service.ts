@@ -1,7 +1,7 @@
 import { rbacRepository } from "../repositories/rbac.repository";
 import { db, eq } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
-import { ROLE_IDS } from "@workspace/database/constants";
+import { ROLE_IDS } from "@workspace/shared/constants";
 
 export const rbacService = {
   /**

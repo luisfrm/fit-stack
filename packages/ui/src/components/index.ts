@@ -49,6 +49,7 @@ export { toast } from "sonner";
 export { Spinner } from "@workspace/ui/components/spinner";
 export { Modal } from "@workspace/ui/components/modal";
 export { Checkbox } from "@workspace/ui/components/checkbox";
+export { ConfirmationModal } from "@workspace/ui/components/confirmation-modal";
 export { Label } from "@workspace/ui/components/label";
 export * from "@workspace/ui/components/select";
 export * from "@workspace/ui/components/sheet";
@@ -59,6 +60,12 @@ export { ColorPicker } from "@workspace/ui/components/color-picker";
 export type { ColorPickerProps } from "@workspace/ui/components/color-picker";
 export { ImageUpload } from "@workspace/ui/components/image-upload";
 export type { ImageUploadProps } from "@workspace/ui/components/image-upload";
+
+export { CoachCard, AddCoachCard } from "@workspace/ui/components/coach-card";
+export type { CoachCardProps } from "@workspace/ui/components/coach-card";
+export { Switch } from "@workspace/ui/components/switch";
+export { Textarea } from "@workspace/ui/components/textarea";
+export type { TextareaProps } from "@workspace/ui/components/textarea";
 
 // Next.js specific components
 export * from "@workspace/ui/components/next/sidebar";
