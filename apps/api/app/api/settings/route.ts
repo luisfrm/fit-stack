@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST: Batch upsert settings or generic creation.
+ * POST: Batch upsert settings.
  * URL: /api/settings
  */
 export async function POST(req: NextRequest) {
@@ -31,12 +31,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { key, value } = await req.json()
+    // Verify permission
+    const permissions = (session.user as any).permissions || [];
+    if (!permissions.includes("settings.general:manage")) {
+      return NextResponse.json(
+        { error: "Forbidden: No tienes permiso para gestionar la configuración." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json()
+    
+    // Handle Record<string, string>
+    if (typeof body === 'object' && !Array.isArray(body)) {
+      const entries = Object.entries(body);
+      for (const [key, value] of entries) {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          await settingsService.upsert(key, String(value));
+        }
+      }
+      return NextResponse.json({ success: true, count: entries.length })
+    }
+
+    // Fallback for single key-value: { key: "...", value: "..." }
+    const { key, value } = body
     if (!key || value === undefined) {
       return NextResponse.json({ error: 'Key and Value are required' }, { status: 400 })
     }
 
-    await settingsService.upsert(key, value)
+    await settingsService.upsert(key, String(value))
     return NextResponse.json({ success: true, key, value }, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,6 +1,7 @@
 import { rbacRepository } from "../repositories/rbac.repository";
 import { db, eq } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
+import { ROLE_IDS } from "@workspace/database/constants";
 
 export const rbacService = {
   /**
@@ -61,6 +62,11 @@ export const rbacService = {
   },
 
   async upsertRole(id: number | undefined, name: string, description: string, permissionIds: number[]) {
+    // Admin Protection Check by ID (Immutable)
+    if (id === ROLE_IDS.ADMIN) {
+      throw new Error("El rol Admin es una parte crítica del sistema y no puede ser modificado.");
+    }
+
     let role: { id: number; name: string; description: string | null } | undefined;
     
     if (id) {
@@ -68,6 +74,10 @@ export const rbacService = {
       await db.update(schema.roles).set({ name, description }).where(eq(schema.roles.id, id));
       role = { id, name, description };
     } else {
+      // Protection: cannot create another role named 'admin' (even name-based block here is fine for creation)
+      if (name.toLowerCase() === "admin") {
+        throw new Error("No se puede crear un rol con el nombre 'admin'.");
+      }
       // Create new
       const newRole = await rbacRepository.createRole(name, description);
       role = newRole;

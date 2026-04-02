@@ -1,6 +1,6 @@
 "use client";
 
-import { useWindowSize } from "./use-window-size.js";
+import { useWindowSize } from "@workspace/ui/hooks/use-window-size";
 
 export type DeviceType = "mobile" | "tablet" | "desktop";
 

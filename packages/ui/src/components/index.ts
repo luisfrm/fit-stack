@@ -54,3 +54,8 @@ export * from "@workspace/ui/components/select";
 export * from "@workspace/ui/components/sheet";
 export * from "@workspace/ui/components/toggle-group";
 export { Skeleton } from "@workspace/ui/components/skeleton";
+
+export { ColorPicker } from "@workspace/ui/components/color-picker";
+export type { ColorPickerProps } from "@workspace/ui/components/color-picker";
+export { ImageUpload } from "@workspace/ui/components/image-upload";
+export type { ImageUploadProps } from "@workspace/ui/components/image-upload";

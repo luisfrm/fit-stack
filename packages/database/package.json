@@ -5,7 +5,8 @@
   "exports": {
     "./client": "./src/client.ts",
     "./schema": "./src/schema.ts",
-    "./seed": "./src/seed.ts"
+    "./seed": "./src/seed.ts",
+    "./constants": "./src/constants.ts"
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",

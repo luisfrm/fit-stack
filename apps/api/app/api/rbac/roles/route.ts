@@ -23,10 +23,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify if session.user has 'settings:manage' permission
+    // Verify if session.user has 'settings.roles:manage' permission
     const permissions = (session.user as any).permissions || [];
-    if (!permissions.includes('settings:manage')) {
-      return NextResponse.json({ error: "Forbidden: Insufficient permissions" }, { status: 403 });
+    if (!permissions.includes("settings.roles:manage")) {
+      return NextResponse.json(
+        { error: "Forbidden: No tienes permiso para gestionar roles y permisos." },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();

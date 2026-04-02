@@ -33,6 +33,7 @@ import {
 } from "@/types/dashboard";
 import { formatTimeRange } from "@/lib/config/display";
 import { getMediaUrl } from "@/lib/utils/media-utils";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
@@ -88,6 +89,7 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
 export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
+  const { settings } = useSettings();
 
   // Close sheet on route change
   React.useEffect(() => {
@@ -97,19 +99,27 @@ export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
   return (
     <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
-          <DumbbellIcon className="text-background w-4 h-4" />
+        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center shrink-0 border border-primary/20 overflow-hidden">
+          {settings[SETTINGS_KEYS.GYM_LOGO] ? (
+            <img 
+              src={getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO])} 
+              alt="Gym Logo" 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <DumbbellIcon className="text-primary w-4 h-4 italic" />
+          )}
         </div>
         <Link href="/dashboard">
-          <Text as="p" size="sm" weight="bold" className="leading-none">
-            Gym CMS
+          <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
+            {settings[SETTINGS_KEYS.GYM_NAME] || "Gym CMS"}
           </Text>
         </Link>
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors">
+          <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer">
             <Menu className="w-6 h-6" />
           </button>
         </SheetTrigger>
@@ -131,23 +141,32 @@ export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
  */
 function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
   const pathname = usePathname();
+  const { settings } = useSettings();
 
   return (
     <>
       <div className="px-6 flex flex-col gap-8">
         {/* Logo (Hidden on mobile as it's in the top nav, but kept for full view consistency) */}
         <div className="hidden lg:flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shrink-0">
-            <DumbbellIcon className="text-black w-5 h-5" />
+          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0 border border-primary/20 overflow-hidden shadow-lg shadow-primary/5">
+            {settings[SETTINGS_KEYS.GYM_LOGO] ? (
+              <img 
+                src={getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO])} 
+                alt="Gym Logo" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <DumbbellIcon className="text-primary w-5 h-5 italic" />
+            )}
           </div>
-          <div>
-            <Link href="/dashboard">
-              <Text as="p" size="md" weight="bold" className="leading-none">
-                Gym CMS
+          <div className="flex flex-col min-w-0">
+            <Link href="/dashboard" className="transition-opacity hover:opacity-80">
+              <Text as="p" size="md" weight="bold" className="leading-tight truncate uppercase italic tracking-tighter">
+                {settings[SETTINGS_KEYS.GYM_NAME] || "Gym CMS"}
               </Text>
             </Link>
-            <Text as="span" size="xs" variant="subtle">
-              Admin Panel
+            <Text as="span" size="xs" variant="subtle" className="truncate opacity-60">
+              {settings[SETTINGS_KEYS.GYM_SLOGAN] || "Admin Panel"}
             </Text>
           </div>
         </div>

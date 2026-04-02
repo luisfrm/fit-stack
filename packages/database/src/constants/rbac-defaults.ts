@@ -15,7 +15,8 @@ export const DEFAULT_PERMISSIONS = [
   { name: 'Gestionar Clases', slug: 'classes:manage', description: 'Administrar el horario y disponibilidad de clases' },
   { name: 'Gestionar Entrenadores', slug: 'trainers:manage', description: 'Administrar el staff de entrenadores' },
   { name: 'Editar Contenido Web', slug: 'content:edit', description: 'Modificar bloques, textos e imágenes de la web pública' },
-  { name: 'Configuración Global', slug: 'settings:manage', description: 'Cambiar ajustes globales del gimnasio' },
+  { name: 'Configuración General', slug: 'settings.general:manage', description: 'Gestionar identidad, colores y ajustes del gym' },
+  { name: 'Gestionar Roles', slug: 'settings.roles:manage', description: 'Administrar roles y permisos del sistema' },
 ];
 
 export const DEFAULT_ROLES = [
@@ -35,7 +36,8 @@ export const DEFAULT_ROLES = [
       'payments:read', 
       'classes:manage', 
       'trainers:manage', 
-      'content:edit'
+      'content:edit',
+      'settings.general:manage'
     ],
   },
   {
