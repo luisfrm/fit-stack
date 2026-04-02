@@ -1,12 +1,6 @@
 "use client";
 
-/**
- * Dashboard-specific UI primitives built on top of @workspace/ui base components.
- * Scoped to the CMS admin dashboard — keeps page.tsx thin and readable.
- */
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -17,13 +11,11 @@ import {
   TrendingUp,
   TrendingDown,
   Inbox,
-  Menu,
   Wallet,
   CalendarCheck,
   AlertTriangle,
   AlertCircle,
   BadgeCheck,
-  Dumbbell as DumbbellIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,32 +26,29 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
-import { Card } from "@workspace/ui/components/card";
-import { Text } from "@workspace/ui/components/text";
+import { 
+  AppSidebar as UISidebar, 
+  MobileNav as UIMobileNav, 
+  type SidebarUser, 
+  type SidebarNavItem,
+  Text,
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Card,
+  Table,
+  type ColumnDef,
+} from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetTitle,
-  SheetHeader
-} from "@workspace/ui/components/sheet";
 import SignOutButton from "../SignOutButton";
 
 /* ─────────────────────────────────────────────
    SIDEBAR
    ───────────────────────────────────────────── */
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-}
-
-const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS: SidebarNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard }, // O 'Files' si lo prefieres
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard },
   { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
   { label: "Miembros", href: "/dashboard/members", icon: Users },
   { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
@@ -68,164 +57,46 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
 
-interface SidebarUser {
-  name: string;
-  role: string;
-  avatarUrl?: string;
-}
-
 export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
+  const { settings, isLoading } = useSettings();
+
   return (
-    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col justify-between py-6 shrink-0 h-svh sticky top-0">
-      <SidebarContent user={user} />
-    </aside>
+    <UISidebar
+      user={user}
+      navigation={NAV_ITEMS}
+      branding={{
+        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
+        title: settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness",
+        subtitle: settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard",
+        isLoading: isLoading,
+        fallbackIcon: Dumbbell,
+      }}
+      footer={<SignOutButton />}
+    />
   );
 }
 
-/**
- * Mobile-specific top navigation with a hamburger menu.
- * Only visible on screens smaller than 1024px.
- */
 export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
-  const [open, setOpen] = React.useState(false);
-  const pathname = usePathname();
-  const { settings } = useSettings();
-
-  // Close sheet on route change
-  React.useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  const { settings, isLoading } = useSettings();
 
   return (
-    <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center shrink-0 border border-primary/20 overflow-hidden">
-          {settings[SETTINGS_KEYS.GYM_LOGO] ? (
-            <img 
-              src={getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO])} 
-              alt="Gym Logo" 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <DumbbellIcon className="text-primary w-4 h-4 italic" />
-          )}
-        </div>
-        <Link href="/dashboard">
-          <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
-            {settings[SETTINGS_KEYS.GYM_NAME] || "Gym CMS"}
-          </Text>
-        </Link>
-      </div>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer">
-            <Menu className="w-6 h-6" />
-          </button>
-        </SheetTrigger>
-        <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navegación del Panel</SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col h-full py-6">
-            <SidebarContent user={user} />
-          </div>
-        </SheetContent>
-      </Sheet>
-    </header>
+    <UIMobileNav
+      user={user}
+      navigation={NAV_ITEMS}
+      branding={{
+        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
+        title: settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness",
+        subtitle: settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard",
+        isLoading: isLoading,
+        fallbackIcon: Dumbbell,
+      }}
+      footer={<SignOutButton />}
+    />
   );
 }
 
-/**
- * Shared sidebar content used by both Desktop Sidebar and Mobile Drawer.
- */
-function SidebarContent({ user }: Readonly<{ user: SidebarUser }>) {
-  const pathname = usePathname();
-  const { settings } = useSettings();
 
-  return (
-    <>
-      <div className="px-6 flex flex-col gap-8">
-        {/* Logo (Hidden on mobile as it's in the top nav, but kept for full view consistency) */}
-        <div className="hidden lg:flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0 border border-primary/20 overflow-hidden shadow-lg shadow-primary/5">
-            {settings[SETTINGS_KEYS.GYM_LOGO] ? (
-              <img 
-                src={getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO])} 
-                alt="Gym Logo" 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <DumbbellIcon className="text-primary w-5 h-5 italic" />
-            )}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <Link href="/dashboard" className="transition-opacity hover:opacity-80">
-              <Text as="p" size="md" weight="bold" className="leading-tight truncate uppercase italic tracking-tighter">
-                {settings[SETTINGS_KEYS.GYM_NAME] || "Gym CMS"}
-              </Text>
-            </Link>
-            <Text as="span" size="xs" variant="subtle" className="truncate opacity-60">
-              {settings[SETTINGS_KEYS.GYM_SLOGAN] || "Admin Panel"}
-            </Text>
-          </div>
-        </div>
 
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <SidebarNavItem
-                key={item.href}
-                {...item}
-                active={isActive}
-              />
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Profile */}
-      <div className="px-4 mt-auto">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5">
-          <Avatar size="default">
-            {user.avatarUrl && <AvatarImage src={getMediaUrl(user.avatarUrl)} alt={user.name} />}
-            <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col min-w-0 flex-1">
-            <Text as="span" size="base" weight="semibold" truncate>
-              {user.name}
-            </Text>
-            <Text as="span" size="xs" variant="subtle" truncate>
-              {user.role}
-            </Text>
-          </div>
-          <SignOutButton />
-        </div>
-      </div>
-    </>
-  );
-}
-
-function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<NavItem & { active?: boolean }>) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium",
-        active
-          ? "bg-primary text-black font-bold shadow-primary/30"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
-      )}
-    >
-      <Icon className={cn("w-5 h-5 shrink-0", active ? "text-background-dark" : "")} />
-      {label}
-    </Link>
-  );
-}
 
 /* ─────────────────────────────────────────────
    KPI CARD
@@ -374,11 +245,11 @@ export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemPro
   );
 }
 
+
 /* ─────────────────────────────────────────────
    DASHBOARD DATA CONTAINERS (W/ EMPTY STATES)
    ───────────────────────────────────────────── */
 
-import { Table, type ColumnDef } from "@workspace/ui/components";
 
 const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
   {

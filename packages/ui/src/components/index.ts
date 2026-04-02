@@ -59,3 +59,8 @@ export { ColorPicker } from "@workspace/ui/components/color-picker";
 export type { ColorPickerProps } from "@workspace/ui/components/color-picker";
 export { ImageUpload } from "@workspace/ui/components/image-upload";
 export type { ImageUploadProps } from "@workspace/ui/components/image-upload";
+
+// Next.js specific components
+export * from "@workspace/ui/components/next/sidebar";
+export { NextImage } from "@workspace/ui/components/next/image";
+

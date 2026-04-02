@@ -20,7 +20,7 @@ export default function TrainersPage() {
     limit: ITEMS_PER_PAGE,
   });
   const [searchInput, setSearchInput] = React.useState("");
-  
+
   // For editing
   const [coachToEdit, setCoachToEdit] = React.useState<ICoach | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
@@ -149,33 +149,33 @@ export default function TrainersPage() {
           loading={isLoading}
         />
 
-            {/* ── Pagination ── */}
-            {result.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6 px-1">
-                <Text size="sm" variant="muted">
-                  Página {result.page} de {result.totalPages}
-                </Text>
-                <div className="flex gap-2">
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={result.page <= 1}
-                    leftIcon={<ChevronLeft className="w-4 h-4" />}
-                    onClick={() => handlePageChange(result.page - 1)}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="glass"
-                    size="sm"
-                    disabled={result.page >= result.totalPages}
-                    onClick={() => handlePageChange(result.page + 1)}
-                  >
-                    Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            )}
+        {/* ── Pagination ── */}
+        {result.totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 px-1">
+            <Text size="sm" variant="muted">
+              Página {result.page} de {result.totalPages}
+            </Text>
+            <div className="flex gap-2">
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={result.page <= 1}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+                onClick={() => handlePageChange(result.page - 1)}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={result.page >= result.totalPages}
+                onClick={() => handlePageChange(result.page + 1)}
+              >
+                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── Modal de Edición ── */}
