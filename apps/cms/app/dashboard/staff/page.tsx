@@ -1,31 +1,26 @@
 "use client";
 
 import * as React from "react";
+import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Input,
   Button,
   toast,
 } from "@workspace/ui/components";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { type IMember } from "@/types/dashboard";
 import { MembersTable } from "@/components/members/members-table";
-import { MemberModal } from "@/components/members/member-modal";
+import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
-import { useRoles } from "@/lib/hooks/use-rbac";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { ROLE_IDS } from "@workspace/shared/constants";
 
-export default function MembersPage() {
-  const [members, setMembers] = React.useState<IMember[]>([]);
+export default function StaffPage() {
+  const [staff, setStaff] = React.useState<IMember[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Hooks de datos
-  const { data: availableRoles = [] } = useRoles();
-
   // Filtros
   const [query, setQuery] = React.useState("");
-  const roleId = ROLE_IDS.CLIENT; // Fuerza el rol de cliente
   const [tempQuery, setTempQuery] = React.useState("");
 
   // Paginación
@@ -33,43 +28,48 @@ export default function MembersPage() {
   const [totalPages, setTotalPages] = React.useState(1);
   const limit = 10;
 
-  const loadMembers = React.useCallback(async () => {
+  const loadStaff = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const filters: any = { page, limit, roleId };
+      // Usamos el nuevo filtro excludeRoleId para obtener Admins, Managers y Trainers
+      const filters: any = { 
+        page, 
+        limit, 
+        excludeRoleId: ROLE_IDS.CLIENT 
+      };
       if (query) filters.query = query;
 
       const data = await membersService.getMembers(filters);
-      setMembers(data.data);
+      setStaff(data.data);
       setTotalPages(data.totalPages || 1);
     } catch (err: any) {
-      setError(err.message || "Error al cargar clientes");
+      setError(err.message || "Error al cargar el personal administrativo");
     } finally {
       setLoading(false);
     }
-  }, [page, limit, query, roleId]);
+  }, [page, limit, query]);
 
   React.useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
+    loadStaff();
+  }, [loadStaff]);
 
   const handleDelete = async (id: number) => {
     try {
       await membersService.deleteMember(id);
-      toast.success("Cliente eliminado.");
-      if (members.length === 1 && page > 1) {
+      toast.success("Usuario de staff eliminado.");
+      if (staff.length === 1 && page > 1) {
         setPage((prev) => prev - 1);
       } else {
-        loadMembers();
+        loadStaff();
       }
     } catch (err: any) {
-      toast.error(err.message || "Fallo al eliminar cliente");
+      toast.error(err.message || "Fallo al eliminar staff");
     }
   };
 
-  const handleSearchSubmit = (e: React.SubmitEvent) => {
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setQuery(tempQuery);
     setPage(1);
@@ -78,17 +78,17 @@ export default function MembersPage() {
   return (
     <div className="flex flex-col gap-6">
       <DashboardHeader
-        title="Clientes"
-        description="Administra los usuarios registrados en tu plataforma como miembros activos."
-        iconName="Users"
+        title="Gestión de Staff"
+        description="Administra los roles operativos del gimnasio (Admins, Managers y Trainers)."
+        iconName="ShieldCheck"
       >
-        <MemberModal
+        <StaffModal
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              NUEVO CLIENTE
+              AÑADIR STAFF
             </Button>
           }
-          onSuccess={() => loadMembers()}
+          onSuccess={() => loadStaff()}
         />
       </DashboardHeader>
 
@@ -114,10 +114,11 @@ export default function MembersPage() {
         ) : (
           <div className="space-y-6">
             <MembersTable
-              members={members}
+              members={staff}
               onDelete={handleDelete}
-              onSuccess={() => loadMembers()}
+              onSuccess={() => loadStaff()}
               loading={loading}
+              EditModal={StaffModal}
             />
 
             {/* Paginación */}

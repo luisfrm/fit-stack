@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
 
     const filters = {
       query: searchParams.get('query') ?? undefined,
-      role: searchParams.get('role') ?? undefined,
+      roleId: searchParams.has('roleId') ? Number(searchParams.get('roleId')) : undefined,
+      excludeRoleId: searchParams.has('excludeRoleId') ? Number(searchParams.get('excludeRoleId')) : undefined,
       isActive: searchParams.has('isActive')
         ? searchParams.get('isActive') === 'true'
         : undefined,

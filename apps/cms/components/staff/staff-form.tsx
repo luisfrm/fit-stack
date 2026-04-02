@@ -5,23 +5,24 @@ import {
   Input,
   Button,
   Checkbox,
-  Label,
   toast,
+  Label,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X } from "lucide-react";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
+import { ROLE_IDS, ROLE_NAMES } from "@workspace/shared/constants";
 import { coachesService } from "@/lib/services/coaches-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
+import { Text } from "@workspace/ui/components/text";
 
-interface MemberFormProps {
+interface StaffFormProps {
   readonly initialData?: IMember;
   readonly onSubmit: (data: Partial<IMember>, sendInvite: boolean) => Promise<void>;
   readonly isLoading?: boolean;
 }
 
-export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
+export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) {
   const isEdit = !!initialData?.id;
   const [sendInvite, setSendInvite] = React.useState(!isEdit);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -31,7 +32,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    roleId: initialData?.roleId ?? ROLE_IDS.CLIENT,
+    roleId: initialData?.roleId ?? ROLE_IDS.MANAGER, // Default to Manager for staff
     isActive: initialData?.isActive ?? true,
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
@@ -80,6 +81,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     try {
       let finalImageUrl = formData.imageUrl;
 
+      // 1. If a new file is selected, upload it first
       if (selectedFile) {
         finalImageUrl = await coachesService.uploadImage(selectedFile);
       }
@@ -90,6 +92,22 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
       };
 
       await onSubmit(payload, sendInvite);
+
+      // Reset form if it was a creation
+      if (!isEdit) {
+        setFormData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          documentId: "",
+          roleId: ROLE_IDS.MANAGER,
+          isActive: true,
+          phoneNumber: "",
+          birthday: "",
+          imageUrl: "",
+        });
+        removeImage();
+      }
     } catch (error: any) {
       toast.error(error.message || "Error al procesar el formulario");
     } finally {
@@ -98,26 +116,18 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
-      {/* Photo Upload */}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 py-4">
+      {/* ── Photo Upload Section ── */}
       <div className="flex flex-col items-center gap-4 py-2">
         <div className="relative group">
-          <Avatar className="size-20 border border-white/10 bg-white/5 ring-offset-background group-hover:ring-2 ring-primary/50 transition-all">
+          <Avatar className="size-24 border-2 border-primary/20 bg-surface-2 ring-offset-2 ring-offset-background group-hover:ring-2 ring-primary/50 transition-all">
             {previewUrl ? (
               <AvatarImage src={previewUrl} className="object-cover" />
             ) : null}
-            <AvatarFallback className="bg-white/5 text-slate-500">
-              <User className="size-8 opacity-30" />
+            <AvatarFallback className="bg-surface-2 text-foreground-dim border-none">
+              <User className="size-10 opacity-30" />
             </AvatarFallback>
           </Avatar>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-          >
-            <Upload className="size-5 text-white" />
-          </button>
 
           {previewUrl && (
             <button
@@ -128,10 +138,34 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
               <X className="size-3" />
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          >
+            <Upload className="size-6 text-white" />
+          </button>
         </div>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="image/*"
+          className="hidden"
+        />
+        <div className="text-center">
+          <Text size="xs" variant="muted" className="mb-1">
+            Foto de Perfil (Opcional)
+          </Text>
+          <Text size="xs" className="text-primary/60">
+            JPG, PNG o WebP. Máx 2MB.
+          </Text>
+        </div>
       </div>
 
+      {/* ── Personal Info ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Nombre"
@@ -155,7 +189,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
         <Input
           label="Correo Electrónico"
           type="email"
-          placeholder="Ej: juan.perez@gmail.com"
+          placeholder="Ej: admin@elitefitness.com"
           value={formData.email}
           onChange={(e) => handleChange("email", e.target.value)}
           required
@@ -163,6 +197,20 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           disabled={isEdit}
         />
 
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-sm font-medium text-slate-300">Rol Administrativo</Label>
+          <select
+            value={formData.roleId}
+            onChange={(e) => handleChange("roleId", Number(e.target.value))}
+            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-primary transition-all h-[46px]"
+          >
+            <option value={ROLE_IDS.MANAGER} className="bg-slate-900">{ROLE_NAMES[ROLE_IDS.MANAGER]}</option>
+            <option value={ROLE_IDS.ADMIN} className="bg-slate-900">{ROLE_NAMES[ROLE_IDS.ADMIN]}</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Identificación / DNI"
           placeholder="Nº de documento"
@@ -170,23 +218,12 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           onChange={(e) => handleChange("documentId", e.target.value)}
           leftIcon={<CreditCard size={16} />}
         />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Teléfono"
           placeholder="Ej: +58 412 1234567"
           value={formData.phoneNumber ?? ""}
           onChange={(e) => handleChange("phoneNumber", e.target.value)}
           leftIcon={<Phone size={16} />}
-        />
-
-        <Input
-          label="Fecha de Nacimiento"
-          type="date"
-          value={formData.birthday ?? ""}
-          onChange={(e) => handleChange("birthday", e.target.value)}
-          leftIcon={<Calendar size={16} />}
         />
       </div>
 
@@ -202,7 +239,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
               Estado Activo
             </Label>
             <p className="text-xs text-muted-foreground">
-              Determina si el cliente tiene acceso actual al gimnasio.
+              Determina si el usuario tiene acceso actual al panel de administración.
             </p>
           </div>
         </div>
@@ -216,10 +253,10 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
             />
             <div className="grid gap-1.5 leading-none">
               <Label htmlFor="sendEmail" className="text-sm font-bold leading-none text-primary">
-                Enviar correo de registro
+                Enviar invitación de acceso
               </Label>
               <p className="text-xs text-primary/60">
-                Se enviarán las credenciales de acceso para que cree su contraseña.
+                Se enviará un enlace al correo para que el nuevo staff cree su contraseña.
               </p>
             </div>
           </div>
@@ -234,9 +271,10 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           loading={isLoading || isUploading}
           rightIcon={!(isLoading || isUploading) && (isEdit ? <ShieldCheck size={18} /> : <Send size={18} />)}
         >
-          {isEdit ? "GUARDAR CAMBIOS" : "CREAR CLIENTE"}
+          {isEdit ? "GUARDAR CAMBIOS" : "AÑADIR AL STAFF"}
         </Button>
       </div>
     </form>
   );
 }
+

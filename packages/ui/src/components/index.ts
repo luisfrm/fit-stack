@@ -66,6 +66,7 @@ export type { CoachCardProps } from "@workspace/ui/components/coach-card";
 export { Switch } from "@workspace/ui/components/switch";
 export { Textarea } from "@workspace/ui/components/textarea";
 export type { TextareaProps } from "@workspace/ui/components/textarea";
+export * from "@workspace/ui/components/dialog";
 
 // Next.js specific components
 export * from "@workspace/ui/components/next/sidebar";

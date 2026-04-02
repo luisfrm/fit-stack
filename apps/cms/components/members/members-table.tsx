@@ -1,103 +1,80 @@
 "use client";
 
 import * as React from "react";
-import { Table, ColumnDef, Button, Badge, toast } from "@workspace/ui/components";
+import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { Edit2, Trash2, ShieldCheck, Mail, Loader2 } from "lucide-react";
+import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
+import { getMediaUrl } from "@/lib/utils/media-utils";
 
 interface MembersTableProps {
   readonly members: IMember[];
   readonly onDelete: (id: number) => void;
   readonly onSuccess: () => void;
+  readonly EditModal?: React.ComponentType<{
+    initialData: IMember;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>;
   readonly loading?: boolean;
 }
 
-const getRoleBadgeColor = (roleName?: string) => {
-  const name = roleName?.toLowerCase() || "";
-  if (name.toLowerCase().includes("admin")) return "bg-chart-2/10 text-chart-2 border-chart-2/20";
-  if (name.toLowerCase().includes("manager")) return "bg-chart-4/10 text-chart-4 border-chart-4/20";
-  if (name.toLowerCase().includes("trainer") || name.toLowerCase().includes("entrenador")) return "bg-chart-1/30 text-chart-1 border-chart-1";
-  return "bg-chart-5/10 text-chart-5 border-chart-5/20";
-};
-
-const getRoleText = (roleName: string) => {
-  return roleName;
-};
-
-const ResendInviteButton = ({ member }: { member: IMember }) => {
-  const [loading, setLoading] = React.useState(false);
-
-  const handleResend = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!member.id) return;
-
-    setLoading(true);
-    try {
-      await membersService.resendInvite(member.id);
-      toast.success(`Invitación reenviada a ${member.email}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Error al reenviar invitación");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Button
-      size="icon"
-      variant="ghost"
-      className="h-8 w-8 text-primary hover:bg-primary/10"
-      onClick={handleResend}
-      disabled={loading}
-      title="Reenviar Invitación"
-    >
-      {loading ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-    </Button>
-  );
-};
-
 const getColumns = (
   onDelete: (id: number) => void,
-  onSuccess: () => void
+  onSuccess: () => void,
+  EditModal: React.ComponentType<{
+    initialData: IMember;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>
 ): ColumnDef<IMember>[] => [
     {
       header: "Miembro",
       className: "pl-6",
       headerClassName: "pl-6",
       cell: (m) => (
-        <div className="flex flex-col">
-          <span className="font-semibold text-white truncate max-w-[200px]">
-            {m.firstName} {m.lastName}
-          </span>
-          <span className="text-xs text-gray-400 truncate max-w-[200px]">
-            {m.email}
-          </span>
+        <div className="flex items-center gap-3">
+          <Avatar size="default" className="size-9 border border-white/10">
+            {m.imageUrl ? (
+              <AvatarImage src={getMediaUrl(m.imageUrl)} alt={m.firstName} className="object-cover" />
+            ) : null}
+            <AvatarFallback className="bg-white/5 text-xs">
+              <User size={14} className="opacity-40" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col min-w-0">
+            <span className="font-semibold text-white truncate max-w-[180px]">
+              {m.firstName} {m.lastName}
+            </span>
+            <span className="text-[10px] text-gray-400 truncate max-w-[180px] uppercase tracking-wider">
+              {m.email}
+            </span>
+          </div>
         </div>
-      )
-    },
-    {
-      header: "Rol",
-      cell: (m) => (
-        <Badge variant="outline" className={getRoleBadgeColor(m.role?.name)}>
-          {getRoleText(capitalize(m.role?.name || ""))}
-        </Badge>
       )
     },
     {
       header: "Identificación",
       cell: (m) => (
-        <span className="text-sm text-gray-400">
+        <span className="text-sm font-medium text-gray-300">
           {m.documentId || "—"}
         </span>
       )
     },
     {
-      header: "Sesión",
+      header: "Rol",
       cell: (m) => (
-        <Badge variant={m.user ? "default" : "outline"} className={m.user ? "border-primary text-black" : "text-gray-500"}>
-          {m.user ? "Vinculado" : "Pendiente"}
+        <Badge variant={m.roleId === 1 ? "default" : "secondary"}>
+          {m.role?.name || "Sin rol"}
+        </Badge>
+      )
+    },
+    {
+      header: "Estado",
+      cell: (m) => (
+        <Badge variant={m.isActive ? "default" : "destructive"}>
+          {m.isActive ? "Activo" : "Inactivo"}
         </Badge>
       )
     },
@@ -106,28 +83,24 @@ const getColumns = (
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
       cell: (m) => (
-        <div className="flex justify-end gap-2">
-          <MemberModal
-            member={m}
+        <div className="flex items-center justify-end gap-2">
+          {!m.user && m.id && (
+            <ResendInviteButton memberId={m.id} />
+          )}
+          <EditModal
+            initialData={m}
             onSuccess={onSuccess}
             trigger={
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:bg-white/10" title="Editar">
-                <Edit2 size={16} />
+              <Button variant="ghost" size="icon">
+                <Edit2 size={16} className="text-gray-400" />
               </Button>
             }
           />
-          {!m.user && <ResendInviteButton member={m} />}
           <Button
-            size="icon"
             variant="ghost"
-            className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (globalThis.confirm(`¿Seguro que deseas eliminar a ${m.firstName}?`)) {
-                if (m.id) onDelete(m.id);
-              }
-            }}
-            title="Eliminar"
+            size="icon"
+            onClick={() => m.id && onDelete(m.id)}
+            className="hover:bg-red-500/10 hover:text-red-500"
           >
             <Trash2 size={16} />
           </Button>
@@ -136,26 +109,42 @@ const getColumns = (
     }
   ];
 
-import { NoData } from "@/components/dashboard/dashboard-ui";
-import { capitalize } from "@/lib/helper";
+function ResendInviteButton({ memberId }: { readonly memberId: number }) {
+  const [loading, setLoading] = React.useState(false);
 
-export function MembersTable({ members, onDelete, onSuccess, loading }: MembersTableProps) {
-  const columns = React.useMemo(() => getColumns(onDelete, onSuccess), [onDelete, onSuccess]);
+  const handleResend = async () => {
+    try {
+      setLoading(true);
+      await membersService.resendInvite(memberId);
+      toast.success("Invitación enviada correctamente.");
+    } catch (err: any) {
+      toast.error(err.message || "Error al enviar invitación.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const emptyState = (
-    <NoData
-      icon={ShieldCheck}
-      message="No se encontraron miembros. Intenta ajustando los filtros o crea un nuevo miembro."
-      className="py-12"
-    />
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={handleResend}
+      disabled={loading}
+      title="Reenviar invitación de registro"
+    >
+      {loading ? <Loader2 size={16} className="animate-spin text-primary" /> : <Mail size={16} className="text-primary" />}
+    </Button>
   );
+}
+
+export function MembersTable({ members, onDelete, onSuccess, EditModal = MemberModal, loading }: MembersTableProps) {
+  const columns = React.useMemo(() => getColumns(onDelete, onSuccess, EditModal), [onDelete, onSuccess, EditModal]);
 
   return (
     <Table
       columns={columns}
       data={members}
       loading={loading}
-      emptyState={emptyState}
     />
   );
 }

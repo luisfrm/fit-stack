@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, desc, db } from '@workspace/database/client';
+import { eq, ne, ilike, and, or, count, desc, db } from '@workspace/database/client';
 import { members } from '@workspace/database/schema';
 
 export type DbMember = typeof members.$inferSelect;
@@ -12,6 +12,7 @@ export type MemberWithRelations = DbMember & {
 export interface MembersFilter {
   query?: string;
   roleId?: number;
+  excludeRoleId?: number;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -28,7 +29,7 @@ export interface PaginatedMembersResult {
 
 export const membersRepository = {
   async findAll(filters: MembersFilter = {}): Promise<PaginatedMembersResult> {
-    const { query, roleId, isActive, page = 1, limit = 10, requireTotal = true } = filters;
+    const { query, roleId, excludeRoleId, isActive, page = 1, limit = 10, requireTotal = true } = filters;
     const offset = (page - 1) * limit;
 
     const conditions = [];
@@ -46,6 +47,10 @@ export const membersRepository = {
     
     if (roleId) {
       conditions.push(eq(members.roleId, roleId));
+    }
+    
+    if (excludeRoleId) {
+      conditions.push(ne(members.roleId, excludeRoleId));
     }
 
     if (isActive !== undefined) {

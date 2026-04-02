@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   AlertCircle,
   BadgeCheck,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,9 +49,10 @@ import SignOutButton from "../SignOutButton";
 
 const NAV_ITEMS: SidebarNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard },
+  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck },
   { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
-  { label: "Miembros", href: "/dashboard/members", icon: Users },
+  { label: "Clientes", href: "/dashboard/members", icon: Users },
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard },
   { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
   { label: "Clases", href: "/dashboard/classes", icon: CalendarDays },
   { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell },
