@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Button,
-  Title,
   Text,
   toast,
   Input,
@@ -12,38 +11,46 @@ import {
   Label
 } from "@workspace/ui/components";
 import { Shield, Plus, Check, Loader2 } from "lucide-react";
-import { rbacService, Role, Permission } from "@/lib/services/rbac-service";
+import { rbacService, type Role } from "@/lib/services/rbac-service";
 import { RolesTable } from "@/components/settings/roles-table";
+import { useRoles, usePermissions } from "@/lib/hooks/use-rbac";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 export default function RolesPage() {
-  const [roles, setRoles] = React.useState<Role[]>([]);
-  const [permissions, setPermissions] = React.useState<Permission[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const queryClient = useQueryClient();
+
+  // Queries
+  const { data: roles = [], isLoading: loadingRoles } = useRoles();
+  const { data: permissions = [], isLoading: loadingPermissions } = usePermissions();
+
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [currentRole, setCurrentRole] = React.useState<Partial<Role> | null>(null);
   const [selectedPermissions, setSelectedPermissions] = React.useState<number[]>([]);
-  const [saving, setSaving] = React.useState(false);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [rolesData, permsData] = await Promise.all([
-        rbacService.getRoles(),
-        rbacService.getPermissions()
-      ]);
-      setRoles(rolesData || []);
-      setPermissions(permsData || []);
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al cargar roles y permisos");
-    } finally {
-      setLoading(false);
+  // Mutations
+  const upsertMutation = useMutation({
+    mutationFn: rbacService.upsertRole,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] });
+      toast.success(currentRole?.id ? "Rol actualizado" : "Rol creado");
+      setIsModalOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Error al guardar el rol");
     }
-  };
+  });
 
-  React.useEffect(() => {
-    fetchData();
-  }, []);
+  const seedMutation = useMutation({
+    mutationFn: rbacService.seed,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rbac", "roles"] });
+      toast.success("Roles base inicializados.");
+    },
+    onError: () => {
+      toast.error("Fallo al inicializar roles base");
+    }
+  });
 
   const handleOpenModal = (role?: Role) => {
     if (role) {
@@ -60,22 +67,12 @@ export default function RolesPage() {
     e.preventDefault();
     if (!currentRole?.name) return;
 
-    setSaving(true);
-    try {
-      await rbacService.upsertRole({
-        id: currentRole.id,
-        name: currentRole.name,
-        description: currentRole.description || "",
-        permissionIds: selectedPermissions
-      });
-      toast.success(currentRole.id ? "Rol actualizado" : "Rol creado");
-      setIsModalOpen(false);
-      fetchData();
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Error al guardar el rol");
-    } finally {
-      setSaving(false);
-    }
+    upsertMutation.mutate({
+      id: currentRole.id,
+      name: currentRole.name,
+      description: currentRole.description || "",
+      permissionIds: selectedPermissions
+    });
   };
 
   const togglePermission = (id: number) => {
@@ -84,7 +81,9 @@ export default function RolesPage() {
     );
   };
 
-  if (loading) {
+  const isLoading = loadingRoles || loadingPermissions;
+
+  if (isLoading) {
     return (
       <div className="flex h-[400px] items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -94,15 +93,16 @@ export default function RolesPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <Title as="h1" size="section" className="mb-2">
+      <DashboardHeader
+        title={
+          <>
             ROLES Y <br />
             <span className="text-primary italic">PERMISOS</span>
-          </Title>
-          <Text variant="muted">Configura los niveles de acceso de tu equipo</Text>
-        </div>
-
+          </>
+        }
+        description="Configura los niveles de acceso de tu equipo"
+        iconName="Shield"
+      >
         <Modal
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
@@ -116,8 +116,13 @@ export default function RolesPage() {
           footer={
             <div className="flex justify-end gap-2 w-full">
               <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>CANCELAR</Button>
-              <Button type="submit" form="role-form" loading={saving} leftIcon={!saving && <Check size={18} />}>
-                {saving ? "GUARDANDO..." : "GUARDAR ROL"}
+              <Button 
+                type="submit" 
+                form="role-form" 
+                loading={upsertMutation.isPending} 
+                leftIcon={!upsertMutation.isPending && <Check size={18} />}
+              >
+                {upsertMutation.isPending ? "GUARDANDO..." : "GUARDAR ROL"}
               </Button>
             </div>
           }
@@ -170,22 +175,25 @@ export default function RolesPage() {
             </div>
           </form>
         </Modal>
-      </div>
+      </DashboardHeader>
 
       {roles.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-white/10 rounded-2xl bg-white/5 space-y-4">
           <Shield size={64} className="text-white/20" />
           <Text size="lg" weight="medium">No hay roles configurados</Text>
-          <Button variant="outlined" onClick={async () => {
-            await rbacService.seed();
-            fetchData();
-          }}>INICIALIZAR ROLES BASE</Button>
+          <Button 
+            variant="outlined" 
+            loading={seedMutation.isPending}
+            onClick={() => seedMutation.mutate()}
+          >
+            INICIALIZAR ROLES BASE
+          </Button>
         </div>
       ) : (
         <RolesTable
           roles={roles}
           onEdit={handleOpenModal}
-          loading={loading}
+          loading={loadingRoles}
         />
       )}
     </div>

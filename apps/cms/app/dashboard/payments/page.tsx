@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Plus, CreditCard, Search } from "lucide-react";
-import { Button, Input, toast } from "@workspace/ui/components";
-import { type ISubscription } from "@/types/dashboard";
+import { Plus, Search } from "lucide-react";
+import { Button, toast, Input } from "@workspace/ui/components";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
+import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 export default function PaymentsPage() {
   const [subs, setSubs] = React.useState<ISubscription[]>([]);
@@ -56,26 +57,20 @@ export default function PaymentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 uppercase">
-            <CreditCard className="text-primary w-8 h-8" />
-            Suscripciones y Pagos
-          </h1>
-          <p className="text-slate-400 mt-2 text-sm">
-            Controla las facturas, renovaciones y vinculaciones de usuarios a sus planes.
-          </p>
-        </div>
-
+      <DashboardHeader
+        title="Suscripciones y Pagos"
+        description="Controla las facturas, renovaciones y vinculaciones de usuarios a sus planes."
+        iconName="CreditCard"
+      >
         <SubscriptionModal
           onSuccess={() => loadSubs()}
           trigger={
-            <Button size="lg" className="rounded-xl w-full md:w-auto font-bold tracking-wider" rightIcon={<Plus size={18} />}>
+            <Button size="sm" rightIcon={<Plus size={18} />}>
               NUEVO PAGO
             </Button>
           }
         />
-      </header>
+      </DashboardHeader>
 
       <section className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-96">

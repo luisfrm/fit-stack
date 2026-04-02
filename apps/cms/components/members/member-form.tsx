@@ -12,7 +12,7 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send } from "lucide-react";
-import { rbacService } from "@/lib/services/rbac-service";
+import { useRoles } from "@/lib/hooks/use-rbac";
 
 interface MemberFormProps {
   readonly initialData?: IMember;
@@ -22,8 +22,8 @@ interface MemberFormProps {
 
 export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
   const isEdit = !!initialData?.id;
-  const [roles, setRoles] = React.useState<{ id: number; name: string }[]>([]);
-  const [isLoadingRoles, setIsLoadingRoles] = React.useState(true);
+  const { data: roles = [], isLoading: isLoadingRoles } = useRoles();
+  const [sendInvite, setSendInvite] = React.useState(!isEdit);
 
   const [formData, setFormData] = React.useState<Partial<IMember>>({
     firstName: initialData?.firstName ?? "",
@@ -34,31 +34,15 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     isActive: initialData?.isActive ?? true,
   });
 
+  // Asignar rol por defecto si es nuevo y cargan los roles
   React.useEffect(() => {
-    const fetchRoles = async () => {
-      setIsLoadingRoles(true);
-      try {
-        const data = await rbacService.getRoles();
-        setRoles(data);
-        
-        // Si es nuevo y no tiene roleId, asignar el primero por defecto (ej: Cliente)
-        if (!isEdit && !formData.roleId && data.length > 0) {
-          const defaultRole = data.find((r) => r.name.toLowerCase() === "client") || data[0];
-          if (defaultRole) {
-            setFormData(prev => ({ ...prev, roleId: defaultRole.id }));
-          }
-        }
-      } catch (error) {
-        console.error("Error cargando roles:", error);
-      } finally {
-        setIsLoadingRoles(false);
+    if (!isEdit && !formData.roleId && roles.length > 0) {
+      const defaultRole = roles.find((r) => r.name.toLowerCase() === "client") || roles[0];
+      if (defaultRole) {
+        setFormData(prev => ({ ...prev, roleId: defaultRole.id }));
       }
-    };
-    fetchRoles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit]);
-
-  const [sendInvite, setSendInvite] = React.useState(!isEdit);
+    }
+  }, [isEdit, roles, formData.roleId]);
 
   const handleChange = (field: keyof IMember, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

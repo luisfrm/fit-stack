@@ -6,6 +6,7 @@ import { Button, Text, toast } from "@workspace/ui/components";
 import { ClassesTable } from "@/components/classes/classes-table";
 import { ClassModal } from "@/components/classes/class-modal";
 import { classesService, type ClassesFilter, type PaginatedClasses } from "@/lib/services/classes-service";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -74,22 +75,20 @@ export default function ClassesPage() {
   return (
     <>
       {/* ── Header ── */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-        <div>
-          <h2 className="text-2xl lg:text-3xl font-bold text-slate-100 italic tracking-tight">Gestión de Clases</h2>
-          <Text variant="muted">Administra el horario y la visibilidad de tus clases diarias.</Text>
-        </div>
-        <div className="flex gap-3">
-          <ClassModal
-            onSuccess={() => fetchClasses(filters)}
-            trigger={
-              <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
-                Nueva Clase
-              </Button>
-            }
-          />
-        </div>
-      </header>
+      <DashboardHeader
+        title="Gestión de Clases"
+        description="Administra el horario y la visibilidad de tus clases diarias."
+        iconName="CalendarDays"
+      >
+        <ClassModal
+          onSuccess={() => fetchClasses(filters)}
+          trigger={
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+              Nueva Clase
+            </Button>
+          }
+        />
+      </DashboardHeader>
 
       {/* ── Filters ── */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">

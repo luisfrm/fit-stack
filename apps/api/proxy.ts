@@ -36,8 +36,6 @@ export async function proxy(request: NextRequest) {
     headers: request.headers,
   });
 
-  console.log("session", session?.user);
-
   if (!session) {
     const errorResponse = NextResponse.json({ error: "No autorizado" }, { status: 401 });
     if (origin?.startsWith(env.frontendUrl!)) setCorsHeaders(errorResponse, origin);

@@ -1,24 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { Dumbbell, Plus, Filter, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dumbbell, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Text, toast } from "@workspace/ui/components";
 import { CoachesTable } from "@/components/coaches/coaches-table";
 import { CoachModal } from "@/components/coaches/coach-modal";
 import { coachesService } from "@/lib/services/coaches-service";
-import { type CoachFilter, type PaginatedCoaches, type ICoach } from "@/types/dashboard";
+import { type CoachFilter, type ICoach } from "@/types/dashboard";
+import { useCoaches } from "@/lib/hooks/use-trainers";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function TrainersPage() {
-  const [result, setResult] = React.useState<PaginatedCoaches>({
-    data: [],
-    total: 0,
-    page: 1,
-    limit: ITEMS_PER_PAGE,
-    totalPages: 0,
-  });
-  const [isLoading, setIsLoading] = React.useState(true);
+  const queryClient = useQueryClient();
   const [filters, setFilters] = React.useState<CoachFilter>({
     page: 1,
     limit: ITEMS_PER_PAGE,
@@ -29,23 +25,10 @@ export default function TrainersPage() {
   const [coachToEdit, setCoachToEdit] = React.useState<ICoach | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
 
-  const fetchCoaches = React.useCallback(async (activeFilters: CoachFilter) => {
-    setIsLoading(true);
-    try {
-      const data = await coachesService.getCoaches(activeFilters);
-      setResult(data);
-    } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "No se pudo conectar con el servidor";
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // React Query fetch
+  const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useCoaches(filters);
 
-  React.useEffect(() => {
-    fetchCoaches(filters);
-  }, [filters, fetchCoaches]);
-
+  // Debounced search
   React.useEffect(() => {
     const timeout = setTimeout(() => {
       setFilters((prev) => ({ ...prev, name: searchInput || undefined, page: 1 }));
@@ -53,19 +36,24 @@ export default function TrainersPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const handleDelete = async (coach: ICoach) => {
-    if (!confirm(`¿Estás seguro de que deseas eliminar al entrenador ${coach.name}?`)) return;
-
-    if (!coach.id) return;
-
-    try {
-      await coachesService.deleteCoach(coach.id);
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => coachesService.deleteCoach(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["coaches"] });
       toast.success("Entrenador eliminado correctamente");
-      fetchCoaches(filters);
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       const message = error.response?.data?.error ?? error.message ?? "Error al eliminar entrenador";
       toast.error(message);
     }
+  });
+
+  const handleDelete = async (coach: ICoach) => {
+    if (!coach.id) return;
+    if (!confirm(`¿Estás seguro de que deseas eliminar al entrenador ${coach.name}?`)) return;
+
+    deleteMutation.mutate(coach.id);
   };
 
   const handleEdit = (coach: ICoach) => {
@@ -80,22 +68,20 @@ export default function TrainersPage() {
   return (
     <>
       {/* ── Header ── */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
-        <div>
-          <h2 className="text-2xl lg:text-3xl font-bold text-slate-100 italic tracking-tight">Entrenadores</h2>
-          <Text variant="muted">Gestión de entrenadores y perfiles del gimnasio.</Text>
-        </div>
-        <div className="flex gap-3">
-          <CoachModal
-            onSuccess={() => fetchCoaches(filters)}
-            trigger={
-              <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
-                Nuevo Entrenador
-              </Button>
-            }
-          />
-        </div>
-      </header>
+      <DashboardHeader
+        title="Entrenadores"
+        description="Gestión de entrenadores y perfiles del gimnasio."
+        iconName="Dumbbell"
+      >
+        <CoachModal
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["coaches"] })}
+          trigger={
+            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
+              Nuevo Entrenador
+            </Button>
+          }
+        />
+      </DashboardHeader>
 
       {/* ── Filters ── */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -197,7 +183,7 @@ export default function TrainersPage() {
         initialData={coachToEdit}
         open={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
-        onSuccess={() => fetchCoaches(filters)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["coaches"] })}
       />
     </>
   );

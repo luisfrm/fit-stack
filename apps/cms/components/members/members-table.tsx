@@ -16,14 +16,14 @@ interface MembersTableProps {
 
 const getRoleBadgeColor = (roleName?: string) => {
   const name = roleName?.toLowerCase() || "";
-  if (name.includes("admin")) return "bg-red-500/10 text-red-500 border-red-500/20";
-  if (name.includes("manager")) return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
-  if (name.includes("trainer") || name.includes("entrenador")) return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-  return "bg-green-500/10 text-green-500 border-green-500/20";
+  if (name.toLowerCase().includes("admin")) return "bg-chart-2/10 text-chart-2 border-chart-2/20";
+  if (name.toLowerCase().includes("manager")) return "bg-chart-4/10 text-chart-4 border-chart-4/20";
+  if (name.toLowerCase().includes("trainer") || name.toLowerCase().includes("entrenador")) return "bg-chart-1/30 text-chart-1 border-chart-1";
+  return "bg-chart-5/10 text-chart-5 border-chart-5/20";
 };
 
-const getRoleText = (roleName?: string) => {
-  return roleName || "Miembro";
+const getRoleText = (roleName: string) => {
+  return roleName;
 };
 
 const ResendInviteButton = ({ member }: { member: IMember }) => {
@@ -81,7 +81,7 @@ const getColumns = (
       header: "Rol",
       cell: (m) => (
         <Badge variant="outline" className={getRoleBadgeColor(m.role?.name)}>
-          {getRoleText(m.role?.name)}
+          {getRoleText(capitalize(m.role?.name || ""))}
         </Badge>
       )
     },
@@ -137,6 +137,7 @@ const getColumns = (
   ];
 
 import { NoData } from "@/components/dashboard/dashboard-ui";
+import { capitalize } from "@/lib/helper";
 
 export function MembersTable({ members, onDelete, onSuccess, loading }: MembersTableProps) {
   const columns = React.useMemo(() => getColumns(onDelete, onSuccess), [onDelete, onSuccess]);

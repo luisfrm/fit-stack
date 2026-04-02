@@ -401,13 +401,31 @@ export function TodayClassesTable({ classes, loading }: Readonly<{ classes: ICla
   );
 }
 
-export function RecentRegistrationsList({ registrations }: Readonly<{ registrations: IRecentRegistration[] }>) {
+export function RecentRegistrationsList({ registrations, loading }: Readonly<{ registrations: IRecentRegistration[]; loading?: boolean }>) {
+  const skeletonIds = React.useMemo(() => Array.from({ length: 5 }, (_, i) => `reg-sk-${i}-${Math.random().toString(36).substr(2, 5)}`), []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col flex-1 p-2 gap-1">
+        {skeletonIds.map((id) => (
+          <div key={id} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
+            <div className="w-10 h-10 rounded-full bg-white/10 shrink-0" />
+            <div className="flex-1 space-y-2 py-1">
+              <div className="h-4 bg-white/10 rounded w-2/3" />
+              <div className="h-3 bg-white/5 rounded w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (registrations.length === 0) {
     return <NoData message="No se han registrado nuevos miembros recientemente." className="py-12" />;
   }
 
   return (
-    <div className="flex flex-col flex-1 p-2 gap-1">
+    <div className="flex flex-col flex-1 p-2 gap-1 animate-in fade-in duration-500">
       {registrations.map((member) => (
         <ActivityItem key={member.name} {...member} />
       ))}
