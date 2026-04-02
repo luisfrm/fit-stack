@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { Dumbbell, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Text, CoachCard, AddCoachCard, Skeleton, ConfirmationModal } from "@workspace/ui/components";
+import { Button, Text, CoachCard, AddCoachCard, Skeleton, ConfirmationModal, toast } from "@workspace/ui/components";
 import { CoachModal } from "@/components/coaches/coach-modal";
+import { membersService } from "@/lib/services/members-service";
 import {
   useDeleteCoachMutation,
   useUpdateCoachMutation
@@ -28,6 +29,7 @@ export default function TrainersPage() {
   const [coachToDelete, setCoachToDelete] = React.useState<ICoach | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+  const [resendingCoachId, setResendingCoachId] = React.useState<number | null>(null);
 
   // React Query fetch
   const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useCoaches(filters);
@@ -75,6 +77,19 @@ export default function TrainersPage() {
     }
   };
 
+  const handleResendInvite = async (coach: ICoach) => {
+    if (!coach.id) return;
+    setResendingCoachId(coach.id);
+    try {
+      await membersService.resendInvite(coach.id);
+      toast.success(`Invitación reenviada a ${coach.email}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Error al reenviar invitación");
+    } finally {
+      setResendingCoachId(null);
+    }
+  };
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -113,9 +128,12 @@ export default function TrainersPage() {
             specialities={coach.specialities}
             imageUrl={coach.imageUrl ? getMediaUrl(coach.imageUrl) : null}
             isVisible={coach.isVisible}
+            hasUser={!!coach.user}
             onEdit={() => handleEdit(coach)}
             onDelete={() => handleDelete(coach)}
             onToggleVisibility={(visible) => handleToggleVisibility(coach, visible)}
+            onResendInvite={() => handleResendInvite(coach)}
+            isResendingInvite={resendingCoachId === coach.id}
           />
         ))}
         {filters.page === 1 && !searchInput && !filters.isVisible && (

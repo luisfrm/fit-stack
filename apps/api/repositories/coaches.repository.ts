@@ -1,5 +1,5 @@
 import { eq, ilike, and, or, db, count, asc, type SQL } from '@workspace/database/client';
-import { members, coachProfiles, roles } from '@workspace/database/schema';
+import { members, coachProfiles, roles, user } from '@workspace/database/schema';
 import { ROLE_IDS } from '@workspace/shared/constants';
 import { type CoachesFilter as ICoachesFilter, type CreateCoachDTO as ICreateCoachDTO, type UpdateCoachDTO as IUpdateCoachDTO } from '@workspace/shared/types';
 export type { CoachesFilter, CreateCoachDTO, UpdateCoachDTO } from '@workspace/shared/types';
@@ -49,11 +49,16 @@ export const coachesRepository = {
         role: {
           id: roles.id,
           name: roles.name,
+        },
+        user: {
+          id: user.id,
+          email: user.email,
         }
       })
       .from(members)
       .leftJoin(coachProfiles, eq(members.id, coachProfiles.memberId))
       .leftJoin(roles, eq(members.roleId, roles.id))
+      .leftJoin(user, eq(members.id, user.memberId))
       .where(whereClause)
       .orderBy(asc(coachProfiles.displayOrder), asc(members.id))
       .limit(limit)
@@ -101,11 +106,16 @@ export const coachesRepository = {
         bio: coachProfiles.bio,
         isVisible: coachProfiles.isVisible,
         displayOrder: coachProfiles.displayOrder,
+        user: {
+          id: user.id,
+          email: user.email,
+        }
       })
       .from(members)
       .leftJoin(coachProfiles, eq(members.id, coachProfiles.memberId))
+      .leftJoin(user, eq(members.id, user.memberId))
       .where(and(eq(members.id, id), eq(members.roleId, ROLE_IDS.TRAINER)));
-    
+
     return result;
   },
 

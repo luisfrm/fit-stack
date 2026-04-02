@@ -6,7 +6,7 @@ import { Button } from "./button"
 import { NextImage } from "./next/image"
 import { Text } from "./text"
 import { Switch } from "./switch"
-import { Pencil, UserPlus, Trash2 } from "lucide-react"
+import { Pencil, UserPlus, Trash2, ShieldCheck, Mail, Loader2 } from "lucide-react"
 
 export interface CoachCardProps {
   readonly firstName: string;
@@ -18,6 +18,9 @@ export interface CoachCardProps {
   readonly onEdit?: () => void;
   readonly onDelete?: () => void;
   readonly onToggleVisibility?: (visible: boolean) => void;
+  readonly hasUser?: boolean;
+  readonly onResendInvite?: () => void;
+  readonly isResendingInvite?: boolean;
   readonly className?: string;
 }
 
@@ -31,6 +34,9 @@ export function CoachCard({
   onEdit,
   onDelete,
   onToggleVisibility,
+  hasUser,
+  onResendInvite,
+  isResendingInvite,
   className,
 }: Readonly<CoachCardProps>) {
   return (
@@ -96,11 +102,32 @@ export function CoachCard({
             </Text>
           </div>
           <div className="flex items-center gap-1">
+            {hasUser ? (
+              <div className="size-8 flex items-center justify-center text-primary" title="Usuario Vinculado">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onResendInvite}
+                disabled={isResendingInvite}
+                className="size-8 text-primary hover:bg-primary/10 transition-colors"
+                title="Reenviar Invitación"
+              >
+                {isResendingInvite ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Mail className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
               onClick={onEdit}
               className="size-8 text-foreground-dim hover:text-primary transition-colors"
+              title="Editar"
             >
               <Pencil className="w-3.5 h-3.5" />
             </Button>
@@ -109,6 +136,7 @@ export function CoachCard({
               size="icon"
               onClick={onDelete}
               className="size-8 text-foreground-dim hover:text-destructive transition-colors"
+              title="Eliminar"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
