@@ -14,10 +14,10 @@ import { Text } from "@workspace/ui/components/text";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const SETTINGS_NAV_ITEMS = [
-  { label: "General", href: "/dashboard/settings", icon: Building2 },
-  { label: "Roles y Permisos", href: "/dashboard/settings/roles", icon: ShieldCheck },
-  { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog },
-  { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard },
+  { label: "General", href: "/dashboard/settings", icon: Building2, disabled: false },
+  { label: "Roles y Permisos", href: "/dashboard/settings/roles", icon: ShieldCheck, disabled: false },
+  { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog, disabled: true },
+  { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: true },
 ];
 
 export default function SettingsLayout({
@@ -47,20 +47,23 @@ export default function SettingsLayout({
                 {SETTINGS_NAV_ITEMS.map((item) => {
                   const isActive = pathname === item.href || (item.href !== "/dashboard/settings" && pathname.startsWith(item.href));
                   const Icon = item.icon;
+                  const Tag = item.disabled ? "div" : Link;
                   return (
-                    <Link
+                    <Tag
                       key={item.href}
                       href={item.href}
+                      aria-disabled={item.disabled}
                       className={cn(
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium border group",
                         isActive
                           ? "bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(252,211,3,0.05)]"
-                          : "text-slate-400 hover:bg-white/5 hover:text-slate-100 border-transparent"
+                          : "text-slate-400 hover:bg-white/5 hover:text-slate-100 border-transparent",
+                        item.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-slate-400"
                       )}
                     >
                       <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-primary" : "text-slate-500 group-hover:text-slate-300")} />
                       {item.label}
-                    </Link>
+                    </Tag>
                   );
                 })}
               </nav>
