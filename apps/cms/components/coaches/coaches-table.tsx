@@ -28,15 +28,15 @@ const getColumns = (
     cell: (coach) => (
       <div className="flex items-center gap-3">
         <Avatar size="default">
-          {coach.imageUrl && <AvatarImage src={getMediaUrl(coach.imageUrl)} alt={coach.name} />}
-          <AvatarFallback>{coach.name.charAt(0)}</AvatarFallback>
+          {coach.imageUrl && <AvatarImage src={getMediaUrl(coach.imageUrl)} alt={`${coach.firstName} ${coach.lastName}`} />}
+          <AvatarFallback>{coach.firstName.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col min-w-0">
           <Text as="span" size="base" weight="medium" truncate>
-            {coach.name}
+            {coach.firstName} {coach.lastName}
           </Text>
           <Text as="span" size="xs" variant="subtle" truncate>
-            {coach.role}
+            {coach.role?.name || "Sin rol"}
           </Text>
         </div>
       </div>
