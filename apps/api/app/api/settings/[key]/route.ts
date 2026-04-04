@@ -11,11 +11,6 @@ export async function GET(
   { params }: { params: Promise<{ key: string }> }
 ) {
   try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { key } = await params
     const value = await settingsService.getByKey(key)
     

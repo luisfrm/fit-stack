@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
-import { auth } from "@/config/auth";
+import { getSessionCookie } from "better-auth/cookies";
 
 const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token"];
 
@@ -32,11 +32,14 @@ export async function proxy(request: NextRequest) {
 
   if (isPublicRoute(pathname)) return response;
 
-  const session = await auth.api.getSession({
-    headers: request.headers,
+  const isGetSettings = pathname.startsWith("/api/settings") && request.method === "GET";
+  if (isGetSettings) return response;
+
+  const sessionCookie = getSessionCookie(request, {
+    cookiePrefix: env.isLocal ? "better-auth" : "__Secure-better-auth",
   });
 
-  if (!session) {
+  if (!sessionCookie) {
     const errorResponse = NextResponse.json({ error: "No autorizado" }, { status: 401 });
     if (origin?.startsWith(env.frontendUrl!)) setCorsHeaders(errorResponse, origin);
     return errorResponse;

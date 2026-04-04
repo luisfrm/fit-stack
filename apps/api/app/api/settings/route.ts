@@ -8,11 +8,6 @@ import { getSession } from '@/config/get-session'
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const allSettings = await settingsService.getAll()
     return NextResponse.json(allSettings)
   } catch (error: any) {
