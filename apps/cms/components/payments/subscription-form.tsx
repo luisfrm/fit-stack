@@ -28,7 +28,8 @@ import {
 import { Search, X, Calculator, CircleDollarSign, CreditCard, CircleX } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { Label } from "@workspace/ui/components/label";
-import { parseDateAsConfigTimezone } from "@/lib/config/display";
+import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ROLE_IDS } from "@workspace/shared/constants";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName"> {
@@ -49,6 +50,8 @@ interface SubscriptionFormProps {
 }
 
 export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initialMember }: SubscriptionFormProps) {
+  const { settings } = useSettings();
+  const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 
   // States 
@@ -152,21 +155,21 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Actualizar fecha final automáticamente si cambia la inicial (1 mes después)
   React.useEffect(() => {
-    const start = parseDateAsConfigTimezone(startDate);
+    const start = parseDateAsConfigTimezone(startDate, timezone);
     if (!Number.isNaN(start.getTime())) {
       const end = new Date(start);
       end.setMonth(end.getMonth() + 1);
       const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
       setEndDate(endStr);
     }
-  }, [startDate]);
+  }, [startDate, timezone]);
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!memberId || !planId) return;
 
-    const startDateObj = parseDateAsConfigTimezone(startDate);
-    const endDateObj = parseDateAsConfigTimezone(endDate);
+    const startDateObj = parseDateAsConfigTimezone(startDate, timezone);
+    const endDateObj = parseDateAsConfigTimezone(endDate, timezone);
 
     await onSubmit({
       memberId,

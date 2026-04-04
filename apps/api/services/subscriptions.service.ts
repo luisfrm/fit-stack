@@ -1,4 +1,5 @@
 import { subscriptionsRepository, type ISubscriptionDTO } from '../repositories/subscriptions.repository'
+import { settingsService } from './settings.service'
 import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
@@ -17,7 +18,8 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id'>
 export const subscriptionsService = {
   // Obtener todas las suscripciones unidas a la data de Miembro y Plan para la tabla
   async getAllVisible() {
-    const records = await subscriptionsRepository.findAllVisible()
+    const gymNow = await settingsService.getGymNow()
+    const records = await subscriptionsRepository.findAllVisible(gymNow)
 
     // Formatear la salida para el frontend (fechas a string ISO y fusionar el nombre completo)
     return records.map(r => ({

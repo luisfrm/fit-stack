@@ -63,6 +63,8 @@ export type { ImageUploadProps } from "@workspace/ui/components/image-upload";
 
 export { CoachCard, AddCoachCard } from "@workspace/ui/components/coach-card";
 export type { CoachCardProps } from "@workspace/ui/components/coach-card";
+export { PlanCard } from "@workspace/ui/components/plan-card";
+export type { PlanCardProps } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
 export { Textarea } from "@workspace/ui/components/textarea";
 export type { TextareaProps } from "@workspace/ui/components/textarea";

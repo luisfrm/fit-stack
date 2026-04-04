@@ -1,9 +1,15 @@
 import { apiClient } from '../api-client'
-import { IMembershipPlan } from '@/types/dashboard'
+import { IMembershipPlan, IMembershipsSummary } from '@/types/dashboard'
 
 export const plansService = {
-  getAll: async (): Promise<IMembershipPlan[]> => {
-    const { data } = await apiClient.get<IMembershipPlan[]>('/plans')
+  getAll: async (options?: { includeStats?: boolean }): Promise<IMembershipPlan[]> => {
+    const params = options?.includeStats ? { includeStats: true } : {}
+    const { data } = await apiClient.get<IMembershipPlan[]>('/plans', { params })
+    return data
+  },
+
+  getSummary: async (): Promise<IMembershipsSummary> => {
+    const { data } = await apiClient.get<IMembershipsSummary>('/plans/summary')
     return data
   },
 

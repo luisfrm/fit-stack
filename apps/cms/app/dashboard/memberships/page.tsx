@@ -2,21 +2,26 @@
 
 import * as React from "react";
 import { Plus, LayoutTemplate, Loader2 } from "lucide-react";
-import { Button, toast } from "@workspace/ui/components";
-import { type IMembershipPlan } from "@/types/dashboard";
+import { Button, toast, Text } from "@workspace/ui/components";
+import { type IMembershipPlan, type IMembershipsSummary } from "@/types/dashboard";
 import { plansService } from "@/lib/services/plans-service";
 import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
 
 export default function MembershipsPage() {
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
+  const [summary, setSummary] = React.useState<IMembershipsSummary | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   const loadPlans = async () => {
     try {
       setLoading(true);
-      const data = await plansService.getAll();
-      setPlans(data);
+      const [plansData, summaryData] = await Promise.all([
+        plansService.getAll({ includeStats: true }),
+        plansService.getSummary()
+      ]);
+      setPlans(plansData);
+      setSummary(summaryData);
     } catch (err: any) {
       toast.error(err.message || "Error al cargar planes");
     } finally {
@@ -28,8 +33,29 @@ export default function MembershipsPage() {
     loadPlans();
   }, []);
 
-  const totalSuscripciones = 0;
-  const ingresos = 0;
+  const formatMonthlyRevenue = (revenue: Record<string, number>) => {
+    const keys = Object.keys(revenue);
+    if (keys.length === 0) return "$0";
+
+    return (
+      <div className="flex flex-col gap-0.5">
+        {keys.map(cur => {
+          const amount = (revenue[cur] ?? 0) / 100;
+          const formatted = new Intl.NumberFormat("es-ES", {
+            style: "currency",
+            currency: cur,
+            minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
+          }).format(amount);
+
+          return (
+            <Text key={cur} size="lg" weight="bold" className="text-primary truncate">
+              {formatted}
+            </Text>
+          );
+        })}
+      </div>
+    );
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -55,6 +81,7 @@ export default function MembershipsPage() {
             key={plan.id}
             plan={plan}
             onUpdate={() => loadPlans()}
+            activeMembersCount={plan.activeMembersCount}
           />
         ))}
       </div>
@@ -86,16 +113,22 @@ export default function MembershipsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Planes Activos</p>
-          <p className="text-3xl font-bold text-white">{plans.filter(p => p.isVisibleOnSite).length}</p>
+          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Planes Activos</Text>
+          <Text size="lg" weight="bold" className="text-white">
+            {plans.filter(p => p.isVisibleOnSite).length}
+          </Text>
         </div>
         <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Suscripciones Totales</p>
-          <p className="text-3xl font-bold text-white">{totalSuscripciones}</p>
+          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Suscripciones Totales</Text>
+          <Text size="lg" weight="bold" className="text-white">
+            {loading ? "..." : (summary?.totalActiveSubscriptions ?? 0)}
+          </Text>
         </div>
         <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Ingresos Mensuales</p>
-          <p className="text-3xl font-bold text-primary">${ingresos.toLocaleString()}</p>
+          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Ingresos Mes Actual</Text>
+          <div className="text-primary">
+            {loading ? "..." : formatMonthlyRevenue(summary?.monthlyRevenue ?? {})}
+          </div>
         </div>
       </div>
 

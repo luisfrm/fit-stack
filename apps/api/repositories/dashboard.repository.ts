@@ -9,9 +9,8 @@ export interface DashboardStats {
 }
 
 export const dashboardRepository = {
-  async getStats(today: string): Promise<DashboardStats> {
-    const now = new Date();
-    const sevenDaysFromNow = new Date();
+  async getStats(today: string, now: Date = new Date()): Promise<DashboardStats> {
+    const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(now.getDate() + 7);
 
     // 1. Monthly Income (Groups of totals per currency)
@@ -36,12 +35,7 @@ export const dashboardRepository = {
     const activeMembersResult = await db
       .select({ count: count(sql`DISTINCT ${subscriptions.memberId}`) })
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.status, 'active'),
-          gte(subscriptions.endDate, now)
-        )
-      );
+      .where(gte(subscriptions.endDate, now));
     const activeMembers = Number(activeMembersResult[0]?.count ?? 0);
 
     // 3. Memberships Expiring (Unique members whose LATEST active subscription expires in < 7 days)
@@ -52,12 +46,7 @@ export const dashboardRepository = {
         maxEndDate: sql<Date>`max(${subscriptions.endDate})`.as('max_end_date'),
       })
       .from(subscriptions)
-      .where(
-        and(
-          eq(subscriptions.status, 'active'),
-          gte(subscriptions.endDate, now)
-        )
-      )
+      .where(gte(subscriptions.endDate, now))
       .groupBy(subscriptions.memberId)
       .as('latest_subs');
 

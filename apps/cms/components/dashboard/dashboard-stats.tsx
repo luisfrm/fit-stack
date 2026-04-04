@@ -4,6 +4,7 @@ import * as React from "react";
 import { KpiGroup } from "./kpi-group";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { toast } from "@workspace/ui/components";
 
 export function DashboardStats() {
@@ -15,9 +16,12 @@ export function DashboardStats() {
   } | null>(null);
   const [loading, setLoading] = React.useState(true);
 
+  const { settings } = useSettings();
+  const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+
   React.useEffect(() => {
     const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: DEFAULT_TIMEZONE,
+      timeZone: timezone,
     }).format(new Date());
 
     dashboardService.getStats(today)

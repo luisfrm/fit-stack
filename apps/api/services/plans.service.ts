@@ -1,9 +1,16 @@
-import { plansRepository, IMembershipPlan } from '../repositories/plans.repository'
-export type { IMembershipPlan } from '../repositories/plans.repository'
+import { plansRepository, IMembershipPlan, IMembershipsSummary } from '../repositories/plans.repository'
+import { settingsService } from './settings.service'
+export type { IMembershipPlan, IMembershipsSummary } from '../repositories/plans.repository'
 
 export const plansService = {
-  async getAll(): Promise<IMembershipPlan[]> {
-    return plansRepository.findAll()
+  async getAll(filters: { includeStats?: boolean } = {}): Promise<IMembershipPlan[]> {
+    const gymNow = await settingsService.getGymNow()
+    return plansRepository.findAll(filters, gymNow)
+  },
+
+  async getSummary(): Promise<IMembershipsSummary> {
+    const gymNow = await settingsService.getGymNow()
+    return plansRepository.getSummary(gymNow)
   },
 
   async getById(id: number): Promise<IMembershipPlan | undefined> {

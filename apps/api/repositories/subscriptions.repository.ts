@@ -1,4 +1,4 @@
-import { db, eq, desc } from '@workspace/database/client'
+import { db, eq, desc, gte, and, sql } from '@workspace/database/client'
 import { subscriptions, members, membershipPlans } from '@workspace/database/schema'
 
 export interface ISubscriptionDTO {
@@ -8,11 +8,12 @@ export interface ISubscriptionDTO {
   startDate: Date
   endDate: Date
   status: 'active' | 'cancelled' | 'expired'
+  isActive?: boolean
   createdAt?: Date
 }
 
 export const subscriptionsRepository = {
-  async findAllVisible() {
+  async findAllVisible(now: Date = new Date()) {
     return db
       .select({
         id: subscriptions.id,
@@ -21,6 +22,7 @@ export const subscriptionsRepository = {
         startDate: subscriptions.startDate,
         endDate: subscriptions.endDate,
         status: subscriptions.status,
+        isActive: sql<boolean>`${subscriptions.endDate} >= ${now}`,
         memberName: members.firstName,
         memberLastName: members.lastName,
         roleId: members.roleId,

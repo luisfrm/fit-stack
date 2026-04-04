@@ -9,7 +9,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const plans = await plansService.getAll()
+    const { searchParams } = req.nextUrl
+    const includeStats = searchParams.get('includeStats') === 'true'
+
+    const plans = await plansService.getAll({ includeStats })
     return NextResponse.json(plans)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
