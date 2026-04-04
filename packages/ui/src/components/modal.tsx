@@ -88,17 +88,27 @@ export function Modal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className={cn("max-w-full", MODAL_SIZES[size], className)}>
+      <DialogContent
+        className={cn(
+          "max-w-full flex flex-col",
+          "max-sm:h-svh max-sm:max-w-full max-sm:rounded-none max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0",
+          MODAL_SIZES[size],
+          className
+        )}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && (
-            <DialogDescription className="mt-2">{description}</DialogDescription>
+            <DialogDescription className="mt-2 text-foreground-muted opacity-70">
+              {description}
+            </DialogDescription>
           )}
         </DialogHeader>
 
         <div
           className={cn(
-            isScrollable && "max-h-[70svh] lg:max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar",
+            "flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar",
+            isScrollable && "lg:max-h-[70vh]",
             "-mx-1 px-1",
             contentClassName
           )}
