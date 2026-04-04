@@ -25,10 +25,11 @@ interface CoachFormProps {
 export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) {
   const isEdit = !!initialData?.id;
 
-  // specialities in DB is jsonb. For now, we process it as a comma-separated string.
-  const [specialitiesText, setSpecialitiesText] = React.useState(
-    initialData?.specialities?.join(", ") ?? ""
+  // specialities in DB is jsonb.
+  const [specialities, setSpecialities] = React.useState<string[]>(
+    initialData?.specialities ?? []
   );
+  const [newSpeciality, setNewSpeciality] = React.useState("");
 
   const [formData, setFormData] = React.useState<Partial<ICoach>>({
     firstName: initialData?.firstName ?? "",
@@ -82,6 +83,10 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
+    if (!formData.firstName?.trim() || !formData.lastName?.trim() || !formData.email?.trim()) {
+      toast.error("Nombre, apellido y correo son obligatorios");
+      return;
+    }
     setIsUploading(true);
 
     try {
@@ -92,39 +97,13 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
         finalImageUrl = await coachesService.uploadImage(selectedFile);
       }
 
-      const specialitiesArray = specialitiesText
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
-
       const payload: Partial<ICoach> = {
         ...formData,
         imageUrl: finalImageUrl,
-        specialities: specialitiesArray.length > 0 ? specialitiesArray : null
+        specialities: specialities.length > 0 ? specialities : null
       };
 
       onSubmit(payload);
-
-      // Reset form if it was a creation (not edit) or if specifically needed
-      if (!isEdit) {
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          documentId: "",
-          phoneNumber: "",
-          birthday: "",
-          imageUrl: "",
-          bio: "",
-          isVisible: true,
-          displayOrder: 0,
-          roleId: ROLE_IDS.TRAINER,
-        });
-        setSpecialitiesText("");
-        setPreviewUrl("");
-        setSelectedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
     } catch (error: any) {
       console.error("Upload error:", error);
       toast.error(error.message || "Error al procesar el formulario. Por favor, revisa los datos.");
@@ -196,13 +175,76 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
       </div>
 
       {/* ── Especialidades ── */}
-      <Input
-        label="Especialidades (separadas por coma)"
-        placeholder="Ej: Yoga, Pilates, Fuerza"
-        value={specialitiesText}
-        onChange={(e) => setSpecialitiesText(e.target.value)}
-        leftIcon={<Star size={16} />}
-      />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <Label className="text-sm font-medium text-slate-300">Especialidades ({specialities.length}/6)</Label>
+          {specialities.length >= 6 && (
+            <span className="text-[10px] text-yellow-500 font-bold uppercase animate-pulse">Límite alcanzado</span>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              placeholder={specialities.length < 6 ? "Ej: Yoga, CrossFit, Pilates..." : "Límite de 6 alcanzado"}
+              value={newSpeciality}
+              onChange={(e) => setNewSpeciality(e.target.value)}
+              disabled={specialities.length >= 6}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const val = newSpeciality.trim();
+                  if (val && !specialities.includes(val) && specialities.length < 6) {
+                    setSpecialities([...specialities, val]);
+                    setNewSpeciality("");
+                  }
+                }
+              }}
+              leftIcon={<Star size={16} />}
+              className="pr-12"
+            />
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="absolute right-1 top-1 h-8 px-2 text-primary hover:bg-primary/10"
+              disabled={!newSpeciality.trim() || specialities.length >= 6}
+              onClick={() => {
+                const val = newSpeciality.trim();
+                if (val && !specialities.includes(val) && specialities.length < 6) {
+                  setSpecialities([...specialities, val]);
+                  setNewSpeciality("");
+                }
+              }}
+            >
+              <Hash size={16} />
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Tags Render ── */}
+        <div className="flex flex-wrap gap-2 min-h-8 p-3 rounded-lg bg-white/5 border border-dashed border-white/10 mt-2">
+          {specialities.length > 0 ? (
+            specialities.map((tag) => (
+              <span
+                key={tag}
+                className="group flex items-center gap-1.5 px-3 py-1 bg-surface-2 text-foreground-dim text-xs rounded-full border border-border-muted transition-all hover:border-primary/50 hover:bg-surface-3"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => setSpecialities(specialities.filter(s => s !== tag))}
+                  className="hover:text-red-400 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))
+          ) : (
+            <p className="text-xs text-slate-500 italic ml-1">Escribe una especialidad arriba y presiona Enter o el botón para añadirla.</p>
+          )}
+        </div>
+      </div>
 
       {/* ── Biografía ── */}
       <Textarea

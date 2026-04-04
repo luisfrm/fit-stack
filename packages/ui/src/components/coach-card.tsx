@@ -6,7 +6,7 @@ import { Button } from "./button"
 import { NextImage } from "./next/image"
 import { Text } from "./text"
 import { Switch } from "./switch"
-import { Pencil, UserPlus, Trash2, ShieldCheck, Mail, Loader2 } from "lucide-react"
+import { Pencil, UserPlus, Trash2, ShieldCheck, Mail, Loader2, ImageOff } from "lucide-react"
 
 export interface CoachCardProps {
   readonly firstName: string;
@@ -41,11 +41,11 @@ export function CoachCard({
 }: Readonly<CoachCardProps>) {
   return (
     <div className={cn(
-      "bg-card rounded-xl overflow-hidden border group flex flex-col aspect-3/5 h-full",
+      "bg-card rounded-xl overflow-hidden border group flex flex-col min-h-[450px]",
       className
     )}>
       {/* ── Image Header ── */}
-      <div className="flex-1 overflow-hidden bg-muted">
+      <div className="flex-[1.4] overflow-hidden bg-muted relative">
         {imageUrl ? (
           <NextImage
             src={imageUrl}
@@ -57,7 +57,7 @@ export function CoachCard({
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <div className="size-20 rounded-full bg-surface-2 flex items-center justify-center text-foreground-dim">
-              <UserPlus className="size-10" />
+              <ImageOff className="size-14" />
             </div>
           </div>
         )}
@@ -155,7 +155,7 @@ export function AddCoachCard({ onClick, className }: Readonly<{ onClick?: () => 
     <button
       onClick={onClick}
       className={cn(
-        "bg-surface/20 rounded-xl overflow-hidden border-2 border-dashed border-input group flex flex-col items-center justify-center aspect-3/5 h-full hover:border-primary/50 hover:bg-primary/5 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[400px]",
+        "bg-surface/20 rounded-xl overflow-hidden border-2 border-dashed border-input group flex flex-col items-center justify-center min-h-[450px] hover:border-primary/50 hover:bg-primary/5 transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className
       )}
     >

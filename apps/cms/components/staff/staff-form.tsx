@@ -92,22 +92,6 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
       };
 
       await onSubmit(payload, sendInvite);
-
-      // Reset form if it was a creation
-      if (!isEdit) {
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          documentId: "",
-          roleId: ROLE_IDS.MANAGER,
-          isActive: true,
-          phoneNumber: "",
-          birthday: "",
-          imageUrl: "",
-        });
-        removeImage();
-      }
     } catch (error: any) {
       toast.error(error.message || "Error al procesar el formulario");
     } finally {
