@@ -9,7 +9,7 @@ import {
   Textarea
 } from "@workspace/ui/components";
 import { type ICoach } from "@/types/dashboard";
-import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar } from "lucide-react";
+import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
 import { coachesService } from "@/lib/services/coaches-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -182,32 +182,30 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
             <span className="text-[10px] text-yellow-500 font-bold uppercase animate-pulse">Límite alcanzado</span>
           )}
         </div>
-        
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input
-              placeholder={specialities.length < 6 ? "Ej: Yoga, CrossFit, Pilates..." : "Límite de 6 alcanzado"}
-              value={newSpeciality}
-              onChange={(e) => setNewSpeciality(e.target.value)}
-              disabled={specialities.length >= 6}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  const val = newSpeciality.trim();
-                  if (val && !specialities.includes(val) && specialities.length < 6) {
-                    setSpecialities([...specialities, val]);
-                    setNewSpeciality("");
-                  }
-                }
-              }}
-              leftIcon={<Star size={16} />}
-              className="pr-12"
-            />
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              className="absolute right-1 top-1 h-8 px-2 text-primary hover:bg-primary/10"
+
+        <Input
+          placeholder={specialities.length < 6 ? "Ej: Yoga, CrossFit, Pilates..." : "Límite de 6 alcanzado"}
+          value={newSpeciality}
+          onChange={(e) => setNewSpeciality(e.target.value)}
+          disabled={specialities.length >= 6}
+          inputSize="sm"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const val = newSpeciality.trim();
+              if (val && !specialities.includes(val) && specialities.length < 6) {
+                setSpecialities([...specialities, val]);
+                setNewSpeciality("");
+              }
+            }
+          }}
+          leftIcon={<Star size={16} />}
+          rightElement={
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-black bg-primary hover:bg-primary/80 hover:scale-95 -mr-2"
               disabled={!newSpeciality.trim() || specialities.length >= 6}
               onClick={() => {
                 const val = newSpeciality.trim();
@@ -217,10 +215,10 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
                 }
               }}
             >
-              <Hash size={16} />
+              <Plus size={16} /> Agregar
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* ── Tags Render ── */}
         <div className="flex flex-wrap gap-2 min-h-8 p-3 rounded-lg bg-white/5 border border-dashed border-white/10 mt-2">
