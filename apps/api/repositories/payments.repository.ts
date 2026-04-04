@@ -17,7 +17,7 @@ export interface IPayment {
   exchangeRateApplied?: string | null
   
   paymentMethod: 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other'
-  paymentMethodDetails?: string | null
+  paymentMethodDetails?: Record<string, any> | null
   
   paymentDate?: Date
   createdAt?: Date

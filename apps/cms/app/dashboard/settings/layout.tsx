@@ -8,6 +8,8 @@ import {
   ShieldCheck,
   CreditCard,
   Building2,
+  Coins,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Text } from "@workspace/ui/components/text";
@@ -15,6 +17,8 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const SETTINGS_NAV_ITEMS = [
   { label: "General", href: "/dashboard/settings", icon: Building2, disabled: false },
+  { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
+  { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
   { label: "Roles y Permisos", href: "/dashboard/settings/roles", icon: ShieldCheck, disabled: false },
   { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog, disabled: true },
   { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: true },
@@ -38,8 +42,8 @@ export default function SettingsLayout({
       <div className="flex flex-col lg:flex-row gap-12">
         {/* Settings Sub-Sidebar */}
         <aside className="w-full lg:w-64 shrink-0">
-          <div className="flex flex-col gap-6 sticky top-24">
-            <div className="px-2">
+          <div className="flex flex-col gap-6 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10">
+            <div className="px-2 pb-8">
               <Text variant="muted" size="xs" weight="bold" uppercase className="px-2 mb-4 tracking-widest opacity-60">
                 Ajustes del Sistema
               </Text>

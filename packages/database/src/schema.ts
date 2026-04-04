@@ -92,8 +92,6 @@ export const verification = pgTable('verification', {
 export const roleEnum = pgEnum('role', ['admin', 'manager', 'trainer', 'client']);
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
-export const currencyEnum = pgEnum('currency', ['USD', 'VES', 'EUR']);
-export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'zelle', 'pago_movil', 'pos', 'other']);
 
 // --- CORE: USERS & MEMBERS ---
 
@@ -118,7 +116,7 @@ export const membershipPlans = pgTable('membership_plans', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   price: integer('price').notNull(), // Guardado en centavos (ej: $45.00 -> 4500)
-  currency: currencyEnum('currency').default('USD').notNull(),
+  currency: text('currency').default('USD').notNull(),
   features: jsonb('features'), // Array: ["Acceso 24/7", "Zonas VIP"]
   isPopular: boolean('is_popular').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(), // Si es false, es un 'Borrador' / Inactivo en CMS
@@ -147,15 +145,15 @@ export const payments = pgTable('payments', {
   // Snapshots para historial histórico invariable
   planSnapshotName: text('plan_snapshot_name').notNull(),
   planSnapshotPrice: integer('plan_snapshot_price').notNull(),
-  planSnapshotCurrency: currencyEnum('plan_snapshot_currency').notNull(),
+  planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
 
   // Datos del Pago (Lo que realmente entró en caja)
   amountPaid: integer('amount_paid').notNull(),
-  currencyPaid: currencyEnum('currency_paid').notNull(),
+  currencyPaid: text('currency_paid').notNull(),
   exchangeRateApplied: text('exchange_rate_applied'), // Guardamos como texto para ser flexibles o numérico? numeric es mejor
 
-  paymentMethod: paymentMethodEnum('payment_method').notNull(),
-  paymentMethodDetails: text('payment_method_details'), // Referencia, banco o texto libre si es 'other'
+  paymentMethod: text('payment_method').notNull(),
+  paymentMethodDetails: jsonb('payment_method_details').$type<Record<string, any>>(), // Metadatos dinámicos del pago
 
   paymentDate: timestamp('payment_date').defaultNow().notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

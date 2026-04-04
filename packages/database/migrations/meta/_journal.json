@@ -64,6 +64,20 @@
       "when": 1775126865499,
       "tag": "0008_striped_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775298448467,
+      "tag": "0009_sloppy_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775337062105,
+      "tag": "0010_little_rage",
+      "breakpoints": true
     }
   ]
 }

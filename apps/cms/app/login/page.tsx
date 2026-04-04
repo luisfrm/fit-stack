@@ -131,14 +131,15 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 rightElement={
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost-muted"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
+                    className="h-8 w-8 p-0"
                     aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                  </Button>
                 }
               />
             </div>

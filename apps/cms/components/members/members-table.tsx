@@ -7,6 +7,8 @@ import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
+import { ValueConverter, CurrencyFormat } from "@/lib/utils/value-converters";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 
 interface MembersTableProps {
   readonly members: IMember[];
@@ -27,7 +29,8 @@ const getColumns = (
     initialData: IMember;
     onSuccess: () => void;
     trigger: React.ReactNode;
-  }>
+  }>,
+  currencyFormat: CurrencyFormat = "latam"
 ): ColumnDef<IMember>[] => [
     {
       header: "Miembro",
@@ -58,7 +61,7 @@ const getColumns = (
       header: "Identificación",
       cell: (m) => (
         <span className="text-sm font-medium text-gray-300">
-          {m.documentId || "—"}
+          {m.documentId ? ValueConverter.formatInteger(m.documentId, currencyFormat) : "—"}
         </span>
       )
     },
@@ -138,7 +141,10 @@ function ResendInviteButton({ memberId }: { readonly memberId: number }) {
 }
 
 export function MembersTable({ members, onDelete, onSuccess, EditModal = MemberModal, loading }: MembersTableProps) {
-  const columns = React.useMemo(() => getColumns(onDelete, onSuccess, EditModal), [onDelete, onSuccess, EditModal]);
+  const { settings } = useSettings();
+  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+
+  const columns = React.useMemo(() => getColumns(onDelete, onSuccess, EditModal, currencyFormat), [onDelete, onSuccess, EditModal, currencyFormat]);
 
   return (
     <Table

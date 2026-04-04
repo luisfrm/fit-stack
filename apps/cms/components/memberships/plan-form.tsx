@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { type IMembershipPlan, type Currency } from "@/types/dashboard";
+import { type IMembershipPlan } from "@/types/dashboard";
 import {
   Input,
   Button,
@@ -12,7 +12,8 @@ import {
   SelectContent,
   SelectItem
 } from "@workspace/ui/components";
-import { Plus, Trash2, BadgeDollarSign } from "lucide-react";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { Plus, Trash2, BadgeDollarSign, Loader2 } from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
 
 interface PlanFormProps {
@@ -21,18 +22,43 @@ interface PlanFormProps {
   readonly isLoading?: boolean;
 }
 
+interface FeatureItem {
+  id: string;
+  text: string;
+}
+
 export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
+  const { settings, isLoading: isLoadingSettings } = useSettings();
   const isEdit = !!initialData?.id;
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [price, setPrice] = React.useState(initialData?.price ? (initialData.price / 100).toString() : "0");
-  const [currency, setCurrency] = React.useState<Currency>(initialData?.currency || "USD");
+  const [currency, setCurrency] = React.useState<string>(initialData?.currency || "USD");
   const [isActive, setIsActive] = React.useState(initialData?.isActive ?? true);
   const [isPopular, setIsPopular] = React.useState(initialData?.isPopular ?? false);
   const [isVisibleOnSite, setIsVisibleOnSite] = React.useState(initialData?.isVisibleOnSite ?? true);
-  const [features, setFeatures] = React.useState<string[]>(initialData?.features || []);
+  const [features, setFeatures] = React.useState<FeatureItem[]>(
+    (initialData?.features || []).map(f => ({ id: crypto.randomUUID(), text: f }))
+  );
 
   const [errors, setErrors] = React.useState<{ name?: string; price?: string }>({});
+
+  const activeCurrencies = React.useMemo(() => {
+    const rawActive = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    if (!rawActive) return ["USD"];
+    try {
+      return JSON.parse(rawActive) as string[];
+    } catch {
+      return ["USD"];
+    }
+  }, [settings]);
+
+  // Ensure selected currency is valid if settings change
+  React.useEffect(() => {
+    if (!activeCurrencies.includes(currency) && activeCurrencies.length > 0) {
+      setCurrency(activeCurrencies[0]!);
+    }
+  }, [activeCurrencies]);
 
   const validate = () => {
     const nextErrors: { name?: string; price?: string } = {};
@@ -55,22 +81,29 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
       isActive,
       isPopular,
       isVisibleOnSite,
-      features: features.filter(f => f.trim().length > 0)
+      features: features.map(f => f.text).filter(t => t.trim().length > 0)
     });
   };
 
-  const addFeature = () => setFeatures([...features, ""]);
+  const addFeature = () => setFeatures([...features, { id: crypto.randomUUID(), text: "" }]);
   
   const updateFeature = (index: number, val: string) => {
     const newFeatures = [...features];
-    newFeatures[index] = val;
+    newFeatures[index]!.text = val;
     setFeatures(newFeatures);
   };
 
-  const removeFeature = (index: number) => {
-    const newFeatures = features.filter((_, i) => i !== index);
-    setFeatures(newFeatures);
+  const removeFeature = (id: string) => {
+    setFeatures(features.filter(f => f.id !== id));
   };
+
+  if (isLoadingSettings) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -91,15 +124,17 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
           <Label id="currency-label" className="text-sm font-medium uppercase tracking-tight text-slate-400">Moneda Base</Label>
           <Select 
             value={currency}
-            onValueChange={(v) => setCurrency(v as Currency)}
+            onValueChange={(v) => setCurrency(v)}
           >
             <SelectTrigger aria-labelledby="currency-label">
               <SelectValue placeholder="Seleccionar Moneda" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="USD">Dólares (USD)</SelectItem>
-              <SelectItem value="VES">Bolívares (VES)</SelectItem>
-              <SelectItem value="EUR">Euros (EUR)</SelectItem>
+              {activeCurrencies.map(code => (
+                <SelectItem key={code} value={code}>
+                  {code}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -180,9 +215,9 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         
         <div className="space-y-2">
           {features.map((feat, index) => (
-            <div key={`${index}-${feat.substring(0,3)}`} className="flex items-center gap-2">
+            <div key={feat.id} className="flex items-center gap-2">
               <Input 
-                value={feat}
+                value={feat.text}
                 onChange={(e) => updateFeature(index, e.target.value)}
                 placeholder="Ej: Acceso a zonas VIP" 
                 className="flex-1"
@@ -192,7 +227,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
                 variant="ghost" 
                 size="icon" 
                 className="text-red-400 hover:text-red-500 hover:bg-red-500/10 shrink-0"
-                onClick={() => removeFeature(index)}
+                onClick={() => removeFeature(feat.id)}
               >
                 <Trash2 size={16} />
               </Button>

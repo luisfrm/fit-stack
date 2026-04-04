@@ -121,16 +121,11 @@ export interface ICoach extends IMember {
   displayOrder: number;
 }
 
-export type Currency = 'USD' | 'VES' | 'EUR';
-
-/**
- * Interface for a Membership Plan.
- */
 export interface IMembershipPlan {
   id?: number;
   name: string;
   price: number; // in cents
-  currency: Currency;
+  currency: string;
   features: string[] | null;
   isPopular: boolean;
   isActive: boolean;
@@ -141,7 +136,7 @@ export interface IMembershipPlan {
 
 export interface IMembershipsSummary {
   totalActiveSubscriptions: number;
-  monthlyRevenue: Record<Currency, number>;
+  monthlyRevenue: Record<string, number>;
 }
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired';
@@ -165,7 +160,19 @@ export interface ISubscription {
   roleId?: number;
 }
 
-export type PaymentMethod = 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other';
+export interface IPaymentMethodField {
+  id: string;
+  label: string;
+  type: 'text' | 'file' | 'number';
+  required: boolean;
+}
+
+export interface IPaymentMethodConfig {
+  id: string;
+  name: string;
+  fields: IPaymentMethodField[];
+  icon?: string;
+}
 
 /**
  * Interface for a Payment record.
@@ -178,15 +185,15 @@ export interface IPayment {
   // Snapshots
   planSnapshotName: string;
   planSnapshotPrice: number;
-  planSnapshotCurrency: Currency;
+  planSnapshotCurrency: string;
   
   // Payment Data
   amountPaid: number;
-  currencyPaid: Currency;
+  currencyPaid: string;
   exchangeRateApplied?: string;
   
-  paymentMethod: PaymentMethod;
-  paymentMethodDetails?: string;
+  paymentMethod: string;
+  paymentMethodDetails?: Record<string, any>;
   
   paymentDate: string;
   createdAt?: string;

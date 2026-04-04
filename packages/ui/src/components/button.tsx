@@ -65,6 +65,30 @@ const buttonVariants = cva(
           "bg-red-600 text-white",
           "hover:bg-red-500",
         ],
+
+        /**
+         * Link — looks like a hyperlink
+         */
+        link: [
+          "bg-transparent text-primary hover:underline",
+          "p-0 h-auto font-bold normal-case tracking-normal",
+        ],
+
+        /**
+         * Ghost Danger — subtle red, no border
+         */
+        "ghost-danger": [
+          "bg-transparent text-red-500",
+          "hover:bg-red-500/10",
+        ],
+
+        /**
+         * Ghost Muted — subtle white, used for input icons
+         */
+        "ghost-muted": [
+          "bg-transparent text-white/40",
+          "hover:text-white hover:bg-white/5 active:bg-white/10",
+        ],
       },
 
       size: {

@@ -229,13 +229,15 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
                 className="group flex items-center gap-1.5 px-3 py-1 bg-surface-2 text-foreground-dim text-xs rounded-full border border-border-muted transition-all hover:border-primary/50 hover:bg-surface-3"
               >
                 {tag}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setSpecialities(specialities.filter(s => s !== tag))}
-                  className="hover:text-red-400 transition-colors"
+                  className="h-auto p-0 text-foreground-dim hover:text-red-400 border-none bg-transparent"
                 >
                   <X size={12} />
-                </button>
+                </Button>
               </span>
             ))
           ) : (

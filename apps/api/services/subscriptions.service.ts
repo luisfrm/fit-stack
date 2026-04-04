@@ -10,7 +10,7 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id'>
     currencyPaid: 'USD' | 'VES' | 'EUR'
     exchangeRateApplied?: string | null
     paymentMethod: 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other'
-    paymentMethodDetails?: string | null
+    paymentMethodDetails?: Record<string, any> | null
     paymentDate?: string // ISO string
   }
 }

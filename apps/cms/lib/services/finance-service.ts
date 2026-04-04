@@ -1,6 +1,5 @@
 import axios from "axios";
-import { EUR_EXCHANGE_URL, USD_EXCHANGE_URL } from "../config/constants";
-import { Currency } from "@/types/dashboard";
+import { BASE_EXCHANGE_API_URL } from "../config/constants";
 
 /**
  * Service to handle financial operations like exchange rate fetching.
@@ -10,11 +9,11 @@ export const financeService = {
    * Fetches the exchange rate for a given base currency and target currency.
    * Uses an external public API.
    */
-  getExchangeRate: async (base: Currency, target: Currency): Promise<number> => {
+  getExchangeRate: async (base: string, target: string): Promise<number> => {
     if (base === target) return 1;
 
     try {
-      const url = base === "USD" ? USD_EXCHANGE_URL : EUR_EXCHANGE_URL;
+      const url = `${BASE_EXCHANGE_API_URL}/${base}`;
       const { data } = await axios.get(url);
       
       // The API returns an object where 'rates' contains the conversion mappings

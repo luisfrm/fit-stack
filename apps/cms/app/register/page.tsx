@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Suspense } from "react";
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -72,7 +72,7 @@ function RegisterForm() {
       return;
     }
 
-    const { data: authData, error } = await signUp({
+    const { error } = await signUp({
       email: memberData.email, // Using pre-validated email to prevent mutation
       password,
       name: `${capitalize(memberData.firstName.toLocaleLowerCase().trim())} ${capitalize(memberData.lastName.toLocaleLowerCase().trim())}`,
@@ -182,13 +182,14 @@ function RegisterForm() {
                 leftIcon={<Lock size={16} />}
                 required
                 rightElement={
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost-muted"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
+                    className="h-8 w-8 p-0"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                  </Button>
                 }
               />
 
@@ -201,13 +202,14 @@ function RegisterForm() {
                 leftIcon={<Lock size={16} />}
                 required
                 rightElement={
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost-muted"
                     onClick={() => setShowConfirmPassword((v) => !v)}
-                    className="flex items-center justify-center transition-colors focus-visible:outline-none text-white/40 hover:text-white"
+                    className="h-8 w-8 p-0"
                   >
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                  </Button>
                 }
               />
 

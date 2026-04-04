@@ -114,22 +114,26 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           </Avatar>
 
           {previewUrl && (
-            <button
+            <Button
               type="button"
+              variant="danger"
+              size="icon"
+              rounded="full"
               onClick={removeImage}
-              className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform z-10"
+              className="absolute -top-1 -right-1 h-6 w-6 shadow-lg hover:scale-110 transition-transform z-10"
             >
               <X className="size-3" />
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0 border-none hover:bg-black/60"
           >
             <Upload className="size-6 text-white" />
-          </button>
+          </Button>
         </div>
 
         <input

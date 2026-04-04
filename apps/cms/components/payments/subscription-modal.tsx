@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Modal, toast } from "@workspace/ui/components";
+import { Modal, toast, Button } from "@workspace/ui/components";
 import { SubscriptionForm } from "./subscription-form";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { MemberForm } from "../members/member-form";
@@ -86,12 +86,13 @@ export function SubscriptionModal({ trigger, onSuccess }: SubscriptionModalProps
         {view === 'member' && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-4">
-              <button 
+              <Button 
+                variant="link"
                 onClick={() => setView('payment')}
-                className="text-xs text-primary hover:underline flex items-center gap-1 font-bold"
+                className="text-[10px] flex items-center gap-1"
               >
                 ← VOLVER AL PAGO
-              </button>
+              </Button>
             </div>
             <MemberForm 
               onSubmit={handleMemberCreate}

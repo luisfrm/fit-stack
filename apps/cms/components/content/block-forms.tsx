@@ -154,13 +154,16 @@ function TestimonialsForm({ data, onSave, isLoading }: any) {
       <div className="space-y-4">
         {fields.map((field, index) => (
           <div key={field.id} className="p-4 bg-white/5 rounded-xl border border-white/5 relative group">
-            <button 
+            <Button 
               type="button" 
+              variant="ghost-danger"
+              size="xs"
+              rounded="full"
               onClick={() => remove(index)}
-              className="absolute top-4 right-4 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 shadow-none border-none"
             >
               <Trash2 size={16} />
-            </button>
+            </Button>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-1">
                    <Controller 
@@ -212,13 +215,16 @@ function GalleryForm({ data, onSave, isLoading }: any) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {fields.map((field, index) => (
             <div key={field.id} className="relative group p-3 bg-white/5 rounded-xl border border-white/5">
-               <button 
+               <Button 
                   type="button" 
+                  variant="danger"
+                  size="xs"
+                  rounded="full"
                   onClick={() => remove(index)}
-                  className="absolute top-4 right-4 z-10 p-1.5 bg-rose-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-4 right-4 z-10 p-0 h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity border-none"
                 >
                   <Trash2 size={14} />
-                </button>
+                </Button>
                <Controller 
                   name={`items.${index}.imageKey`} 
                   control={control} 
@@ -233,14 +239,15 @@ function GalleryForm({ data, onSave, isLoading }: any) {
                </div>
             </div>
           ))}
-          <button 
+          <Button 
             type="button"
+            variant="ghost"
             onClick={() => append({ imageKey: "", caption: "" })}
-            className="flex flex-col items-center justify-center gap-3 h-full min-h-[160px] rounded-xl border-2 border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-slate-500 hover:text-primary"
+            className="flex flex-col items-center justify-center gap-3 h-full min-h-[160px] rounded-xl border-2 border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 transition-all text-slate-500 hover:text-primary p-6"
           >
             <Plus size={24} />
             <Text size="xs" weight="medium">Añadir Imagen</Text>
-          </button>
+          </Button>
         </div>
         <div className="flex justify-end pt-4 border-t border-white/5">
           <Button type="submit" variant="primary" loading={isLoading}>Guardar Galería</Button>

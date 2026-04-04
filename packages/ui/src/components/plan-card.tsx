@@ -92,8 +92,8 @@ export function PlanCard({
 
       {/* Módulo de Features (Lista de Checks) */}
       <div className="flex flex-col gap-3 mb-8 flex-1">
-        {plan.features?.map((feature, i) => (
-          <div key={`${plan.id || i}-${feature.substring(0, 5)}`} className="flex items-center gap-3">
+        {plan.features?.map((feature) => (
+          <div key={`${plan.id}-${feature}`} className="flex items-center gap-3">
             <CheckCircle2 className="w-4 h-4 text-primary shrink-0 opacity-80" />
             <Text as="span" size="sm" className="text-white/70 leading-none font-medium">
               {feature}

@@ -18,6 +18,7 @@ export function DashboardStats() {
 
   const { settings } = useSettings();
   const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+  const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
 
   React.useEffect(() => {
     const today = new Intl.DateTimeFormat('en-CA', {

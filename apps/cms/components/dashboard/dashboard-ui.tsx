@@ -38,6 +38,7 @@ import {
   AvatarImage,
   Card,
   Table,
+  Button,
   type ColumnDef,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
@@ -363,9 +364,13 @@ export function AlertItem({ severity, title, description, actionLabel }: Readonl
         <Text as="p" size="base" weight="semibold">{title}</Text>
         <Text as="p" size="xs" variant="subtle">{description}</Text>
       </div>
-      <button className={cn("ml-auto text-xs font-bold uppercase hover:underline shrink-0", config.buttonClass)}>
+      <Button 
+        variant="link"
+        size="xs"
+        className={cn("ml-auto shrink-0", config.buttonClass)}
+      >
         {actionLabel}
-      </button>
+      </Button>
     </Card>
   );
 }

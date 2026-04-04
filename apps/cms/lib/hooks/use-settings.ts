@@ -9,7 +9,11 @@ export const SETTINGS_KEYS = {
   GYM_SLOGAN: "gym_slogan",
   GYM_LOGO: "gym_logo_url",
   BRAND_PRIMARY: "brand_primary",
-  TIMEZONE: "timezone"
+  TIMEZONE: "timezone",
+  ACTIVE_CURRENCIES: "active_currencies",
+  PRIMARY_CURRENCY: "primary_currency",
+  CURRENCY_FORMAT: "currency_format",
+  ACTIVE_PAYMENT_METHODS: "active_payment_methods",
 } as const;
 
 export function useSettings() {

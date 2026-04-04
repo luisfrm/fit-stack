@@ -2,11 +2,10 @@
 
 import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
-import { Text } from "@workspace/ui/components/text";
+import { Text, Button, toast } from "@workspace/ui/components";
 import { cmsContentService } from "@/lib/services/cms-content-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import axios from "axios";
-import { toast } from "@workspace/ui/components";
 
 interface ImageUploaderProps {
   value?: string;
@@ -69,12 +68,16 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
              <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                <button 
+                <Button 
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  rounded="full"
                   onClick={() => onChange("")}
-                  className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-rose-500 transition-colors"
+                  className="absolute top-2 right-2 h-7 w-7 p-0 bg-black/60 text-white hover:bg-rose-500/80 border-none transition-colors"
                 >
                   <X size={14} />
-                </button>
+                </Button>
              </div>
              <Text size="xs" variant="muted" truncate className="max-w-[200px]">{value}</Text>
           </div>
