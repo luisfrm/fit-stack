@@ -8,6 +8,7 @@ import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { ROLE_IDS } from "@workspace/shared/constants";
 
 export default function PaymentsPage() {
   const [subs, setSubs] = React.useState<ISubscription[]>([]);
@@ -50,10 +51,16 @@ export default function PaymentsPage() {
     }
   };
 
-  const filteredSubs = subs.filter(s =>
-    s.memberName?.toLowerCase().includes(search.toLowerCase()) ||
-    s.planName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredSubs = subs.filter(s => {
+    const matches = s.memberName?.toLowerCase().includes(search.toLowerCase()) ||
+                    s.planName?.toLowerCase().includes(search.toLowerCase());
+    
+    // If searching, restrict results to Cliente role (4)
+    if (search.trim() !== "") {
+      return matches && s.roleId === ROLE_IDS.CLIENT;
+    }
+    return matches;
+  });
 
   return (
     <div className="flex flex-col gap-6">

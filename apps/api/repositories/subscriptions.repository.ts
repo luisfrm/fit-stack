@@ -23,6 +23,7 @@ export const subscriptionsRepository = {
         status: subscriptions.status,
         memberName: members.firstName,
         memberLastName: members.lastName,
+        roleId: members.roleId,
         planName: membershipPlans.name,
         price: membershipPlans.price
       })

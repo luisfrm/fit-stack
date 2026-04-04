@@ -23,6 +23,7 @@ export const subscriptionsService = {
     return records.map(r => ({
       ...r,
       memberName: `${r.memberName} ${r.memberLastName}`,
+      roleId: r.roleId,
       startDate: r.startDate.toISOString(),
       endDate: r.endDate.toISOString(),
     }))

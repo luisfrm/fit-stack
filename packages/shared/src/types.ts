@@ -156,6 +156,7 @@ export interface ISubscription {
   memberName?: string;
   planName?: string;
   price?: number;
+  roleId?: number;
 }
 
 export type PaymentMethod = 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other';
