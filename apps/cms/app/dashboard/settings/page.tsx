@@ -319,6 +319,7 @@ export default function GeneralSettingsPage() {
                 loading={isUpdating}
                 disabled={isUpdating}
                 leftIcon={<Save className="w-4 h-4" />}
+                size="xs"
               >
                 Actualizar Ajustes
               </Button>
@@ -327,6 +328,7 @@ export default function GeneralSettingsPage() {
                 variant="ghost"
                 fullWidth
                 asChild
+                size="xs"
               >
                 <a href="/dashboard">Cancelar y Volver</a>
               </Button>
