@@ -13,6 +13,7 @@ import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
+import { Textarea } from "@workspace/ui/components/textarea";
 import { ColorPicker } from "@workspace/ui/components/color-picker";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
@@ -152,11 +153,12 @@ export default function GeneralSettingsPage() {
                   value={formData[SETTINGS_KEYS.GYM_NAME] || ""}
                   onChange={(e) => handleChange(SETTINGS_KEYS.GYM_NAME, e.target.value)}
                 />
-                <Input
+                <Textarea
                   label="Eslogan / Lema"
                   placeholder="Tu mejor versión comienza aquí"
                   value={formData[SETTINGS_KEYS.GYM_SLOGAN] || ""}
                   onChange={(e) => handleChange(SETTINGS_KEYS.GYM_SLOGAN, e.target.value)}
+                  className="min-h-[100px]"
                 />
               </div>
 

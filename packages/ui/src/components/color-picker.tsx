@@ -18,17 +18,20 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
   ({ className, label, value, onChange, description, ...props }, ref) => {
     const id = React.useId();
     const [format, setFormat] = React.useState<ColorFormat>("hex");
+    
+    // Internal state to handle typing (allows intermediate invalid states)
+    const [tempValue, setTempValue] = React.useState("");
+    const [isFocused, setIsFocused] = React.useState(false);
 
-    // Detect format of incoming value
+    // SYNC: Prop value -> local text (only if valid and NOT typing)
     React.useEffect(() => {
-      if (value.startsWith("oklch")) setFormat("oklch");
-      else if (value.startsWith("rgb")) setFormat("rgba");
-    }, [value]);
-
-    const displayValue = React.useMemo(() => {
-      if (!value) return "";
-      return ColorUtils.formatForDisplay(value, format);
-    }, [value, format]);
+      // We only let the parent's value overwrite our local text if 
+      // we are NOT currently focused (typing). This prevents shorthand expansion 
+      // like "#fff" and cursor jumps while the user is in control.
+      if (ColorUtils.isValid(value) && !isFocused) {
+        setTempValue(ColorUtils.formatForDisplay(value, format));
+      }
+    }, [value, format, isFocused]);
 
     const handleFormatToggle = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -38,28 +41,39 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
       if (nextFormat) setFormat(nextFormat);
     };
 
-    const handleInputChange = (val: string) => {
+    const handleTextChange = (val: string) => {
+      setTempValue(val); // Keep exactly what user types
+      
+      // If it becomes a valid color in ANY format, emit OKLCH to parent
       if (ColorUtils.isValid(val)) {
-        // We ALWAYS emit OKLCH to the parent (as per requirement: "al guardarlos en db siempre seran oklch")
         const oklch = ColorUtils.toOklch(val);
         onChange(oklch);
-      } else {
-        // If invalid, let the parent know the raw string so it stays in the input
-        onChange(val);
       }
     };
 
+    const handlePickerChange = (hex: string) => {
+      // Picker ALWAYS gives HEX. Convert to OKLCH and emit.
+      const oklch = ColorUtils.toOklch(hex);
+      onChange(oklch);
+      // Local tempValue will sync via useEffect
+    };
+
     return (
-      <div className={cn("space-y-3", className)}>
+      <div className={cn("space-y-4", className)}>
         <div className="flex items-center justify-between">
-          {label && (
-            <Label
-              htmlFor={id}
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40"
-            >
-              {label}
-            </Label>
-          )}
+          <div className="flex flex-col gap-0.5">
+            {label && (
+              <Label
+                htmlFor={id}
+                className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40"
+              >
+                {label}
+              </Label>
+            )}
+            <span className="text-[10px] text-primary/60 font-medium">
+               Ej: {ColorUtils.formatExamples[format]}
+            </span>
+          </div>
 
           <button
             type="button"
@@ -71,15 +85,15 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
           </button>
         </div>
 
-        <div className="flex items-center gap-2 group">
+        <div className="flex items-center gap-3 group">
           <div
-            className="w-12 h-12 rounded-xl border border-white/10 shrink-0 shadow-2xl relative overflow-hidden transition-transform group-hover:scale-105 active:scale-95 cursor-pointer ring-offset-2 ring-offset-background group-focus-within:ring-2 group-focus-within:ring-primary"
-            style={{ backgroundColor: ColorUtils.isValid(value) ? value : "transparent" }}
+            className="w-12 h-12 rounded-xl border border-white/10 shrink-0 shadow-2xl relative overflow-hidden transition-all group-hover:scale-105 active:scale-95 cursor-pointer ring-offset-2 ring-offset-background group-focus-within:ring-2 group-focus-within:ring-primary"
+            style={{ backgroundColor: ColorUtils.isValid(value) ? value : "#000000" }}
           >
             <input
               type="color"
               value={ColorUtils.toHex(value) || "#000000"}
-              onChange={(e) => handleInputChange(e.target.value)}
+              onChange={(e) => handlePickerChange(e.target.value)}
               className="absolute inset-0 opacity-0 cursor-pointer w-full h-full scale-150"
               id={id}
             />
@@ -88,10 +102,18 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
             <Input
               ref={ref}
               type="text"
-              value={displayValue}
-              onChange={(e) => handleInputChange(e.target.value)}
+              value={tempValue}
+              onChange={(e) => handleTextChange(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => {
+                setIsFocused(false);
+                // When leaving, if we have a valid color, format it one last time to look nice
+                if (ColorUtils.isValid(tempValue)) {
+                  setTempValue(ColorUtils.formatForDisplay(tempValue, format));
+                }
+              }}
               className="font-mono uppercase bg-white/5 border-white/5 focus:border-primary/50 h-12 text-[13px] pr-10"
-              placeholder={format === "hex" ? "#FCD303" : "oklch(...)"}
+              placeholder={ColorUtils.formatExamples[format]}
               {...props}
             />
             {format === "oklch" && (

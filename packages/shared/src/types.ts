@@ -136,6 +136,12 @@ export interface IMembershipPlan {
   isActive: boolean;
   isVisibleOnSite: boolean;
   createdAt?: string;
+  activeMembersCount?: number;
+}
+
+export interface IMembershipsSummary {
+  totalActiveSubscriptions: number;
+  monthlyRevenue: Record<Currency, number>;
 }
 
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired';

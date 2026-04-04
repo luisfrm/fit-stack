@@ -59,12 +59,38 @@ export function formatTimeRange(
   return `${start} – ${formatTime(endTime, format)}`;
 }
 
+/** 
+ * Helper to get the ISO-style offset (e.g. "+08:00" or "-04:00") for a specific 
+ * IANA timezone at a specific date. 
+ */
+export function getTimezoneOffset(timezone: string, date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    timeZoneName: 'longOffset'
+  }).formatToParts(date);
+  
+  // The 'timeZoneName' part has a value like "GMT+8" or "GMT-04:00"
+  const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT+00:00';
+  const offset = offsetPart.replace('GMT', '');
+  
+  // Handle cases like "+8" -> "+08:00"
+  if (offset === '') return '+00:00';
+  if (!offset.includes(':')) {
+    const sign = offset[0];
+    const hours = offset.slice(1).padStart(2, '0');
+    return `${sign}${hours}:00`;
+  }
+  return offset;
+}
+
 /**
- * Creates a stable Date object directly targeting midnight in the default timezone
+ * Creates a stable Date object directly targeting midnight in the gym's timezone
  * to prevent off-by-one day bugs with basic "YYYY-MM-DD" inputs.
  * @param dateStr "YYYY-MM-DD"
+ * @param timezone IANA string (e.g. "Asia/Shanghai")
  */
-export function parseDateAsConfigTimezone(dateStr: string): Date {
-  // Ej: "2026-03-30T00:00:00-04:00" -> creates a local JS Date matching exactly that UTC point
-  return new Date(`${dateStr}T00:00:00${DEFAULT_TIMEZONE_OFFSET}`);
+export function parseDateAsConfigTimezone(dateStr: string, timezone: string = DEFAULT_TIMEZONE): Date {
+  const offset = getTimezoneOffset(timezone, new Date(dateStr));
+  // Ej: "2026-03-30T00:00:00+08:00" -> creates a local JS Date matching exactly that point in time
+  return new Date(`${dateStr}T00:00:00${offset}`);
 }

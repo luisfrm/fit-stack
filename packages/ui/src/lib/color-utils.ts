@@ -1,4 +1,4 @@
-import { parse, formatHex, formatRgb, formatCss, converter, modeOklch, useMode as culoriUseMode } from 'culori';
+import { parse, formatHex, formatCss, converter, modeOklch, useMode as culoriUseMode } from 'culori';
 
 // Activa el modo OKLCH en culori
 culoriUseMode(modeOklch);
@@ -27,7 +27,7 @@ export const ColorUtils = {
   getHoverColor: (color: string) => {
     const parsed = parse(color);
     if (!parsed) return "";
-    
+
     const oklch = toOklch(parsed);
     if (!oklch) return "";
 
@@ -47,7 +47,7 @@ export const ColorUtils = {
   getContrastForeground: (color: string) => {
     const parsed = parse(color);
     if (!parsed) return "oklch(0 0 0)"; // Default black
-    
+
     const oklch = toOklch(parsed);
     if (!oklch) return "oklch(0 0 0)";
 
@@ -70,7 +70,16 @@ export const ColorUtils = {
   toRgba: (color: string) => {
     const parsed = parse(color);
     if (!parsed) return "";
-    return formatRgb(parsed);
+    const rgb = converter('rgb')(parsed);
+    if (!rgb) return "";
+
+    // Scale from 0-1 to 0-255
+    const r = Math.round((rgb.r || 0) * 255);
+    const g = Math.round((rgb.g || 0) * 255);
+    const b = Math.round((rgb.b || 0) * 255);
+    const a = rgb.alpha === undefined ? 1 : Number(rgb.alpha.toFixed(2));
+
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
   },
 
   /**
@@ -99,5 +108,14 @@ export const ColorUtils = {
       case "oklch": return ColorUtils.toOklch(color);
       default: return color;
     }
+  },
+
+  /**
+   * Example strings for each format.
+   */
+  formatExamples: {
+    hex: "#FCD303",
+    rgba: "rgba(252, 211, 3, 1)",
+    oklch: "oklch(85% 0.15 85)"
   }
 };
