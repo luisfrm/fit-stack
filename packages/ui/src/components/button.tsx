@@ -92,31 +92,31 @@ const buttonVariants = cva(
       },
 
       size: {
-        xs:  "text-[10px] px-3 py-1.5 tracking-[0.15em]",
-        sm:  "text-xs px-5 py-2.5",
-        md:  "text-sm px-6 py-3",
-        lg:  "text-base px-8 py-4",
-        xl:  "text-lg px-10 py-4 tracking-[0.15em]",
-        icon: "size-10 p-0 rounded-full",
+        xs: "text-[10px] px-3 py-1.5 tracking-[0.15em]",
+        sm: "text-xs px-5 py-2.5",
+        md: "text-sm px-6 py-3",
+        lg: "text-base px-8 py-4",
+        xl: "text-lg px-10 py-4 tracking-[0.15em]",
+        icon: "p-2 rounded-full flex items-center justify-center shrink-0",
       },
 
       fullWidth: {
-        true:  "w-full",
+        true: "w-full",
         false: "w-auto",
       },
 
       rounded: {
         default: "rounded-sm",
-        full:    "rounded-full",
-        lg:      "rounded-lg",
+        full: "rounded-full",
+        lg: "rounded-lg",
       },
     },
 
     defaultVariants: {
-      variant:   "primary",
-      size:      "md",
+      variant: "primary",
+      size: "md",
       fullWidth: false,
-      rounded:   "default",
+      rounded: "default",
     },
   }
 );
@@ -126,7 +126,7 @@ const buttonVariants = cva(
    ───────────────────────────────────────────── */
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  VariantProps<typeof buttonVariants> {
   /**
    * If true, the button will render as its child, merging props and styles
    */

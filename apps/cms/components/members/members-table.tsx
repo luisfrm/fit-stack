@@ -50,7 +50,7 @@ const getColumns = (
             <span className="font-semibold text-white truncate max-w-[180px]">
               {m.firstName} {m.lastName}
             </span>
-            <span className="text-[10px] text-gray-400 truncate max-w-[180px] uppercase tracking-wider">
+            <span className="text-[10px] text-gray-400 truncate max-w-[180px] tracking-wider">
               {m.email}
             </span>
           </div>
@@ -86,7 +86,7 @@ const getColumns = (
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
       cell: (m) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end">
           {!m.user && m.id && (
             <ResendInviteButton memberId={m.id} />
           )}

@@ -34,10 +34,10 @@ export default function StaffPage() {
       setError(null);
 
       // Usamos el nuevo filtro excludeRoleId para obtener Admins, Managers y Trainers
-      const filters: any = { 
-        page, 
-        limit, 
-        excludeRoleId: ROLE_IDS.CLIENT 
+      const filters: any = {
+        page,
+        limit,
+        excludeRoleId: ROLE_IDS.CLIENT
       };
       if (query) filters.query = query;
 
@@ -69,7 +69,7 @@ export default function StaffPage() {
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: React.SubmitEvent) => {
     e.preventDefault();
     setQuery(tempQuery);
     setPage(1);

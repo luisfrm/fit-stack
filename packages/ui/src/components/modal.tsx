@@ -90,8 +90,8 @@ export function Modal({
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent
         className={cn(
-          "max-w-full flex flex-col",
-          "max-sm:h-svh max-sm:max-w-full max-sm:rounded-none max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0",
+          "max-w-full flex flex-col max-h-[90vh]",
+          "max-sm:h-svh max-sm:max-h-svh max-sm:max-w-full max-sm:rounded-none max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0",
           MODAL_SIZES[size],
           className
         )}
@@ -108,7 +108,7 @@ export function Modal({
         <div
           className={cn(
             "flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar",
-            isScrollable && "lg:max-h-[70vh]",
+            isScrollable && "max-h-[75vh]",
             "-mx-1 px-1",
             contentClassName
           )}
