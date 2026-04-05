@@ -5,12 +5,12 @@ import { getSession } from '@/config/get-session'
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const subs = await subscriptionsService.getAllVisible()
-    return NextResponse.json(subs)
+    const organizationId = session.session.activeOrganizationId;
+    const subscriptions = await subscriptionsService.getAllVisible(organizationId)
+
+    return NextResponse.json(subscriptions)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
@@ -19,20 +19,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const body = await req.json()
-    // Parse Date strings to actual Date objects for the backend
-    const dto = {
-      ...body,
-      startDate: new Date(body.startDate),
-      endDate: new Date(body.endDate),
-    }
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const newSub = await subscriptionsService.create(dto)
-    return NextResponse.json(newSub, { status: 201 })
+    const body = await req.json()
+    // Validar body...
+    const organizationId = session.session.activeOrganizationId;
+    const newSubscription = await subscriptionsService.create(organizationId, body)
+
+    return NextResponse.json(newSubscription, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }

@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { tokenService } from '@/services/token.service';
 import { membersRepository } from '@/repositories/members.repository';
 import { getSession } from '@/config/get-session';
-import { rbacService } from '@/services/rbac.service';
-import { rbacRepository } from '@/repositories/rbac.repository';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session?.user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    if (!session?.user || !session.session.activeOrganizationId) {
+      return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 });
     }
 
     const { token } = await req.json();
@@ -18,23 +16,26 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = await tokenService.verifyInviteToken(token);
+    const organizationId = session.session.activeOrganizationId;
     
-    const member = await membersRepository.findById(payload.memberId);
+    if (payload.organizationId !== organizationId) {
+      return NextResponse.json({ error: 'El token pertenece a otra organización' }, { status: 403 });
+    }
+    
+    const member = await membersRepository.findById(organizationId, payload.memberId);
     if (!member) {
       return NextResponse.json({ error: 'Miembro no encontrado' }, { status: 404 });
     }
     
-    if (member.user) {
+    if (member.userId) {
       return NextResponse.json({ error: 'Este miembro ya está vinculado' }, { status: 400 });
     }
 
-    // 2. Asignamos el rol dinámico (RBAC) si está pre-definido en la invitación
-    if (member.roleId) {
-      await rbacService.updateUserRoles(session.user.id, [member.roleId]);
-    }
+    // 1. Vinculamos el user.id dentro del registro gymMembers (el schema.ts actual lo soporta)
+    await membersRepository.update(organizationId, member.id, { userId: session.user.id });
 
-    // 3. Vinculamos el memberId en la tabla user
-    await rbacRepository.updateUserMemberId(session.user.id, member.id);
+    // 2. El role se maneja ya con `better-auth member` (si fuera PWA o dashboard).
+    // Si la invitación era para un trainer/admin, asumo que ya se manejaron en la creación del miembro en Auth.
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

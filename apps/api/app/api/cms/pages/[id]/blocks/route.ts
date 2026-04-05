@@ -1,57 +1,66 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { cmsBlocksService } from '@/services/cms-blocks.service'
+import { getSession } from '@/config/get-session'
 
-/**
- * Handle blocks for a specific Page.
- */
-
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params;
-    const blocks = await cmsBlocksService.getPageBlocks(Number(id))
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const organizationId = session.session.activeOrganizationId;
+    const blocks = await cmsBlocksService.getPageBlocks(organizationId, pageId)
     return NextResponse.json(blocks)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params;
-    const body = await request.json()
-    const block = await cmsBlocksService.createBlock({
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const body = await req.json()
+    const organizationId = session.session.activeOrganizationId;
+
+    const newBlock = await cmsBlocksService.createBlock(organizationId, {
       ...body,
-      pageId: Number(id)
+      pageId
     })
-    return NextResponse.json(block, { status: 201 })
+
+    return NextResponse.json(newBlock, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }
 
-/**
- * Reordenamiento masivo (Drag & Drop).
- * Espera un body { orders: { id: number, displayOrder: number }[] }
- */
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params;
-    const body = await request.json()
-    if (!body.orders || !Array.isArray(body.orders)) {
-      throw new Error('Formato de órdenes inválido')
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const body = await req.json()
+    // Se espera que body sea un arreglo de { id, displayOrder }
+    if (!Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid body format' }, { status: 400 })
     }
 
-    await cmsBlocksService.reorderBlocks(Number(id), body.orders)
-    return NextResponse.json({ message: 'Orden actualizado correctamente' })
+    const organizationId = session.session.activeOrganizationId;
+    await cmsBlocksService.reorderBlocks(organizationId, pageId, body)
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }

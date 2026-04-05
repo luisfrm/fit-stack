@@ -8,8 +8,8 @@ export async function POST(
 ) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const { id } = await params
@@ -19,7 +19,8 @@ export async function POST(
       return NextResponse.json({ error: 'ID de miembro inválido' }, { status: 400 })
     }
 
-    const result = await membersService.resendInvite(memberId)
+    const organizationId = session.session.activeOrganizationId;
+    const result = await membersService.resendInvite(organizationId, memberId)
     return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json(

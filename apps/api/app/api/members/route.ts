@@ -5,16 +5,18 @@ import { getSession } from '@/config/get-session'
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const { searchParams } = req.nextUrl
+    const organizationId = session.session.activeOrganizationId;
 
     const filters = {
+      organizationId,
       query: searchParams.get('query') ?? undefined,
-      roleId: searchParams.has('roleId') ? Number(searchParams.get('roleId')) : undefined,
-      excludeRoleId: searchParams.has('excludeRoleId') ? Number(searchParams.get('excludeRoleId')) : undefined,
+      role: searchParams.has('role') ? searchParams.get('role')! : undefined,
+      excludeRole: searchParams.has('excludeRole') ? searchParams.get('excludeRole')! : undefined,
       isActive: searchParams.has('isActive')
         ? searchParams.get('isActive') === 'true'
         : undefined,
@@ -33,8 +35,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const body = await req.json()
@@ -45,7 +47,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nombre, apellido y correo son requeridos' }, { status: 400 })
     }
 
-    const newMember = await membersService.createMember(memberData, sendInvite === true)
+    const organizationId = session.session.activeOrganizationId;
+
+    const newMember = await membersService.createMember(organizationId, memberData, sendInvite === true)
     return NextResponse.json(newMember, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })

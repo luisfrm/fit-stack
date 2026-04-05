@@ -7,8 +7,8 @@ export const tokenService = {
   /**
    * Generates a secure JWT token containing member details
    */
-  async signInviteToken(memberId: number, email: string): Promise<string> {
-    return await new SignJWT({ memberId, email })
+  async signInviteToken(organizationId: string, memberId: number, email: string): Promise<string> {
+    return await new SignJWT({ organizationId, memberId, email })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('48h') // Token expires in 48 hours
@@ -21,7 +21,7 @@ export const tokenService = {
   async verifyInviteToken(token: string) {
     try {
       const { payload } = await jwtVerify(token, SECRET_KEY);
-      return payload as { memberId: number; email: string };
+      return payload as { organizationId: string; memberId: number; email: string };
     } catch (error) {
       throw new Error('Token inválido o expirado', { cause: error });
     }

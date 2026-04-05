@@ -3,6 +3,7 @@ import { coachesService } from '@/services/coaches.service'
 import { getSession } from '@/config/get-session'
 
 import { z } from 'zod';
+import { CoachesFilter, CreateCoachDTO } from '@workspace/shared/types';
 
 const coachSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -22,13 +23,14 @@ const coachSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
     const { searchParams } = req.nextUrl
+    const organizationId = session.session.activeOrganizationId;
 
-    const filters = {
+    const filters: CoachesFilter = {
       name: searchParams.get('name') ?? undefined,
       role: searchParams.get('role') ?? undefined,
       isVisible: searchParams.has('isVisible')
@@ -39,18 +41,19 @@ export async function GET(req: NextRequest) {
       requireTotal: true,
     }
 
-    const result = await coachesService.getAllCoaches(filters)
+    const result = await coachesService.getAllCoaches(organizationId, filters)
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Error interno del servidor';
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
     const body = await req.json()
@@ -61,9 +64,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: firstError, details: validation.error.format() }, { status: 400 })
     }
 
-    const newCoach = await coachesService.createCoach(validation.data)
+    const organizationId = session.session.activeOrganizationId;
+    const { roleId, ...coachData } = validation.data;
+    const newCoach = await coachesService.createCoach(organizationId, coachData as CreateCoachDTO)
     return NextResponse.json(newCoach, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Error al crear el entrenador';
+    return NextResponse.json({ error: errorMessage }, { status: 400 })
   }
 }

@@ -2,50 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { settingsService } from '@/services/settings.service'
 import { getSession } from '@/config/get-session'
 
-/**
- * GET: Retrieves a specific setting value.
- * URL: /api/settings/[key]
- */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ key: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   try {
-    const { key } = await params
-    const value = await settingsService.getByKey(key)
-    
-    // Si no existe, devolvemos null o un objeto vacío según se prefiera.
-    // El CMS espera { value: string } o similar.
-    return NextResponse.json({ value: value ?? null })
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { key } = await params;
+    const organizationId = session.session.activeOrganizationId;
+    const value = await settingsService.getByKey(organizationId, key)
+
+    if (value === undefined) {
+      return NextResponse.json({ error: 'Configuración no encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json({ key, value })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-/**
- * POST: Upserts a setting value.
- * URL: /api/settings/[key]
- */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ key: string }> }
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   try {
     const session = await getSession()
-    if (!session) {
-       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { key } = await params;
+    const body = await req.json()
+
+    if (body.value === undefined) {
+      return NextResponse.json({ error: 'El valor es requerido' }, { status: 400 })
     }
 
-    const { key } = await params
-    const { value } = await req.json()
+    const organizationId = session.session.activeOrganizationId;
+    await settingsService.upsert(organizationId, key, String(body.value))
 
-    if (value === undefined) {
-      return NextResponse.json({ error: 'Value is required' }, { status: 400 })
-    }
-
-    await settingsService.upsert(key, value)
-    return NextResponse.json({ success: true, key, value })
+    return NextResponse.json({ success: true, key, value: String(body.value) })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }

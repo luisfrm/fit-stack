@@ -5,14 +5,14 @@ import { getSession } from '@/config/get-session'
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
 
     const { searchParams } = req.nextUrl
     const includeStats = searchParams.get('includeStats') === 'true'
 
-    const plans = await plansService.getAll({ includeStats })
+    const organizationId = session.session.activeOrganizationId;
+    const plans = await plansService.getAll(organizationId, { includeStats })
+
     return NextResponse.json(plans)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -22,13 +22,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    // In production, we'd add role validation for admin/manager here
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
+
     const body = await req.json()
-    const newPlan = await plansService.create(body)
+    // Here we should validate `body` with Zod ideally
+    const organizationId = session.session.activeOrganizationId;
+    const { id, ...data } = body;
+
+    const newPlan = await plansService.create(organizationId, data)
     return NextResponse.json(newPlan, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })

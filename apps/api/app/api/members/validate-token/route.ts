@@ -15,13 +15,13 @@ export async function GET(req: NextRequest) {
     const payload = await tokenService.verifyInviteToken(token);
     
     // Check if member exists and if they are already linked
-    const member = await membersRepository.findById(payload.memberId);
+    const member = await membersRepository.findById(payload.organizationId, payload.memberId);
     
     if (!member) {
       return NextResponse.json({ error: 'Miembro no encontrado' }, { status: 404 });
     }
     
-    if (member.user) {
+    if (member.userId) {
       return NextResponse.json({ error: 'Esta invitación ya fue utilizada' }, { status: 400 });
     }
 

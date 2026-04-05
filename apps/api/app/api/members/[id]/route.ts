@@ -5,16 +5,17 @@ import { getSession } from '@/config/get-session'
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const { id: rawId } = await params
     const id = Number(rawId)
     if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    const organizationId = session.session.activeOrganizationId;
 
     const body = await req.json()
-    const updatedMember = await membersService.updateMember(id, body)
+    const updatedMember = await membersService.updateMember(organizationId, id, body)
     return NextResponse.json(updatedMember)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
@@ -24,15 +25,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const { id: rawId } = await params
     const id = Number(rawId)
     if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    const organizationId = session.session.activeOrganizationId;
 
-    await membersService.deleteMember(id)
+    await membersService.deleteMember(organizationId, id)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })

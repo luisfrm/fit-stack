@@ -1,62 +1,56 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { settingsService } from '@/services/settings.service'
-import { getSession } from '@/config/get-session'
+import { NextResponse, NextRequest } from "next/server";
+import { getSession } from "@/config/get-session";
+import { settingsService } from "@/services/settings.service";
+import { ROLES } from "@workspace/shared/types";
 
-/**
- * GET: Retrieves all gym settings.
- * URL: /api/settings
- */
+// Reserved ID for Platform-wide settings
+const PLATFORM_ID = "PLATFORM_GLOBAL";
+
 export async function GET(req: NextRequest) {
   try {
-    const allSettings = await settingsService.getAll()
-    return NextResponse.json(allSettings)
+    const session = await getSession();
+
+    // 1. Security Check: Only Admin or someone with an active session in an organization
+    if (session?.user.role !== ROLES.ADMIN && !session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // 2. Resource Identification
+    // If it's a SaaS Admin without an active gym, we use the Platform ID
+    const organizationId = session?.session?.activeOrganizationId || (session?.user.role === ROLES.ADMIN ? PLATFORM_ID : null);
+    
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization ID is required.' }, { status: 400 });
+    }
+
+    const settings = await settingsService.getAll(organizationId);
+    return NextResponse.json(settings);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-/**
- * POST: Batch upsert settings.
- * URL: /api/settings
- */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Verify permission
-    const permissions = (session.user as any).permissions || [];
-    if (!permissions.includes("settings.general:manage")) {
-      return NextResponse.json(
-        { error: "Forbidden: No tienes permiso para gestionar la configuración." },
-        { status: 403 }
-      );
-    }
-
-    const body = await req.json()
+    const session = await getSession();
     
-    // Handle Record<string, string>
-    if (typeof body === 'object' && !Array.isArray(body)) {
-      const entries = Object.entries(body);
-      for (const [key, value] of entries) {
-        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-          await settingsService.upsert(key, String(value));
-        }
-      }
-      return NextResponse.json({ success: true, count: entries.length })
+    // 1. Security Check
+    if (session?.user.role !== ROLES.ADMIN && !session?.session?.activeOrganizationId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Fallback for single key-value: { key: "...", value: "..." }
-    const { key, value } = body
-    if (!key || value === undefined) {
-      return NextResponse.json({ error: 'Key and Value are required' }, { status: 400 })
+    // 2. Resource Identification
+    const organizationId = session?.session?.activeOrganizationId || (session?.user.role === ROLES.ADMIN ? PLATFORM_ID : null);
+    
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Organization ID is required.' }, { status: 400 });
     }
 
-    await settingsService.upsert(key, String(value))
-    return NextResponse.json({ success: true, key, value }, { status: 201 })
+    const settings = await req.json();
+    await settingsService.updateAll(organizationId, settings);
+
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

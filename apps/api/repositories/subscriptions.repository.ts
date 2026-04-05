@@ -1,8 +1,9 @@
-import { db, eq, desc, gte, and, sql } from '@workspace/database/client'
-import { subscriptions, members, membershipPlans } from '@workspace/database/schema'
+import { db, eq, desc, and, sql } from '@workspace/database/client'
+import { subscriptions, gymMembers as members, membershipPlans } from '@workspace/database/schema'
 
 export interface ISubscriptionDTO {
   id?: number
+  organizationId: string
   memberId: number
   planId: number
   startDate: Date
@@ -13,7 +14,7 @@ export interface ISubscriptionDTO {
 }
 
 export const subscriptionsRepository = {
-  async findAllVisible(now: Date = new Date()) {
+  async findAllVisible(organizationId: string, now: Date = new Date()) {
     return db
       .select({
         id: subscriptions.id,
@@ -25,17 +26,17 @@ export const subscriptionsRepository = {
         isActive: sql<boolean>`${subscriptions.endDate} >= ${now}`,
         memberName: members.firstName,
         memberLastName: members.lastName,
-        roleId: members.roleId,
         planName: membershipPlans.name,
         price: membershipPlans.price
       })
       .from(subscriptions)
       .innerJoin(members, eq(subscriptions.memberId, members.id))
       .innerJoin(membershipPlans, eq(subscriptions.planId, membershipPlans.id))
+      .where(eq(subscriptions.organizationId, organizationId))
       .orderBy(desc(subscriptions.id))
   },
 
-  async findRecent(limit: number) {
+  async findRecent(organizationId: string, limit: number) {
     return db
       .select({
         id: subscriptions.id,
@@ -45,12 +46,14 @@ export const subscriptionsRepository = {
       })
       .from(subscriptions)
       .innerJoin(members, eq(subscriptions.memberId, members.id))
+      .where(eq(subscriptions.organizationId, organizationId))
       .orderBy(desc(subscriptions.createdAt))
       .limit(limit)
   },
 
-  async create(data: Omit<ISubscriptionDTO, 'id'>) {
+  async create(organizationId: string, data: Omit<ISubscriptionDTO, 'id' | 'organizationId'>) {
     const inserted = await db.insert(subscriptions).values({
+      organizationId,
       memberId: data.memberId,
       planId: data.planId,
       startDate: data.startDate,
@@ -61,16 +64,16 @@ export const subscriptionsRepository = {
     return inserted[0]
   },
 
-  async updateStatus(id: number, status: 'active' | 'cancelled' | 'expired') {
+  async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled' | 'expired') {
     const updated = await db
       .update(subscriptions)
       .set({ status })
-      .where(eq(subscriptions.id, id))
+      .where(and(eq(subscriptions.id, id), eq(subscriptions.organizationId, organizationId)))
       .returning()
     return updated[0]
   },
 
-  async delete(id: number) {
-    await db.delete(subscriptions).where(eq(subscriptions.id, id))
+  async delete(organizationId: string, id: number) {
+    await db.delete(subscriptions).where(and(eq(subscriptions.id, id), eq(subscriptions.organizationId, organizationId)))
   }
 }

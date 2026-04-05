@@ -1,37 +1,27 @@
 import { settingsRepository } from '../repositories/settings.repository'
 
-/**
- * Service to manage global gym settings.
- */
 export const settingsService = {
-  /**
-   * Retrieves a setting value by its key.
-   */
-  async getByKey(key: string): Promise<string | undefined> {
-    return settingsRepository.findByKey(key)
+  async getByKey(organizationId: string, key: string): Promise<string | undefined> {
+    return settingsRepository.findByKey(organizationId, key)
   },
 
-  /**
-   * Upserts a setting (creates if not exists, updates if it does).
-   */
-  async upsert(key: string, value: string): Promise<void> {
+  async upsert(organizationId: string, key: string, value: string): Promise<void> {
     if (!key) throw new Error('Se requiere una clave para la configuración')
-    return settingsRepository.upsert(key, value)
+    return settingsRepository.upsert(organizationId, key, value)
   },
 
-  /**
-   * Retrieves all dictionary of settings.
-   */
-  async getAll(): Promise<Record<string, string>> {
-    return settingsRepository.getAll()
+  async getAll(organizationId: string): Promise<Record<string, string>> {
+    return settingsRepository.getAll(organizationId)
   },
 
-  /**
-   * Resolves the current "Wall Clock" date/time for the gym 
-   * based on its configured timezone setting.
-   */
-  async getGymNow(): Promise<Date> {
-    const timezone = (await this.getByKey('timezone')) || 'America/Caracas';
+  async updateAll(organizationId: string, settings: Record<string, string>): Promise<void> {
+    for (const [key, value] of Object.entries(settings)) {
+      await this.upsert(organizationId, key, value);
+    }
+  },
+
+  async getGymNow(organizationId: string): Promise<Date> {
+    const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
     const now = new Date();
 
     const formatter = new Intl.DateTimeFormat('en-US', {
@@ -48,8 +38,6 @@ export const settingsService = {
     const parts = formatter.formatToParts(now);
     const partValue = (type: string) => parts.find((p) => p.type === type)?.value || '0';
 
-    // Return a Date where the "UTC" values match the Gym's "Local" wall clock.
-    // This allows direct comparison with naive 'timestamp' database fields.
     return new Date(Date.UTC(
       Number.parseInt(partValue('year'), 10),
       Number.parseInt(partValue('month'), 10) - 1,

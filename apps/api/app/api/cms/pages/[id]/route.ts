@@ -1,53 +1,57 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { cmsPagesService } from '@/services/cms-pages.service'
 import { getSession } from '@/config/get-session'
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params;
-    const page = await cmsPagesService.getPageById(Number(id))
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const organizationId = session.session.activeOrganizationId;
+    const page = await cmsPagesService.getPageById(organizationId, pageId)
     return NextResponse.json(page)
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 404 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await params;
-    const body = await request.json()
-    const updated = await cmsPagesService.updatePage(Number(id), body)
-    return NextResponse.json(updated)
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const body = await req.json()
+    const organizationId = session.session.activeOrganizationId;
+    const updatedPage = await cmsPagesService.updatePage(organizationId, pageId, body)
+
+    return NextResponse.json(updatedPage)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = await params;
-    await cmsPagesService.deletePage(Number(id))
-    return new Response(null, { status: 204 })
+    const pageId = Number(id)
+    if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+
+    const organizationId = session.session.activeOrganizationId;
+    await cmsPagesService.deletePage(organizationId, pageId)
+
+    return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 }

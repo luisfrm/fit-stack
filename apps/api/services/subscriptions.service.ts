@@ -4,51 +4,50 @@ import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
 
-export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id'> {
+export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId'> {
   payment: {
     amountPaid: number
-    currencyPaid: 'USD' | 'VES' | 'EUR'
+    currencyPaid: string
     exchangeRateApplied?: string | null
-    paymentMethod: 'cash' | 'zelle' | 'pago_movil' | 'pos' | 'other'
+    paymentMethod: string
     paymentMethodDetails?: Record<string, any> | null
-    paymentDate?: string // ISO string
+    paymentDate?: string | Date
   }
 }
 
 export const subscriptionsService = {
   // Obtener todas las suscripciones unidas a la data de Miembro y Plan para la tabla
-  async getAllVisible() {
-    const gymNow = await settingsService.getGymNow()
-    const records = await subscriptionsRepository.findAllVisible(gymNow)
+  async getAllVisible(organizationId: string) {
+    const gymNow = await settingsService.getGymNow(organizationId)
+    const records = await subscriptionsRepository.findAllVisible(organizationId, gymNow)
 
     // Formatear la salida para el frontend (fechas a string ISO y fusionar el nombre completo)
-    return records.map(r => ({
+    return records.map((r: any) => ({
       ...r,
       memberName: `${r.memberName} ${r.memberLastName}`,
-      roleId: r.roleId,
       startDate: r.startDate.toISOString(),
       endDate: r.endDate.toISOString(),
     }))
   },
 
-  async getRecent(limit: number) {
-    const records = await subscriptionsRepository.findRecent(limit)
-    return records.map(r => ({
+  async getRecent(organizationId: string, limit: number) {
+    const records = await subscriptionsRepository.findRecent(organizationId, limit)
+    return records.map((r: any) => ({
       id: r.id,
       name: `${r.memberName} ${r.memberLastName}`,
       createdAt: r.createdAt.toISOString(),
     }))
   },
 
-  async create(payload: ICreateSubscriptionPayload) {
+  async create(organizationId: string, payload: ICreateSubscriptionPayload) {
     // 1. Obtener datos del plan para el snapshot histórico
-    const plan = await plansRepository.findById(payload.planId)
+    const plan = await plansRepository.findById(organizationId, payload.planId)
     if (!plan) {
       throw new Error('El plan seleccionado no existe')
     }
 
     // 2. Crear la suscripción
-    const subscription = await subscriptionsRepository.create({
+    const subscription = await subscriptionsRepository.create(organizationId, {
       memberId: payload.memberId,
       planId: payload.planId,
       startDate: payload.startDate,
@@ -61,11 +60,11 @@ export const subscriptionsService = {
     }
 
     // 3. Crear el registro de pago (Snapshot atómico)
-    await paymentsRepository.create({
+    await paymentsRepository.create(organizationId, {
       memberId: payload.memberId,
       subscriptionId: subscription.id,
       planSnapshotName: plan.name,
-      planSnapshotPrice: plan.price,
+      planSnapshotPrice: plan.price.toString(),
       planSnapshotCurrency: plan.currency,
       amountPaid: payload.payment.amountPaid,
       currencyPaid: payload.payment.currencyPaid,
@@ -78,15 +77,15 @@ export const subscriptionsService = {
     return subscription
   },
 
-  async updateStatus(id: number, status: 'active' | 'cancelled' | 'expired') {
-    const updated = await subscriptionsRepository.updateStatus(id, status)
+  async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled' | 'expired') {
+    const updated = await subscriptionsRepository.updateStatus(organizationId, id, status)
     if (!updated) {
       throw new Error('Suscripción no encontrada')
     }
     return updated
   },
 
-  async delete(id: number): Promise<void> {
-    await subscriptionsRepository.delete(id)
+  async delete(organizationId: string, id: number): Promise<void> {
+    await subscriptionsRepository.delete(organizationId, id)
   }
 }

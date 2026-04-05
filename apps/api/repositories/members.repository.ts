@@ -1,18 +1,22 @@
-import { eq, ne, ilike, and, or, count, desc, db } from '@workspace/database/client';
-import { members } from '@workspace/database/schema';
+import { eq, ilike, and, or, count, desc, db, isNull, ne } from '@workspace/database/client';
+import { gymMembers, authMember, user } from '@workspace/database/schema';
 
-export type DbMember = typeof members.$inferSelect;
-export type NewDbMember = typeof members.$inferInsert;
+export type DbMember = typeof gymMembers.$inferSelect;
+export type NewDbMember = typeof gymMembers.$inferInsert;
 
 export type MemberWithRelations = DbMember & {
-  role?: { id: number; name: string } | null;
-  user?: { id: string; email: string } | null;
+  user?: {
+    id: string;
+    email: string;
+  } | null;
+  authRole?: string | null;
 };
 
 export interface MembersFilter {
+  organizationId: string;
   query?: string;
-  roleId?: number;
-  excludeRoleId?: number;
+  role?: string;
+  excludeRole?: string;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -28,62 +32,70 @@ export interface PaginatedMembersResult {
 }
 
 export const membersRepository = {
-  async findAll(filters: MembersFilter = {}): Promise<PaginatedMembersResult> {
-    const { query, roleId, excludeRoleId, isActive, page = 1, limit = 10, requireTotal = true } = filters;
+  async findAll(filters: MembersFilter): Promise<PaginatedMembersResult> {
+    const { organizationId, query, role, excludeRole, isActive, page = 1, limit = 10 } = filters;
     const offset = (page - 1) * limit;
 
-    const conditions = [];
+    const conditions = [eq(gymMembers.organizationId, organizationId)];
 
     if (query) {
       conditions.push(
         or(
-          ilike(members.firstName, `%${query}%`),
-          ilike(members.lastName, `%${query}%`),
-          ilike(members.email, `%${query}%`),
-          ilike(members.documentId, `%${query}%`)
-        )
+          ilike(gymMembers.firstName, `%${query}%`),
+          ilike(gymMembers.lastName, `%${query}%`),
+          ilike(gymMembers.email, `%${query}%`),
+          ilike(gymMembers.documentId, `%${query}%`)
+        )!
       );
-    }
-    
-    if (roleId) {
-      conditions.push(eq(members.roleId, roleId));
-    }
-    
-    if (excludeRoleId) {
-      conditions.push(ne(members.roleId, excludeRoleId));
     }
 
     if (isActive !== undefined) {
-      conditions.push(eq(members.isActive, isActive));
+      conditions.push(eq(gymMembers.isActive, isActive));
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const rowsQuery = db.query.members.findMany({
-      where: whereClause,
-      with: {
-        role: true,
-        user: true
-      },
-      orderBy: desc(members.createdAt),
-      limit: limit,
-      offset: offset
-    });
-
-    if (!requireTotal) {
-      const rows = await rowsQuery;
-      return { data: rows, total: -1, page, limit, totalPages: -1 };
+    if (role) {
+      conditions.push(eq(authMember.role, role));
     }
 
-    const [rows, countResult] = await Promise.all([
-      rowsQuery,
-      db.select({ total: count() }).from(members).where(whereClause),
-    ]);
+    if (excludeRole) {
+      conditions.push(or(isNull(authMember.role), ne(authMember.role, excludeRole))!);
+    }
+
+    const whereClause = and(...conditions);
+
+    const rows = await db
+      .select({
+        member: gymMembers,
+        authRole: authMember.role,
+        user: {
+          id: user.id,
+          email: user.email,
+        }
+      })
+      .from(gymMembers)
+      .leftJoin(authMember, and(
+        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.organizationId, organizationId)
+      ))
+      .leftJoin(user, eq(user.id, gymMembers.userId))
+      .where(whereClause)
+      .orderBy(desc(gymMembers.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const countResult = await db
+      .select({ total: count() })
+      .from(gymMembers)
+      .leftJoin(authMember, and(
+        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.organizationId, organizationId)
+      ))
+      .where(whereClause);
 
     const total = Number(countResult[0]?.total ?? 0);
 
     return {
-      data: rows,
+      data: rows.map(r => ({ ...r.member, authRole: r.authRole, user: r.user })),
       total,
       page,
       limit,
@@ -91,36 +103,78 @@ export const membersRepository = {
     };
   },
 
-  async findById(id: number): Promise<MemberWithRelations | undefined> {
-    return db.query.members.findFirst({
-      where: eq(members.id, id),
-      with: {
-        role: true,
-        user: true
-      }
+  async findById(organizationId: string, id: number): Promise<MemberWithRelations | undefined> {
+    const result = await db
+      .select({
+        member: gymMembers,
+        authRole: authMember.role,
+        user: {
+          id: user.id,
+          email: user.email,
+        }
+      })
+      .from(gymMembers)
+      .leftJoin(authMember, and(
+        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.organizationId, organizationId)
+      ))
+      .leftJoin(user, eq(user.id, gymMembers.userId))
+      .where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)))
+      .limit(1);
+
+    if (result.length === 0 || !result[0]) return undefined;
+    return { ...result[0].member, authRole: result[0].authRole, user: result[0].user };
+  },
+
+  async findByEmail(organizationId: string, email: string) {
+    return db.query.gymMembers.findFirst({
+      where: and(eq(gymMembers.email, email), eq(gymMembers.organizationId, organizationId)),
     });
   },
 
-  async findByEmail(email: string) {
-    const [result] = await db.select().from(members).where(eq(members.email, email));
-    return result;
-  },
-
   async create(data: NewDbMember) {
-    const [newMember] = await db.insert(members).values(data).returning();
+    const [newMember] = await db.insert(gymMembers).values(data).returning();
     return newMember;
   },
 
-  async update(id: number, data: Partial<NewDbMember>) {
+  async update(organizationId: string, id: number, data: Partial<NewDbMember>) {
     const [updatedMember] = await db
-      .update(members)
+      .update(gymMembers)
       .set(data)
-      .where(eq(members.id, id))
+      .where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)))
       .returning();
     return updatedMember;
   },
 
-  async delete(id: number) {
-    await db.delete(members).where(eq(members.id, id));
+  async delete(organizationId: string, id: number) {
+    await db.delete(gymMembers).where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)));
+  },
+
+  async countActive(organizationId: string, _gymNow: Date) {
+    const result = await db
+      .select({ value: count() })
+      .from(gymMembers)
+      .where(and(eq(gymMembers.organizationId, organizationId), eq(gymMembers.isActive, true)));
+    return Number(result[0]?.value ?? 0);
+  },
+
+  async countByRole(organizationId: string) {
+    const results = await db
+      .select({
+        roleName: authMember.role,
+        count: count()
+      })
+      .from(gymMembers)
+      .innerJoin(authMember, and(
+        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.organizationId, organizationId)
+      ))
+      .where(eq(gymMembers.organizationId, organizationId))
+      .groupBy(authMember.role);
+
+    return results.map(r => ({
+      roleId: r.roleName,
+      count: Number(r.count)
+    }));
   }
 };
