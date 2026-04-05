@@ -11,21 +11,17 @@ import { type IMember } from "@/types/dashboard";
 import { MembersTable } from "@/components/members/members-table";
 import { MemberModal } from "@/components/members/member-modal";
 import { membersService } from "@/lib/services/members-service";
-import { useRoles } from "@/lib/hooks/use-rbac";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { ROLES } from "@workspace/shared/constants";
 
 export default function MembersPage() {
   const [members, setMembers] = React.useState<IMember[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Hooks de datos
-  const { data: availableRoles = [] } = useRoles();
-
   // Filtros
   const [query, setQuery] = React.useState("");
-  const roleId = ROLE_IDS.CLIENT; // Fuerza el rol de cliente
+  const role = ROLES.MEMBER; // Fuerza el rol de cliente
   const [tempQuery, setTempQuery] = React.useState("");
 
   // Paginación
@@ -38,7 +34,7 @@ export default function MembersPage() {
       setLoading(true);
       setError(null);
 
-      const filters: any = { page, limit, roleId };
+      const filters: any = { page, limit, role };
       if (query) filters.query = query;
 
       const data = await membersService.getMembers(filters);
@@ -49,7 +45,7 @@ export default function MembersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, query, roleId]);
+  }, [page, limit, query, role]);
 
   React.useEffect(() => {
     loadMembers();

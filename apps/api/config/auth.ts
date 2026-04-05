@@ -3,11 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
-import { customSession } from "better-auth/plugins";
-
-import { rbacService } from "../services/rbac.service";
-import { rbacPlugin } from "./rbac-plugin";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { organization } from "better-auth/plugins";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -19,41 +15,16 @@ export const auth = betterAuth({
   trustedOrigins: [env.frontendUrl!],
   user: {
     additionalFields: {
-      roleId: {
-        type: "number",
+      role: {
+        type: "string",
         required: false,
-        defaultValue: ROLE_IDS.CLIENT, // Cliente por defecto (ID 4)
-        input: false,    // No editable por el usuario
-      },
-      memberId: {
-        type: "number",
-        required: false,
+        defaultValue: "user", // El rol global en la DB. Para Master Admin será "admin"
         input: false,
       },
     },
   },
   plugins: [
-    rbacPlugin(),
-    customSession(async ({ user, session }) => {
-      try {
-        const permissions = await rbacService.getUserPermissions(user.id, (user as any).roleId);
-
-        return {
-          user: {
-            ...user,
-            permissions,
-          },
-          session,
-        };
-      } catch (error) {
-        console.error("Error fetching permissions:", error);
-        return {
-          user,
-          permissions: [],
-          session,
-        };
-      }
-    }),
+    organization(),
   ],
 
   emailAndPassword: {

@@ -1,7 +1,7 @@
 import { createAuthClient } from 'better-auth/react';
-import { customSessionClient } from "better-auth/client/plugins";
+import { customSessionClient, organizationClient } from "better-auth/client/plugins";
 
-const auth = createAuthClient({
+export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
   fetchOptions: {
     credentials: 'include',
@@ -12,20 +12,13 @@ const auth = createAuthClient({
       maxAge: 5 * 60, // 5 minutos
     },
   },
-  user: {
-    additionalFields: {
-      roleId: {
-        type: "number",
-      },
-      memberId: {
-        type: "number",
-      },
-    },
-  },
   plugins: [
-    customSessionClient()
+    customSessionClient(),
+    organizationClient()
   ]
 });
+
+// ── WRAPPERS FOR COMPATIBILITY ──
 
 interface SignInParams {
   email: string;
@@ -34,7 +27,7 @@ interface SignInParams {
 
 export const signIn = async (params: SignInParams) => {
   try {
-    const result = await auth.signIn.email(params);
+    const result = await authClient.signIn.email(params);
     return { data: result?.data || null, error: result?.error || null };
   } catch (err: any) {
     return { data: null, error: err };
@@ -49,50 +42,45 @@ interface SignUpParams {
 
 export const signUp = async (params: SignUpParams) => {
   try {
-    const result = await auth.signUp.email(params);
+    const result = await authClient.signUp.email(params);
     return { data: result?.data || null, error: result?.error || null };
   } catch (err: any) {
     return { data: null, error: err };
   }
 };
 
-/**
- * Sign out the current user
- */
 export const signOut = async (options?: any) => {
   try {
-    const result = await auth.signOut(options);
+    const result = await authClient.signOut(options);
     return { data: result?.data || true, error: result?.error || null };
   } catch (err: any) {
     return { data: null, error: err };
   }
 };
 
-/**
- * Get the current session
- */
 export const getSession = async (options?: any) => {
   try {
-    const result = await auth.getSession(options);
+    const result = await authClient.getSession(options);
     return { data: result?.data || null, error: result?.error || null };
   } catch (err: any) {
     return { data: null, error: err };
   }
 };
 
-export const { useSession } = auth;
+export const { 
+  useSession,
+  organization
+} = authClient;
 
 export interface User {
   id: string;
   name: string;
   email: string;
   emailVerified: boolean;
-  image?: string | null;
+  image?: string;
   createdAt: Date;
   updatedAt: Date;
-  roleId: number;
-  memberId?: number | null;
-  permissions: string[];
+  role?: string; // Global role (e.g. 'admin')
 }
 
 export interface Session {
@@ -104,7 +92,8 @@ export interface Session {
     token: string;
     createdAt: Date;
     updatedAt: Date;
-    ipAddress?: string | null;
-    userAgent?: string | null;
+    ipAddress?: string;
+    userAgent?: string;
+    activeOrganizationId?: string;
   };
-}
+}

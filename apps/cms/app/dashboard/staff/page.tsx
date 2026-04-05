@@ -12,7 +12,7 @@ import { MembersTable } from "@/components/members/members-table";
 import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { ROLES } from "@workspace/shared/constants";
 
 export default function StaffPage() {
   const [staff, setStaff] = React.useState<IMember[]>([]);
@@ -33,11 +33,11 @@ export default function StaffPage() {
       setLoading(true);
       setError(null);
 
-      // Usamos el nuevo filtro excludeRoleId para obtener Admins, Managers y Trainers
+      // Usamos el nuevo filtro excludeRole para obtener Admins, Managers y Trainers
       const filters: any = {
         page,
         limit,
-        excludeRoleId: ROLE_IDS.CLIENT
+        excludeRole: ROLES.MEMBER
       };
       if (query) filters.query = query;
 

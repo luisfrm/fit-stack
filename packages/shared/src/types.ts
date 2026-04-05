@@ -1,6 +1,38 @@
 /* ── SHARED TYPES ── */
 
 /**
+ * Global User interface (Better Auth + Custom Fields)
+ */
+export interface IUser {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  role?: Role; // Defined below as 'admin' | 'manager' etc.
+}
+
+/**
+ * Global Session interface
+ */
+export interface ISession {
+  user: IUser;
+  session: {
+    id: string;
+    userId: string;
+    expiresAt: string | Date;
+    token: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    activeOrganizationId?: string | null;
+  };
+}
+
+/**
  * Interface for a class scheduled for today.
  */
 export interface IClassToday {
@@ -26,7 +58,16 @@ export type TrendDirection = "up" | "down" | "neutral";
 /**
  * Valid roles for members (Dynamic from DB slugs)
  */
-export type Role = 'admin' | 'manager' | 'trainer' | 'client';
+export const ROLES = {
+  ADMIN: 'admin',
+  MANAGER: 'manager',
+  COACH: 'coach',
+  TRAINER: 'trainer',
+  CASHIER: 'cashier',
+  MEMBER: 'member',
+} as const;
+
+export type Role = typeof ROLES[keyof typeof ROLES];
 
 export type FrequencyType = 'once' | 'weekly';
 
@@ -64,11 +105,7 @@ export interface IMember {
   phoneNumber?: string;
   birthday?: string;
   imageUrl?: string | null;
-  roleId: number;
-  role?: {
-    id: number;
-    name: string;
-  };
+  role?: string;
   user?: {
     id: string;
     email: string;
@@ -79,7 +116,7 @@ export interface IMember {
 
 export interface MemberFilter {
   query?: string;
-  roleId?: number;
+  role?: string;
   isActive?: boolean;
   page?: number;
   limit?: number;
@@ -157,7 +194,7 @@ export interface ISubscription {
   memberName?: string;
   planName?: string;
   price?: number;
-  roleId?: number;
+  role?: string;
 }
 
 export interface IPaymentMethodField {

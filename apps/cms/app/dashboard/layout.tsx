@@ -3,7 +3,7 @@ import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
 import { type Session } from "@/lib/auth-client";
-import { canAccessCMS, getRoleName } from "@/lib/utils/auth";
+import { getRoleName } from "@/lib/utils/auth";
 
 export default async function DashboardLayout({
   children,
@@ -19,12 +19,7 @@ export default async function DashboardLayout({
 
   const user = session.user;
 
-  // 🛡️ Security Check: Validate CMS access permission
-  if (!canAccessCMS(user)) {
-    redirect("/unauthorized");
-  }
-
-  const userRole = getRoleName(user.roleId);
+  const userRole = getRoleName(user);
 
   return (
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">

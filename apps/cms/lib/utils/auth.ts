@@ -1,24 +1,20 @@
-import { User } from "@/lib/auth-client";
 import { ROLE_MAP } from "@/lib/config/constants";
+import { ROLES } from "@workspace/shared/types";
 
 /**
- * Checks if a user has a specific permission
+ * Gets the human-readable name of a role from its ID or String code.
+ * Prioritizes 'admin' global role if detected.
  */
-export function hasPermission(user: User | null, permission: string): boolean {
-  return user?.permissions?.includes(permission) ?? false;
-}
+export function getRoleName(user: any): string {
+  if (!user) return "Usuario";
+  
+  // 1. Prioridad: Admin SaaS (Rol global de Better Auth)
+  if (user.role === ROLES.ADMIN) {
+    return ROLE_MAP[ROLES.ADMIN] || "Admin SaaS";
+  }
 
-/**
- * Checks if the user has basic CMS access
- */
-export function canAccessCMS(user: User | null): boolean {
-  return hasPermission(user, "cms:access");
-}
-
-/**
- * Gets the human-readable name of a role from its ID
- */
-export function getRoleName(roleId: number | undefined): string {
-  if (roleId === undefined) return "Usuario";
-  return ROLE_MAP[roleId] || "Usuario";
+  // 2. Rol específico de organización (o roleId legado si aún existiera)
+  const roleCode = user.role || user.roleId || "member";
+  
+  return ROLE_MAP[roleCode] || "Usuario";
 }

@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
-import { ROLE_IDS, ROLE_NAMES } from "@workspace/shared/constants";
+import { ROLES } from "@workspace/shared/constants";
 import { coachesService } from "@/lib/services/coaches-service";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -32,7 +32,7 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    roleId: initialData?.roleId ?? ROLE_IDS.MANAGER, // Default to Manager for staff
+    role: initialData?.role ?? ROLES.MANAGER, // Default to Manager for staff
     isActive: initialData?.isActive ?? true,
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
@@ -188,12 +188,14 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
         <div className="flex flex-col gap-1.5">
           <Label className="text-sm font-medium text-slate-300">Rol Administrativo</Label>
           <select
-            value={formData.roleId}
-            onChange={(e) => handleChange("roleId", Number(e.target.value))}
+            value={formData.role}
+            onChange={(e) => handleChange("role", e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-primary transition-all h-[46px]"
           >
-            <option value={ROLE_IDS.MANAGER} className="bg-slate-900">{ROLE_NAMES[ROLE_IDS.MANAGER]}</option>
-            <option value={ROLE_IDS.ADMIN} className="bg-slate-900">{ROLE_NAMES[ROLE_IDS.ADMIN]}</option>
+            <option value={ROLES.MANAGER} className="bg-slate-900 text-white">Manager / Dueño</option>
+            <option value={ROLES.COACH} className="bg-slate-900 text-white">Entrenador</option>
+            <option value={ROLES.CASHIER} className="bg-slate-900 text-white">Cajero / Staff</option>
+            <option value={ROLES.ADMIN} className="bg-slate-900 text-white">Super Admin (Global)</option>
           </select>
         </div>
       </div>

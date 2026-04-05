@@ -22,7 +22,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { Label } from "@workspace/ui/components/label";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { ROLES } from "@workspace/shared/constants";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";
@@ -169,7 +169,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         const res = await membersService.getMembers({
           query: debouncedSearch,
           limit: 5,
-          roleId: ROLE_IDS.CLIENT
+          role: ROLES.MEMBER
         });
         if (isMounted) setSearchResults(res.data);
       } catch (err) {

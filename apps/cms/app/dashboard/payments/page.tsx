@@ -8,7 +8,7 @@ import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLE_IDS } from "@workspace/shared/constants";
+import { ROLES } from "@workspace/shared/constants";
 
 export default function PaymentsPage() {
   const [subs, setSubs] = React.useState<ISubscription[]>([]);
@@ -55,9 +55,9 @@ export default function PaymentsPage() {
     const matches = s.memberName?.toLowerCase().includes(search.toLowerCase()) ||
                     s.planName?.toLowerCase().includes(search.toLowerCase());
     
-    // If searching, restrict results to Cliente role (4)
+    // If searching, restrict results to Cliente role
     if (search.trim() !== "") {
-      return matches && s.roleId === ROLE_IDS.CLIENT;
+      return matches && s.role === ROLES.MEMBER;
     }
     return matches;
   });
