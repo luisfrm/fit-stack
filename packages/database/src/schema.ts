@@ -1,6 +1,5 @@
 import {
   pgTable,
-  serial,
   text,
   timestamp,
   boolean,
@@ -9,32 +8,27 @@ import {
   pgEnum,
   date,
   uniqueIndex,
+  bigint,
+  numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
-// --- RBAC: ROLES & PERMISSIONS ---
+// ── ENUMS ──
+export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
+export const paymentStatusEnum = pgEnum('payment_status', ['processing', 'validated', 'invalid', 'voided']);
+export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
+export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
+  'hero',
+  'services',
+  'classes_info',
+  'testimonials',
+  'gallery',
+  'contact',
+  'team_info'
+]);
 
-export const roles = pgTable('roles', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull().unique(), // admin, manager, trainer, client, coach, custom
-  description: text('description'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const permissions = pgTable('permissions', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  slug: text('slug').notNull().unique(), // e.g., 'members:delete'
-  description: text('description'),
-});
-
-export const rolePermissions = pgTable('role_permissions', {
-  id: serial('id').primaryKey(),
-  roleId: integer('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
-  permissionId: integer('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
-});
-
-// --- BETTER AUTH TABLES ---
+// ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -42,23 +36,23 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  roleId: integer('role_id').references(() => roles.id),
-  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
+  role: text('role'), // Global role (e.g. 'admin')
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),
-  expiresAt: timestamp('expires_at').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   token: text('token').notNull().unique(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
+  activeOrganizationId: text('active_organization_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const account = pgTable('account', {
@@ -71,34 +65,94 @@ export const account = pgTable('account', {
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   idToken: text('id_token'),
-  accessTokenExpiresAt: timestamp('access_token_expires_at'),
-  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
   scope: text('scope'),
   password: text('password'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const verification = pgTable('verification', {
   id: text('id').primaryKey(),
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
-  expiresAt: timestamp('expires_at').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
-// --- ENUMS ---
-export const roleEnum = pgEnum('role', ['admin', 'manager', 'trainer', 'client']);
-export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
+// ── ORGANIZATIONS & AUTH MEMBERSHIP (Better Auth Plugin) ──
 
-// --- CORE: USERS & MEMBERS ---
+export const organization = pgTable('organization', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').unique(),
+  logo: text('logo'),
+  metadata: text('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
-export const members = pgTable('members', {
-  id: serial('id').primaryKey(),
-  email: text('email').notNull().unique(),
-  roleId: integer('role_id').references(() => roles.id), // Nueva columna para roles dinámicos (RBAC)
+export const authMember = pgTable('member', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(), // 'manager', 'cashier', 'coach', 'member'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const invitation = pgTable('invitation', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: text('role'),
+  status: text('status').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  inviterId: text('inviter_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+});
+
+// ── B2B PLATFORM BILLING ──
+
+export const fitstackPlan = pgTable('fitstack_plan', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  name: text('name').notNull(),
+  monthlyPrice: numeric('monthly_price', { precision: 10, scale: 2 }).notNull(),
+  features: jsonb('features'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const storeSubscription = pgTable('store_subscription', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id').references(() => organization.id, { onDelete: 'cascade' }).notNull(),
+  planId: bigint('plan_id', { mode: 'number' }).references(() => fitstackPlan.id).notNull(),
+  status: text('status').notNull(), // active, past_due, canceled
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+});
+
+// ── GYM DOMAIN: LOCAL MEMBERS & STAFF ──
+
+/**
+ * gym_member represents the local profile of a customer in a gym.
+ * It is linked to a global 'user' for app access, but can exist without it.
+ */
+export const gymMember = pgTable('gym_member', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .references(() => user.id, { onDelete: 'set null' }),
+  email: text('email').notNull(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   documentId: text('document_id'),
@@ -106,69 +160,101 @@ export const members = pgTable('members', {
   birthday: date('birthday'),
   imageUrl: text('image_url'),
   isActive: boolean('is_active').default(true).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// --- GYM MANAGEMENT: MEMBRESÍAS ---
+/**
+ * Unified staff profile for Trainers and Coaches.
+ * Connects a gym_member with additional fitness/cms meta-data.
+ */
+export const staffProfile = pgTable('staff_profile', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' })
+    .notNull()
+    .unique(),
+  
+  // Professional Data
+  specialities: jsonb('specialities'), // array of strings
+  bio: text('bio'),
+  
+  // CMS/App Visibility
+  isVisible: boolean('is_visible').default(true).notNull(),
+  displayOrder: integer('display_order').default(0).notNull(),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
-// Planes de Membresía (Ej: Basic, VIP, Platinum) - Usado tanto en CMS como en Facturación
-export const membershipPlans = pgTable('membership_plans', {
-  id: serial('id').primaryKey(),
+// ── GYM MANAGEMENT: MEMBRESÍAS & PAGOS ──
+
+export const membershipPlan = pgTable('membership_plan', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  price: integer('price').notNull(), // Guardado en centavos (ej: $45.00 -> 4500)
+  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
-  features: jsonb('features'), // Array: ["Acceso 24/7", "Zonas VIP"]
+  features: jsonb('features'),
   isPopular: boolean('is_popular').default(false).notNull(),
-  isActive: boolean('is_active').default(true).notNull(), // Si es false, es un 'Borrador' / Inactivo en CMS
-  isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(), // Solo afecta web pública
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// Suscripciones: Relaciona a un Miembro con un Plan que pagó
-export const subscriptions = pgTable('subscriptions', {
-  id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
-  planId: integer('plan_id').references(() => membershipPlans.id).notNull(),
-  startDate: timestamp('start_date').notNull(),
-  endDate: timestamp('end_date').notNull(),
+export const subscription = pgTable('subscription', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+  planId: bigint('plan_id', { mode: 'number' })
+    .references(() => membershipPlan.id).notNull(),
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }).notNull(),
   status: subscriptionStatusEnum('status').default('active').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// --- FACTURACIÓN Y PAGOS ---
+export const payment = pgTable('payment', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+  subscriptionId: bigint('subscription_id', { mode: 'number' })
+    .references(() => subscription.id),
 
-export const payments = pgTable('payments', {
-  id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
-  subscriptionId: integer('subscription_id').references(() => subscriptions.id),
-
-  // Snapshots para historial histórico invariable
   planSnapshotName: text('plan_snapshot_name').notNull(),
-  planSnapshotPrice: integer('plan_snapshot_price').notNull(),
+  planSnapshotPrice: numeric('plan_snapshot_price', { precision: 10, scale: 2 }).notNull(),
   planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
 
-  // Datos del Pago (Lo que realmente entró en caja)
-  amountPaid: integer('amount_paid').notNull(),
+  amountPaid: numeric('amount_paid', { precision: 10, scale: 2 }).notNull(),
   currencyPaid: text('currency_paid').notNull(),
-  exchangeRateApplied: text('exchange_rate_applied'), // Guardamos como texto para ser flexibles o numérico? numeric es mejor
+  exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
+  status: paymentStatusEnum('status').default('validated').notNull(),
   paymentMethod: text('payment_method').notNull(),
-  paymentMethodDetails: jsonb('payment_method_details').$type<Record<string, any>>(), // Metadatos dinámicos del pago
+  paymentMethodDetails: jsonb('payment_method_details'),
 
-  paymentDate: timestamp('payment_date').defaultNow().notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// --- FITNESS APP: TRAINERS, EJERCICIOS Y RUTINAS ---
+// ── FITNESS APP: ROUTINES & EXERCISES ──
 
-export const trainerProfiles = pgTable('trainer_profiles', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull().unique(), // ← text, no uuid
-  specialities: text('specialities'),
-});
-
-export const exercises = pgTable('exercises', {
-  id: serial('id').primaryKey(),
+export const exercise = pgTable('exercise', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   type: exerciseTypeEnum('type').notNull(),
   primaryMuscle: text('primary_muscle').notNull(),
@@ -178,188 +264,151 @@ export const exercises = pgTable('exercises', {
   metadata: jsonb('metadata'),
 });
 
-// Rutinas Definidas (Plantillas armadas por trainers o default del gym)
-export const routineTemplates = pgTable('routine_templates', {
-  id: serial('id').primaryKey(),
-  trainerId: integer('trainer_id').references(() => trainerProfiles.id, { onDelete: 'cascade' }),
+export const routineTemplate = pgTable('routine_template', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  trainerProfileId: bigint('trainer_profile_id', { mode: 'number' })
+    .references(() => staffProfile.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   description: text('description'),
 });
 
-export const routineTemplateItems = pgTable('routine_template_items', {
-  id: serial('id').primaryKey(),
-  routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id).notNull(),
-  exerciseId: integer('exercise_id').references(() => exercises.id).notNull(),
+export const routineTemplateItem = pgTable('routine_template_item', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  routineTemplateId: bigint('routine_template_id', { mode: 'number' })
+    .references(() => routineTemplate.id, { onDelete: 'cascade' }).notNull(),
+  exerciseId: bigint('exercise_id', { mode: 'number' })
+    .references(() => exercise.id, { onDelete: 'cascade' }).notNull(),
   sets: integer('sets').notNull(),
   reps: text('reps').notNull(),
   restSeconds: integer('rest_seconds'),
   orderIndex: integer('order_index').notNull(),
 });
 
-export const workoutSessions = pgTable('workout_sessions', {
-  id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
-  routineTemplateId: integer('routine_template_id').references(() => routineTemplates.id),
-  date: timestamp('date').defaultNow().notNull(),
+export const workoutSession = pgTable('workout_session', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+  routineTemplateId: bigint('routine_template_id', { mode: 'number' })
+    .references(() => routineTemplate.id, { onDelete: 'set null' }),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
   durationMinutes: integer('duration_minutes'),
   notes: text('notes'),
 });
 
-export const workoutSessionLogs = pgTable('workout_session_logs', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => workoutSessions.id).notNull(),
-  exerciseId: integer('exercise_id').references(() => exercises.id).notNull(),
+export const workoutSessionLog = pgTable('workout_session_log', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  sessionId: bigint('session_id', { mode: 'number' })
+    .references(() => workoutSession.id, { onDelete: 'cascade' }).notNull(),
+  exerciseId: bigint('exercise_id', { mode: 'number' })
+    .references(() => exercise.id).notNull(),
   setsCompleted: integer('sets_completed').notNull(),
   weightUsed: jsonb('weight_used'),
   repsCompleted: jsonb('reps_completed'),
 });
 
-// --- CMS & MARKETING WEBSITE ---
+// ── CMS & WEB ASSETS ──
 
-export const coachProfiles = pgTable('coach_profiles', {
-  id: serial('id').primaryKey(),
-  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }).notNull().unique(),
-  specialities: jsonb('specialities'), // array de strings: ["Fuerza", "Yoga"]
-  bio: text('bio'),
-  isVisible: boolean('is_visible').default(true).notNull(),
-  displayOrder: integer('display_order').default(0).notNull(),
+export const coachAssignment = pgTable('coach_assignment', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  coachMemberId: bigint('coach_member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(), // A coach is a staff member
+  clientMemberId: bigint('client_member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(), // A client is also a gymMember
+  assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const coachAssignments = pgTable('coach_assignments', {
-  id: serial('id').primaryKey(),
-  coachId: integer('coach_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
-  clientId: integer('client_id').references(() => members.id, { onDelete: 'cascade' }).notNull(),
-  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
-});
-
-export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
-
-export const cmsClasses = pgTable('cms_classes', {
-  id: serial('id').primaryKey(),
+export const cmsClass = pgTable('cms_class', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
   trainerName: text('trainer_name'),
   isVisible: boolean('is_visible').default(true).notNull(),
-
-  // Horario estructurado (reemplaza timeInfo)
-  startTime: text('start_time').notNull(),     // "HH:MM" — ej: "09:00"
-  endTime: text('end_time'),                 // opcional — ej: "10:00"
-
-  // Frecuencia
+  startTime: text('start_time').notNull(),
+  endTime: text('end_time'),
   frequencyType: frequencyTypeEnum('frequency_type').default('weekly').notNull(),
-  scheduledDate: date('scheduled_date'),           // solo cuando frequencyType = 'once'
-  daysOfWeek: integer('days_of_week').array(),  // solo cuando frequencyType = 'weekly'
-  // [0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb]
-  // Capacidad
+  scheduledDate: date('scheduled_date'),
+  daysOfWeek: integer('days_of_week').array(),
   capacity: integer('capacity'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// --- CONFIGURACIÓN GLOBAL ---
-
-export const gymSettings = pgTable('gym_settings', {
-  id: serial('id').primaryKey(),
-  key: text('key').notNull().unique(), // Ej: 'allow_price_override', 'timezone', etc.
-  value: text('value').notNull(),       // Guardamos como string, parseamos según key
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-
-export const userRoles = pgTable('user_roles', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull(),
-  roleId: integer('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
-});
-
-export const userPermissions = pgTable('user_permissions', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }).notNull(),
-  permissionId: integer('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
-});
-
-// --- RELATIONS ---
-
-export const userRelations = relations(user, ({ one, many }) => ({
-  userRoles: many(userRoles),
-  userPermissions: many(userPermissions),
-  member: one(members, { fields: [user.memberId], references: [members.id] }),
-  role: one(roles, { fields: [user.roleId], references: [roles.id] }),
-}));
-
-export const membersRelations = relations(members, ({ one, many }) => ({
-  user: one(user, { fields: [members.id], references: [user.memberId] }),
-  role: one(roles, { fields: [members.roleId], references: [roles.id] }),
-  coachProfile: one(coachProfiles, { fields: [members.id], references: [coachProfiles.memberId] }),
-  asCoachAssignments: many(coachAssignments, { relationName: 'coach_assignments_coach' }),
-  asClientAssignments: many(coachAssignments, { relationName: 'coach_assignments_client' }),
-}));
-
-export const coachProfilesRelations = relations(coachProfiles, ({ one }) => ({
-  member: one(members, { fields: [coachProfiles.memberId], references: [members.id] }),
-}));
-
-export const coachAssignmentsRelations = relations(coachAssignments, ({ one }) => ({
-  coach: one(members, { fields: [coachAssignments.coachId], references: [members.id], relationName: 'coach_assignments_coach' }),
-  client: one(members, { fields: [coachAssignments.clientId], references: [members.id], relationName: 'coach_assignments_client' }),
-}));
-
-export const rolesRelations = relations(roles, ({ many }) => ({
-  rolePermissions: many(rolePermissions),
-  userRoles: many(userRoles),
-}));
-
-export const permissionsRelations = relations(permissions, ({ many }) => ({
-  rolePermissions: many(rolePermissions),
-  userPermissions: many(userPermissions),
-}));
-
-export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
-  role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
-  permission: one(permissions, { fields: [rolePermissions.permissionId], references: [permissions.id] }),
-}));
-
-export const userRolesRelations = relations(userRoles, ({ one }) => ({
-  user: one(user, { fields: [userRoles.userId], references: [user.id] }),
-  role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
-}));
-
-export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
-  user: one(user, { fields: [userPermissions.userId], references: [user.id] }),
-  permission: one(permissions, { fields: [userPermissions.permissionId], references: [permissions.id] }),
-}));
-
-// --- CMS PÁGINAS Y BLOQUES DINÁMICOS ---
-
-export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
-  'hero',
-  'services',
-  'classes_info',
-  'testimonials',
-  'gallery',
-  'contact',
-  'team_info'
+export const gymSetting = pgTable('gym_setting', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  key: text('key').notNull(),
+  value: text('value').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('settings_org_key_idx').on(table.organizationId, table.key),
 ]);
 
-export const cmsPages = pgTable('cms_pages', {
-  id: serial('id').primaryKey(),
-  slug: text('slug').notNull().unique(),
+export const cmsPage = pgTable('cms_page', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  slug: text('slug').notNull(),
   title: text('title').notNull(),
   description: text('description'),
   isActive: boolean('is_active').default(true).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('page_org_slug_idx').on(table.organizationId, table.slug),
+]);
 
-export const cmsPageBlocks = pgTable('cms_page_blocks', {
-  id: serial('id').primaryKey(),
-  pageId: integer('page_id').references(() => cmsPages.id, { onDelete: 'cascade' }).notNull(),
+export const cmsPageBlock = pgTable('cms_page_block', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  pageId: bigint('page_id', { mode: 'number' })
+    .references(() => cmsPage.id, { onDelete: 'cascade' }).notNull(),
   blockType: cmsBlockTypeEnum('block_type').notNull(),
-  data: jsonb('data').notNull(), // Estructura validada por Zod en la App
+  data: jsonb('data').notNull(),
   isVisible: boolean('is_visible').default(true).notNull(),
   displayOrder: integer('display_order').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({
-  pageOrderIdx: uniqueIndex('page_order_idx').on(table.pageId, table.displayOrder),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('page_order_idx').on(table.pageId, table.displayOrder),
+]);
+
+// ── RELATIONS ──
+
+export const userRelations = relations(user, ({ many }) => ({
+  memberships: many(authMember),
+}));
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(authMember),
+  gymMembers: many(gymMember),
+  membershipPlans: many(membershipPlan),
+}));
+
+export const authMemberRelations = relations(authMember, ({ one }) => ({
+  user: one(user, { fields: [authMember.userId], references: [user.id] }),
+  organization: one(organization, { fields: [authMember.organizationId], references: [organization.id] }),
+}));
+
+export const gymMemberRelations = relations(gymMember, ({ one, many }) => ({
+  organization: one(organization, { fields: [gymMember.organizationId], references: [organization.id] }),
+  staffProfile: one(staffProfile, { fields: [gymMember.id], references: [staffProfile.memberId] }),
+  asCoachAssignments: many(coachAssignment, { relationName: 'coach_assignments_coach' }),
+  asClientAssignments: many(coachAssignment, { relationName: 'coach_assignments_client' }),
 }));

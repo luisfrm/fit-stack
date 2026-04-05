@@ -5,78 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1774773501802,
-      "tag": "0000_aromatic_captain_marvel",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1774820520648,
-      "tag": "0001_glamorous_giant_girl",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1774825928076,
-      "tag": "0002_concerned_wiccan",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1774864129545,
-      "tag": "0003_absent_jane_foster",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1774871758431,
-      "tag": "0004_abnormal_calypso",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1775044871968,
-      "tag": "0005_careful_norman_osborn",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1775076623843,
-      "tag": "0006_rainy_nemesis",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1775125710036,
-      "tag": "0007_silky_gwen_stacy",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1775126865499,
-      "tag": "0008_striped_madrox",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1775298448467,
-      "tag": "0009_sloppy_groot",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1775337062105,
-      "tag": "0010_little_rage",
+      "when": 1775423352517,
+      "tag": "0000_spooky_gabe_jones",
       "breakpoints": true
     }
   ]

@@ -1,1 +1,0 @@
-ALTER TABLE "payments" ALTER COLUMN "payment_method_details" SET DATA TYPE jsonb USING payment_method_details::jsonb;
