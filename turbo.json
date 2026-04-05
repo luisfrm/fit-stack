@@ -10,6 +10,7 @@
         "DATABASE_URL",
         "BETTER_AUTH_URL",
         "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_API_KEY",
         "R2_ACCOUNT_ID",
         "R2_ACCESS_KEY_ID",
         "R2_SECRET_ACCESS_KEY",
