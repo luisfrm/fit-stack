@@ -4,7 +4,6 @@ import { db } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
 import { customSession } from "better-auth/plugins";
-import { dash } from "@better-auth/infra";
 
 import { rbacService } from "../services/rbac.service";
 import { rbacPlugin } from "./rbac-plugin";
@@ -55,7 +54,6 @@ export const auth = betterAuth({
         };
       }
     }),
-    dash()
   ],
 
   emailAndPassword: {
