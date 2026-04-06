@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
 import { getSessionCookie } from "better-auth/cookies";
 
-const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token"];
+const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token", "/api/init"];
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
