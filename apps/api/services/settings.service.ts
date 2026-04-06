@@ -1,26 +1,37 @@
 import { settingsRepository } from '../repositories/settings.repository'
+import { platformSettingsRepository } from '../repositories/platform-settings.repository'
 
 export const settingsService = {
-  async getByKey(organizationId: string, key: string): Promise<string | undefined> {
+  async getByKey(organizationId: string | null, key: string): Promise<string | undefined> {
+    if (!organizationId) {
+      return platformSettingsRepository.findByKey(key);
+    }
     return settingsRepository.findByKey(organizationId, key)
   },
 
-  async upsert(organizationId: string, key: string, value: string): Promise<void> {
+  async upsert(organizationId: string | null, key: string, value: string): Promise<void> {
     if (!key) throw new Error('Se requiere una clave para la configuración')
+    
+    if (!organizationId) {
+      return platformSettingsRepository.upsert(key, value);
+    }
     return settingsRepository.upsert(organizationId, key, value)
   },
 
-  async getAll(organizationId: string): Promise<Record<string, string>> {
+  async getAll(organizationId: string | null): Promise<Record<string, string>> {
+    if (!organizationId) {
+      return platformSettingsRepository.getAll();
+    }
     return settingsRepository.getAll(organizationId)
   },
 
-  async updateAll(organizationId: string, settings: Record<string, string>): Promise<void> {
+  async updateAll(organizationId: string | null, settings: Record<string, string>): Promise<void> {
     for (const [key, value] of Object.entries(settings)) {
       await this.upsert(organizationId, key, value);
     }
   },
 
-  async getGymNow(organizationId: string): Promise<Date> {
+  async getGymNow(organizationId: string | null): Promise<Date> {
     const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
     const now = new Date();
 

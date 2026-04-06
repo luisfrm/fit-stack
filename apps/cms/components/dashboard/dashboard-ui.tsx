@@ -17,8 +17,14 @@ import {
   AlertCircle,
   BadgeCheck,
   ShieldCheck,
+  Building2,
+  PackageCheck,
+  BarChart3,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
+
+import { ROLES } from "@workspace/shared/types";
 
 import {
   type IClassToday,
@@ -27,10 +33,10 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { getMediaUrl } from "@/lib/utils/media-utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { 
-  AppSidebar as UISidebar, 
-  MobileNav as UIMobileNav, 
-  type SidebarUser, 
+import {
+  AppSidebar as UISidebar,
+  MobileNav as UIMobileNav,
+  type SidebarUser,
   type SidebarNavItem,
   Text,
   Avatar,
@@ -45,10 +51,10 @@ import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
 
 /* ─────────────────────────────────────────────
-   SIDEBAR
+   SIDEBAR NAV SCHEMAS
    ───────────────────────────────────────────── */
 
-const NAV_ITEMS: SidebarNavItem[] = [
+const GYM_NAV_ITEMS: SidebarNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck },
   { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
@@ -60,38 +66,54 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { label: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function AppSidebar({ user }: Readonly<{ user: SidebarUser }>) {
+const SAAS_NAV_ITEMS: SidebarNavItem[] = [
+  { label: "Dashboard Global", href: "/dashboard", icon: BarChart3 },
+  { label: "Organizaciones", href: "/dashboard/platform/organizations", icon: Building2 },
+  { label: "Planes SaaS", href: "/dashboard/platform/plans", icon: PackageCheck },
+  { label: "Finanzas B2B", href: "/dashboard/platform/revenue", icon: TrendingUp },
+  { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
+];
+
+export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { settings, isLoading } = useSettings();
+
+  // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
+  const isSaaSMode = user.role === ROLES.ADMIN && !activeOrganizationId;
+  console.log('user', user)
+  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
   return (
     <UISidebar
       user={user}
-      navigation={NAV_ITEMS}
+      navigation={navigation}
       branding={{
         logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
-        title: settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness",
-        subtitle: settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard",
+        title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
+        subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
         isLoading: isLoading,
-        fallbackIcon: Dumbbell,
+        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
       }}
       footer={<SignOutButton />}
     />
   );
 }
 
-export function MobileNav({ user }: Readonly<{ user: SidebarUser }>) {
+export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { settings, isLoading } = useSettings();
+
+  const isSaaSMode = user.role === ROLES.ADMIN && !activeOrganizationId;
+  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
   return (
     <UIMobileNav
       user={user}
-      navigation={NAV_ITEMS}
+      navigation={navigation}
       branding={{
         logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
-        title: settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness",
-        subtitle: settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard",
+        title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
+        subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
         isLoading: isLoading,
-        fallbackIcon: Dumbbell,
+        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
       }}
       footer={<SignOutButton />}
     />
@@ -364,7 +386,7 @@ export function AlertItem({ severity, title, description, actionLabel }: Readonl
         <Text as="p" size="base" weight="semibold">{title}</Text>
         <Text as="p" size="xs" variant="subtle">{description}</Text>
       </div>
-      <Button 
+      <Button
         variant="link"
         size="xs"
         className={cn("ml-auto shrink-0", config.buttonClass)}

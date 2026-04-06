@@ -7,15 +7,15 @@ export const USD_EXCHANGE_URL_V4 = "https://api.exchangerate-api.com/v4/latest/U
 
 export const ROLE_MAP: Record<string | number, string> = {
   // Global Roles
-  "admin": "Admin SaaS",
-  
+  "admin": "admin",
+
   // Organization Roles
-  "owner": "Propietario",
-  "manager": "Manager",
-  "coach": "Entrenador",
-  "trainer": "Entrenador",
-  "cashier": "Cajero",
-  "member": "Cliente",
+  "owner": "owner",
+  "manager": "manager",
+  "coach": "coach",
+  "trainer": "trainer",
+  "cashier": "cashier",
+  "member": "member",
 
   // Legacy Numeric Support
   1: "Administrador",
