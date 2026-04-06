@@ -21,7 +21,7 @@ export function DashboardHeader({ title, description, iconName, children }: Dash
   return (
     <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
       <div className="flex-1">
-        <h1 className="text-2xl lg:text-3xl font-bold tracking-tighter text-white flex gap-3 items-center uppercase italic">
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tighter text-foreground flex gap-3 items-center uppercase italic">
           {Icon && <Icon className="text-primary w-8 h-8 shrink-0" />}
           <div className="leading-tight">
             {title}

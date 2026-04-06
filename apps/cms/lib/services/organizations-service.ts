@@ -1,54 +1,45 @@
-import { apiClient } from "../api-client";
-import { type Organization } from "@/components/dashboard/organization-mobile-card";
+import { apiClient } from "@/lib/api-client";
+import { IPlatformOrganization, IPlatformSubscription } from "@workspace/shared/types";
 
-interface OrganizationFilter {
-  query?: string;
-  page?: number;
-  limit?: number;
-}
+const ORGANIZATIONS_PATH = "/platform/organizations";
 
-interface PaginatedOrganizations {
-  data: Organization[];
+export interface PaginatedOrganizationsResult {
+  data: IPlatformOrganization[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
 }
 
-/**
- * Service to handle organization-related API operations for SaaS Admins.
- */
 export const organizationsService = {
-  /**
-   * Fetches all organizations from the platform with optional filters.
-   */
-  async getOrganizations(filters: OrganizationFilter = {}): Promise<PaginatedOrganizations> {
-    const response = await apiClient.get<PaginatedOrganizations>("/organizations", {
-      params: filters,
-    });
+  async getAll(params?: { 
+    query?: string; 
+    page?: number; 
+    limit?: number; 
+    includeMemberCount?: boolean;
+  }): Promise<PaginatedOrganizationsResult> {
+    const response = await apiClient.get(ORGANIZATIONS_PATH, { params });
     return response.data;
   },
 
-  /**
-   * Creates a new organization.
-   */
-  async createOrganization(data: Partial<Organization>): Promise<Organization> {
-    const response = await apiClient.post<Organization>("/organizations", data);
+  async create(data: Partial<IPlatformOrganization>): Promise<IPlatformOrganization> {
+    const response = await apiClient.post(ORGANIZATIONS_PATH, data);
     return response.data;
   },
 
-  /**
-   * Updates an existing organization.
-   */
-  async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
-    const response = await apiClient.put<Organization>(`/organizations/${id}`, data);
+  async update(id: string, data: Partial<IPlatformOrganization>): Promise<IPlatformOrganization> {
+    const response = await apiClient.patch(`${ORGANIZATIONS_PATH}/${id}`, data);
     return response.data;
   },
 
-  /**
-   * Special action to update status independently if needed.
-   */
-  async updateStatus(id: string, status: Organization['status']): Promise<void> {
-    await apiClient.patch(`/organizations/${id}/status`, { status });
+  async addSubscription(id: string, data: {
+    planId: number;
+    startDate: string;
+    endDate: string;
+    isTrial: boolean;
+    priceOverride?: string;
+  }): Promise<IPlatformSubscription> {
+    const response = await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/subscriptions`, data);
+    return response.data;
   }
 };

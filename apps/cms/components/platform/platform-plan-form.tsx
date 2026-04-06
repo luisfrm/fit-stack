@@ -8,8 +8,9 @@ import {
   Switch,
   Separator
 } from "@workspace/ui/components";
-import { type IPlatformPlan, type PlanFeatures } from "@workspace/shared/types";
+import { type IPlatformPlan } from "@workspace/shared/types";
 import { Building2, Users, Smartphone, Globe, BookOpen } from "lucide-react";
+import { cleanNumericInput } from "@/lib/utils/helper";
 
 interface PlatformPlanFormProps {
   readonly initialData?: Partial<IPlatformPlan>;
@@ -21,20 +22,38 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
   const [formData, setFormData] = React.useState({
     name: initialData?.name || "",
     monthlyPrice: initialData?.monthlyPrice?.toString() || "0",
-    suggestedDurationDays: initialData?.suggestedDurationDays || 30,
+    yearlyPrice: initialData?.yearlyPrice?.toString() || "0",
+    suggestedDurationDays: initialData?.suggestedDurationDays?.toString() || "30",
     isActive: initialData?.isActive ?? true,
-    features: (initialData?.features || {
-      limits: { members: 0, coaches: 0 },
-      access: { pwa: false, blog: false, web_commercial: false }
-    }) as PlanFeatures
+    features: {
+      limits: {
+        members: initialData?.features?.limits?.members?.toString() || "0",
+        coaches: initialData?.features?.limits?.coaches?.toString() || "0"
+      },
+      access: initialData?.features?.access || {
+        pwa: false,
+        blog: false,
+        web_commercial: false
+      }
+    }
   });
 
-  const handleSubmit = async (e: React.SubmitEvent) => {
-    e.preventDefault();
-    await onSubmit(formData);
+  const updateLimit = (key: keyof typeof formData.features.limits, val: string) => {
+    const processed = cleanNumericInput(formData.features.limits[key], val);
+
+    setFormData(prev => ({
+      ...prev,
+      features: {
+        ...prev.features,
+        limits: {
+          ...prev.features.limits,
+          [key]: processed
+        }
+      }
+    }));
   };
 
-  const updateFeatureAccess = (key: keyof NonNullable<PlanFeatures["access"]>, val: boolean) => {
+  const updateFeatureAccess = (key: keyof typeof formData.features.access, val: boolean) => {
     setFormData(prev => ({
       ...prev,
       features: {
@@ -47,24 +66,32 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
     }));
   };
 
-  const updateLimit = (key: keyof NonNullable<PlanFeatures["limits"]>, val: string) => {
-    setFormData(prev => ({
-      ...prev,
+  const handleSubmit = async (e: React.SubmitEvent) => {
+    e.preventDefault();
+
+    // Convertimos strings a números para el API
+    const submissionData = {
+      ...formData,
+      monthlyPrice: Number.parseFloat(formData.monthlyPrice) || 0,
+      yearlyPrice: Number.parseFloat(formData.yearlyPrice) || 0,
+      suggestedDurationDays: Number.parseInt(formData.suggestedDurationDays, 10) || 0,
       features: {
-        ...prev.features,
+        ...formData.features,
         limits: {
-          ...prev.features.limits,
-          [key]: Number.parseInt(val, 10) || 0
+          members: Number.parseInt(formData.features.limits.members, 10) || 0,
+          coaches: Number.parseInt(formData.features.limits.coaches, 10) || 0,
         }
       }
-    }));
+    };
+
+    await onSubmit(submissionData);
   };
 
   const submitButtonText = initialData?.id ? "ACTUALIZAR PLAN" : "CREAR PLAN";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 py-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Nombre del Plan</Text>
           <Input
@@ -76,14 +103,41 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
           />
         </div>
         <div className="space-y-2">
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Precio Sugerido (USD)</Text>
+          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Precio Sugerido Mensual (USD)</Text>
           <Input
             type="number"
             step="0.01"
+            min="0"
             value={formData.monthlyPrice}
-            onChange={(e) => setFormData(p => ({ ...p, monthlyPrice: e.target.value }))}
+            onChange={(e) => {
+              const val = e.target.value;
+              const processed = cleanNumericInput(formData.monthlyPrice, val);
+              
+              const parsed = Number.parseFloat(processed);
+              const finalValue = Number.isNaN(parsed) ? "0" : Math.max(0, parsed).toString();
+              setFormData(p => ({ ...p, monthlyPrice: finalValue }));
+            }}
             placeholder="0.00"
             required
+            className="bg-white/5 border-white/10"
+          />
+        </div>
+        <div className="space-y-2">
+          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Precio Sugerido Anual (USD)</Text>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.yearlyPrice}
+            onChange={(e) => {
+              const val = e.target.value;
+              const processed = cleanNumericInput(formData.yearlyPrice, val);
+              
+              const parsed = Number.parseFloat(processed);
+              const finalValue = Number.isNaN(parsed) ? "0" : Math.max(0, parsed).toString();
+              setFormData(p => ({ ...p, yearlyPrice: finalValue }));
+            }}
+            placeholder="0.00"
             className="bg-white/5 border-white/10"
           />
         </div>
@@ -93,8 +147,13 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
         <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Duración Sugerida (Días)</Text>
         <Input
           type="number"
+          min="0"
           value={formData.suggestedDurationDays}
-          onChange={(e) => setFormData(p => ({ ...p, suggestedDurationDays: Number.parseInt(e.target.value, 10) || 0 }))}
+          onChange={(e) => {
+            const val = e.target.value;
+            const processed = cleanNumericInput(formData.suggestedDurationDays, val);
+            setFormData(p => ({ ...p, suggestedDurationDays: processed }));
+          }}
           className="bg-white/5 border-white/10"
         />
         <Text size="xs" variant="muted">Este valor pre-llenará el formulario de suscripción manual.</Text>
@@ -112,6 +171,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
             <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">Máx. Miembros</Text>
             <Input
               type="number"
+              min="0"
               value={formData.features.limits?.members}
               onChange={(e) => updateLimit('members', e.target.value)}
               className="bg-white/5 border-white/10"
@@ -121,6 +181,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
             <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">Máx. Coaches</Text>
             <Input
               type="number"
+              min="0"
               value={formData.features.limits?.coaches}
               onChange={(e) => updateLimit('coaches', e.target.value)}
               className="bg-white/5 border-white/10"

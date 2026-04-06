@@ -27,12 +27,29 @@ export function SaaSAdminDashboard() {
   const fetchOrganizations = React.useCallback(async () => {
     try {
       setIsLoading(true);
-      const result = await organizationsService.getOrganizations();
+      const result = await organizationsService.getAll({ includeMemberCount: true });
       
-      const formatted = result.data.map(org => ({
-        ...org,
-        domain: org.domain || `${org.slug}.fitstack.com`
-      }));
+      const formatted: Organization[] = result.data.map(org => {
+        const subStatus = org.latestSubscription?.status;
+        
+        let dashboardStatus: Organization['status'] = 'pending';
+        if (subStatus === 'active' || subStatus === 'past_due' || subStatus === 'read_only') {
+          dashboardStatus = 'active';
+        } else if (subStatus === 'suspended' || subStatus === 'canceled') {
+          dashboardStatus = 'inactive';
+        }
+
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug || 'no-slug',
+          logo: org.logo || undefined,
+          domain: `${org.slug || 'org'}.fitstack.com`,
+          memberCount: org.memberCount || 0,
+          status: dashboardStatus,
+          metadata: org.metadata || {}
+        };
+      });
       setOrganizations(formatted);
     } catch (error: any) {
       console.error("Error fetching organizations:", error);

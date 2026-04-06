@@ -98,7 +98,7 @@ export default function PlatformPlansPage() {
           onSuccess={loadPlans}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              NUEVO NIVEL SAAS
+              NUEVO PLAN
             </Button>
           }
         />
@@ -121,7 +121,7 @@ export default function PlatformPlansPage() {
         <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
           <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Esquema Trial</Text>
           <Text size="lg" weight="bold" className="text-blue-400">
-             {loading ? "..." : trialPlanStatus}
+            {loading ? "..." : trialPlanStatus}
           </Text>
         </div>
         <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">

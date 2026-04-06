@@ -78,11 +78,21 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
           <Text size="lg" weight="bold" className="text-white uppercase tracking-tighter">
             {plan.name}
           </Text>
-          <div className="flex items-center gap-1.5 text-primary">
-            <Text size="lg" weight="bold">
-              ${Number.parseFloat(plan.monthlyPrice.toString()).toLocaleString()}
-            </Text>
-            <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">/ Mes</Text>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 text-primary">
+              <Text size="lg" weight="bold">
+                ${Number.parseFloat(plan.monthlyPrice.toString()).toLocaleString()}
+              </Text>
+              <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">/ Mes</Text>
+            </div>
+            {plan.yearlyPrice && Number.parseFloat(plan.yearlyPrice.toString()) > 0 && (
+              <div className="flex items-center gap-1 opacity-70">
+                <Text size="xs" weight="bold" className="text-white">
+                  ${Number.parseFloat(plan.yearlyPrice.toString()).toLocaleString()}
+                </Text>
+                <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">/ Año</Text>
+              </div>
+            )}
           </div>
         </div>
         <div className={cn(

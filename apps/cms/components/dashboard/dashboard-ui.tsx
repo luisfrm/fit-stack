@@ -69,8 +69,8 @@ const GYM_NAV_ITEMS: SidebarNavItem[] = [
 const SAAS_NAV_ITEMS: SidebarNavItem[] = [
   { label: "Dashboard Global", href: "/dashboard", icon: BarChart3 },
   { label: "Organizaciones", href: "/dashboard/platform/organizations", icon: Building2 },
-  { label: "Planes SaaS", href: "/dashboard/platform/plans", icon: PackageCheck },
-  { label: "Finanzas B2B", href: "/dashboard/platform/revenue", icon: TrendingUp },
+  { label: "Planes", href: "/dashboard/platform/plans", icon: PackageCheck },
+  { label: "Finanzas", href: "/dashboard/platform/revenue", icon: TrendingUp },
   { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
 ];
 
