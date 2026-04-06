@@ -66,9 +66,11 @@ export type { CoachCardProps } from "@workspace/ui/components/coach-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
 export type { PlanCardProps } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
+export { Separator } from "@workspace/ui/components/separator";
 export { Textarea } from "@workspace/ui/components/textarea";
 export type { TextareaProps } from "@workspace/ui/components/textarea";
 export * from "@workspace/ui/components/dialog";
+export * from "@workspace/ui/components/dropdown-menu";
 
 // Next.js specific components
 export * from "@workspace/ui/components/next/sidebar";

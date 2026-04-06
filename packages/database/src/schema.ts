@@ -89,7 +89,7 @@ export const organization = pgTable('organization', {
   name: text('name').notNull(),
   slug: text('slug').unique(),
   logo: text('logo'),
-  metadata: text('metadata'),
+  metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -126,17 +126,46 @@ export const fitstackPlan = pgTable('fitstack_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   name: text('name').notNull(),
   monthlyPrice: numeric('monthly_price', { precision: 10, scale: 2 }).notNull(),
-  features: jsonb('features'),
+  features: jsonb('features'), // PlanFeatures interface from shared/types.ts
+  suggestedDurationDays: integer('suggested_duration_days'), // For manual pre-fill
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const storeSubscription = pgTable('store_subscription', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  organizationId: text('organization_id').references(() => organization.id, { onDelete: 'cascade' }).notNull(),
-  planId: bigint('plan_id', { mode: 'number' }).references(() => fitstackPlan.id).notNull(),
-  status: text('status').notNull(), // active, past_due, canceled
+  organizationId: text('organization_id')
+    .references(() => organization.id, { onDelete: 'cascade' })
+    .notNull(),
+  planId: bigint('plan_id', { mode: 'number' })
+    .references(() => fitstackPlan.id)
+    .notNull(),
+  status: text('status').notNull(), // active, past_due, read_only, suspended, canceled
+  startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+  isTrial: boolean('is_trial').default(false).notNull(),
+  priceOverride: numeric('price_override', { precision: 10, scale: 2 }), // For commercial exceptions
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const platformInvoice = pgTable('platform_invoice', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  planId: bigint('plan_id', { mode: 'number' })
+    .references(() => fitstackPlan.id)
+    .notNull(),
+  
+  amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
+  currency: text('currency').notNull(),
+  paymentMethod: text('payment_method').notNull(),
+  status: text('status').notNull(), // paid, pending, trial, void
+  
+  dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ── GYM DOMAIN: LOCAL MEMBERS & STAFF ──
@@ -342,6 +371,13 @@ export const cmsClass = pgTable('cms_class', {
   daysOfWeek: integer('days_of_week').array(),
   capacity: integer('capacity'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const platformSetting = pgTable('platform_setting', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const gymSetting = pgTable('gym_setting', {

@@ -91,6 +91,7 @@ CREATE TABLE "fitstack_plan" (
 	"name" text NOT NULL,
 	"monthly_price" numeric(10, 2) NOT NULL,
 	"features" jsonb,
+	"suggested_duration_days" integer,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -148,7 +149,7 @@ CREATE TABLE "organization" (
 	"name" text NOT NULL,
 	"slug" text,
 	"logo" text,
-	"metadata" text,
+	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
@@ -170,6 +171,27 @@ CREATE TABLE "payment" (
 	"payment_method_details" jsonb,
 	"payment_date" timestamp with time zone DEFAULT now() NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "platform_invoice" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "platform_invoice_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"organization_id" text NOT NULL,
+	"plan_id" bigint NOT NULL,
+	"amount" numeric(10, 2) NOT NULL,
+	"currency" text NOT NULL,
+	"payment_method" text NOT NULL,
+	"status" text NOT NULL,
+	"due_date" timestamp with time zone NOT NULL,
+	"paid_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "platform_setting" (
+	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "platform_setting_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
+	"key" text NOT NULL,
+	"value" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "platform_setting_key_unique" UNIQUE("key")
 );
 --> statement-breakpoint
 CREATE TABLE "routine_template" (
@@ -221,7 +243,11 @@ CREATE TABLE "store_subscription" (
 	"organization_id" text NOT NULL,
 	"plan_id" bigint NOT NULL,
 	"status" text NOT NULL,
-	"current_period_end" timestamp with time zone NOT NULL
+	"start_date" timestamp with time zone DEFAULT now() NOT NULL,
+	"current_period_end" timestamp with time zone NOT NULL,
+	"is_trial" boolean DEFAULT false NOT NULL,
+	"price_override" numeric(10, 2),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "subscription" (
@@ -295,6 +321,8 @@ ALTER TABLE "membership_plan" ADD CONSTRAINT "membership_plan_organization_id_or
 ALTER TABLE "payment" ADD CONSTRAINT "payment_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_member_id_gym_member_id_fk" FOREIGN KEY ("member_id") REFERENCES "public"."gym_member"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "payment" ADD CONSTRAINT "payment_subscription_id_subscription_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."subscription"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "platform_invoice" ADD CONSTRAINT "platform_invoice_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "platform_invoice" ADD CONSTRAINT "platform_invoice_plan_id_fitstack_plan_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."fitstack_plan"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "routine_template" ADD CONSTRAINT "routine_template_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "routine_template" ADD CONSTRAINT "routine_template_trainer_profile_id_staff_profile_id_fk" FOREIGN KEY ("trainer_profile_id") REFERENCES "public"."staff_profile"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "routine_template_item" ADD CONSTRAINT "routine_template_item_routine_template_id_routine_template_id_fk" FOREIGN KEY ("routine_template_id") REFERENCES "public"."routine_template"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

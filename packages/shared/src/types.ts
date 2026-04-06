@@ -262,3 +262,54 @@ export interface CreateCoachDTO {
 }
 
 export type UpdateCoachDTO = Partial<CreateCoachDTO> & { isActive?: boolean };
+
+/* ── SAAS PLATFORM TYPES ── */
+
+export interface PlanFeatures {
+  limits?: {
+    members?: number;
+    coaches?: number;
+  };
+  access?: {
+    pwa?: boolean;
+    blog?: boolean;
+    web_commercial?: boolean;
+  };
+}
+
+export interface IPlatformPlan {
+  id: number;
+  name: string;
+  monthlyPrice: number;
+  features: PlanFeatures | null;
+  suggestedDurationDays?: number | null;
+  isActive: boolean;
+  createdAt?: string | Date;
+}
+
+export type PlatformSubscriptionStatus = 'active' | 'past_due' | 'read_only' | 'suspended' | 'canceled';
+
+export interface IPlatformSubscription {
+  id: number;
+  organizationId: string;
+  planId: number;
+  status: PlatformSubscriptionStatus;
+  startDate: string | Date;
+  endDate: string | Date;
+  isTrial: boolean;
+  priceOverride?: number | null;
+  createdAt?: string | Date;
+}
+
+export interface IPlatformInvoice {
+  id: number;
+  organizationId: string;
+  planId: number;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  status: 'paid' | 'pending' | 'trial' | 'void';
+  dueDate: string | Date;
+  paidAt?: string | Date | null;
+  createdAt?: string | Date;
+}
