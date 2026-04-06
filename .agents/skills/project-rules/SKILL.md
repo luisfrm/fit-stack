@@ -11,6 +11,7 @@ These rules are mandatory for all development tasks within the Fit-Stack reposit
 - **ORM**: Always use **Drizzle ORM** for database interactions.
 - **Source**: All database-related code, schemas, and clients MUST be imported from `@workspace/database` (located in `packages/database`).
 - **Pattern**: Do not define schemas or raw queries outside of the database package.
+- **Safety**: **NO database-affecting command (push, generate, migrate, seed, etc.) may be executed without explicit and prior approval from the USER for that specific command.**
 
 ## 2. UI Components
 - **Library**: All UI components (buttons, inputs, modals, etc.) MUST be imported from `@workspace/ui` (located in `packages/ui`).
