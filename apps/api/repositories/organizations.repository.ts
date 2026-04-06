@@ -1,5 +1,6 @@
 import { eq, ilike, and, or, count, desc, db } from '@workspace/database/client';
-import { organization } from '@workspace/database/schema';
+import { organization, storeSubscription, fitstackPlan, authMember } from '@workspace/database/schema';
+import { IPlatformOrganization } from '@workspace/shared/types';
 
 export type DbOrganization = typeof organization.$inferSelect;
 export type NewDbOrganization = typeof organization.$inferInsert;
@@ -8,10 +9,11 @@ export interface OrganizationFilter {
   query?: string;
   page?: number;
   limit?: number;
+  includeMemberCount?: boolean;
 }
 
 export interface PaginatedOrganizationsResult {
-  data: DbOrganization[];
+  data: IPlatformOrganization[];
   total: number;
   page: number;
   limit: number;
@@ -36,7 +38,8 @@ export const organizationsRepository = {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const rows = await db
+    // First, get paginated organizations
+    const orgs = await db
       .select()
       .from(organization)
       .where(whereClause)
@@ -44,15 +47,71 @@ export const organizationsRepository = {
       .limit(limit)
       .offset(offset);
 
+    // Get total count
     const countResult = await db
       .select({ total: count() })
       .from(organization)
       .where(whereClause);
-
+    
     const total = Number(countResult[0]?.total ?? 0);
 
+    // Enriched with latest subscription for each org
+    const enrichedData: IPlatformOrganization[] = await Promise.all(
+      orgs.map(async (org) => {
+        // 1. Subscription fetch
+        const [latestSub] = await db
+          .select({
+            id: storeSubscription.id,
+            organizationId: storeSubscription.organizationId,
+            planId: storeSubscription.planId,
+            status: storeSubscription.status,
+            startDate: storeSubscription.startDate,
+            endDate: storeSubscription.currentPeriodEnd,
+            isTrial: storeSubscription.isTrial,
+            priceOverride: storeSubscription.priceOverride,
+            createdAt: storeSubscription.createdAt,
+            planName: fitstackPlan.name,
+          })
+          .from(storeSubscription)
+          .leftJoin(fitstackPlan, eq(storeSubscription.planId, fitstackPlan.id))
+          .where(eq(storeSubscription.organizationId, org.id))
+          .orderBy(desc(storeSubscription.createdAt))
+          .limit(1);
+
+        // 2. Optional Member Count
+        let memberCountNum: number | undefined = undefined;
+        if (filters.includeMemberCount) {
+          const [mCount] = await db
+            .select({ total: count() })
+            .from(authMember)
+            .where(eq(authMember.organizationId, org.id));
+          memberCountNum = Number(mCount?.total || 0);
+        }
+
+        return {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+          logo: org.logo,
+          createdAt: org.createdAt,
+          updatedAt: org.updatedAt,
+          metadata: org.metadata as Record<string, any> | null,
+          memberCount: memberCountNum,
+          latestSubscription: latestSub ? {
+            ...latestSub,
+            startDate: latestSub.startDate.toISOString(),
+            endDate: latestSub.endDate.toISOString(),
+            createdAt: latestSub.createdAt.toISOString(),
+            status: latestSub.status as any,
+            priceOverride: latestSub.priceOverride ? Number(latestSub.priceOverride) : null,
+            planName: latestSub.planName || undefined,
+          } : null,
+        };
+      })
+    );
+
     return {
-      data: rows,
+      data: enrichedData,
       total,
       page,
       limit,

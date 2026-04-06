@@ -18,46 +18,46 @@ import { cn } from "@workspace/ui/lib/utils";
 const textVariants = cva(["leading-normal"], {
   variants: {
     size: {
-      xs:   "text-[10px]",
-      sm:   "text-xs",
+      xs: "text-[10px]",
+      sm: "text-xs",
       base: "text-sm",
-      md:   "text-base",
-      lg:   "text-lg",
+      md: "text-base",
+      lg: "text-lg",
     },
     variant: {
       default: "text-slate-100",
-      muted:   "text-slate-400",
-      subtle:  "text-slate-500",
+      muted: "text-slate-400",
+      subtle: "text-slate-500",
       primary: "text-primary",
       success: "text-emerald-400",
-      danger:  "text-rose-400",
+      danger: "text-rose-400",
     },
     weight: {
-      normal:   "font-normal",
-      medium:   "font-medium",
+      normal: "font-normal",
+      medium: "font-medium",
       semibold: "font-semibold",
-      bold:     "font-bold",
+      bold: "font-bold",
     },
     uppercase: {
-      true:  "uppercase tracking-wide",
+      true: "uppercase tracking-wide",
       false: "",
     },
     truncate: {
-      true:  "truncate",
+      true: "truncate",
       false: "",
     },
     italic: {
-      true:  "italic",
+      true: "italic",
       false: "",
     },
   },
   defaultVariants: {
-    size:      "base",
-    variant:   "default",
-    weight:    "normal",
+    size: "base",
+    variant: "default",
+    weight: "normal",
     uppercase: false,
-    truncate:  false,
-    italic:    false,
+    truncate: false,
+    italic: false,
   },
 });
 
@@ -69,7 +69,7 @@ type TextElement = "p" | "span" | "label" | "div" | "small";
 
 export interface TextProps
   extends Omit<React.HTMLAttributes<HTMLElement>, "color">,
-    VariantProps<typeof textVariants> {
+  VariantProps<typeof textVariants> {
   as?: TextElement;
   htmlFor?: string;
 }

@@ -126,6 +126,7 @@ export const fitstackPlan = pgTable('fitstack_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   name: text('name').notNull(),
   monthlyPrice: numeric('monthly_price', { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: numeric('yearly_price', { precision: 10, scale: 2 }),
   features: jsonb('features'), // PlanFeatures interface from shared/types.ts
   suggestedDurationDays: integer('suggested_duration_days'), // For manual pre-fill
   isActive: boolean('is_active').default(true).notNull(),
@@ -189,6 +190,11 @@ export const gymMember = pgTable('gym_member', {
   birthday: date('birthday'),
   imageUrl: text('image_url'),
   isActive: boolean('is_active').default(true).notNull(),
+
+  // Biometric / Access Control (Optional)
+  biometricId: text('biometric_id'), 
+  isBiometricEnrolled: boolean('is_biometric_enrolled').default(false).notNull(),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -275,6 +281,47 @@ export const payment = pgTable('payment', {
 
   paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ── ACCESS CONTROL: BIOMETRIC LOGS & SYNC ──
+
+/**
+ * Audit log of every access attempt (granted, denied, error).
+ */
+export const accessControlLog = pgTable('access_control_log', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'set null' }),
+  
+  documentId: text('document_id'), // Scanned ID from the device
+  status: text('status'), // 'granted', 'denied', 'error'
+  accessType: text('access_type'), // 'face', 'fingerprint', 'card'
+  
+  metadata: jsonb('metadata'), // Original payload or error from device
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Queue of tasks for the local "Bridge" App to sync members to devices.
+ */
+export const biometricSyncTask = pgTable('biometric_sync_task', {
+  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+  memberId: bigint('member_id', { mode: 'number' })
+    .references(() => gymMember.id, { onDelete: 'cascade' })
+    .notNull(),
+  
+  type: text('type').default('enroll').notNull(), // 'enroll', 'delete'
+  status: text('status').default('pending').notNull(), // 'pending', 'syncing', 'completed', 'error'
+  lastError: text('last_error'),
+  
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // ── FITNESS APP: ROUTINES & EXERCISES ──
@@ -447,4 +494,16 @@ export const gymMemberRelations = relations(gymMember, ({ one, many }) => ({
   staffProfile: one(staffProfile, { fields: [gymMember.id], references: [staffProfile.memberId] }),
   asCoachAssignments: many(coachAssignment, { relationName: 'coach_assignments_coach' }),
   asClientAssignments: many(coachAssignment, { relationName: 'coach_assignments_client' }),
+  accessLogs: many(accessControlLog),
+  syncTasks: many(biometricSyncTask),
+}));
+
+export const accessControlLogRelations = relations(accessControlLog, ({ one }) => ({
+  organization: one(organization, { fields: [accessControlLog.organizationId], references: [organization.id] }),
+  member: one(gymMember, { fields: [accessControlLog.memberId], references: [gymMember.id] }),
+}));
+
+export const biometricSyncTaskRelations = relations(biometricSyncTask, ({ one }) => ({
+  organization: one(organization, { fields: [biometricSyncTask.organizationId], references: [organization.id] }),
+  member: one(gymMember, { fields: [biometricSyncTask.memberId], references: [gymMember.id] }),
 }));

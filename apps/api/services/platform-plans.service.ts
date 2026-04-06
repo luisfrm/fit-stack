@@ -15,7 +15,9 @@ export const platformPlansService = {
 
   async createPlan(data: NewDbPlatformPlan) {
     if (!data.name) throw new Error('El nombre del plan es requerido');
-    if (!data.monthlyPrice) throw new Error('El precio mensual es requerido');
+    if (data.monthlyPrice === undefined || data.monthlyPrice === null) {
+      throw new Error('El precio mensual es requerido');
+    }
 
     // Validar estructura de features si existe
     if (data.features) {

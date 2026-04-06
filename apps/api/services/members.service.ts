@@ -1,4 +1,5 @@
 import { membersRepository, MembersFilter, NewDbMember } from '../repositories/members.repository';
+import { accessControlRepository } from '../repositories/access-control.repository';
 import { tokenService } from './token.service';
 import { emailService } from './email.service';
 
@@ -38,6 +39,11 @@ export const membersService = {
       await emailService.sendRegistrationInvite(newMember.email, token);
     }
 
+    // Trigger biometric sync task if member has a photo
+    if (newMember.imageUrl) {
+      await accessControlRepository.createSyncTask(organizationId, newMember.id, 'enroll');
+    }
+
     return newMember;
   },
 
@@ -53,11 +59,20 @@ export const membersService = {
 
     const updated = await membersRepository.update(organizationId, id, data);
 
+    // Trigger biometric sync task if critical fields changed
+    if (updated && (data.imageUrl || data.documentId || data.firstName || data.lastName)) {
+      await accessControlRepository.createSyncTask(organizationId, id, 'enroll');
+    }
+
     return updated;
   },
 
   async deleteMember(organizationId: string, id: number) {
-    await this.getMemberById(organizationId, id);
+    const member = await this.getMemberById(organizationId, id);
+    
+    // Trigger biometric sync task to remove from hardware
+    await accessControlRepository.createSyncTask(organizationId, id, 'delete');
+    
     await membersRepository.delete(organizationId, id);
   },
 

@@ -281,6 +281,7 @@ export interface IPlatformPlan {
   id: number;
   name: string;
   monthlyPrice: number;
+  yearlyPrice: number | null;
   features: PlanFeatures | null;
   suggestedDurationDays?: number | null;
   isActive: boolean;
@@ -312,4 +313,19 @@ export interface IPlatformInvoice {
   dueDate: string | Date;
   paidAt?: string | Date | null;
   createdAt?: string | Date;
+}
+
+export interface IOrganization {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo: string | null;
+  metadata?: Record<string, any> | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}
+
+export interface IPlatformOrganization extends IOrganization {
+  latestSubscription?: (IPlatformSubscription & { planName?: string }) | null;
+  memberCount?: number;
 }
