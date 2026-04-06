@@ -25,18 +25,20 @@ export default async function DashboardLayout({
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
       <AppSidebar
         user={{
-          name: user?.name || "Usuario",
+          name: user?.name,
           role: userRole,
-          avatarUrl: user?.image || undefined
+          avatarUrl: user?.image || undefined,
         }}
+        activeOrganizationId={session.session?.activeOrganizationId}
       />
 
       <MobileNav
         user={{
           name: user?.name || "Usuario",
           role: userRole,
-          avatarUrl: user?.image || undefined
+          avatarUrl: user?.image || undefined,
         }}
+        activeOrganizationId={session.session?.activeOrganizationId}
       />
 
       <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">

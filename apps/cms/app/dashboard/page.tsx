@@ -2,13 +2,22 @@
 
 import * as React from "react";
 import { useSession } from "@/lib/auth-client";
+import { useSearchParams } from "next/navigation";
 import { ISession, ROLES } from "@workspace/shared/types";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { SaaSAdminDashboard } from "@/components/dashboard/saas-admin-dashboard";
+import { toast } from "@workspace/ui/components";
 
 export default function DashboardPage() {
   const { data: sessionData, isPending } = useSession();
-  const session = sessionData as unknown as ISession | null;
+  const searchParams = useSearchParams();
+  const { user, session: currentSession } = (sessionData as unknown as ISession) || {};
+
+  React.useEffect(() => {
+    if (searchParams.get("status") === "unauthorized") {
+      toast.error("No tienes permisos para acceder a este módulo");
+    }
+  }, [searchParams]);
 
   if (isPending) {
     return (
@@ -19,8 +28,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Si el usuario es 'admin' (Master Admin), mostramos el dashboard del SaaS
-  if (session?.user?.role === ROLES.ADMIN) {
+  // Si el usuario es 'admin' (Master Admin) Y NO tiene una organización activa, mostramos el dashboard del SaaS
+  if (user?.role === ROLES.ADMIN && !currentSession?.activeOrganizationId) {
     return <SaaSAdminDashboard />;
   }
 
