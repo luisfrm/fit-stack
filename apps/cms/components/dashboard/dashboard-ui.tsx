@@ -31,7 +31,7 @@ import {
   type IRecentRegistration
 } from "@/types/dashboard";
 import { formatTimeRange } from "@/lib/config/display";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import {
   AppSidebar as UISidebar,
@@ -87,7 +87,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
       user={user}
       navigation={navigation}
       branding={{
-        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
+        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? uploadService.getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
         title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
         subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
         isLoading: isLoading,
@@ -109,7 +109,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
       user={user}
       navigation={navigation}
       branding={{
-        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
+        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? uploadService.getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
         title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
         subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
         isLoading: isLoading,
@@ -255,7 +255,7 @@ export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemPro
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
       <Avatar size="default">
-        {avatarUrl && <AvatarImage src={getMediaUrl(avatarUrl)} alt={name} />}
+        {avatarUrl && <AvatarImage src={uploadService.getMediaUrl(avatarUrl)} alt={name} />}
         <AvatarFallback>{name.charAt(0)}</AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">

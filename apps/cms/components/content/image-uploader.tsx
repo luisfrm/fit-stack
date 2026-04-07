@@ -4,7 +4,7 @@ import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Text, Button, toast } from "@workspace/ui/components";
 import { cmsContentService } from "@/lib/services/cms-content-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import axios from "axios";
 
 interface ImageUploaderProps {
@@ -20,7 +20,7 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const imageUrl = value ? getMediaUrl(value) : null; 
+  const imageUrl = value ? uploadService.getMediaUrl(value) : null; 
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

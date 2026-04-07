@@ -3,7 +3,7 @@
 import * as React from "react";
 import { type ICoach } from "@/types/dashboard";
 import { NoData } from "../dashboard/dashboard-ui";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
 import { Table, type ColumnDef } from "@workspace/ui/components";
@@ -28,7 +28,7 @@ const getColumns = (
     cell: (coach) => (
       <div className="flex items-center gap-3">
         <Avatar size="default">
-          {coach.imageUrl && <AvatarImage src={getMediaUrl(coach.imageUrl)} alt={`${coach.firstName} ${coach.lastName}`} />}
+          {coach.imageUrl && <AvatarImage src={uploadService.getMediaUrl(coach.imageUrl)} alt={`${coach.firstName} ${coach.lastName}`} />}
           <AvatarFallback>{coach.firstName.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col min-w-0">

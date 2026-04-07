@@ -11,7 +11,7 @@ import {
 import { type ICoach } from "@/types/dashboard";
 import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
 import { coachesService } from "@/lib/services/coaches-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Label } from "@workspace/ui/components/label";
 import { ROLES } from "@workspace/shared/constants";
@@ -47,7 +47,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string>(
-    initialData?.imageUrl ? getMediaUrl(initialData.imageUrl) : ""
+    initialData?.imageUrl ? uploadService.getMediaUrl(initialData.imageUrl) : ""
   );
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);

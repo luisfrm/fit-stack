@@ -66,6 +66,8 @@ export type { CoachCardProps } from "@workspace/ui/components/coach-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
 export type { PlanCardProps } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
+export { CountrySelector } from "@workspace/ui/components/country-selector";
+export type { CountryListItem } from "@workspace/ui/components/country-selector";
 export { Separator } from "@workspace/ui/components/separator";
 export { Textarea } from "@workspace/ui/components/textarea";
 export type { TextareaProps } from "@workspace/ui/components/textarea";
