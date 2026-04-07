@@ -1,36 +1,36 @@
 import { classesRepository, type NewCmsClass, type ClassesFilter } from '@/repositories/classes.repository'
 
 export const classesService = {
-  async getAll(filters: ClassesFilter = {}) {
-    return classesRepository.findAll(filters)
+  async getAll(organizationId: string, filters: ClassesFilter = {}) {
+    return classesRepository.findAll(organizationId, filters)
   },
 
-  async getByDate(date: string) {
-    return classesRepository.findByDate(date)
+  async getByDate(organizationId: string, date: string) {
+    return classesRepository.findByDate(organizationId, date)
   },
 
-  async getById(id: number) {
-    const cls = await classesRepository.findById(id)
+  async getById(organizationId: string, id: number) {
+    const cls = await classesRepository.findById(organizationId, id)
     if (!cls) throw new Error('Class not found')
     return cls
   },
 
-  async create(data: NewCmsClass) {
+  async create(organizationId: string, data: Omit<NewCmsClass, 'organizationId'>) {
     if (!data.name || !data.startTime) {
       throw new Error('Name and startTime are required')
     }
-    return classesRepository.create(data)
+    return classesRepository.create(organizationId, data)
   },
 
-  async update(id: number, data: Partial<NewCmsClass>) {
-    const existing = await classesRepository.findById(id)
+  async update(organizationId: string, id: number, data: Partial<Omit<NewCmsClass, 'organizationId'>>) {
+    const existing = await classesRepository.findById(organizationId, id)
     if (!existing) throw new Error('Class not found')
-    return classesRepository.update(id, data)
+    return classesRepository.update(organizationId, id, data)
   },
 
-  async delete(id: number) {
-    const existing = await classesRepository.findById(id)
+  async delete(organizationId: string, id: number) {
+    const existing = await classesRepository.findById(organizationId, id)
     if (!existing) throw new Error('Class not found')
-    return classesRepository.delete(id)
+    return classesRepository.delete(organizationId, id)
   }
 }

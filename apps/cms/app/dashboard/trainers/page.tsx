@@ -124,7 +124,7 @@ export default function TrainersPage() {
             key={coach.id}
             firstName={coach.firstName}
             lastName={coach.lastName}
-            role={coach.role?.name}
+            role={coach.role}
             specialities={coach.specialities}
             imageUrl={coach.imageUrl ? uploadService.getMediaUrl(coach.imageUrl) : null}
             isVisible={coach.isVisible}

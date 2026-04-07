@@ -1,5 +1,5 @@
 import { db, eq, sql, getTableColumns, sum, gte, and } from '@workspace/database/client'
-import { membershipPlans, subscriptions, payments } from '@workspace/database/schema'
+import { membershipPlan, subscription, payment } from '@workspace/database/schema'
 
 export interface IMembershipPlan {
   id?: number
@@ -16,7 +16,7 @@ export interface IMembershipPlan {
 }
 
 export interface IMembershipsSummary {
-  totalActiveSubscriptions: number
+  totalActivesubscription: number
   monthlyRevenue: Record<string, number>
 }
 
@@ -25,23 +25,23 @@ export const plansRepository = {
     if (filters?.includeStats) {
       const records = await db
         .select({
-          ...getTableColumns(membershipPlans),
-          activeMembersCount: sql<number>`count(${subscriptions.id})`.mapWith(Number)
+          ...getTableColumns(membershipPlan),
+          activeMembersCount: sql<number>`count(${subscription.id})`.mapWith(Number)
         })
-        .from(membershipPlans)
-        .leftJoin(subscriptions, and(
-          eq(membershipPlans.id, subscriptions.planId),
-          gte(subscriptions.endDate, now)
+        .from(membershipPlan)
+        .leftJoin(subscription, and(
+          eq(membershipPlan.id, subscription.planId),
+          gte(subscription.endDate, now)
         ))
-        .where(eq(membershipPlans.organizationId, organizationId))
-        .groupBy(membershipPlans.id)
-        .orderBy(membershipPlans.id)
+        .where(eq(membershipPlan.organizationId, organizationId))
+        .groupBy(membershipPlan.id)
+        .orderBy(membershipPlan.id)
       return records as unknown as IMembershipPlan[]
     }
 
-    const records = await db.select().from(membershipPlans)
-      .where(eq(membershipPlans.organizationId, organizationId))
-      .orderBy(membershipPlans.id)
+    const records = await db.select().from(membershipPlan)
+      .where(eq(membershipPlan.organizationId, organizationId))
+      .orderBy(membershipPlan.id)
     return records as unknown as IMembershipPlan[]
   },
 
@@ -51,15 +51,15 @@ export const plansRepository = {
     // 1. Monthly Revenue (Reusing logic from dashboard)
     const incomeResults = await db
       .select({ 
-        currency: payments.currencyPaid, 
-        total: sum(payments.amountPaid) 
+        currency: payment.currencyPaid, 
+        total: sum(payment.amountPaid) 
       })
-      .from(payments)
+      .from(payment)
       .where(and(
-        eq(payments.organizationId, organizationId), 
-        gte(payments.paymentDate, firstDayOfMonth)
+        eq(payment.organizationId, organizationId), 
+        gte(payment.paymentDate, firstDayOfMonth)
       ))
-      .groupBy(payments.currencyPaid)
+      .groupBy(payment.currencyPaid)
 
     const monthlyRevenue: Record<string, number> = {
       USD: 0,
@@ -72,29 +72,29 @@ export const plansRepository = {
       }
     })
 
-    // 2. Total Active Subscriptions (Using same 'active' logic as dashboard)
+    // 2. Total Active subscription (Using same 'active' logic as dashboard)
     const activeSubsResult = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
-      .from(subscriptions)
+      .from(subscription)
       .where(and(
-        eq(subscriptions.organizationId, organizationId), 
-        gte(subscriptions.endDate, now)
+        eq(subscription.organizationId, organizationId), 
+        gte(subscription.endDate, now)
       ))
 
     return {
-      totalActiveSubscriptions: activeSubsResult[0]?.count ?? 0,
+      totalActivesubscription: activeSubsResult[0]?.count ?? 0,
       monthlyRevenue
     }
   },
 
   async findById(organizationId: string, id: number): Promise<IMembershipPlan | undefined> {
-    const records = await db.select().from(membershipPlans)
-      .where(and(eq(membershipPlans.id, id), eq(membershipPlans.organizationId, organizationId)))
+    const records = await db.select().from(membershipPlan)
+      .where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)))
     return records[0] as unknown as IMembershipPlan | undefined
   },
 
   async create(organizationId: string, data: Omit<IMembershipPlan, 'id' | 'organizationId'>): Promise<IMembershipPlan> {
-    const inserted = await db.insert(membershipPlans).values({
+    const inserted = await db.insert(membershipPlan).values({
       organizationId,
       name: data.name,
       price: data.price.toString(),
@@ -109,7 +109,7 @@ export const plansRepository = {
 
   async update(organizationId: string, id: number, data: Partial<IMembershipPlan>): Promise<IMembershipPlan> {
     const updated = await db
-      .update(membershipPlans)
+      .update(membershipPlan)
       .set({
         name: data.name,
         price: data.price?.toString(),
@@ -119,12 +119,12 @@ export const plansRepository = {
         isActive: data.isActive,
         isVisibleOnSite: data.isVisibleOnSite,
       })
-      .where(and(eq(membershipPlans.id, id), eq(membershipPlans.organizationId, organizationId)))
+      .where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)))
       .returning()
     return updated[0] as unknown as IMembershipPlan
   },
 
   async delete(organizationId: string, id: number): Promise<void> {
-    await db.delete(membershipPlans).where(and(eq(membershipPlans.id, id), eq(membershipPlans.organizationId, organizationId)))
+    await db.delete(membershipPlan).where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)))
   }
 }

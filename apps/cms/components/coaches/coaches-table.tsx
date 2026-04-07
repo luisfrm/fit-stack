@@ -36,7 +36,7 @@ const getColumns = (
             {coach.firstName} {coach.lastName}
           </Text>
           <Text as="span" size="xs" variant="subtle" truncate>
-            {coach.role?.name || "Sin rol"}
+            {coach.role || "Sin rol"}
           </Text>
         </div>
       </div>

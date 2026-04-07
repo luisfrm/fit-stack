@@ -1,9 +1,9 @@
 import { eq, ilike, and, or, sql, db, count, asc } from '@workspace/database/client';
-import { cmsClasses } from '@workspace/database/schema';
+import { cmsClass } from '@workspace/database/schema';
 
 // Types inferred from schema
-export type CmsClass = typeof cmsClasses.$inferSelect;
-export type NewCmsClass = typeof cmsClasses.$inferInsert;
+export type CmsClass = typeof cmsClass.$inferSelect;
+export type NewCmsClass = typeof cmsClass.$inferInsert;
 
 export interface ClassesFilter {
   name?: string;
@@ -27,18 +27,18 @@ export const classesRepository = {
   /**
    * Returns all classes with optional filters and pagination (CMS listing).
    */
-  async findAll(filters: ClassesFilter = {}): Promise<PaginatedClasses> {
+  async findAll(organizationId: string, filters: ClassesFilter = {}): Promise<PaginatedClasses> {
     const { name, trainerName, isVisible, page = 1, limit = 10, requireTotal = false } = filters;
     const offset = (page - 1) * limit;
 
-    const conditions = [];
-    if (name) conditions.push(ilike(cmsClasses.name, `%${name}%`));
-    if (trainerName) conditions.push(ilike(cmsClasses.trainerName, `%${trainerName}%`));
-    if (isVisible !== undefined) conditions.push(eq(cmsClasses.isVisible, isVisible));
+    const conditions = [eq(cmsClass.organizationId, organizationId)];
+    if (name) conditions.push(ilike(cmsClass.name, `%${name}%`));
+    if (trainerName) conditions.push(ilike(cmsClass.trainerName, `%${trainerName}%`));
+    if (isVisible !== undefined) conditions.push(eq(cmsClass.isVisible, isVisible));
 
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const where = and(...conditions);
 
-    const rowsQuery = db.select().from(cmsClasses).where(where).orderBy(cmsClasses.id).limit(limit).offset(offset);
+    const rowsQuery = db.select().from(cmsClass).where(where).orderBy(cmsClass.id).limit(limit).offset(offset);
 
     if (!requireTotal) {
       const rows = await rowsQuery;
@@ -47,7 +47,7 @@ export const classesRepository = {
 
     const [rows, countResult] = await Promise.all([
       rowsQuery,
-      db.select({ total: count() }).from(cmsClasses).where(where),
+      db.select({ total: count() }).from(cmsClass).where(where),
     ]);
 
     const total = Number(countResult[0]?.total ?? 0);
@@ -63,13 +63,8 @@ export const classesRepository = {
 
   /**
    * Returns classes scheduled for a specific date.
-   * Includes:
-   *  - 'once' classes whose scheduledDate matches the date
-   *  - 'weekly' classes whose daysOfWeek includes the day of week of the date
-   *
-   * Day of week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
    */
-  async findByDate(date: string): Promise<CmsClass[]> {
+  async findByDate(organizationId: string, date: string): Promise<CmsClass[]> {
     // Parse "YYYY-MM-DD" safely to avoid timezone shifts
     const [year, month, day] = date.split('-').map(Number);
     const dateObj = new Date(year!, month! - 1, day!);
@@ -77,47 +72,48 @@ export const classesRepository = {
 
     return db
       .select()
-      .from(cmsClasses)
+      .from(cmsClass)
       .where(
         and(
-          eq(cmsClasses.isVisible, true),
+          eq(cmsClass.organizationId, organizationId),
+          eq(cmsClass.isVisible, true),
           or(
             // Clase puntual: fecha exacta
             and(
-              eq(cmsClasses.frequencyType, 'once'),
-              eq(cmsClasses.scheduledDate, date)
+              eq(cmsClass.frequencyType, 'once'),
+              eq(cmsClass.scheduledDate, date)
             ),
             // Clase semanal: el día de semana está en el array daysOfWeek
             and(
-              eq(cmsClasses.frequencyType, 'weekly'),
-              sql`${dayOfWeek} = ANY(${cmsClasses.daysOfWeek})`
+              eq(cmsClass.frequencyType, 'weekly'),
+              sql`${dayOfWeek} = ANY(${cmsClass.daysOfWeek})`
             )
           )
         )
       )
-      .orderBy(asc(cmsClasses.startTime));
+      .orderBy(asc(cmsClass.startTime));
   },
 
-  async findById(id: number) {
-    const [result] = await db.select().from(cmsClasses).where(eq(cmsClasses.id, id));
+  async findById(organizationId: string, id: number) {
+    const [result] = await db.select().from(cmsClass).where(and(eq(cmsClass.id, id), eq(cmsClass.organizationId, organizationId)));
     return result;
   },
 
-  async create(data: NewCmsClass) {
-    const [newClass] = await db.insert(cmsClasses).values(data).returning();
+  async create(organizationId: string, data: Omit<NewCmsClass, 'organizationId'>) {
+    const [newClass] = await db.insert(cmsClass).values({ ...data, organizationId }).returning();
     return newClass;
   },
 
-  async update(id: number, data: Partial<NewCmsClass>) {
+  async update(organizationId: string, id: number, data: Partial<Omit<NewCmsClass, 'organizationId'>>) {
     const [updatedClass] = await db
-      .update(cmsClasses)
+      .update(cmsClass)
       .set(data)
-      .where(eq(cmsClasses.id, id))
+      .where(and(eq(cmsClass.id, id), eq(cmsClass.organizationId, organizationId)))
       .returning();
     return updatedClass;
   },
 
-  async delete(id: number) {
-    await db.delete(cmsClasses).where(eq(cmsClasses.id, id));
+  async delete(organizationId: string, id: number) {
+    await db.delete(cmsClass).where(and(eq(cmsClass.id, id), eq(cmsClass.organizationId, organizationId)));
   }
 };

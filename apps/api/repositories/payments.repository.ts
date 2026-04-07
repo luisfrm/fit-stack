@@ -1,5 +1,5 @@
 import { db, eq, and } from '@workspace/database/client'
-import { payments } from '@workspace/database/schema'
+import { payment } from '@workspace/database/schema'
 
 export interface IPayment {
   id?: number
@@ -27,7 +27,7 @@ export interface IPayment {
 
 export const paymentsRepository = {
   async create(organizationId: string, data: Omit<IPayment, 'id' | 'createdAt' | 'organizationId'>): Promise<IPayment> {
-    const inserted = await db.insert(payments).values({
+    const inserted = await db.insert(payment).values({
       organizationId,
       memberId: data.memberId,
       subscriptionId: data.subscriptionId,
@@ -46,17 +46,17 @@ export const paymentsRepository = {
   },
 
   async findBySubscriptionId(organizationId: string, subscriptionId: number): Promise<IPayment | undefined> {
-    const records = await db.select().from(payments).where(and(
-      eq(payments.subscriptionId, subscriptionId),
-      eq(payments.organizationId, organizationId)
+    const records = await db.select().from(payment).where(and(
+      eq(payment.subscriptionId, subscriptionId),
+      eq(payment.organizationId, organizationId)
     ))
     return records[0] as unknown as IPayment | undefined
   },
 
   async findByMemberId(organizationId: string, memberId: number): Promise<IPayment[]> {
-    const records = await db.select().from(payments).where(and(
-      eq(payments.memberId, memberId),
-      eq(payments.organizationId, organizationId)
+    const records = await db.select().from(payment).where(and(
+      eq(payment.memberId, memberId),
+      eq(payment.organizationId, organizationId)
     ))
     return records as unknown as IPayment[]
   }

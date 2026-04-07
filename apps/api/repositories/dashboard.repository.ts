@@ -1,5 +1,5 @@
 import { db, sql, and, eq, or, gte, count, sum } from '@workspace/database/client';
-import { subscriptions, payments, cmsClasses } from '@workspace/database/schema';
+import { subscription, payment, cmsClass } from '@workspace/database/schema';
 
 export interface DashboardStats {
   activeMembers: number;
@@ -9,7 +9,7 @@ export interface DashboardStats {
 }
 
 export const dashboardRepository = {
-  async getStats(today: string, now: Date = new Date()): Promise<DashboardStats> {
+  async getStats(organizationId: string, today: string, now: Date = new Date()): Promise<DashboardStats> {
     const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(now.getDate() + 7);
 
@@ -17,12 +17,15 @@ export const dashboardRepository = {
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const incomeResults = await db
       .select({ 
-        currency: payments.currencyPaid, 
-        total: sum(payments.amountPaid) 
+        currency: payment.currencyPaid, 
+        total: sum(payment.amountPaid) 
       })
-      .from(payments)
-      .where(gte(payments.paymentDate, firstDayOfMonth))
-      .groupBy(payments.currencyPaid);
+      .from(payment)
+      .where(and(
+        eq(payment.organizationId, organizationId),
+        gte(payment.paymentDate, firstDayOfMonth)
+      ))
+      .groupBy(payment.currencyPaid);
 
     const monthlyIncome: Record<string, number> = {};
     incomeResults.forEach(row => {
@@ -33,21 +36,27 @@ export const dashboardRepository = {
 
     // 2. Active Members (Unique members with at least one active, non-expired subscription)
     const activeMembersResult = await db
-      .select({ count: count(sql`DISTINCT ${subscriptions.memberId}`) })
-      .from(subscriptions)
-      .where(gte(subscriptions.endDate, now));
+      .select({ count: count(sql`DISTINCT ${subscription.memberId}`) })
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        gte(subscription.endDate, now)
+      ));
     const activeMembers = Number(activeMembersResult[0]?.count ?? 0);
 
     // 3. Memberships Expiring (Unique members whose LATEST active subscription expires in < 7 days)
     // We use a subquery to find the max(end_date) per member
     const latestSubs = db
       .select({
-        memberId: subscriptions.memberId,
-        maxEndDate: sql<Date>`max(${subscriptions.endDate})`.as('max_end_date'),
+        memberId: subscription.memberId,
+        maxEndDate: sql<Date>`max(${subscription.endDate})`.as('max_end_date'),
       })
-      .from(subscriptions)
-      .where(gte(subscriptions.endDate, now))
-      .groupBy(subscriptions.memberId)
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        gte(subscription.endDate, now)
+      ))
+      .groupBy(subscription.memberId)
       .as('latest_subs');
 
     const expiringSoonResult = await db
@@ -65,18 +74,19 @@ export const dashboardRepository = {
 
     const classesTodayResult = await db
       .select({ count: count() })
-      .from(cmsClasses)
+      .from(cmsClass)
       .where(
         and(
-          eq(cmsClasses.isVisible, true),
+          eq(cmsClass.organizationId, organizationId),
+          eq(cmsClass.isVisible, true),
           or(
             and(
-              eq(cmsClasses.frequencyType, 'once'),
-              eq(cmsClasses.scheduledDate, today)
+              eq(cmsClass.frequencyType, 'once'),
+              eq(cmsClass.scheduledDate, today)
             ),
             and(
-              eq(cmsClasses.frequencyType, 'weekly'),
-              sql`${dayOfWeek} = ANY(${cmsClasses.daysOfWeek})`
+              eq(cmsClass.frequencyType, 'weekly'),
+              sql`${dayOfWeek} = ANY(${cmsClass.daysOfWeek})`
             )
           )
         )

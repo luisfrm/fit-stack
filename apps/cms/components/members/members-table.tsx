@@ -4,6 +4,7 @@ import * as React from "react";
 import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
+import { ROLES } from "@workspace/shared/constants";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
@@ -68,8 +69,8 @@ const getColumns = (
     {
       header: "Rol",
       cell: (m) => (
-        <Badge variant={m.roleId === 1 ? "default" : "secondary"}>
-          {m.role?.name || "Sin rol"}
+        <Badge variant={m.role === ROLES.ADMIN ? "default" : "secondary"}>
+          {m.role || "Sin rol"}
         </Badge>
       )
     },

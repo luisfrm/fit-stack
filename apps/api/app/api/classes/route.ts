@@ -4,7 +4,6 @@ import { getSession } from '@/config/get-session'
 
 /**
  * Validates the body of a POST/PUT class request.
- * Returns an array of error messages, empty if valid.
  */
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -69,20 +68,19 @@ function validateClassBody(body: Record<string, unknown>): string[] {
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const organizationId = session?.session?.activeOrganizationId;
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const { searchParams } = req.nextUrl
     const date = searchParams.get('date')
 
-    // Mode A: filter by date
     if (date) {
-      const classes = await classesService.getByDate(date)
+      const classes = await classesService.getByDate(organizationId, date)
       return NextResponse.json(classes)
     }
 
-    // Mode B: paginated CMS listing
     const filters = {
       name: searchParams.get('name') ?? undefined,
       trainerName: searchParams.get('trainerName') ?? undefined,
@@ -94,7 +92,7 @@ export async function GET(req: NextRequest) {
       requireTotal: true, // needed for CMS pagination UI
     }
 
-    const result = await classesService.getAll(filters)
+    const result = await classesService.getAll(organizationId, filters)
     return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -108,8 +106,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const organizationId = session?.session?.activeOrganizationId;
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
     const body = await req.json()
@@ -118,7 +117,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 })
     }
 
-    const newClass = await classesService.create(body)
+    const newClass = await classesService.create(organizationId, body)
     return NextResponse.json(newClass, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })

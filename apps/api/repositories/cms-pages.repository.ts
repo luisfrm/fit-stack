@@ -1,5 +1,5 @@
 import { db, eq, and } from '@workspace/database/client'
-import { cmsPages } from '@workspace/database/schema'
+import { cmsPage } from '@workspace/database/schema'
 
 export interface ICmsPage {
   id: number
@@ -14,30 +14,30 @@ export interface ICmsPage {
 
 export const cmsPagesRepository = {
   async findAll(organizationId: string): Promise<ICmsPage[]> {
-    const records = await db.select().from(cmsPages)
-      .where(eq(cmsPages.organizationId, organizationId))
-      .orderBy(cmsPages.id)
+    const records = await db.select().from(cmsPage)
+      .where(eq(cmsPage.organizationId, organizationId))
+      .orderBy(cmsPage.id)
     return records as unknown as ICmsPage[]
   },
 
   async findById(organizationId: string, id: number): Promise<ICmsPage | undefined> {
-    const records = await db.select().from(cmsPages).where(and(
-      eq(cmsPages.id, id),
-      eq(cmsPages.organizationId, organizationId)
+    const records = await db.select().from(cmsPage).where(and(
+      eq(cmsPage.id, id),
+      eq(cmsPage.organizationId, organizationId)
     ))
     return records[0] as unknown as ICmsPage | undefined
   },
 
   async findBySlug(organizationId: string, slug: string): Promise<ICmsPage | undefined> {
-    const records = await db.select().from(cmsPages).where(and(
-      eq(cmsPages.slug, slug),
-      eq(cmsPages.organizationId, organizationId)
+    const records = await db.select().from(cmsPage).where(and(
+      eq(cmsPage.slug, slug),
+      eq(cmsPage.organizationId, organizationId)
     ))
     return records[0] as unknown as ICmsPage | undefined
   },
 
   async create(organizationId: string, data: Omit<ICmsPage, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>): Promise<ICmsPage> {
-    const inserted = await db.insert(cmsPages).values({
+    const inserted = await db.insert(cmsPage).values({
       organizationId,
       slug: data.slug,
       title: data.title,
@@ -49,17 +49,17 @@ export const cmsPagesRepository = {
 
   async update(organizationId: string, id: number, data: Partial<ICmsPage>): Promise<ICmsPage> {
     const updated = await db
-      .update(cmsPages)
+      .update(cmsPage)
       .set({
         ...data,
         updatedAt: new Date(),
       })
-      .where(and(eq(cmsPages.id, id), eq(cmsPages.organizationId, organizationId)))
+      .where(and(eq(cmsPage.id, id), eq(cmsPage.organizationId, organizationId)))
       .returning()
     return updated[0] as unknown as ICmsPage
   },
 
   async delete(organizationId: string, id: number): Promise<void> {
-    await db.delete(cmsPages).where(and(eq(cmsPages.id, id), eq(cmsPages.organizationId, organizationId)))
+    await db.delete(cmsPage).where(and(eq(cmsPage.id, id), eq(cmsPage.organizationId, organizationId)))
   }
 }

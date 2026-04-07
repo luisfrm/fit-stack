@@ -1,15 +1,15 @@
 import { eq, ilike, and, or, count, desc, db, isNull, ne } from '@workspace/database/client';
-import { gymMembers, authMember, user } from '@workspace/database/schema';
+import { gymMember, authMember, user } from '@workspace/database/schema';
 
-export type DbMember = typeof gymMembers.$inferSelect;
-export type NewDbMember = typeof gymMembers.$inferInsert;
+export type DbMember = typeof gymMember.$inferSelect;
+export type NewDbMember = typeof gymMember.$inferInsert;
 
 export type MemberWithRelations = DbMember & {
   user?: {
     id: string;
     email: string;
   } | null;
-  authRole?: string | null;
+  role?: string | null;
 };
 
 export interface MembersFilter {
@@ -36,21 +36,21 @@ export const membersRepository = {
     const { organizationId, query, role, excludeRole, isActive, page = 1, limit = 10 } = filters;
     const offset = (page - 1) * limit;
 
-    const conditions = [eq(gymMembers.organizationId, organizationId)];
+    const conditions = [eq(gymMember.organizationId, organizationId)];
 
     if (query) {
       conditions.push(
         or(
-          ilike(gymMembers.firstName, `%${query}%`),
-          ilike(gymMembers.lastName, `%${query}%`),
-          ilike(gymMembers.email, `%${query}%`),
-          ilike(gymMembers.documentId, `%${query}%`)
+          ilike(gymMember.firstName, `%${query}%`),
+          ilike(gymMember.lastName, `%${query}%`),
+          ilike(gymMember.email, `%${query}%`),
+          ilike(gymMember.documentId, `%${query}%`)
         )!
       );
     }
 
     if (isActive !== undefined) {
-      conditions.push(eq(gymMembers.isActive, isActive));
+      conditions.push(eq(gymMember.isActive, isActive));
     }
 
     if (role) {
@@ -65,29 +65,29 @@ export const membersRepository = {
 
     const rows = await db
       .select({
-        member: gymMembers,
-        authRole: authMember.role,
+        member: gymMember,
+        role: authMember.role,
         user: {
           id: user.id,
           email: user.email,
         }
       })
-      .from(gymMembers)
+      .from(gymMember)
       .leftJoin(authMember, and(
-        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.userId, gymMember.userId),
         eq(authMember.organizationId, organizationId)
       ))
-      .leftJoin(user, eq(user.id, gymMembers.userId))
+      .leftJoin(user, eq(user.id, gymMember.userId))
       .where(whereClause)
-      .orderBy(desc(gymMembers.createdAt))
+      .orderBy(desc(gymMember.createdAt))
       .limit(limit)
       .offset(offset);
 
     const countResult = await db
       .select({ total: count() })
-      .from(gymMembers)
+      .from(gymMember)
       .leftJoin(authMember, and(
-        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.userId, gymMember.userId),
         eq(authMember.organizationId, organizationId)
       ))
       .where(whereClause);
@@ -95,7 +95,7 @@ export const membersRepository = {
     const total = Number(countResult[0]?.total ?? 0);
 
     return {
-      data: rows.map(r => ({ ...r.member, authRole: r.authRole, user: r.user })),
+      data: rows.map(r => ({ ...r.member, role: r.role, user: r.user })),
       total,
       page,
       limit,
@@ -106,55 +106,55 @@ export const membersRepository = {
   async findById(organizationId: string, id: number): Promise<MemberWithRelations | undefined> {
     const result = await db
       .select({
-        member: gymMembers,
-        authRole: authMember.role,
+        member: gymMember,
+        role: authMember.role,
         user: {
           id: user.id,
           email: user.email,
         }
       })
-      .from(gymMembers)
+      .from(gymMember)
       .leftJoin(authMember, and(
-        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.userId, gymMember.userId),
         eq(authMember.organizationId, organizationId)
       ))
-      .leftJoin(user, eq(user.id, gymMembers.userId))
-      .where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)))
+      .leftJoin(user, eq(user.id, gymMember.userId))
+      .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)))
       .limit(1);
 
     if (result.length === 0 || !result[0]) return undefined;
-    return { ...result[0].member, authRole: result[0].authRole, user: result[0].user };
+    return { ...result[0].member, role: result[0].role, user: result[0].user };
   },
 
   async findByEmail(organizationId: string, email: string) {
-    return db.query.gymMembers.findFirst({
-      where: and(eq(gymMembers.email, email), eq(gymMembers.organizationId, organizationId)),
+    return db.query.gymMember.findFirst({
+      where: and(eq(gymMember.email, email), eq(gymMember.organizationId, organizationId)),
     });
   },
 
   async create(data: NewDbMember) {
-    const [newMember] = await db.insert(gymMembers).values(data).returning();
+    const [newMember] = await db.insert(gymMember).values(data).returning();
     return newMember;
   },
 
   async update(organizationId: string, id: number, data: Partial<NewDbMember>) {
     const [updatedMember] = await db
-      .update(gymMembers)
+      .update(gymMember)
       .set(data)
-      .where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)))
+      .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)))
       .returning();
     return updatedMember;
   },
 
   async delete(organizationId: string, id: number) {
-    await db.delete(gymMembers).where(and(eq(gymMembers.id, id), eq(gymMembers.organizationId, organizationId)));
+    await db.delete(gymMember).where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
   },
 
   async countActive(organizationId: string, _gymNow: Date) {
     const result = await db
       .select({ value: count() })
-      .from(gymMembers)
-      .where(and(eq(gymMembers.organizationId, organizationId), eq(gymMembers.isActive, true)));
+      .from(gymMember)
+      .where(and(eq(gymMember.organizationId, organizationId), eq(gymMember.isActive, true)));
     return Number(result[0]?.value ?? 0);
   },
 
@@ -164,12 +164,12 @@ export const membersRepository = {
         roleName: authMember.role,
         count: count()
       })
-      .from(gymMembers)
+      .from(gymMember)
       .innerJoin(authMember, and(
-        eq(authMember.userId, gymMembers.userId),
+        eq(authMember.userId, gymMember.userId),
         eq(authMember.organizationId, organizationId)
       ))
-      .where(eq(gymMembers.organizationId, organizationId))
+      .where(eq(gymMember.organizationId, organizationId))
       .groupBy(authMember.role);
 
     return results.map(r => ({
