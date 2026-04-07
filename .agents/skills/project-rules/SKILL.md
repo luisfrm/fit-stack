@@ -25,5 +25,22 @@ These rules are mandatory for all development tasks within the Fit-Stack reposit
 - **No `any`**: Avoid using the `any` type in the codebase. Use proper TypeScript interfaces, types, or generics.
 - **Strict Typing**: Prioritize strong typing for both backend and frontend code to ensure reliability.
 
-## 5. Architectural Constraints
+## 5. Naming Conventions
+- **Tables**: Database table names in Drizzle schemas MUST be in **singular** (e.g., `user`, `organization`, `gym_member`).
+- **Services & Repositories**: File names and class/object names for services and repositories MUST be in **plural** (e.g., `users.service.ts`, `members.repository.ts`).
+
+## 6. Architectural Constraints
 - **Package Separation**: Respect the boundaries between `apps/` and `packages/`. Logic belonging to a package should not be duplicated in an app.
+
+## 7. Next.js & API Rules
+- **Async Params**: In Next.js 15+ (used in `apps/api`), the `params` and `searchParams` props in route handlers and server components are **Promises**. You MUST define them as `Promise<...>` and use `await` before accessing their properties.
+- **Middleware/Proxy**: The project follows the Next.js 16 convention where `middleware.ts` is renamed to `proxy.ts`. This shift clarifies its purpose as a network boundary/routing layer rather than a place for heavy business logic. Use it for CORS, header manipulation, and early session validation, but keep robust authorization and logic within route handlers or the service layer.
+
+## 8. Database Integrity & Migrations
+- **Workflow**: All database changes MUST follow the `generate` -> `review` -> `migrate` cycle.
+- **Verification**: Before pushing, run `npm run db:check` in `packages/database` to ensure the schema matches the migrations folder.
+- **Push Restriction**: The command `db:push` is EXCLUSIVELY for local development and rapid prototyping. It is strictly prohibited for shared branches (`master`, `staging`) or production.
+- **Automation**: The project uses GitHub Actions (`database-integrity.yml`) to:
+    1.  **Check**: Statically verify migration integrity on every Pull Request.
+    2.  **Deploy**: Automatically run `db:migrate` on production/dev when merging to `master`.
+- **Secrets**: Production `DATABASE_URL` must be managed as a GitHub Secret.

@@ -11,6 +11,7 @@
     "db:migrate": "pnpm --filter @workspace/database db:migrate",
     "db:push": "pnpm --filter @workspace/database db:push",
     "db:pull": "pnpm --filter @workspace/database db:pull",
+    "db:check": "pnpm --filter @workspace/database db:check",
     "db:studio": "pnpm --filter @workspace/database db:studio",
     "db:seed": "pnpm --filter @workspace/database db:seed"
   },
