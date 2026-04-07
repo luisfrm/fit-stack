@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { membersService } from '@/services/members.service'
 import { getSession } from '@/config/get-session'
+import { OrgRole } from '@workspace/shared'
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,8 +16,8 @@ export async function GET(req: NextRequest) {
     const filters = {
       organizationId,
       query: searchParams.get('query') ?? undefined,
-      role: searchParams.has('role') ? searchParams.get('role')! : undefined,
-      excludeRole: searchParams.has('excludeRole') ? searchParams.get('excludeRole')! : undefined,
+      role: searchParams.get('role') as OrgRole ?? undefined,
+      excludeRole: searchParams.get('excludeRole') as OrgRole ?? undefined,
       isActive: searchParams.has('isActive')
         ? searchParams.get('isActive') === 'true'
         : undefined,

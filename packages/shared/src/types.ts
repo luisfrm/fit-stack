@@ -1,3 +1,5 @@
+import { Role } from './constants';
+
 /* ── SHARED TYPES ── */
 
 /**
@@ -55,19 +57,8 @@ export interface IRecentRegistration {
  */
 export type TrendDirection = "up" | "down" | "neutral";
 
-/**
- * Valid roles for members (Dynamic from DB slugs)
- */
-export const ROLES = {
-  ADMIN: 'admin',
-  MANAGER: 'manager',
-  COACH: 'coach',
-  TRAINER: 'trainer',
-  CASHIER: 'cashier',
-  MEMBER: 'member',
-} as const;
 
-export type Role = typeof ROLES[keyof typeof ROLES];
+// Role types are now managed in ./constants.ts to separate Global and Org roles
 
 export type FrequencyType = 'once' | 'weekly';
 

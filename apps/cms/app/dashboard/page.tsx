@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
-import { ISession, ROLES } from "@workspace/shared/types";
+import { ISession, GLOBAL_ROLES } from "@workspace/shared";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { SaaSAdminDashboard } from "@/components/dashboard/saas-admin-dashboard";
 import { toast } from "@workspace/ui/components";
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   }
 
   // Si el usuario es 'admin' (Master Admin) Y NO tiene una organización activa, mostramos el dashboard del SaaS
-  if (user?.role === ROLES.ADMIN && !currentSession?.activeOrganizationId) {
+  if (user?.role === GLOBAL_ROLES.ADMIN && !currentSession?.activeOrganizationId) {
     return <SaaSAdminDashboard />;
   }
 

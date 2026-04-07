@@ -12,7 +12,7 @@ import { MembersTable } from "@/components/members/members-table";
 import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLES } from "@workspace/shared/constants";
+import { ORG_ROLES } from "@workspace/shared";
 
 export default function StaffPage() {
   const [staff, setStaff] = React.useState<IMember[]>([]);
@@ -37,7 +37,7 @@ export default function StaffPage() {
       const filters: any = {
         page,
         limit,
-        excludeRole: ROLES.MEMBER
+        excludeRole: ORG_ROLES.MEMBER
       };
       if (query) filters.query = query;
 

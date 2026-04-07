@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getSession } from "@/config/get-session";
 import { settingsService } from "@/services/settings.service";
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES } from "@workspace/shared";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     // (Better Auth handles org access, but we could add more checks here)
     if (!organizationId) {
       // 2. If no organization, ONLY SaaS Admins can access (Global Settings context)
-      if (session?.user.role !== ROLES.ADMIN) {
+      if (session?.user.role !== GLOBAL_ROLES.ADMIN) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     // Security & Context Dispatch:
     if (!organizationId) {
-      if (session?.user.role !== ROLES.ADMIN) {
+      if (session?.user.role !== GLOBAL_ROLES.ADMIN) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }

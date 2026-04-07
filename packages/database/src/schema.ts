@@ -12,6 +12,7 @@ import {
   numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared';
 
 // ── ENUMS ──
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
@@ -28,6 +29,18 @@ export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
   'team_info'
 ]);
 
+export const globalRoleEnum = pgEnum('global_role', [
+  GLOBAL_ROLES.ADMIN,
+  GLOBAL_ROLES.USER,
+]);
+
+export const orgRoleEnum = pgEnum('org_role', [
+  ORG_ROLES.MANAGER,
+  ORG_ROLES.CASHIER,
+  ORG_ROLES.COACH,
+  ORG_ROLES.MEMBER,
+]);
+
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
 export const user = pgTable('user', {
@@ -36,7 +49,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  role: text('role'), // Global role (e.g. 'admin')
+  role: globalRoleEnum('role').default(GLOBAL_ROLES.USER), // Global role (e.g. 'admin')
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -110,7 +123,7 @@ export const authMember = pgTable('member', {
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
-  role: text('role').notNull(), // 'manager', 'cashier', 'coach', 'member'
+  role: orgRoleEnum('role').notNull(), // 'manager', 'cashier', 'coach', 'member'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

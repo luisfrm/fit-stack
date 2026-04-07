@@ -1,5 +1,6 @@
 import { eq, ilike, and, or, count, desc, db, isNull, ne } from '@workspace/database/client';
 import { gymMember, authMember, user } from '@workspace/database/schema';
+import { OrgRole } from '@workspace/shared';
 
 export type DbMember = typeof gymMember.$inferSelect;
 export type NewDbMember = typeof gymMember.$inferInsert;
@@ -9,14 +10,14 @@ export type MemberWithRelations = DbMember & {
     id: string;
     email: string;
   } | null;
-  role?: string | null;
+  role?: OrgRole | null;
 };
 
 export interface MembersFilter {
   organizationId: string;
   query?: string;
-  role?: string;
-  excludeRole?: string;
+  role?: OrgRole;
+  excludeRole?: OrgRole;
   isActive?: boolean;
   page?: number;
   limit?: number;

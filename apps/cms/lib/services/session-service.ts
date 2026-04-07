@@ -1,5 +1,5 @@
 import { getSession, signOut, type Session, type User } from "@/lib/auth-client";
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES } from "@workspace/shared";
 import { getRoleName } from "@/lib/utils/auth";
 
 /**
@@ -85,6 +85,6 @@ export const sessionService = {
    */
   async isAdmin(): Promise<boolean> {
     const { data: session } = await this.getSession();
-    return session?.user.role === ROLES.ADMIN;
+    return session?.user.role === GLOBAL_ROLES.ADMIN;
   }
 };

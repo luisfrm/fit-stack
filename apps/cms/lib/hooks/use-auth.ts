@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
 import { getRoleName } from "@/lib/utils/auth";
 import { useMemo } from "react";
 import type { User } from "@/lib/auth-client";
@@ -19,9 +19,9 @@ export function useAuth() {
   const roleName = useMemo(() => getRoleName(user), [user]);
 
   // Role flags for easy UI conditions
-  const isAdmin = user?.role === ROLES.ADMIN;
-  const isCoach = user?.role === "coach" || user?.role === "COACH"; // Based on typical naming
-  const isMember = user?.role === "member" || user?.role === "MEMBER";
+  const isAdmin = user?.role === GLOBAL_ROLES.ADMIN;
+  const isCoach = user?.role === ORG_ROLES.COACH;
+  const isMember = user?.role === ORG_ROLES.MEMBER;
 
   return {
     // Core session data

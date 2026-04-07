@@ -8,7 +8,7 @@ import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLES } from "@workspace/shared/constants";
+import { ORG_ROLES } from "@workspace/shared";
 
 export default function PaymentsPage() {
   const [subs, setSubs] = React.useState<ISubscription[]>([]);
@@ -57,7 +57,7 @@ export default function PaymentsPage() {
     
     // If searching, restrict results to Cliente role
     if (search.trim() !== "") {
-      return matches && s.role === ROLES.MEMBER;
+      return matches && s.role === ORG_ROLES.MEMBER;
     }
     return matches;
   });

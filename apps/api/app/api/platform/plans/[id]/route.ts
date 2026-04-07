@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/config/auth';
-import { ROLES } from '@workspace/shared/types';
+import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformPlansService } from '@/services/platform-plans.service';
 
 interface RouteContext {
@@ -10,7 +10,7 @@ interface RouteContext {
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== ROLES.ADMIN) {
+  if (!session || session.user.role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 export async function DELETE(req: NextRequest, { params }: RouteContext) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== ROLES.ADMIN) {
+  if (!session || session.user.role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 

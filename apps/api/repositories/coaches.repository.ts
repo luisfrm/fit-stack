@@ -1,13 +1,13 @@
 import { eq, ilike, and, or, db, count, asc, type SQL } from '@workspace/database/client';
 import { gymMember, staffProfile, authMember, user } from '@workspace/database/schema';
-import { ROLES } from '@workspace/shared/constants';
+import { ORG_ROLES } from '@workspace/shared';
 import { type CoachesFilter as ICoachesFilter, type CreateCoachDTO as ICreateCoachDTO, type UpdateCoachDTO as IUpdateCoachDTO } from '@workspace/shared/types';
 export type { CoachesFilter, CreateCoachDTO, UpdateCoachDTO } from '@workspace/shared/types';
 
 export const coachesRepository = {
   /**
    * Finds all coaches by joining gymMember with staffProfile and authMember.
-   * Filters by authMember.role === ROLES.COACH.
+   * Filters by authMember.role === ORG_ROLES.COACH.
    */
   async findAll(organizationId: string, filters: ICoachesFilter = {}) {
     const { name, isVisible, page = 1, limit = 10, requireTotal = true } = filters;
@@ -15,7 +15,7 @@ export const coachesRepository = {
 
     const conditions: SQL[] = [
       eq(gymMember.organizationId, organizationId),
-      eq(authMember.role, ROLES.COACH)
+      eq(authMember.role, ORG_ROLES.COACH)
     ];
 
     if (name) {
@@ -118,7 +118,7 @@ export const coachesRepository = {
       .leftJoin(staffProfile, eq(gymMember.id, staffProfile.memberId))
       .leftJoin(user, eq(gymMember.userId, user.id))
       .innerJoin(authMember, eq(user.id, authMember.userId))
-      .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId), eq(authMember.role, ROLES.COACH)));
+      .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId), eq(authMember.role, ORG_ROLES.COACH)));
 
     return result;
   },

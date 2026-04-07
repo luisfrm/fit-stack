@@ -12,7 +12,7 @@ import { MembersTable } from "@/components/members/members-table";
 import { MemberModal } from "@/components/members/member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { ROLES } from "@workspace/shared/constants";
+import { ORG_ROLES } from "@workspace/shared";
 
 export default function MembersPage() {
   const [members, setMembers] = React.useState<IMember[]>([]);
@@ -21,7 +21,7 @@ export default function MembersPage() {
 
   // Filtros
   const [query, setQuery] = React.useState("");
-  const role = ROLES.MEMBER; // Fuerza el rol de cliente
+  const role = ORG_ROLES.MEMBER; // Fuerza el rol de cliente
   const [tempQuery, setTempQuery] = React.useState("");
 
   // Paginación

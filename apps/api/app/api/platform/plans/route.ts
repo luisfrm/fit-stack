@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/config/auth';
-import { ROLES } from '@workspace/shared/types';
+import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformPlansService } from '@/services/platform-plans.service';
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== ROLES.ADMIN) {
+  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== ROLES.ADMIN) {
+  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 

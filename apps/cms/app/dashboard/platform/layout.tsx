@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { sessionService } from "@/lib/services/session-service";
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES } from "@workspace/shared";
 import { type Session } from "@/lib/auth-client";
 
 export default async function PlatformLayout({
@@ -16,7 +16,7 @@ export default async function PlatformLayout({
   }
 
   // 2. Validar rol de administrador (Crucial para el módulo platform)
-  if (session.user.role !== ROLES.ADMIN) {
+  if (session.user.role !== GLOBAL_ROLES.ADMIN) {
     redirect("/dashboard?status=unauthorized");
   }
 

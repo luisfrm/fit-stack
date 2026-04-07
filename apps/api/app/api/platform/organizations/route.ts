@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { organizationsService } from '@/services/organizations.service';
 import { getSession } from '@/config/get-session';
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES } from "@workspace/shared";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     
     // Security: Only SaaS Admin (Role 1 or specific ADMIN string)
     // We assume Role 1 is Super Admin based on project patterns
-    if (session?.user?.role !== ROLES.ADMIN) {
+    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     
-    if (session?.user?.role !== ROLES.ADMIN) {
+    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

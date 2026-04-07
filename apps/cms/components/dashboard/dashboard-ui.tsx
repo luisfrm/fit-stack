@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { ROLES } from "@workspace/shared/types";
+import { GLOBAL_ROLES } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -78,7 +78,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
   const { settings, isLoading } = useSettings();
 
   // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
-  const isSaaSMode = user.role === ROLES.ADMIN && !activeOrganizationId;
+  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   console.log('user', user)
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
@@ -101,7 +101,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
 export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { settings, isLoading } = useSettings();
 
-  const isSaaSMode = user.role === ROLES.ADMIN && !activeOrganizationId;
+  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
   return (
@@ -317,7 +317,7 @@ export function TodayClassesTable({ classes, loading }: Readonly<{ classes: ICla
 }
 
 export function RecentRegistrationsList({ registrations, loading }: Readonly<{ registrations: IRecentRegistration[]; loading?: boolean }>) {
-  const skeletonIds = React.useMemo(() => Array.from({ length: 5 }, (_, i) => `reg-sk-${i}-${Math.random().toString(36).substr(2, 5)}`), []);
+  const skeletonIds = React.useMemo(() => Array.from({ length: 5 }, (_, i) => `reg-sk-${i}-${Math.random().toString(36).slice(2, 7)}`), []);
 
   if (loading) {
     return (

@@ -14,7 +14,7 @@ import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Label } from "@workspace/ui/components/label";
-import { ROLES } from "@workspace/shared/constants";
+import { ORG_ROLES } from "@workspace/shared";
 
 interface CoachFormProps {
   readonly initialData?: ICoach;
@@ -42,7 +42,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
     bio: initialData?.bio ?? "",
     isVisible: initialData?.isVisible ?? true,
     displayOrder: initialData?.displayOrder ?? 0,
-    role: initialData?.role ?? ROLES.COACH,
+    role: initialData?.role ?? ORG_ROLES.COACH,
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);

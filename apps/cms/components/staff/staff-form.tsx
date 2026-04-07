@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
-import { ROLES } from "@workspace/shared/constants";
+import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
 import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -32,7 +32,7 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    role: initialData?.role ?? ROLES.MANAGER, // Default to Manager for staff
+    role: initialData?.role ?? ORG_ROLES.MANAGER, // Default to Manager for staff
     isActive: initialData?.isActive ?? true,
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
@@ -192,10 +192,10 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
             onChange={(e) => handleChange("role", e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-primary transition-all h-[46px]"
           >
-            <option value={ROLES.MANAGER} className="bg-slate-900 text-white">Manager / Dueño</option>
-            <option value={ROLES.COACH} className="bg-slate-900 text-white">Entrenador</option>
-            <option value={ROLES.CASHIER} className="bg-slate-900 text-white">Cajero / Staff</option>
-            <option value={ROLES.ADMIN} className="bg-slate-900 text-white">Super Admin (Global)</option>
+            <option value={ORG_ROLES.MANAGER} className="bg-slate-900 text-white">Manager / Dueño</option>
+            <option value={ORG_ROLES.COACH} className="bg-slate-900 text-white">Entrenador</option>
+            <option value={ORG_ROLES.CASHIER} className="bg-slate-900 text-white">Cajero / Staff</option>
+            <option value={GLOBAL_ROLES.ADMIN} className="bg-slate-900 text-white">Super Admin (Global)</option>
           </select>
         </div>
       </div>

@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X, MapPin } from "lucide-react";
-import { ROLES } from "@workspace/shared/constants";
+import { ORG_ROLES } from "@workspace/shared";
 import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -31,7 +31,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
     documentId: initialData?.documentId ?? "",
-    role: initialData?.role ?? ROLES.MEMBER,
+    role: initialData?.role ?? ORG_ROLES.MEMBER,
     isActive: initialData?.isActive ?? true,
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
