@@ -111,6 +111,7 @@ export interface IMember {
     email: string;
   } | null;
   documentId?: string;
+  address?: string | null;
   isActive: boolean;
 }
 
@@ -211,6 +212,12 @@ export interface IPaymentMethodConfig {
   icon?: string;
 }
 
+export interface ITaxDetail {
+  name: string;
+  rate: number;
+  amount: number;
+}
+
 /**
  * Interface for a Payment record.
  */
@@ -232,6 +239,11 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: Record<string, any>;
   
+  // Invoice Details (Optional/Internal)
+  subtotal?: number;
+  taxTotal?: number;
+  taxDetails?: ITaxDetail[] | null;
+
   paymentDate: string;
   createdAt?: string;
 }
@@ -321,6 +333,14 @@ export interface IOrganization {
   slug: string | null;
   logo: string | null;
   metadata?: Record<string, any> | null;
+
+  // Fiscal/Localization Fields
+  countryCode?: string;
+  taxId?: string | null;
+  legalName?: string | null;
+  address?: string | null;
+  fiscalConfig?: Record<string, any> | null;
+
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }

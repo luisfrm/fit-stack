@@ -23,3 +23,19 @@ export const PAYMENT_STATUSES = {
 } as const;
 
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
+
+/**
+ * List of countries for internationalization (LATAM-focused).
+ */
+export const LATAM_COUNTRIES = [
+  { name: "Venezuela", code: "VE", currency: "VES", flag: "🇻🇪" },
+  { name: "Colombia", code: "CO", currency: "COP", flag: "🇨🇴" },
+  { name: "México", code: "MX", currency: "MXN", flag: "🇲🇽" },
+  { name: "Argentina", code: "AR", currency: "ARS", flag: "🇦🇷" },
+  { name: "Chile", code: "CL", currency: "CLP", flag: "🇨🇱" },
+  { name: "Perú", code: "PE", currency: "PEN", flag: "🇵🇪" },
+  { name: "Ecuador", code: "EC", currency: "USD", flag: "🇪🇨" },
+  { name: "Panamá", code: "PA", currency: "USD", flag: "🇵🇦" },
+] as const;
+
+export type Country = typeof LATAM_COUNTRIES[number];
