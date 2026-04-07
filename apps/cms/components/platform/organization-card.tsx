@@ -11,12 +11,12 @@ import { ExternalLink, Edit2, CreditCard, Building2, Calendar, ShieldCheck } fro
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { cn } from "@workspace/ui/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface OrganizationCardProps {
-  organization: IPlatformOrganization;
-  onEdit: (org: IPlatformOrganization) => void;
-  onAddSubscription: (org: IPlatformOrganization) => void;
+  readonly organization: IPlatformOrganization;
+  readonly onEdit: (org: IPlatformOrganization) => void;
+  readonly onAddSubscription: (org: IPlatformOrganization) => void;
 }
 
 export function OrganizationCard({ 
@@ -24,6 +24,7 @@ export function OrganizationCard({
   onEdit, 
   onAddSubscription 
 }: OrganizationCardProps) {
+  const router = useRouter();
   const sub = org.latestSubscription;
   const hasSub = !!sub;
   
@@ -50,7 +51,7 @@ export function OrganizationCard({
         <Button 
           variant="primary" 
           size="sm" 
-          onClick={() => window.location.href = `/dashboard/platform/organizations/${org.id}`}
+          onClick={() => router.push(`/dashboard/platform/organizations/${org.id}`)}
           className="h-10 w-10 p-0 flex items-center justify-center shrink-0 rounded-xl"
         >
           <ExternalLink size={18} />
@@ -68,13 +69,13 @@ export function OrganizationCard({
                 {sub.planName || 'Personalizada'}
               </Badge>
               {sub.isTrial && (
-                <Badge variant="info" className="uppercase text-[9px] font-black tracking-tighter h-5 bg-blue-500/20 text-blue-400 border-blue-500/20">
+                <Badge variant="info" className="uppercase text-[9px] font-black tracking-tighter h-5">
                   Prueba
                 </Badge>
               )}
             </div>
           ) : (
-             <Badge variant="outlined" className="uppercase text-[9px] font-black tracking-tighter h-5 border-white/10 text-slate-500">
+             <Badge variant="outline" className="uppercase text-[9px] font-black tracking-tighter h-5 border-white/10 text-slate-500">
                Inactiva
              </Badge>
           )}
@@ -85,7 +86,7 @@ export function OrganizationCard({
             <Calendar size={14} className="text-primary/50" />
             <Text size="xs" className="font-semibold italic">
               Expira: <span className="text-white font-black uppercase tracking-tighter">
-                {format(new Date(sub.endDate), "dd MMM yyyy", { locale: es })}
+                {sub.endDate ? format(new Date(sub.endDate), "dd MMM yyyy", { locale: es }) : '—'}
               </span>
             </Text>
           </div>

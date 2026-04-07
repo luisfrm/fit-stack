@@ -23,10 +23,10 @@ export function OrganizationModal({ organization, trigger, onSuccess }: Organiza
     
     try {
       if (isEdit && organization?.id) {
-        await organizationsService.updateOrganization(organization.id, formData);
+        await organizationsService.update(organization.id, formData as any);
         toast.success("Organización actualizada correctamente.");
       } else {
-        await organizationsService.createOrganization(formData);
+        await organizationsService.create(formData as any);
         toast.success("Organización creada exitosamente.");
       }
       
