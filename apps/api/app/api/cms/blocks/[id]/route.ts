@@ -28,7 +28,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const { id } = await params;
     const blockId = Number(id)
-    if (isNaN(blockId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    if (Number.isNaN(blockId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     const organizationId = session.session.activeOrganizationId;
     await cmsBlocksService.deleteBlock(organizationId, blockId)
