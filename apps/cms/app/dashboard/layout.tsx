@@ -3,7 +3,6 @@ import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
 import { type Session } from "@/lib/auth-client";
-import { getRoleName } from "@/lib/utils/auth";
 
 export default async function DashboardLayout({
   children,
@@ -18,8 +17,7 @@ export default async function DashboardLayout({
   }
 
   const user = session.user;
-
-  const userRole = getRoleName(user);
+  const userRole = await sessionService.getUserRole();
 
   return (
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">

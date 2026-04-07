@@ -8,7 +8,7 @@ import { Title, TitleAccent } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast, Checkbox, Label } from "@workspace/ui/components";
-import { signIn } from "@/lib/auth-client";
+import { signIn, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────────
@@ -21,6 +21,14 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const router = useRouter();
+  const { data: session, isPending } = useSession();
+
+  // ── AUTH: Redirect if already logged in ──
+  React.useEffect(() => {
+    if (!isPending && session) {
+      router.replace('/dashboard');
+    }
+  }, [session, isPending, router]);
 
   // ── MOUNT: Check localStorage ──
   React.useEffect(() => {
@@ -63,6 +71,17 @@ export default function LoginPage() {
     setIsLoading(false);
     router.push('/dashboard');
   };
+
+  if (isPending) {
+    return (
+      <div className="h-svh w-full flex items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
+          <p className="text-gray-400 animate-pulse">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-svh w-full overflow-hidden" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>

@@ -1,4 +1,6 @@
-import { getSession, signOut, type Session } from "@/lib/auth-client";
+import { getSession, signOut, type Session, type User } from "@/lib/auth-client";
+import { ROLES } from "@workspace/shared/types";
+import { getRoleName } from "@/lib/utils/auth";
 
 /**
  * Service to handle session-related operations in the CMS.
@@ -10,15 +12,18 @@ export const sessionService = {
    * @param customHeaders Optional headers (useful for Middleware)
    */
   async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: any }> {
-    let fetchOptions = {};
-
     if (globalThis.window === undefined) {
-      const { headers: nextHeaders } = await import("next/headers");
-      const headers = customHeaders || await nextHeaders();
-      fetchOptions = { headers };
+      try {
+        const { headers: nextHeaders } = await import("next/headers");
+        const headers = customHeaders || await nextHeaders();
+        return await getSession({ fetchOptions: { headers } }) as { data: Session | null; error: any };
+      } catch (error) {
+        console.error("Error fetching session on server:", error);
+        return { data: null, error };
+      }
     }
 
-    return await getSession({ fetchOptions }) as { data: Session | null; error: any };
+    return await getSession() as { data: Session | null; error: any };
   },
 
   /**
@@ -26,8 +31,8 @@ export const sessionService = {
    * Designed to work in Edge Runtime where standard clients might fail.
    */
   async getServerSession(headers: Headers) {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-    
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+
     try {
       const response = await fetch(`${apiBase}/api/auth/get-session`, {
         headers,
@@ -61,9 +66,25 @@ export const sessionService = {
   /**
    * Placeholder for future profile data fetching
    */
-  async getProfileData() {
+  async getProfileData(): Promise<User | null> {
     const { data: session } = await this.getSession();
     if (!session) return null;
     return session.user;
+  },
+
+  /**
+   * Helper to get user role name.
+   */
+  async getUserRole(): Promise<string> {
+    const { data: session } = await this.getSession();
+    return getRoleName(session?.user);
+  },
+
+  /**
+   * Check if current user is Admin.
+   */
+  async isAdmin(): Promise<boolean> {
+    const { data: session } = await this.getSession();
+    return session?.user.role === ROLES.ADMIN;
   }
 };
