@@ -90,6 +90,14 @@ export const organization = pgTable('organization', {
   slug: text('slug').unique(),
   logo: text('logo'),
   metadata: jsonb('metadata'),
+
+  // Localization & Fiscal (Optional)
+  countryCode: text('country_code').default('VE').notNull(),
+  taxId: text('tax_id'),
+  legalName: text('legal_name'),
+  address: text('address'),
+  fiscalConfig: jsonb('fiscal_config'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -189,6 +197,7 @@ export const gymMember = pgTable('gym_member', {
   phoneNumber: text('phone_number'),
   birthday: date('birthday'),
   imageUrl: text('image_url'),
+  address: text('address'),
   isActive: boolean('is_active').default(true).notNull(),
 
   // Biometric / Access Control (Optional)
@@ -278,6 +287,11 @@ export const payment = pgTable('payment', {
   status: paymentStatusEnum('status').default('validated').notNull(),
   paymentMethod: text('payment_method').notNull(),
   paymentMethodDetails: jsonb('payment_method_details'),
+
+  // Invoice Breakdown (Optional)
+  subtotal: numeric('subtotal', { precision: 15, scale: 2 }),
+  taxTotal: numeric('tax_total', { precision: 15, scale: 2 }),
+  taxDetails: jsonb('tax_details'),
 
   paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
