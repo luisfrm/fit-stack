@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Eye, EyeOff, Mail, Lock, User, ShieldCheck } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, notFound } from "next/navigation";
 import { Input } from "@workspace/ui/components/input";
 import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
@@ -16,6 +16,7 @@ export default function InitPage() {
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isChecking, setIsChecking] = React.useState(true);
+  const [isNotFound, setIsNotFound] = React.useState(false);
 
   React.useEffect(() => {
     // Check if initialization is actually required
@@ -23,8 +24,7 @@ export default function InitPage() {
       if (res.needsInit) {
         setIsChecking(false);
       } else {
-        toast.info("El sistema ya ha sido inicializado.");
-        router.replace("/login");
+        setIsNotFound(true);
       }
     }).catch(() => {
       setIsChecking(false);
@@ -57,6 +57,10 @@ export default function InitPage() {
       setIsLoading(false);
     }
   };
+
+  if (isNotFound) {
+    return notFound();
+  }
 
   if (isChecking) {
     return (
