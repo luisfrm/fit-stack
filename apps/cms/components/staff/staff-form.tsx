@@ -12,7 +12,7 @@ import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
 import { ROLES } from "@workspace/shared/constants";
 import { coachesService } from "@/lib/services/coaches-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
 
@@ -41,7 +41,7 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string>(
-    initialData?.imageUrl ? getMediaUrl(initialData.imageUrl) : ""
+    initialData?.imageUrl ? uploadService.getMediaUrl(initialData.imageUrl) : ""
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 

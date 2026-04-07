@@ -8,12 +8,15 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-  Text
+  Text,
+  CountrySelector,
+  Separator,
 } from "@workspace/ui/components";
 import { type Organization } from "./organization-mobile-card";
-import { Building2, Globe, ShieldCheck, Send, Upload, X } from "lucide-react";
+import { Building2, Globe, ShieldCheck, Send, Upload, X, MapPin, Fingerprint } from "lucide-react";
+import { LATAM_COUNTRIES } from "@workspace/shared/constants";
 import { coachesService } from "@/lib/services/coaches-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 
 interface OrganizationFormProps {
   readonly initialData?: Organization;
@@ -30,11 +33,15 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     slug: initialData?.slug ?? "",
     logo: initialData?.logo ?? "",
     status: initialData?.status ?? 'active',
+    countryCode: initialData?.countryCode ?? "VE",
+    taxId: initialData?.taxId ?? "",
+    legalName: initialData?.legalName ?? "",
+    address: initialData?.address ?? "",
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string>(
-    initialData?.logo ? getMediaUrl(initialData.logo) : ""
+    initialData?.logo ? uploadService.getMediaUrl(initialData.logo) : ""
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -145,6 +152,45 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
           <Text size="xs" variant="muted" className="pl-1">
             Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre.
           </Text>
+        </div>
+
+        <Separator className="bg-white/5 my-2" />
+
+        <div className="space-y-4 pt-2">
+          <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+            Información de la Entidad (Opcional)
+          </Text>
+
+          <CountrySelector
+            value={formData.countryCode || "VE"}
+            onChange={(code) => handleChange("countryCode", code)}
+            countries={LATAM_COUNTRIES}
+          />
+
+          <Input
+            label="Nombre Legal / Razón Social"
+            placeholder="Ej: Iron Gym C.A."
+            value={formData.legalName}
+            onChange={(e) => handleChange("legalName", e.target.value)}
+            leftIcon={<Building2 size={16} />}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="ID Fiscal (RIF / NIT)"
+              placeholder="Ej: J-12345678-9"
+              value={formData.taxId}
+              onChange={(e) => handleChange("taxId", e.target.value)}
+              leftIcon={<Fingerprint size={16} />}
+            />
+            <Input
+              label="Dirección"
+              placeholder="Ej: Av. Principal, Edif. X..."
+              value={formData.address}
+              onChange={(e) => handleChange("address", e.target.value)}
+              leftIcon={<MapPin size={16} />}
+            />
+          </div>
         </div>
       </div>
 

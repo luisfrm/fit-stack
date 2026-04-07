@@ -15,7 +15,7 @@ import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { EUR_EXCHANGE_URL } from "@/lib/config/constants";
+import { currencyService } from "@/lib/services/currency-service";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -60,8 +60,7 @@ export default function CurrencySettingsPage() {
     const fetchCodes = async () => {
       setIsFetchingCodes(true);
       try {
-        const res = await fetch(EUR_EXCHANGE_URL);
-        const data = await res.json();
+        const data = await currencyService.getExchangeRates();
         if (data.result === "success") {
           setAllCurrencies(Object.keys(data.rates).sort((a, b) => a.localeCompare(b)));
         }

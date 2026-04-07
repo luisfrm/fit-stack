@@ -9,10 +9,10 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X } from "lucide-react";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X, MapPin } from "lucide-react";
 import { ROLES } from "@workspace/shared/constants";
 import { coachesService } from "@/lib/services/coaches-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 
 interface MemberFormProps {
@@ -36,11 +36,12 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
     imageUrl: initialData?.imageUrl ?? "",
+    address: initialData?.address ?? "",
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = React.useState<string>(
-    initialData?.imageUrl ? getMediaUrl(initialData.imageUrl) : ""
+    initialData?.imageUrl ? uploadService.getMediaUrl(initialData.imageUrl) : ""
   );
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -191,6 +192,16 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
           value={formData.birthday ?? ""}
           onChange={(e) => handleChange("birthday", e.target.value)}
           leftIcon={<Calendar size={16} />}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        <Input
+          label="Dirección"
+          placeholder="Ej: Calle 123, Urb. Las Flores..."
+          value={formData.address ?? ""}
+          onChange={(e) => handleChange("address", e.target.value)}
+          leftIcon={<MapPin size={16} />}
         />
       </div>
 

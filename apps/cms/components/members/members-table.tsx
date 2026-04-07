@@ -6,7 +6,7 @@ import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 
@@ -40,7 +40,7 @@ const getColumns = (
         <div className="flex items-center gap-3">
           <Avatar size="default" className="size-9 border border-white/10">
             {m.imageUrl ? (
-              <AvatarImage src={getMediaUrl(m.imageUrl)} alt={m.firstName} className="object-cover" />
+              <AvatarImage src={uploadService.getMediaUrl(m.imageUrl)} alt={m.firstName} className="object-cover" />
             ) : null}
             <AvatarFallback className="bg-white/5 text-xs">
               <User size={14} className="opacity-40" />

@@ -18,8 +18,7 @@ import { ColorPicker } from "@workspace/ui/components/color-picker";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { uploadFile } from "@/lib/utils/upload-utils";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { Title, toast } from "@workspace/ui";
 
 const DEFAULT_BRANDING = {
@@ -75,7 +74,7 @@ export default function GeneralSettingsPage() {
 
       // 1. Upload logo if changed
       if (logoFile) {
-        const logoKey = await uploadFile(logoFile, "gym");
+        const logoKey = await uploadService.uploadFile(logoFile, "gym");
         dataToSave[SETTINGS_KEYS.GYM_LOGO] = logoKey;
       }
 
@@ -165,7 +164,7 @@ export default function GeneralSettingsPage() {
               <ImageUpload
                 label="Logo del Gimnasio"
                 description="Se recomienda usar formatos SVG o PNG con transparencia."
-                value={getMediaUrl(formData[SETTINGS_KEYS.GYM_LOGO])}
+                value={uploadService.getMediaUrl(formData[SETTINGS_KEYS.GYM_LOGO])}
                 onChange={(file) => setLogoFile(file)}
                 onRemove={() => {
                   setLogoFile(null);

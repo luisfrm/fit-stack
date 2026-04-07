@@ -12,7 +12,7 @@ import {
 import { type CoachFilter, type ICoach } from "@/types/dashboard";
 import { useCoaches } from "@/lib/hooks/use-trainers";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { getMediaUrl } from "@/lib/utils/media-utils";
+import { uploadService } from "@/lib/services/upload-service";
 import { NoData } from "@/components/dashboard/dashboard-ui";
 
 const ITEMS_PER_PAGE = 10;
@@ -126,7 +126,7 @@ export default function TrainersPage() {
             lastName={coach.lastName}
             role={coach.role?.name}
             specialities={coach.specialities}
-            imageUrl={coach.imageUrl ? getMediaUrl(coach.imageUrl) : null}
+            imageUrl={coach.imageUrl ? uploadService.getMediaUrl(coach.imageUrl) : null}
             isVisible={coach.isVisible}
             hasUser={!!coach.user}
             onEdit={() => handleEdit(coach)}

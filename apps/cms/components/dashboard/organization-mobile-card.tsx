@@ -17,6 +17,10 @@ export interface Organization {
   readonly memberCount: number;
   readonly status: 'active' | 'inactive' | 'pending';
   readonly logo?: string;
+  readonly countryCode?: string;
+  readonly taxId?: string;
+  readonly legalName?: string;
+  readonly address?: string;
   readonly metadata?: Record<string, any>; // Estructurado
 }
 
