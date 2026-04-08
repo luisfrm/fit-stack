@@ -1,0 +1,1 @@
+ALTER TABLE "gym_member" ADD COLUMN IF NOT EXISTS "role" "org_role" DEFAULT 'member' NOT NULL;

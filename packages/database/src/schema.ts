@@ -12,7 +12,7 @@ import {
   numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared';
+import { GLOBAL_ROLES, ORG_ROLES, type PlanFeatures } from '@workspace/shared';
 
 // ── ENUMS ──
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
@@ -149,7 +149,7 @@ export const fitstackPlan = pgTable('fitstack_plan', {
   name: text('name').notNull(),
   monthlyPrice: numeric('monthly_price', { precision: 10, scale: 2 }).notNull(),
   yearlyPrice: numeric('yearly_price', { precision: 10, scale: 2 }),
-  features: jsonb('features'), // PlanFeatures interface from shared/types.ts
+  features: jsonb('features').$type<PlanFeatures | null>(), // PlanFeatures interface from shared/types.ts
   suggestedDurationDays: integer('suggested_duration_days'), // For manual pre-fill
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -213,6 +213,7 @@ export const gymMember = pgTable('gym_member', {
   imageUrl: text('image_url'),
   address: text('address'),
   isActive: boolean('is_active').default(true).notNull(),
+  role: orgRoleEnum('role').default(ORG_ROLES.MEMBER).notNull(),
 
   // Biometric / Access Control (Optional)
   biometricId: text('biometric_id'), 
@@ -258,7 +259,7 @@ export const membershipPlan = pgTable('membership_plan', {
   name: text('name').notNull(),
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
-  features: jsonb('features'),
+  features: jsonb('features').$type<string[] | null>(),
   isPopular: boolean('is_popular').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
