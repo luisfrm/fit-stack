@@ -3,60 +3,76 @@
 import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
 import { OrganizationForm } from "./organization-form";
-import { type Organization } from "./organization-mobile-card";
 import { organizationsService } from "@/lib/services/organizations-service";
+import { type IPlatformOrganization } from "@workspace/shared";
 
 interface OrganizationModalProps {
-  readonly organization?: Organization;
-  readonly trigger: React.ReactNode;
+  readonly initialData?: IPlatformOrganization;
+  readonly trigger?: React.ReactNode;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
   readonly onSuccess?: () => void;
 }
 
-export function OrganizationModal({ organization, trigger, onSuccess }: OrganizationModalProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(false);
+export function OrganizationModal({
+  initialData,
+  trigger,
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+  onSuccess,
+}: OrganizationModalProps) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
 
-  const isEdit = !!organization?.id;
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
 
-  const handleSubmit = async (formData: Partial<Organization>) => {
-    setIsLoading(true);
-    
+  const handleOpenChange = (value: boolean) => {
+    if (isControlled) {
+      setControlledOpen?.(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
+
+  const handleSuccess = () => {
+    handleOpenChange(false);
+    onSuccess?.();
+  };
+
+  const isEdit = !!initialData?.id;
+
+  const handleSubmit = async (formData: Partial<IPlatformOrganization>) => {
     try {
-      if (isEdit && organization?.id) {
-        await organizationsService.update(organization.id, formData as any);
+      if (isEdit && initialData?.id) {
+        await organizationsService.update(initialData.id, formData as any);
         toast.success("Organización actualizada correctamente.");
       } else {
         await organizationsService.create(formData as any);
         toast.success("Organización creada exitosamente.");
       }
-      
-      onSuccess?.();
-      setIsOpen(false);
+      handleSuccess();
     } catch (error: any) {
       const message = error.response?.data?.error ?? error.message ?? "Algo salió mal";
       toast.error(message);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   return (
     <Modal
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      trigger={trigger}
+      open={open}
+      onOpenChange={handleOpenChange}
+      trigger={trigger!}
       title={isEdit ? "Editar Organización" : "Nueva Organización"}
       description={
-        isEdit 
-          ? `Actualiza la información y configuración de ${organization.name}.` 
+        isEdit
+          ? `Actualiza la información y configuración de ${initialData?.name}.`
           : "Completa los datos para dar de alta a una nueva entidad en la plataforma SaaS."
       }
       isScrollable={true}
     >
-      <OrganizationForm 
-        initialData={organization} 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading} 
+      <OrganizationForm
+        initialData={initialData}
+        onSubmit={handleSubmit}
       />
     </Modal>
   );

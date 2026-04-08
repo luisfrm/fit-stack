@@ -19,7 +19,7 @@ import { type IPlatformOrganization } from "@workspace/shared/types";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { OrganizationsTable } from "@/components/dashboard/organizations-table";
 import { OrganizationMobileCard } from "@/components/dashboard/organization-mobile-card";
-import { OrganizationModal } from "@/components/platform/organization-modal";
+import { OrganizationModal } from "@/components/dashboard/organization-modal";
 import { AddSubscriptionModal } from "@/components/platform/add-subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
@@ -78,10 +78,6 @@ export default function OrganizationsPage() {
     setIsSubModalOpen(true);
   };
 
-  const handleCreateNew = () => {
-    setSelectedOrg(undefined);
-    setIsEditModalOpen(true);
-  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -90,14 +86,18 @@ export default function OrganizationsPage() {
         description="Listado global de clientes SaaS y su estado actual de suscripción."
         iconName="LayoutGrid"
       >
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleCreateNew}
-          leftIcon={<Plus size={18} />}
-        >
-          NUEVA ORGANIZACIÓN
-        </Button>
+        <OrganizationModal
+          onSuccess={loadOrganizations}
+          trigger={
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={18} />}
+            >
+              NUEVA ORGANIZACIÓN
+            </Button>
+          }
+        />
       </DashboardHeader>
 
       {/* Stats bar */}
@@ -208,10 +208,11 @@ export default function OrganizationsPage() {
       </div>
 
       {/* Shared Modals */}
+      {/* Instance 2: Shared Modal for Edition */}
       <OrganizationModal
         open={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
-        organizationData={selectedOrg}
+        initialData={selectedOrg}
         onSuccess={loadOrganizations}
       />
 
