@@ -18,6 +18,7 @@ import { OrganizationModal } from "./organization-modal";
 import { OrganizationsList } from "./organizations-list";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { type IPlatformOrganization } from "@workspace/shared/types";
+import Link from "next/link";
 
 export function SaaSAdminDashboard() {
   const [organizations, setOrganizations] = React.useState<IPlatformOrganization[]>([]);
@@ -91,8 +92,10 @@ export function SaaSAdminDashboard() {
             <Text as="p" size="lg" weight="bold">Gimnasios Activos</Text>
             <Text size="sm" variant="muted">Monitoreo y gestión de inquilinos de la plataforma.</Text>
           </div>
-          <Button variant="ghost" size="sm" className="text-primary font-bold hover:bg-primary/5">
-            Ver todas las organizaciones
+          <Button asChild variant="ghost" size="sm" className="text-primary font-bold hover:bg-primary/5">
+            <Link href="/dashboard/platform/organizations">
+              Ver todas las organizaciones
+            </Link>
           </Button>
         </div>
 

@@ -73,6 +73,7 @@ export { Textarea } from "@workspace/ui/components/textarea";
 export type { TextareaProps } from "@workspace/ui/components/textarea";
 export * from "@workspace/ui/components/dialog";
 export * from "@workspace/ui/components/dropdown-menu";
+export * from "@workspace/ui/components/actions-dropdown";
 
 // Next.js specific components
 export * from "@workspace/ui/components/next/sidebar";

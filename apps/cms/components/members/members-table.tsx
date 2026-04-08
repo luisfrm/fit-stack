@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback } from "@workspace/ui/components";
+import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback, Text } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
 import { GLOBAL_ROLES } from "@workspace/shared";
@@ -21,6 +21,8 @@ interface MembersTableProps {
     trigger: React.ReactNode;
   }>;
   readonly loading?: boolean;
+  readonly emptyTitle?: string;
+  readonly emptyDescription?: string;
 }
 
 const getColumns = (
@@ -141,7 +143,15 @@ function ResendInviteButton({ memberId }: { readonly memberId: number }) {
   );
 }
 
-export function MembersTable({ members, onDelete, onSuccess, EditModal = MemberModal, loading }: MembersTableProps) {
+export function MembersTable({
+  members,
+  onDelete,
+  onSuccess,
+  EditModal = MemberModal,
+  loading,
+  emptyTitle,
+  emptyDescription
+}: MembersTableProps) {
   const { settings } = useSettings();
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
@@ -152,6 +162,16 @@ export function MembersTable({ members, onDelete, onSuccess, EditModal = MemberM
       columns={columns}
       data={members}
       loading={loading}
+      emptyState={
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <Text variant="muted" size="lg" weight="bold">
+            {emptyTitle || "No hay resultados"}
+          </Text>
+          <Text variant="muted" size="sm" className="max-w-[400px]">
+            {emptyDescription || "No se encontraron registros que coincidan con la búsqueda."}
+          </Text>
+        </div>
+      }
     />
   );
 }

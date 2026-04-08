@@ -4,85 +4,150 @@ import * as React from "react";
 import {
   ArrowUpRight,
   Settings,
-  MoreHorizontal,
   Edit2,
   Power,
   CreditCard
 } from "lucide-react";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  toast
+  ActionsDropdown
 } from "@workspace/ui/components";
-import { useRouter } from "next/navigation";
-import { sessionService } from "@/lib/services/session-service";
-import { organizationsService } from "@/lib/services/organizations-service";
+import { type IPlatformOrganization } from "@workspace/shared/types";
+import { useOrganizationActivation } from "@/lib/hooks/use-organization-activation";
 
 interface OrganizationActionsProps {
-  readonly organizationId: string;
+  readonly organization: IPlatformOrganization;
   readonly status: 'active' | 'inactive' | 'pending';
+  readonly layout?: 'dropdown' | 'inline';
   readonly onActivate?: () => void;
   readonly onEdit?: () => void;
   readonly onSettings?: () => void;
   readonly onAddSubscription?: () => void;
   readonly onToggleStatus?: () => void;
+  readonly onSuccess?: () => void;
+  readonly EditModal?: React.ComponentType<{
+    initialData: IPlatformOrganization;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>;
 }
 
-export function OrganizationActions({ organizationId, status, onActivate, onEdit, onSettings, onAddSubscription, onToggleStatus }: OrganizationActionsProps) {
-  const [isActivating, setIsActivating] = React.useState(false);
-  const router = useRouter();
+export function OrganizationActions({
+  organization,
+  status,
+  layout = 'dropdown',
+  onActivate,
+  onEdit,
+  onSettings,
+  onAddSubscription,
+  onToggleStatus,
+  onSuccess,
+  EditModal
+}: OrganizationActionsProps) {
+  const { activate, isActivating } = useOrganizationActivation();
 
   const handleActivate = async () => {
-    setIsActivating(true);
-    try {
-      if (onActivate) {
-        onActivate();
-        return;
-      }
-
-      const { error } = await sessionService.setActiveOrganization(organizationId);
-
-      if (error) {
-        // If the user is a global admin but not a member, we auto-join them
-        if (error.code === "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") {
-          toast.info("Vinculando perfil de administrador...");
-
-          try {
-            await organizationsService.join(organizationId);
-
-            // Retry activation after joining
-            const { error: retryError } = await sessionService.setActiveOrganization(organizationId);
-            if (retryError) throw new Error(retryError.message);
-
-            toast.success("Perfil vinculado y contexto activado");
-            router.refresh();
-            return;
-          } catch (joinErr: any) {
-            console.error("Failed to auto-join organization:", joinErr);
-          }
-        }
-
-        toast.error(error.message || "Error al cambiar de organización");
-        console.error("Error activating organization:", error);
-
-        return;
-      }
-
-      toast.success("Contexto activado correctamente");
-      router.refresh();
-    } catch (err: any) {
-      console.error("Error activating organization:", err);
-      toast.error("Error crítico al establecer contexto");
-    } finally {
-      setIsActivating(false);
+    if (onActivate) {
+      onActivate();
+      return;
     }
+    await activate(organization.id);
   };
 
+  const dropdownSections = React.useMemo(() => [
+    {
+      label: "Gestión de Sede",
+      items: [
+        {
+          label: "Editar Información",
+          icon: <Edit2 size={14} />,
+          Modal: EditModal,
+          show: !!EditModal,
+        },
+        {
+          label: "Editar Información",
+          icon: <Edit2 size={14} />,
+          onClick: onEdit,
+          show: !EditModal,
+        },
+        {
+          label: "Gestionar Plan",
+          icon: <CreditCard size={14} />,
+          onClick: onAddSubscription,
+        },
+      ],
+    },
+    {
+      label: "Estado",
+      items: [
+        {
+          label: status === 'active' ? 'Desactivar Acceso' : 'Activar Acceso',
+          icon: <Power size={14} />,
+          variant: 'amber' as const,
+          onClick: onToggleStatus,
+        },
+      ],
+    },
+  ], [EditModal, onEdit, onAddSubscription, status, onToggleStatus]);
+
+  if (layout === 'inline') {
+    return (
+      <div className="flex items-center justify-end gap-2">
+        {/* Main CTA: Subscription/Plan */}
+        <Button
+          variant={organization.latestSubscription ? "outlined" : "primary"}
+          size="sm"
+          leftIcon={<CreditCard size={16} />}
+          onClick={onAddSubscription}
+          title={organization.latestSubscription ? "Gestionar Plan" : "Vincular Plan"}
+          className="font-black"
+        >
+          {organization.latestSubscription ? 'Plan' : 'Vincular'}
+        </Button>
+
+        {/* Edit Action */}
+        {EditModal ? (
+          <EditModal
+            initialData={organization}
+            onSuccess={onSuccess ?? (() => { })}
+            trigger={
+              <Button variant="ghost" size="icon" title="Editar Información">
+                <Edit2 size={18} />
+              </Button>
+            }
+          />
+        ) : (
+          <Button variant="ghost" size="icon" onClick={onEdit} title="Editar Información">
+            <Edit2 size={18} />
+          </Button>
+        )}
+
+        {/* Technical Settings */}
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Configuración Técnica"
+          onClick={onSettings}
+        >
+          <Settings size={18} />
+        </Button>
+
+        {/* Activation Action (matches brand style) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          title="Activar Contexto"
+          className="text-primary hover:bg-primary/10"
+          onClick={handleActivate}
+          loading={isActivating}
+        >
+          <ArrowUpRight size={18} />
+        </Button>
+      </div>
+    );
+  }
+
+  // Default: Dropdown layout
   return (
     <div className="flex items-center justify-end gap-1">
       <Button
@@ -101,33 +166,14 @@ export function OrganizationActions({ organizationId, status, onActivate, onEdit
         title="Configuración Técnica"
         onClick={onSettings}
       >
-        <Settings size={18} className="text-gray-400" />
+        <Settings size={18} />
       </Button>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal size={18} className="text-gray-500" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Gestión de Sede</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="gap-2" onClick={onEdit}>
-            <Edit2 size={14} /> Editar Información
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2" onClick={onAddSubscription}>
-            <CreditCard size={14} /> Gestionar Plan
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="gap-2 text-amber-500 hover:text-amber-600"
-            onClick={onToggleStatus}
-          >
-            <Power size={14} /> {status === 'active' ? 'Desactivar Acceso' : 'Activar Acceso'}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <ActionsDropdown
+        modalData={organization}
+        onSuccess={onSuccess}
+        sections={dropdownSections}
+      />
     </div>
   );
 }

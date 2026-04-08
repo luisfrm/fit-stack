@@ -37,7 +37,6 @@ export default function OrganizationsPage() {
 
   // Modales
   const [selectedOrg, setSelectedOrg] = React.useState<IPlatformOrganization | undefined>();
-  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = React.useState(false);
 
   const loadOrganizations = React.useCallback(async () => {
@@ -68,10 +67,6 @@ export default function OrganizationsPage() {
     setPage(1);
   };
 
-  const handleEdit = (org: IPlatformOrganization) => {
-    setSelectedOrg(org);
-    setIsEditModalOpen(true);
-  };
 
   const handleAddSubscription = (org: IPlatformOrganization) => {
     setSelectedOrg(org);
@@ -153,9 +148,10 @@ export default function OrganizationsPage() {
               <OrganizationsTable
                 organizations={organizations}
                 isLoading={loading}
-                onEdit={handleEdit}
+                onSuccess={loadOrganizations}
                 onAddSubscription={handleAddSubscription}
                 variant="detailed"
+                EditModal={OrganizationModal}
               />
             </div>
 
@@ -168,8 +164,9 @@ export default function OrganizationsPage() {
                   <OrganizationMobileCard
                     key={org.id}
                     org={org}
-                    onEdit={handleEdit}
+                    onSuccess={loadOrganizations}
                     onAddSubscription={handleAddSubscription}
+                    EditModal={OrganizationModal}
                   />
                 ))
               )}
@@ -207,14 +204,6 @@ export default function OrganizationsPage() {
         )}
       </div>
 
-      {/* Shared Modals */}
-      {/* Instance 2: Shared Modal for Edition */}
-      <OrganizationModal
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        initialData={selectedOrg}
-        onSuccess={loadOrganizations}
-      />
 
       {selectedOrg && (
         <AddSubscriptionModal

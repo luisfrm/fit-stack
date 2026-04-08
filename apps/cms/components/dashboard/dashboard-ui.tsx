@@ -276,11 +276,11 @@ interface NoDataProps {
 
 export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDataProps>) {
   return (
-    <div className={cn("flex flex-col items-center justify-center p-12 text-center gap-3", className)}>
+    <div className={cn("flex flex-col items-center p-12 text-center gap-3", className)}>
       <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
         <Icon className="w-6 h-6 text-slate-500" />
       </div>
-      <Text variant="muted" size="sm" className="max-w-[200px]">
+      <Text variant="muted" size="sm">
         {message}
       </Text>
     </div>

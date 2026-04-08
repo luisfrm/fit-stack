@@ -114,6 +114,7 @@ export default function MembersPage() {
               onDelete={handleDelete}
               onSuccess={() => loadMembers()}
               loading={loading}
+              emptyDescription="Aún no se han registrado clientes en esta organización."
             />
 
             {/* Paginación */}

@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, desc, db, isNull, ne } from '@workspace/database/client';
+import { eq, ilike, and, or, count, desc, db, isNotNull, ne } from '@workspace/database/client';
 import crypto from "node:crypto";
 import { gymMember, authMember, user } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
@@ -60,7 +60,7 @@ export const membersRepository = {
     }
 
     if (excludeRole) {
-      conditions.push(or(isNull(authMember.role), ne(authMember.role, excludeRole))!);
+      conditions.push(and(isNotNull(authMember.role), ne(authMember.role, excludeRole))!);
     }
 
     const whereClause = and(...conditions);

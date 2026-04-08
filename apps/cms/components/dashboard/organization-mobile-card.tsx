@@ -18,9 +18,15 @@ interface OrganizationMobileCardProps {
   readonly isLoading?: boolean;
   readonly onEdit?: (org: IPlatformOrganization) => void;
   readonly onAddSubscription?: (org: IPlatformOrganization) => void;
+  readonly onSuccess?: () => void;
+  readonly EditModal?: React.ComponentType<{
+    initialData: IPlatformOrganization;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>;
 }
 
-export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription }: OrganizationMobileCardProps) {
+export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription, onSuccess, EditModal }: OrganizationMobileCardProps) {
   if (isLoading) {
     return (
       <Card className="bg-white/5 border-none backdrop-blur-md p-5 rounded-xl space-y-4">
@@ -90,9 +96,11 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
         </div>
         {/* Usamos el componente de acciones también en mobile */}
         <OrganizationActions
-          organizationId={org.id}
+          organization={org}
           status={displayStatus as any}
           onEdit={() => onEdit?.(org)}
+          onSuccess={onSuccess}
+          EditModal={EditModal}
         />
       </div>
 

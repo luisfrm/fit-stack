@@ -5,14 +5,14 @@ import {
   Table,
   ColumnDef,
   Badge,
-  Button,
   NextImage,
   Text,
   Skeleton
 } from "@workspace/ui/components";
 import { OrganizationActions } from "./organization-actions";
-import { Building2, Edit2, CreditCard, ExternalLink, Users, Settings } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import { uploadService } from "@/lib/services/upload-service";
 import { format } from "date-fns";
@@ -25,6 +25,11 @@ interface OrganizationsTableProps {
   readonly onEdit?: (org: IPlatformOrganization) => void;
   readonly onAddSubscription?: (org: IPlatformOrganization) => void;
   readonly variant?: 'simple' | 'detailed';
+  readonly EditModal?: React.ComponentType<{
+    initialData: IPlatformOrganization;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>;
 }
 
 const getColumns = (
@@ -33,7 +38,12 @@ const getColumns = (
   onAddSubscription?: (org: IPlatformOrganization) => void,
   variant: 'simple' | 'detailed' = 'simple',
   isLoading?: boolean,
-  router?: any
+  router?: AppRouterInstance,
+  EditModal?: React.ComponentType<{
+    initialData: IPlatformOrganization;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>
 ): ColumnDef<IPlatformOrganization>[] => {
   const columns: ColumnDef<IPlatformOrganization>[] = [
     {
@@ -195,67 +205,26 @@ const getColumns = (
             </div>
           );
         }
+        const currentSubStatus = org.latestSubscription?.status || 'pending';
+        let calcStatus: 'active' | 'inactive' | 'pending' = 'pending';
+        if (currentSubStatus === 'active') {
+          calcStatus = 'active';
+        } else if (org.latestSubscription) {
+          calcStatus = 'inactive';
+        }
+
         return (
           <div className="flex items-center justify-end gap-2">
-            {variant === 'detailed' ? (
-              <>
-                <Button
-                  variant={org.latestSubscription ? "outlined" : "primary"}
-                  size="sm"
-                  onClick={() => onAddSubscription?.(org)}
-                  className="h-9 text-[10px] font-black uppercase tracking-widest px-3 border-white/10 hover:bg-white/5"
-                  title={org.latestSubscription ? "Gestionar Plan" : "Vincular Plan"}
-                >
-                  <CreditCard size={14} className="mr-2" />
-                  {org.latestSubscription ? 'Plan' : 'Vincular'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="sm"
-                  onClick={() => onEdit?.(org)}
-                  className="bg-transparent border-white/10 hover:bg-white/10 h-9 p-0 w-9 flex items-center justify-center shrink-0"
-                  title="Editar Información"
-                >
-                  <Edit2 size={14} />
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="sm"
-                  onClick={() => router.push(`/dashboard/platform/organizations/${org.id}/settings`)}
-                  className="bg-transparent border-white/10 hover:bg-white/10 h-9 p-0 w-9 flex items-center justify-center shrink-0"
-                  title="Configuración Técnica"
-                >
-                  <Settings size={14} className="text-gray-400" />
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => window.open(`/dashboard/platform/organizations/${org.id}`, '_blank')}
-                  className="h-9 w-9 p-0 flex items-center justify-center shrink-0"
-                  title="Acceder a Sede"
-                >
-                  <ExternalLink size={16} />
-                </Button>
-              </>
-            ) : (() => {
-              const currentSubStatus = org.latestSubscription?.status || 'pending';
-              let calcStatus: 'active' | 'inactive' | 'pending' = 'pending';
-              if (currentSubStatus === 'active') {
-                calcStatus = 'active';
-              } else if (org.latestSubscription) {
-                calcStatus = 'inactive';
-              }
-
-              return (
-                <OrganizationActions
-                  organizationId={org.id}
-                  status={calcStatus}
-                  onEdit={() => onEdit?.(org)}
-                  onSettings={() => router.push(`/dashboard/platform/organizations/${org.id}/settings`)}
-                  onAddSubscription={() => onAddSubscription?.(org)}
-                />
-              );
-            })()}
+            <OrganizationActions
+              organization={org}
+              status={calcStatus}
+              layout={variant === 'detailed' ? 'inline' : 'dropdown'}
+              onEdit={() => onEdit?.(org)}
+              onSettings={() => router?.push(`/dashboard/platform/organizations/${org.id}/settings`)}
+              onAddSubscription={() => onAddSubscription?.(org)}
+              onSuccess={onSuccess}
+              EditModal={EditModal}
+            />
           </div>
         );
       }
@@ -273,12 +242,13 @@ export function OrganizationsTable({
   onSuccess,
   onEdit,
   onAddSubscription,
-  variant = 'simple'
+  variant = 'simple',
+  EditModal
 }: OrganizationsTableProps) {
   const router = useRouter();
   const columns = React.useMemo(() =>
-    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, variant, isLoading, router),
-    [onSuccess, onEdit, onAddSubscription, variant, isLoading, router]
+    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, variant, isLoading, router, EditModal),
+    [onSuccess, onEdit, onAddSubscription, variant, isLoading, router, EditModal]
   );
 
   const displayData = React.useMemo(() => {

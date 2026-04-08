@@ -4,6 +4,7 @@ import * as React from "react";
 import { Text, Card } from "@workspace/ui/components";
 import { OrganizationsTable } from "./organizations-table";
 import { OrganizationMobileCard } from "./organization-mobile-card";
+import { OrganizationModal } from "./organization-modal";
 import { type IPlatformOrganization } from "@workspace/shared/types";
 
 interface OrganizationsListProps {
@@ -32,6 +33,7 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
             isLoading={isLoading}
             onSuccess={onSuccess}
             variant="simple"
+            EditModal={OrganizationModal}
           />
         </Card>
       </div>
@@ -44,7 +46,12 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
           ))
         ) : (
           organizations.map((org) => (
-            <OrganizationMobileCard key={org.id} org={org} />
+            <OrganizationMobileCard
+              key={org.id}
+              org={org}
+              onSuccess={onSuccess}
+              EditModal={OrganizationModal}
+            />
           ))
         )}
       </div>

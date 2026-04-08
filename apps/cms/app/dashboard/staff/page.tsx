@@ -119,6 +119,7 @@ export default function StaffPage() {
               onSuccess={() => loadStaff()}
               loading={loading}
               EditModal={StaffModal}
+              emptyDescription="Aún no se han registrado miembros del personal administrativo."
             />
 
             {/* Paginación */}

@@ -97,7 +97,7 @@ const buttonVariants = cva(
         md: "text-sm px-6 py-3",
         lg: "text-base px-8 py-4",
         xl: "text-lg px-10 py-4 tracking-[0.15em]",
-        icon: "p-2 rounded-full flex items-center justify-center shrink-0",
+        icon: "p-2 flex items-center justify-center shrink-0",
       },
 
       fullWidth: {
