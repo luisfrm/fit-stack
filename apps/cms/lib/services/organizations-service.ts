@@ -22,6 +22,11 @@ export const organizationsService = {
     return response.data;
   },
 
+  async getById(id: string): Promise<IPlatformOrganization> {
+    const response = await apiClient.get(`${ORGANIZATIONS_PATH}/${id}`);
+    return response.data;
+  },
+
   async create(data: Partial<IPlatformOrganization>): Promise<IPlatformOrganization> {
     const response = await apiClient.post(ORGANIZATIONS_PATH, data);
     return response.data;

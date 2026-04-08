@@ -6,7 +6,8 @@ import {
   Settings,
   MoreHorizontal,
   Edit2,
-  Power
+  Power,
+  CreditCard
 } from "lucide-react";
 import {
   Button,
@@ -28,10 +29,11 @@ interface OrganizationActionsProps {
   readonly onActivate?: () => void;
   readonly onEdit?: () => void;
   readonly onSettings?: () => void;
+  readonly onAddSubscription?: () => void;
   readonly onToggleStatus?: () => void;
 }
 
-export function OrganizationActions({ organizationId, status, onActivate, onEdit, onSettings, onToggleStatus }: OrganizationActionsProps) {
+export function OrganizationActions({ organizationId, status, onActivate, onEdit, onSettings, onAddSubscription, onToggleStatus }: OrganizationActionsProps) {
   const [isActivating, setIsActivating] = React.useState(false);
   const router = useRouter();
 
@@ -96,7 +98,7 @@ export function OrganizationActions({ organizationId, status, onActivate, onEdit
       <Button
         variant="ghost"
         size="icon"
-        title="Configuración"
+        title="Configuración Técnica"
         onClick={onSettings}
       >
         <Settings size={18} className="text-gray-400" />
@@ -108,12 +110,16 @@ export function OrganizationActions({ organizationId, status, onActivate, onEdit
             <MoreHorizontal size={18} className="text-gray-500" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuLabel>Gestión</DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Gestión de Sede</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="gap-2" onClick={onEdit}>
             <Edit2 size={14} /> Editar Información
           </DropdownMenuItem>
+          <DropdownMenuItem className="gap-2" onClick={onAddSubscription}>
+            <CreditCard size={14} /> Gestionar Plan
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="gap-2 text-amber-500 hover:text-amber-600"
             onClick={onToggleStatus}

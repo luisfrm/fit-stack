@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Building2, Edit2, CreditCard, ExternalLink, Users } from "lucide-react";
 import {
   Table,
   ColumnDef,
@@ -12,6 +11,8 @@ import {
   Skeleton
 } from "@workspace/ui/components";
 import { OrganizationActions } from "./organization-actions";
+import { Building2, Edit2, CreditCard, ExternalLink, Users, Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import { uploadService } from "@/lib/services/upload-service";
 import { format } from "date-fns";
@@ -31,7 +32,8 @@ const getColumns = (
   onEdit?: (org: IPlatformOrganization) => void,
   onAddSubscription?: (org: IPlatformOrganization) => void,
   variant: 'simple' | 'detailed' = 'simple',
-  isLoading?: boolean
+  isLoading?: boolean,
+  router?: any
 ): ColumnDef<IPlatformOrganization>[] => {
   const columns: ColumnDef<IPlatformOrganization>[] = [
     {
@@ -180,13 +182,14 @@ const getColumns = (
     },
     {
       header: "Acciones",
-      className: "pr-6 text-right w-[200px]",
+      className: "pr-6 text-right w-[240px]",
       headerClassName: "pr-6 text-right",
       cell: (org) => {
         if (isLoading) {
           return (
             <div className="flex items-center justify-end gap-2">
               <Skeleton className="h-9 w-20 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md" />
               <Skeleton className="h-9 w-9 rounded-md" />
               <Skeleton className="h-9 w-9 rounded-md" />
             </div>
@@ -211,9 +214,18 @@ const getColumns = (
                   size="sm"
                   onClick={() => onEdit?.(org)}
                   className="bg-transparent border-white/10 hover:bg-white/10 h-9 p-0 w-9 flex items-center justify-center shrink-0"
-                  title="Editar Configuración"
+                  title="Editar Información"
                 >
                   <Edit2 size={14} />
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="sm"
+                  onClick={() => router.push(`/dashboard/platform/organizations/${org.id}/settings`)}
+                  className="bg-transparent border-white/10 hover:bg-white/10 h-9 p-0 w-9 flex items-center justify-center shrink-0"
+                  title="Configuración Técnica"
+                >
+                  <Settings size={14} className="text-gray-400" />
                 </Button>
                 <Button
                   variant="primary"
@@ -239,6 +251,8 @@ const getColumns = (
                   organizationId={org.id}
                   status={calcStatus}
                   onEdit={() => onEdit?.(org)}
+                  onSettings={() => router.push(`/dashboard/platform/organizations/${org.id}/settings`)}
+                  onAddSubscription={() => onAddSubscription?.(org)}
                 />
               );
             })()}
@@ -261,9 +275,10 @@ export function OrganizationsTable({
   onAddSubscription,
   variant = 'simple'
 }: OrganizationsTableProps) {
+  const router = useRouter();
   const columns = React.useMemo(() =>
-    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, variant, isLoading),
-    [onSuccess, onEdit, onAddSubscription, variant, isLoading]
+    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, variant, isLoading, router),
+    [onSuccess, onEdit, onAddSubscription, variant, isLoading, router]
   );
 
   const displayData = React.useMemo(() => {
