@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
-  Loader2,
   Users
 } from "lucide-react";
 import {
@@ -63,7 +62,7 @@ export default function OrganizationsPage() {
     loadOrganizations();
   }, [loadOrganizations]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SubmitEvent) => {
     e.preventDefault();
     setQuery(tempQuery);
     setPage(1);

@@ -6,12 +6,14 @@ import {
   ColumnDef,
   Text,
   Badge,
-  Button
+  Button,
+  NextImage
 } from "@workspace/ui/components";
 import { ExternalLink, Edit2, CreditCard, Building2 } from "lucide-react";
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { uploadService } from "@/lib/services/upload-service";
 
 import { useRouter } from "next/navigation";
 
@@ -35,7 +37,7 @@ const getColumns = (
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden">
           {org.logo ? (
-            <img src={org.logo} alt={org.name} className="w-full h-full object-cover" />
+            <NextImage src={uploadService.getMediaUrl(org.logo)} alt={org.name} width={40} height={40} className="w-full h-full object-cover" />
           ) : (
             <Building2 size={20} />
           )}
