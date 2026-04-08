@@ -49,6 +49,9 @@ import {
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
+import { authClient } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 /* ─────────────────────────────────────────────
    SIDEBAR NAV SCHEMAS
@@ -74,6 +77,37 @@ const SAAS_NAV_ITEMS: SidebarNavItem[] = [
   { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
 ];
 
+function ReturnToSaaSButton() {
+  const router = useRouter();
+  const [loading, setLoading] = React.useState(false);
+
+  const handleReturn = async () => {
+    try {
+      setLoading(true);
+      await authClient.organization.setActive({ organizationId: null });
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      console.error("Error returning to SaaS:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="link"
+      size="xs"
+      onClick={handleReturn}
+      loading={loading}
+      className="p-0 h-auto text-[10px] uppercase font-black text-primary hover:text-white transition-colors gap-1.5 justify-start"
+      leftIcon={<ArrowLeft className="w-3 h-3" />}
+    >
+      Volver a SaaS
+    </Button>
+  );
+}
+
 
 export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
@@ -88,10 +122,11 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
       navigation={navigation}
       branding={{
         logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
+        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Gym unnamed"),
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
         isLoading: sessionLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
+        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
       }}
       footer={<SignOutButton />}
     />
@@ -114,6 +149,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
         isLoading: sessionLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
+        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
       }}
       footer={<SignOutButton />}
     />

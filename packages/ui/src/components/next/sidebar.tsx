@@ -28,6 +28,7 @@ export interface SidebarBranding {
   subtitle?: string;
   isLoading?: boolean;
   fallbackIcon?: LucideIcon;
+  action?: React.ReactNode;
 }
 
 interface SidebarProps {
@@ -79,7 +80,8 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
         )}>
           {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : LogoContent}
         </div>
-        <Link href="/dashboard">
+      <div className="flex flex-col gap-1 flex-1 min-w-0">
+        <Link href="/dashboard" className="transition-opacity hover:opacity-80">
           {branding.isLoading ? (
             <Skeleton className="h-5 w-24 rounded-md" />
           ) : (
@@ -88,23 +90,27 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
             </Text>
           )}
         </Link>
+        {branding.action && <div>{branding.action}</div>}
+      </div>
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer focus:outline-none">
-            <Menu className="w-6 h-6" />
-          </button>
-        </SheetTrigger>
-        <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark text-slate-100">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navegación</SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col h-full py-6">
-            <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <div className="flex items-center gap-2">
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer focus:outline-none">
+              <Menu className="w-6 h-6" />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark text-slate-100">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navegación</SheetTitle>
+            </SheetHeader>
+            <div className="flex flex-col h-full py-6">
+              <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </header>
   );
 }
@@ -129,32 +135,35 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
     <>
       <div className="px-6 flex flex-col gap-8 h-full">
         {/* Branding Branding */}
-        <div className="hidden lg:flex items-center gap-3">
-          <div className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg transition-colors duration-300",
-            branding.isLoading ? "bg-white/5 border-white/5 shadow-none" : "bg-primary/10 border-primary/20 shadow-primary/5"
-          )}>
-            {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : DesktopLogoContent}
-          </div>
-          <div className="flex flex-col min-w-0">
-            {branding.isLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-32 rounded-md" />
-                <Skeleton className="h-3 w-20 rounded-md" />
-              </div>
-            ) : (
-              <>
-                <Link href="/dashboard" className="transition-opacity hover:opacity-80">
-                  <Text as="p" size="md" weight="bold" className="leading-tight truncate uppercase italic tracking-tighter">
-                    {branding.title || "Panel"}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg transition-colors duration-300",
+              branding.isLoading ? "bg-white/5 border-white/5 shadow-none" : "bg-primary/10 border-primary/20 shadow-primary/5"
+            )}>
+              {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : DesktopLogoContent}
+            </div>
+            <div className="flex flex-col min-w-0">
+              {branding.isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-32 rounded-md" />
+                  <Skeleton className="h-3 w-20 rounded-md" />
+                </div>
+              ) : (
+                <>
+                  <Link href="/dashboard" className="transition-opacity hover:opacity-80">
+                    <Text as="p" size="md" weight="bold" className="leading-tight truncate uppercase italic tracking-tighter">
+                      {branding.title || "Panel"}
+                    </Text>
+                  </Link>
+                  <Text as="span" size="xs" variant="subtle" className="truncate opacity-60">
+                    {branding.subtitle || "Admin"}
                   </Text>
-                </Link>
-                <Text as="span" size="xs" variant="subtle" className="truncate opacity-60">
-                  {branding.subtitle || "Admin"}
-                </Text>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
+          {branding.action && <div>{branding.action}</div>}
         </div>
 
         {/* Navigation */}
