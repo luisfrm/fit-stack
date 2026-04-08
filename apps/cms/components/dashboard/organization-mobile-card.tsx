@@ -1,69 +1,120 @@
 "use client";
 
 import * as React from "react";
-import { Building2 } from "lucide-react";
 import {
   Card,
   Text,
-  Badge
+  Badge,
+  Button,
+  Skeleton
 } from "@workspace/ui/components";
+import { CreditCard, ExternalLink, Building2 } from "lucide-react";
 import { OrganizationActions } from "./organization-actions";
 
-export interface Organization {
-  readonly id: string;
-  readonly name: string;
-  readonly slug: string; // Añadido para gestión
-  readonly domain: string;
-  readonly memberCount: number;
-  readonly status: 'active' | 'inactive' | 'pending';
-  readonly logo?: string;
-  readonly countryCode?: string;
-  readonly taxId?: string;
-  readonly legalName?: string;
-  readonly address?: string;
-  readonly metadata?: Record<string, any>; // Estructurado
-}
+import { type IPlatformOrganization } from "@workspace/shared/types";
 
 interface OrganizationMobileCardProps {
-  readonly org: Organization;
+  readonly org: IPlatformOrganization;
+  readonly isLoading?: boolean;
+  readonly onEdit?: (org: IPlatformOrganization) => void;
+  readonly onAddSubscription?: (org: IPlatformOrganization) => void;
 }
 
-export function OrganizationMobileCard({ org }: OrganizationMobileCardProps) {
-  const statusVariants: Record<Organization['status'], "default" | "outline" | "destructive" | "secondary"> = {
+export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription }: OrganizationMobileCardProps) {
+  if (isLoading) {
+    return (
+      <Card className="bg-white/5 border-none backdrop-blur-md p-5 rounded-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-10 rounded-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="flex justify-between items-center pt-2 border-t border-white/5">
+          <div className="space-y-1">
+            <Skeleton className="h-2 w-12" />
+            <Skeleton className="h-4 w-8" />
+          </div>
+          <Skeleton className="h-8 w-8 rounded-md" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+          <Skeleton className="h-10 w-full rounded-md" />
+          <Skeleton className="h-10 w-full rounded-md" />
+        </div>
+      </Card>
+    );
+  }
+
+  const status = org.latestSubscription?.status || 'pending';
+  
+  let displayStatus: 'active' | 'inactive' | 'pending' = 'pending';
+  if (status === 'active') {
+    displayStatus = 'active';
+  } else if (org.latestSubscription) {
+    displayStatus = 'inactive';
+  }
+
+  const statusVariants: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
     active: 'default',
     pending: 'outline',
     inactive: 'destructive'
   };
 
-  const badgeVariant = statusVariants[org.status] || 'secondary';
+  const badgeVariant = statusVariants[displayStatus] || 'secondary';
 
   return (
     <Card className="bg-white/5 border-none backdrop-blur-md p-5 rounded-xl space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="size-10 bg-primary/20 rounded-full flex items-center justify-center">
-            <Building2 size={20} className="text-primary" />
+          <div className="size-10 bg-primary/20 rounded-full flex items-center justify-center text-primary">
+            <Building2 size={20} />
           </div>
           <div className="min-w-0">
             <Text weight="bold" truncate className="block">{org.name}</Text>
-            <Text size="xs" variant="muted" truncate className="block font-medium">{org.domain}</Text>
+            <Text size="xs" variant="muted" truncate className="block font-medium">{org.slug}.fit-stack.com</Text>
           </div>
         </div>
         <Badge variant={badgeVariant}>
-          {org.status}
+          {displayStatus}
         </Badge>
       </div>
 
       <div className="flex justify-between items-center pt-2 border-t border-white/5">
         <div className="flex flex-col">
           <Text size="xs" variant="muted" weight="bold" uppercase className="tracking-tighter font-medium">Miembros</Text>
-          <Text weight="bold">{org.memberCount}</Text>
+          <Text weight="bold">{org.memberCount || 0}</Text>
         </div>
         {/* Usamos el componente de acciones también en mobile */}
         <OrganizationActions
           organizationId={org.id}
-          status={org.status}
+          status={displayStatus as any}
+          onEdit={() => onEdit?.(org)}
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+        <Button 
+          variant="outlined" 
+          size="sm" 
+          onClick={() => onAddSubscription?.(org)}
+          className="bg-transparent border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest py-3 h-auto"
+        >
+          <CreditCard size={14} className="mr-2 text-primary" />
+          Plan
+        </Button>
+        <Button 
+          variant="primary" 
+          size="sm" 
+          onClick={() => window.open(`/dashboard/platform/organizations/${org.id}`, '_blank')}
+          className="h-auto py-3 text-[10px] font-black uppercase tracking-widest"
+        >
+          <ExternalLink size={14} className="mr-2" />
+          Entrar
+        </Button>
       </div>
     </Card>
   );

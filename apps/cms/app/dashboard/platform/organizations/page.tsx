@@ -17,8 +17,8 @@ import {
 } from "@workspace/ui/components";
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { OrganizationTable } from "@/components/platform/organization-table";
-import { OrganizationCard } from "@/components/platform/organization-card";
+import { OrganizationsTable } from "@/components/dashboard/organizations-table";
+import { OrganizationMobileCard } from "@/components/dashboard/organization-mobile-card";
 import { OrganizationModal } from "@/components/platform/organization-modal";
 import { AddSubscriptionModal } from "@/components/platform/add-subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -150,11 +150,12 @@ export default function OrganizationsPage() {
           <>
             {/* Desktop View */}
             <div className="hidden lg:block">
-              <OrganizationTable
+              <OrganizationsTable
                 organizations={organizations}
-                loading={loading}
+                isLoading={loading}
                 onEdit={handleEdit}
                 onAddSubscription={handleAddSubscription}
+                variant="detailed"
               />
             </div>
 
@@ -164,9 +165,9 @@ export default function OrganizationsPage() {
                 [1, 2, 3, 4].map(i => <div key={i} className="h-48 bg-white/5 rounded-2xl animate-pulse" />)
               ) : (
                 organizations.map(org => (
-                  <OrganizationCard
+                  <OrganizationMobileCard
                     key={org.id}
-                    organization={org}
+                    org={org}
                     onEdit={handleEdit}
                     onAddSubscription={handleAddSubscription}
                   />

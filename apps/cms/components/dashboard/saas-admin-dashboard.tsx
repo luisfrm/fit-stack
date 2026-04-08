@@ -14,46 +14,20 @@ import {
 } from "@workspace/ui/components";
 import { DashboardHeader } from "./dashboard-header";
 import { StatCard } from "./stat-card";
-import { type Organization } from "./organization-mobile-card";
 import { OrganizationModal } from "./organization-modal";
 import { OrganizationsList } from "./organizations-list";
 import { organizationsService } from "@/lib/services/organizations-service";
+import { type IPlatformOrganization } from "@workspace/shared/types";
 
 export function SaaSAdminDashboard() {
-  const [organizations, setOrganizations] = React.useState<Organization[]>([]);
+  const [organizations, setOrganizations] = React.useState<IPlatformOrganization[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const fetchOrganizations = React.useCallback(async () => {
     try {
       setIsLoading(true);
       const result = await organizationsService.getAll({ includeMemberCount: true });
-
-      const formatted: Organization[] = result.data.map(org => {
-        const subStatus = org.latestSubscription?.status;
-
-        let dashboardStatus: Organization['status'] = 'pending';
-        if (subStatus === 'active' || subStatus === 'past_due' || subStatus === 'read_only') {
-          dashboardStatus = 'active';
-        } else if (subStatus === 'suspended' || subStatus === 'canceled') {
-          dashboardStatus = 'inactive';
-        }
-
-        return {
-          id: org.id,
-          name: org.name,
-          slug: org.slug || 'no-slug',
-          logo: org.logo || undefined,
-          domain: `${org.slug || 'org'}.fitstack.com`,
-          memberCount: org.memberCount || 0,
-          status: dashboardStatus,
-          countryCode: org.countryCode,
-          taxId: org.taxId || undefined,
-          legalName: org.legalName || undefined,
-          address: org.address || undefined,
-          metadata: org.metadata || {}
-        };
-      });
-      setOrganizations(formatted);
+      setOrganizations(result.data);
     } catch (error: any) {
       console.error("Error fetching organizations:", error);
     } finally {
@@ -92,7 +66,7 @@ export function SaaSAdminDashboard() {
         />
         <StatCard
           title="Miembros Globales"
-          value={organizations.reduce((acc, org) => acc + org.memberCount, 0).toLocaleString()}
+          value={organizations.reduce((acc, org) => acc + (org.memberCount ?? 0), 0).toLocaleString()}
           change="+15% vs mes anterior"
           icon={<Users className="text-blue-400" size={24} />}
         />
