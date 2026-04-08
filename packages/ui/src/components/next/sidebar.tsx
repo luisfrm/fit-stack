@@ -80,18 +80,18 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
         )}>
           {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : LogoContent}
         </div>
-      <div className="flex flex-col gap-1 flex-1 min-w-0">
-        <Link href="/dashboard" className="transition-opacity hover:opacity-80">
-          {branding.isLoading ? (
-            <Skeleton className="h-5 w-24 rounded-md" />
-          ) : (
-            <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
-              {branding.title || "Panel"}
-            </Text>
-          )}
-        </Link>
-        {branding.action && <div>{branding.action}</div>}
-      </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <Link href="/dashboard" className="transition-opacity hover:opacity-80">
+            {branding.isLoading ? (
+              <Skeleton className="h-5 w-24 rounded-md" />
+            ) : (
+              <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
+                {branding.title || "Panel"}
+              </Text>
+            )}
+          </Link>
+          {!branding.isLoading && branding.action && <div>{branding.action}</div>}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -114,6 +114,8 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
     </header>
   );
 }
+
+const NAV_SKELETON_IDS = ["nav-sk-1", "nav-sk-2", "nav-sk-3", "nav-sk-4", "nav-sk-5"];
 
 /**
  * Shared sidebar content used by both Desktop Sidebar and Mobile Nav
@@ -163,45 +165,68 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
               )}
             </div>
           </div>
-          {branding.action && <div>{branding.action}</div>}
+          {!branding.isLoading && branding.action && <div>{branding.action}</div>}
         </div>
 
         {/* Navigation */}
         <nav className="flex flex-col gap-1">
-          {navigation.map((item) => {
-            const isActive = item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <SidebarNavItem
-                key={item.href}
-                {...item}
-                active={isActive}
-              />
-            );
-          })}
+          {branding.isLoading ? (
+            <>
+              {NAV_SKELETON_IDS.map((id) => (
+                <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 animate-pulse">
+                  <div className="w-5 h-5 rounded bg-white/10 shrink-0" />
+                  <div className="h-4 bg-white/10 rounded w-2/3" />
+                </div>
+              ))}
+            </>
+          ) : (
+            navigation.map((item) => {
+              const isActive = item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <SidebarNavItem
+                  key={item.href}
+                  {...item}
+                  active={isActive}
+                />
+              );
+            })
+          )}
         </nav>
       </div>
 
       {/* Profile/Footer Section */}
       <div className="px-4 mt-auto">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-primary/10">
-            {user.avatarUrl ? (
-              <NextImage src={user.avatarUrl} alt={user.name} width={40} height={40} />
-            ) : (
-              <span className="text-sm font-bold text-primary">{user.name.charAt(0)}</span>
-            )}
-          </div>
-          <div className="flex flex-col min-w-0 flex-1">
-            <Text as="span" size="base" weight="semibold" truncate>
-              {user.name}
-            </Text>
-            <Text as="span" size="xs" variant="subtle" truncate>
-              {user.role}
-            </Text>
-          </div>
-          {footer}
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 min-h-[66px]">
+          {branding.isLoading ? (
+            <>
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-3 w-16 rounded" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-primary/10">
+                {user.avatarUrl ? (
+                  <NextImage src={user.avatarUrl} alt={user.name} width={40} height={40} />
+                ) : (
+                  <span className="text-sm font-bold text-primary">{user.name.charAt(0)}</span>
+                )}
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <Text as="span" size="base" weight="semibold" truncate>
+                  {user.name}
+                </Text>
+                <Text as="span" size="xs" variant="subtle" truncate>
+                  {user.role}
+                </Text>
+              </div>
+              {footer}
+            </>
+          )}
         </div>
       </div>
     </>

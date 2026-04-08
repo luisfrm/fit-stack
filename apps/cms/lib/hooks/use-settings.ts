@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "@workspace/ui";
+import { useAuth } from "./use-auth";
 
 export const SETTINGS_KEYS = {
   BRAND_PRIMARY: "brand_primary",
@@ -15,9 +16,11 @@ export const SETTINGS_KEYS = {
 
 export function useSettings() {
   const queryClient = useQueryClient();
+  const { activeOrganization } = useAuth();
+  const activeOrganizationId = activeOrganization?.id;
 
   const query = useQuery({
-    queryKey: ["settings"],
+    queryKey: ["settings", activeOrganizationId || "global"],
     queryFn: async () => {
       const response = await apiClient.get<Record<string, string>>("/settings");
       return response.data;

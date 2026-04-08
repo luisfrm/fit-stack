@@ -1,6 +1,6 @@
-import * as React from "react";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 /**
  * ThemeInjector - Dynamically applies gym branding colors to CSS variables.
@@ -10,10 +10,16 @@ import { ColorUtils } from "@workspace/ui/lib/color-utils";
  */
 export function ThemeInjector() {
   const { settings } = useSettings();
+  const { activeOrganization } = useAuth();
+  const activeOrganizationId = activeOrganization?.id;
 
-  const primary = settings[SETTINGS_KEYS.BRAND_PRIMARY];
+  // Fit-Stack Default Branding (sync with globals.css)
+  const PLATFORM_PRIMARY = "oklch(0.853 0.199 91.26)";
 
-  // If no custom branding is set, don't inject anything (avoiding empty style tag)
+  const primary = settings[SETTINGS_KEYS.BRAND_PRIMARY] || (activeOrganizationId ? undefined : PLATFORM_PRIMARY);
+
+  // While loading a gym's settings, we might not have 'primary' yet. 
+  // We return null to let the Skeleton show the base colors without "flashing" a wrong custom color.
   if (!primary) return null;
 
   // Intelligent secondary variants calculation

@@ -33,6 +33,7 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { useSettings } from "@/lib/hooks/use-settings";
 import {
   AppSidebar as UISidebar,
   MobileNav as UIMobileNav,
@@ -111,6 +112,9 @@ function ReturnToSaaSButton() {
 
 export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
+  const { isLoading: settingsLoading } = useSettings();
+
+  const isBrandingLoading = sessionLoading || settingsLoading;
 
   // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
@@ -124,7 +128,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
         logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
         title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Gym unnamed"),
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
-        isLoading: sessionLoading,
+        isLoading: isBrandingLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
         action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
       }}
@@ -135,6 +139,9 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
 
 export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
+  const { isLoading: settingsLoading } = useSettings();
+
+  const isBrandingLoading = sessionLoading || settingsLoading;
 
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
@@ -147,7 +154,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
         logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
         title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
-        isLoading: sessionLoading,
+        isLoading: isBrandingLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
         action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
       }}
