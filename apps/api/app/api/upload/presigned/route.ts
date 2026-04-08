@@ -35,7 +35,8 @@ function constructStorageKey(orgId: string, folder: string, filename: string, cu
   const slug = slugify(baseName);
   const shortId = crypto.randomUUID().split('-')[0];
 
-  return `${orgId}/${folder}/${slug}_${shortId}.${extension}`;
+  const folderPath = folder && folder !== 'general' ? `${folder}/` : '';
+  return `cms/${orgId}/${folderPath}${slug}_${shortId}.${extension}`;
 }
 
 export async function POST(req: NextRequest) {

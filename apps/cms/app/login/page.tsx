@@ -8,7 +8,8 @@ import { Title, TitleAccent } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast, Checkbox, Label } from "@workspace/ui/components";
-import { signIn, useSession } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
+import { sessionService } from "@/lib/services/session-service";
 import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────────
@@ -47,7 +48,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    const { error } = await signIn({ email, password });
+    const { error } = await sessionService.signIn({ email, password });
 
     if (error) {
       if (error.code === 'INVALID_EMAIL_OR_PASSWORD' || error.message?.includes('Invalid email or password')) {

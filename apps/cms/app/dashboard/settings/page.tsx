@@ -7,19 +7,18 @@ import {
   Save,
   RotateCcw,
   Clock,
-  Globe
+  Globe,
+  ChevronRight
 } from "lucide-react";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
-import { Textarea } from "@workspace/ui/components/textarea";
 import { ColorPicker } from "@workspace/ui/components/color-picker";
-import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { uploadService } from "@/lib/services/upload-service";
 import { Title, toast } from "@workspace/ui";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 const DEFAULT_BRANDING = {
   primary: "#FCD303",
@@ -43,16 +42,24 @@ const TIMEZONES = [
 ];
 
 export default function GeneralSettingsPage() {
-  const { settings, isLoading, isUpdating, updateSettings } = useSettings();
+  const { settings, isLoading: settingsLoading, isUpdating: settingsUpdating, updateSettings } = useSettings();
+  const { isPending: sessionLoading, activeOrganization: activeOrg } = useAuth();
   const [formData, setFormData] = React.useState<Record<string, string>>({});
-  const [logoFile, setLogoFile] = React.useState<File | null>(null);
 
-  // Sync state with settings hook
+  const hasInitialized = React.useRef(false);
+
+  // Sync state with settings hook and session - only once on initial load
   React.useEffect(() => {
-    if (settings && Object.keys(settings).length > 0) {
-      setFormData(settings);
+    console.log("activeOrg", activeOrg);
+    const hasSettings = settings && Object.keys(settings).length > 0;
+
+    if (!hasInitialized.current && (hasSettings || activeOrg)) {
+      if (hasSettings) {
+        setFormData(settings);
+      }
+      hasInitialized.current = true;
     }
-  }, [settings]);
+  }, [settings, activeOrg]);
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -70,25 +77,20 @@ export default function GeneralSettingsPage() {
     e.preventDefault();
 
     try {
+      // 1. Handle Key-Value Settings
       const dataToSave = { ...formData };
 
-      // 1. Upload logo if changed
-      if (logoFile) {
-        const logoKey = await uploadService.uploadFile(logoFile, "gym");
-        dataToSave[SETTINGS_KEYS.GYM_LOGO] = logoKey;
-      }
-
-      // 2. Ensure primary color is in OKLCH format before saving to DB
+      // Ensure primary color is in OKLCH format before saving to DB
       const primaryColor = dataToSave[SETTINGS_KEYS.BRAND_PRIMARY];
       if (primaryColor) {
         dataToSave[SETTINGS_KEYS.BRAND_PRIMARY] = ColorUtils.toOklch(primaryColor);
       }
 
-      // 3. Save all settings
       await updateSettings(dataToSave);
-      setLogoFile(null); // Clear pending file
-    } catch (error) {
+      toast.success("Ajustes generales actualizados");
+    } catch (error: any) {
       console.error("Error saving settings:", error);
+      toast.error(error.message || "Error general al guardar");
     }
   };
 
@@ -111,6 +113,9 @@ export default function GeneralSettingsPage() {
     }
   };
 
+  const isUpdating = settingsUpdating;
+  const isLoading = settingsLoading || sessionLoading;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -131,46 +136,35 @@ export default function GeneralSettingsPage() {
 
       <div className="space-y-8 max-w-3xl">
 
-        {/* IDENTIDAD VISUAL */}
+        {/* INFORMACIÓN DEL GIMNASIO */}
         <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-primary/10 text-primary">
-              <Building2 className="w-6 h-6" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div className="flex flex-col">
+                <Text size="lg" weight="bold">Información de Marca</Text>
+                <Text variant="muted" size="sm">Configura los mensajes y lemas que definen a tu sede.</Text>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <Text size="lg" weight="bold">Información del Gimnasio</Text>
-              <Text variant="muted" size="sm">Identifica tu sede ante los miembros y el equipo.</Text>
-            </div>
+
+            <Button variant="ghost" size="sm" asChild className="group">
+              <a href="/dashboard/settings/organization" className="flex items-center gap-2">
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">Editar Identidad</span>
+                <ChevronRight className="w-4 h-4" />
+              </a>
+            </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8">
             <div className="space-y-6">
-              <Input
-                label="Nombre Comercial"
-                placeholder="Elite Fitness Gym"
-                value={formData[SETTINGS_KEYS.GYM_NAME] || ""}
-                onChange={(e) => handleChange(SETTINGS_KEYS.GYM_NAME, e.target.value)}
-              />
-              <Textarea
-                label="Eslogan / Lema"
-                placeholder="Tu mejor versión comienza aquí"
-                value={formData[SETTINGS_KEYS.GYM_SLOGAN] || ""}
-                onChange={(e) => handleChange(SETTINGS_KEYS.GYM_SLOGAN, e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-
-            <div className="flex justify-center md:justify-end">
-              <ImageUpload
-                label="Logo del Gimnasio"
-                description="Se recomienda usar formatos SVG o PNG con transparencia."
-                value={uploadService.getMediaUrl(formData[SETTINGS_KEYS.GYM_LOGO])}
-                onChange={(file) => setLogoFile(file)}
-                onRemove={() => {
-                  setLogoFile(null);
-                  handleChange(SETTINGS_KEYS.GYM_LOGO, "");
-                }}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                <div className="space-y-1 mt-1">
+                  <Text size="sm" weight="bold">Marca Institucional</Text>
+                  <Text variant="muted" size="xs">Nombre, logo y eslogan gestionados en Organización.</Text>
+                </div>
+              </div>
             </div>
           </div>
         </Card>

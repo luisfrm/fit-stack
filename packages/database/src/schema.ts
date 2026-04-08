@@ -102,6 +102,7 @@ export const organization = pgTable('organization', {
   name: text('name').notNull(),
   slug: text('slug').unique(),
   logo: text('logo'),
+  slogan: text('slogan'),
   metadata: jsonb('metadata'),
 
   // Localization & Fiscal (Optional)

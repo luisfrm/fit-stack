@@ -38,31 +38,6 @@ export const coachesService = {
     return response.data;
   },
 
-  /**
-   * Generates a presigned URL and uploads the file directly to Cloudflare R2.
-   * Returns the `key` of the uploaded file.
-   */
-  async uploadImage(file: File): Promise<string> {
-    const response = await apiClient.post<{ presignedUrl: string; key: string }>("/upload/presigned", {
-      filename: file.name,
-      contentType: file.type,
-      folder: "coaches"
-    });
-
-    const uploadResponse = await fetch(response.data.presignedUrl, {
-      method: "PUT",
-      body: file,
-      headers: {
-        "Content-Type": file.type,
-      },
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error("Fallo al subir la imagen directamente a R2. Revisa los CORS del bucket.");
-    }
-
-    return response.data.key;
-  },
 };
 
 /**

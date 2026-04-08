@@ -11,7 +11,6 @@ import {
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
 import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
-import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
@@ -83,7 +82,7 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
 
       // 1. If a new file is selected, upload it first
       if (selectedFile) {
-        finalImageUrl = await coachesService.uploadImage(selectedFile);
+        finalImageUrl = await uploadService.uploadFile(selectedFile);
       }
 
       const payload = {

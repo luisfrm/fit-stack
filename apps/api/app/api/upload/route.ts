@@ -4,7 +4,7 @@ import { getSession } from '@/config/get-session';
 
 /**
  * Handle listing of files in a specific folder.
- * GET /api/upload?folder=coaches
+ * GET /api/upload?folder=
  */
 export async function GET(req: NextRequest) {
   try {
@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const folder = searchParams.get('folder') || '';
     const orgId = session.session.activeOrganizationId || 'public';
-    
-    // El prefijo siempre empieza por el ID de la organización para asegurar el aislamiento
-    const prefix = `${orgId}/${folder}`;
-    
+
+    // El prefijo siempre empieza por 'cms/' y el ID de la organización
+    const folderPath = folder && folder !== 'general' ? `${folder}/` : '';
+    const prefix = `cms/${orgId}/${folderPath}`;
+
     const files = await r2Service.listFiles(prefix);
     return NextResponse.json(files);
   } catch (error: any) {
@@ -45,9 +46,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Key is required' }, { status: 400 });
     }
 
-    // Verificación de seguridad: el usuario solo puede borrar archivos de su organización
+    // Verificación de seguridad: el usuario solo puede borrar archivos de su organización dentro de 'cms/'
     const orgId = session.session.activeOrganizationId || 'public';
-    if (!key.startsWith(`${orgId}/`)) {
+    if (!key.startsWith(`cms/${orgId}/`)) {
       return NextResponse.json({ error: 'Forbidden: No tienes permiso para borrar este archivo.' }, { status: 403 });
     }
 

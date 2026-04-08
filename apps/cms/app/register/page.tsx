@@ -11,7 +11,7 @@ import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast } from "@workspace/ui/components";
-import { signUp } from "@/lib/auth-client";
+import { sessionService } from "@/lib/services/session-service";
 import { capitalize } from "@/lib/helper";
 import { membersService } from "@/lib/services/members-service";
 
@@ -72,7 +72,7 @@ function RegisterForm() {
       return;
     }
 
-    const { error } = await signUp({
+    const { error } = await sessionService.signUp({
       email: memberData.email, // Using pre-validated email to prevent mutation
       password,
       name: `${capitalize(memberData.firstName.toLocaleLowerCase().trim())} ${capitalize(memberData.lastName.toLocaleLowerCase().trim())}`,

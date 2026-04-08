@@ -7,10 +7,9 @@ import {
   TrendingUp,
   Plus,
   ShieldCheck,
-  Globe
 } from "lucide-react";
-import { 
-  Button, 
+import {
+  Button,
   Text
 } from "@workspace/ui/components";
 import { DashboardHeader } from "./dashboard-header";
@@ -28,10 +27,10 @@ export function SaaSAdminDashboard() {
     try {
       setIsLoading(true);
       const result = await organizationsService.getAll({ includeMemberCount: true });
-      
+
       const formatted: Organization[] = result.data.map(org => {
         const subStatus = org.latestSubscription?.status;
-        
+
         let dashboardStatus: Organization['status'] = 'pending';
         if (subStatus === 'active' || subStatus === 'past_due' || subStatus === 'read_only') {
           dashboardStatus = 'active';
@@ -47,6 +46,10 @@ export function SaaSAdminDashboard() {
           domain: `${org.slug || 'org'}.fitstack.com`,
           memberCount: org.memberCount || 0,
           status: dashboardStatus,
+          countryCode: org.countryCode,
+          taxId: org.taxId || undefined,
+          legalName: org.legalName || undefined,
+          address: org.address || undefined,
           metadata: org.metadata || {}
         };
       });
@@ -119,9 +122,9 @@ export function SaaSAdminDashboard() {
           </Button>
         </div>
 
-        <OrganizationsList 
-          organizations={organizations} 
-          isLoading={isLoading} 
+        <OrganizationsList
+          organizations={organizations}
+          isLoading={isLoading}
           onSuccess={fetchOrganizations}
         />
       </div>

@@ -10,7 +10,6 @@ import {
 } from "@workspace/ui/components";
 import { type ICoach } from "@/types/dashboard";
 import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
-import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Label } from "@workspace/ui/components/label";
@@ -94,7 +93,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
 
       // 1. If a new file is selected, upload it first
       if (selectedFile) {
-        finalImageUrl = await coachesService.uploadImage(selectedFile);
+        finalImageUrl = await uploadService.uploadFile(selectedFile);
       }
 
       const payload: Partial<ICoach> = {

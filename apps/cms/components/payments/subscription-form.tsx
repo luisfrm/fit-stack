@@ -223,7 +223,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         const methodName = selectedPaymentConfig.name.toLowerCase().replaceAll(/\s+/g, '-');
         const customName = `${clientName}_${methodName}_${timestamp}`;
 
-        finalDetails[field.id] = await uploadService.uploadFile(file, "payments", customName);
+        finalDetails[field.id] = await uploadService.uploadFile(file, "receipts", customName);
       }
     }
     return finalDetails;

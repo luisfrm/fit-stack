@@ -27,7 +27,7 @@ export default async function DashboardLayout({
           role: userRole,
           avatarUrl: user?.image || undefined,
         }}
-        activeOrganizationId={session.session?.activeOrganizationId}
+        activeOrganizationId={session.session?.activeOrganizationId || undefined}
       />
 
       <MobileNav
@@ -36,7 +36,7 @@ export default async function DashboardLayout({
           role: userRole,
           avatarUrl: user?.image || undefined,
         }}
-        activeOrganizationId={session.session?.activeOrganizationId}
+        activeOrganizationId={session.session?.activeOrganizationId || undefined}
       />
 
       <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">

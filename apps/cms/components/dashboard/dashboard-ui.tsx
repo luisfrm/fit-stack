@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { GLOBAL_ROLES } from "@workspace/shared";
+import { GLOBAL_ROLES, IOrganization } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -32,7 +32,7 @@ import {
 } from "@/types/dashboard";
 import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import {
   AppSidebar as UISidebar,
   MobileNav as UIMobileNav,
@@ -74,12 +74,12 @@ const SAAS_NAV_ITEMS: SidebarNavItem[] = [
   { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
 ];
 
+
 export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
-  const { settings, isLoading } = useSettings();
+  const { isPending: sessionLoading, activeOrganization } = useAuth();
 
   // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
-  console.log('user', user)
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
   return (
@@ -87,10 +87,10 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
       user={user}
       navigation={navigation}
       branding={{
-        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? uploadService.getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
-        title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
-        subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
-        isLoading: isLoading,
+        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
+        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        isLoading: sessionLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
       }}
       footer={<SignOutButton />}
@@ -99,7 +99,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
 }
 
 export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
-  const { settings, isLoading } = useSettings();
+  const { isPending: sessionLoading, activeOrganization } = useAuth();
 
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
@@ -109,10 +109,10 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
       user={user}
       navigation={navigation}
       branding={{
-        logo: settings[SETTINGS_KEYS.GYM_LOGO] ? uploadService.getMediaUrl(settings[SETTINGS_KEYS.GYM_LOGO]) : undefined,
-        title: isSaaSMode ? "FitStack SaaS" : (settings[SETTINGS_KEYS.GYM_NAME] || "Elite Fitness"),
-        subtitle: isSaaSMode ? "Administración Master" : (settings[SETTINGS_KEYS.GYM_SLOGAN] || "CMS Dashboard"),
-        isLoading: isLoading,
+        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
+        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        isLoading: sessionLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
       }}
       footer={<SignOutButton />}

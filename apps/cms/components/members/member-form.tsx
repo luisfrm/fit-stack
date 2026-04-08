@@ -11,7 +11,6 @@ import {
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X, MapPin } from "lucide-react";
 import { ORG_ROLES } from "@workspace/shared";
-import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 
@@ -82,7 +81,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
       let finalImageUrl = formData.imageUrl;
 
       if (selectedFile) {
-        finalImageUrl = await coachesService.uploadImage(selectedFile);
+        finalImageUrl = await uploadService.uploadFile(selectedFile);
       }
 
       const payload = {

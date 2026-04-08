@@ -181,7 +181,7 @@ export interface ISubscription {
   endDate: string;
   status: SubscriptionStatus;
   createdAt?: string;
-  
+
   // Optional joined fields for CMS Table display
   memberName?: string;
   planName?: string;
@@ -216,20 +216,20 @@ export interface IPayment {
   id?: number;
   memberId: number;
   subscriptionId?: number;
-  
+
   // Snapshots
   planSnapshotName: string;
   planSnapshotPrice: number;
   planSnapshotCurrency: string;
-  
+
   // Payment Data
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
-  
+
   paymentMethod: string;
   paymentMethodDetails?: Record<string, any>;
-  
+
   // Invoice Details (Optional/Internal)
   subtotal?: number;
   taxTotal?: number;
@@ -331,6 +331,7 @@ export interface IOrganization {
   legalName?: string | null;
   address?: string | null;
   fiscalConfig?: Record<string, any> | null;
+  slogan?: string | null;
 
   createdAt?: string | Date;
   updatedAt?: string | Date;

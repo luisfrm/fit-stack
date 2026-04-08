@@ -35,8 +35,14 @@ export function DashboardStats() {
   }, []);
 
   const formatIncome = (income: Record<string, number>): React.ReactNode => {
+    if (!income || Object.keys(income).length === 0) {
+      return new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency: primaryCurrency,
+      }).format(0);
+    }
+
     const keys = Object.keys(income);
-    if (keys.length === 0) return "$0";
 
     return (
       <div className="flex flex-col gap-1">
@@ -47,7 +53,7 @@ export function DashboardStats() {
             currency: cur,
             minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
           }).format(amount);
-          
+
           return <div key={cur}>{formatted}</div>;
         })}
       </div>
@@ -63,7 +69,7 @@ export function DashboardStats() {
     },
     {
       label: "Clases Hoy",
-      value: stats ? String(stats.classesToday) : "0",
+      value: stats?.classesToday ? String(stats.classesToday) : "0",
       icon: "calendar" as const,
       trend: { value: "Programadas", direction: "neutral" as const },
     },
@@ -75,7 +81,7 @@ export function DashboardStats() {
     },
     {
       label: "Membresías por Vencer",
-      value: stats ? String(stats.membershipsExpiring) : "0",
+      value: stats?.membershipsExpiring ? String(stats.membershipsExpiring) : "0",
       icon: "alert" as const,
       trend: { value: "Próx. 7 días", direction: "neutral" as const },
       accent: true,

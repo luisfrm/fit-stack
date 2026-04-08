@@ -9,7 +9,10 @@ import { GLOBAL_ROLES } from "@workspace/shared";
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
-    schema: schema,
+    schema: {
+      ...schema,
+      member: schema.authMember, // Map 'authMember' to 'member' for Better Auth
+    },
   }),
   secret: env.betterAuthSecret,
 
@@ -25,7 +28,20 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    organization(),
+    organization({
+      schema: {
+        organization: {
+          additionalFields: {
+            slogan: { type: "string", required: false },
+            countryCode: { type: "string", required: false },
+            taxId: { type: "string", required: false },
+            legalName: { type: "string", required: false },
+            address: { type: "string", required: false },
+            fiscalConfig: { type: "string", required: false },
+          }
+        }
+      }
+    }),
   ],
 
   emailAndPassword: {

@@ -61,6 +61,7 @@ export function OrganizationMobileCard({ org }: OrganizationMobileCardProps) {
         </div>
         {/* Usamos el componente de acciones también en mobile */}
         <OrganizationActions
+          organizationId={org.id}
           status={org.status}
         />
       </div>

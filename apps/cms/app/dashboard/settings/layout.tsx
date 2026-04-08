@@ -17,6 +17,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const SETTINGS_NAV_ITEMS = [
   { label: "General", href: "/dashboard/settings", icon: Building2, disabled: false },
+  { label: "Organización", href: "/dashboard/settings/organization", icon: Building2, disabled: false },
   { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
   { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
   { label: "Roles y Permisos", href: "/dashboard/settings/roles", icon: ShieldCheck, disabled: false },

@@ -35,7 +35,7 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
     <>
       {/* Desktop View: Table */}
       <div className="hidden md:block">
-        <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden min-h-[400px]">
+        <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden min-h-[400px] py-0">
           <OrganizationsTable
             organizations={organizations}
             onSuccess={onSuccess}

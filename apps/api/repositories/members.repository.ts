@@ -1,4 +1,5 @@
 import { eq, ilike, and, or, count, desc, db, isNull, ne } from '@workspace/database/client';
+import crypto from "node:crypto";
 import { gymMember, authMember, user } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
 
@@ -177,5 +178,21 @@ export const membersRepository = {
       roleId: r.roleName,
       count: Number(r.count)
     }));
+  },
+
+  async addToOrganization(userId: string, organizationId: string, role: OrgRole) {
+    const id = crypto.randomUUID();
+    const [newAuthMember] = await db
+      .insert(authMember)
+      .values({
+        id,
+        userId,
+        organizationId,
+        role,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    return newAuthMember;
   }
 };

@@ -90,8 +90,8 @@ const getColumns = (onSuccess: () => void): ColumnDef<Organization>[] => [
           }
         />
         <OrganizationActions 
+          organizationId={org.id}
           status={org.status} 
-          onActivate={() => console.log('Activar', org.id)}
         />
       </div>
     )

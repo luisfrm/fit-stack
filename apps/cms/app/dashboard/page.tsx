@@ -1,17 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { useSession } from "@/lib/auth-client";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { useSearchParams } from "next/navigation";
-import { ISession, GLOBAL_ROLES } from "@workspace/shared";
+import { GLOBAL_ROLES } from "@workspace/shared";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { SaaSAdminDashboard } from "@/components/dashboard/saas-admin-dashboard";
 import { toast } from "@workspace/ui/components";
 
 export default function DashboardPage() {
-  const { data: sessionData, isPending } = useSession();
+  const { session, isPending, user } = useAuth();
   const searchParams = useSearchParams();
-  const { user, session: currentSession } = (sessionData as unknown as ISession) || {};
 
   React.useEffect(() => {
     if (searchParams.get("status") === "unauthorized") {
@@ -29,7 +28,7 @@ export default function DashboardPage() {
   }
 
   // Si el usuario es 'admin' (Master Admin) Y NO tiene una organización activa, mostramos el dashboard del SaaS
-  if (user?.role === GLOBAL_ROLES.ADMIN && !currentSession?.activeOrganizationId) {
+  if (user?.role === GLOBAL_ROLES.ADMIN && !session?.session?.activeOrganizationId) {
     return <SaaSAdminDashboard />;
   }
 

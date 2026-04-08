@@ -5,9 +5,6 @@ import { apiClient } from "@/lib/api-client";
 import { toast } from "@workspace/ui";
 
 export const SETTINGS_KEYS = {
-  GYM_NAME: "gym_name",
-  GYM_SLOGAN: "gym_slogan",
-  GYM_LOGO: "gym_logo_url",
   BRAND_PRIMARY: "brand_primary",
   TIMEZONE: "timezone",
   ACTIVE_CURRENCIES: "active_currencies",

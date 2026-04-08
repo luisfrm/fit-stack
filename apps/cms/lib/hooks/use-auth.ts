@@ -1,45 +1,47 @@
 "use client";
 
-import { useSession } from "@/lib/auth-client";
+import { useSession, useActiveOrganization } from "@/lib/auth-client";
 import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
-import { getRoleName } from "@/lib/utils/auth";
-import { useMemo } from "react";
-import type { User } from "@/lib/auth-client";
+import type { User, Session } from "@/lib/auth-client";
 
 /**
  * Fit-Stack Custom Auth Hook
- * Provides reactive access to session, user, and role-based permissions.
+ * Wrapper around Better Auth's native hooks:
+ *  - useSession()              → user + session data
+ *  - useActiveOrganization()   → active org (separate hook by design)
+ *
+ * Adds role-based permission flags for easy UI conditions.
  */
 export function useAuth() {
-  const { data: session, isPending, error, refetch } = useSession();
+  const { data: sessionData, isPending, error, refetch } = useSession();
+  const { data: activeOrganization, isPending: orgPending } = useActiveOrganization();
 
-  const user = (session?.user as unknown as User) || null;
-  
-  // Use useMemo to avoid recalculating on every render if user hasn't changed
-  const roleName = useMemo(() => getRoleName(user), [user]);
+  const session = sessionData as Session;
+  const user = session?.user as User;
 
-  // Role flags for easy UI conditions
+  const roleName = user?.role || GLOBAL_ROLES.USER;
   const isAdmin = user?.role === GLOBAL_ROLES.ADMIN;
-  const isCoach = user?.role === ORG_ROLES.COACH;
-  const isMember = user?.role === ORG_ROLES.MEMBER;
+  const isCoach = session?.member?.role === ORG_ROLES.COACH;
+  const isMember = session?.member?.role === ORG_ROLES.MEMBER;
 
   return {
     // Core session data
     session,
     user,
-    
+    activeOrganization: activeOrganization ?? null,
+
     // Auth status
     isAuthenticated: !!session,
-    isPending,
+    isPending: isPending || orgPending,
     error,
-    
+
     // Role information
     roleName,
     isAdmin,
     isCoach,
     isMember,
-    
+
     // Actions
-    refetch
+    refetch,
   };
 }

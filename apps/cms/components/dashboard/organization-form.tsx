@@ -15,7 +15,6 @@ import {
 import { type Organization } from "./organization-mobile-card";
 import { Building2, Globe, ShieldCheck, Send, Upload, X, MapPin, Fingerprint } from "lucide-react";
 import { LATAM_COUNTRIES } from "@workspace/shared/constants";
-import { coachesService } from "@/lib/services/coaches-service";
 import { uploadService } from "@/lib/services/upload-service";
 
 interface OrganizationFormProps {
@@ -73,7 +72,10 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       let finalLogoUrl = formData.logo;
 
       if (selectedFile) {
-        finalLogoUrl = await coachesService.uploadImage(selectedFile);
+        finalLogoUrl = await uploadService.uploadFile(selectedFile);
+      } else if (!isEdit && !formData.logo) {
+        // Default logo for new organizations to solve isolation issues
+        finalLogoUrl = "/public/no_logo.png";
       }
 
       // Convertimos null de vuelta a undefined para cumplir con la interfaz si es necesario,
@@ -93,43 +95,53 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
-      {/* Logo Upload */}
-      <div className="flex flex-col items-center gap-4 py-2">
-        <div className="relative group">
-          <Avatar className="size-20 border border-white/10 bg-white/5 ring-offset-background group-hover:ring-2 ring-primary/50 transition-all">
-            {previewUrl ? (
-              <AvatarImage src={previewUrl} className="object-cover" />
-            ) : null}
-            <AvatarFallback className="bg-white/5 text-slate-500 font-bold">
-              <Building2 className="size-8 opacity-30" />
-            </AvatarFallback>
-          </Avatar>
+      {/* Logo Upload - Only show in Edit mode or if we already have a logo */}
+      {(isEdit || previewUrl) && (
+        <div className="flex flex-col items-center gap-4 py-2">
+          <div className="relative group">
+            <Avatar className="size-20 border border-white/10 bg-white/5 ring-offset-background group-hover:ring-2 ring-primary/50 transition-all">
+              {previewUrl ? (
+                <AvatarImage src={previewUrl} className="object-cover" />
+              ) : null}
+              <AvatarFallback className="bg-white/5 text-slate-500 font-bold">
+                <Building2 className="size-8 opacity-30" />
+              </AvatarFallback>
+            </Avatar>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0 border-none hover:bg-black/60"
-          >
-            <Upload className="size-5 text-white" />
-          </Button>
-
-          {previewUrl && (
             <Button
               type="button"
-              variant="danger"
-              size="icon"
-              rounded="full"
-              onClick={removeImage}
-              className="absolute -top-1 -right-1 h-5 w-5 shadow-lg hover:scale-110 transition-transform z-10"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0 border-none hover:bg-black/60"
             >
-              <X className="size-3" />
+              <Upload className="size-5 text-white" />
             </Button>
-          )}
+
+            {previewUrl && previewUrl !== uploadService.getMediaUrl("/public/no_logo.png") && (
+              <Button
+                type="button"
+                variant="danger"
+                size="icon"
+                rounded="full"
+                onClick={removeImage}
+                className="absolute -top-1 -right-1 h-5 w-5 shadow-lg hover:scale-110 transition-transform z-10"
+              >
+                <X className="size-3" />
+              </Button>
+            )}
+          </div>
+          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+          <Text size="xs" variant="muted" className="font-medium uppercase tracking-wider">Logo de la organización</Text>
         </div>
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-        <Text size="xs" variant="muted" className="font-medium uppercase tracking-wider">Logo de la organización</Text>
-      </div>
+      )}
+
+      {!isEdit && !previewUrl && (
+        <div className="flex flex-col items-center gap-2 py-4 px-6 bg-white/5 border border-dashed border-white/10 rounded-2xl">
+          <Text size="xs" variant="muted" className="text-center italic">
+            Podrás subir el logo personalizado una vez creada la sede para asegurar que se guarde en su carpeta aislada.
+          </Text>
+        </div>
+      )}
 
       <div className="space-y-4">
         <Input

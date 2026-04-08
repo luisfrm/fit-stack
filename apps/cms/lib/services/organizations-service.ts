@@ -41,5 +41,9 @@ export const organizationsService = {
   }): Promise<IPlatformSubscription> {
     const response = await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/subscriptions`, data);
     return response.data;
+  },
+
+  async join(id: string): Promise<void> {
+    await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/join`);
   }
 };

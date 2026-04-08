@@ -1,5 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { customSessionClient, organizationClient } from "better-auth/client/plugins";
+import { GlobalRole } from '@workspace/shared';
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
@@ -20,56 +21,21 @@ export const authClient = createAuthClient({
 
 // ── WRAPPERS FOR COMPATIBILITY ──
 
-interface SignInParams {
+export interface SignInParams {
   email: string;
   password: string;
 }
 
-export const signIn = async (params: SignInParams) => {
-  try {
-    const result = await authClient.signIn.email(params);
-    return { data: result?.data || null, error: result?.error || null };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-};
-
-interface SignUpParams {
+export interface SignUpParams {
   email: string;
   password: string;
   name: string;
 }
 
-export const signUp = async (params: SignUpParams) => {
-  try {
-    const result = await authClient.signUp.email(params);
-    return { data: result?.data || null, error: result?.error || null };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-};
-
-export const signOut = async (options?: any) => {
-  try {
-    const result = await authClient.signOut(options);
-    return { data: result?.data || true, error: result?.error || null };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-};
-
-export const getSession = async (options?: any) => {
-  try {
-    const result = await authClient.getSession(options);
-    return { data: result?.data || null, error: result?.error || null };
-  } catch (err: any) {
-    return { data: null, error: err };
-  }
-};
-
-export const { 
+export const {
   useSession,
-  organization
+  useActiveOrganization,
+  organization,
 } = authClient;
 
 export interface User {
@@ -77,10 +43,10 @@ export interface User {
   name: string;
   email: string;
   emailVerified: boolean;
-  image?: string;
+  image?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  role?: string; // Global role (e.g. 'admin')
+  role?: GlobalRole; // Global role (e.g. 'admin')
 }
 
 export interface Session {
@@ -92,8 +58,31 @@ export interface Session {
     token: string;
     createdAt: Date;
     updatedAt: Date;
-    ipAddress?: string;
-    userAgent?: string;
-    activeOrganizationId?: string;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    activeOrganizationId?: string | null;
   };
-}
+  member?: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    role: string;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+  activeOrganization?: {
+    id: string;
+    name: string;
+    slug: string;
+    logo?: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    metadata?: any;
+    countryCode: string;
+    slogan?: string | null;
+    taxId?: string | null;
+    legalName?: string | null;
+    address?: string | null;
+    fiscalConfig?: any;
+  } | null;
+}

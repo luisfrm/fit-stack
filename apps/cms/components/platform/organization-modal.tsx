@@ -1,11 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
   DialogFooter,
   Button,
@@ -19,16 +19,16 @@ import { type IPlatformOrganization } from "@workspace/shared/types";
 import { organizationsService } from "@/lib/services/organizations-service";
 
 interface OrganizationModalProps {
-  organizationData?: IPlatformOrganization;
-  onSuccess: () => void;
-  trigger?: React.ReactNode;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  readonly organizationData?: IPlatformOrganization;
+  readonly onSuccess: () => void;
+  readonly trigger?: React.ReactNode;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
-export function OrganizationModal({ 
-  organizationData, 
-  onSuccess, 
+export function OrganizationModal({
+  organizationData,
+  onSuccess,
   trigger,
   open: controlledOpen,
   onOpenChange: setControlledOpen
@@ -58,7 +58,7 @@ export function OrganizationModal({
     }
   }, [organizationData, open, isEdit]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!formData.name) return toast.error("El nombre es requerido");
 
@@ -68,7 +68,10 @@ export function OrganizationModal({
         await organizationsService.update(organizationData.id, formData);
         toast.success("Organización actualizada con éxito");
       } else {
-        await organizationsService.create(formData);
+        await organizationsService.create({
+          ...formData,
+          logo: formData.logo || "/public/no_logo.png"
+        });
         toast.success("Organización creada con éxito");
       }
       onSuccess();
@@ -132,16 +135,25 @@ export function OrganizationModal({
               </Text>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="logo" className="text-xs uppercase font-black tracking-widest text-slate-400">URL del Logo (Opcional)</Label>
-              <Input
-                id="logo"
-                value={formData.logo}
-                onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                placeholder="https://su-web.com/logo.png"
-                className="bg-white/5 border-white/10 h-12 text-sm"
-              />
-            </div>
+            {isEdit && (
+              <div className="space-y-2">
+                <Label htmlFor="logo" className="text-xs uppercase font-black tracking-widest text-slate-400">URL del Logo (Opcional)</Label>
+                <Input
+                  id="logo"
+                  value={formData.logo}
+                  onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+                  placeholder="https://su-web.com/logo.png"
+                  className="bg-white/5 border-white/10 h-12 text-sm"
+                />
+              </div>
+            )}
+            {!isEdit && (
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                <Text size="xs" variant="muted" className="italic text-center">
+                  Se asignará un logo genérico inicialmente. Podrás personalizarlo desde la configuración de la sede tras su creación.
+                </Text>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-4 border-t border-white/5 flex flex-col sm:flex-row gap-3">

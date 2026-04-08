@@ -1,6 +1,5 @@
-import { getSession, signOut, type Session, type User } from "@/lib/auth-client";
-import { GLOBAL_ROLES } from "@workspace/shared";
-import { getRoleName } from "@/lib/utils/auth";
+import { authClient, type Session, type User, type SignInParams, type SignUpParams } from "@/lib/auth-client";
+import { GLOBAL_ROLES, GlobalRole } from "@workspace/shared";
 
 /**
  * Service to handle session-related operations in the CMS.
@@ -16,14 +15,16 @@ export const sessionService = {
       try {
         const { headers: nextHeaders } = await import("next/headers");
         const headers = customHeaders || await nextHeaders();
-        return await getSession({ fetchOptions: { headers } }) as { data: Session | null; error: any };
+        const result = await authClient.getSession({ fetchOptions: { headers } });
+        return { data: result?.data as Session | null, error: result?.error || null };
       } catch (error) {
         console.error("Error fetching session on server:", error);
         return { data: null, error };
       }
     }
 
-    return await getSession() as { data: Session | null; error: any };
+    const result = await authClient.getSession();
+    return { data: result?.data as Session | null, error: result?.error || null };
   },
 
   /**
@@ -51,16 +52,66 @@ export const sessionService = {
   },
 
   /**
+   * Signs in a user with email and password.
+   */
+  async signIn(params: SignInParams) {
+    try {
+      const result = await authClient.signIn.email(params);
+      return { data: result?.data || null, error: result?.error || null };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * Registers a new user.
+   */
+  async signUp(params: SignUpParams) {
+    try {
+      const result = await authClient.signUp.email(params);
+      return { data: result?.data || null, error: result?.error || null };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  },
+
+  /**
    * Signs out the current user.
    */
   async signOut(onSuccess?: () => void) {
-    return await signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          if (onSuccess) onSuccess();
+    try {
+      const result = await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            if (onSuccess) onSuccess();
+          }
         }
-      }
-    });
+      });
+      return { data: result?.data || true, error: result?.error || null };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * 🏢 Sets the active organization context for the current session.
+   */
+  async setActiveOrganization(organizationId: string | null) {
+    try {
+      const result = await authClient.organization.setActive({
+        organizationId: organizationId || null,
+      });
+      return { data: result?.data || null, error: result?.error || null };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
+  },
+
+  /**
+   * 🛡️ Helper to check if the current user has Super Admin (Global) privileges.
+   */
+  isSuperAdmin(session: Session | null): boolean {
+    return session?.user?.role === 'admin';
   },
 
   /**
@@ -75,9 +126,9 @@ export const sessionService = {
   /**
    * Helper to get user role name.
    */
-  async getUserRole(): Promise<string> {
+  async getUserRole(): Promise<GlobalRole> {
     const { data: session } = await this.getSession();
-    return getRoleName(session?.user);
+    return session?.user?.role || GLOBAL_ROLES.USER;
   },
 
   /**
