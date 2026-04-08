@@ -11,7 +11,8 @@ export type MemberWithRelations = DbMember & {
     id: string;
     email: string;
   } | null;
-  role?: OrgRole | null;
+  role: OrgRole;
+  authRole?: OrgRole | null;
 };
 
 export interface MembersFilter {
@@ -56,11 +57,11 @@ export const membersRepository = {
     }
 
     if (role) {
-      conditions.push(eq(authMember.role, role));
+      conditions.push(eq(gymMember.role, role));
     }
 
     if (excludeRole) {
-      conditions.push(and(isNotNull(authMember.role), ne(authMember.role, excludeRole))!);
+      conditions.push(ne(gymMember.role, excludeRole));
     }
 
     const whereClause = and(...conditions);
@@ -68,7 +69,7 @@ export const membersRepository = {
     const rows = await db
       .select({
         member: gymMember,
-        role: authMember.role,
+        authRole: authMember.role,
         user: {
           id: user.id,
           email: user.email,
@@ -97,7 +98,7 @@ export const membersRepository = {
     const total = Number(countResult[0]?.total ?? 0);
 
     return {
-      data: rows.map(r => ({ ...r.member, role: r.role, user: r.user })),
+      data: rows.map(r => ({ ...r.member, role: r.member.role, authRole: r.authRole, user: r.user })),
       total,
       page,
       limit,
@@ -109,7 +110,7 @@ export const membersRepository = {
     const result = await db
       .select({
         member: gymMember,
-        role: authMember.role,
+        authRole: authMember.role,
         user: {
           id: user.id,
           email: user.email,
@@ -125,7 +126,7 @@ export const membersRepository = {
       .limit(1);
 
     if (result.length === 0 || !result[0]) return undefined;
-    return { ...result[0].member, role: result[0].role, user: result[0].user };
+    return { ...result[0].member, role: result[0].member.role, authRole: result[0].authRole, user: result[0].user };
   },
 
   async findByEmail(organizationId: string, email: string) {
@@ -194,5 +195,14 @@ export const membersRepository = {
       .returning();
 
     return newAuthMember;
+  },
+
+  async updateAuthRole(userId: string, organizationId: string, role: OrgRole) {
+    const [updated] = await db
+      .update(authMember)
+      .set({ role })
+      .where(and(eq(authMember.userId, userId), eq(authMember.organizationId, organizationId)))
+      .returning();
+    return updated;
   }
 };

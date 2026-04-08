@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     // 1. Vinculamos el user.id dentro del registro gymMembers (el schema.ts actual lo soporta)
     await membersRepository.update(organizationId, member.id, { userId: session.user.id });
 
-    // 2. El role se maneja ya con `better-auth member` (si fuera PWA o dashboard).
-    // Si la invitación era para un trainer/admin, asumo que ya se manejaron en la creación del miembro en Auth.
+    // 2. Agregamos el usuario a la organización en Better Auth con el rol que ya tiene definido el miembro
+    await membersRepository.addToOrganization(session.user.id, organizationId, member.role);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

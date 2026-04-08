@@ -7,7 +7,7 @@ export interface IMembershipPlan {
   name: string
   price: string | number // decimal in pg is string in drizzle
   currency: string
-  features: unknown | null
+  features: string[] | null
   isPopular: boolean
   isActive: boolean
   isVisibleOnSite: boolean
@@ -61,11 +61,7 @@ export const plansRepository = {
       ))
       .groupBy(payment.currencyPaid)
 
-    const monthlyRevenue: Record<string, number> = {
-      USD: 0,
-      VES: 0,
-      EUR: 0
-    }
+    const monthlyRevenue: Record<string, number> = {}
     incomeResults.forEach(row => {
       if (row.currency) {
         monthlyRevenue[row.currency] = Number(row.total ?? 0)

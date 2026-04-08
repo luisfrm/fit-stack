@@ -3,6 +3,16 @@ import { accessControlRepository } from '../repositories/access-control.reposito
 import { tokenService } from './token.service';
 import { emailService } from './email.service';
 
+const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
+  const sanitized = { ...data };
+  for (const key in sanitized) {
+    if (sanitized[key] === "") {
+      sanitized[key] = null as any;
+    }
+  }
+  return sanitized;
+};
+
 export const membersService = {
   async getAllMembers(filters: MembersFilter) {
     if (!filters.organizationId) throw new Error("organizationId is required");
@@ -18,13 +28,14 @@ export const membersService = {
   },
 
   async createMember(organizationId: string, data: Omit<NewDbMember, "organizationId">, sendInvite: boolean = false) {
-    const existing = await membersRepository.findByEmail(organizationId, data.email);
+    const sanitizedData = sanitizeMemberData(data);
+    const existing = await membersRepository.findByEmail(organizationId, sanitizedData.email);
     if (existing) {
       throw new Error('El correo electrónico ya está registrado para otro miembro en esta organización');
     }
 
     const newMemberData: NewDbMember = {
-      ...data,
+      ...sanitizedData,
       organizationId,
     };
 
@@ -57,7 +68,17 @@ export const membersService = {
       }
     }
 
-    const updated = await membersRepository.update(organizationId, id, data);
+    const sanitizedData = sanitizeMemberData(data);
+
+    // If role is being updated, sync with auth system if user is linked
+    if (sanitizedData.role) {
+      const currentMember = await this.getMemberById(organizationId, id);
+      if (currentMember.userId) {
+        await membersRepository.updateAuthRole(currentMember.userId, organizationId, sanitizedData.role);
+      }
+    }
+
+    const updated = await membersRepository.update(organizationId, id, sanitizedData);
 
     // Trigger biometric sync task if critical fields changed
     if (updated && (data.imageUrl || data.documentId || data.firstName || data.lastName)) {
@@ -68,11 +89,9 @@ export const membersService = {
   },
 
   async deleteMember(organizationId: string, id: number) {
-    const member = await this.getMemberById(organizationId, id);
-    
     // Trigger biometric sync task to remove from hardware
     await accessControlRepository.createSyncTask(organizationId, id, 'delete');
-    
+
     await membersRepository.delete(organizationId, id);
   },
 

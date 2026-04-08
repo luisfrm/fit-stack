@@ -101,7 +101,7 @@ function ReturnToSaaSButton() {
       size="xs"
       onClick={handleReturn}
       loading={loading}
-      className="p-0 h-auto text-[10px] uppercase font-black text-primary hover:text-white transition-colors gap-1.5 justify-start"
+      className="p-0 uppercase gap-1.5"
       leftIcon={<ArrowLeft className="w-3 h-3" />}
     >
       Volver a SaaS

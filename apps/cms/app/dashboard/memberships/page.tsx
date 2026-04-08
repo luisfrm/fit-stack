@@ -7,11 +7,25 @@ import { type IMembershipPlan, type IMembershipsSummary } from "@/types/dashboar
 import { plansService } from "@/lib/services/plans-service";
 import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 
 export default function MembershipsPage() {
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
   const [summary, setSummary] = React.useState<IMembershipsSummary | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const { settings } = useSettings();
+
+  const activeCurrencies: string[] = React.useMemo(() => {
+    const active = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    if (!active) return ["USD"];
+    try {
+      return JSON.parse(active);
+    } catch {
+      return ["USD"];
+    }
+  }, [settings]);
+
+  const currencyFormat = settings[SETTINGS_KEYS.CURRENCY_FORMAT] || "latam";
 
   const loadPlans = async () => {
     try {
@@ -34,23 +48,39 @@ export default function MembershipsPage() {
   }, []);
 
   const formatMonthlyRevenue = (revenue: Record<string, number>) => {
-    const keys = Object.keys(revenue);
-    if (keys.length === 0) return "$0";
+    // Unión de monedas activas + monedas con ingresos reales
+    const revenueKeys = Object.keys(revenue);
+    const allDisplayCurrencies = Array.from(new Set([...activeCurrencies, ...revenueKeys]));
+
+    if (allDisplayCurrencies.length === 0) return "$0";
 
     return (
       <div className="flex flex-col gap-0.5">
-        {keys.map(cur => {
-          const amount = (revenue[cur] ?? 0) / 100;
-          const formatted = new Intl.NumberFormat("es-ES", {
+        {allDisplayCurrencies.map(cur => {
+          const rawAmount = revenue[cur] ?? 0;
+          const amount = rawAmount / 100;
+          const locale = currencyFormat === "usa" ? "en-US" : "es-ES";
+
+          // Solo mostramos monedas desactivadas si tienen un monto mayor a 0
+          if (!activeCurrencies.includes(cur) && rawAmount === 0) return null;
+
+          const formatted = new Intl.NumberFormat(locale, {
             style: "currency",
             currency: cur,
             minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
           }).format(amount);
 
           return (
-            <Text key={cur} size="lg" weight="bold" className="text-primary truncate">
-              {formatted}
-            </Text>
+            <div key={cur} className="flex items-center gap-2">
+              <Text size="lg" weight="bold" className="text-primary truncate">
+                {formatted}
+              </Text>
+              {!activeCurrencies.includes(cur) && (
+                <span className="text-[10px] px-1.5 py-0.5 bg-white/5 border border-white/10 rounded-md text-white/40 uppercase font-bold tracking-tighter">
+                  Inactiva
+                </span>
+              )}
+            </div>
           );
         })}
       </div>
