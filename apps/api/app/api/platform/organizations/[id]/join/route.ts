@@ -25,12 +25,12 @@ export async function POST(
   }
 
   try {
-    // 3. Add admin as a MANAGER to the organization
-    // We use MANAGER role to ensure full access during the intervention
+    // 3. Add admin as an OWNER to the organization
+    // We use OWNER role to ensure full access during the intervention
     const newMember = await membersRepository.addToOrganization(
       session.user.id,
       organizationId,
-      ORG_ROLES.MANAGER
+      ORG_ROLES.OWNER
     );
 
     return NextResponse.json({

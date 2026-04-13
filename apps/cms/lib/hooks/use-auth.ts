@@ -21,8 +21,13 @@ export function useAuth() {
 
   const roleName = user?.role || GLOBAL_ROLES.USER;
   const isAdmin = user?.role === GLOBAL_ROLES.ADMIN;
-  const isCoach = session?.member?.role === ORG_ROLES.COACH;
-  const isMember = session?.member?.role === ORG_ROLES.MEMBER;
+
+  const orgRole = session?.member?.role;
+  const isOwner = orgRole === ORG_ROLES.OWNER;
+  const isManager = orgRole === ORG_ROLES.MANAGER;
+  const isCashier = orgRole === ORG_ROLES.CASHIER;
+  const isCoach = orgRole === ORG_ROLES.COACH;
+  const isMember = orgRole === ORG_ROLES.MEMBER;
 
   return {
     // Core session data
@@ -37,7 +42,11 @@ export function useAuth() {
 
     // Role information
     roleName,
-    isAdmin,
+    orgRole,
+    isAdmin, // Global SaaS Admin
+    isOwner, // Org Owner
+    isManager, // Org Operational Admin
+    isCashier,
     isCoach,
     isMember,
 

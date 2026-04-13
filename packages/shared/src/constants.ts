@@ -14,6 +14,7 @@ export type GlobalRole = typeof GLOBAL_ROLES[keyof typeof GLOBAL_ROLES];
  * Defines what a user can do within a specific gym/organization.
  */
 export const ORG_ROLES = {
+  OWNER: "owner", // Super Admin / Creator - total control
   MANAGER: "manager", // Gym Owner/Manager - full tenant control
   CASHIER: "cashier", // Staff/Cashier - payments and check-ins
   COACH: "coach", // Trainer - routines and athlete progress

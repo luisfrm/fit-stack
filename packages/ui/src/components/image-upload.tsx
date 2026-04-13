@@ -60,17 +60,17 @@ export function ImageUpload({
           {label}
         </Text>
       )}
-      
-      <div className="relative w-40">
-        <label 
+
+      <div className="relative w-full max-w-40">
+        <label
           htmlFor={id}
           className={cn(
-            "relative aspect-square w-40 rounded-xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-black",
+            "relative aspect-square w-full rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-black",
             disabled && "opacity-60 cursor-not-allowed",
             preview && "border-solid border-white/20"
           )}
         >
-          <input 
+          <input
             id={id}
             type="file"
             accept="image/*"
@@ -81,29 +81,29 @@ export function ImageUpload({
           />
 
           {preview ? (
-            <img 
-              src={preview} 
-              alt="Preview" 
+            <img
+              src={preview}
+              alt="Preview"
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="flex flex-col items-center gap-2 p-4 text-center">
-              <div className="p-3 rounded-full bg-white/5 text-slate-400 group-hover:text-primary group-hover:bg-primary/10 transition-all">
-                <Upload className="h-5 w-5" />
+            <div className="flex flex-col items-center gap-3 p-6 text-center">
+              <div className="p-4 rounded-full bg-white/5 text-slate-400 group-hover:text-primary group-hover:bg-primary/10 transition-all border border-white/5">
+                <Upload className="h-6 w-6" />
               </div>
-              <Text size="xs" variant="muted">Subir imagen</Text>
             </div>
           )}
         </label>
 
         {preview && !disabled && (
-          <div className="absolute top-2 right-2 z-10">
-            <Button 
-              type="button" 
-              variant="danger" 
-              size="icon" 
+          <div className="absolute -top-2 -right-2 z-10">
+            <Button
+              type="button"
+              variant="danger"
+              size="icon"
+              rounded="lg"
               onClick={handleRemove}
-              className="rounded-full h-8 w-8 shadow-lg"
+              className="h-8 w-8 shadow-xl border-2 border-black/50 hover:scale-110 transition-transform"
               title="Eliminar imagen"
             >
               <X className="h-4 w-4" />
@@ -111,7 +111,7 @@ export function ImageUpload({
           </div>
         )}
       </div>
-      
+
       {description && (
         <Text size="xs" variant="muted" italic>
           {description}

@@ -4,8 +4,10 @@ import { db } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
 import { organization } from "better-auth/plugins";
-import { GLOBAL_ROLES } from "@workspace/shared";
+import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
 
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -31,16 +33,10 @@ export const auth = betterAuth({
     organization({
       schema: {
         organization: {
-          additionalFields: {
-            slogan: { type: "string", required: false },
-            countryCode: { type: "string", required: false },
-            taxId: { type: "string", required: false },
-            legalName: { type: "string", required: false },
-            address: { type: "string", required: false },
-            fiscalConfig: { type: "string", required: false },
-          }
+          additionalFields: ORGANIZATION_ADDITIONAL_FIELDS
         }
-      }
+      },
+      roles: orgRoleDefinitions
     }),
   ],
 

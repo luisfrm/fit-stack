@@ -17,8 +17,8 @@ import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { CountrySelector, toast, Title } from "@workspace/ui";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { authClient } from "@/lib/auth-client";
 import { uploadService } from "@/lib/services/upload-service";
+import { organizationsService } from "@/lib/services/organizations-service";
 import { LATAM_COUNTRIES } from "@workspace/shared/constants";
 import { useRouter } from "next/navigation";
 
@@ -76,28 +76,19 @@ export default function OrganizationSettingsPage() {
         finalLogoUrl = await uploadService.uploadFile(logoFile);
       }
 
-      // 2. Update organization via Better Auth
-      const { error } = await authClient.organization.update({
-        data: {
-          name: formData.name,
-          slug: formData.slug || undefined,
-          logo: finalLogoUrl ?? undefined,
-          metadata: {
-            // Reserved for future use
-            ...activeOrg?.metadata
-          },
-          // @ts-ignore - Better Auth might need these to be in metadata or root depending on schema config, 
-          // but our database schema has them as root columns. Better Auth organization.update 
-          // usually picks up schema columns if configured correctly.
-          countryCode: formData.countryCode,
-          taxId: formData.taxId,
-          legalName: formData.legalName,
-          address: formData.address,
-          slogan: formData.slogan || undefined,
-        }
+      // 2. Update via our Custom Platform API
+      // We use organizationsService.update because it handles custom fields (taxId, slogan, etc.)
+      // and has been updated to allow both Global Admins and Org Managers.
+      await organizationsService.update(activeOrg!.id, {
+        name: formData.name,
+        slug: formData.slug || undefined,
+        logo: finalLogoUrl || "public/no_logo.png",
+        countryCode: formData.countryCode,
+        taxId: formData.taxId,
+        legalName: formData.legalName,
+        address: formData.address,
+        slogan: formData.slogan || undefined,
       });
-
-      if (error) throw new Error(error.message || "Error al actualizar la organización");
 
       toast.success("Información de la sede actualizada correctamente");
       setLogoFile(null);
@@ -156,8 +147,8 @@ export default function OrganizationSettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative z-10">
-            <div className="md:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 relative z-10">
+            <div className="lg:col-span-8 space-y-6">
               <Input
                 label="Nombre Comercial"
                 placeholder="Elite Fitness Gym"
@@ -176,7 +167,7 @@ export default function OrganizationSettingsPage() {
                   leftIcon={<Globe className="w-4 h-4" />}
                   className="bg-white/5! border-white/10!"
                 />
-                <Text size="xs" variant="muted" className="pl-1 flex items-center gap-1.5 font-medium opacity-60">
+                <Text size="xs" variant="muted" className="pl-1 flex items-center gap-1.5 font-medium opacity-60 italic">
                   URL actual: <span className="text-primary/80 lowercase">{formData.slug}.fit-stack.com</span>
                 </Text>
               </div>
@@ -186,21 +177,23 @@ export default function OrganizationSettingsPage() {
                 placeholder="Tu mejor versión comienza aquí"
                 value={formData.slogan}
                 onChange={(e) => handleChange("slogan", e.target.value)}
-                className="min-h-[100px] bg-white/5! border-white/10!"
+                className="min-h-[120px] bg-white/5! border-white/10! resize-none"
               />
             </div>
 
-            <div className="flex flex-col items-center justify-center bg-white/5 rounded-2xl p-6 border border-white/5 hover:border-white/10 transition-colors">
-              <ImageUpload
-                label="Logo Principal"
-                description="Formatos sugeridos: SVG, PNG."
-                value={uploadService.getMediaUrl(logoUrl || "")}
-                onChange={(file) => setLogoFile(file)}
-                onRemove={() => {
-                  setLogoFile(null);
-                  setLogoUrl("");
-                }}
-              />
+            <div className="lg:col-span-4 flex flex-col items-center">
+              <div className="p-1 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm self-center lg:self-end">
+                <ImageUpload
+                  label="Logo Principal"
+                  description="Formatos sugeridos: SVG, PNG."
+                  value={uploadService.getMediaUrl(logoUrl)}
+                  onChange={(file) => setLogoFile(file)}
+                  onRemove={() => {
+                    setLogoFile(null);
+                    setLogoUrl("public/no_logo.png"); // Reset to default R2 placeholder
+                  }}
+                />
+              </div>
             </div>
           </div>
         </Card>

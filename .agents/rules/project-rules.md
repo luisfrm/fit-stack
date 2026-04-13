@@ -84,3 +84,5 @@ The CMS uses a layered auth system. Each layer has a single, exclusive responsib
 - **Server components / Layouts** MUST use `sessionService.getSession()` from `@/lib/services/session-service`.
 - **Active Organization**: Always comes from `useActiveOrganization()` (via `useAuth`). Do NOT read `session.activeOrganization` — it is not populated by `useSession` by Better Auth design.
 - **Identity (Name/Logo)**: The `organization` table (Better Auth) is the source of truth. Do NOT use `gym_settings` for `GYM_NAME` or `GYM_LOGO`. Use `authClient.organization.update()` to save identity changes.
+
+## 12. Don't mix API and Frontend. Never import anything between apps, the only way is using shared packages.

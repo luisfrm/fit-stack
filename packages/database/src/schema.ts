@@ -35,6 +35,7 @@ export const globalRoleEnum = pgEnum('global_role', [
 ]);
 
 export const orgRoleEnum = pgEnum('org_role', [
+  ORG_ROLES.OWNER,
   ORG_ROLES.MANAGER,
   ORG_ROLES.CASHIER,
   ORG_ROLES.COACH,

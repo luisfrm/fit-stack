@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { organizationsService } from '@/services/organizations.service';
 import { settingsService } from '@/services/settings.service';
 import { getSession } from '@/config/get-session';
-import { GLOBAL_ROLES } from "@workspace/shared";
+import { canManageOrganization } from '@/config/auth-utils';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -15,19 +15,18 @@ interface RouteParams {
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
     const session = await getSession();
-    
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    const { id } = await params;
+
+    if (!canManageOrganization(session, id)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
-    
     // 1. Fetch organization basic info
     const organization = await organizationsService.getOrganizationById(id);
-    
+
     // 2. Fetch specialized settings (branding, timezone, etc.)
     const settings = await settingsService.getAll(id);
-    
+
     return NextResponse.json({
       ...organization,
       settings
@@ -45,20 +44,20 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   try {
     const session = await getSession();
-    
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    const { id } = await params;
+
+    if (!canManageOrganization(session, id)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
     const body = await req.json();
     const { settings, ...orgData } = body;
-    
+
     // 1. Update settings if provided
     if (settings) {
       await settingsService.updateAll(id, settings);
     }
-    
+
     // 2. Update basic organization info if provided
     let updatedOrg = null;
     if (Object.keys(orgData).length > 0) {
@@ -66,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     } else {
       updatedOrg = await organizationsService.getOrganizationById(id);
     }
-    
+
     return NextResponse.json(updatedOrg);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 });
