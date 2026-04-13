@@ -25,7 +25,7 @@ const buttonVariants = cva(
          */
         primary: [
           "bg-primary text-black",
-          "hover:bg-yellow-400",
+          "hover:bg-primary-hover",
           "active:scale-[0.98]",
         ],
 

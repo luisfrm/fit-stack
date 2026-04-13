@@ -42,6 +42,20 @@ export const ColorUtils = {
   },
 
   /**
+   * Generates a variant with a specific alpha (transparency) in OKLCH.
+   */
+  getAlphaVariant: (color: string, alpha: number) => {
+    const parsed = parse(color);
+    if (!parsed) return "";
+
+    const oklch = toOklch(parsed);
+    if (!oklch) return "";
+
+    oklch.alpha = alpha;
+    return formatCss(oklch);
+  },
+
+  /**
    * Calculates a suitable foreground color (black or white) based on contrast.
    */
   getContrastForeground: (color: string) => {

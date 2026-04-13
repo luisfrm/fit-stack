@@ -85,18 +85,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex h-svh w-full overflow-hidden" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>
+    <div className="flex min-h-svh w-full" style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}>
 
       {/* ── LEFT: Form ── */}
       <div
-        className="w-full lg:w-1/2 flex flex-col justify-between"
+        className="w-full lg:w-1/2 flex flex-col justify-between gap-3"
         style={{ padding: "clamp(2rem, 6vw, 6rem)" }}
       >
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <Dumbbell size={28} className="text-[--color-primary]" />
+          <Dumbbell size={28} className="text-primary" />
           <Text as="span" size="lg" weight="bold" uppercase className="tracking-tight italic">
-            PREMIUM<span className="text-[--color-primary]">GYM</span>
+            Fit<span className="text-primary">Stack</span>
           </Text>
         </div>
 
@@ -104,8 +104,7 @@ export default function LoginPage() {
         <div className="lg:max-w-md">
           <div className="mb-10">
             <Title as="h1" size="section" className="mb-3">
-              ACCEDE A TU <br />
-              <TitleAccent>PANEL</TitleAccent>
+              ACCEDE A TU <span className="text-primary">PANEL</span>
             </Title>
             <Text variant="muted" size="lg">
               Gestiona tu gimnasio desde un solo lugar
@@ -198,7 +197,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <Text variant="subtle" size="xs">
-          © {new Date().getFullYear()} Premium Gym CMS. Todos los derechos reservados.
+          © {new Date().getFullYear()} Fit Stack. Todos los derechos reservados.
         </Text>
       </div>
 

@@ -25,6 +25,7 @@ export function useSettings() {
       const response = await apiClient.get<Record<string, string>>("/settings");
       return response.data;
     },
+    enabled: !!activeOrganizationId,
   });
 
   const updateMutation = useMutation({

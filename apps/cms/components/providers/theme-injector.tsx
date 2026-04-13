@@ -16,30 +16,25 @@ export function ThemeInjector() {
   // Fit-Stack Default Branding (sync with globals.css)
   const PLATFORM_PRIMARY = "oklch(0.853 0.199 91.26)";
 
-  const primary = settings[SETTINGS_KEYS.BRAND_PRIMARY] || (activeOrganizationId ? undefined : PLATFORM_PRIMARY);
-
-  // While loading a gym's settings, we might not have 'primary' yet. 
-  // We return null to let the Skeleton show the base colors without "flashing" a wrong custom color.
-  if (!primary) return null;
+  const primary = (activeOrganizationId && settings[SETTINGS_KEYS.BRAND_PRIMARY]) || PLATFORM_PRIMARY;
 
   // Intelligent secondary variants calculation
   const hover = ColorUtils.getHoverColor(primary);
   const primaryFg = ColorUtils.getContrastForeground(primary);
+  const borderPrimary = ColorUtils.getAlphaVariant(primary, 0.4);
+  const primaryGlow = ColorUtils.getAlphaVariant(primary, 0.08);
+  const primaryGlowHover = ColorUtils.getAlphaVariant(primary, 0.15);
 
-  // We overwrite both the raw variable and the Tailwind-mapped variable
-  // Note: V4 uses --primary as source of truth
+  // We overwrite the raw variables to affect both standard and custom components
   const css = `
     :root {
-      ${primary ? `
-        --primary: ${primary} !important; 
-        --ring: ${primary} !important;
-      ` : ""}
-      ${hover ? `
-        --primary-hover: ${hover} !important; 
-      ` : ""}
-      ${primaryFg ? `
-        --primary-foreground: ${primaryFg} !important; 
-      ` : ""}
+      --primary: ${primary} !important; 
+      --primary-hover: ${hover} !important; 
+      --primary-foreground: ${primaryFg} !important;
+      --border-primary: ${borderPrimary} !important;
+      --primary-glow: ${primaryGlow} !important;
+      --primary-glow-hover: ${primaryGlowHover} !important;
+      --ring: ${primary} !important;
     }
   `;
 
