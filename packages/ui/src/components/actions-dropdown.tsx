@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 import {
   Button,
@@ -11,9 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
-import { NextImage } from "./next/image";
 
 export interface ActionDropdownItem<T = unknown> {
   label: string;
@@ -92,7 +93,10 @@ export function ActionsDropdown<T = unknown>({
         onSelect={item.Modal ? (e) => e.preventDefault() : undefined}
       >
         {item.image ? (
-          <NextImage src={item.image} alt={item.label} width={16} height={16} className="rounded-full" />
+          <Avatar className="size-4 shrink-0">
+            <AvatarImage src={item.image} alt={item.label} />
+            <AvatarFallback className="text-[10px]">{item.label.charAt(0)}</AvatarFallback>
+          </Avatar>
         ) : (
           item.icon && <span className="shrink-0">{item.icon}</span>
         )}
@@ -104,7 +108,7 @@ export function ActionsDropdown<T = unknown>({
     if (item.href) {
       return (
         <DropdownMenuItem asChild key={`${item.label}-${index}`} className="p-0">
-          <Link
+          <a
             href={item.href}
             className={cn(
               "flex w-full items-center gap-2 px-2 py-1.5 focus:bg-accent focus:text-accent-foreground",
@@ -113,12 +117,15 @@ export function ActionsDropdown<T = unknown>({
             )}
           >
             {item.image ? (
-              <NextImage src={item.image} alt={item.label} width={16} height={16} className="rounded-full" />
+              <Avatar className="size-4 shrink-0">
+                <AvatarImage src={item.image} alt={item.label} />
+                <AvatarFallback className="text-[10px]">{item.label.charAt(0)}</AvatarFallback>
+              </Avatar>
             ) : (
               item.icon && <span className="shrink-0">{item.icon}</span>
             )}
             {item.label}
-          </Link>
+          </a>
         </DropdownMenuItem>
       );
     }
