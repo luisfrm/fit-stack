@@ -67,8 +67,7 @@ export function canReadMembers(session: AnySession, organizationId: string): boo
   return isGlobalAdmin ||
     memberRole === ORG_ROLES.OWNER ||
     memberRole === ORG_ROLES.MANAGER ||
-    memberRole === ORG_ROLES.CASHIER ||
-    memberRole === ORG_ROLES.COACH;
+    memberRole === ORG_ROLES.CASHIER
 }
 
 /**
