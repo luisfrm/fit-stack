@@ -40,7 +40,6 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   const [previewUrl, setPreviewUrl] = React.useState<string>(
     initialData?.logo ? uploadService.getMediaUrl(initialData.logo) : ""
   );
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleChange = (field: keyof IOrganization, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -71,7 +70,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         finalLogoUrl = await uploadService.uploadFile(selectedFile);
       } else if (!isEdit && !formData.logo) {
         // Default logo for new organizations in R2
-        finalLogoUrl = "public/no_logo.png";
+        finalLogoUrl = "";
       }
 
       // Convertimos null de vuelta a undefined para cumplir con la interfaz si es necesario,
@@ -107,7 +106,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         <Input
           label="Nombre de la Organización"
           placeholder="Ej: Premium Gym Central"
-          value={formData.name}
+          value={formData.name ?? ""}
           onChange={(e) => handleChange("name", e.target.value)}
           required
           leftIcon={<Building2 size={16} />}
@@ -117,7 +116,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
           <Input
             label="Slug / Subdominio"
             placeholder="ej-premium-gym"
-            value={formData.slug}
+            value={formData.slug ?? ""}
             onChange={(e) => handleChange("slug", e.target.value)}
             leftIcon={<Globe size={16} />}
           />
@@ -142,7 +141,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
           <Input
             label="Nombre Legal / Razón Social"
             placeholder="Ej: Iron Gym C.A."
-            value={formData.legalName}
+            value={formData.legalName ?? ""}
             onChange={(e) => handleChange("legalName", e.target.value)}
             leftIcon={<Building2 size={16} />}
           />
@@ -151,14 +150,14 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
             <Input
               label="ID Fiscal (RIF / NIT)"
               placeholder="Ej: J-12345678-9"
-              value={formData.taxId}
+              value={formData.taxId ?? ""}
               onChange={(e) => handleChange("taxId", e.target.value)}
               leftIcon={<Fingerprint size={16} />}
             />
             <Input
               label="Dirección"
               placeholder="Ej: Av. Principal, Edif. X..."
-              value={formData.address}
+              value={formData.address ?? ""}
               onChange={(e) => handleChange("address", e.target.value)}
               leftIcon={<MapPin size={16} />}
             />

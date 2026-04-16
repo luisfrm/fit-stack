@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Lock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
 import { Text } from "@workspace/ui/components/text";
@@ -88,8 +88,11 @@ export function ImageUpload({
             />
           ) : (
             <div className="flex flex-col items-center gap-3 p-6 text-center">
-              <div className="p-4 rounded-full bg-white/5 text-slate-400 group-hover:text-primary group-hover:bg-primary/10 transition-all border border-white/5">
-                <Upload className="h-6 w-6" />
+              <div className={cn(
+                "p-4 rounded-full bg-white/5 text-slate-400 border border-white/5 transition-all",
+                !disabled && "group-hover:text-primary group-hover:bg-primary/10"
+              )}>
+                {disabled ? <Lock className="h-6 w-6" /> : <Upload className="h-6 w-6" />}
               </div>
             </div>
           )}

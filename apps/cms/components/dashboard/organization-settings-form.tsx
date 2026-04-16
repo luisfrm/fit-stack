@@ -157,7 +157,7 @@ export function OrganizationSettingsForm({
             </div>
 
             <Button variant="ghost" size="sm" asChild className="group">
-              <Link href={`${backUrl}/organization`} className="flex items-center gap-2">
+              <Link href={`${backUrl}/settings/organization`} className="flex items-center gap-2">
                 <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">Editar Identidad</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
@@ -222,7 +222,7 @@ export function OrganizationSettingsForm({
         <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-orange-500/10 text-orange-400">
+              <div className="p-3 rounded-xl bg-primary/10 text-primary/40">
                 <Palette className="w-6 h-6" />
               </div>
               <div className="flex flex-col">
