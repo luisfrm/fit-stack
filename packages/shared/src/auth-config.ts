@@ -9,6 +9,7 @@ export const ORGANIZATION_ADDITIONAL_FIELDS = {
   legalName: { type: "string", required: false },
   address: { type: "string", required: false },
   fiscalConfig: { type: "string", required: false },
+  status: { type: "string", required: false },
 } as const;
 
 export type OrganizationAdditionalFields = typeof ORGANIZATION_ADDITIONAL_FIELDS;

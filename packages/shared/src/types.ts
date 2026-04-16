@@ -332,6 +332,7 @@ export interface IOrganization {
   address?: string | null;
   fiscalConfig?: Record<string, any> | null;
   slogan?: string | null;
+  status?: string | null;
 
   createdAt?: string | Date;
   updatedAt?: string | Date;
