@@ -65,7 +65,7 @@ export function ImageUpload({
         <label
           htmlFor={id}
           className={cn(
-            "relative aspect-square w-full rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-black",
+            "relative aspect-square w-full rounded-xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-black",
             disabled && "opacity-60 cursor-not-allowed",
             preview && "border-solid border-white/20"
           )}
@@ -84,12 +84,12 @@ export function ImageUpload({
             <img
               src={preview}
               alt="Preview"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           ) : (
             <div className="flex flex-col items-center gap-3 p-6 text-center">
               <div className={cn(
-                "p-4 rounded-full bg-white/5 text-slate-400 border border-white/5 transition-all",
+                "p-4 rounded bg-white/5 text-slate-400 border border-white/5 transition-all",
                 !disabled && "group-hover:text-primary group-hover:bg-primary/10"
               )}>
                 {disabled ? <Lock className="h-6 w-6" /> : <Upload className="h-6 w-6" />}

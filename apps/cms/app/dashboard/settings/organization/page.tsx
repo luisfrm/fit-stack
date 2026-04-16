@@ -179,7 +179,7 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="lg:col-span-4 flex flex-col items-center">
-              <div className="p-1 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-sm self-center lg:self-end">
+              <div className="p-2 rounded-xl bg-foreground/5 border border-foreground/10 backdrop-blur-sm self-center lg:self-end">
                 <ImageUpload
                   label="Logo Principal"
                   description="Formatos sugeridos: SVG, PNG."
