@@ -4,10 +4,10 @@ import * as React from "react";
 import { Eye, EyeOff, LogIn, Mail, Lock, Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@workspace/ui/components/input";
-import { Title, TitleAccent } from "@workspace/ui/components/title";
+import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
-import { toast, Checkbox, Label } from "@workspace/ui/components";
+import { toast, Checkbox, Label, SplashScreen } from "@workspace/ui/components";
 import { useSession } from "@/lib/auth-client";
 import { sessionService } from "@/lib/services/session-service";
 import { useRouter } from "next/navigation";
@@ -74,14 +74,7 @@ export default function LoginPage() {
   };
 
   if (isPending) {
-    return (
-      <div className="h-svh w-full flex items-center justify-center bg-black">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
-          <p className="text-gray-400 animate-pulse">Verificando sesión...</p>
-        </div>
-      </div>
-    );
+    return <SplashScreen message="Verificando sesión..." />;
   }
 
   return (

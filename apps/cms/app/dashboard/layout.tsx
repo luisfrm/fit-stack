@@ -2,14 +2,13 @@ import * as React from "react";
 import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
-import { type Session } from "@/lib/auth-client";
 
 export default async function DashboardLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { data: session } = await sessionService.getSession() as { data: Session | null; error: any };
+  const { data: session } = await sessionService.getSession();
 
   // If no session, redirect to login
   if (!session) {

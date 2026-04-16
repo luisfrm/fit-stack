@@ -58,7 +58,7 @@ export const sessionService = {
     try {
       const result = await authClient.signIn.email(params);
       return { data: result?.data || null, error: result?.error || null };
-    } catch (err) {
+    } catch (err: any) {
       return { data: null, error: err };
     }
   },

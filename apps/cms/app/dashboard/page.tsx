@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { GLOBAL_ROLES } from "@workspace/shared";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { SaaSAdminDashboard } from "@/components/dashboard/saas-admin-dashboard";
-import { toast } from "@workspace/ui/components";
+import { toast, SplashScreen } from "@workspace/ui/components";
 
 export default function DashboardPage() {
   const { session, isPending, user } = useAuth();
@@ -19,12 +19,7 @@ export default function DashboardPage() {
   }, [searchParams]);
 
   if (isPending) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
-        <p className="text-gray-400 animate-pulse">Cargando tablero...</p>
-      </div>
-    );
+    return <SplashScreen fullScreen={false} message="Cargando entorno..." />;
   }
 
   // Si el usuario es 'admin' (Master Admin) Y NO tiene una organización activa, mostramos el dashboard del SaaS

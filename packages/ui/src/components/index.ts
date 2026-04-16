@@ -79,3 +79,5 @@ export * from "@workspace/ui/components/actions-dropdown";
 export * from "@workspace/ui/components/next/sidebar";
 export { NextImage } from "@workspace/ui/components/next/image";
 
+// Loaders
+export { SplashScreen } from "@workspace/ui/components/splash-screen";
