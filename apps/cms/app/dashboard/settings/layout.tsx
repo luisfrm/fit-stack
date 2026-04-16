@@ -62,7 +62,7 @@ export default function SettingsLayout({
                         "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium border group",
                         isActive
                           ? "bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(252,211,3,0.05)]"
-                          : "text-slate-400 hover:bg-white/5 hover:text-slate-100 border-transparent",
+                          : "text-slate-400 hover:bg-foreground/10 hover:text-slate-100 border-transparent",
                         item.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-slate-400"
                       )}
                     >

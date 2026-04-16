@@ -173,9 +173,9 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
           {branding.isLoading ? (
             <>
               {NAV_SKELETON_IDS.map((id) => (
-                <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/5 animate-pulse">
-                  <div className="w-5 h-5 rounded bg-white/10 shrink-0" />
-                  <div className="h-4 bg-white/10 rounded w-2/3" />
+                <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-foreground/5 animate-pulse">
+                  <div className="w-5 h-5 rounded bg-foreground/10 shrink-0" />
+                  <div className="h-4 bg-foreground/10 rounded w-2/3" />
                 </div>
               ))}
             </>
@@ -241,7 +241,7 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<SidebarNav
         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium",
         active
           ? "bg-primary text-black font-bold shadow-lg shadow-primary/20"
-          : "text-slate-400 hover:bg-white/5 hover:text-slate-100"
+          : "text-slate-400 hover:bg-foreground/10 hover:text-slate-100"
       )}
     >
       <Icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-black" : "group-hover:text-slate-200")} />
