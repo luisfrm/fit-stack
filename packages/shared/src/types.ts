@@ -17,6 +17,19 @@ export interface IUser {
 }
 
 /**
+ * Auth member record — represents a user's membership within an organization
+ * in the Better Auth context (auth_member table).
+ */
+export interface IAuthMember {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
  * Global Session interface
  */
 export interface ISession {

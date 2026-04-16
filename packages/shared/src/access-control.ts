@@ -1,4 +1,5 @@
 import { createAccessControl } from "better-auth/plugins/access";
+import type { Role } from "better-auth/plugins/access";
 import { adminAc, defaultStatements } from "better-auth/plugins/organization/access";
 import { ORG_ROLES } from "./constants";
 
@@ -38,18 +39,19 @@ export const cashier = ac.newRole({
   member: ["create", "update"],   // Can register and update gym members
 });
 
-export const coach = ac.newRole({});
+// newRole({}) infers K=never due to empty statements — cast needed to satisfy Role<any> contract
+export const coach = ac.newRole({}) as unknown as Role<any>;
 
-export const member = ac.newRole({});
+export const member = ac.newRole({}) as unknown as Role<any>;
 
 /**
  * Unified role definitions for the organization plugin.
  * Keys match the string values from ORG_ROLES constants.
  */
-export const orgRoleDefinitions = {
+export const orgRoleDefinitions: Record<string, Role<any>> = {
   [ORG_ROLES.OWNER]: owner,
   [ORG_ROLES.MANAGER]: manager,
   [ORG_ROLES.CASHIER]: cashier,
   [ORG_ROLES.COACH]: coach,
   [ORG_ROLES.MEMBER]: member,
-} as Record<string, any>;
+};

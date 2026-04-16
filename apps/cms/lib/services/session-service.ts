@@ -10,7 +10,7 @@ export const sessionService = {
    * Gets the current session.
    * @param customHeaders Optional headers (useful for Middleware)
    */
-  async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: any }> {
+  async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: unknown }> {
     if (globalThis.window === undefined) {
       try {
         const { headers: nextHeaders } = await import("next/headers");
@@ -58,7 +58,7 @@ export const sessionService = {
     try {
       const result = await authClient.signIn.email(params);
       return { data: result?.data || null, error: result?.error || null };
-    } catch (err: any) {
+    } catch (err) {
       return { data: null, error: err };
     }
   },
@@ -70,7 +70,7 @@ export const sessionService = {
     try {
       const result = await authClient.signUp.email(params);
       return { data: result?.data || null, error: result?.error || null };
-    } catch (err: any) {
+    } catch (err) {
       return { data: null, error: err };
     }
   },
@@ -88,7 +88,7 @@ export const sessionService = {
         }
       });
       return { data: result?.data || true, error: result?.error || null };
-    } catch (err: any) {
+    } catch (err) {
       return { data: null, error: err };
     }
   },
@@ -102,7 +102,7 @@ export const sessionService = {
         organizationId: organizationId || null,
       });
       return { data: result?.data || null, error: result?.error || null };
-    } catch (err: any) {
+    } catch (err) {
       return { data: null, error: err };
     }
   },
@@ -111,7 +111,7 @@ export const sessionService = {
    * 🛡️ Helper to check if the current user has Super Admin (Global) privileges.
    */
   isSuperAdmin(session: Session | null): boolean {
-    return session?.user?.role === 'admin';
+    return session?.user?.role === GLOBAL_ROLES.ADMIN;
   },
 
   /**
@@ -128,7 +128,7 @@ export const sessionService = {
    */
   async getUserRole(): Promise<GlobalRole> {
     const { data: session } = await this.getSession();
-    return session?.user?.role || GLOBAL_ROLES.USER;
+    return (session?.user?.role as GlobalRole) || GLOBAL_ROLES.USER;
   },
 
   /**

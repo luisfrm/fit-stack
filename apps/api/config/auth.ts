@@ -7,7 +7,6 @@ import { organization } from "better-auth/plugins";
 import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
 
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -18,7 +17,7 @@ export const auth = betterAuth({
   }),
   secret: env.betterAuthSecret,
 
-  trustedOrigins: [env.frontendUrl!],
+  trustedOrigins: [env.frontendUrl],
   user: {
     additionalFields: {
       role: {

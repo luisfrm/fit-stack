@@ -1,6 +1,6 @@
 import { createAuthClient } from 'better-auth/react';
 import { customSessionClient, organizationClient } from "better-auth/client/plugins";
-import { orgRoleDefinitions, IUser, ISession, IOrganization } from '@workspace/shared';
+import { orgRoleDefinitions, IUser, ISession, IOrganization, IAuthMember } from '@workspace/shared';
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
@@ -42,13 +42,6 @@ export const {
 
 export interface User extends IUser { }
 export interface Session extends ISession {
-  member?: {
-    id: string;
-    organizationId: string;
-    userId: string;
-    role: string;
-    createdAt: Date;
-    updatedAt: Date;
-  } | null;
+  member?: IAuthMember | null;
   activeOrganization?: IOrganization | null;
 }
