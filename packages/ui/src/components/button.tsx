@@ -44,8 +44,8 @@ const buttonVariants = cva(
          * Use for tertiary actions or nav items
          */
         ghost: [
-          "bg-transparent text-white",
-          "hover:bg-white/10",
+          "bg-input border-input-border text-white",
+          "hover:bg-foreground/10",
         ],
 
         /**

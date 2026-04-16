@@ -12,7 +12,7 @@ export interface TextareaProps
 }
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, label, hint, variant = "default", state, id, ...props }, ref) => {
+  ({ className, label, hint, variant = "default", state, id, disabled, ...props }, ref) => {
     const generatedId = React.useId()
     const textareaId = id ?? generatedId
 
@@ -26,16 +26,24 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             {label}
           </Label>
         )}
-        <textarea
-          id={textareaId}
+        <div
           className={cn(
             inputWrapperVariants({ variant, state }),
-            "min-h-[120px] w-full px-4 py-3 bg-transparent text-sm placeholder:text-gray-600 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-colors",
+            "min-h-[120px] transition-all",
             className
           )}
-          ref={ref}
-          {...props}
-        />
+        >
+          <textarea
+            id={textareaId}
+            className={cn(
+              "flex-1 w-full bg-transparent outline-none border-none shadow-none px-4 py-3 text-sm text-white placeholder-gray-600 min-w-0 resize-y",
+              disabled && "cursor-not-allowed opacity-50"
+            )}
+            disabled={disabled}
+            ref={ref}
+            {...props}
+          />
+        </div>
         {hint && (
           <p className={cn("text-xs", state === "error" ? "text-red-400" : "text-white/40")}>
             {hint}

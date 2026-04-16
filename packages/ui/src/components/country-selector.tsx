@@ -80,7 +80,7 @@ export function CountrySelector({
         aria-haspopup="listbox"
         aria-controls="country-listbox"
         className={cn(
-          "h-11 justify-between bg-white/5 border border-white/10 px-4 hover:bg-white/10 transition-all text-white",
+          "h-11 justify-between border border-white/10 px-4 hover:bg-white/10 transition-all text-white",
           open && "ring-2 ring-primary/50 border-primary/50"
         )}
       >
@@ -106,7 +106,7 @@ export function CountrySelector({
       </Button>
 
       {open && (
-        <div 
+        <div
           id="country-listbox"
           role="listbox"
           aria-labelledby="country-selector-trigger"
@@ -119,7 +119,7 @@ export function CountrySelector({
                 placeholder="Buscar país por nombre o código..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs bg-white/5 border-white/5"
+                className="pl-5 h-9 text-xs"
                 autoFocus
               />
             </div>

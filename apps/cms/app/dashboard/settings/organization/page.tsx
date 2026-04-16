@@ -155,7 +155,6 @@ export default function OrganizationSettingsPage() {
                 value={formData.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 required
-                className="bg-white/5! border-white/10!"
               />
 
               <div className="space-y-2">
@@ -165,7 +164,6 @@ export default function OrganizationSettingsPage() {
                   value={formData.slug}
                   onChange={(e) => handleChange("slug", e.target.value)}
                   leftIcon={<Globe className="w-4 h-4" />}
-                  className="bg-white/5! border-white/10!"
                 />
                 <Text size="xs" variant="muted" className="pl-1 flex items-center gap-1.5 font-medium opacity-60 italic">
                   URL actual: <span className="text-primary/80 lowercase">{formData.slug}.fit-stack.com</span>
@@ -177,7 +175,6 @@ export default function OrganizationSettingsPage() {
                 placeholder="Tu mejor versión comienza aquí"
                 value={formData.slogan}
                 onChange={(e) => handleChange("slogan", e.target.value)}
-                className="min-h-[120px] bg-white/5! border-white/10! resize-none"
               />
             </div>
 
@@ -227,7 +224,6 @@ export default function OrganizationSettingsPage() {
                 value={formData.legalName}
                 onChange={(e) => handleChange("legalName", e.target.value)}
                 leftIcon={<Building2 className="w-4 h-4" />}
-                className="bg-white/5! border-white/10!"
               />
             </div>
 
@@ -238,7 +234,6 @@ export default function OrganizationSettingsPage() {
                 value={formData.taxId}
                 onChange={(e) => handleChange("taxId", e.target.value)}
                 leftIcon={<ShieldCheck className="w-4 h-4" />}
-                className="bg-white/5! border-white/10!"
               />
 
               <Input
@@ -247,14 +242,13 @@ export default function OrganizationSettingsPage() {
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 leftIcon={<MapPin className="w-4 h-4" />}
-                className="bg-white/5! border-white/10!"
               />
             </div>
           </div>
         </Card>
 
         {/* ACCIONES */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl flex gap-6">
           <div className="flex flex-col gap-1">
             <Text weight="bold" size="lg">¿Guardar cambios institucionales?</Text>
             <Text variant="muted" size="sm">

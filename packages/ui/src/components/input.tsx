@@ -22,7 +22,7 @@ const inputWrapperVariants = cva(
          * default — glass/dark surface, border glows on focus (used for CMS forms)
          */
         default: [
-          "bg-surface border-border",
+          "bg-input border-input-border",
           "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
         /**
@@ -163,7 +163,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             disabled={disabled}
             className={cn(
-              "flex-1 bg-transparent outline-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
+              "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
               "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:white]",
               leftIcon && "pl-2",
               renderRightElement && "pr-2",
