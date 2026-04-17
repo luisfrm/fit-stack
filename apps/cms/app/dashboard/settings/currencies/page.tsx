@@ -38,10 +38,11 @@ export default function CurrencySettingsPage() {
           setActiveCurrencies(JSON.parse(activeCurs));
         } catch (e) {
           console.error("Error parsing active currencies:", e);
-          setActiveCurrencies(["USD", "VES"]);
+          toast.error("Error al cargar las monedas configuradas");
+          setActiveCurrencies(["USD"]);
         }
       } else {
-        setActiveCurrencies(["USD", "VES"]);
+        setActiveCurrencies(["USD"]);
       }
 
       const primaryCur = settings[SETTINGS_KEYS.PRIMARY_CURRENCY];

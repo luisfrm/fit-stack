@@ -14,6 +14,8 @@ export const SETTINGS_KEYS = {
   ACTIVE_PAYMENT_METHODS: "active_payment_methods",
 } as const;
 
+const EMPTY_SETTINGS: Record<string, string> = {};
+
 export function useSettings() {
   const queryClient = useQueryClient();
   const { activeOrganization } = useAuth();
@@ -43,7 +45,7 @@ export function useSettings() {
   });
 
   return {
-    settings: query.data || {},
+    settings: query.data || EMPTY_SETTINGS,
     isLoading: query.isLoading,
     isUpdating: updateMutation.isPending,
     updateSettings: updateMutation.mutateAsync,
