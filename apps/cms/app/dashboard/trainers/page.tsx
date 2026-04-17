@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Dumbbell, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Dumbbell, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, Text, CoachCard, AddCoachCard, Skeleton, ConfirmationModal, toast } from "@workspace/ui/components";
 import { CoachModal } from "@/components/coaches/coach-modal";
 import { membersService } from "@/lib/services/members-service";
@@ -11,9 +11,11 @@ import {
 } from "@/lib/services/coaches-service";
 import { type CoachFilter, type ICoach } from "@/types/dashboard";
 import { useCoaches } from "@/lib/hooks/use-trainers";
-import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { uploadService } from "@/lib/services/upload-service";
 import { NoData } from "@/components/dashboard/dashboard-ui";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { useDebounce } from "@/lib/hooks/use-debounce";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -22,7 +24,8 @@ export default function TrainersPage() {
     page: 1,
     limit: ITEMS_PER_PAGE,
   });
-  const [searchInput, setSearchInput] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
   // For editing
   const [coachToEdit, setCoachToEdit] = React.useState<ICoach | undefined>(undefined);
@@ -35,12 +38,10 @@ export default function TrainersPage() {
   const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useCoaches(filters);
 
   // Debounced search
+  // Sync debounced search with filters
   React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, name: searchInput || undefined, page: 1 }));
-    }, 400);
-    return () => clearTimeout(timeout);
-  }, [searchInput]);
+    setFilters((prev) => ({ ...prev, name: debouncedSearch || undefined, page: 1 }));
+  }, [debouncedSearch]);
 
   // Mutations from service
   const deleteMutation = useDeleteCoachMutation();
@@ -102,7 +103,7 @@ export default function TrainersPage() {
     }
 
     if (result.data.length === 0) {
-      if (!searchInput) {
+      if (!debouncedSearch) {
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <CoachModal trigger={<AddCoachCard />} />
@@ -136,7 +137,7 @@ export default function TrainersPage() {
             isResendingInvite={resendingCoachId === coach.id}
           />
         ))}
-        {filters.page === 1 && !searchInput && !filters.isVisible && (
+        {filters.page === 1 && !debouncedSearch && !filters.isVisible && (
           <CoachModal trigger={<AddCoachCard />} />
         )}
       </div>
@@ -161,17 +162,12 @@ export default function TrainersPage() {
       </DashboardHeader>
 
       {/* ── Filters ── */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-primary placeholder:text-slate-600 transition-all"
-          />
-        </div>
+      <FilterPanel
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por nombre..."
+        className="mb-8"
+      >
         <div className="flex gap-2">
           <Button
             variant={filters.isVisible === true ? "primary" : "glass"}
@@ -201,7 +197,7 @@ export default function TrainersPage() {
             Ocultos
           </Button>
         </div>
-      </div>
+      </FilterPanel>
 
       {/* ── Listado ── */}
       <section className="animate-in fade-in slide-in-from-bottom-3 duration-500">

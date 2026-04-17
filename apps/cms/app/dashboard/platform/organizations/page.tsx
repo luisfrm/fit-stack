@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Plus,
-  Search,
   ChevronLeft,
   ChevronRight,
   Building2,
@@ -11,7 +10,6 @@ import {
 } from "lucide-react";
 import {
   Button,
-  Input,
   Text,
   toast
 } from "@workspace/ui/components";
@@ -22,6 +20,8 @@ import { OrganizationMobileCard } from "@/components/dashboard/organization-mobi
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
 import { AddSubscriptionModal } from "@/components/platform/add-subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = React.useState<IPlatformOrganization[]>([]);
@@ -30,7 +30,8 @@ export default function OrganizationsPage() {
 
   // Filtros y Paginación
   const [query, setQuery] = React.useState("");
-  const [tempQuery, setTempQuery] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const debouncedSearch = useDebounce(searchTerm, 500);
   const [page, setPage] = React.useState(1);
   const [totalPages, setTotalPages] = React.useState(1);
   const limit = 10;
@@ -61,11 +62,13 @@ export default function OrganizationsPage() {
     loadOrganizations();
   }, [loadOrganizations]);
 
-  const handleSearch = (e: React.SubmitEvent) => {
-    e.preventDefault();
-    setQuery(tempQuery);
+  // Sync debounced search with query
+  React.useEffect(() => {
+    setQuery(debouncedSearch);
     setPage(1);
-  };
+  }, [debouncedSearch]);
+
+
 
 
   const handleAddSubscription = (org: IPlatformOrganization) => {
@@ -96,7 +99,7 @@ export default function OrganizationsPage() {
       </DashboardHeader>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white/5 border border-white/5 p-5 rounded-2xl flex items-center justify-between">
           <div>
             <Text size="xs" variant="muted" className="uppercase font-black tracking-widest leading-none mb-1">Total Clientes</Text>
@@ -115,19 +118,13 @@ export default function OrganizationsPage() {
             <Users size={20} />
           </div>
         </div>
-        <form onSubmit={handleSearch} className="flex gap-2 w-full">
-          <Input
-            value={tempQuery}
-            onChange={(e) => setTempQuery(e.target.value)}
-            placeholder="Buscar por nombre o slug..."
-            leftIcon={<Search size={16} />}
-            className="flex-1 bg-white/5 border-white/5 h-full min-h-[60px]"
-          />
-          <Button type="submit" variant="outlined" className="h-full min-h-[60px] px-6 uppercase font-black text-xs tracking-widest">
-            BUSCAR
-          </Button>
-        </form>
       </div>
+
+      <FilterPanel
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por nombre o slug..."
+      />
 
       <div className="h-px w-full bg-white/5" />
 

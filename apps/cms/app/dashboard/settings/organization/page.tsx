@@ -165,8 +165,8 @@ export default function OrganizationSettingsPage() {
                   onChange={(e) => handleChange("slug", e.target.value)}
                   leftIcon={<Globe className="w-4 h-4" />}
                 />
-                <Text size="xs" variant="muted" className="pl-1 flex items-center gap-1.5 font-medium opacity-60 italic">
-                  URL actual: <span className="text-primary/80 lowercase">{formData.slug}.fit-stack.com</span>
+                <Text size="xs" variant="muted" className="pl-1 flex items-center gap-1.5 font-medium opacity-70 italic">
+                  URL actual: <span className="text-primary lowercase">{formData.slug}.fit-stack.com</span>
                 </Text>
               </div>
 
@@ -199,7 +199,7 @@ export default function OrganizationSettingsPage() {
         {/* DATOS FISCALES Y LOCALIZACIÓN */}
         <Card variant="settings">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
+            <div className="p-3 rounded-xl bg-foreground/5 text-foreground-dim border border-border/50">
               <Fingerprint className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
@@ -247,7 +247,7 @@ export default function OrganizationSettingsPage() {
         </Card>
 
         {/* ACCIONES */}
-        <Card variant="settings" className="flex-row items-center">
+        <Card variant="settings">
           <div className="flex flex-col gap-1">
             <Text weight="bold" size="lg">¿Guardar cambios institucionales?</Text>
             <Text variant="muted" size="sm">
@@ -269,7 +269,7 @@ export default function OrganizationSettingsPage() {
               loading={isUpdating}
               disabled={isUpdating}
               leftIcon={<Save className="w-4 h-4" />}
-              className="flex-1 md:flex-none h-12 px-12 shadow-[0_0_20px_rgba(252,211,3,0.1)]"
+              className="flex-1 md:flex-none h-12 px-12 shadow-primary/10 shadow-lg"
             >
               Actualizar Sede
             </Button>

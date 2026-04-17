@@ -66,7 +66,7 @@ export function CountrySelector({
   return (
     <div className="space-y-2 relative" ref={containerRef}>
       {label && (
-        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
           {label}
         </Label>
       )}
@@ -74,7 +74,7 @@ export function CountrySelector({
       <Button
         id="country-selector-trigger"
         type="button"
-        variant="glass"
+        variant="secondary"
         fullWidth
         onClick={() => setOpen(!open)}
         role="combobox"
@@ -87,32 +87,32 @@ export function CountrySelector({
           {selectedCountry ? (
             <>
               {selectedCountry.flag && <span className="text-lg leading-none">{selectedCountry.flag}</span>}
-              <span className="text-sm font-bold uppercase tracking-tight text-white">
+              <span className="text-sm font-bold uppercase tracking-tight text-foreground">
                 {selectedCountry.name}
               </span>
-              <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-black text-slate-400">
+              <span className="text-[10px] bg-foreground/5 px-1.5 py-0.5 rounded font-black text-foreground-muted">
                 {selectedCountry.code}
               </span>
             </>
           ) : (
             <>
-              <Globe className="size-4 text-slate-500" />
-              <span className="text-sm text-slate-500 font-medium italic">{placeholder}</span>
+              <Globe className="size-4 text-foreground-dim" />
+              <span className="text-sm text-foreground-dim font-medium italic">{placeholder}</span>
             </>
           )}
         </div>
-        <ChevronsUpDown className="size-4 text-slate-500" />
+        <ChevronsUpDown className="size-4 text-foreground-dim" />
       </Button>
 
       {open && (
         <div
           id="country-listbox"
           aria-labelledby="country-selector-trigger"
-          className="absolute z-50 w-full mt-2 bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          className="absolute z-50 w-full mt-2 bg-popover border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          <div className="p-3 border-b border-white/5 bg-background">
+          <div className="p-3 border-b border-border-muted bg-popover">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-slate-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-foreground-dim" />
               <Input
                 placeholder="Buscar país por nombre o código..."
                 value={search}
@@ -139,8 +139,8 @@ export function CountrySelector({
                     setSearch("");
                   }}
                   className={cn(
-                    "flex items-center justify-between px-4 py-3 h-auto rounded-none border-b border-white/5 last:border-0 transition-colors group",
-                    value === country.code ? "bg-primary/5 hover:bg-primary/10" : "bg-transparent hover:bg-white/5"
+                    "flex items-center justify-between px-4 py-3 h-auto rounded-none border-b border-border-muted last:border-0 transition-colors group",
+                    value === country.code ? "bg-primary/5 hover:bg-primary/10" : "bg-transparent hover:bg-foreground/5"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -148,12 +148,12 @@ export function CountrySelector({
                     <div className="flex flex-col items-start">
                       <span className={cn(
                         "text-xs font-bold uppercase tracking-tight",
-                        value === country.code ? "text-primary" : "text-white"
+                        value === country.code ? "text-primary" : "text-foreground"
                       )}>
                         {country.name}
                       </span>
                       {country.currency && (
-                        <span className="text-[10px] text-slate-500 font-medium font-outfit">
+                        <span className="text-[10px] text-foreground-dim font-medium font-outfit">
                           Moneda: {country.currency}
                         </span>
                       )}
@@ -176,7 +176,7 @@ export function CountrySelector({
       )}
 
       {error && (
-        <Text size="xs" className="text-red-500 font-medium mt-1">
+        <Text size="xs" className="text-destructive font-medium mt-1">
           {error}
         </Text>
       )}

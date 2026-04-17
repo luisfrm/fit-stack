@@ -2,16 +2,17 @@
 
 import * as React from "react";
 import {
-  Input,
   Button,
   toast,
 } from "@workspace/ui/components";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { type IMember } from "@/types/dashboard";
 import { MembersTable } from "@/components/members/members-table";
 import { MemberModal } from "@/components/members/member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ORG_ROLES } from "@workspace/shared";
 
 export default function MembersPage() {
@@ -21,8 +22,9 @@ export default function MembersPage() {
 
   // Filtros
   const [query, setQuery] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const debouncedSearch = useDebounce(searchTerm, 500);
   const role = ORG_ROLES.MEMBER; // Fuerza el rol de cliente
-  const [tempQuery, setTempQuery] = React.useState("");
 
   // Paginación
   const [page, setPage] = React.useState(1);
@@ -51,6 +53,12 @@ export default function MembersPage() {
     loadMembers();
   }, [loadMembers]);
 
+  // Sync debounced search with query
+  React.useEffect(() => {
+    setQuery(debouncedSearch);
+    setPage(1);
+  }, [debouncedSearch]);
+
   const handleDelete = async (id: number) => {
     try {
       await membersService.deleteMember(id);
@@ -65,11 +73,7 @@ export default function MembersPage() {
     }
   };
 
-  const handleSearchSubmit = (e: React.SubmitEvent) => {
-    e.preventDefault();
-    setQuery(tempQuery);
-    setPage(1);
-  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,17 +93,11 @@ export default function MembersPage() {
       </DashboardHeader>
 
       {/* Panel de Filtros */}
-      <section className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
-        <form onSubmit={handleSearchSubmit} className="flex gap-2 w-full md:w-[350px]">
-          <Input
-            value={tempQuery}
-            onChange={(e) => setTempQuery(e.target.value)}
-            placeholder="Buscar por nombre, email..."
-            leftIcon={<Search size={16} />}
-          />
-          <Button type="submit" variant="outlined" className="h-[46px]">Buscar</Button>
-        </form>
-      </section>
+      <FilterPanel
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por nombre, email..."
+      />
 
       {/* Tabla */}
       <section>

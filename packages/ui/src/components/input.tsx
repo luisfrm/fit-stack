@@ -124,7 +124,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     let renderRightElement = null
     if (state === "error") {
       renderRightElement = (
-        <span className="pr-4 shrink-0 flex items-center text-red-500">
+        <span className="pr-4 shrink-0 flex items-center text-destructive">
           <CircleX size={16} />
         </span>
       )
@@ -162,8 +162,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="flex flex-col gap-1.5 w-full">
-        {/* Label */ }
-        { label && (
+        {/* Label */}
+        {label && (
           <Label
             htmlFor={inputId}
             className="text-xs font-semibold uppercase tracking-wider text-foreground-muted"
@@ -215,9 +215,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {hint && (
           <p
             className={cn(
-              "text-xs",
-              state === "error" && "text-red-400",
-              state === "success" && "text-green-400",
+              "text-xs font-medium",
+              state === "error" && "text-destructive",
+              state === "success" && "text-primary",
               (!state || state === "default") && "text-foreground-dim"
             )}
           >

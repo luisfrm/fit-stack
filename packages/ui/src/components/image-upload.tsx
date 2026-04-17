@@ -67,9 +67,9 @@ export function ImageUpload({
         <label
           htmlFor={id}
           className={cn(
-            "relative aspect-square w-full rounded-xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-black",
+            "relative aspect-square w-full rounded-xl border-2 border-dashed border-border bg-foreground/5 flex flex-col items-center justify-center transition-all cursor-pointer group hover:border-primary/50 overflow-hidden outline-none focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background",
             disabled && "opacity-60 cursor-not-allowed",
-            preview && "border-solid border-white/20"
+            preview && "border-solid border-border"
           )}
         >
           <input
@@ -94,7 +94,7 @@ export function ImageUpload({
                 "p-4 rounded transition-all",
                 fallbackIcon 
                   ? "bg-primary/10 text-primary border border-primary/20" 
-                  : "bg-white/5 text-slate-400 border border-white/5",
+                  : "bg-foreground/5 text-foreground-dim border border-border",
                 !disabled && !fallbackIcon && "group-hover:text-primary group-hover:bg-primary/10"
               )}>
                 {disabled ? <Lock className="h-6 w-6" /> : (fallbackIcon || <Upload className="h-6 w-6" />)}
@@ -111,7 +111,7 @@ export function ImageUpload({
               size="icon"
               rounded="lg"
               onClick={handleRemove}
-              className="h-8 w-8 shadow-xl border-2 border-black/50 hover:scale-110 transition-transform"
+              className="h-8 w-8 shadow-xl border-2 border-background hover:scale-110 transition-transform"
               title="Eliminar imagen"
             >
               <X className="h-4 w-4" />

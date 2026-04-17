@@ -21,7 +21,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <Label
             htmlFor={textareaId}
-            className="text-xs font-semibold uppercase tracking-wider text-gray-400"
+            className="text-xs font-semibold uppercase tracking-wider text-foreground-muted"
           >
             {label}
           </Label>
@@ -36,16 +36,17 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <textarea
             id={textareaId}
             className={cn(
-              "flex-1 w-full bg-transparent outline-none border-none shadow-none px-4 py-3 text-sm text-white placeholder-gray-600 min-w-0 resize-y",
-              disabled && "cursor-not-allowed opacity-50"
+              "flex-1 w-full bg-transparent outline-none border-none shadow-none px-4 py-3 text-sm text-foreground placeholder-foreground-dim/50 min-w-0 resize-y",
+              disabled && "cursor-not-allowed opacity-40"
             )}
             disabled={disabled}
+            re
             ref={ref}
             {...props}
           />
         </div>
         {hint && (
-          <p className={cn("text-xs", state === "error" ? "text-red-400" : "text-white/40")}>
+          <p className={cn("text-xs", state === "error" ? "text-destructive" : "text-foreground-muted")}>
             {hint}
           </p>
         )}
