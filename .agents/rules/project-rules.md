@@ -14,85 +14,51 @@ description: Essential coding standards and architectural rules for the Fit-Stac
 These rules are mandatory for all development tasks within the Fit-Stack repository. Adherence ensures consistency, maintainability, and architectural integrity.
 
 Implementation plans should be in Spanish.
+Always ask for explicit approval before proceeding with any implementation plan.
 
-Always ask for approval before proceed in any implementation plan.
+## 1. Monorepo Architecture & Boundaries
 
-## 1. Database Operations
+- **Package Separation**: Respect the boundaries between `apps/` and `packages/`. Logic belonging to a package MUST NEVER be duplicated in an app.
+- **Strict Isolation**: Don't mix API and Frontend contexts. Never import anything between apps directly; the only allowed interaction is through shared packages (`packages/shared`).
+- **Shared Logic & Types**: Use `@workspace/shared` for any interfaces, DTOs, or constants shared between the backend, frontend, or other consumers. Keep shared business logic here to avoid duplication.
+- **Type Safety**: Avoid using the `any` type. Prioritize strict, strong typing for backend, frontend, and shared code.
 
-- **ORM**: Always use **Drizzle ORM** for database interactions.
-- **Source**: All database-related code, schemas, and clients MUST be imported from `@workspace/database` (located in `packages/database`).
-- **Pattern**: Do not define schemas or raw queries outside of the database package.
-- **Safety**: **NO database-affecting command (push, generate, migrate, seed, etc.) may be executed without explicit and prior approval from the USER for that specific command.**
+## 2. UI Design System & Hierarchy
 
-## 2. UI Components
+- **Library Origins**: All UI components (buttons, inputs, modals, layout elements) MUST be imported from `@workspace/ui` (`packages/ui`).
+- **Variant Enforcements**: Components MUST use their predefined variants. Do not use ad-hoc Tailwind classes to override sizes, spacing, or styles unless absolutely necessary, and only after notifying the user.
+- **Mathematical Scale**: Maintain the premium aesthetic using strict generic tokens:
+  - **Backgrounds (bg)**: Use `bg-input`, `bg-card`, `bg-surface`, and translucent scales (`bg-white/5`, `bg-white/10`).
+  - **Borders**: Subtlety is mandatory. Use low opacity boundaries (`border-white/5`, `border-white/10`, `border-input-border`) over solid hexes. Limit solid colors to focus rings.
+  - **Border Radius**:
+    - **Inputs, Buttons, CheckboxCards (Internal Controls)**: `rounded-md`
+    - **Cards, Containers (Intermediate Surfaces)**: `rounded-xl`
+    - **Modals, Dialogs (Large Parent Surfaces)**: `rounded-2xl`
 
-- **Library**: All UI components (buttons, inputs, modals, etc.) MUST be imported from `@workspace/ui` (located in `packages/ui`).
-- **Variants**: If a task requires a new variant or a modification to an existing variant in a UI component, **you must inform the user** before proceeding with the change. You must never should any dynamic classname, it's supposed the variants have all the styles necesaries, if it's necessary any hardcode classname you must inform to human.
+## 3. Database Integrity & ORM
 
-## 3. Shared Logic and Types
+- **ORM Usage**: Always use **Drizzle ORM**. All database-related code, schemas, and clients MUST be imported from `@workspace/database`.
+- **Workflow & Safety**: All database changes MUST follow the `generate` -> `review` -> `migrate` cycle. NO database-affecting commands (`push`, `generate`, `migrate`, `seed`) may be executed without explicit and prior approval from the USER.
+- **Push Restriction**: `db:push` is EXCLUSIVELY for local prototyping. It is strictly prohibited on shared branches or production.
+- **Naming Conventions**: Table names in Drizzle schemas MUST be **singular** (e.g., `user`, `organization`). Repositories and Services MUST be **plural** (e.g., `users.service.ts`).
+- **Validation**: Run `npm run db:check` before pushing to ensure schemas match migrations. GitHub Actions verify migrations on PRs automatically.
 
-- **Interfaces**: Use `@workspace/shared` (located in `packages/shared`) for any interfaces or types that are shared between the API, CMS, or other apps.
-- **Consistency**: Keep business logic that is shared between packages within the `shared` package to avoid duplication.
+## 4. Next.js Patterns & Best Practices
 
-## 4. Type Safety
+- **Server vs Client (RSC)**: Keep the `"use client"` directive only at leaf nodes. Assume everything is a Server Component by default, and perform data fetching exclusively Server-side where possible.
+- **State as URL**: Prioritize URL state (`?search=foo`) over React `useState` if the state alters page content and should be persistent/shareable (like pagination, tabs, or global searches).
+- **Async Params in Next.js 15+**: `params` and `searchParams` in route handlers and server components are **Promises**. Define them as `Promise<...>` and use `await` before accessing values.
+- **Navigation Context**: Do not use `window.location` in client components. Always rely on `useRouter` from `next/navigation` for programmatic routing, and `router.refresh()` to sync server-side state (like auth/org changes) without full reloads.
+- **Proxy/Middleware**: The Next.js `proxy.ts` (formerly `middleware.ts`) defines the network boundary. Keep heavy business logic out. Use it solely for CORS, header manipulation, and early session validation.
 
-- **No `any`**: Avoid using the `any` type in the codebase. Use proper TypeScript interfaces, types, or generics.
-- **Strict Typing**: Prioritize strong typing for both backend and frontend code to ensure reliability.
+## 5. Security & Authentication Architecture
 
-## 5. Naming Conventions
+- **The Source of Truth**: The `organization` table managed by Better Auth is the sole source of identity (Name/Logo). Do NOT fall back to legacy settings. Uses `authClient.organization.update()`.
+- **Layered Structure**:
+  - **Config (`auth-client.ts`)**: Setup and native exports.
+  - **Client Hook (`use-auth.ts`)**: Wraps native hooks to add role flags (`isAdmin`). Client components MUST use `useAuth()`. NEVER use `useSession()` directly. NEVER read `session.activeOrganization` directly, always rely on `useActiveOrganization()`.
+  - **Server Service (`session-service.ts`)**: Used explicitly in Server Components, Layouts, and API layers to fetch isomorphic session data securely.
 
-- **Tables**: Database table names in Drizzle schemas MUST be in **singular** (e.g., `user`, `organization`, `gym_member`).
-- **Services & Repositories**: File names and class/object names for services and repositories MUST be in **plural** (e.g., `users.service.ts`, `members.repository.ts`).
+## 6. Error Handling & Mutations
 
-## 6. Architectural Constraints
-
-- **Package Separation**: Respect the boundaries between `apps/` and `packages/`. Logic belonging to a package should not be duplicated in an app.
-
-## 7. Next.js & API Rules
-
-- **Async Params**: In Next.js 15+ (used in `apps/api`), the `params` and `searchParams` props in route handlers and server components are **Promises**. You MUST define them as `Promise<...>` and use `await` before accessing their properties.
-- **Middleware/Proxy**: The project follows the Next.js 16 convention where `middleware.ts` is renamed to `proxy.ts`. This shift clarifies its purpose as a network boundary/routing layer rather than a place for heavy business logic. Use it for CORS, header manipulation, and early session validation, but keep robust authorization and logic within route handlers or the service layer.
-
-## 8. Database Integrity & Migrations
-
-- **Workflow**: All database changes MUST follow the `generate` -> `review` -> `migrate` cycle.
-- **Verification**: Before pushing, run `npm run db:check` in `packages/database` to ensure the schema matches the migrations folder.
-- **Push Restriction**: The command `db:push` is EXCLUSIVELY for local development and rapid prototyping. It is strictly prohibited for shared branches (`master`, `staging`) or production.
-- **Automation**: The project uses GitHub Actions (`database-integrity.yml`) to:
-  1.  **Check**: Statically verify migration integrity on every Pull Request.
-  2.  **Deploy**: Automatically run `db:migrate` on production/dev when merging to `master`.
-- **Secrets**: Production `DATABASE_URL` must be managed as a GitHub Secret.
-## 9. Navigation in Next.js
-- **No `window.location`**: Do not use `window.location` for navigation or page refreshes in client components.
-- **Router hooks**: Use `useRouter` from `next/navigation` to handle programmatic navigation.
-- **State Sync**: Use `router.refresh()` to sync server-side state (like sessions or active organizations) without a full browser reload.
-
-## 10. CMS Authentication Architecture
-
-The CMS uses a layered auth system. Each layer has a single, exclusive responsibility:
-
-| Layer              | File                                       | Used In                                | Responsibility                                                                                                                                  |
-| ------------------ | ------------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Config**         | `apps/cms/lib/auth-client.ts`              | Everywhere                             | Better Auth client setup, type exports (`Session`, `User`), native hook re-exports (`useSession`, `useActiveOrganization`, `organization`)      |
-| **Client Hook**    | `apps/cms/lib/hooks/use-auth.ts`           | Client Components                      | Wraps `useSession` + `useActiveOrganization`. Adds role flags (`isAdmin`, `isCoach`). **This is the standard for all client-side auth access.** |
-| **Server Service** | `apps/cms/lib/services/session-service.ts` | Server Components, Layouts, Middleware | Async session fetching for SSR. Never import this in client components.                                                                         |
-
-## 11. Better Auth usage rules
-
-- **Client components** MUST use `useAuth()` from `@/lib/hooks/use-auth`. Do NOT call `useSession()` or `useActiveOrganization()` directly in components.
-- **Server components / Layouts** MUST use `sessionService.getSession()` from `@/lib/services/session-service`.
-- **Active Organization**: Always comes from `useActiveOrganization()` (via `useAuth`). Do NOT read `session.activeOrganization` — it is not populated by `useSession` by Better Auth design.
-- **Identity (Name/Logo)**: The `organization` table (Better Auth) is the source of truth. Do NOT use `gym_settings` for `GYM_NAME` or `GYM_LOGO`. Use `authClient.organization.update()` to save identity changes.
-
-## 12. Don't mix API and Frontend. Never import anything between apps, the only way is using shared packages.
-
-## 13. UI Design Elements & Hierarchy Scale
-
-The project strictly follows a mathematical scale for borders, radiuses, and backgrounds to maintain a premium aesthetic. Do NOT mix styles randomly.
-
-- **Backgrounds (bg)**: Use the defined CSS variables (`bg-input`, `bg-card`, `bg-surface`) and translucent scales (`bg-white/5`, `bg-white/10`).
-- **Borders**: Subtlety is mandatory. Use low opacity boundaries (`border-white/5`, `border-white/10` or `border-border`) rather than solid hexes, reserving solid colors for focus rings.
-- **Border Radius Scale**:
-  - **Inputs, Buttons, CheckboxCards (Internal Controls)**: `rounded-md`
-  - **Cards, Containers (Intermediate Surfaces)**: `rounded-xl`
-  - **Modals, Dialogs (Large Parent Surfaces)**: `rounded-2xl`
+- **User Feedback**: No silent `console.log()` errors in production components. All form mutations (create, edit, delete) MUST implement a robust `try/catch` block and notify the user of the outcome using `toast.success` or `toast.error` pulling explicit server responses.
