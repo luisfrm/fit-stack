@@ -48,6 +48,13 @@ export { Toaster } from "@workspace/ui/components/sonner";
 export { toast } from "sonner";
 export { Spinner } from "@workspace/ui/components/spinner";
 export { Modal } from "@workspace/ui/components/modal";
+export {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  SimpleTooltip,
+} from "./tooltip";
 export { Checkbox } from "@workspace/ui/components/checkbox";
 export { CheckboxCard } from "@workspace/ui/components/checkbox-card";
 export { ConfirmationModal } from "@workspace/ui/components/confirmation-modal";
@@ -85,5 +92,3 @@ export { NextImage } from "@workspace/ui/components/next/image";
 
 // Loaders
 export { SplashScreen } from "@workspace/ui/components/splash-screen";
-
-export * from "@workspace/ui/components/tooltip";

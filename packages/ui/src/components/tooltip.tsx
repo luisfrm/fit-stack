@@ -54,23 +54,25 @@ function TooltipContent({
   )
 }
 
-function SimpleTooltip({
-  children,
-  content,
-  side = "top",
-  delayDuration = 400,
-}: {
-  readonly children: React.ReactNode
-  readonly content: React.ReactNode
-  readonly side?: "top" | "bottom" | "left" | "right"
-  readonly delayDuration?: number
-}) {
+const SimpleTooltip = React.forwardRef<
+  HTMLButtonElement,
+  {
+    readonly children: React.ReactNode
+    readonly content: React.ReactNode
+    readonly side?: "top" | "bottom" | "left" | "right"
+    readonly delayDuration?: number
+  }
+>(({ children, content, side = "top", delayDuration = 400, ...props }, ref) => {
   return (
     <Tooltip delayDuration={delayDuration}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger asChild {...props} ref={ref}>
+        {children}
+      </TooltipTrigger>
       <TooltipContent side={side}>{content}</TooltipContent>
     </Tooltip>
   )
-}
+})
+
+SimpleTooltip.displayName = "SimpleTooltip"
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, SimpleTooltip }
