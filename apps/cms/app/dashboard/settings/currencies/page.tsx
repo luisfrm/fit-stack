@@ -143,7 +143,6 @@ export default function CurrencySettingsPage() {
                   <Input
                     placeholder="Buscar moneda (ej: USD, EUR, MXN...)"
                     leftIcon={<Search className="w-4 h-4" />}
-                    wrapperClassName="h-11 bg-zinc-900 border-white/5 focus-within:border-primary/50"
                     className="px-4"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -152,7 +151,7 @@ export default function CurrencySettingsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsEditingCurrencies(false)}
-                    className="text-white/40 hover:text-white"
+                    className="text-white/40 hover:text-white h-12"
                   >
                     Cerrar
                   </Button>

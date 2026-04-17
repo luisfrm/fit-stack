@@ -171,7 +171,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         id="plan-price"
         type="number"
         step="0.01"
-        min="0"
+        allowNegative={false}
         value={price}
         onChange={(e) => setPrice(e.target.value)}
         placeholder="0.00"
@@ -186,7 +186,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
           <Input
             label="Duración (Valor)"
             type="number"
-            min="1"
+            allowNegative={false}
             value={durationValue}
             onChange={(e) => setDurationValue(Number(e.target.value))}
           />

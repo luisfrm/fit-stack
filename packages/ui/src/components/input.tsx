@@ -85,6 +85,12 @@ export interface InputProps
   hint?: string
   /** Override wrapper className */
   wrapperClassName?: string
+  /**
+   * If false, prevents typing or pasting negative values.
+   * Only applies when type="number"
+   * @default true
+   */
+  allowNegative?: boolean
 }
 
 /* ─────────────────────────────────────────────
@@ -104,6 +110,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       wrapperClassName,
       id,
       disabled,
+      type,
+      allowNegative = true,
+      onKeyDown,
+      onChange,
       ...props
     },
     ref
@@ -132,10 +142,28 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       )
     }
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (type === "number" && !allowNegative && (e.key === "-" || e.key === "e")) {
+        e.preventDefault()
+      }
+      onKeyDown?.(e)
+    }
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (type === "number") {
+        const raw = e.target.value
+        // Strip leading zeros (e.g. "02" → "2"), but allow "0" and "0.x"
+        if (raw.length > 1 && raw.startsWith("0") && !raw.startsWith("0.")) {
+          e.target.value = raw.replace(/^0+/, "") || "0"
+        }
+      }
+      onChange?.(e)
+    }
+
     return (
       <div className="flex flex-col gap-1.5 w-full">
-        {/* Label */}
-        {label && (
+        {/* Label */ }
+        { label && (
           <Label
             htmlFor={inputId}
             className="text-xs font-semibold uppercase tracking-wider text-gray-400"
@@ -163,10 +191,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            type={type}
             disabled={disabled}
+            onKeyDown={handleKeyDown}
+            onChange={handleChange}
+            min={type === "number" && !allowNegative ? 0 : props.min}
             className={cn(
               "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
               "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:white]",
+              "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
               leftIcon && "pl-2",
               renderRightElement && "pr-2",
               className
