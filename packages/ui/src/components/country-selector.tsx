@@ -65,14 +65,16 @@ export function CountrySelector({
 
   return (
     <div className="space-y-2 relative" ref={containerRef}>
-      <Label className="text-xs uppercase font-black tracking-widest text-slate-400">
-        {label}
-      </Label>
+      {label && (
+        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+          {label}
+        </Label>
+      )}
 
       <Button
         id="country-selector-trigger"
         type="button"
-        variant="ghost"
+        variant="secondary"
         fullWidth
         onClick={() => setOpen(!open)}
         role="combobox"
@@ -80,7 +82,7 @@ export function CountrySelector({
         aria-haspopup="listbox"
         aria-controls="country-listbox"
         className={cn(
-          "h-11 justify-between border border-white/10 px-4 hover:bg-white/10 transition-all text-white",
+          "h-12 justify-between px-4",
           open && "ring-2 ring-primary/50 border-primary/50"
         )}
       >
@@ -108,7 +110,6 @@ export function CountrySelector({
       {open && (
         <div
           id="country-listbox"
-          role="listbox"
           aria-labelledby="country-selector-trigger"
           className="absolute z-50 w-full mt-2 bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
         >

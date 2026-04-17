@@ -207,16 +207,14 @@ export default function OrganizationSettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-0 items-start">
             <div className="space-y-6">
-              <div className="space-y-2">
-                <Text size="xs" weight="bold" className="uppercase tracking-widest opacity-50 ml-1">País de Operación</Text>
-                <CountrySelector
-                  value={formData.countryCode}
-                  onChange={(code) => handleChange("countryCode", code)}
-                  countries={LATAM_COUNTRIES}
-                />
-              </div>
+              <CountrySelector
+                label="País de Operación"
+                value={formData.countryCode}
+                onChange={(code) => handleChange("countryCode", code)}
+                countries={LATAM_COUNTRIES}
+              />
 
               <Input
                 label="Razón Social / Nombre Legal"

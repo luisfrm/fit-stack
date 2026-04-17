@@ -278,7 +278,6 @@ export function OrganizationSettingsForm({
                   label="Campo de Ejemplo"
                   placeholder="Escribe algo aquí..."
                   readOnly
-                  wrapperClassName="h-12 bg-white/5 border-white/10 rounded-xl"
                 />
               </div>
 

@@ -4,6 +4,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { cn } from "@workspace/ui/lib/utils";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
+import { Button } from "./button";
 
 export interface ColorPickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
   label?: string;
@@ -18,7 +19,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
   ({ className, label, value, onChange, description, ...props }, ref) => {
     const id = React.useId();
     const [format, setFormat] = React.useState<ColorFormat>("hex");
-    
+
     // Internal state to handle typing (allows intermediate invalid states)
     const [tempValue, setTempValue] = React.useState("");
     const [isFocused, setIsFocused] = React.useState(false);
@@ -43,7 +44,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
 
     const handleTextChange = (val: string) => {
       setTempValue(val); // Keep exactly what user types
-      
+
       // If it becomes a valid color in ANY format, emit OKLCH to parent
       if (ColorUtils.isValid(val)) {
         const oklch = ColorUtils.toOklch(val);
@@ -71,18 +72,19 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
               </Label>
             )}
             <span className="text-[10px] text-primary/60 font-medium">
-               Ej: {ColorUtils.formatExamples[format]}
+              Ej: {ColorUtils.formatExamples[format]}
             </span>
           </div>
 
-          <button
+          <Button
             type="button"
             onClick={handleFormatToggle}
-            className="text-[9px] uppercase font-bold text-primary hover:underline transition-all flex items-center gap-1 cursor-pointer"
+            variant="link"
+            size="sm"
           >
             Formato: {format}
             <MoveRight className="w-2.5 h-2.5" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 group">
@@ -112,7 +114,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
                   setTempValue(ColorUtils.formatForDisplay(tempValue, format));
                 }
               }}
-              className="font-mono uppercase bg-white/5 border-white/5 focus:border-primary/50 h-12 text-[13px] pr-10"
+              className="font-mono uppercase"
               placeholder={ColorUtils.formatExamples[format]}
               {...props}
             />
