@@ -67,7 +67,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       let finalLogoUrl = formData.logo;
 
       if (selectedFile) {
-        finalLogoUrl = await uploadService.uploadFile(selectedFile);
+        finalLogoUrl = await uploadService.uploadFile(selectedFile, undefined, initialData?.id);
       } else if (!isEdit && !formData.logo) {
         // Default logo for new organizations in R2
         finalLogoUrl = "";

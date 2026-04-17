@@ -73,7 +73,7 @@ export default function OrganizationSettingsPage() {
 
       // 1. Upload new logo if exists
       if (logoFile) {
-        finalLogoUrl = await uploadService.uploadFile(logoFile);
+        finalLogoUrl = await uploadService.uploadFile(logoFile, undefined, activeOrg!.id);
       }
 
       // 2. Update via our Custom Platform API
@@ -82,7 +82,7 @@ export default function OrganizationSettingsPage() {
       await organizationsService.update(activeOrg!.id, {
         name: formData.name,
         slug: formData.slug || undefined,
-        logo: finalLogoUrl || "public/no_logo.png",
+        logo: finalLogoUrl || "",
         countryCode: formData.countryCode,
         taxId: formData.taxId,
         legalName: formData.legalName,
@@ -183,11 +183,12 @@ export default function OrganizationSettingsPage() {
                 <ImageUpload
                   label="Logo Principal"
                   description="Formatos sugeridos: SVG, PNG."
+                  fallbackIcon={<Building2 className="h-8 w-8" />}
                   value={uploadService.getMediaUrl(logoUrl)}
                   onChange={(file) => setLogoFile(file)}
                   onRemove={() => {
                     setLogoFile(null);
-                    setLogoUrl("public/no_logo.png"); // Reset to default R2 placeholder
+                    setLogoUrl(""); // Reset to empty to trigger fallback icon
                   }}
                 />
               </div>

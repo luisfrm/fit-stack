@@ -16,12 +16,18 @@ export const uploadService = {
    * Generates a presigned URL and uploads the file directly.
    * Path format: [organizationId]/[folder]/[filename]_[shortId].[ext]
    */
-  async uploadFile(file: File, folder: string = "general", customName?: string): Promise<string> {
+  async uploadFile(
+    file: File,
+    customName?: string,
+    organizationId?: string,
+    folder?: string
+  ): Promise<string> {
     const { data } = await apiClient.post<{ presignedUrl: string; key: string }>("/upload/presigned", {
       filename: file.name,
-      customName,
+      customName: customName || undefined,
+      organizationId: organizationId || undefined,
+      folder: folder || undefined,
       contentType: file.type,
-      folder
     });
 
     // We use direct axios here because apiClient has a fixed baseURL for our own API

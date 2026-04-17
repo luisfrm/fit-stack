@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type LucideIcon, Menu } from "lucide-react";
+import { type LucideIcon, Menu, Building2 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Text } from "@workspace/ui/components/text";
 import { Skeleton } from "@workspace/ui/components/skeleton";
@@ -66,8 +66,8 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
   const LogoContent = branding.logo ? (
     <NextImage src={branding.logo} alt="Logo" width={32} height={32} />
   ) : (
-    <div className="text-primary w-4 h-4 italic">
-      {FallbackIcon ? <FallbackIcon className="w-full h-full" /> : "G"}
+    <div className="text-primary w-4 h-4">
+      {FallbackIcon ? <FallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
     </div>
   );
 
@@ -128,8 +128,8 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
   const DesktopLogoContent = branding.logo ? (
     <NextImage src={branding.logo} alt="Logo" width={40} height={40} />
   ) : (
-    <div className="text-primary w-5 h-5 italic">
-      {DesktopFallbackIcon ? <DesktopFallbackIcon className="w-full h-full" /> : "G"}
+    <div className="text-primary w-5 h-5">
+      {DesktopFallbackIcon ? <DesktopFallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
     </div>
   );
 

@@ -46,14 +46,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { filename, contentType, folder = 'general', customName } = await req.json();
+    const { filename, contentType, folder, customName, organizationId } = await req.json();
 
     if (!filename || !contentType) {
       return NextResponse.json({ error: 'Filename and content type are required' }, { status: 400 });
     }
 
-    const orgId = session.session.activeOrganizationId || 'public';
-    const uniqueKey = constructStorageKey(orgId, folder, filename, customName);
+    // Priority: Body organizationId > Session activeOrganizationId > 'public'
+    const orgId = organizationId || session.session.activeOrganizationId || 'public';
+    const uniqueKey = constructStorageKey(orgId, folder || 'general', filename, customName);
 
     const result = await r2Service.getPresignedUploadUrl(uniqueKey, contentType);
     return NextResponse.json(result);

@@ -12,6 +12,7 @@ export interface ImageUploadProps {
   className?: string;
   label?: string;
   description?: string;
+  fallbackIcon?: React.ReactNode;
 }
 
 export function ImageUpload({
@@ -21,7 +22,8 @@ export function ImageUpload({
   disabled,
   className,
   label,
-  description
+  description,
+  fallbackIcon
 }: Readonly<ImageUploadProps>) {
   const [preview, setPreview] = React.useState<string | undefined>(value);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -89,10 +91,13 @@ export function ImageUpload({
           ) : (
             <div className="flex flex-col items-center gap-3 p-6 text-center">
               <div className={cn(
-                "p-4 rounded bg-white/5 text-slate-400 border border-white/5 transition-all",
-                !disabled && "group-hover:text-primary group-hover:bg-primary/10"
+                "p-4 rounded transition-all",
+                fallbackIcon 
+                  ? "bg-primary/10 text-primary border border-primary/20" 
+                  : "bg-white/5 text-slate-400 border border-white/5",
+                !disabled && !fallbackIcon && "group-hover:text-primary group-hover:bg-primary/10"
               )}>
-                {disabled ? <Lock className="h-6 w-6" /> : <Upload className="h-6 w-6" />}
+                {disabled ? <Lock className="h-6 w-6" /> : (fallbackIcon || <Upload className="h-6 w-6" />)}
               </div>
             </div>
           )}
