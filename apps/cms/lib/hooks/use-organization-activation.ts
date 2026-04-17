@@ -29,7 +29,7 @@ export function useOrganizationActivation() {
           error = retry.error;
         } catch (joinErr: any) {
           console.error("Failed to auto-join organization:", joinErr);
-          error = { message: "No se pudo vincular automáticamente al gimnasio." };
+          error = { code: 'AUTO_JOIN_ERROR', message: "No se pudo vincular automáticamente al gimnasio." };
         }
       }
 
