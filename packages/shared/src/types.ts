@@ -1,5 +1,15 @@
 import { Role } from './constants';
 
+/**
+ * Standard interface for Better Auth errors.
+ */
+export interface IAuthError {
+  code: string;
+  message?: string;
+  status?: number;
+  statusText?: string;
+}
+
 /* ── SHARED TYPES ── */
 
 /**

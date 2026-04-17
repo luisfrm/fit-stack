@@ -1,5 +1,5 @@
 import { authClient, type Session, type User, type SignInParams, type SignUpParams } from "@/lib/auth-client";
-import { GLOBAL_ROLES, GlobalRole } from "@workspace/shared";
+import { GLOBAL_ROLES, GlobalRole, type IAuthError } from "@workspace/shared";
 
 /**
  * Service to handle session-related operations in the CMS.
@@ -10,21 +10,21 @@ export const sessionService = {
    * Gets the current session.
    * @param customHeaders Optional headers (useful for Middleware)
    */
-  async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: unknown }> {
+  async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: IAuthError | null }> {
     if (globalThis.window === undefined) {
       try {
         const { headers: nextHeaders } = await import("next/headers");
         const headers = customHeaders || await nextHeaders();
         const result = await authClient.getSession({ fetchOptions: { headers } });
-        return { data: result?.data as Session | null, error: result?.error || null };
-      } catch (error) {
+        return { data: result?.data as Session | null, error: (result?.error as IAuthError) || null };
+      } catch (error: any) {
         console.error("Error fetching session on server:", error);
-        return { data: null, error };
+        return { data: null, error: error as IAuthError };
       }
     }
 
     const result = await authClient.getSession();
-    return { data: result?.data as Session | null, error: result?.error || null };
+    return { data: result?.data as Session | null, error: (result?.error as IAuthError) || null };
   },
 
   /**
@@ -41,37 +41,37 @@ export const sessionService = {
       });
 
       if (!response.ok) {
-        return { data: null, error: `Auth API error: ${response.statusText}` };
+        return { data: null, error: { code: 'AUTH_API_ERROR', message: `Auth API error: ${response.statusText}`, status: response.status } };
       }
 
       const data = await response.json();
       return { data, error: null };
     } catch {
-      return { data: null, error: "Error de red al obtener sesión" };
+      return { data: null, error: { code: 'NETWORK_ERROR', message: "Error de red al obtener sesión" } };
     }
   },
 
   /**
    * Signs in a user with email and password.
    */
-  async signIn(params: SignInParams) {
+  async signIn(params: SignInParams): Promise<{ data: any; error: IAuthError | null }> {
     try {
       const result = await authClient.signIn.email(params);
-      return { data: result?.data || null, error: result?.error || null };
+      return { data: result?.data || null, error: (result?.error as IAuthError) || null };
     } catch (err: any) {
-      return { data: null, error: err };
+      return { data: null, error: err as IAuthError };
     }
   },
 
   /**
    * Registers a new user.
    */
-  async signUp(params: SignUpParams) {
+  async signUp(params: SignUpParams): Promise<{ data: any; error: IAuthError | null }> {
     try {
       const result = await authClient.signUp.email(params);
-      return { data: result?.data || null, error: result?.error || null };
-    } catch (err) {
-      return { data: null, error: err };
+      return { data: result?.data || null, error: (result?.error as IAuthError) || null };
+    } catch (err: any) {
+      return { data: null, error: err as IAuthError };
     }
   },
 
@@ -87,9 +87,9 @@ export const sessionService = {
           }
         }
       });
-      return { data: result?.data || true, error: result?.error || null };
-    } catch (err) {
-      return { data: null, error: err };
+      return { data: result?.data || true, error: (result?.error as IAuthError) || null };
+    } catch (err: any) {
+      return { data: null, error: err as IAuthError };
     }
   },
 
@@ -101,9 +101,9 @@ export const sessionService = {
       const result = await authClient.organization.setActive({
         organizationId: organizationId || null,
       });
-      return { data: result?.data || null, error: result?.error || null };
-    } catch (err) {
-      return { data: null, error: err };
+      return { data: result?.data || null, error: (result?.error as IAuthError) || null };
+    } catch (err: any) {
+      return { data: null, error: err as IAuthError };
     }
   },
 
