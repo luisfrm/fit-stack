@@ -4,7 +4,8 @@ import * as React from "react";
 import { 
   Label, 
   ToggleGroup, 
-  ToggleGroupItem 
+  ToggleGroupItem,
+  Text
 } from "@workspace/ui/components";
 import { type IMembershipPlan } from "@/types/dashboard";
 
@@ -40,13 +41,19 @@ export function PlanSelector({
             <ToggleGroupItem
               key={plan.id}
               value={String(plan.id)}
-              className="rounded-xl border border-white/5 data-[state=on]:bg-primary data-[state=on]:text-black h-auto py-3 px-4 flex flex-col items-start gap-1"
+              className="rounded-xl border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground h-auto py-3 px-4 flex flex-col items-start gap-1 transition-all duration-300 hover:border-primary/50"
             >
               <div className="flex items-center justify-between w-full gap-4">
-                <span className="font-bold text-sm uppercase">{plan.name}</span>
-                <span className="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded uppercase">{plan.currency}</span>
+                <Text size="base" weight="bold" uppercase as="span">
+                  {plan.name}
+                </Text>
+                <Text size="xs" weight="bold" className="bg-muted px-1.5 py-0.5 rounded uppercase" as="span">
+                  {plan.currency}
+                </Text>
               </div>
-              <span className="text-xs opacity-80">{plan.price / 100} {plan.currency}/mes</span>
+              <Text size="sm" variant="muted">
+                {plan.price / 100} {plan.currency}/mes
+              </Text>
             </ToggleGroupItem>
           ))}
         </ToggleGroup>

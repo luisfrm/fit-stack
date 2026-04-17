@@ -76,7 +76,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
-  const [isEditingPayment, setIsEditingPayment] = React.useState(false);
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
@@ -307,8 +306,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentMethodId={paymentMethodId}
           activeCurrencies={activeCurrencies}
           activePaymentMethods={activePaymentMethods}
-          isEditingPayment={isEditingPayment}
-          onToggleEdit={() => setIsEditingPayment(!isEditingPayment)}
           finalAmount={finalAmount}
           currencyFormat={currencyFormat}
           selectedPaymentConfig={selectedPaymentConfig}

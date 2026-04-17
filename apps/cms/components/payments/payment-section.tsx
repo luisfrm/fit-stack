@@ -4,7 +4,6 @@ import * as React from "react";
 import { Calculator, CircleDollarSign, CreditCard } from "lucide-react";
 import {
   Card,
-  Button,
   Text,
   Label,
   Input,
@@ -25,8 +24,6 @@ interface PaymentSectionProps {
   readonly paymentMethodId: string;
   readonly activeCurrencies: string[];
   readonly activePaymentMethods: IPaymentMethodConfig[];
-  readonly isEditingPayment: boolean;
-  readonly onToggleEdit: () => void;
   readonly finalAmount: number;
   readonly currencyFormat: CurrencyFormat;
   readonly selectedPaymentConfig?: IPaymentMethodConfig;
@@ -52,8 +49,6 @@ export function PaymentSection({
   paymentMethodId,
   activeCurrencies,
   activePaymentMethods,
-  isEditingPayment,
-  onToggleEdit,
   finalAmount,
   currencyFormat,
   selectedPaymentConfig,
@@ -77,111 +72,87 @@ export function PaymentSection({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Calculator className="w-5 h-5 text-primary" />
-          <h3 className="text-sm font-bold uppercase tracking-widest text-white">Detalles del Pago</h3>
+          <Text weight="bold" uppercase size="base" as="div">Detalles del Pago</Text>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onToggleEdit}
-          className="text-[10px] font-bold text-primary uppercase h-7 px-3"
-        >
-          {isEditingPayment ? "Ocultar" : "Modificar"}
-        </Button>
       </div>
 
-      {isEditingPayment ? (
-        <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <CurrencySelector
-              value={paymentCurrency}
-              onChange={onCurrencyChange}
-              currencies={activeCurrencies}
-              label="Moneda de Pago"
-            />
 
-            <SimpleSelect
-              label="Método de Pago"
-              value={paymentMethodId}
-              onChange={onMethodChange}
-              placeholder="Seleccionar Método"
-              options={[
-                ...activePaymentMethods.map(method => ({
-                  value: method.id,
-                  label: method.name
-                })),
-                { value: "other", label: "Otro / Personalizado" }
-              ]}
-            />
-          </div>
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CurrencySelector
+            value={paymentCurrency}
+            onChange={onCurrencyChange}
+            currencies={activeCurrencies}
+            label="Moneda de Pago"
+          />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5">
-            {paymentCurrency !== selectedPlan.currency && (
-              <div className="space-y-2">
-                <Label htmlFor="exchange-rate" className="text-xs font-semibold text-slate-400 uppercase">
-                  Tasa ({selectedPlan.currency} {"\u2192"} {paymentCurrency})
-                </Label>
-                <Input
-                  id="exchange-rate"
-                  type={rateFocus ? "number" : "text"}
-                  step="0.01"
-                  value={rateFocus ? exchangeRate : ValueConverter.format(exchangeRate, "", currencyFormat)}
-                  onFocus={() => onRateFocus(true)}
-                  onBlur={() => onRateFocus(false)}
-                  onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
-                  variant="default"
-                  leftIcon={<CircleDollarSign size={16} />}
-                />
-              </div>
-            )}
+          <SimpleSelect
+            label="Método de Pago"
+            value={paymentMethodId}
+            onChange={onMethodChange}
+            placeholder="Seleccionar Método"
+            options={[
+              ...activePaymentMethods.map(method => ({
+                value: method.id,
+                label: method.name
+              })),
+              { value: "other", label: "Otro / Personalizado" }
+            ]}
+          />
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
+          {paymentCurrency !== selectedPlan.currency && (
             <div className="space-y-2">
-              <Label htmlFor="final-amount" className="text-xs font-semibold text-slate-400 uppercase">Monto Total a Recibir</Label>
+              <Label htmlFor="exchange-rate" className="text-xs font-semibold text-muted-foreground uppercase">
+                Tasa ({selectedPlan.currency} {"\u2192"} {paymentCurrency})
+              </Label>
               <Input
-                id="final-amount"
-                type={amountFocus ? "number" : "text"}
+                id="exchange-rate"
+                type={rateFocus ? "number" : "text"}
                 step="0.01"
-                value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
-                onFocus={() => onAmountFocus(true)}
-                onBlur={() => onAmountFocus(false)}
-                onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
-                readOnly={!allowPriceOverride}
+                value={rateFocus ? exchangeRate : ValueConverter.format(exchangeRate, "", currencyFormat)}
+                onFocus={() => onRateFocus(true)}
+                onBlur={() => onRateFocus(false)}
+                onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
                 variant="default"
-                className={allowPriceOverride ? "" : "opacity-70"}
-                leftIcon={<CreditCard size={16} />}
+                leftIcon={<CircleDollarSign size={16} />}
               />
-              {!allowPriceOverride && (
-                <p className="text-[10px] text-slate-500 italic">Basado en el plan. No editable.</p>
-              )}
             </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="final-amount" className="text-xs font-semibold text-muted-foreground uppercase">Monto Total a Recibir</Label>
+            <Input
+              id="final-amount"
+              type={amountFocus ? "number" : "text"}
+              step="0.01"
+              value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
+              onFocus={() => onAmountFocus(true)}
+              onBlur={() => onAmountFocus(false)}
+              onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
+              readOnly={!allowPriceOverride}
+              variant="default"
+              className={allowPriceOverride ? "" : "opacity-70"}
+              leftIcon={<CreditCard size={16} />}
+            />
+            {!allowPriceOverride && (
+              <p className="text-[10px] text-muted-foreground italic">Basado en el plan. No editable.</p>
+            )}
           </div>
         </div>
-      ) : (
-        <div className="flex items-center justify-between p-4 bg-surface-2/40 border border-border rounded-2xl animate-in fade-in slide-in-from-top-1 duration-300">
-          <div className="flex flex-col">
-            <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest">A recibir</Text>
-            <Text size="lg" weight="bold" className="text-primary tabular-nums">
-              {ValueConverter.format(finalAmount, paymentCurrency, currencyFormat)}
-            </Text>
-          </div>
-          <div className="text-right">
-            <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Método</Text>
-            <Text size="sm" weight="bold" className="text-white uppercase">
-              {selectedPaymentConfig?.name || "Efectivo / Otro"}
-            </Text>
-          </div>
-        </div>
-      )}
+      </div>
+
 
       {/* Dynamic Fields */}
       {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
           {selectedPaymentConfig.fields.map(field => (
             <div key={field.id} className={cn("space-y-2", field.type === 'file' && "md:col-span-2")}>
-              <Label className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1">
+              <Text as="label" variant="muted" size="xs" weight="bold" uppercase className="flex items-center gap-1">
                 {field.label}
                 {field.required && <span className="text-red-500">*</span>}
-              </Label>
+              </Text>
 
               {field.type === 'file' ? (
                 <ImageUpload
@@ -205,7 +176,7 @@ export function PaymentSection({
 
       {paymentMethodId === 'other' && (
         <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
-          <Label id="other-method-details-label" className="text-xs font-semibold text-slate-400 uppercase">Especificar Método / Referencia</Label>
+          <Label id="other-method-details-label" className="text-xs font-semibold text-muted-foreground uppercase">Especificar Método / Referencia</Label>
           <Input
             id="other-method-details"
             placeholder="Ej: Transferencia Banco Mercantil..."
