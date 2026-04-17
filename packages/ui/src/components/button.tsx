@@ -57,13 +57,12 @@ const buttonVariants = cva(
         ],
 
         /**
-         * Glass — translucent panel style
+         * glass — translucent surface matching inputs
          */
         glass: [
-          "bg-[--color-glass-bg] backdrop-blur-md",
-          "border border-border",
-          "text-white",
-          "hover:border-[--color-primary] hover:bg-white/10",
+          "bg-white/5 border border-white/10 text-white",
+          "hover:bg-white/10 hover:border-white/20",
+          "active:scale-[0.98]",
         ],
 
         /**
@@ -97,15 +96,24 @@ const buttonVariants = cva(
           "bg-transparent text-white/40",
           "hover:text-white hover:bg-white/5 active:bg-white/10",
         ],
+
+        /**
+         * white — background white, text black (Premium CTA)
+         */
+        white: [
+          "bg-white text-black",
+          "hover:bg-slate-200",
+          "active:scale-[0.95]",
+        ],
       },
 
       size: {
-        xs: "text-[10px] px-3 py-1.5 tracking-[0.15em]",
-        sm: "text-xs px-5 py-2.5",
-        md: "text-sm px-6 py-3",
-        lg: "text-base px-8 py-4",
-        xl: "text-lg px-10 py-4 tracking-[0.15em]",
-        icon: "p-2 flex items-center justify-center shrink-0",
+        xs: "text-[10px] px-3 h-8 tracking-[0.15em]",
+        sm: "text-xs px-5 h-10",
+        md: "text-sm px-6 h-12",
+        lg: "text-base px-8 h-14",
+        xl: "text-lg px-10 h-16 tracking-[0.15em]",
+        icon: "size-10 flex items-center justify-center shrink-0",
       },
 
       fullWidth: {

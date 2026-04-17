@@ -7,6 +7,8 @@ export interface IMembershipPlan {
   name: string
   price: string | number // decimal in pg is string in drizzle
   currency: string
+  durationValue: number
+  durationUnit: 'day' | 'week' | 'month' | 'year'
   features: string[] | null
   isPopular: boolean
   isActive: boolean
@@ -95,6 +97,8 @@ export const plansRepository = {
       name: data.name,
       price: data.price.toString(),
       currency: data.currency,
+      durationValue: data.durationValue,
+      durationUnit: data.durationUnit,
       features: data.features,
       isPopular: data.isPopular,
       isActive: data.isActive,
@@ -110,6 +114,8 @@ export const plansRepository = {
         name: data.name,
         price: data.price?.toString(),
         currency: data.currency,
+        durationValue: data.durationValue,
+        durationUnit: data.durationUnit as any, // Cast because of Drizzle enum type
         features: data.features,
         isPopular: data.isPopular,
         isActive: data.isActive,

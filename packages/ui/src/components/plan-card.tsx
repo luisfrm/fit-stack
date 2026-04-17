@@ -13,6 +13,8 @@ export interface PlanCardProps {
     name: string;
     price: number;
     currency: string;
+    durationValue?: number;
+    durationUnit?: "day" | "week" | "month" | "year";
     features: string[] | null;
     isPopular?: boolean;
     isActive?: boolean;
@@ -39,6 +41,27 @@ export function PlanCard({
     style: "currency",
     currency: plan.currency || "USD",
   }).format(plan.price / 100);
+
+  const durationLabel = React.useMemo(() => {
+    const val = plan.durationValue ?? 1;
+    const unit = plan.durationUnit ?? "month";
+
+    if (val === 1) {
+      if (unit === "month") return "/ mes";
+      if (unit === "year") return "/ año";
+      if (unit === "week") return "/ semana";
+      return "/ día";
+    }
+
+    const unitLabels = {
+      day: "días",
+      week: "semanas",
+      month: "meses",
+      year: "años",
+    };
+
+    return `/ ${val} ${unitLabels[unit]}`;
+  }, [plan.durationValue, plan.durationUnit]);
 
   return (
     <Card 
@@ -77,15 +100,17 @@ export function PlanCard({
 
       {/* Precio */}
       <div className="flex items-end gap-2 my-8">
-        <Text as="p" className="text-4xl font-black text-white tracking-tighter leading-none">
-          {priceFormatted}
-        </Text>
+        <div className="flex items-baseline gap-1">
+          <Text as="p" className="text-4xl font-black text-white tracking-tighter leading-none">
+            {priceFormatted}
+          </Text>
+        </div>
         <div className="flex flex-col mb-1">
           <Text as="span" size="xs" className="text-primary font-bold uppercase leading-none mb-0.5 text-[10px]">
             {plan.currency}
           </Text>
           <Text as="span" size="xs" variant="muted" className="text-white/30 uppercase text-[9px] font-bold leading-none">
-            /mes
+            {durationLabel}
           </Text>
         </div>
       </div>

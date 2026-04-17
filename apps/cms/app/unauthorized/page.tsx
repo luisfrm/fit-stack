@@ -27,14 +27,14 @@ export default function UnauthorizedPage() {
           </p>
           
           <div className="flex flex-col gap-3">
-            <Button asChild className="w-full h-12 bg-white text-black hover:bg-slate-200 rounded-xl font-semibold transition-all">
+            <Button asChild variant="white" fullWidth>
               <Link href="/login" className="flex items-center justify-center gap-2">
                 <LogIn className="w-4 h-4" />
                 Volver al Login
               </Link>
             </Button>
             
-            <Button asChild variant="ghost" className="w-full h-12 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-all">
+            <Button asChild variant="glass" fullWidth>
               <Link href="/" className="flex items-center justify-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
                 Ir al Inicio

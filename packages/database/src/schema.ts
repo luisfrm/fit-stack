@@ -19,6 +19,7 @@ export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
 export const paymentStatusEnum = pgEnum('payment_status', ['processing', 'validated', 'invalid', 'voided']);
 export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
+export const membershipDurationUnitEnum = pgEnum('membership_duration_unit', ['day', 'week', 'month', 'year']);
 export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
   'hero',
   'services',
@@ -148,10 +149,11 @@ export const invitation = pgTable('invitation', {
 export const fitstackPlan = pgTable('fitstack_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   name: text('name').notNull(),
-  monthlyPrice: numeric('monthly_price', { precision: 10, scale: 2 }).notNull(),
-  yearlyPrice: numeric('yearly_price', { precision: 10, scale: 2 }),
+  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+  currency: text('currency').default('USD').notNull(),
+  durationValue: integer('duration_value').default(1).notNull(),
+  durationUnit: membershipDurationUnitEnum('duration_unit').default('month').notNull(),
   features: jsonb('features').$type<PlanFeatures | null>(), // PlanFeatures interface from shared/types.ts
-  suggestedDurationDays: integer('suggested_duration_days'), // For manual pre-fill
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -260,6 +262,8 @@ export const membershipPlan = pgTable('membership_plan', {
   name: text('name').notNull(),
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
+  durationValue: integer('duration_value').default(1).notNull(),
+  durationUnit: membershipDurationUnitEnum('duration_unit').default('month').notNull(),
   features: jsonb('features').$type<string[] | null>(),
   isPopular: boolean('is_popular').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),

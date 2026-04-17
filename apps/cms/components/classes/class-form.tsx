@@ -4,14 +4,14 @@ import * as React from "react";
 import {
   Input,
   Button,
-  Checkbox,
   ToggleGroup,
   ToggleGroupItem,
+  Textarea,
+  CheckboxCard,
 } from "@workspace/ui/components";
 import { type ICmsClass } from "@/types/dashboard";
-import { Calendar, Clock, User, FileText, Globe, Repeat } from "lucide-react";
+import { Calendar, Clock, User, Repeat } from "lucide-react";
 import { parseDateAsConfigTimezone } from "@/lib/config/display";
-import { Label } from "@workspace/ui/components/label";
 
 const DAYS_OF_WEEK = [
   { label: "Domingo", value: 0 },
@@ -110,9 +110,9 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
 
       {/* ── Frecuencia ── */}
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
           Tipo de Frecuencia
-        </Label>
+        </span>
         <ToggleGroup
           type="single"
           value={formData.frequencyType ?? "weekly"}
@@ -185,40 +185,23 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
       </div>
 
       {/* ── Descripción ── */}
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Descripción
-        </Label>
-        <div className="relative">
-          <FileText className="absolute left-3 top-3 text-white/30" size={16} />
-          <textarea
-            className="w-full min-h-[100px] bg-surface border border-border rounded-lg p-3 pl-10 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-primary transition-all resize-none"
-            placeholder="Describe brevemente la clase..."
-            value={formData.description ?? ""}
-            onChange={(e) => handleChange("description", e.target.value)}
-          />
-        </div>
-      </div>
+      <Textarea
+        label="Descripción"
+        placeholder="Describe brevemente la clase..."
+        value={formData.description ?? ""}
+        onChange={(e) => handleChange("description", e.target.value)}
+        rows={4}
+      />
 
       {/* ── Visibilidad ── */}
-      <div className="flex items-center space-x-3 rounded-lg border border-muted bg-surface-2 p-4 transition-colors hover:bg-white/[0.07]">
-        <Checkbox
+      <div className="col-span-full pt-2">
+        <CheckboxCard
           id="isVisible"
           checked={formData.isVisible}
           onCheckedChange={(checked) => handleChange("isVisible", checked)}
+          label="Visible en la Web Pública"
+          description="Determina si los clientes pueden ver esta clase en la aplicación."
         />
-        <div className="grid gap-1.5 leading-none">
-          <Label
-            htmlFor="isVisible"
-            className="text-sm font-medium leading-none flex items-center gap-2"
-          >
-            <Globe size={14} className="text-primary" />
-            Visible en la Web
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Determina si los clientes pueden ver esta clase en la aplicación.
-          </p>
-        </div>
       </div>
 
       {/* ── Submit ── */}

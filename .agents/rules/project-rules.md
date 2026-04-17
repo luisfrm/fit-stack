@@ -27,7 +27,7 @@ Always ask for approval before proceed in any implementation plan.
 ## 2. UI Components
 
 - **Library**: All UI components (buttons, inputs, modals, etc.) MUST be imported from `@workspace/ui` (located in `packages/ui`).
-- **Variants**: If a task requires a new variant or a modification to an existing variant in a UI component, **you must inform the user** before proceeding with the change.
+- **Variants**: If a task requires a new variant or a modification to an existing variant in a UI component, **you must inform the user** before proceeding with the change. You must never should any dynamic classname, it's supposed the variants have all the styles necesaries, if it's necessary any hardcode classname you must inform to human.
 
 ## 3. Shared Logic and Types
 

@@ -112,9 +112,9 @@ function HeroForm({ data, onSave, isLoading }: any) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Input label="Título Principal" {...register("title")} />
           {errors.title && <Text size="xs" className="text-rose-400 mt-1">{errors.title.message as string}</Text>}
           <Input label="Subtítulo / Bajada" {...register("subtitle")} />
@@ -123,7 +123,7 @@ function HeroForm({ data, onSave, isLoading }: any) {
             <Input label="Link de Botón" {...register("ctaLink")} />
           </div>
         </div>
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <Controller 
             name="imageKey" 
             control={control} 
@@ -150,8 +150,8 @@ function TestimonialsForm({ data, onSave, isLoading }: any) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
-      <div className="space-y-4">
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {fields.map((field, index) => (
           <div key={field.id} className="p-4 bg-white/5 rounded-xl border border-white/5 relative group">
             <Button 
@@ -172,7 +172,7 @@ function TestimonialsForm({ data, onSave, isLoading }: any) {
                       render={({ field }) => <ImageUploader value={field.value} onChange={field.onChange} />}
                    />
                 </div>
-                <div className="md:col-span-2 space-y-3">
+                <div className="md:col-span-2 flex flex-col gap-3">
                    <div className="grid grid-cols-2 gap-3">
                       <Input label="Autor" {...register(`items.${index}.author`)} />
                       <Input label="Rol (ej. Miembro)" {...register(`items.${index}.role`)} />
@@ -211,7 +211,7 @@ function GalleryForm({ data, onSave, isLoading }: any) {
     });
   
     return (
-      <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {fields.map((field, index) => (
             <div key={field.id} className="relative group p-3 bg-white/5 rounded-xl border border-white/5">
@@ -262,9 +262,9 @@ function ContactForm({ data, onSave, isLoading }: any) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <Input label="Dirección Física" {...register("address")} />
           <div className="grid grid-cols-2 gap-4">
              <Input label="Teléfono" {...register("phone")} />
@@ -272,7 +272,7 @@ function ContactForm({ data, onSave, isLoading }: any) {
           </div>
           <Input label="Google Maps URL (Embed/Link)" {...register("googleMapsUrl")} />
         </div>
-        <div className="space-y-4 p-4 rounded-xl bg-white/5 border border-white/5">
+        <div className="flex flex-col gap-4 p-4 rounded-xl bg-white/5 border border-white/5">
            <Text weight="semibold" size="sm">Redes Sociales</Text>
            <Input label="Instagram" placeholder="@gym_premium" {...register("social.instagram")} />
            <Input label="Facebook" placeholder="Link a página" {...register("social.facebook")} />
@@ -293,7 +293,7 @@ function GeneralInfoForm({ data, onSave, isLoading, titleLabel }: any) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 max-w-xl">
         <Input label={`Título de ${titleLabel}`} {...register("title")} />
         <Input label="Subtítulo / Descripción corta" {...register("subtitle")} />

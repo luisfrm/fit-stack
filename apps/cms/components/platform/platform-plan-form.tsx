@@ -5,11 +5,13 @@ import {
   Button,
   Input,
   Text,
-  Switch,
-  Separator
+  Separator,
+  SimpleSelect,
+  CurrencySelector,
+  CheckboxCard
 } from "@workspace/ui/components";
 import { type IPlatformPlan } from "@workspace/shared/types";
-import { Building2, Users, Smartphone, Globe, BookOpen } from "lucide-react";
+import { Users, Globe } from "lucide-react";
 import { cleanNumericInput } from "@/lib/utils/helper";
 
 interface PlatformPlanFormProps {
@@ -21,9 +23,10 @@ interface PlatformPlanFormProps {
 export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformPlanFormProps) {
   const [formData, setFormData] = React.useState({
     name: initialData?.name || "",
-    monthlyPrice: initialData?.monthlyPrice?.toString() || "0",
-    yearlyPrice: initialData?.yearlyPrice?.toString() || "0",
-    suggestedDurationDays: initialData?.suggestedDurationDays?.toString() || "30",
+    price: initialData?.price ? (initialData.price / 100).toString() : "0",
+    currency: initialData?.currency || "USD",
+    durationValue: initialData?.durationValue?.toString() || "1",
+    durationUnit: initialData?.durationUnit || "month",
     isActive: initialData?.isActive ?? true,
     features: {
       limits: {
@@ -37,6 +40,26 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
       }
     }
   });
+
+  // Frequency auto-complete logic
+  const [frequency, setFrequency] = React.useState<string>(() => {
+    if (!initialData?.durationValue) return "monthly";
+    const v = initialData.durationValue;
+    const u = initialData.durationUnit;
+    if (v === 1 && u === "day") return "daily";
+    if (v === 1 && u === "week") return "weekly";
+    if (v === 1 && u === "month") return "monthly";
+    if (v === 1 && u === "year") return "annual";
+    return "custom";
+  });
+
+  const handleFrequencyChange = (val: string) => {
+    setFrequency(val);
+    if (val === "daily") setFormData(prev => ({ ...prev, durationValue: "1", durationUnit: "day" }));
+    else if (val === "weekly") setFormData(prev => ({ ...prev, durationValue: "1", durationUnit: "week" }));
+    else if (val === "monthly") setFormData(prev => ({ ...prev, durationValue: "1", durationUnit: "month" }));
+    else if (val === "annual") setFormData(prev => ({ ...prev, durationValue: "1", durationUnit: "year" }));
+  };
 
   const updateLimit = (key: keyof typeof formData.features.limits, val: string) => {
     const processed = cleanNumericInput(formData.features.limits[key], val);
@@ -69,12 +92,16 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
-    // Convertimos strings a números para el API
+    // Convert centenas para el API
+    const priceInCents = Math.round(Number(formData.price) * 100);
+
     const submissionData = {
-      ...formData,
-      monthlyPrice: Number.parseFloat(formData.monthlyPrice) || 0,
-      yearlyPrice: Number.parseFloat(formData.yearlyPrice) || 0,
-      suggestedDurationDays: Number.parseInt(formData.suggestedDurationDays, 10) || 0,
+      name: formData.name,
+      price: priceInCents,
+      currency: formData.currency,
+      durationValue: Number.parseInt(formData.durationValue, 10) || 1,
+      durationUnit: formData.durationUnit,
+      isActive: formData.isActive,
       features: {
         ...formData.features,
         limits: {
@@ -91,155 +118,148 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 py-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Nombre del Plan</Text>
-          <Input
-            value={formData.name}
-            onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-            placeholder="Ej: Plan Basic, Plan Elite..."
-            required
-            className="bg-white/5 border-white/10"
-          />
-        </div>
-        <div className="space-y-2">
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Precio Sugerido Mensual (USD)</Text>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.monthlyPrice}
-            onChange={(e) => {
-              const val = e.target.value;
-              const processed = cleanNumericInput(formData.monthlyPrice, val);
-              
-              const parsed = Number.parseFloat(processed);
-              const finalValue = Number.isNaN(parsed) ? "0" : Math.max(0, parsed).toString();
-              setFormData(p => ({ ...p, monthlyPrice: finalValue }));
-            }}
-            placeholder="0.00"
-            required
-            className="bg-white/5 border-white/10"
-          />
-        </div>
-        <div className="space-y-2">
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Precio Sugerido Anual (USD)</Text>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.yearlyPrice}
-            onChange={(e) => {
-              const val = e.target.value;
-              const processed = cleanNumericInput(formData.yearlyPrice, val);
-              
-              const parsed = Number.parseFloat(processed);
-              const finalValue = Number.isNaN(parsed) ? "0" : Math.max(0, parsed).toString();
-              setFormData(p => ({ ...p, yearlyPrice: finalValue }));
-            }}
-            placeholder="0.00"
-            className="bg-white/5 border-white/10"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Text size="sm" weight="bold" className="text-white uppercase tracking-wider">Duración Sugerida (Días)</Text>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Basic Info */}
         <Input
+          label="Nombre del Plan"
+          value={formData.name}
+          onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+          placeholder="Ej: Plan Basic..."
+          required
+        />
+
+        <SimpleSelect
+          label="Frecuencia"
+          value={frequency}
+          onChange={handleFrequencyChange}
+          options={[
+            { value: "daily", label: "Diario" },
+            { value: "weekly", label: "Semanal" },
+            { value: "monthly", label: "Mensual" },
+            { value: "annual", label: "Anual" },
+            { value: "custom", label: "Personalizado" },
+          ]}
+        />
+
+        <Input
+          label="Precio (USD)"
           type="number"
+          step="0.01"
           min="0"
-          value={formData.suggestedDurationDays}
+          value={formData.price}
           onChange={(e) => {
             const val = e.target.value;
-            const processed = cleanNumericInput(formData.suggestedDurationDays, val);
-            setFormData(p => ({ ...p, suggestedDurationDays: processed }));
+            const processed = cleanNumericInput(formData.price, val);
+            setFormData(p => ({ ...p, price: processed }));
           }}
-          className="bg-white/5 border-white/10"
+          placeholder="0.00"
+          required
         />
-        <Text size="xs" variant="muted">Este valor pre-llenará el formulario de suscripción manual.</Text>
+
+        <CurrencySelector
+          label="Moneda"
+          value={formData.currency}
+          onChange={(v) => setFormData(p => ({ ...p, currency: v }))}
+          currencies={["USD", "VES", "COP"]}
+        />
       </div>
 
-      <Separator className="bg-white/10" />
+      {/* Custom Duration Fields */}
+      {frequency === "custom" && (
+        <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-top-2">
+          <div className="space-y-2">
+            <Text size="xs" weight="bold" className="text-primary/70 uppercase">Valor</Text>
+            <Input
+              type="number"
+              min="1"
+              value={formData.durationValue}
+              onChange={(e) => setFormData(p => ({ ...p, durationValue: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-0">
+            <SimpleSelect
+              label="Unidad"
+              value={formData.durationUnit}
+              onChange={(v: any) => setFormData(p => ({ ...p, durationUnit: v }))}
+              options={[
+                { value: "day", label: "Días" },
+                { value: "week", label: "Semanas" },
+                { value: "month", label: "Meses" },
+                { value: "year", label: "Años" },
+              ]}
+            />
+          </div>
+        </div>
+      )}
 
+      {/* Status */}
+      <div className="col-span-full">
+        <CheckboxCard
+          id="isActive"
+          label="Plan Activo"
+          description="Habilitar para nuevas suscripciones."
+          checked={formData.isActive}
+          onCheckedChange={(val) => setFormData(p => ({ ...p, isActive: val }))}
+        />
+      </div>
+
+      <Separator className="bg-white/10 my-2" />
+
+      {/* Limits */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <Users size={18} className="text-primary" />
           <Text size="sm" weight="bold" className="text-white uppercase tracking-widest">Límites de Uso (0 = Ilimitado)</Text>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">Máx. Miembros</Text>
-            <Input
-              type="number"
-              min="0"
-              value={formData.features.limits?.members}
-              onChange={(e) => updateLimit('members', e.target.value)}
-              className="bg-white/5 border-white/10"
-            />
-          </div>
-          <div className="space-y-2">
-            <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">Máx. Coaches</Text>
-            <Input
-              type="number"
-              min="0"
-              value={formData.features.limits?.coaches}
-              onChange={(e) => updateLimit('coaches', e.target.value)}
-              className="bg-white/5 border-white/10"
-            />
-          </div>
+          <Input
+            label="Máx. Miembros"
+            type="number"
+            min="0"
+            value={formData.features.limits?.members}
+            onChange={(e) => updateLimit('members', e.target.value)}
+          />
+          <Input
+            label="Máx. Coaches"
+            type="number"
+            min="0"
+            value={formData.features.limits?.coaches}
+            onChange={(e) => updateLimit('coaches', e.target.value)}
+          />
         </div>
       </div>
 
       <Separator className="bg-white/10" />
 
+      {/* Access Control */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-2">
           <Globe size={18} className="text-primary" />
           <Text size="sm" weight="bold" className="text-white uppercase tracking-widest">Accesos y Módulos</Text>
         </div>
 
-        <div className="space-y-4 bg-white/5 p-4 rounded-xl border border-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Smartphone size={20} className="text-slate-400" />
-              <div>
-                <Text size="sm" weight="bold" className="text-slate-200">Acceso a PWA</Text>
-                <Text size="xs" variant="muted">Permitir uso de la aplicación móvil.</Text>
-              </div>
-            </div>
-            <Switch
-              checked={formData.features.access?.pwa}
-              onCheckedChange={(val) => updateFeatureAccess('pwa', val)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <BookOpen size={20} className="text-slate-400" />
-              <div>
-                <Text size="sm" weight="bold" className="text-slate-200">Módulo de Blog</Text>
-                <Text size="xs" variant="muted">Habilitar creación de contenido informativo.</Text>
-              </div>
-            </div>
-            <Switch
-              checked={formData.features.access?.blog}
-              onCheckedChange={(val) => updateFeatureAccess('blog', val)}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Building2 size={20} className="text-slate-400" />
-              <div>
-                <Text size="sm" weight="bold" className="text-slate-200">Web Comercial</Text>
-                <Text size="xs" variant="muted">Habilitar sitio corporativo personalizable.</Text>
-              </div>
-            </div>
-            <Switch
-              checked={formData.features.access?.web_commercial}
-              onCheckedChange={(val) => updateFeatureAccess('web_commercial', val)}
-            />
-          </div>
+        <div className="flex flex-col gap-3">
+          <CheckboxCard
+            id="pwa"
+            checked={formData.features.access?.pwa}
+            onCheckedChange={(val) => updateFeatureAccess('pwa', val)}
+            label="Acceso a PWA"
+            description="Permitir uso de la aplicación móvil."
+          />
+          <CheckboxCard
+            id="blog"
+            checked={formData.features.access?.blog}
+            onCheckedChange={(val) => updateFeatureAccess('blog', val)}
+            label="Módulo de Blog"
+            description="Habilitar creación de contenido informativo."
+          />
+          <CheckboxCard
+            id="web_commercial"
+            checked={formData.features.access?.web_commercial}
+            onCheckedChange={(val) => updateFeatureAccess('web_commercial', val)}
+            label="Web Comercial"
+            description="Habilitar sitio corporativo personalizable."
+          />
         </div>
       </div>
 
@@ -247,7 +267,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
         <Button
           type="submit"
           variant="primary"
-          className="w-full font-black uppercase tracking-widest h-12"
+          fullWidth
           disabled={isLoading}
         >
           {isLoading ? "Guardando..." : submitButtonText}

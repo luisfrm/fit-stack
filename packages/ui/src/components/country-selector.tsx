@@ -74,17 +74,14 @@ export function CountrySelector({
       <Button
         id="country-selector-trigger"
         type="button"
-        variant="secondary"
+        variant="glass"
         fullWidth
         onClick={() => setOpen(!open)}
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls="country-listbox"
-        className={cn(
-          "h-12 justify-between px-4",
-          open && "ring-2 ring-primary/50 border-primary/50"
-        )}
+        className={open ? "ring-2 ring-primary/50" : ""}
       >
         <div className="flex items-center gap-3">
           {selectedCountry ? (

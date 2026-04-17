@@ -17,7 +17,8 @@ import {
   Button,
   ColorPicker,
   Title,
-  toast
+  toast,
+  SimpleSelect
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
@@ -189,20 +190,12 @@ export function OrganizationSettingsForm({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-            <div className="space-y-2">
-              <Text size="xs" weight="bold" className="uppercase tracking-widest opacity-50 ml-1">Zona Horaria (IANA)</Text>
-              <select
-                value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
-                onChange={(e) => handleChange(SETTINGS_KEYS.TIMEZONE, e.target.value)}
-                className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all appearance-none"
-              >
-                {TIMEZONES.map((tz) => (
-                  <option key={tz.value} value={tz.value} className="bg-zinc-900 text-white">
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SimpleSelect
+              label="Zona Horaria (IANA)"
+              value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
+              onChange={(value) => handleChange(SETTINGS_KEYS.TIMEZONE, value)}
+              options={TIMEZONES}
+            />
 
             <div className="bg-white/5 border border-white/5 p-4 rounded-xl flex items-center gap-4">
               <div className="p-2.5 rounded-lg bg-white/5 text-white/40">

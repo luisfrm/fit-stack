@@ -4,9 +4,9 @@ import * as React from "react";
 import {
   Input,
   Button,
-  Checkbox,
+  CheckboxCard,
   toast,
-  Label,
+  SimpleSelect,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
@@ -103,11 +103,11 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
       {/* ── Photo Upload Section ── */}
       <div className="flex flex-col items-center gap-4 py-2">
         <div className="relative group">
-          <Avatar className="size-24 border-2 border-primary/20 bg-surface-2 ring-offset-2 ring-offset-background group-hover:ring-2 ring-primary/50 transition-all">
+          <Avatar size="2xl">
             {previewUrl ? (
               <AvatarImage src={previewUrl} className="object-cover" />
             ) : null}
-            <AvatarFallback className="bg-surface-2 text-foreground-dim border-none">
+            <AvatarFallback>
               <User className="size-10 opacity-30" />
             </AvatarFallback>
           </Avatar>
@@ -184,19 +184,17 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           disabled={isEdit}
         />
 
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-sm font-medium text-slate-300">Rol Administrativo</Label>
-          <select
-            value={formData.role}
-            onChange={(e) => handleChange("role", e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-primary transition-all h-[46px]"
-          >
-            <option value={ORG_ROLES.MANAGER} className="bg-slate-900 text-white">Manager / Dueño</option>
-            <option value={ORG_ROLES.COACH} className="bg-slate-900 text-white">Entrenador</option>
-            <option value={ORG_ROLES.CASHIER} className="bg-slate-900 text-white">Cajero / Staff</option>
-            <option value={GLOBAL_ROLES.ADMIN} className="bg-slate-900 text-white">Super Admin (Global)</option>
-          </select>
-        </div>
+        <SimpleSelect
+          label="Rol Administrativo"
+          value={formData.role ?? ORG_ROLES.MANAGER}
+          onChange={(v) => handleChange("role", v)}
+          options={[
+            { value: ORG_ROLES.MANAGER, label: "Manager / Dueño" },
+            { value: ORG_ROLES.COACH, label: "Entrenador" },
+            { value: ORG_ROLES.CASHIER, label: "Cajero / Staff" },
+            { value: GLOBAL_ROLES.ADMIN, label: "Super Admin (Global)" }
+          ]}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,39 +214,24 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
         />
       </div>
 
-      <div className="flex flex-col gap-4 pt-2">
-        <div className="flex items-center space-x-3 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
-          <Checkbox
-            id="isActive"
-            checked={formData.isActive}
-            onCheckedChange={(checked) => handleChange("isActive", checked)}
-          />
-          <div className="grid gap-1.5 leading-none">
-            <Label htmlFor="isActive" className="text-sm font-medium leading-none text-white">
-              Estado Activo
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Determina si el usuario tiene acceso actual al panel de administración.
-            </p>
-          </div>
-        </div>
+      <div className="col-span-full flex flex-col gap-3 pt-2">
+        <CheckboxCard
+          id="isActive"
+          checked={formData.isActive}
+          onCheckedChange={(checked) => handleChange("isActive", checked)}
+          label="Estado Activo"
+          description="Determina si el usuario tiene acceso actual al panel de administración."
+        />
 
         {!isEdit && (
-          <div className="flex items-center space-x-3 rounded-lg border border-primary/10 bg-primary/5 p-4">
-            <Checkbox
-              id="sendEmail"
-              checked={sendInvite}
-              onCheckedChange={(checked) => setSendInvite(!!checked)}
-            />
-            <div className="grid gap-1.5 leading-none">
-              <Label htmlFor="sendEmail" className="text-sm font-bold leading-none text-primary">
-                Enviar invitación de acceso
-              </Label>
-              <p className="text-xs text-primary/60">
-                Se enviará un enlace al correo para que el nuevo staff cree su contraseña.
-              </p>
-            </div>
-          </div>
+          <CheckboxCard
+            id="sendEmail"
+            checked={sendInvite}
+            onCheckedChange={(checked) => setSendInvite(!!checked)}
+            label="Enviar invitación de acceso"
+            description="Se enviará un enlace al correo para que el nuevo staff cree su contraseña."
+            className="border-primary/10 bg-primary/5 hover:bg-primary/10"
+          />
         )}
       </div>
 

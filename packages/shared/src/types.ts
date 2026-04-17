@@ -168,6 +168,8 @@ export interface IMembershipPlan {
   name: string;
   price: number; // in cents
   currency: string;
+  durationValue: number;
+  durationUnit: 'day' | 'week' | 'month' | 'year';
   features: string[] | null;
   isPopular: boolean;
   isActive: boolean;
@@ -296,10 +298,11 @@ export interface PlanFeatures {
 export interface IPlatformPlan {
   id: number;
   name: string;
-  monthlyPrice: number;
-  yearlyPrice: number | null;
+  price: number; // in cents
+  currency: string;
+  durationValue: number;
+  durationUnit: 'day' | 'week' | 'month' | 'year';
   features: PlanFeatures | null;
-  suggestedDurationDays?: number | null;
   isActive: boolean;
   createdAt?: string | Date;
 }

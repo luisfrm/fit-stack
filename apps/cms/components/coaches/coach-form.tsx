@@ -4,15 +4,14 @@ import * as React from "react";
 import {
   Input,
   Button,
-  Checkbox,
+  CheckboxCard,
   toast,
   Textarea
 } from "@workspace/ui/components";
 import { type ICoach } from "@/types/dashboard";
-import { User, Star, Globe, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
+import { User, Star, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
-import { Label } from "@workspace/ui/components/label";
 import { ORG_ROLES } from "@workspace/shared";
 
 interface CoachFormProps {
@@ -174,9 +173,9 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
       </div>
 
       {/* ── Especialidades ── */}
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
-          <Label className="text-sm font-medium text-slate-300">Especialidades ({specialities.length}/6)</Label>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Especialidades ({specialities.length}/6)</span>
           {specialities.length >= 6 && (
             <span className="text-[10px] text-yellow-500 font-bold uppercase animate-pulse">Límite alcanzado</span>
           )}
@@ -256,8 +255,8 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
 
       {/* ── Imagen y Orden ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-        <div className="md:col-span-2 space-y-2">
-          <Label className="text-sm font-medium text-slate-300 ml-1 block">Foto de Perfil</Label>
+        <div className="md:col-span-2 flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Foto de Perfil</span>
           <div className="flex items-center gap-4">
             <Avatar size="lg" className="border-2 border-white/10 shrink-0">
               <AvatarImage src={previewUrl} />
@@ -313,24 +312,14 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
       </div>
 
       {/* ── Visibilidad ── */}
-      <div className="flex items-center space-x-3 rounded-lg border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/[0.07]">
-        <Checkbox
+      <div className="col-span-full flex flex-col gap-3 pt-2">
+        <CheckboxCard
           id="isVisible"
           checked={formData.isVisible}
           onCheckedChange={(checked) => handleChange("isVisible", checked)}
+          label="Visible en la Web Pública"
+          description="Determina si el entrenador será visible en la página pública y en la app."
         />
-        <div className="grid gap-1.5 leading-none">
-          <label
-            htmlFor="isVisible"
-            className="text-sm font-medium leading-none flex items-center gap-2"
-          >
-            <Globe size={14} className="text-primary" />
-            Visible en la Web
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Determina si el entrenador será visible en la página pública y en la app.
-          </p>
-        </div>
       </div>
 
       {/* ── Submit ── */}

@@ -2,29 +2,48 @@
 
 import * as React from "react";
 import { type IPlatformPlan } from "@workspace/shared/types";
-import { 
-  Button, 
-  toast, 
+import {
+  Button,
+  toast,
   Text,
   Separator
 } from "@workspace/ui/components";
-import { 
-  Trash2, 
-  Users, 
-  ShieldCheck, 
-  Smartphone, 
-  Globe, 
-  BookOpen, 
-  Clock 
+import {
+  Trash2,
+  Users,
+  ShieldCheck,
+  Smartphone,
+  Globe,
+  BookOpen,
+  Clock
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { PlatformPlanModal } from "./platform-plan-modal";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 
-interface PlatformPlanCardProps {
-  readonly plan: IPlatformPlan;
-  readonly onUpdate: () => void;
-}
+/* ─────────────────────────────────────────────
+   CONSTANTS & HELPERS
+   ───────────────────────────────────────────── */
+
+const DURATION_LABELS: Record<string, { singular: string; plural: string; short: string }> = {
+  day: { singular: 'Día', plural: 'Días', short: 'día(s)' },
+  week: { singular: 'Semana', plural: 'Semanas', short: 'semana(s)' },
+  month: { singular: 'Mes', plural: 'Meses', short: 'mes(es)' },
+  year: { singular: 'Año', plural: 'Años', short: 'año(s)' },
+};
+
+/**
+ * Formats duration value and unit into a descriptive string.
+ */
+const getDurationText = (value: number, unit: string, isShort = false) => {
+  const labels = DURATION_LABELS[unit] || { singular: unit, plural: unit, short: unit };
+  if (isShort) return labels.short;
+  return value === 1 ? labels.singular : `${value} ${labels.plural}`;
+};
+
+/* ─────────────────────────────────────────────
+   SUB-COMPONENTS
+   ───────────────────────────────────────────── */
 
 interface FeatureItemProps {
   readonly icon: any;
@@ -47,8 +66,66 @@ function FeatureItem({ icon: Icon, label, active = true, detail }: FeatureItemPr
   );
 }
 
+function PlanFeatures({ features }: { readonly features: any }) {
+  return (
+    <div className="space-y-4 mb-8">
+      <div className="space-y-2">
+        <FeatureItem
+          icon={Users}
+          label="Miembros"
+          detail={features.limits?.members ? `${features.limits.members} Miembros máx.` : "Ilimitados"}
+        />
+        <FeatureItem
+          icon={ShieldCheck}
+          label="Coaches"
+          detail={features.limits?.coaches ? `${features.limits.coaches} Coaches máx.` : "Ilimitados"}
+        />
+      </div>
+
+      <Separator className="bg-white/5 h-px mb-4" />
+
+      <div className="space-y-3">
+        <FeatureItem
+          icon={Smartphone}
+          label="Aplicación (PWA)"
+          active={features.access?.pwa}
+        />
+        <FeatureItem
+          icon={BookOpen}
+          label="Módulo de Blog"
+          active={features.access?.blog}
+        />
+        <FeatureItem
+          icon={Globe}
+          label="Web Comercial"
+          active={features.access?.web_commercial}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   MAIN COMPONENT
+   ───────────────────────────────────────────── */
+
+interface PlatformPlanCardProps {
+  readonly plan: IPlatformPlan;
+  readonly onUpdate: () => void;
+}
+
 export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
   const [isDeleting, setIsDeleting] = React.useState(false);
+
+  // Style Variants
+  const styles = React.useMemo(() => ({
+    statusWrapper: plan.isActive
+      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+      : "bg-red-500/10 text-red-500 border-red-500/20",
+    editButton: plan.isActive
+      ? "bg-primary text-black hover:bg-primary/90"
+      : "bg-white/5 text-white hover:bg-white/10",
+  }), [plan.isActive]);
 
   const handleDelete = async () => {
     try {
@@ -63,16 +140,14 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
     }
   };
 
-  const features = plan.features || { 
-    limits: { members: 0, coaches: 0 }, 
-    access: { pwa: false, blog: false, web_commercial: false } 
+  const features = plan.features || {
+    limits: { members: 0, coaches: 0 },
+    access: { pwa: false, blog: false, web_commercial: false }
   };
-
-  const isActiveVariant = plan.isActive ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20";
-  const buttonStyle = plan.isActive ? "bg-primary text-black hover:bg-primary/90" : "bg-white/5 text-white hover:bg-white/10";
 
   return (
     <div className="bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-primary/20 transition-all group">
+      {/* Header & Price */}
       <div className="flex justify-between items-start mb-4">
         <div className="space-y-1">
           <Text size="lg" weight="bold" className="text-white uppercase tracking-tighter">
@@ -81,83 +156,49 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5 text-primary">
               <Text size="lg" weight="bold">
-                ${Number.parseFloat(plan.monthlyPrice.toString()).toLocaleString()}
+                ${(Number(plan.price) / 100).toLocaleString()}
               </Text>
-              <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">/ Mes</Text>
+              <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">
+                / {getDurationText(plan.durationValue, plan.durationUnit)}
+              </Text>
             </div>
-            {plan.yearlyPrice && Number.parseFloat(plan.yearlyPrice.toString()) > 0 && (
-              <div className="flex items-center gap-1 opacity-70">
-                <Text size="xs" weight="bold" className="text-white">
-                  ${Number.parseFloat(plan.yearlyPrice.toString()).toLocaleString()}
-                </Text>
-                <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">/ Año</Text>
-              </div>
-            )}
           </div>
         </div>
         <div className={cn(
           "px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border",
-          isActiveVariant
+          styles.statusWrapper
         )}>
           {plan.isActive ? "Activo" : "Inactivo"}
         </div>
       </div>
 
+      {/* Persistence Label */}
       <div className="flex items-center gap-2 mb-6">
         <Clock size={14} className="text-slate-500" />
-        <Text size="xs" variant="muted">Sugerido: <span className="text-slate-300 font-bold">{plan.suggestedDurationDays} días</span></Text>
+        <Text size="xs" variant="muted">Periodicidad: <span className="text-slate-300 font-bold">
+          {plan.durationValue} {getDurationText(plan.durationValue, plan.durationUnit, true)}
+        </span></Text>
       </div>
 
       <Separator className="bg-white/10 mb-6" />
 
-      <div className="space-y-4 mb-8">
-        <div className="space-y-2">
-          <FeatureItem 
-            icon={Users} 
-            label="Miembros" 
-            detail={features.limits?.members ? `${features.limits.members} Miembros máx.` : "Ilimitados"} 
-          />
-          <FeatureItem 
-            icon={ShieldCheck} 
-            label="Coaches" 
-            detail={features.limits?.coaches ? `${features.limits.coaches} Coaches máx.` : "Ilimitados"} 
-          />
-        </div>
+      {/* Feature List */}
+      <PlanFeatures features={features} />
 
-        <Separator className="bg-white/5 h-px mb-4" />
-
-        <div className="space-y-3">
-          <FeatureItem 
-            icon={Smartphone} 
-            label="Aplicación (PWA)" 
-            active={features.access?.pwa} 
-          />
-          <FeatureItem 
-            icon={BookOpen} 
-            label="Módulo de Blog" 
-            active={features.access?.blog} 
-          />
-          <FeatureItem 
-            icon={Globe} 
-            label="Web Comercial" 
-            active={features.access?.web_commercial} 
-          />
-        </div>
-      </div>
-
+      {/* Actions */}
       <div className="flex items-center gap-2">
-        <PlatformPlanModal 
+        <PlatformPlanModal
           planData={plan}
           onSuccess={onUpdate}
           trigger={
-            <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", buttonStyle)}>
+            <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", styles.editButton)}>
               Editar Plan
             </Button>
           }
         />
-        <Button 
-          variant="outlined" 
-          size="icon" 
+        <Button
+          variant="outlined"
+          size="icon"
           onClick={handleDelete}
           disabled={isDeleting}
           className="h-11 w-11 border-red-500/10 hover:bg-red-500/10 bg-transparent"

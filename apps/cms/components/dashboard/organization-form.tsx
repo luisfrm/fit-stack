@@ -91,7 +91,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
       {/* Logo Section */}
-      <div className="flex flex-col items-center justify-center py-4">
+      <div className="col-span-full flex flex-col items-center justify-center py-4">
         <ImageUpload
           label="Logo de la organización"
           description={!isEdit && !previewUrl ? "Podrás subir el logo personalizado una vez creada la sede." : "Formatos sugeridos: SVG, PNG."}
@@ -102,70 +102,64 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         />
       </div>
 
-      <div className="space-y-4">
-        <Input
-          label="Nombre de la Organización"
-          placeholder="Ej: Premium Gym Central"
-          value={formData.name ?? ""}
-          onChange={(e) => handleChange("name", e.target.value)}
-          required
-          leftIcon={<Building2 size={16} />}
-        />
+      <Input
+        label="Nombre de la Organización"
+        placeholder="Ej: Premium Gym Central"
+        value={formData.name ?? ""}
+        onChange={(e) => handleChange("name", e.target.value)}
+        required
+        leftIcon={<Building2 size={16} />}
+      />
 
-        <div className="space-y-1.5">
-          <Input
-            label="Slug / Subdominio"
-            placeholder="ej-premium-gym"
-            value={formData.slug ?? ""}
-            onChange={(e) => handleChange("slug", e.target.value)}
-            leftIcon={<Globe size={16} />}
-          />
-          <Text size="xs" variant="muted" className="pl-1">
-            Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre.
-          </Text>
-        </div>
+      <Input
+        label="Slug / Subdominio"
+        placeholder="ej-premium-gym"
+        value={formData.slug ?? ""}
+        onChange={(e) => handleChange("slug", e.target.value)}
+        leftIcon={<Globe size={16} />}
+        hint="Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre."
+      />
 
-        <Separator className="bg-white/5 my-2" />
+      <Separator className="col-span-full bg-white/5 my-2" />
 
-        <div className="space-y-4 pt-2">
-          <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
-            Información de la Entidad (Opcional)
-          </Text>
-
-          <CountrySelector
-            value={formData.countryCode || "VE"}
-            onChange={(code) => handleChange("countryCode", code)}
-            countries={LATAM_COUNTRIES}
-          />
-
-          <Input
-            label="Nombre Legal / Razón Social"
-            placeholder="Ej: Iron Gym C.A."
-            value={formData.legalName ?? ""}
-            onChange={(e) => handleChange("legalName", e.target.value)}
-            leftIcon={<Building2 size={16} />}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="ID Fiscal (RIF / NIT)"
-              placeholder="Ej: J-12345678-9"
-              value={formData.taxId ?? ""}
-              onChange={(e) => handleChange("taxId", e.target.value)}
-              leftIcon={<Fingerprint size={16} />}
-            />
-            <Input
-              label="Dirección"
-              placeholder="Ej: Av. Principal, Edif. X..."
-              value={formData.address ?? ""}
-              onChange={(e) => handleChange("address", e.target.value)}
-              leftIcon={<MapPin size={16} />}
-            />
-          </div>
-        </div>
+      <div className="col-span-full pt-2">
+        <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+          Información de la Entidad (Opcional)
+        </Text>
       </div>
 
-      <div className="pt-4">
+      <CountrySelector
+        value={formData.countryCode || "VE"}
+        onChange={(code) => handleChange("countryCode", code)}
+        countries={LATAM_COUNTRIES}
+      />
+
+      <Input
+        label="Nombre Legal / Razón Social"
+        placeholder="Ej: Iron Gym C.A."
+        value={formData.legalName ?? ""}
+        onChange={(e) => handleChange("legalName", e.target.value)}
+        leftIcon={<Building2 size={16} />}
+      />
+
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input
+          label="ID Fiscal (RIF / NIT)"
+          placeholder="Ej: J-12345678-9"
+          value={formData.taxId ?? ""}
+          onChange={(e) => handleChange("taxId", e.target.value)}
+          leftIcon={<Fingerprint size={16} />}
+        />
+        <Input
+          label="Dirección"
+          placeholder="Ej: Av. Principal, Edif. X..."
+          value={formData.address ?? ""}
+          onChange={(e) => handleChange("address", e.target.value)}
+          leftIcon={<MapPin size={16} />}
+        />
+      </div>
+
+      <div className="col-span-full pt-4">
         <Button
           type="submit"
           fullWidth

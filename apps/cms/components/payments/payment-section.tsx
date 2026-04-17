@@ -2,22 +2,19 @@
 
 import * as React from "react";
 import { Calculator, CircleDollarSign, CreditCard } from "lucide-react";
-import { 
-  Card, 
-  Button, 
-  Text, 
-  Label, 
-  Select, 
-  SelectTrigger, 
-  SelectValue, 
-  SelectContent, 
-  SelectItem, 
-  Input
+import {
+  Card,
+  Button,
+  Text,
+  Label,
+  Input,
+  SimpleSelect,
+  CurrencySelector
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
-import { 
-  type IMembershipPlan, 
-  type IPaymentMethodConfig 
+import {
+  type IMembershipPlan,
+  type IPaymentMethodConfig
 } from "@/types/dashboard";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { cn } from "@workspace/ui/lib/utils";
@@ -76,7 +73,7 @@ export function PaymentSection({
   onPaymentDetailsChange,
 }: PaymentSectionProps) {
   return (
-    <Card className="p-6 border-white/5 bg-white/2 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <Card className="p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Calculator className="w-5 h-5 text-primary" />
@@ -87,7 +84,7 @@ export function PaymentSection({
           variant="ghost"
           size="sm"
           onClick={onToggleEdit}
-          className="text-[10px] font-bold text-primary uppercase h-7 px-3 hover:bg-primary/10"
+          className="text-[10px] font-bold text-primary uppercase h-7 px-3"
         >
           {isEditingPayment ? "Ocultar" : "Modificar"}
         </Button>
@@ -96,34 +93,26 @@ export function PaymentSection({
       {isEditingPayment ? (
         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label id="payment-currency-label" className="text-xs font-semibold text-slate-400 uppercase">Moneda de Pago</Label>
-              <Select value={paymentCurrency} onValueChange={onCurrencyChange}>
-                <SelectTrigger aria-labelledby="payment-currency-label" className="w-full bg-white/2 border-white/5 h-10">
-                  <SelectValue placeholder="Seleccionar Moneda" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeCurrencies.map(code => (
-                    <SelectItem key={`cur-${code}`} value={code}>{code}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <CurrencySelector
+              value={paymentCurrency}
+              onChange={onCurrencyChange}
+              currencies={activeCurrencies}
+              label="Moneda de Pago"
+            />
 
-            <div className="space-y-2">
-              <Label id="payment-method-label" className="text-xs font-semibold text-slate-400 uppercase">Método de Pago</Label>
-              <Select value={paymentMethodId} onValueChange={onMethodChange}>
-                <SelectTrigger aria-labelledby="payment-method-label" className="w-full bg-white/2 border-white/5 h-10">
-                  <SelectValue placeholder="Seleccionar Método" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activePaymentMethods.map(method => (
-                    <SelectItem key={method.id} value={method.id}>{method.name}</SelectItem>
-                  ))}
-                  <SelectItem value="other">Otro / Personalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <SimpleSelect
+              label="Método de Pago"
+              value={paymentMethodId}
+              onChange={onMethodChange}
+              placeholder="Seleccionar Método"
+              options={[
+                ...activePaymentMethods.map(method => ({
+                  value: method.id,
+                  label: method.name
+                })),
+                { value: "other", label: "Otro / Personalizado" }
+              ]}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/5">
@@ -140,6 +129,7 @@ export function PaymentSection({
                   onFocus={() => onRateFocus(true)}
                   onBlur={() => onRateFocus(false)}
                   onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
+                  variant="default"
                   leftIcon={<CircleDollarSign size={16} />}
                 />
               </div>
@@ -156,7 +146,8 @@ export function PaymentSection({
                 onBlur={() => onAmountFocus(false)}
                 onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
                 readOnly={!allowPriceOverride}
-                className={allowPriceOverride ? "" : "bg-white/5 opacity-70"}
+                variant="default"
+                className={allowPriceOverride ? "" : "opacity-70"}
                 leftIcon={<CreditCard size={16} />}
               />
               {!allowPriceOverride && (
@@ -166,7 +157,7 @@ export function PaymentSection({
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between p-4 bg-white/2 border border-white/5 rounded-2xl animate-in fade-in slide-in-from-top-1 duration-300">
+        <div className="flex items-center justify-between p-4 bg-surface-2/40 border border-border rounded-2xl animate-in fade-in slide-in-from-top-1 duration-300">
           <div className="flex flex-col">
             <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest">A recibir</Text>
             <Text size="lg" weight="bold" className="text-primary tabular-nums">
@@ -184,7 +175,7 @@ export function PaymentSection({
 
       {/* Dynamic Fields */}
       {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-white/5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
           {selectedPaymentConfig.fields.map(field => (
             <div key={field.id} className={cn("space-y-2", field.type === 'file' && "md:col-span-2")}>
               <Label className="text-[10px] font-bold text-white/40 uppercase tracking-widest flex items-center gap-1">
@@ -205,7 +196,6 @@ export function PaymentSection({
                   placeholder={`Ingresa ${field.label.toLowerCase()}...`}
                   value={dynamicFieldValues[field.id] || ""}
                   onChange={(e) => onDynamicChange(field.id, e.target.value)}
-                  className="h-10 bg-white/5 border-white/5"
                 />
               )}
             </div>
@@ -221,6 +211,7 @@ export function PaymentSection({
             placeholder="Ej: Transferencia Banco Mercantil..."
             value={paymentDetails}
             onChange={(e) => onPaymentDetailsChange(e.target.value)}
+            variant="default"
             aria-labelledby="other-method-details-label"
           />
         </div>

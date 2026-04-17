@@ -74,7 +74,7 @@ export default function PlatformPlansPage() {
   };
 
   const activePlansCount = plans.filter(p => p.isActive).length;
-  const hasTrialPlan = plans.some(p => Number.parseFloat(p.monthlyPrice.toString()) === 0);
+  const hasTrialPlan = plans.some(p => (Number(p.price) / 100) === 0);
   const trialPlanStatus = hasTrialPlan ? "Habilitado" : "No detectado";
 
   return (

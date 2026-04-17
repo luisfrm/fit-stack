@@ -58,7 +58,8 @@ export function AddSubscriptionModal({
       setPlansLoading(true);
       const data = await platformPlansService.getAll();
       setPlans(data.filter(p => p.isActive));
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[LOAD_PLANS_ERROR]", err);
       toast.error("Error al cargar los planes disponibles");
     } finally {
       setPlansLoading(false);
@@ -77,14 +78,14 @@ export function AddSubscriptionModal({
     }
   }, [open, loadPlans]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!formData.planId) return toast.error("Debes seleccionar un plan");
 
     try {
       setLoading(true);
       await organizationsService.addSubscription(organization.id, {
-        planId: parseInt(formData.planId),
+        planId: Number.parseInt(formData.planId),
         startDate: formData.startDate,
         endDate: formData.endDate,
         isTrial: formData.isTrial,
@@ -98,6 +99,21 @@ export function AddSubscriptionModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const getPlanDurationLabel = (plan: IPlatformPlan) => {
+    const { durationValue: v, durationUnit: u } = plan;
+    const isSingular = v === 1;
+
+    const unitMap: Record<string, { singular: string; plural: string }> = {
+      day: { singular: "día", plural: "días" },
+      week: { singular: "semana", plural: "semanas" },
+      month: { singular: "mes", plural: "meses" },
+      year: { singular: "año", plural: "años" }
+    };
+
+    const unit = unitMap[u] || { singular: u, plural: `${u}s` };
+    return isSingular ? unit.singular : `${v} ${unit.plural}`;
   };
 
   return (
@@ -130,28 +146,32 @@ export function AddSubscriptionModal({
                     Consultando niveles...
                   </div>
                 ) : plans.map((plan) => (
-                  <div
+                  <Button
                     key={plan.id}
+                    type="button"
                     onClick={() => setFormData({ ...formData, planId: plan.id.toString() })}
+                    variant="ghost"
                     className={cn(
-                      "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group",
+                      "flex items-center justify-between p-3 h-auto rounded-xl border transition-all cursor-pointer group text-left w-full outline-none normal-case tracking-normal hover:bg-white/10",
                       formData.planId === plan.id.toString()
-                        ? "bg-primary/10 border-primary shadow-lg shadow-primary/5"
+                        ? "bg-primary/10 border-primary shadow-lg shadow-primary/5 hover:bg-primary/15"
                         : "bg-white/5 border-white/5 hover:border-white/20"
                     )}
                   >
-                    <div className="flex flex-col">
+                    <div className="flex flex-col items-start">
                       <Text size="xs" weight="bold" className={cn("uppercase tracking-widest", formData.planId === plan.id.toString() ? "text-primary" : "text-white")}>
                         {plan.name}
                       </Text>
-                      <Text size="xs" variant="muted" className="opacity-60">${plan.monthlyPrice}/mes • ${plan.yearlyPrice || '---'}/año</Text>
+                      <Text size="xs" variant="muted" className="opacity-60 font-medium">
+                        ${(Number(plan.price) / 100).toLocaleString()} / {getPlanDurationLabel(plan)}
+                      </Text>
                     </div>
                     {formData.planId === plan.id.toString() && (
-                      <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-black shadow-lg">
+                      <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center text-black shadow-lg shrink-0">
                         <Check size={14} strokeWidth={4} />
                       </div>
                     )}
-                  </div>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -192,8 +212,9 @@ export function AddSubscriptionModal({
 
             {/* Trial & Price Override */}
             <div className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-4">
-              <div
-                className="flex items-center justify-between cursor-pointer group"
+              <button
+                type="button"
+                className="flex items-center justify-between cursor-pointer group w-full text-left outline-none p-0 bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-lg"
                 onClick={() => setFormData({ ...formData, isTrial: !formData.isTrial })}
               >
                 <div className="flex items-center gap-3">
@@ -214,7 +235,7 @@ export function AddSubscriptionModal({
                     formData.isTrial ? "right-1" : "left-1"
                   )} />
                 </div>
-              </div>
+              </button>
 
               {!formData.isTrial && (
                 <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-300">

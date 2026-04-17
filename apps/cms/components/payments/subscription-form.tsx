@@ -19,7 +19,6 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { Label } from "@workspace/ui/components/label";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ORG_ROLES } from "@workspace/shared";
@@ -337,15 +336,21 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       )}
 
       {/* Selector de Fechas */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="start-date" className="text-sm font-medium uppercase tracking-tight text-slate-400">Fecha de Inicio</Label>
-          <Input id="start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="end-date" className="text-sm font-medium uppercase tracking-tight text-slate-400">Fecha Final</Label>
-          <Input id="end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input 
+          id="start-date" 
+          type="date" 
+          label="Fecha de Inicio"
+          value={startDate} 
+          onChange={(e) => setStartDate(e.target.value)} 
+        />
+        <Input 
+          id="end-date" 
+          type="date" 
+          label="Fecha Final"
+          value={endDate} 
+          onChange={(e) => setEndDate(e.target.value)} 
+        />
       </div>
 
       <StatusSelector

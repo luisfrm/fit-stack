@@ -30,9 +30,9 @@ const selectTriggerVariants = cva(
           "data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary",
         ],
         /**
-         * filled — glass-like surface
+         * glass — subtle translucent surface (formerly filled)
          */
-        filled: [
+        glass: [
           "bg-white/5 border-white/10",
           "focus:border-primary focus:ring-1 focus:ring-primary",
           "data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary",

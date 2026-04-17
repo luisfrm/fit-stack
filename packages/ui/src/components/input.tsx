@@ -26,11 +26,11 @@ const inputWrapperVariants = cva(
           "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
         /**
-         * filled — slightly elevated surface
+         * glass — subtle translucent surface (formerly filled)
          */
-        filled: [
+        glass: [
           "bg-white/5 border-white/10",
-          "focus-within:border-[--color-primary] focus-within:ring-1 focus-within:ring-[--color-primary]",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
       },
 
