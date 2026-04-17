@@ -43,6 +43,13 @@
       "when": 1776414548589,
       "tag": "0005_blue_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776434160691,
+      "tag": "0006_right_black_crow",
+      "breakpoints": true
     }
   ]
 }

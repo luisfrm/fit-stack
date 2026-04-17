@@ -16,7 +16,6 @@ import { GLOBAL_ROLES, ORG_ROLES, type PlanFeatures } from '@workspace/shared';
 
 // ── ENUMS ──
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'expired', 'cancelled']);
 export const paymentStatusEnum = pgEnum('payment_status', ['processing', 'validated', 'invalid', 'voided']);
 export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
 export const membershipDurationUnitEnum = pgEnum('membership_duration_unit', ['day', 'week', 'month', 'year']);
@@ -282,7 +281,7 @@ export const subscription = pgTable('subscription', {
     .references(() => membershipPlan.id).notNull(),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   endDate: timestamp('end_date', { withTimezone: true }).notNull(),
-  status: subscriptionStatusEnum('status').default('active').notNull(),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

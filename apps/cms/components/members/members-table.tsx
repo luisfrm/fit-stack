@@ -94,7 +94,7 @@ const getColumns = (
       cell: (m: IMember) => {
         const sub = m.latestSubscription;
         if (!sub) {
-          return <Badge variant="secondary">Sin suscripción</Badge>;
+          return <Badge className="pointer-events-none" variant="warning">Sin suscripción</Badge>;
         }
 
         const end = parseISO(sub.endDate);

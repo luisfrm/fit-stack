@@ -27,16 +27,17 @@ import { ORG_ROLES } from "@workspace/shared";
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
-import { StatusSelector } from "./status-selector";
 import { CurrencyFormat } from "@/lib/utils/value-converters";
 
-interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName"> {
+interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
   payment: {
     amountPaid: number;
     currencyPaid: string;
     exchangeRateApplied?: string;
     paymentMethod: string;
     paymentMethodDetails?: Record<string, any>;
+    status?: string;
+    paymentDate?: Date | string;
   }
 }
 
@@ -76,6 +77,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
+  const [paymentValidated, setPaymentValidated] = React.useState(true);
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
@@ -94,7 +96,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     date.setMonth(date.getMonth() + 1);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   });
-  const [status, setStatus] = React.useState<"active" | "canceled">("active");
 
   const [memberSearch, setMemberSearch] = React.useState("");
   const debouncedSearch = useDebounce(memberSearch, 500);
@@ -250,13 +251,14 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         planId: planId!,
         startDate: startDateObj.toISOString(),
         endDate: endDateObj.toISOString(),
-        status: status === "active" ? "active" : "canceled" as any,
         payment: {
           amountPaid: Math.round(finalAmount * 100),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
           paymentMethod: paymentMethodId,
-          paymentMethodDetails: finalPaymentMethodDetails
+          paymentMethodDetails: finalPaymentMethodDetails,
+          status: paymentValidated ? 'validated' : 'processing',
+          paymentDate: new Date(),
         }
       });
     } catch (err: any) {
@@ -322,6 +324,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={setPaymentCurrency}
+          onPaymentValidatedChange={setPaymentValidated}
+          paymentValidated={paymentValidated}
           onMethodChange={(v) => {
             setPaymentMethodId(v);
             setDynamicFieldValues({});
@@ -334,26 +338,23 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
       {/* Selector de Fechas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input 
-          id="start-date" 
-          type="date" 
+        <Input
+          id="start-date"
+          type="date"
           label="Fecha de Inicio"
-          value={startDate} 
-          onChange={(e) => setStartDate(e.target.value)} 
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
         />
-        <Input 
-          id="end-date" 
-          type="date" 
+        <Input
+          id="end-date"
+          type="date"
           label="Fecha Final"
-          value={endDate} 
-          onChange={(e) => setEndDate(e.target.value)} 
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
         />
       </div>
 
-      <StatusSelector
-        status={status}
-        onStatusChange={setStatus}
-      />
+
 
       <Button
         type="submit"

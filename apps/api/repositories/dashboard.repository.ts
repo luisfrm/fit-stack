@@ -1,4 +1,4 @@
-import { db, sql, and, eq, or, gte, count, sum } from '@workspace/database/client';
+import { db, sql, and, eq, or, gte, count, sum, isNull } from '@workspace/database/client';
 import { subscription, payment, cmsClass } from '@workspace/database/schema';
 
 export interface DashboardStats {
@@ -40,7 +40,8 @@ export const dashboardRepository = {
       .from(subscription)
       .where(and(
         eq(subscription.organizationId, organizationId),
-        gte(subscription.endDate, now)
+        gte(subscription.endDate, now),
+        isNull(subscription.cancelledAt)
       ));
     const activeMembers = Number(activeMembersResult[0]?.count ?? 0);
 
@@ -54,7 +55,8 @@ export const dashboardRepository = {
       .from(subscription)
       .where(and(
         eq(subscription.organizationId, organizationId),
-        gte(subscription.endDate, now)
+        gte(subscription.endDate, now),
+        isNull(subscription.cancelledAt)
       ))
       .groupBy(subscription.memberId)
       .as('latest_subs');

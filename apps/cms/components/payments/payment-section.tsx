@@ -8,7 +8,8 @@ import {
   Label,
   Input,
   SimpleSelect,
-  CurrencySelector
+  CurrencySelector,
+  Switch
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import {
@@ -38,6 +39,8 @@ interface PaymentSectionProps {
   readonly onAmountChange: (value: number) => void;
   readonly onCurrencyChange: (value: string) => void;
   readonly onMethodChange: (value: string) => void;
+  readonly paymentValidated: boolean;
+  readonly onPaymentValidatedChange: (value: boolean) => void;
   readonly allowPriceOverride: boolean;
   readonly paymentDetails: string;
   readonly onPaymentDetailsChange: (value: string) => void;
@@ -63,6 +66,8 @@ export function PaymentSection({
   onAmountChange,
   onCurrencyChange,
   onMethodChange,
+  paymentValidated,
+  onPaymentValidatedChange,
   allowPriceOverride,
   paymentDetails,
   onPaymentDetailsChange,
@@ -142,8 +147,16 @@ export function PaymentSection({
           </div>
         </div>
       </div>
-
-
+      <div className="flex items-center justify-between p-4 rounded-xl border border-dashed border-border bg-accent/5">
+        <div className="flex flex-col gap-0.5">
+          <Text weight="bold" size="sm">Registrar pago como validado</Text>
+          <Text size="xs" variant="muted">El pago se marcará como confirmado inmediatamente</Text>
+        </div>
+        <Switch 
+          checked={paymentValidated}
+          onCheckedChange={onPaymentValidatedChange}
+        />
+      </div>
       {/* Dynamic Fields */}
       {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">

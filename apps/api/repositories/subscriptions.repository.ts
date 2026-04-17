@@ -8,7 +8,8 @@ export interface ISubscriptionDTO {
   planId: number
   startDate: Date
   endDate: Date
-  status: 'active' | 'cancelled' | 'expired'
+  status?: 'active' | 'cancelled' | 'expired'
+  cancelledAt?: Date | null
   isActive?: boolean
   createdAt?: Date
 }
@@ -22,8 +23,13 @@ export const subscriptionsRepository = {
         planId: subscription.planId,
         startDate: subscription.startDate,
         endDate: subscription.endDate,
-        status: subscription.status,
-        isActive: sql<boolean>`${subscription.endDate} >= ${now}`,
+        cancelledAt: subscription.cancelledAt,
+        status: sql<'active' | 'cancelled' | 'expired'>`CASE 
+          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
+          WHEN ${subscription.endDate} < ${now} THEN 'expired'
+          ELSE 'active'
+        END`.as('status'),
+        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
         memberName: members.firstName,
         memberLastName: members.lastName,
         planName: membershipPlan.name,
@@ -58,16 +64,16 @@ export const subscriptionsRepository = {
       planId: data.planId,
       startDate: data.startDate,
       endDate: data.endDate,
-      status: data.status,
+      cancelledAt: data.cancelledAt ?? null,
       createdAt: data.createdAt ?? new Date(),
     }).returning()
     return inserted[0]
   },
 
-  async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled' | 'expired') {
+  async cancel(organizationId: string, id: number) {
     const updated = await db
       .update(subscription)
-      .set({ status })
+      .set({ cancelledAt: new Date() })
       .where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
       .returning()
     return updated[0]

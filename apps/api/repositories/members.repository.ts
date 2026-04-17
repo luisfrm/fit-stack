@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, desc, db, isNotNull, ne } from '@workspace/database/client';
+import { eq, ilike, and, or, count, desc, db, ne, sql } from '@workspace/database/client';
 import crypto from "node:crypto";
 import { gymMember, authMember, user, subscription, membershipPlan } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
@@ -107,7 +107,12 @@ export const membersRepository = {
             planId: subscription.planId,
             startDate: subscription.startDate,
             endDate: subscription.endDate,
-            status: subscription.status,
+            cancelledAt: subscription.cancelledAt,
+            status: sql<'active' | 'cancelled' | 'expired'>`CASE 
+              WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
+              WHEN ${subscription.endDate} < ${new Date()} THEN 'expired'
+              ELSE 'active'
+            END`.as('status'),
             createdAt: subscription.createdAt,
             planName: membershipPlan.name,
           })

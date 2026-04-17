@@ -11,6 +11,7 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
     exchangeRateApplied?: string | null
     paymentMethod: string
     paymentMethodDetails?: Record<string, any> | null
+    status?: string
     paymentDate?: string | Date
   }
 }
@@ -50,9 +51,8 @@ export const subscriptionsService = {
     const subscription = await subscriptionsRepository.create(organizationId, {
       memberId: payload.memberId,
       planId: payload.planId,
-      startDate: payload.startDate,
-      endDate: payload.endDate,
-      status: payload.status,
+      startDate: new Date(payload.startDate),
+      endDate: new Date(payload.endDate),
     })
 
     if (!subscription?.id) {
@@ -77,8 +77,8 @@ export const subscriptionsService = {
     return subscription
   },
 
-  async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled' | 'expired') {
-    const updated = await subscriptionsRepository.updateStatus(organizationId, id, status)
+  async cancel(organizationId: string, id: number) {
+    const updated = await subscriptionsRepository.cancel(organizationId, id)
     if (!updated) {
       throw new Error('Suscripción no encontrada')
     }

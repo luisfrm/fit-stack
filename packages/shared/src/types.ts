@@ -206,6 +206,7 @@ export interface ISubscription {
   startDate: string;
   endDate: string;
   status: SubscriptionStatus;
+  cancelledAt?: string;
   createdAt?: string;
 
   // Optional joined fields for CMS Table display

@@ -1,4 +1,4 @@
-import { db, eq, and, sql, desc } from '@workspace/database/client';
+import { db, eq, and, sql, desc, isNull } from '@workspace/database/client';
 import { 
   accessControlLog, 
   biometricSyncTask, 
@@ -34,7 +34,7 @@ export const accessControlRepository = {
       where: and(
         eq(subscription.memberId, member.id),
         eq(subscription.organizationId, organizationId),
-        eq(subscription.status, 'active'),
+        isNull(subscription.cancelledAt),
         sql`${subscription.endDate} >= ${now}`
       ),
       orderBy: desc(subscription.endDate),
