@@ -1,13 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Plus, LayoutTemplate, Loader2 } from "lucide-react";
+import { Plus, LayoutTemplate, Users, CreditCard, Loader2 } from "lucide-react";
 import { Button, toast, Text } from "@workspace/ui/components";
 import { type IMembershipPlan, type IMembershipsSummary } from "@/types/dashboard";
 import { plansService } from "@/lib/services/plans-service";
 import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { StatCard } from "@/components/dashboard/stat-card";
+import { NoData } from "@/components/dashboard/dashboard-ui";
 
 export default function MembershipsPage() {
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
@@ -90,17 +93,20 @@ export default function MembershipsPage() {
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="text-center py-20 text-slate-500 flex items-center justify-center gap-2">
-          <Loader2 className="animate-spin" size={24} />Cargando planes...
+        <div className="text-center py-24 text-foreground-muted flex flex-col items-center justify-center gap-4 bg-surface/50 border border-border rounded-2xl border-dashed">
+          <Loader2 className="animate-spin text-primary" size={32} />
+          <Text size="sm" weight="medium">Cargando planes del gimnasio...</Text>
         </div>
       );
     }
 
     if (plans.length === 0) {
       return (
-        <div className="text-center py-20 text-slate-500 bg-white/5 rounded-2xl border border-white/5">
-          No hay planes registrados. Crea uno nuevo para empezar.
-        </div>
+        <NoData 
+          icon={LayoutTemplate}
+          message="No hay planes registrados. Crea uno nuevo para empezar a ofrecer membresías." 
+          className="bg-surface/50 border-dashed"
+        />
       );
     }
 
@@ -119,18 +125,12 @@ export default function MembershipsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3 uppercase">
-            <LayoutTemplate className="text-primary w-8 h-8" />
-            Planes de Membresía
-          </h1>
-          <p className="text-slate-400 mt-2 text-sm">
-            Administra y configura los niveles de suscripción de tu gimnasio.
-          </p>
-        </div>
-
+    <div className="flex flex-col gap-6">
+      <DashboardHeader
+        title="Planes de Membresía"
+        description="Administra y configura los niveles de suscripción de tu gimnasio."
+        iconName="LayoutTemplate"
+      >
         <PlanModal
           onSuccess={() => loadPlans()}
           trigger={
@@ -139,30 +139,29 @@ export default function MembershipsPage() {
             </Button>
           }
         />
-      </header>
+      </DashboardHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Planes Activos</Text>
-          <Text size="lg" weight="bold" className="text-white">
-            {plans.filter(p => p.isVisibleOnSite).length}
-          </Text>
-        </div>
-        <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Suscripciones Totales</Text>
-          <Text size="lg" weight="bold" className="text-white">
-            {loading ? "..." : (summary?.totalActiveSubscriptions ?? 0)}
-          </Text>
-        </div>
-        <div className="bg-white/5 border border-white/5 p-6 rounded-2xl">
-          <Text as="p" size="xs" variant="muted" className="uppercase tracking-widest font-bold mb-2">Ingresos Mes Actual</Text>
-          <div className="text-primary">
-            {loading ? "..." : formatMonthlyRevenue(summary?.monthlyRevenue ?? {})}
-          </div>
-        </div>
+        <StatCard
+          title="Planes Activos"
+          value={plans.filter(p => p.isVisibleOnSite).length.toString()}
+          icon={<LayoutTemplate className="text-primary size-5" />}
+        />
+        <StatCard
+          title="Suscripciones Totales"
+          value={loading ? "..." : (summary?.totalActiveSubscriptions ?? 0).toString()}
+          icon={<Users className="text-blue-400 size-5" />}
+        />
+        <StatCard
+          title="Ingresos Mes Actual"
+          value={loading ? "..." : ""} // Valor vacío para el header, el formatted va abajo
+          icon={<CreditCard className="text-emerald-400 size-5" />}
+        >
+          {!loading && formatMonthlyRevenue(summary?.monthlyRevenue ?? {})}
+        </StatCard>
       </div>
 
-      <div className="h-px w-full bg-white/10 my-2" />
+      <div className="h-px w-full bg-border/50 my-2" />
 
       {renderContent()}
     </div>

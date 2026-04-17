@@ -9,9 +9,10 @@ interface StatCardProps {
   readonly change?: string;
   readonly icon: React.ReactNode;
   readonly status?: "online" | "offline";
+  readonly children?: React.ReactNode;
 }
 
-export function StatCard({ title, value, change, icon, status }: StatCardProps) {
+export function StatCard({ title, value, change, icon, status, children }: StatCardProps) {
   return (
     <Card className="p-6 hover:bg-foreground/8 transition-all">
       <div className="flex justify-between items-start mb-4">
@@ -25,8 +26,9 @@ export function StatCard({ title, value, change, icon, status }: StatCardProps) 
       </div>
       <div>
         <Text variant="muted" size="xs" weight="bold" uppercase className="mb-1 tracking-widest">{title}</Text>
-        <Text size="lg" weight="bold" className="mb-1">{value}</Text>
+        {value && <Text size="lg" weight="bold" className="mb-1">{value}</Text>}
         {change && <Text size="xs" className="text-emerald-400 font-medium">{change}</Text>}
+        {children}
       </div>
     </Card>
   );

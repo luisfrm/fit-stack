@@ -77,7 +77,7 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
             checked={plan.isVisibleOnSite} 
             disabled 
           />
-          <Text as="span" size="xs" className="text-white/40 text-[9px] uppercase font-bold tracking-wide">
+          <Text as="span" size="xs" className="text-foreground-muted text-[9px] uppercase font-bold tracking-wide">
             {plan.isVisibleOnSite ? "Web Visible" : "Web Oculto"}
           </Text>
         </div>
@@ -92,8 +92,8 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
                 className={cn(
                   "flex-1 uppercase font-black tracking-widest h-11 text-xs transition-all",
                   plan.isPopular 
-                    ? "bg-primary text-black hover:bg-primary/90 shadow-lg shadow-primary/10" 
-                    : "bg-white/5 text-white hover:bg-white/10"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/10" 
+                    : "bg-foreground/5 text-foreground hover:bg-foreground/10"
                 )}
               >
                 Editar
@@ -105,7 +105,7 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
             variant="outlined" 
             size="icon" 
             className={cn(
-              "h-11 w-11 shrink-0 border-white/5 hover:bg-white/5 bg-transparent transition-colors",
+              "h-11 w-11 shrink-0 border-border hover:bg-foreground/5 bg-transparent transition-colors",
               isToggling && "opacity-50 cursor-not-allowed"
             )}
             onClick={(e) => {
@@ -118,7 +118,7 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
             {plan.isVisibleOnSite ? (
               <Eye className="size-4 text-primary" />
             ) : (
-              <EyeOff className="size-4 text-slate-500" />
+              <EyeOff className="size-4 text-foreground-dim" />
             )}
           </Button>
 
@@ -129,10 +129,10 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
               <Button 
                 variant="outlined" 
                 size="icon" 
-                className="h-11 w-11 shrink-0 border-red-500/10 hover:bg-red-500/10 bg-transparent"
+                className="h-11 w-11 shrink-0 border-destructive/10 hover:bg-destructive/10 bg-transparent"
                 title="Eliminar Plan"
               >
-                <Trash2 className="size-4 text-red-500/70" />
+                <Trash2 className="size-4 text-destructive" />
               </Button>
             }
             footer={
@@ -140,7 +140,7 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
                 <Button 
                   variant="outlined" 
                   onClick={() => {}} 
-                  className="border-white/5"
+                  className="border-border"
                 >
                   Cancelar
                 </Button>
@@ -148,7 +148,7 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
                   variant="danger" 
                   onClick={handleDelete}
                   disabled={isDeleting}
-                  className="bg-red-600 hover:bg-red-700 font-bold"
+                  className="font-bold"
                 >
                   {isDeleting ? "..." : "Eliminar"}
                 </Button>

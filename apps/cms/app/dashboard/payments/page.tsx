@@ -1,19 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search } from "lucide-react";
-import { Button, toast, Input } from "@workspace/ui/components";
+import { Plus } from "lucide-react";
+import { Button, toast } from "@workspace/ui/components";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { FilterPanel } from "@/components/dashboard/filter-panel";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ORG_ROLES } from "@workspace/shared";
 
 export default function PaymentsPage() {
   const [subs, setSubs] = React.useState<ISubscription[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const debouncedSearch = useDebounce(searchTerm, 500);
 
   const loadSubs = async () => {
     try {
@@ -30,6 +34,11 @@ export default function PaymentsPage() {
   React.useEffect(() => {
     loadSubs();
   }, []);
+
+  // Sync debounced search
+  React.useEffect(() => {
+    setSearch(debouncedSearch);
+  }, [debouncedSearch]);
 
   const handleStatusChange = async (id: number, status: 'active' | 'canceled' | 'expired') => {
     try {
@@ -53,8 +62,8 @@ export default function PaymentsPage() {
 
   const filteredSubs = subs.filter(s => {
     const matches = s.memberName?.toLowerCase().includes(search.toLowerCase()) ||
-                    s.planName?.toLowerCase().includes(search.toLowerCase());
-    
+      s.planName?.toLowerCase().includes(search.toLowerCase());
+
     // If searching, restrict results to Cliente role
     if (search.trim() !== "") {
       return matches && s.role === ORG_ROLES.MEMBER;
@@ -79,17 +88,11 @@ export default function PaymentsPage() {
         />
       </DashboardHeader>
 
-      <section className="bg-white/5 border border-white/5 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por usuario o nivel de plan..."
-            className="pl-9 h-[46px]"
-          />
-        </div>
-      </section>
+      <FilterPanel
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por usuario o nivel de plan..."
+      />
 
       <section>
         <SubscriptionsTable

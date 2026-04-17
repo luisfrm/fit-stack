@@ -34,7 +34,7 @@ export function FilterPanel({
   return (
     <section
       className={cn(
-        "bg-surface/50 backdrop-blur-md border border-border rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between",
+        "bg-surface/50 backdrop-blur-md border border-border rounded-2xl flex flex-col md:flex-row gap-4 items-center justify-between",
         className
       )}
     >
