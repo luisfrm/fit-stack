@@ -123,7 +123,7 @@ export function SimpleSelect({
               </div>
             )}
 
-            <div className="max-h-60 overflow-y-auto py-1 custom-scrollbar">
+            <div className="max-h-60 overflow-y-auto custom-scrollbar">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => (
                   <Button
@@ -140,7 +140,7 @@ export function SimpleSelect({
                       "flex w-full items-center justify-between px-3 py-2.5 h-auto rounded-none border-b border-border/50 last:border-0 transition-colors select-none font-medium normal-case tracking-normal text-foreground",
                       value === option.value
                         ? "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-                        : "hover:bg-white/5 focus:bg-white/5"
+                        : ""
                     )}
                   >
                     <div className="flex flex-col items-start overflow-hidden w-full pr-2">

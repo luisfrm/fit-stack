@@ -45,7 +45,7 @@ const buttonVariants = cva(
          */
         ghost: [
           "bg-transparent text-foreground",
-          "hover:bg-foreground/10",
+          "hover:bg-input-hover",
         ],
 
         /**
@@ -53,7 +53,7 @@ const buttonVariants = cva(
          */
         secondary: [
           "bg-input border border-input-border text-foreground",
-          "hover:bg-foreground/5",
+          "hover:bg-input-hover",
         ],
 
         /**
@@ -94,7 +94,7 @@ const buttonVariants = cva(
          */
         "ghost-muted": [
           "bg-transparent text-foreground-muted",
-          "hover:text-foreground hover:bg-foreground/5 active:bg-foreground/10",
+          "hover:text-foreground hover:bg-input-hover active:bg-foreground/10",
         ],
 
         /**

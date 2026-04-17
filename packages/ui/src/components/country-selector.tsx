@@ -123,7 +123,7 @@ export function CountrySelector({
             </div>
           </div>
 
-          <div className="max-h-60 overflow-y-auto py-1 custom-scrollbar">
+          <div className="max-h-60 overflow-y-auto custom-scrollbar">
             {filteredCountries.length > 0 ? (
               filteredCountries.map((country) => (
                 <Button
@@ -140,7 +140,7 @@ export function CountrySelector({
                   }}
                   className={cn(
                     "flex items-center justify-between px-4 py-3 h-auto rounded-none border-b border-border-muted last:border-0 transition-colors group",
-                    value === country.code ? "bg-primary/5 hover:bg-primary/10" : "bg-transparent hover:bg-foreground/5"
+                    value === country.code ? "bg-primary/5 hover:bg-primary/10" : "bg-transparent"
                   )}
                 >
                   <div className="flex items-center gap-3">

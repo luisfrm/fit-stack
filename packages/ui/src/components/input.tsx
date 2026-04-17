@@ -12,7 +12,7 @@ const inputWrapperVariants = cva(
   [
     "relative flex items-center",
     "border rounded-md",
-    "transition-all duration-200",
+    "transition-colors duration-300 ease-in-out",
     "focus-within:outline-none",
   ],
   {
@@ -23,8 +23,8 @@ const inputWrapperVariants = cva(
          */
         default: [
           "bg-input border-input-border",
-          "hover:bg-foreground/4",
-          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-input",
+          "hover:bg-input-hover",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
         /**
          * glass — subtle translucent surface (formerly filled)
@@ -32,7 +32,7 @@ const inputWrapperVariants = cva(
         glass: [
           "bg-foreground/5 border-border",
           "hover:bg-foreground/8 hover:border-border",
-          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-foreground/5",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
         ],
       },
 

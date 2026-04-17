@@ -25,9 +25,10 @@ export function CheckboxCard({
   return (
     <div
       className={cn(
-        "flex items-center space-x-3 rounded-md border p-4 transition-colors",
-        variant === "default" && "bg-input border-input-border hover:bg-white/4",
-        variant === "glass" && "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20",
+        "flex items-center space-x-3 rounded-md border p-4 transition-all cursor-pointer",
+        variant === "default" && "bg-input border-border",
+        variant === "glass" && "bg-foreground/5 border-border",
+        "hover:bg-foreground/5",
         className
       )}
     >
@@ -37,7 +38,7 @@ export function CheckboxCard({
         onCheckedChange={onCheckedChange}
       />
       <div className="grid gap-1 leading-none">
-        <Label htmlFor={id} className="text-sm font-medium text-white leading-none">
+        <Label htmlFor={id} className="text-sm font-medium leading-none">
           {label}
         </Label>
         {description && (
