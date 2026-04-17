@@ -26,6 +26,7 @@
   --border-muted: oklch(1 0 0 / 0.05);
   --border-primary: oklch(0.853 0.199 91.26 / 0.4);
 
+  --glass: oklch(1 0 0 / 0.05);
   --glass-bg: oklch(0.4 0 0 / 0.2);
   --primary-glow: oklch(0.853 0.199 91.26 / 0.08);
   --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.15);
@@ -77,6 +78,7 @@
   --border-muted: oklch(0 0 0 / 0.04);
   --border-primary: oklch(0.853 0.199 91.26 / 0.25);
 
+  --glass: oklch(0 0 0 / 0.02);
   --glass-bg: oklch(1 0 0 / 0.5);
   --primary-glow: oklch(0.853 0.199 91.26 / 0.06);
   --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.12);
@@ -107,6 +109,7 @@
   --color-border-muted: var(--border-muted);
   --color-border-primary: var(--border-primary);
 
+  --color-glass: var(--glass);
   --color-glass-bg: var(--glass-bg);
   --color-primary-glow: var(--primary-glow);
   --color-primary-glow-hover: var(--primary-glow-hover);

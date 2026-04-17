@@ -140,20 +140,20 @@ export default function PaymentMethodsSettingsPage() {
       </div>
 
       <div className="max-w-2xl space-y-6">
-        <Card className="p-6 bg-white/2 border-white/5 space-y-6">
+        <Card className="p-6 space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <CreditCard className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <Text className="font-bold text-white">Gestión de Cobros</Text>
-              <Text className="text-[10px] text-white/30 uppercase tracking-wider font-bold">Personaliza los campos de captura por método</Text>
+              <Text className="font-bold">Gestión de Cobros</Text>
+              <Text className="text-[10px] text-foreground-dim uppercase tracking-wider font-bold">Personaliza los campos de captura por método</Text>
             </div>
           </div>
 
           <div className="space-y-6">
             {paymentMethods.length === 0 && (
-              <div className="p-6 border-2 border-dashed border-white/5 rounded-2xl bg-white/1 space-y-4">
+              <div className="p-6 border-2 border-dashed border-border rounded-2xl space-y-4">
                 <div className="flex items-center gap-2 text-primary">
                   <Sparkles className="w-4 h-4" />
                   <Text className="text-[10px] font-bold uppercase tracking-wider">Sugerencias rápidas</Text>
@@ -166,7 +166,7 @@ export default function PaymentMethodsSettingsPage() {
                       fullWidth
                       onClick={() => handleAddSuggestedMethod(suggested)}
                       className="justify-between px-4 h-12"
-                      rightIcon={<ChevronRight className="w-4 h-4 text-white/20 group-hover:text-primary transition-colors" />}
+                      rightIcon={<ChevronRight className="w-4 h-4 text-foreground-dim group-hover:text-primary transition-colors" />}
                     >
                       <Text className="text-sm font-medium">{suggested.name}</Text>
                     </Button>
@@ -177,7 +177,7 @@ export default function PaymentMethodsSettingsPage() {
 
             <Button
               onClick={handleOpenCreationModal}
-              className="w-full h-11 bg-transparent border border-dashed border-white/10 hover:border-primary/40 hover:bg-primary/5 text-white/40 hover:text-primary transition-all rounded-xl gap-2 font-medium text-xs uppercase tracking-wider"
+              className="w-full h-11 bg-transparent border border-dashed border-border hover:border-primary/40 hover:bg-primary/5 text-foreground-muted hover:text-primary transition-all rounded-xl gap-2 font-medium text-xs uppercase tracking-wider"
               variant="ghost"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -188,13 +188,13 @@ export default function PaymentMethodsSettingsPage() {
               {paymentMethods.map(method => (
                 <div
                   key={method.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-white/2 border border-white/5 group hover:border-primary/30 transition-all"
+                  className="flex items-center justify-between p-4 rounded-xl bg-foreground/3 border border-border group hover:border-primary/30 transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-primary/40 group-hover:bg-primary" />
                     <div className="flex flex-col">
-                      <Text className="text-sm font-medium text-white/80">{method.name}</Text>
-                      <Text className="text-[9px] text-white/30 uppercase font-bold tracking-tight">
+                      <Text className="text-sm font-medium">{method.name}</Text>
+                      <Text className="text-[9px] text-foreground-dim uppercase font-bold tracking-tight">
                         {method.fields.length} campos configurados
                       </Text>
                     </div>
@@ -213,7 +213,7 @@ export default function PaymentMethodsSettingsPage() {
                     </Button>
                     <button
                       onClick={() => handleRemovePaymentMethod(method.id)}
-                      className="p-2 text-white/20 hover:text-red-400 transition-colors"
+                      className="p-2 text-foreground-dim hover:text-red-400 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -232,7 +232,7 @@ export default function PaymentMethodsSettingsPage() {
         </Card>
 
         {/* Action Bar */}
-        <div className="flex justify-end pt-4 border-t border-white/5">
+        <div className="flex justify-end pt-4 border-t border-border">
           <Button
             onClick={handleSave}
             disabled={isUpdating}
@@ -302,11 +302,11 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
     >
       <div className="space-y-6">
         <div className="space-y-2">
-          <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Nombre del Método</Text>
+          <Text className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Nombre del Método</Text>
           <Input
             value={localMethod.name}
             onChange={(e) => setLocalMethod({ ...localMethod, name: e.target.value })}
-            wrapperClassName="bg-zinc-900 border-white/10"
+            wrapperClassName="border-border"
             className="px-4"
           />
         </div>
@@ -324,21 +324,21 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
 
           <div className="space-y-3">
             {localMethod.fields.length === 0 ? (
-              <div className="p-8 border border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center gap-2">
-                <Settings2 className="w-8 h-8 text-white/5" />
-                <Text className="text-xs text-white/20">No hay campos adicionales configurados.</Text>
+              <div className="p-8 border border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2">
+                <Settings2 className="w-8 h-8 text-foreground-dim" />
+                <Text className="text-xs text-foreground-muted">No hay campos adicionales configurados.</Text>
               </div>
             ) : (
               localMethod.fields.map((field, idx) => (
-                <div key={field.id} className="p-4 rounded-2xl bg-white/2 border border-white/5 space-y-4 group">
+                <div key={field.id} className="p-4 rounded-2xl bg-foreground/3 border border-border space-y-4 group">
                   <div className="flex items-end gap-3">
                     <div className="flex-1 space-y-1">
-                      <Text className="text-[9px] font-bold text-white/20 uppercase tracking-tighter">Etiqueta del Campo</Text>
+                      <Text className="text-[9px] font-bold text-foreground-dim uppercase tracking-tighter">Etiqueta del Campo</Text>
                       <Input
                         placeholder="Ej: Referencia, Correo..."
                         value={field.label}
                         onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
-                        wrapperClassName="h-9 bg-zinc-900 border-white/5"
+                        wrapperClassName="h-9 border-border"
                         className="text-sm px-3"
                       />
                     </div>
@@ -346,13 +346,13 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                       variant="ghost"
                       size="icon"
                       onClick={() => handleRemoveField(field.id)}
-                      className="h-9 w-9 text-white/10 hover:text-red-500 hover:bg-red-500/10"
+                      className="h-9 w-9 text-foreground-dim hover:text-red-500 hover:bg-red-500/10"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1">
                         <Button
@@ -361,7 +361,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                           onClick={() => handleUpdateField(field.id, { type: 'text' })}
                           className={cn(
                             "p-1.5 rounded-lg border transition-all h-auto",
-                            field.type === 'text' ? "bg-primary/20 border-primary/40 text-primary" : "bg-white/5 border-transparent text-white/20"
+                            field.type === 'text' ? "bg-primary/20 border-primary/40 text-primary" : "bg-foreground/5 border-transparent text-foreground-dim"
                           )}
                           title="Texto"
                         >
@@ -373,7 +373,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                           onClick={() => handleUpdateField(field.id, { type: 'file' })}
                           className={cn(
                             "p-1.5 rounded-lg border transition-all h-auto",
-                            field.type === 'file' ? "bg-primary/20 border-primary/40 text-primary" : "bg-white/5 border-transparent text-white/20"
+                            field.type === 'file' ? "bg-primary/20 border-primary/40 text-primary" : "bg-foreground/5 border-transparent text-foreground-dim"
                           )}
                           title="Archivo / Captura"
                         >
@@ -385,7 +385,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                           onClick={() => handleUpdateField(field.id, { type: 'number' })}
                           className={cn(
                             "p-1.5 rounded-lg border transition-all h-auto",
-                            field.type === 'number' ? "bg-primary/20 border-primary/40 text-primary" : "bg-white/5 border-transparent text-white/20"
+                            field.type === 'number' ? "bg-primary/20 border-primary/40 text-primary" : "bg-foreground/5 border-transparent text-foreground-dim"
                           )}
                           title="Número"
                         >
@@ -398,7 +398,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                           checked={field.required}
                           onCheckedChange={(val) => handleUpdateField(field.id, { required: val })}
                         />
-                        <Text className="text-[10px] font-bold text-white/40 uppercase">Obligatorio</Text>
+                        <Text className="text-[10px] font-bold text-foreground-muted uppercase">Obligatorio</Text>
                       </div>
                     </div>
 
@@ -412,7 +412,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
+        <div className="flex justify-end gap-3 pt-4 border-t border-border">
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button variant="primary" onClick={() => onSave(localMethod)}>Guardar Configuración</Button>
         </div>

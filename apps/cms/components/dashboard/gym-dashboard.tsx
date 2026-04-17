@@ -19,7 +19,7 @@ import { useTodayClasses } from "@/lib/hooks/use-classes";
 import { useRecentRegistrations } from "@/lib/hooks/use-payments";
 
 export function GymDashboard() {
-  const today = new Intl.DateTimeFormat('en-CA', { 
+  const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: DEFAULT_TIMEZONE,
   }).format(new Date());
 
@@ -37,7 +37,7 @@ export function GymDashboard() {
           Reporte
         </Button>
         <MemberModal
-          onSuccess={() => {}}
+          onSuccess={() => { }}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               Nuevo Miembro
@@ -49,8 +49,8 @@ export function GymDashboard() {
       <DashboardStats />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        <Card className="lg:col-span-2 bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden">
-          <div className="p-6 border-b border-border-dark flex justify-between items-center">
+        <Card className="lg:col-span-2 overflow-hidden pb-0">
+          <div className="p-6 border-b border-border flex justify-between items-center">
             <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
             <Link href="/dashboard/classes" className="text-primary text-sm font-medium hover:underline">
               Ver todas
@@ -59,8 +59,8 @@ export function GymDashboard() {
           <TodayClassesTable classes={todayClasses} loading={isLoadingClasses} />
         </Card>
 
-        <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-border-dark">
+        <Card className="overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-border">
             <Text as="p" size="lg" weight="bold">Últimos Registros</Text>
           </div>
           <RecentRegistrationsList registrations={recentRegistrations} loading={isLoadingRegistrations} />

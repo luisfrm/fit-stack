@@ -107,23 +107,24 @@ export interface TableProps<T> {
   readonly onRowClick?: (item: T) => void
   readonly rowKey?: (item: T) => string | number
   readonly loading?: boolean
+  readonly className?: string
 }
 
-function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: TableProps<T>) {
+function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading, className }: TableProps<T>) {
   const tableId = React.useId();
 
   return (
-    <div className="bg-zinc-900/50 rounded-xl border border-white/5 overflow-hidden">
+    <div className={cn("bg-glass rounded-xl border border-border overflow-hidden", className)}>
       <TablePrimitive>
-        <TableHeader className="bg-black/20">
-          <TableRow className="border-white/5 hover:bg-transparent">
+        <TableHeader className="bg-foreground/5">
+          <TableRow className="border-border hover:bg-transparent">
             {columns.map((col, i) => {
               const colKey = col.id ?? (typeof col.header === "string" ? col.header : `col-${tableId}-${i}`);
               return (
                 <TableHead
                   key={colKey}
                   className={cn(
-                    "py-4 text-slate-400 uppercase text-[10px] tracking-widest font-bold",
+                    "py-4 text-foreground-muted uppercase text-[10px] tracking-widest font-bold",
                     col.className,
                     col.headerClassName
                   )}
@@ -137,7 +138,7 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: Ta
         <TableBody>
           {loading && (
             Array.from({ length: 5 }).map((_, rowIndex) => (
-              <TableRow key={`${tableId}-loading-row-${rowIndex}`} className="border-white/5 hover:bg-transparent">
+              <TableRow key={`${tableId}-loading-row-${rowIndex}`} className="border-border hover:bg-transparent">
                 {columns.map((col, colIndex) => {
                   const cellKey = col.id ?? (typeof col.header === "string" ? col.header : `loading-cell-${colIndex}`);
                   return (
@@ -150,8 +151,8 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: Ta
             ))
           )}
           {data.length === 0 && emptyState && !loading && (
-            <TableRow className="border-white/5 hover:bg-transparent">
-              <TableCell colSpan={columns.length} className="py-12 text-center text-slate-500">
+            <TableRow className="border-border hover:bg-transparent">
+              <TableCell colSpan={columns.length} className="py-12 text-center text-foreground-dim">
                 {emptyState}
               </TableCell>
             </TableRow>
@@ -165,8 +166,8 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading }: Ta
               <TableRow
                 key={itemKey}
                 className={cn(
-                  "group transition-colors border-white/5",
-                  onRowClick ? "cursor-pointer hover:bg-white/5" : "hover:bg-white/5"
+                  "group transition-colors border-border",
+                  onRowClick ? "cursor-pointer hover:bg-foreground/5" : "hover:bg-foreground/5"
                 )}
                 onClick={() => onRowClick?.(item)}
               >

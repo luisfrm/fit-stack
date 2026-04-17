@@ -109,8 +109,8 @@ export default function OrganizationSettingsPage() {
   if (sessionLoading && !hasInitialized.current) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-64 bg-white/5 rounded-2xl" />
-        <div className="h-96 bg-white/5 rounded-2xl" />
+        <div className="h-64 bg-foreground/5 rounded-2xl" />
+        <div className="h-96 bg-foreground/5 rounded-2xl" />
       </div>
     );
   }
@@ -132,7 +132,7 @@ export default function OrganizationSettingsPage() {
       <div className="space-y-8 max-w-4xl">
 
         {/* IDENTIDAD COMERCIAL */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col relative overflow-hidden">
+        <Card variant="settings" className="relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Building2 className="w-32 h-32" />
           </div>
@@ -197,7 +197,7 @@ export default function OrganizationSettingsPage() {
         </Card>
 
         {/* DATOS FISCALES Y LOCALIZACIÓN */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col">
+        <Card variant="settings">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
               <Fingerprint className="w-6 h-6" />
@@ -247,7 +247,7 @@ export default function OrganizationSettingsPage() {
         </Card>
 
         {/* ACCIONES */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl flex gap-6">
+        <Card variant="settings" className="flex-row items-center">
           <div className="flex flex-col gap-1">
             <Text weight="bold" size="lg">¿Guardar cambios institucionales?</Text>
             <Text variant="muted" size="sm">

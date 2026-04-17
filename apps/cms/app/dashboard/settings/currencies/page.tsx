@@ -125,14 +125,14 @@ export default function CurrencySettingsPage() {
       </div>
 
       <div className="max-w-2xl space-y-6">
-        <Card className="p-6 bg-white/2 border-white/5 space-y-6">
+        <Card className="p-6 space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <Coins className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <Text className="font-bold text-white">Configuración de Divisas</Text>
-              <Text className="text-[10px] text-white/30 uppercase tracking-wider font-bold">Activa o desactiva monedas globales</Text>
+              <Text className="font-bold">Configuración de Divisas</Text>
+              <Text className="text-[10px] text-foreground-dim uppercase tracking-wider font-bold">Activa o desactiva monedas globales</Text>
             </div>
           </div>
 

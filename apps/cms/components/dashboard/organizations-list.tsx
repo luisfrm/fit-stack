@@ -16,7 +16,7 @@ interface OrganizationsListProps {
 export function OrganizationsList({ organizations, isLoading, onSuccess }: OrganizationsListProps) {
   if (organizations.length === 0 && !isLoading) {
     return (
-      <Card className="bg-white/5 backdrop-blur-md rounded-xl p-20 flex flex-col items-center justify-center gap-4 text-center border-2 border-dashed border-white/5 min-h-[400px]">
+      <Card className="p-20 flex flex-col items-center justify-center gap-4 text-center border-2 border-dashed border-border min-h-[400px]">
         <Text variant="muted" size="lg" weight="bold">No hay resultados</Text>
         <Text variant="muted" size="sm">Aún no se han registrado gimnasios en la plataforma.</Text>
       </Card>
@@ -27,7 +27,7 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
     <>
       {/* Desktop View: Table */}
       <div className="hidden md:block">
-        <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden min-h-[400px] py-0">
+        <Card className="overflow-hidden min-h-[400px] py-0">
           <OrganizationsTable
             organizations={organizations}
             isLoading={isLoading}

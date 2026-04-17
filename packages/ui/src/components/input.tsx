@@ -23,16 +23,16 @@ const inputWrapperVariants = cva(
          */
         default: [
           "bg-input border-input-border",
-          "hover:bg-white/4",
+          "hover:bg-foreground/4",
           "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-input",
         ],
         /**
          * glass — subtle translucent surface (formerly filled)
          */
         glass: [
-          "bg-white/5 border-white/10",
-          "hover:bg-white/10 hover:border-white/20",
-          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-white/5",
+          "bg-foreground/5 border-border",
+          "hover:bg-foreground/8 hover:border-border",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-foreground/5",
         ],
       },
 
@@ -130,13 +130,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       )
     } else if (state === "loading") {
       renderRightElement = (
-        <span className="pr-4 shrink-0 flex items-center text-white/30">
+        <span className="pr-4 shrink-0 flex items-center text-foreground-muted">
           <Spinner className="size-4" />
         </span>
       )
     } else if (rightElement) {
       renderRightElement = (
-        <span className="pr-4 shrink-0 flex items-center text-white/30">
+        <span className="pr-4 shrink-0 flex items-center text-foreground-muted">
           {rightElement}
         </span>
       )
@@ -166,7 +166,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         { label && (
           <Label
             htmlFor={inputId}
-            className="text-xs font-semibold uppercase tracking-wider text-gray-400"
+            className="text-xs font-semibold uppercase tracking-wider text-foreground-muted"
           >
             {label}
           </Label>
@@ -182,7 +182,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         >
           {/* Left icon */}
           {leftIcon && (
-            <span className="pl-4 shrink-0 flex items-center text-white/30">
+            <span className="pl-4 shrink-0 flex items-center text-foreground-muted">
               {leftIcon}
             </span>
           )}
@@ -197,8 +197,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             onChange={handleChange}
             min={type === "number" && !allowNegative ? 0 : props.min}
             className={cn(
-              "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-sm text-white placeholder-gray-600 min-w-0",
-              "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:white]",
+              "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-sm text-foreground placeholder:text-foreground-dim min-w-0",
+              "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:var(--color-foreground)]",
               "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
               leftIcon && "pl-2",
               renderRightElement && "pr-2",
@@ -218,7 +218,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               "text-xs",
               state === "error" && "text-red-400",
               state === "success" && "text-green-400",
-              (!state || state === "default") && "text-white/40"
+              (!state || state === "default") && "text-foreground-dim"
             )}
           >
             {hint}

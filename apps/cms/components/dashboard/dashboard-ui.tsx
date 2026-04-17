@@ -198,7 +198,7 @@ export function KpiCard({ label, value, icon, trend, accent }: Readonly<KpiCardP
   return (
     <Card
       className={cn(
-        "bg-white/5 border-white/5 backdrop-blur-md rounded-xl p-6! gap-2! flex flex-col",
+        "p-6! gap-2! flex flex-col",
         accent && "border-l-4 border-l-primary"
       )}
     >
@@ -254,7 +254,7 @@ function KpiTrend({ direction, value }: Readonly<{ direction: TrendDirection; va
 export function OccupancyBar({ percentage }: Readonly<{ percentage: number }>) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex-1 h-1.5 w-24 bg-white/10 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 w-24 bg-foreground/10 rounded-full overflow-hidden">
         <div className="h-full bg-primary rounded-full" style={{ width: `${percentage}%` }} />
       </div>
       <Text as="span" size="sm" variant="muted">
@@ -277,8 +277,8 @@ interface NoDataProps {
 export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDataProps>) {
   return (
     <div className={cn("flex flex-col items-center p-12 text-center gap-3", className)}>
-      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-1">
-        <Icon className="w-6 h-6 text-slate-500" />
+      <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center mb-1">
+        <Icon className="w-6 h-6 text-foreground-dim" />
       </div>
       <Text variant="muted" size="sm">
         {message}
@@ -296,7 +296,7 @@ interface ActivityItemProps {
 
 export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemProps>) {
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors">
+    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
       <Avatar size="default">
         {avatarUrl && <AvatarImage src={uploadService.getMediaUrl(avatarUrl)} alt={name} />}
         <AvatarFallback>{name.charAt(0)}</AvatarFallback>
@@ -355,6 +355,7 @@ export function TodayClassesTable({ classes, loading }: Readonly<{ classes: ICla
       data={classes}
       loading={loading}
       emptyState={<NoData message="No hay clases programadas para hoy." className="py-20" />}
+      className="rounded-none"
     />
   );
 }
@@ -367,10 +368,10 @@ export function RecentRegistrationsList({ registrations, loading }: Readonly<{ r
       <div className="flex flex-col flex-1 p-2 gap-1">
         {skeletonIds.map((id) => (
           <div key={id} className="flex items-center gap-3 p-3 rounded-lg animate-pulse">
-            <div className="w-10 h-10 rounded-full bg-white/10 shrink-0" />
+            <div className="w-10 h-10 rounded-full bg-foreground/10 shrink-0" />
             <div className="flex-1 space-y-2 py-1">
-              <div className="h-4 bg-white/10 rounded w-2/3" />
-              <div className="h-3 bg-white/5 rounded w-1/3" />
+              <div className="h-4 bg-foreground/10 rounded w-2/3" />
+              <div className="h-3 bg-foreground/5 rounded w-1/3" />
             </div>
           </div>
         ))}
@@ -417,7 +418,7 @@ export function AlertItem({ severity, title, description, actionLabel }: Readonl
   return (
     <Card
       className={cn(
-        "flex-1 min-w-[300px] bg-white/5 border-white/5 backdrop-blur-md p-4! rounded-xl",
+        "flex-1 min-w-[300px] p-4! rounded-xl",
         "flex flex-row items-center gap-4 border-l-4",
         config.borderClass
       )}

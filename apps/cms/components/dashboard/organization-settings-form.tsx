@@ -20,7 +20,10 @@ import {
   ColorPicker,
   Title,
   toast,
-  SimpleSelect
+  SimpleSelect,
+  Switch,
+  Label,
+  cn
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
@@ -147,7 +150,7 @@ export function OrganizationSettingsForm({
       <div className="space-y-8 max-w-3xl">
 
         {/* INFORMACIÓN DEL GIMNASIO */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col relative z-50">
+        <Card variant="settings" className="relative z-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-primary/10 text-primary">
@@ -180,7 +183,7 @@ export function OrganizationSettingsForm({
         </Card>
 
         {/* CONFIGURACIÓN REGIONAL */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col relative z-40">
+        <Card variant="settings" className="relative z-40">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
               <Globe className="w-6 h-6" />
@@ -199,8 +202,8 @@ export function OrganizationSettingsForm({
               options={TIMEZONES}
             />
 
-            <div className="bg-white/5 border border-white/5 p-4 rounded-xl flex items-center gap-4">
-              <div className="p-2.5 rounded-lg bg-white/5 text-white/40">
+            <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
+              <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">
                 <Clock className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
@@ -214,7 +217,7 @@ export function OrganizationSettingsForm({
         </Card>
 
         {/* PREFERENCIA DE APARIENCIA */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col relative z-30">
+        <Card variant="settings" className="relative z-30">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400">
               {formData[SETTINGS_KEYS.THEME_MODE] === "light" ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
@@ -225,27 +228,42 @@ export function OrganizationSettingsForm({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-            <SimpleSelect
-              label="Modo Visual"
-              value={formData[SETTINGS_KEYS.THEME_MODE] || "dark"}
-              onChange={(value) => handleChange(SETTINGS_KEYS.THEME_MODE, value)}
-              options={[
-                { value: "dark", label: "Oscuro (Predeterminado)" },
-                { value: "light", label: "Claro" },
-              ]}
-            />
-
-            <div className="p-4 rounded-xl border border-white/5 bg-white/2">
-              <Text size="xs" className="opacity-40 italic">
-                * El cambio se aplicará a todos los administradores de la sede.
+          <div className="flex items-center justify-between p-6 rounded-xl border border-border bg-foreground/3">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                Modo Visual
+              </Label>
+              <Text variant="muted" size="xs">
+                {formData[SETTINGS_KEYS.THEME_MODE] === "light"
+                  ? "Tema claro activo para una mejor visibilidad diurna."
+                  : "Tema oscuro activo (predeterminado de la sede)."}
               </Text>
+            </div>
+
+            <div className="flex items-center gap-4 px-4 py-3 rounded-2xl bg-foreground/10 border border-border">
+              <Moon
+                className={cn(
+                  "size-5 transition-all duration-300",
+                  formData[SETTINGS_KEYS.THEME_MODE] === "light" ? "text-foreground/20 scale-90" : "text-primary fill-primary/20 scale-110"
+                )}
+              />
+              <Switch
+                checked={formData[SETTINGS_KEYS.THEME_MODE] === "light"}
+                onCheckedChange={(checked) => handleChange(SETTINGS_KEYS.THEME_MODE, checked ? "light" : "dark")}
+                className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-primary scale-125"
+              />
+              <Sun
+                className={cn(
+                  "size-5 transition-all duration-300",
+                  formData[SETTINGS_KEYS.THEME_MODE] === "light" ? "text-yellow-500 fill-yellow-500/20 scale-110" : "text-foreground/20 scale-90"
+                )}
+              />
             </div>
           </div>
         </Card>
 
         {/* COLOR DE MARCA */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl gap-8! flex flex-col relative z-20">
+        <Card variant="settings" className="relative z-20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-primary/10 text-primary/40">
@@ -282,7 +300,7 @@ export function OrganizationSettingsForm({
             </div>
 
             <div
-              className="rounded-2xl border p-10 flex flex-col gap-8 transition-all duration-700 shadow-xl relative bg-zinc-950"
+              className="rounded-2xl border p-10 flex flex-col gap-8 transition-all duration-700 border-input-border relative"
               style={{
                 color: "#ffffff",
                 borderColor: `${currentPrimary}20`,
@@ -325,7 +343,7 @@ export function OrganizationSettingsForm({
         </Card>
 
         {/* ACCIONES FINALES */}
-        <Card className="p-8! bg-white/5 border-white/5 backdrop-blur-md rounded-2xl flex flex-col justify-between gap-6 relative z-10">
+        <Card variant="settings" className="justify-between relative z-10">
           <div className="flex flex-col gap-1">
             <Text weight="bold" size="lg">¿Deseas aplicar estos cambios?</Text>
             <Text variant="muted" size="sm">
@@ -347,7 +365,7 @@ export function OrganizationSettingsForm({
               loading={isUpdating}
               disabled={isUpdating}
               leftIcon={<Save className="w-4 h-4" />}
-              className="flex-1 md:flex-none px-12"
+              className="flex-1 md:flex-none px-12 h-12"
             >
               Guardar Ajustes
             </Button>

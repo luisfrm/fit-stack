@@ -66,7 +66,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
             {label && (
               <Label
                 htmlFor={id}
-                className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40"
+                className="text-[10px] font-bold uppercase tracking-[0.2em] text-foreground-muted"
               >
                 {label}
               </Label>
@@ -89,7 +89,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
 
         <div className="flex items-center gap-3 group">
           <div
-            className="w-12 h-12 rounded-xl border border-white/10 shrink-0 shadow-2xl relative overflow-hidden transition-all group-hover:scale-105 active:scale-95 cursor-pointer ring-offset-2 ring-offset-background group-focus-within:ring-2 group-focus-within:ring-primary"
+            className="w-12 h-12 rounded-xl border border-border shrink-0 shadow-2xl relative overflow-hidden transition-all group-hover:scale-105 active:scale-95 cursor-pointer ring-offset-2 ring-offset-background group-focus-within:ring-2 group-focus-within:ring-primary"
             style={{ backgroundColor: ColorUtils.isValid(value) ? value : "#000000" }}
           >
             <input
@@ -126,7 +126,7 @@ export const ColorPicker = React.forwardRef<HTMLInputElement, ColorPickerProps>(
           </div>
         </div>
         {description && (
-          <p className="text-[11px] text-white/30 italic leading-relaxed">
+          <p className="text-[11px] text-foreground-dim italic leading-relaxed">
             {description}
           </p>
         )}

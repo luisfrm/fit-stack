@@ -1,18 +1,46 @@
 import * as React from "react"
-
+import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@workspace/ui/lib/utils"
+
+const cardVariants = cva(
+  "group/card flex flex-col text-sm text-card-foreground",
+  {
+    variants: {
+      /**
+       * variant controls the visual style of the card:
+       * - glass    → translucent surface with backdrop blur (CMS default)
+       * - settings → glass + extra padding + rounded-2xl (settings pages)
+       * - plain    → the original shadcn/ui card with ring border
+       */
+      variant: {
+        glass:    "gap-4 rounded-xl bg-glass backdrop-blur-md border border-border py-4",
+        settings: "gap-8 rounded-2xl bg-glass backdrop-blur-md border border-border p-8 flex flex-col",
+        plain:    "gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10",
+      },
+      size: {
+        default: "",
+        sm: "gap-3 py-3",
+      },
+    },
+    defaultVariants: {
+      variant: "glass",
+      size: "default",
+    },
+  }
+)
 
 function Card({
   className,
-  size = "default",
+  variant,
+  size,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & VariantProps<typeof cardVariants>) {
   return (
     <div
       data-slot="card"
-      data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        cardVariants({ variant, size }),
+        "has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
         className
       )}
       {...props}
@@ -94,6 +122,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 export {
   Card,
+  cardVariants,
   CardHeader,
   CardFooter,
   CardTitle,

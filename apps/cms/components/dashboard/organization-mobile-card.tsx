@@ -29,7 +29,7 @@ interface OrganizationMobileCardProps {
 export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription, onSuccess, EditModal }: OrganizationMobileCardProps) {
   if (isLoading) {
     return (
-      <Card className="bg-white/5 border-none backdrop-blur-md p-5 rounded-xl space-y-4">
+      <Card className="p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Skeleton className="size-10 rounded-full" />
@@ -40,14 +40,14 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
           </div>
           <Skeleton className="h-5 w-16 rounded-full" />
         </div>
-        <div className="flex justify-between items-center pt-2 border-t border-white/5">
+        <div className="flex justify-between items-center pt-2 border-t border-border">
           <div className="space-y-1">
             <Skeleton className="h-2 w-12" />
             <Skeleton className="h-4 w-8" />
           </div>
           <Skeleton className="h-8 w-8 rounded-md" />
         </div>
-        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
           <Skeleton className="h-10 w-full rounded-md" />
           <Skeleton className="h-10 w-full rounded-md" />
         </div>
@@ -73,7 +73,7 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
   const badgeVariant = statusVariants[displayStatus] || 'secondary';
 
   return (
-    <Card className="bg-white/5 border-none backdrop-blur-md p-5 rounded-xl space-y-4">
+    <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="size-10 bg-primary/20 rounded-full flex items-center justify-center text-primary">
@@ -89,7 +89,7 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
         </Badge>
       </div>
 
-      <div className="flex justify-between items-center pt-2 border-t border-white/5">
+      <div className="flex justify-between items-center pt-2 border-t border-border">
         <div className="flex flex-col">
           <Text size="xs" variant="muted" weight="bold" uppercase className="tracking-tighter font-medium">Miembros</Text>
           <Text weight="bold">{org.memberCount || 0}</Text>
@@ -104,7 +104,7 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
         <Button 
           variant="outlined" 
           size="sm" 

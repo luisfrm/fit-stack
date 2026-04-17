@@ -168,8 +168,9 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
           {!branding.isLoading && branding.action && <div>{branding.action}</div>}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex flex-col gap-1">
+        {/* Navigation - Scrollable Area */}
+        <div className="flex-1 overflow-y-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-foreground/20 transition-colors">
+          <nav className="flex flex-col gap-1">
           {branding.isLoading ? (
             <>
               {NAV_SKELETON_IDS.map((id) => (
@@ -193,7 +194,8 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
               );
             })
           )}
-        </nav>
+          </nav>
+        </div>
       </div>
 
       {/* Profile/Footer Section */}
@@ -247,5 +249,60 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<SidebarNav
       <Icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-primary-foreground" : "")} />
       {label}
     </Link>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   SETTINGS SIDEBAR (SUB-SIDEBAR)
+   ───────────────────────────────────────────── */
+
+export interface SettingsSidebarItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  disabled?: boolean;
+}
+
+interface SettingsSidebarProps {
+  items: SettingsSidebarItem[];
+  pathname: string;
+  title?: string;
+}
+
+export function SettingsSidebar({ items, pathname, title = "Ajustes del Sistema" }: Readonly<SettingsSidebarProps>) {
+  return (
+    <aside className="w-full lg:w-64 shrink-0">
+      <div className="flex flex-col gap-6 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-foreground/20 transition-colors">
+        <div className="px-2 pb-8">
+          <Text variant="muted" size="xs" weight="bold" uppercase className="px-2 mb-4 tracking-widest opacity-60">
+            {title}
+          </Text>
+          <nav className="flex flex-col gap-1">
+            {items.map((item) => {
+              const isActive = pathname === item.href || (item.href !== "/dashboard/settings" && pathname.startsWith(item.href));
+              const Icon = item.icon;
+              const Tag = item.disabled ? "div" : Link;
+              return (
+                <Tag
+                  key={item.href}
+                  href={item.disabled ? undefined : item.href}
+                  aria-disabled={item.disabled}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium border group",
+                    isActive
+                      ? "bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(252,211,3,0.05)]"
+                      : "text-foreground-muted hover:bg-foreground/5 hover:text-foreground border-transparent",
+                    item.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-foreground-muted"
+                  )}
+                >
+                  <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-primary" : "text-foreground-dim group-hover:text-foreground-muted")} />
+                  {item.label}
+                </Tag>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+    </aside>
   );
 }

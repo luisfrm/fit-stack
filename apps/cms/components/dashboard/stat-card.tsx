@@ -13,7 +13,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, change, icon, status }: StatCardProps) {
   return (
-    <Card className="bg-white/5 border-none backdrop-blur-md p-6 rounded-xl hover:bg-white/8 transition-all">
+    <Card className="p-6 hover:bg-foreground/8 transition-all">
       <div className="flex justify-between items-start mb-4">
         {icon}
         {status === 'online' && (

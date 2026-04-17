@@ -24,7 +24,7 @@ const buttonVariants = cva(
          * Use for main CTA actions
          */
         primary: [
-          "bg-primary text-black",
+          "bg-primary text-primary-foreground",
           "hover:bg-primary-hover",
           "active:scale-[0.98]",
         ],
@@ -34,9 +34,9 @@ const buttonVariants = cva(
          * Use for secondary actions
          */
         outlined: [
-          "bg-transparent text-white",
-          "border-2 border-white",
-          "hover:bg-white hover:text-black",
+          "bg-transparent text-foreground",
+          "border-2 border-foreground",
+          "hover:bg-foreground hover:text-background",
         ],
 
         /**
@@ -44,7 +44,7 @@ const buttonVariants = cva(
          * Use for tertiary actions or nav items
          */
         ghost: [
-          "bg-transparent text-white",
+          "bg-transparent text-foreground",
           "hover:bg-foreground/10",
         ],
 
@@ -52,7 +52,7 @@ const buttonVariants = cva(
          * Secondary — matches input surface
          */
         secondary: [
-          "bg-input border border-input-border text-white",
+          "bg-input border border-input-border text-foreground",
           "hover:bg-foreground/5",
         ],
 
@@ -60,8 +60,8 @@ const buttonVariants = cva(
          * glass — translucent surface matching inputs
          */
         glass: [
-          "bg-white/5 border border-white/10 text-white",
-          "hover:bg-white/10 hover:border-white/20",
+          "bg-foreground/5 border border-border text-foreground",
+          "hover:bg-foreground/10 hover:border-border",
           "active:scale-[0.98]",
         ],
 
@@ -93,8 +93,8 @@ const buttonVariants = cva(
          * Ghost Muted — subtle white, used for input icons
          */
         "ghost-muted": [
-          "bg-transparent text-white/40",
-          "hover:text-white hover:bg-white/5 active:bg-white/10",
+          "bg-transparent text-foreground-muted",
+          "hover:text-foreground hover:bg-foreground/5 active:bg-foreground/10",
         ],
 
         /**
