@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   UserCog,
@@ -10,8 +9,6 @@ import {
   Coins,
   Wallet,
 } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
-import { Text } from "@workspace/ui/components/text";
 import { SettingsSidebar } from "@workspace/ui/components/next/sidebar";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 

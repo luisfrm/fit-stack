@@ -43,7 +43,7 @@ interface SidebarProps {
  */
 export function AppSidebar({ user, branding, navigation, footer }: Readonly<SidebarProps>) {
   return (
-    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col justify-between py-6 shrink-0 h-svh sticky top-0 font-display">
+    <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col py-6 shrink-0 h-svh sticky top-0 font-display">
       <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} />
     </aside>
   );
@@ -135,7 +135,7 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
 
   return (
     <>
-      <div className="px-6 flex flex-col gap-8 h-full">
+      <div className="px-6 flex-1 flex flex-col gap-8 min-h-0">
         {/* Branding Branding */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-3">
@@ -169,7 +169,7 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
         </div>
 
         {/* Navigation - Scrollable Area */}
-        <div className="flex-1 overflow-y-auto -mx-2 px-2 scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-foreground/20 transition-colors">
+        <div className="flex-1 overflow-y-auto -mx-2 px-2 pb-6 scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-foreground/20 transition-colors">
           <nav className="flex flex-col gap-1">
           {branding.isLoading ? (
             <>
@@ -199,7 +199,7 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
       </div>
 
       {/* Profile/Footer Section */}
-      <div className="px-4 mt-auto">
+      <div className="px-4 mt-auto pt-10">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-foreground/5 border border-border min-h-[66px]">
           {branding.isLoading ? (
             <>
@@ -281,23 +281,41 @@ export function SettingsSidebar({ items, pathname, title = "Ajustes del Sistema"
             {items.map((item) => {
               const isActive = pathname === item.href || (item.href !== "/dashboard/settings" && pathname.startsWith(item.href));
               const Icon = item.icon;
-              const Tag = item.disabled ? "div" : Link;
-              return (
-                <Tag
-                  key={item.href}
-                  href={item.disabled ? undefined : item.href}
-                  aria-disabled={item.disabled}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium border group",
-                    isActive
-                      ? "bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(252,211,3,0.05)]"
-                      : "text-foreground-muted hover:bg-foreground/5 hover:text-foreground border-transparent",
-                    item.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-foreground-muted"
-                  )}
-                >
+              const content = (
+                <>
                   <Icon className={cn("w-4 h-4 shrink-0 transition-colors", isActive ? "text-primary" : "text-foreground-dim group-hover:text-foreground-muted")} />
                   {item.label}
-                </Tag>
+                </>
+              );
+
+              const className = cn(
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium border group",
+                isActive
+                  ? "bg-primary/10 text-primary border-primary/20 shadow-[0_0_20px_rgba(252,211,3,0.05)]"
+                  : "text-foreground-muted hover:bg-foreground/5 hover:text-foreground border-transparent",
+                item.disabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-foreground-muted"
+              );
+
+              if (item.disabled) {
+                return (
+                  <div
+                    key={item.href}
+                    aria-disabled={item.disabled}
+                    className={className}
+                  >
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={className}
+                >
+                  {content}
+                </Link>
               );
             })}
           </nav>

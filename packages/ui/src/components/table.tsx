@@ -116,7 +116,7 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading, clas
   return (
     <div className={cn("bg-glass rounded-xl border border-border overflow-hidden", className)}>
       <TablePrimitive>
-        <TableHeader className="bg-foreground/5">
+        <TableHeader className="bg-table-header">
           <TableRow className="border-border hover:bg-transparent">
             {columns.map((col, i) => {
               const colKey = col.id ?? (typeof col.header === "string" ? col.header : `col-${tableId}-${i}`);
@@ -167,7 +167,7 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading, clas
                 key={itemKey}
                 className={cn(
                   "group transition-colors border-border",
-                  onRowClick ? "cursor-pointer hover:bg-foreground/5" : "hover:bg-foreground/5"
+                  onRowClick ? "cursor-pointer hover:bg-foreground/3" : "hover:bg-foreground/3"
                 )}
                 onClick={() => onRowClick?.(item)}
               >

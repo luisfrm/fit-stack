@@ -30,6 +30,7 @@
   --glass-bg: oklch(0.4 0 0 / 0.2);
   --primary-glow: oklch(0.853 0.199 91.26 / 0.08);
   --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.15);
+  --table-header: oklch(0 0 0 / 0.4);
 
   --card: var(--surface);
   --card-foreground: var(--foreground);
@@ -82,6 +83,7 @@
   --glass-bg: oklch(1 0 0 / 0.5);
   --primary-glow: oklch(0.853 0.199 91.26 / 0.06);
   --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.12);
+  --table-header: oklch(0 0 0 / 0.04);
 
   --destructive: oklch(0.52 0.22 27);
   --destructive-foreground: oklch(1 0 0);
@@ -113,6 +115,7 @@
   --color-glass-bg: var(--glass-bg);
   --color-primary-glow: var(--primary-glow);
   --color-primary-glow-hover: var(--primary-glow-hover);
+  --color-table-header: var(--table-header);
 
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
