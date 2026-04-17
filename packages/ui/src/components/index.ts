@@ -85,3 +85,5 @@ export { NextImage } from "@workspace/ui/components/next/image";
 
 // Loaders
 export { SplashScreen } from "@workspace/ui/components/splash-screen";
+
+export * from "@workspace/ui/components/tooltip";

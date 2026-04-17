@@ -8,10 +8,11 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Upload, X, MapPin } from "lucide-react";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Calendar, Camera, X, MapPin, Loader2 } from "lucide-react";
 import { ORG_ROLES } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
+import { cn } from "@workspace/ui/lib/utils";
 
 interface MemberFormProps {
   readonly initialData?: IMember;
@@ -99,25 +100,49 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
       {/* Photo Upload */}
-      <div className="flex flex-col items-center gap-4 py-2">
-        <div className="relative group">
-          <Avatar size="xl">
-            {previewUrl ? (
-              <AvatarImage src={previewUrl} className="object-cover" />
-            ) : null}
-            <AvatarFallback>
-              <User className="size-8 opacity-30" />
-            </AvatarFallback>
-          </Avatar>
+      <div className="flex flex-col items-center gap-4 py-4">
+        <button
+          type="button"
+          aria-label={previewUrl ? "Cambiar foto de perfil" : "Subir foto de perfil"}
+          className={cn(
+            "relative group cursor-pointer transition-all duration-300 outline-none rounded-full block",
+            !previewUrl && "hover:border-primary/50"
+          )}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+        >
+          <div className={cn(
+            "rounded-full p-1 border-2 border-dashed border-white/10 group-hover:border-primary/40 transition-colors",
+            previewUrl && "border-solid border-primary/20"
+          )}>
+            <Avatar size="2xl" className="size-24 border shadow-sm ring-1 ring-white/5 ring-inset">
+              {previewUrl ? (
+                <AvatarImage src={previewUrl} className="object-cover" />
+              ) : null}
+              <AvatarFallback className="bg-white/5">
+                <User className="size-10 text-gray-600 opacity-20" />
+              </AvatarFallback>
+            </Avatar>
+          </div>
 
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-0 border-none hover:bg-black/60"
-          >
-            <Upload className="size-5 text-white" />
-          </Button>
+          {/* Hover Overlay */}
+          <div className="absolute inset-1 rounded-full bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 z-10 overflow-hidden">
+            {isUploading ? (
+              <Loader2 className="size-6 text-white animate-spin" />
+            ) : (
+              <>
+                <Camera className="size-6 text-white" />
+                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                  {previewUrl ? "Cambiar" : "Subir foto"}
+                </span>
+              </>
+            )}
+          </div>
 
           {previewUrl && (
             <Button
@@ -125,12 +150,19 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
               variant="danger"
               size="icon"
               rounded="full"
-              onClick={removeImage}
-              className="absolute -top-1 -right-1 h-5 w-5 shadow-lg hover:scale-110 transition-transform z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeImage();
+              }}
+              className="absolute -top-1 -right-1 h-6 w-6 shadow-xl hover:scale-110 transition-transform z-20"
             >
-              <X className="size-3" />
+              <X className="size-3.5" />
             </Button>
           )}
+        </button>
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs font-semibold text-gray-300">Foto de perfil</span>
+          <span className="text-[10px] text-gray-400">JPG, PNG o WEBP (Máx. 2MB)</span>
         </div>
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
       </div>

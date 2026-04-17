@@ -9,6 +9,7 @@ import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { type IMember } from "@/types/dashboard";
 import { MembersTable } from "@/components/members/members-table";
 import { MemberModal } from "@/components/members/member-modal";
+import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
@@ -109,6 +110,8 @@ export default function MembersPage() {
               members={members}
               onDelete={handleDelete}
               onSuccess={() => loadMembers()}
+              SubscriptionModal={SubscriptionModal}
+              hideRoleColumn={true}
               loading={loading}
               emptyDescription="Aún no se han registrado clientes en esta organización."
             />

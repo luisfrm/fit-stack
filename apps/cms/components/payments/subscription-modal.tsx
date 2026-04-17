@@ -11,25 +11,33 @@ import { IMember } from "@/types/dashboard";
 interface SubscriptionModalProps {
   readonly trigger: React.ReactNode;
   readonly onSuccess?: () => void;
+  readonly initialMember?: IMember | null;
 }
 
-export function SubscriptionModal({ trigger, onSuccess }: SubscriptionModalProps) {
+export function SubscriptionModal({ trigger, onSuccess, initialMember }: SubscriptionModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   
   // Workflow states
   const [view, setView] = React.useState<'payment' | 'member'>('payment');
-  const [newMember, setNewMember] = React.useState<IMember | null>(null);
+  const [newMember, setNewMember] = React.useState<IMember | null>(initialMember ?? null);
+
+  // Sync with prop when modal opens/changes
+  React.useEffect(() => {
+    if (initialMember) {
+      setNewMember(initialMember);
+    }
+  }, [initialMember, isOpen]);
 
   // Reset workflow when modal opens/closes
   React.useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
         setView('payment');
-        setNewMember(null);
+        setNewMember(initialMember ?? null);
       }, 300); // Wait for animation to finish
     }
-  }, [isOpen]);
+  }, [isOpen, initialMember]);
 
   const handleSubmit = async (formData: any) => {
     setIsLoading(true);

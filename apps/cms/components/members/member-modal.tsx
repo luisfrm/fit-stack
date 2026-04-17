@@ -20,7 +20,7 @@ export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
 
   const handleSubmit = async (formData: Partial<IMember>, sendInvite: boolean) => {
     setIsLoading(true);
-    
+
     try {
       if (isEdit && member?.id) {
         await membersService.updateMember(member.id, formData);
@@ -29,10 +29,10 @@ export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
         await membersService.createMember(formData, sendInvite);
         toast.success("Miembro creado exitosamente.");
         if (sendInvite) {
-          toast.success("Se ha programado el envío de la invitación.", { description: "Revisa la consola (o bandeja de correo) para ver el link mágico." });
+          toast.success("Se ha programado el envío de la invitación.", { description: "Se ha enviado un correo electrónico al nuevo miembro con un enlace para configurar su contraseña." });
         }
       }
-      
+
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
@@ -50,16 +50,16 @@ export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
       trigger={trigger}
       title={isEdit ? "Editar Miembro" : "Nuevo Miembro"}
       description={
-        isEdit 
-          ? `Actualiza la información de ${member.firstName} ${member.lastName}.` 
+        isEdit
+          ? `Actualiza la información de ${member.firstName} ${member.lastName}.`
           : "Completa los datos para dar de alta a un nuevo miembro en el gimnasio."
       }
       isScrollable={true}
     >
-      <MemberForm 
-        initialData={member} 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading} 
+      <MemberForm
+        initialData={member}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
       />
     </Modal>
   );

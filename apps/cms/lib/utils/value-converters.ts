@@ -24,7 +24,7 @@ export class ValueConverter {
     const [integerPart, decimalPart] = fixedValue.split(".");
 
     // Add thousand separators to integer part
-    const formattedInteger = integerPart!.replace(/\B(?=(\d{3})+(?!\d))/g, thousandSeparator);
+    const formattedInteger = integerPart!.replaceAll(/\B(?=(\d{3})+(?!\d))/g, thousandSeparator);
 
     const result = `${formattedInteger}${decimalSeparator}${decimalPart}`;
 
@@ -44,10 +44,10 @@ export class ValueConverter {
 
     if (isLatam) {
       // LATAM: 1.250,50 -> Remove dot, change comma to dot
-      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+      cleaned = cleaned.replaceAll(".", "").replace(",", ".");
     } else {
       // USA: 1,250.50 -> Remove comma
-      cleaned = cleaned.replace(/,/g, "");
+      cleaned = cleaned.replaceAll(",", "");
     }
 
     const parsed = Number.parseFloat(cleaned);
@@ -59,13 +59,27 @@ export class ValueConverter {
    * Useful for Document IDs, member counts, etc.
    */
   static formatInteger(value: number | string, format: CurrencyFormat = 'latam'): string {
-    const num = typeof value === 'string' ? parseInt(value, 10) : value;
-    if (isNaN(num)) return String(value);
+    const num = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    if (Number.isNaN(num)) return String(value);
 
     const isLatam = format === 'latam';
     const separator = isLatam ? "." : ",";
 
-    return String(num).replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+    return String(num).replaceAll(/\B(?=(\d{3})+(?!\d))/g, separator);
+  }
+
+  /**
+   * Formats a date string or object to DD/MM/YYYY (LATAM) or MM/DD/YYYY (USA).
+   */
+  static formatDate(date: string | Date, format: CurrencyFormat = 'latam'): string {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (Number.isNaN(d.getTime())) return typeof date === 'string' ? date : "";
+
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+
+    return format === 'latam' ? `${day}/${month}/${year}` : `${month}/${day}/${year}`;
   }
 
   /**

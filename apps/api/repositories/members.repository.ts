@@ -1,6 +1,6 @@
 import { eq, ilike, and, or, count, desc, db, isNotNull, ne } from '@workspace/database/client';
 import crypto from "node:crypto";
-import { gymMember, authMember, user } from '@workspace/database/schema';
+import { gymMember, authMember, user, subscription, membershipPlan } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
 
 export type DbMember = typeof gymMember.$inferSelect;
@@ -97,8 +97,44 @@ export const membersRepository = {
 
     const total = Number(countResult[0]?.total ?? 0);
 
+    // Enriched with latest subscription for each member
+    const enrichedData = await Promise.all(
+      rows.map(async (r) => {
+        const [latestSub] = await db
+          .select({
+            id: subscription.id,
+            memberId: subscription.memberId,
+            planId: subscription.planId,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            status: subscription.status,
+            createdAt: subscription.createdAt,
+            planName: membershipPlan.name,
+          })
+          .from(subscription)
+          .leftJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+          .where(and(eq(subscription.memberId, r.member.id), eq(subscription.organizationId, organizationId)))
+          .orderBy(desc(subscription.endDate))
+          .limit(1);
+
+        return {
+          ...r.member,
+          role: r.member.role,
+          authRole: r.authRole,
+          user: r.user,
+          latestSubscription: latestSub ? {
+            ...latestSub,
+            startDate: latestSub.startDate.toISOString(),
+            endDate: latestSub.endDate.toISOString(),
+            createdAt: latestSub.createdAt.toISOString(),
+            planName: latestSub.planName || undefined,
+          } : null,
+        };
+      })
+    );
+
     return {
-      data: rows.map(r => ({ ...r.member, role: r.member.role, authRole: r.authRole, user: r.user })),
+      data: enrichedData,
       total,
       page,
       limit,

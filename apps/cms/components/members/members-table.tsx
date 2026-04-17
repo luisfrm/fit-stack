@@ -1,15 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback, Text } from "@workspace/ui/components";
+import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback, Text, SimpleTooltip } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
+import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-react";
 import { GLOBAL_ROLES } from "@workspace/shared";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { differenceInDays, parseISO } from "date-fns";
 
 interface MembersTableProps {
   readonly members: IMember[];
@@ -20,6 +21,12 @@ interface MembersTableProps {
     onSuccess: () => void;
     trigger: React.ReactNode;
   }>;
+  readonly SubscriptionModal?: React.ComponentType<{
+    initialMember: IMember;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>;
+  readonly hideRoleColumn?: boolean;
   readonly loading?: boolean;
   readonly emptyTitle?: string;
   readonly emptyDescription?: string;
@@ -33,7 +40,13 @@ const getColumns = (
     onSuccess: () => void;
     trigger: React.ReactNode;
   }>,
-  currencyFormat: CurrencyFormat = "latam"
+  currencyFormat: CurrencyFormat = "latam",
+  hideRoleColumn?: boolean,
+  SubscriptionModal?: React.ComponentType<{
+    initialMember: IMember;
+    onSuccess: () => void;
+    trigger: React.ReactNode;
+  }>
 ): ColumnDef<IMember>[] => [
     {
       header: "Miembro",
@@ -50,10 +63,10 @@ const getColumns = (
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col min-w-0">
-            <span className="font-semibold text-white truncate max-w-[180px]">
+            <span className="font-semibold text-foreground truncate max-w-[180px]">
               {m.firstName} {m.lastName}
             </span>
-            <span className="text-[10px] text-gray-400 truncate max-w-[180px] tracking-wider">
+            <span className="text-[10px] text-muted-foreground truncate max-w-[180px] tracking-wider">
               {m.email}
             </span>
           </div>
@@ -63,22 +76,52 @@ const getColumns = (
     {
       header: "Identificación",
       cell: (m) => (
-        <span className="text-sm font-medium text-gray-300">
+        <span className="text-muted-foreground text-sm font-medium">
           {m.documentId ? ValueConverter.formatInteger(m.documentId, currencyFormat) : "—"}
         </span>
       )
     },
-    {
+    ...(hideRoleColumn ? [] : [{
       header: "Rol",
-      cell: (m) => (
+      cell: (m: IMember) => (
         <Badge variant={m.role === GLOBAL_ROLES.ADMIN ? "default" : "secondary"}>
           {m.role || "Sin rol"}
         </Badge>
       )
+    }]),
+    {
+      header: "Suscripción",
+      cell: (m: IMember) => {
+        const sub = m.latestSubscription;
+        if (!sub) {
+          return <Badge variant="secondary">Sin suscripción</Badge>;
+        }
+
+        const end = parseISO(sub.endDate);
+        const daysLeft = differenceInDays(end, new Date());
+
+        let variant: "success" | "warning" | "destructive" = "success";
+        if (sub.status !== 'active' || daysLeft < 0) {
+          variant = "destructive";
+        } else if (daysLeft <= 7) {
+          variant = "warning";
+        }
+
+        return (
+          <div className="flex flex-col gap-1">
+            <Badge variant={variant} size="sm">
+              {sub.planName || "Plan personalizado"}
+            </Badge>
+            <span className="text-[10px] text-muted-foreground font-medium">
+              Expira: {ValueConverter.formatDate(sub.endDate, currencyFormat)}
+            </span>
+          </div>
+        );
+      }
     },
     {
       header: "Estado",
-      cell: (m) => (
+      cell: (m: IMember) => (
         <Badge variant={m.isActive ? "default" : "destructive"}>
           {m.isActive ? "Activo" : "Inactivo"}
         </Badge>
@@ -88,28 +131,53 @@ const getColumns = (
       header: "Acciones",
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
-      cell: (m) => (
+      cell: (m: IMember) => (
         <div className="flex items-center justify-end">
+          {SubscriptionModal && m.isActive && (
+            <SubscriptionModal
+              initialMember={m}
+              onSuccess={onSuccess}
+              trigger={
+                <SimpleTooltip content="Registrar Pago / Suscripción">
+                  <Button
+                    variant="ghost-accent"
+                    size="icon"
+                  >
+                    <CreditCard size={16} />
+                    <Plus size={8} className="absolute top-2 right-2" />
+                  </Button>
+                </SimpleTooltip>
+              }
+            />
+          )}
           {!m.user && m.id && (
-            <ResendInviteButton memberId={m.id} />
+            <SimpleTooltip content="Reenviar invitación de registro">
+              <ResendInviteButton memberId={m.id} />
+            </SimpleTooltip>
           )}
           <EditModal
             initialData={m}
             onSuccess={onSuccess}
             trigger={
-              <Button variant="ghost" size="icon">
-                <Edit2 size={16} className="text-gray-400" />
-              </Button>
+              <SimpleTooltip content="Editar información">
+                <Button
+                  variant="ghost-accent"
+                  size="icon"
+                >
+                  <Edit2 size={16} />
+                </Button>
+              </SimpleTooltip>
             }
           />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => m.id && onDelete(m.id)}
-            className="hover:bg-red-500/10 hover:text-red-500"
-          >
-            <Trash2 size={16} />
-          </Button>
+          <SimpleTooltip content="Eliminar miembro">
+            <Button
+              variant="ghost-danger"
+              size="icon"
+              onClick={() => m.id && onDelete(m.id)}
+            >
+              <Trash2 size={16} />
+            </Button>
+          </SimpleTooltip>
         </div>
       )
     }
@@ -131,15 +199,16 @@ function ResendInviteButton({ memberId }: { readonly memberId: number }) {
   };
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={handleResend}
-      disabled={loading}
-      title="Reenviar invitación de registro"
-    >
-      {loading ? <Loader2 size={16} className="animate-spin text-primary" /> : <Mail size={16} className="text-primary" />}
-    </Button>
+    <SimpleTooltip content="Reenviar invitación de registro">
+      <Button
+        variant="ghost-accent"
+        size="icon"
+        onClick={handleResend}
+        disabled={loading}
+      >
+        {loading ? <Loader2 size={16} className="animate-spin text-primary" /> : <Mail size={16} />}
+      </Button>
+    </SimpleTooltip>
   );
 }
 
@@ -148,6 +217,8 @@ export function MembersTable({
   onDelete,
   onSuccess,
   EditModal = MemberModal,
+  SubscriptionModal,
+  hideRoleColumn,
   loading,
   emptyTitle,
   emptyDescription
@@ -155,7 +226,10 @@ export function MembersTable({
   const { settings } = useSettings();
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
-  const columns = React.useMemo(() => getColumns(onDelete, onSuccess, EditModal, currencyFormat), [onDelete, onSuccess, EditModal, currencyFormat]);
+  const columns = React.useMemo(
+    () => getColumns(onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal),
+    [onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal]
+  );
 
   return (
     <Table

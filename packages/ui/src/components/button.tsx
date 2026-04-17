@@ -85,8 +85,16 @@ const buttonVariants = cva(
          * Ghost Danger — subtle red, no border
          */
         "ghost-danger": [
-          "bg-transparent text-red-500",
-          "hover:bg-red-500/10",
+          "bg-transparent text-destructive",
+          "hover:bg-destructive/10",
+        ],
+
+        /**
+         * Ghost Accent — muted text, primary-glow bg on hover
+         */
+        "ghost-accent": [
+          "bg-transparent text-muted-foreground",
+          "hover:bg-primary/30 hover:text-foreground",
         ],
 
         /**
@@ -113,7 +121,7 @@ const buttonVariants = cva(
         md: "text-sm px-6 h-12",
         lg: "text-base px-8 h-14",
         xl: "text-lg px-10 h-16 tracking-[0.15em]",
-        icon: "size-10 flex items-center justify-center shrink-0",
+        icon: "p-2 flex items-center justify-center shrink-0",
       },
 
       fullWidth: {

@@ -127,6 +127,7 @@ export interface IMember {
   documentId?: string;
   address?: string | null;
   isActive: boolean;
+  latestSubscription?: (ISubscription & { planName?: string }) | null;
 }
 
 export interface MemberFilter {
