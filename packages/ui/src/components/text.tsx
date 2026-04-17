@@ -25,9 +25,9 @@ const textVariants = cva(["leading-normal"], {
       lg: "text-lg",
     },
     variant: {
-      default: "text-slate-100",
-      muted: "text-slate-400",
-      subtle: "text-slate-500",
+      default: "text-foreground",
+      muted: "text-foreground-muted",
+      subtle: "text-foreground-dim",
       primary: "text-primary",
       success: "text-emerald-400",
       danger: "text-rose-400",

@@ -18,11 +18,11 @@ const titleVariants = cva(
        * sm      → small labels / sub-headings
        */
       size: {
-        hero:    "text-6xl md:text-8xl",
+        hero: "text-6xl md:text-8xl",
         section: "text-4xl md:text-5xl",
-        card:    "text-2xl",
-        sm:      "text-xl",
-        lg:      "text-3xl",
+        card: "text-2xl",
+        sm: "text-xl",
+        lg: "text-3xl",
       },
 
       /**
@@ -31,14 +31,14 @@ const titleVariants = cva(
        * colored word, or pass `accent` to colour the entire title.
        */
       accent: {
-        none:    "text-white",
+        none: "text-foreground-strong",
         primary: "text-[--color-primary]",
-        muted:   "text-[--color-foreground-muted]",
+        muted: "text-[--color-foreground-muted]",
       },
     },
 
     defaultVariants: {
-      size:   "section",
+      size: "section",
       accent: "none",
     },
   }
@@ -53,8 +53,8 @@ const eyebrowVariants = cva(
     variants: {
       accent: {
         primary: "text-[--color-primary]",
-        muted:   "text-[--color-foreground-muted]",
-        white:   "text-white",
+        muted: "text-[--color-foreground-muted]",
+        white: "text-white",
       },
       size: {
         sm: "text-xs",
@@ -63,7 +63,7 @@ const eyebrowVariants = cva(
     },
     defaultVariants: {
       accent: "primary",
-      size:   "sm",
+      size: "sm",
     },
   }
 );
@@ -75,15 +75,13 @@ type TitleElement = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
 export interface TitleProps
   extends React.HTMLAttributes<HTMLHeadingElement>,
-    VariantProps<typeof titleVariants> {
+  VariantProps<typeof titleVariants> {
   as?: TitleElement;
 }
 
 export interface EyebrowProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof eyebrowVariants> {}
-
-export interface TitleAccentProps extends React.HTMLAttributes<HTMLSpanElement> {}
+  VariantProps<typeof eyebrowVariants> { }
 
 /* ─────────────────────────────────────────────
    COMPONENTS
@@ -118,7 +116,7 @@ Title.displayName = "Title";
  * @example
  * <Title>DOMINA TU <TitleAccent>DESTINO</TitleAccent></Title>
  */
-const TitleAccent = React.forwardRef<HTMLSpanElement, TitleAccentProps>(
+const TitleAccent = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(
   ({ className, children, ...props }, ref) => (
     <span
       ref={ref}
@@ -155,12 +153,12 @@ Eyebrow.displayName = "Eyebrow";
  * SectionHeader — convenient wrapper that groups Eyebrow + Title + description
  */
 interface SectionHeaderProps {
-  eyebrow?: string;
-  title: React.ReactNode;
-  description?: string;
-  align?: "left" | "center" | "right";
-  size?: VariantProps<typeof titleVariants>["size"];
-  className?: string;
+  readonly eyebrow?: string;
+  readonly title: React.ReactNode;
+  readonly description?: string;
+  readonly align?: "left" | "center" | "right";
+  readonly size?: VariantProps<typeof titleVariants>["size"];
+  readonly className?: string;
 }
 
 function SectionHeader({
@@ -172,9 +170,9 @@ function SectionHeader({
   className,
 }: SectionHeaderProps) {
   const alignClass = {
-    left:   "text-left",
+    left: "text-left",
     center: "text-center items-center",
-    right:  "text-right items-end",
+    right: "text-right items-end",
   }[align];
 
   return (

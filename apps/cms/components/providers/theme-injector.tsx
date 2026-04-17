@@ -1,6 +1,7 @@
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { useAuth } from "@/lib/hooks/use-auth";
+import React from "react";
 
 /**
  * ThemeInjector - Dynamically applies gym branding colors to CSS variables.
@@ -13,9 +14,20 @@ export function ThemeInjector() {
   const { activeOrganization } = useAuth();
   const activeOrganizationId = activeOrganization?.id;
 
+  // Handles switching between light and dark mode classes on the <html> element
+  React.useEffect(() => {
+    const mode = settings[SETTINGS_KEYS.THEME_MODE] || "dark";
+    if (mode === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    }
+  }, [settings[SETTINGS_KEYS.THEME_MODE]]);
+
   // Fit-Stack Default Branding (sync with globals.css)
   const PLATFORM_PRIMARY = "oklch(0.853 0.199 91.26)";
-
   const primary = (activeOrganizationId && settings[SETTINGS_KEYS.BRAND_PRIMARY]) || PLATFORM_PRIMARY;
 
   // Intelligent secondary variants calculation

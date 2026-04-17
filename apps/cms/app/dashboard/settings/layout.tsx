@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   UserCog,
-  ShieldCheck,
   CreditCard,
   Building2,
   Coins,
@@ -20,7 +19,6 @@ const SETTINGS_NAV_ITEMS = [
   { label: "Organización", href: "/dashboard/settings/organization", icon: Building2, disabled: false },
   { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
   { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
-  { label: "Roles y Permisos", href: "/dashboard/settings/roles", icon: ShieldCheck, disabled: false },
   { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog, disabled: true },
   { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: true },
 ];

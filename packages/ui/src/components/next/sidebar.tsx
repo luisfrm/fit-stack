@@ -97,11 +97,11 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
       <div className="flex items-center gap-2">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <button className="p-2 text-slate-400 hover:text-slate-100 transition-colors cursor-pointer focus:outline-none">
+            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none">
               <Menu className="w-6 h-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="right" className="p-0 w-72 bg-background border-r-border-dark text-slate-100">
+          <SheetContent side="right" className="p-0 w-72 bg-background border-r-border text-foreground">
             <SheetHeader className="sr-only">
               <SheetTitle>Navegación</SheetTitle>
             </SheetHeader>
@@ -198,7 +198,7 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
 
       {/* Profile/Footer Section */}
       <div className="px-4 mt-auto">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 min-h-[66px]">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-foreground/5 border border-border min-h-[66px]">
           {branding.isLoading ? (
             <>
               <Skeleton className="w-10 h-10 rounded-full" />
@@ -240,11 +240,11 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<SidebarNav
       className={cn(
         "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm font-medium",
         active
-          ? "bg-primary text-black font-bold shadow-lg shadow-primary/20"
-          : "text-slate-400 hover:bg-foreground/10 hover:text-slate-100"
+          ? "bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20"
+          : "text-muted-foreground hover:bg-foreground/8 hover:text-foreground"
       )}
     >
-      <Icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-black" : "group-hover:text-slate-200")} />
+      <Icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-primary-foreground" : "")} />
       {label}
     </Link>
   );
