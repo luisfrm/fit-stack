@@ -18,7 +18,6 @@ import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
-import { Badge } from "@workspace/ui/components/badge";
 import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
@@ -31,17 +30,17 @@ const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
     id: "pago_movil",
     name: "Pago Móvil",
     fields: [
-      { id: "ref", label: "Referencia de Pago", type: "text", required: true },
-      { id: "bank", label: "Banco Emisor", type: "text", required: true },
-      { id: "capture", label: "Captura de Pantalla", type: "file", required: false },
+      { id: "fld_pm1", label: "Referencia de Pago", type: "text", required: true },
+      { id: "fld_pm2", label: "Banco Emisor", type: "text", required: true },
+      { id: "fld_pm3", label: "Captura de Pantalla", type: "file", required: false },
     ]
   },
   {
     id: "zelle",
     name: "Zelle",
     fields: [
-      { id: "email", label: "Email de cuenta emisora", type: "text", required: true },
-      { id: "owner", label: "Nombre del titular", type: "text", required: false },
+      { id: "fld_z1", label: "Email de cuenta emisora", type: "text", required: true },
+      { id: "fld_z2", label: "Nombre del titular", type: "text", required: false },
     ]
   },
   {
@@ -53,8 +52,8 @@ const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
     id: "transferencia",
     name: "Transferencia Bancaria",
     fields: [
-      { id: "ref", label: "Número de Referencia", type: "text", required: true },
-      { id: "bank", label: "Banco Destino", type: "text", required: true },
+      { id: "fld_tb1", label: "Número de Referencia", type: "text", required: true },
+      { id: "fld_tb2", label: "Banco Destino", type: "text", required: true },
     ]
   }
 ];
@@ -401,10 +400,6 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                         <Text className="text-[10px] font-bold text-foreground-muted uppercase">Obligatorio</Text>
                       </div>
                     </div>
-
-                    <Badge variant="outline" className="bg-white/5 border-white/10 text-[8px] font-mono opacity-40">
-                      ID: {field.id.split('_')[1]}
-                    </Badge>
                   </div>
                 </div>
               ))

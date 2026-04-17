@@ -1,5 +1,6 @@
 import axios from "axios";
 import { BASE_EXCHANGE_API_URL } from "../config/constants";
+import { apiClient } from "../api-client";
 
 /**
  * Service to handle financial operations like exchange rate fetching.
@@ -31,5 +32,12 @@ export const financeService = {
       // Fallback to 1 to avoid breaking calculations
       return 1;
     }
+  },
+
+  /**
+   * Updates the status of a payment.
+   */
+  updatePaymentStatus: async (paymentId: number, status: string): Promise<void> => {
+    await apiClient.post(`/payments/${paymentId}/status`, { status });
   }
 };

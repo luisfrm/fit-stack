@@ -211,9 +211,31 @@ export interface ISubscription {
 
   // Optional joined fields for CMS Table display
   memberName?: string;
+  memberLastName?: string;
+  memberDocumentId?: string;
+  memberImage?: string | null;
   planName?: string;
+  planSnapshotName?: string;
+  planSnapshotPrice?: number;
+  planSnapshotCurrency?: string;
   price?: number;
   role?: string;
+
+  // Payment Data (From Join)
+  paymentId?: number;
+  amountPaid?: number;
+  currencyPaid?: string;
+  paymentMethod?: string;
+  paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
+  exchangeRateApplied?: string;
+  paymentStatus?: 'processing' | 'validated' | 'invalid' | 'voided';
+  paymentDate?: string;
+}
+
+export interface IPaymentMethodDetail {
+  label: string;
+  value: any;
+  type?: 'text' | 'file' | 'number';
 }
 
 export interface IPaymentMethodField {
@@ -255,7 +277,7 @@ export interface IPayment {
   exchangeRateApplied?: string;
 
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
 
   // Invoice Details (Optional/Internal)
   subtotal?: number;

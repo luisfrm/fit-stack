@@ -1,5 +1,5 @@
 import { db, eq, desc, and, sql } from '@workspace/database/client'
-import { subscription, gymMember as members, membershipPlan } from '@workspace/database/schema'
+import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema'
 
 export interface ISubscriptionDTO {
   id?: number
@@ -32,14 +32,28 @@ export const subscriptionsRepository = {
         isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
         memberName: members.firstName,
         memberLastName: members.lastName,
+        memberImage: members.imageUrl,
+        memberDocumentId: members.documentId,
         planName: membershipPlan.name,
-        price: membershipPlan.price
+        planSnapshotName: payment.planSnapshotName,
+        planSnapshotPrice: payment.planSnapshotPrice,
+        planSnapshotCurrency: payment.planSnapshotCurrency,
+        // Payment joined fields
+        paymentId: payment.id,
+        amountPaid: payment.amountPaid,
+        currencyPaid: payment.currencyPaid,
+        paymentMethod: payment.paymentMethod,
+        paymentMethodDetails: payment.paymentMethodDetails,
+        exchangeRateApplied: payment.exchangeRateApplied,
+        paymentStatus: payment.status,
+        paymentDate: payment.paymentDate,
       })
       .from(subscription)
       .innerJoin(members, eq(subscription.memberId, members.id))
       .innerJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+      .leftJoin(payment, eq(subscription.id, payment.subscriptionId))
       .where(eq(subscription.organizationId, organizationId))
-      .orderBy(desc(subscription.id))
+      .orderBy(desc(payment.id), desc(subscription.id))
   },
 
   async findRecent(organizationId: string, limit: number) {

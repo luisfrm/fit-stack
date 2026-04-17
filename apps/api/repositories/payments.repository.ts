@@ -59,5 +59,24 @@ export const paymentsRepository = {
       eq(payment.organizationId, organizationId)
     ))
     return records as unknown as IPayment[]
+  },
+
+  async updateStatus(organizationId: string, id: number, status: 'processing' | 'validated' | 'invalid' | 'voided'): Promise<IPayment | undefined> {
+    const updated = await db
+      .update(payment)
+      .set({ status })
+      .where(and(eq(payment.id, id), eq(payment.organizationId, organizationId)))
+      .returning()
+    return updated[0] as unknown as IPayment | undefined
+  },
+
+  async findByIdDetailed(organizationId: string, id: number) {
+    return db.query.payment.findFirst({
+      where: and(eq(payment.id, id), eq(payment.organizationId, organizationId)),
+      with: {
+        member: true,
+        subscription: true
+      }
+    })
   }
 }

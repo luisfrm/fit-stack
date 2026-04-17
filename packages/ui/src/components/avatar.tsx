@@ -102,6 +102,36 @@ function AvatarGroupCount({
   )
 }
 
+function SimpleAvatar({
+  src,
+  fallback,
+  size = "default",
+  variant = "default",
+  className,
+  ...props
+}: {
+  readonly src?: string | null;
+  readonly fallback: string;
+  readonly size?: "default" | "sm" | "lg" | "xl" | "2xl";
+  readonly variant?: "default" | "premium" | "ghost";
+  readonly className?: string;
+} & React.ComponentProps<typeof Avatar>) {
+  const variantClasses = {
+    default: "",
+    premium: "border-2 border-border shadow-lg shadow-primary/20 transition-transform group-hover:scale-110",
+    ghost: "opacity-80 hover:opacity-100 transition-opacity",
+  };
+
+  return (
+    <Avatar size={size} className={cn(variantClasses[variant], className)} {...props}>
+      {src && <AvatarImage src={src} />}
+      <AvatarFallback className="bg-primary text-black font-bold uppercase">
+        {fallback}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
+
 export {
   Avatar,
   AvatarImage,
@@ -109,4 +139,5 @@ export {
   AvatarGroup,
   AvatarGroupCount,
   AvatarBadge,
+  SimpleAvatar,
 }

@@ -4,17 +4,11 @@ import * as React from "react";
 import { MoreHorizontal } from "lucide-react";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   Avatar,
-  AvatarImage,
-  AvatarFallback,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { AvatarFallback, AvatarImage } from "./avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./dropdown-menu";
 
 export interface ActionDropdownItem<T = unknown> {
   label: string;
@@ -93,7 +87,7 @@ export function ActionsDropdown<T = unknown>({
         onSelect={item.Modal ? (e) => e.preventDefault() : undefined}
       >
         {item.image ? (
-          <Avatar className="size-4 shrink-0">
+          <Avatar className="size-4 shrink-0" fallback={""}>
             <AvatarImage src={item.image} alt={item.label} />
             <AvatarFallback className="text-[10px]">{item.label.charAt(0)}</AvatarFallback>
           </Avatar>
@@ -117,7 +111,7 @@ export function ActionsDropdown<T = unknown>({
             )}
           >
             {item.image ? (
-              <Avatar className="size-4 shrink-0">
+              <Avatar className="size-4 shrink-0" fallback={""}>
                 <AvatarImage src={item.image} alt={item.label} />
                 <AvatarFallback className="text-[10px]">{item.label.charAt(0)}</AvatarFallback>
               </Avatar>

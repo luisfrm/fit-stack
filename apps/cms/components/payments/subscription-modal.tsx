@@ -17,7 +17,7 @@ interface SubscriptionModalProps {
 export function SubscriptionModal({ trigger, onSuccess, initialMember }: SubscriptionModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  
+
   // Workflow states
   const [view, setView] = React.useState<'payment' | 'member'>('payment');
   const [newMember, setNewMember] = React.useState<IMember | null>(initialMember ?? null);
@@ -71,9 +71,10 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember }: Subscri
     <Modal
       open={isOpen}
       onOpenChange={setIsOpen}
+      size="lg"
       trigger={trigger}
       title={view === 'payment' ? "Registrar Nuevo Pago" : "Nuevo Cliente"}
-      description={view === 'payment' 
+      description={view === 'payment'
         ? "Vincula un miembro a un nivel de membresía activo para gestionar su ingreso y ciclo de facturación."
         : "Completa los datos básicos para registrar al cliente en el sistema antes de procesar su pago."
       }
@@ -82,9 +83,9 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember }: Subscri
       <div className="pt-3">
         {/* Subscription Form (Always mounted to preserve state, but hidden when creating member) */}
         <div className={view === 'payment' ? "animate-in fade-in duration-300" : "hidden"}>
-          <SubscriptionForm 
-            onSubmit={handleSubmit} 
-            isLoading={isLoading} 
+          <SubscriptionForm
+            onSubmit={handleSubmit}
+            isLoading={isLoading}
             initialMember={newMember}
             onAddMemberClick={() => setView('member')}
           />
@@ -94,7 +95,7 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember }: Subscri
         {view === 'member' && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <div className="mb-4">
-              <Button 
+              <Button
                 variant="link"
                 onClick={() => setView('payment')}
                 className="text-[10px] flex items-center gap-1"
@@ -102,7 +103,7 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember }: Subscri
                 ← VOLVER AL PAGO
               </Button>
             </div>
-            <MemberForm 
+            <MemberForm
               onSubmit={handleMemberCreate}
               isLoading={isLoading}
             />

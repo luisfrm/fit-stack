@@ -540,3 +540,21 @@ export const biometricSyncTaskRelations = relations(biometricSyncTask, ({ one })
   organization: one(organization, { fields: [biometricSyncTask.organizationId], references: [organization.id] }),
   member: one(gymMember, { fields: [biometricSyncTask.memberId], references: [gymMember.id] }),
 }));
+
+export const membershipPlanRelations = relations(membershipPlan, ({ one, many }) => ({
+  organization: one(organization, { fields: [membershipPlan.organizationId], references: [organization.id] }),
+  subscriptions: many(subscription),
+}));
+
+export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
+  organization: one(organization, { fields: [subscription.organizationId], references: [organization.id] }),
+  member: one(gymMember, { fields: [subscription.memberId], references: [gymMember.id] }),
+  plan: one(membershipPlan, { fields: [subscription.planId], references: [membershipPlan.id] }),
+  payments: many(payment),
+}));
+
+export const paymentRelations = relations(payment, ({ one }) => ({
+  organization: one(organization, { fields: [payment.organizationId], references: [organization.id] }),
+  member: one(gymMember, { fields: [payment.memberId], references: [gymMember.id] }),
+  subscription: one(subscription, { fields: [payment.subscriptionId], references: [subscription.id] }),
+}));

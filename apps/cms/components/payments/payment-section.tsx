@@ -152,7 +152,7 @@ export function PaymentSection({
           <Text weight="bold" size="sm">Registrar pago como validado</Text>
           <Text size="xs" variant="muted">El pago se marcará como confirmado inmediatamente</Text>
         </div>
-        <Switch 
+        <Switch
           checked={paymentValidated}
           onCheckedChange={onPaymentValidatedChange}
         />
@@ -177,7 +177,7 @@ export function PaymentSection({
               ) : (
                 <Input
                   type={field.type === 'number' ? 'number' : 'text'}
-                  placeholder={`Ingresa ${field.label.toLowerCase()}...`}
+                  placeholder="Escribe aquí..."
                   value={dynamicFieldValues[field.id] || ""}
                   onChange={(e) => onDynamicChange(field.id, e.target.value)}
                 />

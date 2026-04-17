@@ -2,6 +2,7 @@ import { subscriptionsRepository, type ISubscriptionDTO } from '../repositories/
 import { settingsService } from './settings.service'
 import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
+import { emailService } from './email.service'
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
 
 export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId'> {
@@ -28,6 +29,7 @@ export const subscriptionsService = {
       memberName: `${r.memberName} ${r.memberLastName}`,
       startDate: r.startDate.toISOString(),
       endDate: r.endDate.toISOString(),
+      paymentDate: r.paymentDate?.toISOString(),
     }))
   },
 
@@ -71,10 +73,19 @@ export const subscriptionsService = {
       exchangeRateApplied: payload.payment.exchangeRateApplied,
       paymentMethod: payload.payment.paymentMethod,
       paymentMethodDetails: payload.payment.paymentMethodDetails,
+      status: payload.payment.status as any,
       paymentDate: payload.payment.paymentDate ? new Date(payload.payment.paymentDate) : new Date(),
     })
 
     return subscription
+  },
+
+  async updatePaymentStatus(organizationId: string, paymentId: number, status: 'processing' | 'validated' | 'invalid' | 'voided') {
+    const updated = await paymentsRepository.updateStatus(organizationId, paymentId, status)
+    if (!updated) {
+      throw new Error('Registro de pago no encontrado')
+    }
+    return updated
   },
 
   async cancel(organizationId: string, id: number) {
@@ -87,5 +98,24 @@ export const subscriptionsService = {
 
   async delete(organizationId: string, id: number): Promise<void> {
     await subscriptionsRepository.delete(organizationId, id)
+  },
+
+  async sendReceiptEmail(organizationId: string, paymentId: number) {
+    const paymentData = await paymentsRepository.findByIdDetailed(organizationId, paymentId)
+    if (!paymentData || !paymentData.member) {
+      throw new Error('Pago o miembro no encontrado')
+    }
+
+    const formattedData = {
+      paymentId: paymentData.id,
+      memberName: `${paymentData.member.firstName} ${paymentData.member.lastName}`,
+      planName: paymentData.planSnapshotName,
+      amountPaidFormatted: `${Number.parseFloat(paymentData.amountPaid.toString()).toLocaleString('es-ES')} ${paymentData.currencyPaid}`,
+      paymentMethod: paymentData.paymentMethod.toUpperCase(),
+      paymentDate: paymentData.paymentDate,
+      reference: paymentData.paymentMethodDetails?.reference || paymentData.paymentMethodDetails?.confirmation_number || ''
+    }
+
+    return await emailService.sendPaymentReceipt(paymentData.member.email, formattedData)
   }
 }

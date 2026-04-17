@@ -13,11 +13,11 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 
 const MODAL_SIZES = {
-  sm: "sm:max-w-sm",
-  md: "sm:max-w-[525px]",
-  lg: "sm:max-w-lg",
-  xl: "sm:max-w-xl",
-  "2xl": "sm:max-w-2xl",
+  sm: "sm:max-w-sm",      // 384px
+  md: "sm:max-w-lg",      // 512px
+  lg: "sm:max-w-xl",      // 576px
+  xl: "sm:max-w-3xl",     // 768px
+  "2xl": "sm:max-w-5xl",  // 1024px
   full: "sm:max-w-[95vw]",
 } as const;
 

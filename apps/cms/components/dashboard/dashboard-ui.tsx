@@ -297,7 +297,7 @@ interface ActivityItemProps {
 export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemProps>) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
-      <Avatar size="default">
+      <Avatar size="default" fallback={""}>
         {avatarUrl && <AvatarImage src={uploadService.getMediaUrl(avatarUrl)} alt={name} />}
         <AvatarFallback>{name.charAt(0)}</AvatarFallback>
       </Avatar>

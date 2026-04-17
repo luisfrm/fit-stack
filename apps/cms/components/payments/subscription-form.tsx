@@ -6,7 +6,8 @@ import {
   type IMembershipPlan,
   type PaginatedMembers,
   type IMember,
-  type IPaymentMethodConfig
+  type IPaymentMethodConfig,
+  type IPaymentMethodDetail
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
@@ -35,7 +36,7 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     currencyPaid: string;
     exchangeRateApplied?: string;
     paymentMethod: string;
-    paymentMethodDetails?: Record<string, any>;
+    paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
     status?: string;
     paymentDate?: Date | string;
   }
@@ -199,7 +200,10 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
     if (selectedPaymentConfig) {
       for (const field of selectedPaymentConfig.fields) {
-        if (field.required && !dynamicFieldValues[field.id]) {
+        const value = dynamicFieldValues[field.id];
+        const isEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === "");
+        
+        if (field.required && isEmpty) {
           toast.error(`El campo "${field.label}" es obligatorio`);
           return false;
         }
@@ -239,11 +243,23 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       const startDateObj = parseDateAsConfigTimezone(startDate, timezone);
       const endDateObj = parseDateAsConfigTimezone(endDate, timezone);
 
-      let finalPaymentMethodDetails: Record<string, any> | undefined = undefined;
-      if (Object.keys(finalDetails).length > 0) {
-        finalPaymentMethodDetails = finalDetails;
+      let finalPaymentMethodDetails: IPaymentMethodDetail[] | Record<string, any> | undefined = undefined;
+
+      if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
+        // Map field IDs to human-readable labels for self-descriptive data
+        finalPaymentMethodDetails = selectedPaymentConfig.fields
+          .filter(field => finalDetails[field.id] !== undefined)
+          .map(field => ({
+            label: field.label,
+            value: finalDetails[field.id],
+            type: field.type
+          }));
       } else if (paymentDetails) {
-        finalPaymentMethodDetails = { note: paymentDetails };
+        finalPaymentMethodDetails = [{ 
+          label: "Nota / Referencia", 
+          value: paymentDetails,
+          type: "text"
+        }];
       }
 
       await onSubmit({
