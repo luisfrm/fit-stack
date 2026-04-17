@@ -62,11 +62,10 @@ Always ask for approval before proceed in any implementation plan.
   1.  **Check**: Statically verify migration integrity on every Pull Request.
   2.  **Deploy**: Automatically run `db:migrate` on production/dev when merging to `master`.
 - **Secrets**: Production `DATABASE_URL` must be managed as a GitHub Secret.
-  47:
-  48: ## 9. Navigation in Next.js
-  49: - **No `window.location`**: Do not use `window.location` for navigation or page refreshes in client components.
-  50: - **Router hooks**: Use `useRouter` from `next/navigation` to handle programmatic navigation.
-  51: - **State Sync**: Use `router.refresh()` to sync server-side state (like sessions or active organizations) without a full browser reload.
+## 9. Navigation in Next.js
+- **No `window.location`**: Do not use `window.location` for navigation or page refreshes in client components.
+- **Router hooks**: Use `useRouter` from `next/navigation` to handle programmatic navigation.
+- **State Sync**: Use `router.refresh()` to sync server-side state (like sessions or active organizations) without a full browser reload.
 
 ## 10. CMS Authentication Architecture
 
@@ -86,3 +85,14 @@ The CMS uses a layered auth system. Each layer has a single, exclusive responsib
 - **Identity (Name/Logo)**: The `organization` table (Better Auth) is the source of truth. Do NOT use `gym_settings` for `GYM_NAME` or `GYM_LOGO`. Use `authClient.organization.update()` to save identity changes.
 
 ## 12. Don't mix API and Frontend. Never import anything between apps, the only way is using shared packages.
+
+## 13. UI Design Elements & Hierarchy Scale
+
+The project strictly follows a mathematical scale for borders, radiuses, and backgrounds to maintain a premium aesthetic. Do NOT mix styles randomly.
+
+- **Backgrounds (bg)**: Use the defined CSS variables (`bg-input`, `bg-card`, `bg-surface`) and translucent scales (`bg-white/5`, `bg-white/10`).
+- **Borders**: Subtlety is mandatory. Use low opacity boundaries (`border-white/5`, `border-white/10` or `border-border`) rather than solid hexes, reserving solid colors for focus rings.
+- **Border Radius Scale**:
+  - **Inputs, Buttons, CheckboxCards (Internal Controls)**: `rounded-md`
+  - **Cards, Containers (Intermediate Surfaces)**: `rounded-xl`
+  - **Modals, Dialogs (Large Parent Surfaces)**: `rounded-2xl`

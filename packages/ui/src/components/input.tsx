@@ -23,14 +23,16 @@ const inputWrapperVariants = cva(
          */
         default: [
           "bg-input border-input-border",
-          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
+          "hover:bg-white/4",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-input",
         ],
         /**
          * glass — subtle translucent surface (formerly filled)
          */
         glass: [
           "bg-white/5 border-white/10",
-          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary",
+          "hover:bg-white/10 hover:border-white/20",
+          "focus-within:border-primary focus-within:ring-1 focus-within:ring-primary focus-within:hover:bg-white/5",
         ],
       },
 

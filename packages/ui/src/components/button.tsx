@@ -10,7 +10,7 @@ const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-2",
     "font-bold uppercase tracking-wider",
-    "rounded-sm",
+    "rounded-md",
     "transition-all duration-300 ease-in-out",
     "cursor-pointer select-none",
     "disabled:opacity-40 disabled:pointer-events-none",
@@ -122,7 +122,7 @@ const buttonVariants = cva(
       },
 
       rounded: {
-        default: "rounded-sm",
+        default: "rounded-md",
         full: "rounded-full",
         lg: "rounded-lg",
       },

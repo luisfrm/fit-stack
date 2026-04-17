@@ -25,7 +25,7 @@ export function CheckboxCard({
   return (
     <div
       className={cn(
-        "flex items-center space-x-3 rounded-lg border p-4 transition-colors",
+        "flex items-center space-x-3 rounded-md border p-4 transition-colors",
         variant === "default" && "bg-input border-input-border hover:bg-white/4",
         variant === "glass" && "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20",
         className
