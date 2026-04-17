@@ -36,6 +36,13 @@
       "when": 1776097230668,
       "tag": "0004_wise_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776414548589,
+      "tag": "0005_blue_wraith",
+      "breakpoints": true
     }
   ]
 }
