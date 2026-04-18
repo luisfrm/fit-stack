@@ -1,8 +1,61 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionsService } from "../services/subscriptions-service";
-import { type IRecentRegistration } from "@/types/dashboard";
+import { financeService } from "../services/finance-service";
+import { type IRecentRegistration, type ISubscription } from "@/types/dashboard";
+
+/**
+ * Hook to fetch all subscriptions.
+ */
+export function useSubscriptions() {
+  return useQuery<ISubscription[]>({
+    queryKey: ["subscriptions", "all"],
+    queryFn: () => subscriptionsService.getAll(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+/**
+ * Mutation to update payment status (validated, invalid, voided).
+ */
+export function useUpdatePaymentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, status }: { paymentId: number; status: string }) =>
+      financeService.updatePaymentStatus(paymentId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+    },
+  });
+}
+
+/**
+ * Mutation to update subscription status (active, canceled, expired).
+ */
+export function useUpdateSubscriptionStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      subscriptionsService.updateStatus(id, status as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+    },
+  });
+}
+
+/**
+ * Mutation to delete a subscription record.
+ */
+export function useDeleteSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => subscriptionsService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+    },
+  });
+}
 
 /**
  * Utility to format relative time (e.g., "Hace 5 min").

@@ -3,8 +3,6 @@
 import * as React from "react";
 import { Plus } from "lucide-react";
 import { Button, toast } from "@workspace/ui/components";
-import { subscriptionsService } from "@/lib/services/subscriptions-service";
-import { type ISubscription } from "@/types/dashboard";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -12,28 +10,21 @@ import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ORG_ROLES } from "@workspace/shared";
 
+import {
+  useSubscriptions,
+  useUpdateSubscriptionStatus,
+  useDeleteSubscription,
+  useUpdatePaymentStatus
+} from "@/lib/hooks/use-payments";
+
 export default function PaymentsPage() {
-  const [subs, setSubs] = React.useState<ISubscription[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { data: subs = [], isLoading, refetch } = useSubscriptions();
+  const updateStatusMutation = useUpdateSubscriptionStatus();
+  const deleteMutation = useDeleteSubscription();
+
   const [search, setSearch] = React.useState("");
   const [searchTerm, setSearchTerm] = React.useState("");
   const debouncedSearch = useDebounce(searchTerm, 500);
-
-  const loadSubs = async () => {
-    try {
-      setLoading(true);
-      const data = await subscriptionsService.getAll();
-      setSubs(data);
-    } catch (err: any) {
-      toast.error(err.message || "Error al cargar suscripciones");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    loadSubs();
-  }, []);
 
   // Sync debounced search
   React.useEffect(() => {
@@ -41,23 +32,38 @@ export default function PaymentsPage() {
   }, [debouncedSearch]);
 
   const handleStatusChange = async (id: number, status: 'active' | 'canceled' | 'expired') => {
-    try {
-      await subscriptionsService.updateStatus(id, status);
-      toast.success(`Suscripción ${status === 'active' ? 'activada' : 'revocada'}.`);
-      loadSubs();
-    } catch (err: any) {
-      toast.error(err.message || "Fallo al cambiar estado");
-    }
+    updateStatusMutation.mutate({ id, status }, {
+      onSuccess: () => {
+        toast.success(`Suscripción ${status === 'active' ? 'activada' : 'revocada'}.`);
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Fallo al cambiar estado");
+      }
+    });
   };
 
   const handleDelete = async (id: number) => {
-    try {
-      await subscriptionsService.delete(id);
-      toast.success("Registro eliminado.");
-      loadSubs();
-    } catch (err: any) {
-      toast.error(err.message || "Fallo al eliminar");
-    }
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success("Registro eliminado.");
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Fallo al eliminar");
+      }
+    });
+  };
+
+  const updatePaymentStatusMutation = useUpdatePaymentStatus();
+
+  const handlePaymentStatusChange = async (paymentId: number, status: string) => {
+    updatePaymentStatusMutation.mutate({ paymentId, status }, {
+      onSuccess: () => {
+        toast.success("Estado de pago actualizado correctamente");
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Error al actualizar pago");
+      }
+    });
   };
 
   const filteredSubs = subs.filter(s => {
@@ -79,7 +85,7 @@ export default function PaymentsPage() {
         iconName="CreditCard"
       >
         <SubscriptionModal
-          onSuccess={() => loadSubs()}
+          onSuccess={() => refetch()}
           trigger={
             <Button size="sm" rightIcon={<Plus size={18} />}>
               NUEVO PAGO
@@ -99,7 +105,8 @@ export default function PaymentsPage() {
           subscriptions={filteredSubs}
           onDelete={handleDelete}
           onStatusChange={handleStatusChange}
-          loading={loading}
+          onPaymentStatusChange={handlePaymentStatusChange}
+          loading={isLoading}
         />
       </section>
     </div>

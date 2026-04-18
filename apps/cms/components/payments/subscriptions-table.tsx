@@ -6,8 +6,7 @@ import {
   type ColumnDef,
   Badge,
   Text,
-  ActionsDropdown,
-  toast
+  ActionsDropdown
 } from "@workspace/ui/components";
 import { type ISubscription } from "@/types/dashboard";
 import {
@@ -21,7 +20,6 @@ import {
   Clock,
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
-import { financeService } from "@/lib/services/finance-service";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 
@@ -65,9 +63,9 @@ const getSubscriptionStatusBadge = (status: string) => {
 };
 
 const getColumns = (
-  onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void,
-  onPaymentStatusChange: (paymentId: number, status: string) => Promise<void>,
-  onDelete: (id: number) => void,
+  onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void | Promise<void>,
+  onPaymentStatusChange: (paymentId: number, status: string) => void | Promise<void>,
+  onDelete: (id: number) => void | Promise<void>,
   currencyFormat: CurrencyFormat
 ): ColumnDef<ISubscription>[] => [
     {
@@ -229,32 +227,28 @@ interface SubscriptionsTableProps {
   readonly subscriptions: ISubscription[];
   readonly onDelete: (id: number) => void;
   readonly onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void;
+  readonly onPaymentStatusChange: (paymentId: number, status: string) => void;
   readonly loading?: boolean;
 }
 
 import { NoData } from "../dashboard/dashboard-ui";
 
-export function SubscriptionsTable({ subscriptions, onDelete, onStatusChange, loading }: SubscriptionsTableProps) {
+export function SubscriptionsTable({
+  subscriptions,
+  onDelete,
+  onStatusChange,
+  onPaymentStatusChange,
+  loading
+}: SubscriptionsTableProps) {
   const { settings } = useSettings();
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
-  const handlePaymentStatusChange = async (paymentId: number, status: string) => {
-    try {
-      await financeService.updatePaymentStatus(paymentId, status);
-      toast.success("Estado de pago actualizado correctamente");
-      // Forzar recarga de la data desde el server component
-      globalThis.location.reload();
-    } catch (err: any) {
-      toast.error(err.message || "Error al actualizar estado");
-    }
-  };
-
   const columns = React.useMemo(() => getColumns(
     onStatusChange,
-    handlePaymentStatusChange,
+    onPaymentStatusChange,
     onDelete,
     currencyFormat
-  ), [onStatusChange, onDelete, currencyFormat]);
+  ), [onStatusChange, onDelete, onPaymentStatusChange, currencyFormat]);
 
   return (
     <Table
