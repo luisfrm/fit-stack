@@ -12,12 +12,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (Number.isNaN(subId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     const { status } = await req.json()
-    if (!['active', 'cancelled', 'expired'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    const organizationId = session.session.activeOrganizationId;
+
+    if (status !== 'cancelled') {
+      return NextResponse.json(
+        { error: 'Los estados "active" y "expired" son calculados automáticamente. Solo se permite el cambio manual a "cancelled".' }, 
+        { status: 400 }
+      )
     }
 
-    const organizationId = session.session.activeOrganizationId;
-    const updated = await subscriptionsService.updateStatus(organizationId, subId, status)
+    const updated = await subscriptionsService.cancel(organizationId, subId)
 
     return NextResponse.json(updated)
   } catch (error: any) {
