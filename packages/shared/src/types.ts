@@ -212,6 +212,7 @@ export interface ISubscription {
   // Optional joined fields for CMS Table display
   memberName?: string;
   memberLastName?: string;
+  memberEmail?: string;
   memberDocumentId?: string;
   memberImage?: string | null;
   planName?: string;

@@ -32,6 +32,7 @@ export const subscriptionsRepository = {
         isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
         memberName: members.firstName,
         memberLastName: members.lastName,
+        memberEmail: members.email,
         memberImage: members.imageUrl,
         memberDocumentId: members.documentId,
         planName: membershipPlan.name,

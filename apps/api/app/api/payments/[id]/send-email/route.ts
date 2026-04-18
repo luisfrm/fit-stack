@@ -4,7 +4,7 @@ import { subscriptionsService } from '@/services/subscriptions.service'
 
 export async function POST(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession()
@@ -14,7 +14,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
-    const paymentId = Number.parseInt(params.id)
+    const { id } = await params
+    const paymentId = Number.parseInt(id)
     if (Number.isNaN(paymentId)) {
       return NextResponse.json({ error: 'ID de pago inválido' }, { status: 400 })
     }
