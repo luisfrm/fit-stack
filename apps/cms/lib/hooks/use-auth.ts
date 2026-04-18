@@ -3,6 +3,7 @@
 import { useSession, useActiveOrganization } from "@/lib/auth-client";
 import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
 import type { User, Session } from "@/lib/auth-client";
+import type { IOrganization } from "@workspace/shared/types";
 
 /**
  * Fit-Stack Custom Auth Hook
@@ -33,7 +34,7 @@ export function useAuth() {
     // Core session data
     session,
     user,
-    activeOrganization: activeOrganization ?? null,
+    activeOrganization: (activeOrganization as unknown as IOrganization) ?? null,
 
     // Auth status
     isAuthenticated: !!session,

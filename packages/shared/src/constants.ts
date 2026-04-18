@@ -41,17 +41,105 @@ export const PAYMENT_STATUSES = {
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
 
 /**
- * List of countries for internationalization (LATAM-focused).
+ * Detailed configuration for each supported country.
+ * Includes labels for identification and tax registration to avoid hardcoding.
  */
-export const LATAM_COUNTRIES = [
-  { name: "Venezuela", code: "VE", currency: "VES", flag: "🇻🇪" },
-  { name: "Colombia", code: "CO", currency: "COP", flag: "🇨🇴" },
-  { name: "México", code: "MX", currency: "MXN", flag: "🇲🇽" },
-  { name: "Argentina", code: "AR", currency: "ARS", flag: "🇦🇷" },
-  { name: "Chile", code: "CL", currency: "CLP", flag: "🇨🇱" },
-  { name: "Perú", code: "PE", currency: "PEN", flag: "🇵🇪" },
-  { name: "Ecuador", code: "EC", currency: "USD", flag: "🇪🇨" },
-  { name: "Panamá", code: "PA", currency: "USD", flag: "🇵🇦" },
-] as const;
+export interface ICountryConfig {
+  name: string;
+  code: string;
+  currency: string;
+  flag: string;
+  timezone: string;
+  docLabel: string; // e.g. "C.I.", "C.C.", "Doc. Identidad"
+  taxLabel: string; // e.g. "R.I.F.", "NIT", "Registro"
+}
 
-export type Country = typeof LATAM_COUNTRIES[number];
+/**
+ * Global Dictionary of Countries.
+ * Keyed by ISO Country Code for O(1) access.
+ */
+export const COUNTRIES: Record<string, ICountryConfig> = {
+  VE: {
+    name: "Venezuela",
+    code: "VE",
+    currency: "VES",
+    flag: "🇻🇪",
+    timezone: "America/Caracas",
+    docLabel: "C.I.",
+    taxLabel: "R.I.F.",
+  },
+  CO: {
+    name: "Colombia",
+    code: "CO",
+    currency: "COP",
+    flag: "🇨🇴",
+    timezone: "America/Bogota",
+    docLabel: "C.C.",
+    taxLabel: "NIT",
+  },
+  MX: {
+    name: "México",
+    code: "MX",
+    currency: "MXN",
+    flag: "🇲🇽",
+    timezone: "America/Mexico_City",
+    docLabel: "CURP",
+    taxLabel: "RFC",
+  },
+  AR: {
+    name: "Argentina",
+    code: "AR",
+    currency: "ARS",
+    flag: "🇦🇷",
+    timezone: "America/Argentina/Buenos_Aires",
+    docLabel: "DNI",
+    taxLabel: "CUIT",
+  },
+  CL: {
+    name: "Chile",
+    code: "CL",
+    currency: "CLP",
+    flag: "🇨🇱",
+    timezone: "America/Santiago",
+    docLabel: "RUT",
+    taxLabel: "RUT",
+  },
+  PE: {
+    name: "Perú",
+    code: "PE",
+    currency: "PEN",
+    flag: "🇵🇪",
+    timezone: "America/Lima",
+    docLabel: "DNI",
+    taxLabel: "RUC",
+  },
+  ES: {
+    name: "España",
+    code: "ES",
+    currency: "EUR",
+    flag: "🇪🇸",
+    timezone: "Europe/Madrid",
+    docLabel: "DNI/NIE",
+    taxLabel: "NIF/CIF",
+  },
+  US: {
+    name: "Estados Unidos",
+    code: "US",
+    currency: "USD",
+    flag: "🇺🇸",
+    timezone: "America/New_York",
+    docLabel: "ID",
+    taxLabel: "Tax ID",
+  },
+};
+
+/**
+ * Legacy array for selection components.
+ */
+export const COUNTRY_LIST = Object.values(COUNTRIES);
+
+export type Country = typeof COUNTRY_LIST[number];
+export const DEFAULT_COUNTRY = COUNTRIES.VE;
+
+/** @deprecated Use COUNTRIES or COUNTRY_LIST instead */
+export const LATAM_COUNTRIES = COUNTRY_LIST;

@@ -82,7 +82,7 @@ export const emailService = {
   /**
    * Sends a payment receipt email to the member.
    */
-  async sendPaymentReceipt(email: string, data: any) {
+  async sendPaymentReceipt(email: string, data: any, attachments?: any[]) {
     const provider = process.env.EMAIL_PROVIDER || 'gmail';
     const dateStr = new Date(data.paymentDate).toLocaleDateString('es-ES', {
       day: '2-digit',
@@ -151,13 +151,17 @@ export const emailService = {
                       </div>
                   </div>
 
+                  <p style="font-size: 12px; color: #71717a; margin-top: 24px; font-style: italic;">
+                    Se adjunta a este correo una copia digital del comprobante para sus registros personales.
+                  </p>
+
                   ${data.reference ? `
                   <div class="details">
-                      <strong>Referencia:</strong> ${data.reference}
+                      <strong>Referencia de Operación:</strong> ${data.reference}
                   </div>` : ''}
               </div>
               <div class="footer">
-                  &copy; ${new Date().getFullYear()} Fit-Stack Engine PD. Este es un comprobante de soporte de pago administrativo.
+                  &copy; ${new Date().getFullYear()} Fit-Stack Global Registry. Este es un comprobante de soporte administrativo.
               </div>
           </div>
       </body>
@@ -169,11 +173,16 @@ export const emailService = {
 
       if (provider === 'resend' && process.env.RESEND_API_KEY) {
         const resend = new Resend(process.env.RESEND_API_KEY);
+        // @ts-ignore - type discrepancy between resend versions
         await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
           to: email,
           subject,
           html: receiptTemplate,
+          attachments: attachments?.map(a => ({
+            filename: a.filename,
+            content: a.content
+          }))
         });
         return true;
       }
@@ -192,13 +201,17 @@ export const emailService = {
           to: email,
           subject,
           html: receiptTemplate,
+          attachments: attachments?.map(a => ({
+            filename: a.filename,
+            content: a.content
+          }))
         });
         return true;
       }
 
       return false;
     } catch (error) {
-      console.error('❌ Error enviando email de recibo:', error);
+      console.error('❌ Error enviando email de recibo con adjuntos:', error);
       return false;
     }
   }

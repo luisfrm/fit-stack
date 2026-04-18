@@ -13,7 +13,8 @@ import { OrganizationActions } from "./organization-actions";
 import { Building2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import { type IPlatformOrganization } from "@workspace/shared/types";
+import { IPlatformOrganization } from "@workspace/shared/types";
+import { COUNTRIES } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -108,7 +109,7 @@ const getColumns = (
                 {org.countryCode || '??'}
               </div>
               <Text size="xs" weight="bold" className="text-gray-300 uppercase tracking-tighter">
-                {org.countryCode === 'VE' ? 'Venezuela' : (org.countryCode || 'Global')}
+                {COUNTRIES[org.countryCode || '']?.name || org.countryCode || 'Global'}
               </Text>
             </div>
             <Text size="xs" variant="muted" className="opacity-50 font-mono tracking-widest text-[9px]">

@@ -35,6 +35,7 @@ export const subscriptionsRepository = {
         memberEmail: members.email,
         memberImage: members.imageUrl,
         memberDocumentId: members.documentId,
+        memberAddress: members.address,
         planName: membershipPlan.name,
         planSnapshotName: payment.planSnapshotName,
         planSnapshotPrice: payment.planSnapshotPrice,

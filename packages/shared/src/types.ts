@@ -214,6 +214,7 @@ export interface ISubscription {
   memberLastName?: string;
   memberEmail?: string;
   memberDocumentId?: string;
+  memberAddress?: string | null;
   memberImage?: string | null;
   planName?: string;
   planSnapshotName?: string;

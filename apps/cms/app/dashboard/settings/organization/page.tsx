@@ -19,7 +19,7 @@ import { CountrySelector, toast, Title } from "@workspace/ui";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { LATAM_COUNTRIES } from "@workspace/shared/constants";
+import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import { useRouter } from "next/navigation";
 
 export default function OrganizationSettingsPage() {
@@ -77,8 +77,6 @@ export default function OrganizationSettingsPage() {
       }
 
       // 2. Update via our Custom Platform API
-      // We use organizationsService.update because it handles custom fields (taxId, slogan, etc.)
-      // and has been updated to allow both Global Admins and Org Managers.
       await organizationsService.update(activeOrg!.id, {
         name: formData.name,
         slug: formData.slug || undefined,
@@ -106,6 +104,9 @@ export default function OrganizationSettingsPage() {
     }
   };
 
+  // Get current country labels for placeholder/logic
+  const currentCountry = COUNTRIES[formData.countryCode] || COUNTRIES.VE;
+
   if (sessionLoading && !hasInitialized.current) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -125,7 +126,7 @@ export default function OrganizationSettingsPage() {
             <span>Configuración de Sede</span>
           </div>
           <Title as="h3" size="card" className="tracking-tight">Detalles de la Organización</Title>
-          <Text variant="muted">Gestiona la identidad legal y comercial de tu sede.</Text>
+          <Text variant="muted">Gestiona la identidad institucional y comercial de tu sede.</Text>
         </div>
       </div>
 
@@ -188,7 +189,7 @@ export default function OrganizationSettingsPage() {
                   onChange={(file) => setLogoFile(file)}
                   onRemove={() => {
                     setLogoFile(null);
-                    setLogoUrl(""); // Reset to empty to trigger fallback icon
+                    setLogoUrl("");
                   }}
                 />
               </div>
@@ -196,15 +197,15 @@ export default function OrganizationSettingsPage() {
           </div>
         </Card>
 
-        {/* DATOS FISCALES Y LOCALIZACIÓN */}
+        {/* DATOS DE IDENTIFICACIÓN Y LOCALIZACIÓN */}
         <Card variant="settings">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-foreground/5 text-foreground-dim border border-border/50">
               <Fingerprint className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
-              <Text size="lg" weight="bold">Información Legal y Fiscal</Text>
-              <Text variant="muted" size="sm">Datos requeridos para facturación y reportes oficiales.</Text>
+              <Text size="lg" weight="bold">Información de Registro</Text>
+              <Text variant="muted" size="sm">Datos requeridos para identificación corporativa y reportes.</Text>
             </div>
           </div>
 
@@ -214,11 +215,11 @@ export default function OrganizationSettingsPage() {
                 label="País de Operación"
                 value={formData.countryCode}
                 onChange={(code) => handleChange("countryCode", code)}
-                countries={LATAM_COUNTRIES}
+                countries={COUNTRY_LIST}
               />
 
               <Input
-                label="Razón Social / Nombre Legal"
+                label="Nombre de Registro / Legal"
                 placeholder="Elite Fitness C.A."
                 value={formData.legalName}
                 onChange={(e) => handleChange("legalName", e.target.value)}
@@ -228,19 +229,21 @@ export default function OrganizationSettingsPage() {
 
             <div className="space-y-6">
               <Input
-                label="ID Fiscal (RIF / NIT)"
+                label={`Nro. Registro (${currentCountry?.taxLabel})`}
                 placeholder="J-12345678-9"
                 value={formData.taxId}
                 onChange={(e) => handleChange("taxId", e.target.value)}
                 leftIcon={<ShieldCheck className="w-4 h-4" />}
+                required
               />
 
               <Input
-                label="Dirección Fiscal"
+                label="Dirección de Sede"
                 placeholder="Av. Principal, Edificio Fit..."
                 value={formData.address}
                 onChange={(e) => handleChange("address", e.target.value)}
                 leftIcon={<MapPin className="w-4 h-4" />}
+                required
               />
             </div>
           </div>

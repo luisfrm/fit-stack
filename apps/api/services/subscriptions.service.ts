@@ -3,6 +3,8 @@ import { settingsService } from './settings.service'
 import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
 import { emailService } from './email.service'
+import { pdfService } from './pdf/pdf-service'
+
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
 
 export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId'> {
@@ -102,20 +104,64 @@ export const subscriptionsService = {
 
   async sendReceiptEmail(organizationId: string, paymentId: number) {
     const paymentData = await paymentsRepository.findByIdDetailed(organizationId, paymentId)
-    if (!paymentData || !paymentData.member) {
+    if (!paymentData?.member) {
       throw new Error('Pago o miembro no encontrado')
+    }
+
+    const details = (paymentData.paymentMethodDetails as any) || {}
+    
+    // Normalizar metadatos: manejar tanto formato Array como Objeto legado
+    let paymentDetails: Array<{ label: string; value: string }> = []
+
+    if (Array.isArray(details)) {
+      paymentDetails = details
+        .filter((d: any) => d.type !== 'file') // Excluir archivos/capturas
+        .map((d: any) => ({
+          label: String(d.label || d.key || ''),
+          value: String(d.value || '')
+        }))
+    } else {
+      paymentDetails = Object.entries(details)
+        .filter(([_, value]) => {
+          // Heurística para excluir archivos en formato legado (rutas o URLs)
+          const valStr = String(value);
+          return !valStr.startsWith('http') && !valStr.includes('/media/') && !valStr.includes('files/');
+        })
+        .map(([key, value]) => ({
+          label: key.replaceAll('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          value: String(value)
+        }))
     }
 
     const formattedData = {
       paymentId: paymentData.id,
       memberName: `${paymentData.member.firstName} ${paymentData.member.lastName}`,
+      memberDocumentId: paymentData.member.documentId,
       planName: paymentData.planSnapshotName,
       amountPaidFormatted: `${Number.parseFloat(paymentData.amountPaid.toString()).toLocaleString('es-ES')} ${paymentData.currencyPaid}`,
       paymentMethod: paymentData.paymentMethod.toUpperCase(),
       paymentDate: paymentData.paymentDate,
-      reference: paymentData.paymentMethodDetails?.reference || paymentData.paymentMethodDetails?.confirmation_number || ''
+      paymentDetails // Enviamos la colección completa
     }
 
-    return await emailService.sendPaymentReceipt(paymentData.member.email, formattedData)
+    // Generar el archivo PDF profesional usando los datos de la organización ya cargados en paymentData
+    const pdfBuffer = await pdfService.generateReceiptBuffer(
+      {
+        ...formattedData,
+        amountPaid: Number(paymentData.amountPaid),
+        currencyPaid: paymentData.currencyPaid,
+        exchangeRateApplied: paymentData.exchangeRateApplied
+      } as any,
+      paymentData.organization as any
+    )
+
+    return await emailService.sendPaymentReceipt(
+      paymentData.member.email,
+      formattedData,
+      [{
+        filename: `Comprobante_${paymentData.id}.pdf`,
+        content: pdfBuffer
+      }]
+    )
   }
 }

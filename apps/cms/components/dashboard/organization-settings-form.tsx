@@ -23,31 +23,19 @@ import {
   SimpleSelect,
   Switch,
   Label,
-  cn
+  cn,
+  CountrySelector
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import Link from "next/link";
 
 const DEFAULT_BRANDING = {
   primary: "#FCD303",
 };
 
-// Common timezones for selection
-const TIMEZONES = [
-  { value: "America/Caracas", label: "Caracas (Venezuela)" },
-  { value: "America/Bogota", label: "Bogotá (Colombia)" },
-  { value: "America/Mexico_City", label: "Ciudad de México (México)" },
-  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires (Argentina)" },
-  { value: "America/Santiago", label: "Santiago (Chile)" },
-  { value: "America/Lima", label: "Lima (Perú)" },
-  { value: "America/New_York", label: "Nueva York (USA)" },
-  { value: "America/Los_Angeles", label: "Los Ángeles (USA)" },
-  { value: "Europe/Madrid", label: "Madrid (España)" },
-  { value: "Europe/London", label: "Londres (UK)" },
-  { value: "UTC", label: "UTC (Universal)" },
-];
 
 interface OrganizationSettingsFormProps {
   readonly initialData: Record<string, string>;
@@ -71,6 +59,13 @@ export function OrganizationSettingsForm({
   const [formData, setFormData] = React.useState<Record<string, string>>({});
   const hasInitialized = React.useRef(false);
 
+  // Derive country code from timezone if possible, or fallback to VE
+  const currentCountryCode = React.useMemo(() => {
+    const tz = formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+    const country = COUNTRY_LIST.find(c => c.timezone === tz);
+    return country?.code || "VE";
+  }, [formData]);
+
   // Sync state with initial data - only once
   React.useEffect(() => {
     if (!hasInitialized.current && Object.keys(initialData).length > 0) {
@@ -83,12 +78,11 @@ export function OrganizationSettingsForm({
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleReset = () => {
-    setFormData((prev) => ({
-      ...prev,
-      [SETTINGS_KEYS.BRAND_PRIMARY]: DEFAULT_BRANDING.primary,
-    }));
-    toast.info("Valores de marca restaurados");
+  const handleCountryChange = (code: string) => {
+    const config = COUNTRIES[code];
+    if (config) {
+      handleChange(SETTINGS_KEYS.TIMEZONE, config.timezone);
+    }
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -110,9 +104,17 @@ export function OrganizationSettingsForm({
     }
   };
 
+  const handleReset = () => {
+    setFormData((prev) => ({
+      ...prev,
+      [SETTINGS_KEYS.BRAND_PRIMARY]: DEFAULT_BRANDING.primary,
+    }));
+    toast.info("Valores de marca restaurados");
+  };
+
   const currentPrimary = formData[SETTINGS_KEYS.BRAND_PRIMARY] || DEFAULT_BRANDING.primary;
 
-  // Calculate derivates ONLY for preview
+  // Calculate derivatives ONLY for preview
   const previewHover = ColorUtils.getHoverColor(currentPrimary);
   const previewPrimaryFg = ColorUtils.getContrastForeground(currentPrimary);
 
@@ -157,14 +159,14 @@ export function OrganizationSettingsForm({
                 <Building2 className="w-6 h-6" />
               </div>
               <div className="flex flex-col">
-                <Text size="lg" weight="bold">Información de Marca</Text>
+                <Text size="lg" weight="bold">Configuración de Marca</Text>
                 <Text variant="muted" size="sm">Configura los mensajes y lemas que definen a tu sede.</Text>
               </div>
             </div>
 
             <Button variant="ghost" size="sm" asChild className="group">
               <Link href={`${backUrl}/settings/organization`} className="flex items-center gap-2">
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">Editar Identidad</span>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">Editar Identidad Legal</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </Button>
@@ -174,8 +176,8 @@ export function OrganizationSettingsForm({
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 <div className="space-y-1 mt-1">
-                  <Text size="sm" weight="bold">Marca Institucional</Text>
-                  <Text variant="muted" size="xs">Nombre, logo y eslogan gestionados en Organización.</Text>
+                  <Text size="sm" weight="bold">Identidad Corporativa</Text>
+                  <Text variant="muted" size="xs">Nombre, logo y dirección gestionados en Organización.</Text>
                 </div>
               </div>
             </div>
@@ -190,16 +192,16 @@ export function OrganizationSettingsForm({
             </div>
             <div className="flex flex-col">
               <Text size="lg" weight="bold">Configuración Regional</Text>
-              <Text variant="muted" size="sm">Define la zona horaria para agendas y reservas inteligentes.</Text>
+              <Text variant="muted" size="sm">Define el país y zona horaria para agendas y recibos.</Text>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-            <SimpleSelect
-              label="Zona Horaria (IANA)"
-              value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
-              onChange={(value) => handleChange(SETTINGS_KEYS.TIMEZONE, value)}
-              options={TIMEZONES}
+            <CountrySelector
+              label="Región / País"
+              value={currentCountryCode}
+              onChange={handleCountryChange}
+              countries={COUNTRY_LIST}
             />
 
             <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
@@ -207,12 +209,21 @@ export function OrganizationSettingsForm({
                 <Clock className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
-                <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Hora Local Actual</Text>
+                <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Hora Local (Sincronizada)</Text>
                 <Text size="lg" weight="bold" className="tabular-nums">
                   {getTimeInZone(formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE)}
                 </Text>
               </div>
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-border/50">
+            <SimpleSelect
+              label="Zona Horaria (Avanzado)"
+              value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
+              onChange={(value) => handleChange(SETTINGS_KEYS.TIMEZONE, value)}
+              options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
+            />
           </div>
         </Card>
 

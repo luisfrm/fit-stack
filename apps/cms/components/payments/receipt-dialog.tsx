@@ -16,13 +16,16 @@ import { type ISubscription } from "@/types/dashboard";
 import {
   Mail,
   Printer,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck
 } from "lucide-react";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useReactToPrint } from "react-to-print";
 import { emailsService } from "@/lib/services/emails-service";
 import { uploadService } from "@/lib/services/upload-service";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { COUNTRIES } from "@workspace/shared/constants";
 
 interface ReceiptDialogProps {
   readonly initialData: ISubscription;
@@ -31,9 +34,11 @@ interface ReceiptDialogProps {
 
 export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDialogProps) {
   const { settings } = useSettings();
+  const { activeOrganization: org } = useAuth();
   const [isSendingEmail, setIsSendingEmail] = React.useState(false);
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
-  
+  const countryConfig = COUNTRIES[org?.countryCode || "VE"] || COUNTRIES.VE;
+
   const contentRef = React.useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef,
@@ -41,7 +46,7 @@ export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDia
   });
 
   const paymentDate = subscription.paymentDate
-// ... (omitting lines for brevity in diff tool logic context, but keeping necessary logic)
+    // ... (omitting lines for brevity in diff tool logic context, but keeping necessary logic)
     ? new Date(subscription.paymentDate)
     : new Date();
 
@@ -188,6 +193,16 @@ export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDia
                 <Text size="xs" variant="primary" weight="bold" italic uppercase className="opacity-80">{subscription.planName}</Text>
               </div>
             </div>
+
+            {subscription.memberDocumentId && (
+              <div className="flex justify-between items-center gap-4">
+                <Text className="label-text">{countryConfig?.docLabel} del Socio</Text>
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck size={12} className="text-muted-foreground opacity-50" />
+                  <Text className="value-text">{subscription.memberDocumentId}</Text>
+                </div>
+              </div>
+            )}
 
             <Separator className="opacity-5" />
 

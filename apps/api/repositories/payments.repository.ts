@@ -75,7 +75,8 @@ export const paymentsRepository = {
       where: and(eq(payment.id, id), eq(payment.organizationId, organizationId)),
       with: {
         member: true,
-        subscription: true
+        subscription: true,
+        organization: true
       }
     })
   }
