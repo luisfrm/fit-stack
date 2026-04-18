@@ -51,7 +51,13 @@ export const subscriptionsService = {
       throw new Error('El plan seleccionado no existe')
     }
 
-    // 2. Crear la suscripción
+    // 2. Blindaje de seguridad: Evitar duplicidad si hay un pago pendiente
+    const latest = await subscriptionsRepository.findLatestForMember(organizationId, payload.memberId);
+    if (latest?.paymentStatus === 'processing') {
+      throw new Error('No es posible registrar un nuevo pago mientras el anterior esté pendiente de validación');
+    }
+
+    // 3. Crear la suscripción
     const subscription = await subscriptionsRepository.create(organizationId, {
       memberId: payload.memberId,
       planId: payload.planId,
@@ -109,7 +115,7 @@ export const subscriptionsService = {
     }
 
     const details = (paymentData.paymentMethodDetails as any) || {}
-    
+
     // Normalizar metadatos: manejar tanto formato Array como Objeto legado
     let paymentDetails: Array<{ label: string; value: string }> = []
 
@@ -128,7 +134,7 @@ export const subscriptionsService = {
           return !valStr.startsWith('http') && !valStr.includes('/media/') && !valStr.includes('files/');
         })
         .map(([key, value]) => ({
-          label: key.replaceAll('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          label: key.replaceAll('_', ' ').replaceAll(/\b\w/g, l => l.toUpperCase()),
           value: String(value)
         }))
     }

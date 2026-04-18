@@ -44,6 +44,7 @@ interface PaymentSectionProps {
   readonly allowPriceOverride: boolean;
   readonly paymentDetails: string;
   readonly onPaymentDetailsChange: (value: string) => void;
+  readonly disabled?: boolean;
 }
 
 export function PaymentSection({
@@ -71,9 +72,13 @@ export function PaymentSection({
   allowPriceOverride,
   paymentDetails,
   onPaymentDetailsChange,
+  disabled,
 }: PaymentSectionProps) {
   return (
-    <Card className="p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <Card className={cn(
+      "p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500",
+      disabled && "opacity-40 cursor-not-allowed transition-opacity"
+    )}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Calculator className="w-5 h-5 text-primary" />

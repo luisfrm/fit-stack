@@ -1,7 +1,8 @@
-import { eq, ilike, and, or, count, desc, db, ne, sql } from '@workspace/database/client';
+import { eq, ilike, and, or, count, desc, db, ne } from '@workspace/database/client';
 import crypto from "node:crypto";
-import { gymMember, authMember, user, subscription, membershipPlan } from '@workspace/database/schema';
+import { gymMember, authMember, user } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
+import { subscriptionsRepository } from './subscriptions.repository';
 
 export type DbMember = typeof gymMember.$inferSelect;
 export type NewDbMember = typeof gymMember.$inferInsert;
@@ -24,6 +25,7 @@ export interface MembersFilter {
   page?: number;
   limit?: number;
   requireTotal?: boolean;
+  includeLatestSubscription?: boolean;
 }
 
 export interface PaginatedMembersResult {
@@ -97,30 +99,30 @@ export const membersRepository = {
 
     const total = Number(countResult[0]?.total ?? 0);
 
+    // Only enrich with latest subscription if explicitly requested (Optimization to avoid N+1 queries)
+    if (!filters.includeLatestSubscription) {
+      return {
+        data: rows.map(r => ({
+          ...r.member,
+          role: r.member.role,
+          authRole: r.authRole,
+          user: r.user,
+          latestSubscription: null,
+        })),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
     // Enriched with latest subscription for each member
     const enrichedData = await Promise.all(
       rows.map(async (r) => {
-        const [latestSub] = await db
-          .select({
-            id: subscription.id,
-            memberId: subscription.memberId,
-            planId: subscription.planId,
-            startDate: subscription.startDate,
-            endDate: subscription.endDate,
-            cancelledAt: subscription.cancelledAt,
-            status: sql<'active' | 'cancelled' | 'expired'>`CASE 
-              WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
-              WHEN ${subscription.endDate} < ${new Date()} THEN 'expired'
-              ELSE 'active'
-            END`.as('status'),
-            createdAt: subscription.createdAt,
-            planName: membershipPlan.name,
-          })
-          .from(subscription)
-          .leftJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
-          .where(and(eq(subscription.memberId, r.member.id), eq(subscription.organizationId, organizationId)))
-          .orderBy(desc(subscription.endDate))
-          .limit(1);
+        const latestSub = await subscriptionsRepository.findLatestForMember(
+          organizationId,
+          r.member.id
+        );
 
         return {
           ...r.member,
@@ -131,8 +133,8 @@ export const membersRepository = {
             ...latestSub,
             startDate: latestSub.startDate.toISOString(),
             endDate: latestSub.endDate.toISOString(),
-            createdAt: latestSub.createdAt.toISOString(),
             planName: latestSub.planName || undefined,
+            paymentStatus: latestSub.paymentStatus,
           } : null,
         };
       })

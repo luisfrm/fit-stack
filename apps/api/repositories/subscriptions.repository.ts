@@ -1,5 +1,6 @@
-import { db, eq, desc, and, sql } from '@workspace/database/client'
+import { db, eq, desc, and, sql, or } from '@workspace/database/client'
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema'
+import { SubscriptionStatus } from '@workspace/shared'
 
 export interface ISubscriptionDTO {
   id?: number
@@ -8,7 +9,7 @@ export interface ISubscriptionDTO {
   planId: number
   startDate: Date
   endDate: Date
-  status?: 'active' | 'cancelled' | 'expired'
+  status?: SubscriptionStatus
   cancelledAt?: Date | null
   isActive?: boolean
   createdAt?: Date
@@ -24,7 +25,7 @@ export const subscriptionsRepository = {
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
-        status: sql<'active' | 'cancelled' | 'expired'>`CASE 
+        status: sql<SubscriptionStatus>`CASE 
           WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
           WHEN ${subscription.endDate} < ${now} THEN 'expired'
           ELSE 'active'
@@ -97,5 +98,38 @@ export const subscriptionsRepository = {
 
   async delete(organizationId: string, id: number) {
     await db.delete(subscription).where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
+  },
+
+  async findLatestForMember(organizationId: string, memberId: number, now: Date = new Date()) {
+    const results = await db
+      .select({
+        id: subscription.id,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        cancelledAt: subscription.cancelledAt,
+        planName: membershipPlan.name,
+        paymentStatus: payment.status,
+        status: sql<SubscriptionStatus>`CASE 
+          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
+          WHEN ${subscription.endDate} < ${now} THEN 'expired'
+          ELSE 'active'
+        END`.as('status'),
+      })
+      .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .leftJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+      .where(and(
+        eq(subscription.memberId, memberId),
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.cancelledAt} IS NULL`,
+        or(
+          eq(payment.status, 'validated'),
+          eq(payment.status, 'processing')
+        )
+      ))
+      .orderBy(desc(subscription.endDate))
+      .limit(1);
+
+    return results[0] || null;
   }
 }

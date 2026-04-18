@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       page: searchParams.has('page') ? Number(searchParams.get('page')) : 1,
       limit: searchParams.has('limit') ? Number(searchParams.get('limit')) : 10,
       requireTotal: true,
+      includeLatestSubscription: searchParams.get('includeLatestSubscription') === 'true',
     }
 
     const result = await membersService.getAllMembers(filters)

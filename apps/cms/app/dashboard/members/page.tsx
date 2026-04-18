@@ -37,7 +37,7 @@ export default function MembersPage() {
       setLoading(true);
       setError(null);
 
-      const filters: any = { page, limit, role };
+      const filters: any = { page, limit, role, includeLatestSubscription: true };
       if (query) filters.query = query;
 
       const data = await membersService.getMembers(filters);

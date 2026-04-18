@@ -136,6 +136,7 @@ export interface MemberFilter {
   isActive?: boolean;
   page?: number;
   limit?: number;
+  includeLatestSubscription?: boolean;
 }
 
 export interface PaginatedMembers {
@@ -194,7 +195,7 @@ export interface IMembershipsSummary {
   monthlyRevenue: Record<string, number>;
 }
 
-export type SubscriptionStatus = 'active' | 'canceled' | 'expired';
+export type SubscriptionStatus = 'active' | 'cancelled' | 'expired';
 
 /**
  * Interface for a Member's Subscription.

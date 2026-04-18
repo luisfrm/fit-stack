@@ -18,6 +18,9 @@ import {
   Input,
   Button,
   toast,
+  Text,
+  cn,
+  Badge
 } from "@workspace/ui/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
@@ -103,6 +106,55 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [searchResults, setSearchResults] = React.useState<PaginatedMembers["data"]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
 
+  // Lógica de Fecha Final Inteligente y Acumulativa
+  React.useEffect(() => {
+    const start = parseDateAsConfigTimezone(startDate, timezone);
+    if (!Number.isNaN(start.getTime()) && selectedPlan) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      // Determinamos el Baseline para el cálculo acumulativo
+      // Si el socio tiene una suscripción VIGENTE, usamos suEndDate como base.
+      // Si no, usamos la fecha de inicio seleccionada (Hoy).
+      let baseline = new Date(start);
+      if (selectedMember?.latestSubscription) {
+        const currentExpiration = new Date(selectedMember.latestSubscription.endDate);
+        if (currentExpiration >= now && selectedMember.latestSubscription.status === 'active') {
+          baseline = new Date(currentExpiration);
+        }
+      }
+
+      const end = new Date(baseline);
+      const durationValue = selectedPlan.durationValue || 1;
+      const durationUnit = selectedPlan.durationUnit || 'month';
+
+      switch (durationUnit) {
+        case 'day':
+          end.setDate(end.getDate() + durationValue);
+          break;
+        case 'week':
+          end.setDate(end.getDate() + (durationValue * 7));
+          break;
+        case 'month':
+          end.setMonth(end.getMonth() + durationValue);
+          break;
+        case 'year':
+          end.setFullYear(end.getFullYear() + durationValue);
+          break;
+        default:
+          end.setMonth(end.getMonth() + 1);
+      }
+
+      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+      setEndDate(endStr);
+    } else if (!Number.isNaN(start.getTime()) && !selectedPlan) {
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 1);
+      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+      setEndDate(endStr);
+    }
+  }, [startDate, timezone, selectedPlan, selectedMember]);
+
   // Inicialización
   React.useEffect(() => {
     plansService.getAll().then(setPlans);
@@ -169,7 +221,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         const res = await membersService.getMembers({
           query: debouncedSearch,
           limit: 5,
-          role: ORG_ROLES.MEMBER
+          role: ORG_ROLES.MEMBER,
+          includeLatestSubscription: true
         });
         if (isMounted) setSearchResults(res.data);
       } catch (err) {
@@ -183,26 +236,22 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     return () => { isMounted = false; };
   }, [debouncedSearch]);
 
-  // Actualizar fecha final automáticamente si cambia la inicial (1 mes después)
-  React.useEffect(() => {
-    const start = parseDateAsConfigTimezone(startDate, timezone);
-    if (!Number.isNaN(start.getTime())) {
-      const end = new Date(start);
-      end.setMonth(end.getMonth() + 1);
-      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
-      setEndDate(endStr);
-    }
-  }, [startDate, timezone]);
-
   // Helper to validate payment fields
   const validatePaymentFields = () => {
     if (!memberId || !planId) return false;
+
+    // Simple Date Validation
+    const start = parseDateAsConfigTimezone(startDate, timezone);
+    if (Number.isNaN(start.getTime())) {
+      toast.error("Fecha de inicio inválida");
+      return false;
+    }
 
     if (selectedPaymentConfig) {
       for (const field of selectedPaymentConfig.fields) {
         const value = dynamicFieldValues[field.id];
         const isEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === "");
-        
+
         if (field.required && isEmpty) {
           toast.error(`El campo "${field.label}" es obligatorio`);
           return false;
@@ -255,8 +304,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
             type: field.type
           }));
       } else if (paymentDetails) {
-        finalPaymentMethodDetails = [{ 
-          label: "Nota / Referencia", 
+        finalPaymentMethodDetails = [{
+          label: "Nota / Referencia",
           value: paymentDetails,
           type: "text"
         }];
@@ -295,6 +344,9 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     setMemberSearch("");
   };
 
+  const isPendingPayment = selectedMember?.latestSubscription?.paymentStatus === "processing";
+  const isSectionDisabled = !selectedMember || isPendingPayment;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -311,10 +363,28 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         onAddMemberClick={onAddMemberClick}
       />
 
+      {isPendingPayment && (
+        <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 animate-in fade-in zoom-in-95 duration-300">
+          <div className="flex items-start gap-3">
+            <Badge variant="destructive" size="sm" className="mt-0.5 uppercase font-black tracking-tighter">
+              Bloqueo de Seguridad
+            </Badge>
+            <div className="flex flex-col gap-1">
+              <Text weight="bold" size="sm" className="text-red-400">Pago pendiente detectado</Text>
+              <Text size="xs" variant="muted">
+                Este socio tiene una suscripción con pago en estado <span className="text-red-400 font-bold uppercase">Procesando</span>.
+                Debe validar o anular el pago anterior antes de registrar uno nuevo.
+              </Text>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PlanSelector
         plans={plans}
         planId={planId}
         onPlanSelect={setPlanId}
+        disabled={isSectionDisabled}
       />
 
       {selectedPlan && (
@@ -349,16 +419,18 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           allowPriceOverride={allowPriceOverride}
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
+          disabled={isSectionDisabled}
         />
       )}
 
       {/* Selector de Fechas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4", isSectionDisabled && "cursor-not-allowed opacity-40")}>
         <Input
           id="start-date"
           type="date"
           label="Fecha de Inicio"
           value={startDate}
+          disabled={isSectionDisabled}
           onChange={(e) => setStartDate(e.target.value)}
         />
         <Input
@@ -366,15 +438,14 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           type="date"
           label="Fecha Final"
           value={endDate}
+          disabled={isSectionDisabled}
           onChange={(e) => setEndDate(e.target.value)}
         />
       </div>
 
-
-
       <Button
         type="submit"
-        disabled={isLoading || isProcessingUploads || !memberId || !planId}
+        disabled={isLoading || isProcessingUploads || !memberId || !planId || isPendingPayment}
         className="w-full h-12 uppercase tracking-widest font-bold shadow-xl shadow-primary/5"
       >
         {isLoading || isProcessingUploads ? "PROCESANDO..." : "GENERAR SUSCRIPCIÓN"}

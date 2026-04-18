@@ -8,20 +8,23 @@ import {
   Text
 } from "@workspace/ui/components";
 import { type IMembershipPlan } from "@/types/dashboard";
+import { cn } from "@workspace/ui/lib/utils";
 
 interface PlanSelectorProps {
   readonly plans: IMembershipPlan[];
   readonly planId: number | null;
   readonly onPlanSelect: (id: number) => void;
+  readonly disabled?: boolean;
 }
 
 export function PlanSelector({
   plans,
   planId,
   onPlanSelect,
+  disabled,
 }: PlanSelectorProps) {
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", disabled && "opacity-40 cursor-not-allowed transition-opacity")}>
       <Label id="plan-selection-label" className="text-sm font-medium">Plan de Membresía</Label>
       {plans.length === 0 ? (
         <p className="text-sm text-yellow-500 bg-yellow-500/10 p-3 rounded-lg">
