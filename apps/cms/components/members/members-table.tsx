@@ -54,7 +54,7 @@ const getColumns = (
       headerClassName: "pl-6",
       cell: (m) => (
         <div className="flex items-center gap-3">
-          <Avatar size="default" className="size-9 border border-white/10">
+          <Avatar size="default" className="size-9 border border-white/10" fallback={""}>
             {m.imageUrl ? (
               <AvatarImage src={uploadService.getMediaUrl(m.imageUrl)} alt={m.firstName} className="object-cover" />
             ) : null}

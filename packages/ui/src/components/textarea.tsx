@@ -40,7 +40,6 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
               disabled && "cursor-not-allowed opacity-40"
             )}
             disabled={disabled}
-            re
             ref={ref}
             {...props}
           />
