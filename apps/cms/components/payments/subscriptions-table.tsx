@@ -22,6 +22,7 @@ import {
 import { ReceiptDialog } from "./receipt-dialog";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 const getPaymentStatusBadge = (status?: string) => {
   switch (status) {
@@ -66,7 +67,8 @@ const getColumns = (
   onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void | Promise<void>,
   onPaymentStatusChange: (paymentId: number, status: string) => void | Promise<void>,
   onDelete: (id: number) => void | Promise<void>,
-  currencyFormat: CurrencyFormat
+  currencyFormat: CurrencyFormat,
+  canDelete: boolean
 ): ColumnDef<ISubscription>[] => [
     {
       header: "Miembro",
@@ -93,11 +95,29 @@ const getColumns = (
             </Text>
             {getSubscriptionStatusBadge(sub.status)}
           </div>
-          {sub.price !== undefined && (
-            <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
-              Precio: {ValueConverter.format(sub.price / 100, 'USD', currencyFormat)}
+          <div className="flex flex-col">
+            {sub.planSnapshotPrice !== undefined && (
+              <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
+                Precio base: {ValueConverter.format(sub.planSnapshotPrice / 100, 'USD', currencyFormat)}
+              </Text>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Vigencia",
+      cell: (sub) => (
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} className="text-primary opacity-70" />
+            <Text size="sm" className="font-bold tabular-nums">
+              {new Date(sub.endDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
             </Text>
-          )}
+          </div>
+          <Text size="xs" variant="muted" className="opacity-40 italic">
+            Desde: {new Date(sub.startDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+          </Text>
         </div>
       )
     },
@@ -208,6 +228,7 @@ const getColumns = (
                     label: "Eliminar Registro",
                     icon: <Trash2 size={14} />,
                     variant: "destructive",
+                    show: canDelete,
                     onClick: () => {
                       if (globalThis.confirm(`¿Seguro que deseas eliminar este registro de pago de ${sub.memberName}?`)) {
                         sub.id && onDelete(sub.id);
@@ -241,14 +262,18 @@ export function SubscriptionsTable({
   loading
 }: SubscriptionsTableProps) {
   const { settings } = useSettings();
+  const { isCashier } = useAuth();
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+
+  const canDelete = !isCashier;
 
   const columns = React.useMemo(() => getColumns(
     onStatusChange,
     onPaymentStatusChange,
     onDelete,
-    currencyFormat
-  ), [onStatusChange, onDelete, onPaymentStatusChange, currencyFormat]);
+    currencyFormat,
+    canDelete
+  ), [onStatusChange, onDelete, onPaymentStatusChange, currencyFormat, canDelete]);
 
   return (
     <Table
