@@ -8,7 +8,7 @@ description: Functional and business overview of the Fit-Stack ecosystem. Explai
 This skill provides the conceptual framework for the Fit-Stack ecosystem, a multi-tenant SaaS designed for the Gym and Fitness industry, primarily serving the Venezuelan market.
 
 ## 1. Project Vision
-Fit-Stack is more than a CMS; it's a gym management engine. It solves the complexity of multi-currency billing (USD/VES), member retention, and automated physical access control.
+Fit-Stack is more than a CMS; it's a gym management engine. It solves the complexity of multi-currency billing, member retention, and automated physical access control.
 
 ### Core Architecture Concepts
 - **Multi-tenancy**: Every gym is an `Organization`. Data isolation is strictly enforced via `organizationId`.
@@ -24,7 +24,7 @@ Fit-Stack is more than a CMS; it's a gym management engine. It solves the comple
 
 ### **Membership Plans**
 - **Intention**: Commercial product catalog.
-- **Why**: To define the "what is being sold." It allows gyms to configure flexible durations (Daily, Weekly, Monthly) and precise pricing in a base currency (usually USD).
+- **Why**: To define the "what is being sold." It allows gyms to configure flexible durations (Daily, Weekly, Monthly) and precise pricing in a base currency (USD by default, configurable in the Settings module).
 
 ### **Subscriptions**
 - **Intention**: Temporal access control logic.
@@ -61,6 +61,6 @@ Fit-Stack is more than a CMS; it's a gym management engine. It solves the comple
 - **Why**: A Python/Flet application that runs locally at the gym’s entrance. It communicates with the API to validate a member's QR/Biometric data against their active subscription, effectively turning "billing data" into "physical access."
 
 ## 4. Business Rules Summary
-1. **Multi-currency**: Systems always think in a base currency but allow payment in local currency (VES) via real-time exchange rate calculation.
+1. **Multi-currency**: Systems always think in a base currency (USD by default) but allow payment in any active local currency via real-time exchange rate calculation. Both the base currency and the list of active currencies are managed dynamically in the **Settings** module.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
 3. **Strict Isolation**: No gym can ever see another gym's data. Everything is scoped to the `activeOrganizationId` in the session.

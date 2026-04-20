@@ -55,3 +55,7 @@ export { NextImage } from "@workspace/ui/components/next/image";
 
 // Special UI
 export { SplashScreen } from "@workspace/ui/components/splash-screen";
+
+// Charts
+export { SimpleChart } from "@workspace/ui/components/simple-chart";
+export type { ChartConfig } from "@workspace/ui/components/chart";

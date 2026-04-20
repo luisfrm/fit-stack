@@ -107,3 +107,13 @@ try {
   toast.error(error.message || "Error al procesar la solicitud");
 }
 ```
+
+---
+
+## 6. Gestión de Monedas y Precios
+
+El sistema es **estrictamente multi-moneda dinámico**.
+- **Configuración**: Las monedas activas se definen en el módulo de Settings.
+- **Moneda Base**: Por defecto es **USD**, pero puede ser modificada.
+- **Cero Hardcodeo**: Nunca asumas que una moneda es USD o VES en el código. Usa siempre la propiedad `currency` del objeto de negocio (Plan, Suscripción, Pago).
+- **Conversión**: El `exchangeRate` debe manejarse siempre dinámicamente y permitir la edición manual por parte del staff si la configuración lo permite.
