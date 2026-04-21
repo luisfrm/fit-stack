@@ -1,5 +1,5 @@
 import { eq, ilike, and, or, count, desc, db } from '@workspace/database/client';
-import { organization, storeSubscription, fitstackPlan, authMember } from '@workspace/database/schema';
+import { organization, storeSubscription, fitstackPlan, authMember, gymMember } from '@workspace/database/schema';
 import { IPlatformOrganization } from '@workspace/shared/types';
 
 export type DbOrganization = typeof organization.$inferSelect;
@@ -80,12 +80,22 @@ export const organizationsRepository = {
 
         // 2. Optional Member Count
         let memberCountNum: number | undefined = undefined;
+        let userCountNum: number | undefined = undefined;
+        
         if (filters.includeMemberCount) {
+          // Clientes (gymMember)
           const [mCount] = await db
+            .select({ total: count() })
+            .from(gymMember)
+            .where(eq(gymMember.organizationId, org.id));
+          memberCountNum = Number(mCount?.total || 0);
+
+          // Usuarios con App (authMember)
+          const [uCount] = await db
             .select({ total: count() })
             .from(authMember)
             .where(eq(authMember.organizationId, org.id));
-          memberCountNum = Number(mCount?.total || 0);
+          userCountNum = Number(uCount?.total || 0);
         }
 
         return {
@@ -102,6 +112,7 @@ export const organizationsRepository = {
           updatedAt: org.updatedAt,
           metadata: org.metadata as Record<string, any> | null,
           memberCount: memberCountNum,
+          userCount: userCountNum,
           latestSubscription: latestSub ? {
             ...latestSub,
             startDate: latestSub.startDate.toISOString(),
