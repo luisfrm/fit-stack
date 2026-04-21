@@ -3,19 +3,22 @@ name: CI/CD Pipeline
 on:
   pull_request:
     branches: [master, develop]
-  push:
-    branches: [master, develop]
+
+# Evita que se acumulen ejecuciones si haces varios commits seguidos
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
-    name: Lint, Typecheck & Build
+    name: Validate Affected Apps
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Necesario para que Turbo compare cambios
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -31,14 +34,19 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Fetch Base Branch
-        run: git fetch origin master
+      # Turbo detecta automáticamente qué filtrar basándose en el historial de git
+      # Usamos el SHA del commit base (en PRs) o el commit anterior (en Pushes)
+      - name: Run CI Tasks
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+          
+          # Si por alguna razón BASE_SHA es nulo o vacío (ej: primer commit), comparamos con master
+          BASE_SHA=${BASE_SHA:-master}
 
-      - name: Lint Affected
-        run: pnpm turbo lint --filter=...[origin/master]
-
-      - name: Typecheck Affected
-        run: pnpm turbo typecheck --filter=...[origin/master]
-
-      - name: Verify Build
-        run: pnpm turbo build --filter=...[origin/master]
+          echo "Comparing against: $BASE_SHA"
+          
+          pnpm turbo lint typecheck build --filter="...[$BASE_SHA]"
