@@ -7,7 +7,7 @@ export default function Page() {
         <h1 className="text-2xl font-bold">Hello World</h1>
         <div className="flex gap-2">
           <Button>Button</Button>
-          <Button variant="outline">Outline</Button>
+          <Button variant="outlined">Outline</Button>
         </div>
       </div>
     </div>
