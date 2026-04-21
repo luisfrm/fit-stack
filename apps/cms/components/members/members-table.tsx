@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Table, ColumnDef, Button, Badge, toast, Avatar, AvatarImage, AvatarFallback, Text, SimpleTooltip } from "@workspace/ui/components";
+import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip, NextImage } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-react";
 import { GLOBAL_ROLES } from "@workspace/shared";
@@ -54,14 +54,19 @@ const getColumns = (
       headerClassName: "pl-6",
       cell: (m) => (
         <div className="flex items-center gap-3">
-          <Avatar size="default" className="size-9 border border-white/10" fallback={""}>
+          <div className="size-9 rounded-full border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center shrink-0">
             {m.imageUrl ? (
-              <AvatarImage src={uploadService.getMediaUrl(m.imageUrl)} alt={m.firstName} className="object-cover" />
-            ) : null}
-            <AvatarFallback className="bg-white/5 text-xs">
-              <User size={14} className="opacity-40" />
-            </AvatarFallback>
-          </Avatar>
+              <NextImage
+                src={uploadService.getMediaUrl(m.imageUrl)}
+                alt={`${m.firstName} ${m.lastName}`}
+                width={36}
+                height={36}
+                className="size-full object-cover"
+              />
+            ) : (
+              <User size={18} className="text-muted-foreground/60" />
+            )}
+          </div>
           <div className="flex flex-col min-w-0">
             <span className="font-semibold text-foreground truncate max-w-[180px]">
               {m.firstName} {m.lastName}
