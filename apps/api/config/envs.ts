@@ -19,6 +19,10 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET_NAME: z.string().optional(),
   R2_PUBLIC_URL: z.string().url().optional(),
+
+  // Upstash Redis
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
 const _parsed = envSchema.safeParse(process.env);
@@ -41,6 +45,10 @@ export const env = {
   r2SecretAccessKey: _env.R2_SECRET_ACCESS_KEY,
   r2BucketName: _env.R2_BUCKET_NAME,
   r2PublicUrl: _env.R2_PUBLIC_URL,
+
+  // Upstash Redis
+  upstashRedisRestUrl: _env.UPSTASH_REDIS_REST_URL,
+  upstashRedisRestToken: _env.UPSTASH_REDIS_REST_TOKEN,
 
   // Better-Auth
   betterAuthSecret: _env.BETTER_AUTH_SECRET,

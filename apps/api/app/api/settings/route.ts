@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { getSession } from "@/config/get-session";
 import { settingsService } from "@/services/settings.service";
 import { GLOBAL_ROLES } from "@workspace/shared";
+import { cache } from "@/lib/cache";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,8 +19,17 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const cacheKey = `org:${organizationId || 'global'}:settings`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
+
     // Call service with organizationId (will be null for SaaS Admin without active org)
     const settings = await settingsService.getAll(organizationId || null);
+
+    await cache.set(cacheKey, settings, 600); // 10 mins
+
     return NextResponse.json(settings);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -40,6 +50,8 @@ export async function POST(req: NextRequest) {
 
     const settings = await req.json();
     await settingsService.updateAll(organizationId || null, settings);
+
+    await cache.invalidate(`org:${organizationId || 'global'}:settings*`);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

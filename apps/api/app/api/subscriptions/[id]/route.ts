@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -23,6 +24,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const updated = await subscriptionsService.cancel(organizationId, subId)
 
+    await cache.invalidate(`org:${organizationId}:subscriptions`);
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${organizationId}:members:*`);
+
     return NextResponse.json(updated)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
@@ -40,6 +45,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const organizationId = session.session.activeOrganizationId;
     await subscriptionsService.delete(organizationId, subId)
+
+    await cache.invalidate(`org:${organizationId}:subscriptions`);
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${organizationId}:members:*`);
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
