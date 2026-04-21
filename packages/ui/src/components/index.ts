@@ -16,6 +16,8 @@ export { OurServices } from "@workspace/ui/components/our-services";
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@workspace/ui/components/card";
 export { Table } from "@workspace/ui/components/table";
 export type { TableProps, ColumnDef } from "@workspace/ui/components/table";
+export { Pagination } from "@workspace/ui/components/pagination";
+export type { PaginationProps } from "@workspace/ui/components/pagination";
 export { SimpleAvatar as Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 export { Badge } from "@workspace/ui/components/badge";
 export { Text } from "@workspace/ui/components/text";

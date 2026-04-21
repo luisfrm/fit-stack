@@ -3,15 +3,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionsService } from "../services/subscriptions-service";
 import { financeService } from "../services/finance-service";
-import { type IRecentRegistration, type ISubscription } from "@/types/dashboard";
+import { type IRecentRegistration, type ISubscription, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
 
 /**
- * Hook to fetch all subscriptions.
+ * Hook to fetch all subscriptions with pagination and filters.
  */
-export function useSubscriptions() {
-  return useQuery<ISubscription[]>({
-    queryKey: ["subscriptions", "all"],
-    queryFn: () => subscriptionsService.getAll(),
+export function useSubscriptions(params?: SubscriptionsFilter) {
+  return useQuery<PaginatedSubscriptions>({
+    queryKey: ["subscriptions", "paginated", params],
+    queryFn: () => subscriptionsService.getAll(params),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

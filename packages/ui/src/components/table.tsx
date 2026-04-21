@@ -4,12 +4,13 @@ import * as React from "react"
 
 import { cn } from "@workspace/ui/lib/utils"
 import { Skeleton } from "@workspace/ui/components"
+import { Pagination, type PaginationProps } from "./pagination"
 
 function TablePrimitive({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className="relative w-full overflow-x-auto flex-1"
     >
       <table
         data-slot="table"
@@ -108,13 +109,23 @@ export interface TableProps<T> {
   readonly rowKey?: (item: T) => string | number
   readonly loading?: boolean
   readonly className?: string
+  readonly pagination?: PaginationProps
 }
 
-function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading, className }: TableProps<T>) {
+function Table<T>({ 
+  data, 
+  columns, 
+  emptyState, 
+  onRowClick, 
+  rowKey, 
+  loading, 
+  className,
+  pagination
+}: TableProps<T>) {
   const tableId = React.useId();
 
   return (
-    <div className={cn("bg-glass rounded-xl border border-border overflow-hidden", className)}>
+    <div className={cn("bg-glass rounded-xl border border-border overflow-hidden flex flex-col", className)}>
       <TablePrimitive>
         <TableHeader className="bg-table-header">
           <TableRow className="border-border hover:bg-transparent">
@@ -187,6 +198,12 @@ function Table<T>({ data, columns, emptyState, onRowClick, rowKey, loading, clas
           })}
         </TableBody>
       </TablePrimitive>
+
+      {pagination && (
+        <div className="p-4 border-t border-border bg-black/20">
+          <Pagination {...pagination} />
+        </div>
+      )}
     </div>
   )
 }

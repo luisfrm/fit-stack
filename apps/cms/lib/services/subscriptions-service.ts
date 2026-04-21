@@ -1,9 +1,9 @@
 import { apiClient } from '../api-client'
-import { ISubscription, SubscriptionStatus } from '@/types/dashboard'
+import { ISubscription, SubscriptionStatus, PaginatedSubscriptions, SubscriptionsFilter } from '@/types/dashboard'
 
 export const subscriptionsService = {
-  getAll: async (): Promise<ISubscription[]> => {
-    const { data } = await apiClient.get<ISubscription[]>('/subscriptions')
+  getAll: async (params?: SubscriptionsFilter): Promise<PaginatedSubscriptions> => {
+    const { data } = await apiClient.get<PaginatedSubscriptions>('/subscriptions', { params })
     return data
   },
 

@@ -147,6 +147,21 @@ export interface PaginatedMembers {
   totalPages: number;
 }
 
+export interface SubscriptionsFilter {
+  query?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedSubscriptions {
+  data: ISubscription[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface CoachFilter {
   name?: string;
   role?: string;

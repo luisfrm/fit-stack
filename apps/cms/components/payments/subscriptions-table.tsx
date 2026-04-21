@@ -250,6 +250,7 @@ interface SubscriptionsTableProps {
   readonly onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void;
   readonly onPaymentStatusChange: (paymentId: number, status: string) => void;
   readonly loading?: boolean;
+  readonly pagination?: any;
 }
 
 import { NoData } from "../dashboard/dashboard-ui";
@@ -259,7 +260,8 @@ export function SubscriptionsTable({
   onDelete,
   onStatusChange,
   onPaymentStatusChange,
-  loading
+  loading,
+  pagination
 }: SubscriptionsTableProps) {
   const { settings } = useSettings();
   const { isCashier } = useAuth();
@@ -277,9 +279,11 @@ export function SubscriptionsTable({
 
   return (
     <Table
+      className="min-h-[600px]"
       columns={columns}
       data={subscriptions}
       loading={loading}
+      pagination={pagination}
       emptyState={
         <NoData
           icon={CreditCard}

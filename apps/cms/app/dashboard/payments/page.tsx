@@ -25,7 +25,18 @@ import {
 } from "@/lib/hooks/use-payments";
 
 export default function PaymentsPage() {
-  const { data: subs = [], isLoading, refetch } = useSubscriptions();
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const debouncedSearch = useDebounce(searchTerm, 500);
+  const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
+  const [page, setPage] = React.useState(1);
+  const limit = 10;
+
+  const { data: subsResult, isLoading, isPlaceholderData, refetch } = useSubscriptions({
+    page,
+    limit,
+    query: debouncedSearch,
+    status: activeFilter || undefined
+  });
 
   const { settings } = useSettings();
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
@@ -37,9 +48,10 @@ export default function PaymentsPage() {
   const deleteMutation = useDeleteSubscription();
   const updatePaymentStatusMutation = useUpdatePaymentStatus();
 
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const debouncedSearch = useDebounce(searchTerm, 500);
-  const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
+  // Reset page when search or filter changes
+  React.useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, activeFilter]);
 
   const handleStatusChange = async (id: number, status: 'active' | 'canceled' | 'expired') => {
     updateStatusMutation.mutate({ id, status }, {
@@ -73,34 +85,6 @@ export default function PaymentsPage() {
       }
     });
   };
-
-  // Advanced Filtering Logic
-  const filteredSubs = React.useMemo(() => {
-    return subs.filter(s => {
-      // 1. Search filter
-      const matchesSearch = !debouncedSearch ||
-        s.memberName?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        s.planName?.toLowerCase().includes(debouncedSearch.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      // 2. Role restriction during search
-      if (debouncedSearch && s.role !== ORG_ROLES.MEMBER) return false;
-
-      // 3. KPI/Status filters
-      if (activeFilter === "processing") return s.paymentStatus === "processing";
-      if (activeFilter === "expiring") {
-        const now = new Date();
-        const limitDate = new Date();
-        limitDate.setDate(now.getDate() + 7);
-        const endDate = new Date(s.endDate);
-        return endDate >= now && endDate <= limitDate && s.isActive !== false;
-      }
-      if (activeFilter === "active") return s.isActive === true;
-
-      return true;
-    });
-  }, [subs, debouncedSearch, activeFilter]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -183,11 +167,18 @@ export default function PaymentsPage() {
 
         <section>
           <SubscriptionsTable
-            subscriptions={filteredSubs}
+            subscriptions={subsResult?.data || []}
             onDelete={handleDelete}
             onStatusChange={handleStatusChange}
             onPaymentStatusChange={handlePaymentStatusChange}
             loading={isLoading}
+            pagination={{
+              page,
+              totalPages: subsResult?.totalPages || 1,
+              total: subsResult?.total || 0,
+              limit: limit,
+              onPageChange: setPage
+            }}
           />
         </section>
       </div>

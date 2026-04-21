@@ -8,19 +8,27 @@ export async function GET(req: NextRequest) {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
 
-    const cacheKey = `org:${organizationId}:subscriptions`;
+    const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`;
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
       return NextResponse.json(cachedData);
     }
 
-    const subscriptions = await subscriptionsService.getAllVisible(organizationId)
+    const filters = {
+      query: searchParams.get('query') ?? undefined,
+      status: searchParams.get('status') ?? undefined,
+      page: searchParams.has('page') ? Number(searchParams.get('page')) : 1,
+      limit: searchParams.has('limit') ? Number(searchParams.get('limit')) : 10,
+    }
 
-    await cache.set(cacheKey, subscriptions, 300);
+    const result = await subscriptionsService.getAllPaginated(organizationId, filters)
 
-    return NextResponse.json(subscriptions)
+    await cache.set(cacheKey, result, 300);
+
+    return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

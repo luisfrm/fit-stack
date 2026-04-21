@@ -1,4 +1,4 @@
-import { db, eq, desc, and, sql, or } from '@workspace/database/client'
+import { db, eq, desc, and, sql, or, count, ilike } from '@workspace/database/client'
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema'
 import { SubscriptionStatus } from '@workspace/shared'
 
@@ -15,7 +15,128 @@ export interface ISubscriptionDTO {
   createdAt?: Date
 }
 
+export interface SubscriptionsFilter {
+  organizationId: string;
+  query?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedSubscriptionsResult {
+  data: any[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export const subscriptionsRepository = {
+  async findAllPaginated(filters: SubscriptionsFilter, now: Date = new Date()): Promise<PaginatedSubscriptionsResult> {
+    const { organizationId, query, status, page = 1, limit = 10 } = filters;
+    const offset = (page - 1) * limit;
+
+    const conditions = [eq(subscription.organizationId, organizationId)];
+
+    if (query) {
+      conditions.push(
+        or(
+          ilike(members.firstName, `%${query}%`),
+          ilike(members.lastName, `%${query}%`),
+          ilike(members.email, `%${query}%`),
+          ilike(members.documentId, `%${query}%`),
+          ilike(membershipPlan.name, `%${query}%`)
+        )!
+      );
+    }
+
+    if (status) {
+      if (status === "processing") {
+        conditions.push(eq(payment.status, "processing"));
+      } else if (status === "active") {
+        conditions.push(
+          and(
+            sql`${subscription.endDate} >= ${now}`,
+            sql`${subscription.cancelledAt} IS NULL`
+          )!
+        );
+      } else if (status === "expiring") {
+        const limitDate = new Date(now);
+        limitDate.setDate(now.getDate() + 7);
+        conditions.push(
+          and(
+            sql`${subscription.endDate} >= ${now}`,
+            sql`${subscription.endDate} <= ${limitDate}`,
+            sql`${subscription.cancelledAt} IS NULL`
+          )!
+        );
+      }
+    }
+
+    const whereClause = and(...conditions);
+
+    const rows = await db
+      .select({
+        id: subscription.id,
+        memberId: subscription.memberId,
+        planId: subscription.planId,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        cancelledAt: subscription.cancelledAt,
+        status: sql<SubscriptionStatus>`CASE 
+          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
+          WHEN ${subscription.endDate} < ${now} THEN 'expired'
+          ELSE 'active'
+        END`.as('status'),
+        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
+        memberName: members.firstName,
+        memberLastName: members.lastName,
+        memberEmail: members.email,
+        memberImage: members.imageUrl,
+        memberDocumentId: members.documentId,
+        memberAddress: members.address,
+        planName: membershipPlan.name,
+        planSnapshotName: payment.planSnapshotName,
+        planSnapshotPrice: payment.planSnapshotPrice,
+        planSnapshotCurrency: payment.planSnapshotCurrency,
+        // Payment joined fields
+        paymentId: payment.id,
+        amountPaid: payment.amountPaid,
+        currencyPaid: payment.currencyPaid,
+        paymentMethod: payment.paymentMethod,
+        paymentMethodDetails: payment.paymentMethodDetails,
+        exchangeRateApplied: payment.exchangeRateApplied,
+        paymentStatus: payment.status,
+        paymentDate: payment.paymentDate,
+      })
+      .from(subscription)
+      .innerJoin(members, eq(subscription.memberId, members.id))
+      .innerJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+      .leftJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .where(whereClause)
+      .orderBy(desc(payment.id), desc(subscription.id))
+      .limit(limit)
+      .offset(offset);
+
+    const countResult = await db
+      .select({ total: count() })
+      .from(subscription)
+      .innerJoin(members, eq(subscription.memberId, members.id))
+      .innerJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+      .leftJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .where(whereClause);
+
+    const total = Number(countResult[0]?.total ?? 0);
+
+    return {
+      data: rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  },
+
   async findAllVisible(organizationId: string, now: Date = new Date()) {
     return db
       .select({
