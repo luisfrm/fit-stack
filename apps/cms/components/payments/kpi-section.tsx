@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle, SimpleTooltip } from "@workspace/ui/components";
 import { TrendingUp, Clock, AlertTriangle, Users } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { KpiCard } from "./kpi-card";
 
 interface CurrencyBreakdown {
   currency: string;
@@ -50,6 +49,17 @@ export function KpiSection({
       className: "text-primary",
       filterId: undefined,
       isTicker: true,
+      tooltipContent: stats.todayRevenue.length > 0 ? (
+        <div className="flex flex-col gap-1 p-1">
+          <p className="font-bold border-b border-white/10 pb-1 mb-1">Cortes del día</p>
+          {stats.todayRevenue.map(r => (
+            <div key={r.currency} className="flex justify-between gap-4 text-xs">
+              <span className="opacity-70">{r.currency}</span>
+              <span className="font-mono">{ValueConverter.format(r.amount / 100, "", currencyFormat)}</span>
+            </div>
+          ))}
+        </div>
+      ) : undefined
     },
     {
       title: "Suscripciones Activas",
@@ -79,65 +89,21 @@ export function KpiSection({
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        const isActive = activeFilter === card.filterId;
-
-        const content = (
-          <Card
-            key={card.title}
-            className={cn(
-              "cursor-pointer transition-all hover:border-white/20 hover:bg-white/8 select-none",
-              isActive && "border-primary/50 bg-primary/5 ring-1 ring-primary/20",
-              card.filterId === undefined && "cursor-default hover:bg-white/5"
-            )}
-            onClick={() => card.filterId !== undefined && onFilterChange(isActive ? null : card.filterId)}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <Icon className={cn("h-4 w-4", card.className)} />
-            </CardHeader>
-            <CardContent>
-              {card.isTicker ? (
-                <div className="relative group/ticker overflow-hidden">
-                  <div className="text-xl font-bold truncate whitespace-nowrap mask-fade-right">
-                    {card.value}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-2xl font-bold">{card.value}</div>
-              )}
-              <p className="text-xs text-muted-foreground mt-1">
-                {card.description}
-              </p>
-            </CardContent>
-          </Card>
-        );
-
-        if (card.isTicker && stats.todayRevenue.length > 0) {
-          return (
-            <SimpleTooltip 
-              key={card.title}
-              side="bottom"
-              content={
-                <div className="flex flex-col gap-1 p-1">
-                  <p className="font-bold border-b border-white/10 pb-1 mb-1">Cortes del día</p>
-                  {stats.todayRevenue.map(r => (
-                    <div key={r.currency} className="flex justify-between gap-4 text-xs">
-                      <span className="opacity-70">{r.currency}</span>
-                      <span className="font-mono">{ValueConverter.format(r.amount / 100, "", currencyFormat)}</span>
-                    </div>
-                  ))}
-                </div>
-              }
-            >
-              {content}
-            </SimpleTooltip>
-          );
-        }
-
-        return content;
-      })}
+      {cards.map((card) => (
+        <KpiCard
+          key={card.title}
+          title={card.title}
+          value={card.value}
+          description={card.description}
+          icon={card.icon}
+          iconClassName={card.className}
+          filterId={card.filterId}
+          isActive={activeFilter === card.filterId}
+          isTicker={card.isTicker}
+          onFilterChange={onFilterChange}
+          tooltipContent={card.tooltipContent}
+        />
+      ))}
     </div>
   );
 }
