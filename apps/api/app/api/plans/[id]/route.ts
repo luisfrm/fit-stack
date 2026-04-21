@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { plansService } from '@/services/plans.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,6 +15,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const organizationId = session.session.activeOrganizationId;
     const body = await req.json()
     const updatedPlan = await plansService.update(organizationId, planId, body)
+
+    await cache.invalidate(`org:${organizationId}:plans:*`);
 
     return NextResponse.json(updatedPlan)
   } catch (error: any) {
@@ -32,6 +35,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     const organizationId = session.session.activeOrganizationId;
     await plansService.delete(organizationId, planId)
+
+    await cache.invalidate(`org:${organizationId}:plans:*`);
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

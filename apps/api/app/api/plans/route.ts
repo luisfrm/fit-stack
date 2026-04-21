@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { plansService } from '@/services/plans.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +12,16 @@ export async function GET(req: NextRequest) {
     const includeStats = searchParams.get('includeStats') === 'true'
 
     const organizationId = session.session.activeOrganizationId;
+    
+    const cacheKey = `org:${organizationId}:plans:${searchParams.toString()}`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
+
     const plans = await plansService.getAll(organizationId, { includeStats })
+
+    await cache.set(cacheKey, plans, 300); // Cache for 5 minutes
 
     return NextResponse.json(plans)
   } catch (error: any) {
@@ -30,6 +40,9 @@ export async function POST(req: NextRequest) {
     const { id, ...data } = body;
 
     const newPlan = await plansService.create(organizationId, data)
+    
+    await cache.invalidate(`org:${organizationId}:plans:*`);
+
     return NextResponse.json(newPlan, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })

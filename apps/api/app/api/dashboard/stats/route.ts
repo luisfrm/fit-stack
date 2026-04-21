@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dashboardService } from "../../../../services/dashboard.service";
 import { getSession } from '@/config/get-session';
+import { cache } from '@/lib/cache';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,19 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId;
+    const cacheKey = `org:${organizationId}:dashboard:stats:${today}`;
+
+    // Try to get from cache
+    const cachedStats = await cache.get(cacheKey);
+    if (cachedStats) {
+      return NextResponse.json(cachedStats);
+    }
+
     const stats = await dashboardService.getDashboardSummary(organizationId);
+
+    // Cache for 5 minutes (300 seconds)
+    await cache.set(cacheKey, stats, 300);
+
     return NextResponse.json(stats);
   } catch (error) {
     console.error('[DASHBOARD_STATS_GET]', error);

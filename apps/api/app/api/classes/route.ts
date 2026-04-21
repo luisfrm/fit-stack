@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache';
 
 /**
  * Validates the body of a POST/PUT class request.
@@ -74,10 +75,19 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = req.nextUrl
+    const cacheKey = `org:${organizationId}:classes:${searchParams.toString()}`
+
+    // Try to get from cache
+    const cachedData = await cache.get(cacheKey)
+    if (cachedData) {
+      return NextResponse.json(cachedData)
+    }
+
     const date = searchParams.get('date')
 
     if (date) {
       const classes = await classesService.getByDate(organizationId, date)
+      await cache.set(cacheKey, classes, 300) // 5 minutes
       return NextResponse.json(classes)
     }
 
@@ -93,6 +103,7 @@ export async function GET(req: NextRequest) {
     }
 
     const result = await classesService.getAll(organizationId, filters)
+    await cache.set(cacheKey, result, 300) // 5 minutes
     return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache'
 
 export async function POST(
   req: NextRequest,
@@ -21,6 +22,10 @@ export async function POST(
       Number(id),
       status
     )
+
+    await cache.invalidate(`org:${organizationId}:subscriptions*`);
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${organizationId}:members:*`);
 
     return NextResponse.json(updated)
   } catch (error: any) {

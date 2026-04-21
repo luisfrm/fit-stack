@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { coachesService } from '@/services/coaches.service'
 import { getSession } from '@/config/get-session'
+import { cache } from '@/lib/cache'
 
 import { z } from 'zod';
 import { CoachesFilter, CreateCoachDTO } from '@workspace/shared/types';
@@ -30,6 +31,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
 
+    const cacheKey = `org:${organizationId}:coaches:${searchParams.toString()}`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
+
     const filters: CoachesFilter = {
       name: searchParams.get('name') ?? undefined,
       role: searchParams.get('role') ?? undefined,
@@ -42,6 +49,9 @@ export async function GET(req: NextRequest) {
     }
 
     const result = await coachesService.getAllCoaches(organizationId, filters)
+    
+    await cache.set(cacheKey, result, 300); // Cache for 5 minutes
+    
     return NextResponse.json(result)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error interno del servidor';
@@ -67,6 +77,9 @@ export async function POST(req: NextRequest) {
     const organizationId = session.session.activeOrganizationId;
     const { roleId, ...coachData } = validation.data;
     const newCoach = await coachesService.createCoach(organizationId, coachData as CreateCoachDTO)
+    
+    await cache.invalidate(`org:${organizationId}:coaches:*`);
+
     return NextResponse.json(newCoach, { status: 201 })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error al crear el entrenador';

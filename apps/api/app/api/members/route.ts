@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { membersService } from '@/services/members.service'
 import { getSession } from '@/config/get-session'
 import { OrgRole } from '@workspace/shared'
+import { cache } from '@/lib/cache'
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,6 +13,12 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
+
+    const cacheKey = `org:${organizationId}:members:${searchParams.toString()}`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
 
     const filters = {
       organizationId,
@@ -28,6 +35,8 @@ export async function GET(req: NextRequest) {
     }
 
     const result = await membersService.getAllMembers(filters)
+    await cache.set(cacheKey, result, 300); // Cache for 5 minutes
+    
     return NextResponse.json(result)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -52,6 +61,10 @@ export async function POST(req: NextRequest) {
     const organizationId = session.session.activeOrganizationId;
 
     const newMember = await membersService.createMember(organizationId, memberData, sendInvite === true)
+
+    await cache.invalidate(`org:${organizationId}:members:*`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+
     return NextResponse.json(newMember, { status: 201 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 400 })
