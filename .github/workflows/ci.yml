@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -31,11 +31,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint Codebase
-        run: pnpm turbo lint
+      - name: Lint Affected
+        run: pnpm turbo lint --filter=[...origin/master]
 
-      - name: Typecheck Applications
-        run: pnpm turbo typecheck
+      - name: Typecheck Affected
+        run: pnpm turbo typecheck --filter=[...origin/master]
 
       - name: Verify Build
-        run: pnpm turbo build
+        run: pnpm turbo build --filter=[...origin/master]

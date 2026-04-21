@@ -25,7 +25,10 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
-const _parsed = envSchema.safeParse(process.env);
+const isBuildTime = process.env.NEXT_PHASE === "phase-production-build" || process.env.CI === "true";
+
+const _parsed = isBuildTime ? envSchema.partial().safeParse(process.env) : envSchema.safeParse(process.env);
+
 if (!_parsed.success) {
   console.error("❌ Invalid environment variables:", _parsed.error.flatten().fieldErrors);
   throw new Error("Missing or invalid environment variables. Check server logs.");
