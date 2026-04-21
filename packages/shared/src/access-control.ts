@@ -1,7 +1,7 @@
 import { createAccessControl } from "better-auth/plugins/access";
 import type { Role } from "better-auth/plugins/access";
 import { adminAc, defaultStatements } from "better-auth/plugins/organization/access";
-import { ORG_ROLES } from "./constants";
+import { ORG_ROLES } from "@workspace/shared/constants";
 
 /**
  * Access Control for Better Auth organization plugin.
