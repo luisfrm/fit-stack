@@ -31,11 +31,14 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch Base Branch
+        run: git fetch origin master:master
+
       - name: Lint Affected
-        run: pnpm turbo lint --filter=[...origin/master]
+        run: pnpm turbo lint --filter=...[master]
 
       - name: Typecheck Affected
-        run: pnpm turbo typecheck --filter=[...origin/master]
+        run: pnpm turbo typecheck --filter=...[master]
 
       - name: Verify Build
-        run: pnpm turbo build --filter=[...origin/master]
+        run: pnpm turbo build --filter=...[master]
