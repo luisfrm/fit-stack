@@ -16,7 +16,7 @@ export const financeService = {
     try {
       const url = `${BASE_EXCHANGE_API_URL}/${base}`;
       const { data } = await axios.get(url);
-      
+
       // The API returns an object where 'rates' contains the conversion mappings
       const rates = data.rates || {};
       const rate = rates[target];
@@ -39,5 +39,40 @@ export const financeService = {
    */
   updatePaymentStatus: async (paymentId: number, status: string): Promise<void> => {
     await apiClient.post(`/payments/${paymentId}/status`, { status });
+  },
+
+  getAnalytics: async (baseCurrency: string): Promise<{
+    kpis: {
+      todayRevenue: Array<{ currency: string; amount: number }>
+      pendingPayments: number
+      expiringSoon: number
+      activeSubscriptions: number
+    }
+    chartData: Array<{
+      day: string
+      currency: string
+      amount: number
+      normalizedAmount: number
+      originalExchangeRate: string
+    }>
+  }> => {
+    const { data } = await apiClient.get("/payments/analytics");
+
+    // Convert all chart currencies to the real base currency on the fly
+    if (data.chartData && baseCurrency) {
+      const currencies = Array.from(new Set(data.chartData.map((d: any) => d.currency)));
+      const rates: Record<string, number> = {};
+
+      for (const curr of currencies) {
+        rates[curr as string] = await financeService.getExchangeRate(curr as string, baseCurrency);
+      }
+
+      data.chartData = data.chartData.map((d: any) => ({
+        ...d,
+        normalizedAmount: d.amount * (rates[d.currency] ?? 1)
+      }));
+    }
+
+    return data;
   }
 };

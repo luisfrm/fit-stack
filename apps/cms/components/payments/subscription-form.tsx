@@ -320,7 +320,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           amountPaid: Math.round(finalAmount * 100),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
-          paymentMethod: paymentMethodId,
+          paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
           paymentMethodDetails: finalPaymentMethodDetails,
           status: paymentValidated ? 'validated' : 'processing',
           paymentDate: new Date(),

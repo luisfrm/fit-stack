@@ -10,8 +10,8 @@ import {
   Line,
   LineChart,
   XAxis,
+  YAxis,
 } from "recharts"
-
 import {
   ChartContainer,
   ChartTooltip,
@@ -19,7 +19,10 @@ import {
   ChartLegend,
   ChartLegendContent,
   type ChartConfig,
-} from "./chart"
+} from "@workspace/ui/components/chart"
+import { cn } from "../lib/utils"
+
+
 
 interface SimpleChartProps {
   /** Array of data objects */
@@ -42,12 +45,18 @@ interface SimpleChartProps {
   readonly showLegend?: boolean
   /** Whether the chart is stacked (for area/bar) */
   readonly stacked?: boolean
+  /** Custom formatter for X-axis ticks */
+  readonly xAxisFormatter?: (value: string | number) => string
+  /** Whether to show the Y-axis */
+  readonly showYAxis?: boolean
+  /** Custom formatter for Y-axis ticks */
+  readonly yAxisFormatter?: (value: string | number) => string
+  /** Custom formatter for Tooltip */
+  readonly tooltipFormatter?: React.ComponentProps<typeof ChartTooltipContent>["formatter"]
 }
 
 /**
  * SimpleChart - High-level abstraction for Recharts.
- * Follows the "Tactical Simplicity" pattern (like Modal.tsx).
- * Handles boilerplate and ensures visual synergy with the Fit-Stack theme.
  */
 export function SimpleChart({
   data,
@@ -60,26 +69,63 @@ export function SimpleChart({
   showGrid = true,
   showLegend = false,
   stacked = false,
+  xAxisFormatter,
+  showYAxis = false,
+  yAxisFormatter,
+  tooltipFormatter,
 }: SimpleChartProps) {
   return (
-    <ChartContainer config={config} variant={variant} className={className}>
-      {renderChart(type, data, index, categories, showGrid, showLegend, stacked)}
+    <ChartContainer config={config} variant={variant} className={cn("h-full w-full aspect-auto", className)}>
+      {renderChart({
+        type,
+        data,
+        index,
+        categories,
+        showGrid,
+        showLegend,
+        stacked,
+        xAxisFormatter,
+        showYAxis,
+        yAxisFormatter,
+        tooltipFormatter
+      })}
     </ChartContainer>
   )
 }
 
-function renderChart(
+function renderChart({
+  type,
+  data,
+  index,
+  categories,
+  showGrid,
+  showLegend,
+  stacked,
+  xAxisFormatter,
+  showYAxis,
+  yAxisFormatter,
+  tooltipFormatter
+}: {
   type: "area" | "bar" | "line",
   data: Record<string, string | number | boolean>[],
   index: string,
   categories: string[],
   showGrid: boolean,
   showLegend: boolean,
-  stacked: boolean
-) {
+  stacked: boolean,
+  xAxisFormatter?: (value: string | number) => string,
+  showYAxis?: boolean,
+  yAxisFormatter?: (value: string | number) => string,
+  tooltipFormatter?: React.ComponentProps<typeof ChartTooltipContent>["formatter"]
+}) {
   const commonProps = {
     data,
-    margin: { left: 12, right: 12, top: 12, bottom: 0 },
+    margin: {
+      left: 0,
+      right: 12,
+      top: 12,
+      bottom: 0
+    },
   }
 
   const grid = showGrid && <CartesianGrid vertical={false} />
@@ -89,13 +135,23 @@ function renderChart(
       tickLine={false}
       axisLine={false}
       tickMargin={8}
-      tickFormatter={(value) => value.slice(0, 3)}
+      tickFormatter={xAxisFormatter ?? ((value) => value)}
+    />
+  )
+  const yAxis = showYAxis && (
+    <YAxis
+      width={40}
+      tickLine={false}
+      axisLine={false}
+      tickMargin={8}
+      tickFormatter={yAxisFormatter}
+      className="text-[10px] fill-foreground/50"
     />
   )
   const tooltip = (
     <ChartTooltip
       cursor={false}
-      content={<ChartTooltipContent hideLabel />}
+      content={<ChartTooltipContent hideLabel formatter={tooltipFormatter} />}
     />
   )
   const legend = showLegend && (
@@ -108,6 +164,7 @@ function renderChart(
         <BarChart {...commonProps}>
           {grid}
           {xAxis}
+          {yAxis}
           {tooltip}
           {legend}
           {categories.map((key) => (
@@ -126,6 +183,7 @@ function renderChart(
         <LineChart {...commonProps}>
           {grid}
           {xAxis}
+          {yAxis}
           {tooltip}
           {legend}
           {categories.map((key) => (
@@ -146,6 +204,7 @@ function renderChart(
         <AreaChart {...commonProps}>
           {grid}
           {xAxis}
+          {yAxis}
           {tooltip}
           {legend}
           {categories.map((key) => (

@@ -1,4 +1,4 @@
-import { db, eq, and } from '@workspace/database/client'
+import { db, eq, and, sql } from '@workspace/database/client'
 import { payment } from '@workspace/database/schema'
 
 export interface IPayment {
@@ -6,21 +6,21 @@ export interface IPayment {
   organizationId: string
   memberId: number
   subscriptionId?: number | null
-  
+
   // Snapshots
   planSnapshotName: string
   planSnapshotPrice: string | number
   planSnapshotCurrency: string
-  
+
   // Real Payment
   amountPaid: string | number
   currencyPaid: string
   exchangeRateApplied?: string | null
-  
+
   status?: 'processing' | 'validated' | 'invalid' | 'voided'
   paymentMethod: string
   paymentMethodDetails?: Record<string, any> | null
-  
+
   paymentDate?: Date
   createdAt?: string | Date
 }
@@ -79,5 +79,34 @@ export const paymentsRepository = {
         organization: true
       }
     })
+  },
+
+  async getAggregatedPayments(organizationId: string, startDate: Date) {
+    return db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', ${payment.paymentDate})`,
+        currency: payment.currencyPaid,
+        amount: sql<number>`SUM(${payment.amountPaid})`,
+        exchangeRate: payment.exchangeRateApplied,
+      })
+      .from(payment)
+      .where(and(
+        eq(payment.organizationId, organizationId),
+        eq(payment.status, 'validated'),
+        sql`${payment.paymentDate} >= ${startDate}`
+      ))
+      .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
+      .orderBy(sql`1`);
+  },
+
+  async getPendingPaymentsCount(organizationId: string) {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(payment)
+      .where(and(
+        eq(payment.organizationId, organizationId),
+        eq(payment.status, 'processing')
+      ));
+    return result[0]?.count || 0;
   }
 }

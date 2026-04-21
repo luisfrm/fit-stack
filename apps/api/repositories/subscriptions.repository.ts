@@ -131,5 +131,33 @@ export const subscriptionsRepository = {
       .limit(1);
 
     return results[0] || null;
+  },
+
+  async getExpiringSoonCount(organizationId: string, now: Date, days: number = 7) {
+    const limitDate = new Date(now);
+    limitDate.setDate(limitDate.getDate() + days);
+
+    const result = await db
+      .select({ count: sql<number>`count(distinct ${subscription.memberId})` })
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.cancelledAt} IS NULL`,
+        sql`${subscription.endDate} >= ${now}`,
+        sql`${subscription.endDate} <= ${limitDate}`
+      ));
+    return result[0]?.count || 0;
+  },
+
+  async getActiveCount(organizationId: string, now: Date) {
+    const result = await db
+      .select({ count: sql<number>`count(distinct ${subscription.memberId})` })
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.cancelledAt} IS NULL`,
+        sql`${subscription.endDate} >= ${now}`
+      ));
+    return result[0]?.count || 0;
   }
 }

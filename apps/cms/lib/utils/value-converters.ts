@@ -15,12 +15,14 @@ export class ValueConverter {
    * @param format  'latam' (1.250,50) or 'usa' (1,250.50)
    */
   static format(value: number, symbol: string = "", format: CurrencyFormat = 'latam'): string {
+    if (value === undefined || value === null) return symbol ? `0.00 ${symbol}` : "0.00";
+
     const isLatam = format === 'latam';
     const thousandSeparator = isLatam ? "." : ",";
     const decimalSeparator = isLatam ? "," : ".";
 
     // Round to 2 decimals
-    const fixedValue = value.toFixed(2);
+    const fixedValue = Number(value).toFixed(2);
     const [integerPart, decimalPart] = fixedValue.split(".");
 
     // Add thousand separators to integer part

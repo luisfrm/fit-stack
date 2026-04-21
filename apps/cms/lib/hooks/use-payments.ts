@@ -26,6 +26,7 @@ export function useUpdatePaymentStatus() {
       financeService.updatePaymentStatus(paymentId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "analytics"] });
     },
   });
 }
@@ -40,6 +41,7 @@ export function useUpdateSubscriptionStatus() {
       subscriptionsService.updateStatus(id, status as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "analytics"] });
     },
   });
 }
@@ -53,6 +55,7 @@ export function useDeleteSubscription() {
     mutationFn: (id: number) => subscriptionsService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "analytics"] });
     },
   });
 }
@@ -90,5 +93,17 @@ export function useRecentRegistrations(limit: number = 5) {
       }));
     },
     staleTime: 1000 * 60 * 2,
+  });
+}
+
+/**
+ * Hook to fetch payments dashboard analytics.
+ */
+export function useAnalytics(baseCurrency: string) {
+  return useQuery({
+    queryKey: ["payments", "analytics", baseCurrency],
+    queryFn: () => financeService.getAnalytics(baseCurrency),
+    enabled: !!baseCurrency,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

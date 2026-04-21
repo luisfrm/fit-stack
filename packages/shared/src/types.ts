@@ -223,6 +223,7 @@ export interface ISubscription {
   planSnapshotCurrency?: string;
   price?: number;
   role?: string;
+  isActive?: boolean;
 
   // Payment Data (From Join)
   paymentId?: number;

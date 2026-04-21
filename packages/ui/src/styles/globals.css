@@ -202,4 +202,8 @@
   ::-webkit-scrollbar-thumb:active {
     background: var(--primary);
   }
+
+  .mask-fade-right {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
 }
