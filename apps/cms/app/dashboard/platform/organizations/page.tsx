@@ -46,7 +46,8 @@ export default function OrganizationsPage() {
       const result = await organizationsService.getAll({
         query: query || undefined,
         page,
-        limit
+        limit,
+        includeMemberCount: true
       });
       setOrganizations(result.data);
       setTotal(result.total);

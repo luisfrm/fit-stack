@@ -395,4 +395,5 @@ export interface IOrganization {
 export interface IPlatformOrganization extends IOrganization {
   latestSubscription?: (IPlatformSubscription & { planName?: string }) | null;
   memberCount?: number;
+  userCount?: number;
 }

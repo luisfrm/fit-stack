@@ -15,6 +15,7 @@
     "@better-auth/infra": "^0.1.13",
     "@react-pdf/renderer": "^4.5.1",
     "@types/react": "^19.2.10",
+    "@upstash/redis": "^1.37.0",
     "@workspace/database": "workspace:*",
     "@workspace/shared": "workspace:*",
     "better-auth": "^1.5.5",
