@@ -15,9 +15,9 @@ export const auth = betterAuth({
       member: schema.authMember, // Map 'authMember' to 'member' for Better Auth
     },
   }),
-  secret: env.betterAuthSecret,
+  secret: env.betterAuthSecret!,
 
-  trustedOrigins: [env.frontendUrl],
+  trustedOrigins: [env.frontendUrl!],
   user: {
     additionalFields: {
       role: {
@@ -44,7 +44,7 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    crossSubdomainCookies: {
+    crossSubDomainCookies: {
       enabled: !env.isLocal,
       domain: env.isLocal ? undefined : env.cookieDomain!,
     },
@@ -55,3 +55,6 @@ export const auth = betterAuth({
     },
   },
 });
+
+export type Session = typeof auth.$Infer.Session;
+export type User = typeof auth.$Infer.Session.user;
