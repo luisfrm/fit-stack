@@ -1,4 +1,4 @@
-import { Role } from './constants';
+import { Role } from '@workspace/shared/constants';
 
 /**
  * Standard interface for Better Auth errors.

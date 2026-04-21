@@ -1,6 +1,7 @@
 {
   "name": "@workspace/shared",
   "version": "0.0.1",
+  "type": "module",
   "private": true,
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -11,13 +12,16 @@
     "./types": "./src/types.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "better-auth": "^1.5.5"
   },
   "devDependencies": {
+    "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.39.2",
     "typescript": "^5.0.0"
   }
 }
