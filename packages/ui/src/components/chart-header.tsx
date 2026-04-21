@@ -48,7 +48,7 @@ export function ChartHeader({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex border border-white/10 rounded-md p-1 bg-white/5 mr-2">
+        {options && options.length > 0 && (<div className="flex border border-white/10 rounded-md p-1 bg-white/5 mr-2">
           {options.map((opt) => (
             <button
               key={String(opt.value)}
@@ -62,7 +62,8 @@ export function ChartHeader({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
+        )}
+        < div className="flex items-center gap-1">
           <Button
             variant="outlined"
             size="icon"
@@ -83,6 +84,6 @@ export function ChartHeader({
           </Button>
         </div>
       </div>
-    </CardHeader>
+    </CardHeader >
   );
 }
