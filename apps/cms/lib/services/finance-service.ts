@@ -48,6 +48,10 @@ export const financeService = {
       expiringSoon: number
       activeSubscriptions: number
     }
+    plansDistribution: Array<{
+      planName: string
+      count: number
+    }>
     chartData: Array<{
       day: string
       currency: string

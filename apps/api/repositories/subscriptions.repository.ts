@@ -274,11 +274,33 @@ export const subscriptionsRepository = {
     const result = await db
       .select({ count: sql<number>`count(distinct ${subscription.memberId})` })
       .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${now}`
+        sql`${subscription.endDate} >= ${now}`,
+        eq(payment.status, 'validated')
       ));
     return result[0]?.count || 0;
+  },
+
+  async getActiveCountByPlan(organizationId: string, now: Date) {
+    const result = await db
+      .select({
+        planName: payment.planSnapshotName,
+        count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
+      })
+      .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.cancelledAt} IS NULL`,
+        sql`${subscription.endDate} >= ${now}`,
+        eq(payment.status, 'validated')
+      ))
+      .groupBy(payment.planSnapshotName)
+      .orderBy(desc(sql`count`));
+    
+    return result;
   }
 }

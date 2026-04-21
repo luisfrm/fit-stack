@@ -130,7 +130,7 @@ export function RevenueChart({
   ];
 
   return (
-    <Card variant="glass" className="w-1/2">
+    <Card variant="glass" className="w-full h-full flex flex-col">
       <ChartHeader
         title="Ingresos por Moneda"
         description="Métricas de recaudación neta (montos reales sin normalizar)."
@@ -141,9 +141,10 @@ export function RevenueChart({
         canPrev={canPrev}
         canNext={canNext}
         options={windowOptions}
+        className="flex-none"
       />
-      <CardContent>
-        <div className="h-[300px] w-full">
+      <CardContent className="flex-1 flex flex-col">
+        <div className="h-[300px] w-full mt-auto">
           {processedData.length > 0 ? (
             <SimpleChart
               type="line"

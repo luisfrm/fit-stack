@@ -10,6 +10,7 @@ export const financeService = {
     const pendingPayments = await paymentsRepository.getPendingPaymentsCount(organizationId)
     const expiringSoon = await subscriptionsRepository.getExpiringSoonCount(organizationId, now)
     const activeSubscriptions = await subscriptionsRepository.getActiveCount(organizationId, now)
+    const activeSubscriptionsByPlan = await subscriptionsRepository.getActiveCountByPlan(organizationId, now)
 
     // Calculate today's revenue in base currency
     const today = new Date(now)
@@ -39,6 +40,7 @@ export const financeService = {
         expiringSoon,
         activeSubscriptions
       },
+      plansDistribution: activeSubscriptionsByPlan,
       chartData: chartDataRaw.map(d => ({
         day: d.day,
         currency: d.currency,

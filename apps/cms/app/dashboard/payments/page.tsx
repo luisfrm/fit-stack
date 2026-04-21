@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { KpiSection } from "@/components/payments/kpi-section";
 import { RevenueChart } from "@/components/payments/revenue-chart";
+import { PlansDistributionChart } from "@/components/payments/plans-distribution-chart";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ORG_ROLES } from "@workspace/shared";
@@ -110,7 +111,10 @@ export default function PaymentsPage() {
       {isAnalyticsLoading ? (
         <>
           <KpiSectionSkeleton />
-          <RevenueChartSkeleton />
+          <div className="flex flex-col xl:flex-row gap-4 w-full">
+            <RevenueChartSkeleton />
+            <RevenueChartSkeleton />
+          </div>
         </>
       ) : analytics && (
         <>
@@ -120,11 +124,20 @@ export default function PaymentsPage() {
             onFilterChange={setActiveFilter}
             currencyFormat={currencyFormat}
           />
-          <RevenueChart
-            data={analytics.chartData}
-            baseCurrency={primaryCurrency}
-            currencyFormat={currencyFormat}
-          />
+          <div className="flex flex-col xl:flex-row gap-4 w-full">
+            <div className="w-full xl:w-1/2">
+              <RevenueChart
+                data={analytics.chartData}
+                baseCurrency={primaryCurrency}
+                currencyFormat={currencyFormat}
+              />
+            </div>
+            <div className="w-full xl:w-1/2">
+              <PlansDistributionChart
+                data={analytics.plansDistribution || []}
+              />
+            </div>
+          </div>
         </>
       )}
 
