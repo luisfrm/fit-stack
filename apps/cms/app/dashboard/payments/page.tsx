@@ -26,7 +26,7 @@ import {
 
 export default function PaymentsPage() {
   const { data: subs = [], isLoading, refetch } = useSubscriptions();
-  
+
   const { settings } = useSettings();
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
@@ -136,10 +136,10 @@ export default function PaymentsPage() {
             onFilterChange={setActiveFilter}
             currencyFormat={currencyFormat}
           />
-          <RevenueChart 
-            data={analytics.chartData} 
+          <RevenueChart
+            data={analytics.chartData}
             baseCurrency={primaryCurrency}
-            currencyFormat={currencyFormat} 
+            currencyFormat={currencyFormat}
           />
         </>
       )}
@@ -159,10 +159,9 @@ export default function PaymentsPage() {
             ].map((btn) => (
               <Badge
                 key={btn.id}
-                variant="outline"
+                variant={btn.id === activeFilter ? "info" : "outline"}
                 className={cn(
-                  "cursor-pointer px-3 py-1 text-xs transition-all hover:brightness-110",
-                  activeFilter === btn.id ? btn.color : "opacity-50 grayscale hover:opacity-100 hover:grayscale-0"
+                  "cursor-pointer hover:brightness-110 hover:scale-110",
                 )}
                 onClick={() => setActiveFilter(activeFilter === btn.id ? null : btn.id)}
               >
