@@ -32,7 +32,7 @@ export function ChartCarousel({ views, className }: Readonly<ChartCarouselProps>
   };
 
   // Enforce a dummy options array if none provided to keep header height stable
-  const headerOptions = currentView?.options || [{ label: "Total", value: "all" }];
+  const headerOptions = currentView?.options || [];
 
   return (
     <Card variant="glass" className={`w-full h-full flex flex-col ${className || ''}`}>

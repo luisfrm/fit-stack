@@ -91,5 +91,32 @@ export const financeService = {
     }
 
     return data;
+  },
+
+  getRevenueReport: async (baseCurrency: string, timeframe: '12m' = '12m'): Promise<Array<{
+    month: string
+    currency: string
+    amount: number
+    normalizedAmount: number
+    originalExchangeRate: string
+  }>> => {
+    const { data } = await apiClient.get("/reports/revenue");
+
+    // Convert all chart currencies to the real base currency on the fly
+    if (data && baseCurrency) {
+      const currencies = Array.from(new Set(data.map((d: any) => d.currency)));
+      const rates: Record<string, number> = {};
+
+      for (const curr of currencies) {
+        rates[curr as string] = await financeService.getExchangeRate(curr as string, baseCurrency);
+      }
+
+      return data.map((d: any) => ({
+        ...d,
+        normalizedAmount: d.amount * (rates[d.currency] ?? 1)
+      }));
+    }
+
+    return data;
   }
 };

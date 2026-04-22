@@ -99,6 +99,24 @@ export const paymentsRepository = {
       .orderBy(sql`1`);
   },
 
+  async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date) {
+    return db
+      .select({
+        month: sql<string>`DATE_TRUNC('month', ${payment.paymentDate})`,
+        currency: payment.currencyPaid,
+        amount: sql<number>`SUM(${payment.amountPaid})`,
+        exchangeRate: payment.exchangeRateApplied,
+      })
+      .from(payment)
+      .where(and(
+        eq(payment.organizationId, organizationId),
+        eq(payment.status, 'validated'),
+        sql`${payment.paymentDate} >= ${startDate}`
+      ))
+      .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
+      .orderBy(sql`1`);
+  },
+
   async getPendingPaymentsCount(organizationId: string) {
     const result = await db
       .select({ count: sql<number>`count(*)` })
