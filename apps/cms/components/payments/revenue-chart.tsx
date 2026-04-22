@@ -88,14 +88,16 @@ export function RevenueChart({
         dateLabel = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
       }
 
-      if (!grouped[dateLabel]) {
-        grouped[dateLabel] = { dateLabel };
+      let group = grouped[dateLabel];
+      if (!group) {
+        group = { dateLabel };
+        grouped[dateLabel] = group;
       }
 
       // El valor para la gráfica es el normalizado
-      grouped[dateLabel][item.currency] = (grouped[dateLabel][item.currency] as number || 0) + (item.normalizedAmount / 100);
+      group[item.currency] = (group[item.currency] as number || 0) + (item.normalizedAmount / 100);
       // Guardamos el original para el tooltip
-      grouped[dateLabel][`${item.currency}_raw`] = (grouped[dateLabel][`${item.currency}_raw`] as number || 0) + (item.amount / 100);
+      group[`${item.currency}_raw`] = (group[`${item.currency}_raw`] as number || 0) + (item.amount / 100);
     });
 
     const currencies = Array.from(new Set(activeData.map((d: any) => d.currency)));
