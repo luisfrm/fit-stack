@@ -26,7 +26,7 @@ import { cn } from "../lib/utils"
 
 interface SimpleChartProps {
   /** Array of data objects */
-  readonly data: Record<string, any>[]
+  readonly data: Record<string, unknown>[]
   /** Configuration for labels and colors */
   readonly config: ChartConfig
   /** Key for the X-axis */
@@ -107,7 +107,7 @@ function renderChart({
   tooltipFormatter
 }: {
   type: "area" | "bar" | "line",
-  data: Record<string, any>[],
+  data: Record<string, unknown>[],
   index: string,
   categories: string[],
   showGrid: boolean,
