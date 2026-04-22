@@ -52,6 +52,19 @@ export const financeService = {
       planName: string
       count: number
     }>
+    paymentMethods: Array<{
+      method: string
+      count: number
+      breakdown: Record<string, number>
+    }>
+    renewals: Array<{
+      day: string
+      count: number
+    }>
+    growth: {
+      altas: Array<{ day: string; count: number }>
+      bajas: Array<{ day: string; count: number }>
+    }
     chartData: Array<{
       day: string
       currency: string

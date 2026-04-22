@@ -302,5 +302,64 @@ export const subscriptionsRepository = {
       .orderBy(desc(sql`count`));
     
     return result;
+  },
+
+  async getRenewalsProjection(organizationId: string, startDate: Date, endDate: Date) {
+    return db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', ${subscription.endDate})`,
+        count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
+      })
+      .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.cancelledAt} IS NULL`,
+        sql`${subscription.endDate} >= ${startDate}`,
+        sql`${subscription.endDate} <= ${endDate}`,
+        eq(payment.status, 'validated')
+      ))
+      .groupBy(sql`1`)
+      .orderBy(sql`1`);
+  },
+
+  async getNetGrowth(organizationId: string, startDate: Date, now: Date) {
+    const altas = await db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', ${subscription.startDate})`,
+        count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
+      })
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        sql`${subscription.startDate} >= ${startDate}`,
+        sql`${subscription.startDate} <= ${now}`
+      ))
+      .groupBy(sql`1`);
+
+    const bajas = await db
+      .select({
+        day: sql<string>`DATE_TRUNC('day', COALESCE(${subscription.cancelledAt}, ${subscription.endDate}))`,
+        count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
+      })
+      .from(subscription)
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        or(
+          and(
+            sql`${subscription.cancelledAt} IS NOT NULL`,
+            sql`${subscription.cancelledAt} >= ${startDate}`,
+            sql`${subscription.cancelledAt} <= ${now}`
+          ),
+          and(
+            sql`${subscription.cancelledAt} IS NULL`,
+            sql`${subscription.endDate} < ${now}`,
+            sql`${subscription.endDate} >= ${startDate}`
+          )
+        )
+      ))
+      .groupBy(sql`1`);
+
+    return { altas, bajas };
   }
 }

@@ -9,7 +9,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { KpiSection } from "@/components/payments/kpi-section";
 import { RevenueChart } from "@/components/payments/revenue-chart";
-import { PlansDistributionChart } from "@/components/payments/plans-distribution-chart";
+import { AnalyticsCarousel } from "@/components/payments/analytics-carousel";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { ORG_ROLES } from "@workspace/shared";
@@ -133,8 +133,9 @@ export default function PaymentsPage() {
               />
             </div>
             <div className="w-full xl:w-1/2">
-              <PlansDistributionChart
-                data={analytics.plansDistribution || []}
+              <AnalyticsCarousel
+                data={analytics}
+                currencyFormat={currencyFormat}
               />
             </div>
           </div>

@@ -108,5 +108,23 @@ export const paymentsRepository = {
         eq(payment.status, 'processing')
       ));
     return result[0]?.count || 0;
+  },
+
+  async getPaymentsByMethod(organizationId: string, startDate: Date) {
+    return db
+      .select({
+        paymentMethod: payment.paymentMethod,
+        currencyPaid: payment.currencyPaid,
+        totalAmount: sql<number>`SUM(${payment.amountPaid})`.mapWith(Number),
+        count: sql<number>`count(*)`.mapWith(Number),
+      })
+      .from(payment)
+      .where(and(
+        eq(payment.organizationId, organizationId),
+        eq(payment.status, 'validated'),
+        sql`${payment.paymentDate} >= ${startDate}`
+      ))
+      .groupBy(payment.paymentMethod, payment.currencyPaid)
+      .orderBy(sql`count(*) DESC`);
   }
 }
