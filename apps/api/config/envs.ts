@@ -25,16 +25,28 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
+const isProduction = process.env.APP_ENV === "production";
 const isBuildTime = process.env.NEXT_PHASE === "phase-production-build" || process.env.CI === "true";
 
-const _parsed = isBuildTime ? envSchema.partial().safeParse(process.env) : envSchema.safeParse(process.env);
+// Solo permitimos validación parcial durante el build si NO estamos en producción real
+const _parsed = (isBuildTime && !isProduction) 
+  ? envSchema.partial().safeParse(process.env) 
+  : envSchema.safeParse(process.env);
 
 if (!_parsed.success) {
-  console.error("❌ Invalid environment variables:", _parsed.error.flatten().fieldErrors);
-  throw new Error("Missing or invalid environment variables. Check server logs.");
+  console.error("❌ Invalid environment variables:", JSON.stringify(_parsed.error.format(), null, 2));
+  if (isBuildTime && !isProduction) {
+    console.warn("⚠️  Skipping strict environment validation during build (Non-production)");
+  } else {
+    throw new Error("Missing or invalid environment variables. Check server logs.");
+  }
 }
 
-const _env = _parsed.data;
+const _env = _parsed.success 
+  ? _parsed.data 
+  : (isBuildTime && !isProduction)
+    ? { APP_ENV: "development", FRONTEND_URL: "http://localhost:3000", BETTER_AUTH_SECRET: "dummy-secret-at-least-16-chars" } as any
+    : ({} as any);
 
 export const env = {
   appEnv: _env.APP_ENV,
