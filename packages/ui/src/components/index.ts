@@ -63,3 +63,5 @@ export { SimpleChart } from "@workspace/ui/components/simple-chart";
 export { ChartHeader } from "@workspace/ui/components/chart-header";
 export type { ChartHeaderOption, ChartHeaderProps } from "@workspace/ui/components/chart-header";
 export type { ChartConfig } from "@workspace/ui/components/chart";
+export { ChartCarousel } from "@workspace/ui/components/chart-carousel";
+export type { ChartCarouselProps, ChartView } from "@workspace/ui/components/chart-carousel";

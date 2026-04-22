@@ -14,17 +14,28 @@ const parsed = envSchema.safeParse({
   NEXT_PUBLIC_R2_URL: process.env.NEXT_PUBLIC_R2_URL,
 });
 
+const isProduction = process.env.APP_ENV === "production";
+const isBuildTime = process.env.CI === "true" || process.env.NEXT_PHASE === "phase-production-build" || process.env.NODE_ENV === "test";
+
 if (!parsed.success) {
   if (globalThis.window === undefined) {
-    console.error("❌ Invalid CMS environment variables:", JSON.stringify(parsed.error.format(), null, 2));
-    throw new Error("Invalid CMS environment variables");
+    // Si es producción real, NUNCA permitimos saltarnos la validación
+    if (isBuildTime && !isProduction) {
+      console.warn("⚠️  Skipping strict CMS env validation during build/CI (Non-production)");
+    } else {
+      console.error("❌ Invalid CMS environment variables:", JSON.stringify(parsed.error.format(), null, 2));
+      throw new Error("Invalid CMS environment variables");
+    }
   } else {
-    // En el cliente, solo fallamos si es crítico, pero el error ya sale en consola
     console.error("❌ CMS Environment validation failed on client", parsed.error.format());
   }
 }
 
-const validatedEnv = parsed.success ? parsed.data : ({} as z.infer<typeof envSchema>);
+const validatedEnv = parsed.success 
+  ? parsed.data 
+  : (isBuildTime && !isProduction)
+    ? { APP_ENV: "development", NEXT_PUBLIC_API_BASE_URL: "http://localhost:3001", NEXT_PUBLIC_R2_URL: "http://localhost:3001" }
+    : ({} as z.infer<typeof envSchema>);
 
 export const env = {
   appEnv: validatedEnv.APP_ENV ?? "development",

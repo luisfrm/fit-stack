@@ -40,12 +40,12 @@ export function PlansDistributionChart({
         title="Suscripciones por Plan"
         description="Usuarios activos distribuidos según su membresía."
         viewWindow={"all"}
-        onViewWindowChange={() => {}}
-        onPrev={() => {}}
-        onNext={() => {}}
+        onViewWindowChange={() => { }}
+        onPrev={() => { }}
+        onNext={() => { }}
         canPrev={false}
         canNext={false}
-        options={[{ label: "Total", value: "all" }]}
+        options={[]}
         className="flex-none"
       />
       <CardContent className="flex-1 flex flex-col">

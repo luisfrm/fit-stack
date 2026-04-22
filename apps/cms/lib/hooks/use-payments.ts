@@ -107,3 +107,15 @@ export function useAnalytics(baseCurrency: string) {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
+
+/**
+ * Hook to fetch revenue report (12m).
+ */
+export function useRevenueReport(baseCurrency: string, timeframe: '12m' = '12m') {
+  return useQuery({
+    queryKey: ["payments", "report-revenue", baseCurrency, timeframe],
+    queryFn: () => financeService.getRevenueReport(baseCurrency, timeframe),
+    enabled: !!baseCurrency,
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
+}

@@ -6,6 +6,7 @@ import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converter
 import { KpiCard } from "./kpi-card";
 
 interface CurrencyBreakdown {
+  id?: string | number;
   currency: string;
   amount: number;
 }
@@ -22,19 +23,19 @@ interface KpiSectionProps {
   currencyFormat: CurrencyFormat;
 }
 
-export function KpiSection({ 
-  stats, 
-  onFilterChange, 
-  activeFilter, 
-  currencyFormat = "latam" 
+export function KpiSection({
+  stats,
+  onFilterChange,
+  activeFilter,
+  currencyFormat = "latam"
 }: Readonly<KpiSectionProps>) {
-  
+
   // Format currency list for the ticker using ValueConverter
   const tickerLabel = React.useMemo(() => {
     if (stats.todayRevenue.length === 0) {
       return ValueConverter.format(0, "---", currencyFormat);
     }
-    
+
     return stats.todayRevenue
       .map(r => ValueConverter.format(r.amount / 100, r.currency, currencyFormat))
       .join(" • ");
@@ -52,8 +53,8 @@ export function KpiSection({
       tooltipContent: stats.todayRevenue.length > 0 ? (
         <div className="flex flex-col gap-1 p-1">
           <p className="font-bold border-b border-white/10 pb-1 mb-1">Cortes del día</p>
-          {stats.todayRevenue.map(r => (
-            <div key={r.currency} className="flex justify-between gap-4 text-xs">
+          {stats.todayRevenue.map((r, idx) => (
+            <div key={`${r.currency}-${r.id ?? idx}`} className="flex justify-between gap-4 text-xs">
               <span className="opacity-70">{r.currency}</span>
               <span className="font-mono">{ValueConverter.format(r.amount / 100, "", currencyFormat)}</span>
             </div>

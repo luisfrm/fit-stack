@@ -30,6 +30,34 @@ export const financeService = {
 
     const chartDataRaw = await paymentsRepository.getAggregatedPayments(organizationId, startDate)
 
+    // Payment Methods
+    const paymentMethodsRaw = await paymentsRepository.getPaymentsByMethod(organizationId, startDate)
+    
+    const methodsMap: Record<string, { method: string, count: number, breakdown: Record<string, number> }> = {}
+    
+    for (const record of paymentMethodsRaw) {
+      const methodKey = record.paymentMethod || 'unknown';
+      if (!methodsMap[methodKey]) {
+        methodsMap[methodKey] = {
+          method: methodKey,
+          count: 0,
+          breakdown: {}
+        }
+      }
+      methodsMap[methodKey].count += record.count
+      methodsMap[methodKey].breakdown[record.currencyPaid] = (methodsMap[methodKey].breakdown[record.currencyPaid] || 0) + Number(record.totalAmount)
+    }
+    
+    const paymentMethods = Object.values(methodsMap)
+
+    // Renewals (next 30 days)
+    const futureDate = new Date(now)
+    futureDate.setDate(futureDate.getDate() + 30)
+    const renewals = await subscriptionsRepository.getRenewalsProjection(organizationId, now, futureDate)
+    
+    // Net Growth (last 30 days)
+    const growth = await subscriptionsRepository.getNetGrowth(organizationId, startDate, now)
+
     // The frontend will handle the specific grouping for the chart window
     // but we return the raw aggregated records for efficiency.
 
@@ -41,6 +69,9 @@ export const financeService = {
         activeSubscriptions
       },
       plansDistribution: activeSubscriptionsByPlan,
+      paymentMethods,
+      renewals,
+      growth,
       chartData: chartDataRaw.map(d => ({
         day: d.day,
         currency: d.currency,
