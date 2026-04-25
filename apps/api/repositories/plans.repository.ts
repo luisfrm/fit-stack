@@ -47,10 +47,8 @@ export const plansRepository = {
     return records as unknown as IMembershipPlan[]
   },
 
-  async getSummary(organizationId: string, now: Date = new Date()): Promise<IMembershipsSummary> {
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-    // 1. Monthly Revenue (Reusing logic from dashboard)
+  async getSummary(organizationId: string, now: Date = new Date(), timezone: string = 'UTC'): Promise<IMembershipsSummary> {
+    // 1. Monthly Revenue (Using PostgreSQL AT TIME ZONE for correct month truncation)
     const incomeResults = await db
       .select({ 
         currency: payment.currencyPaid, 
@@ -59,7 +57,9 @@ export const plansRepository = {
       .from(payment)
       .where(and(
         eq(payment.organizationId, organizationId), 
-        gte(payment.paymentDate, firstDayOfMonth)
+        eq(payment.status, 'validated'),
+        // Filter payments where the date truncated to month in local time matches current local month
+        sql`DATE_TRUNC('month', ${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}) = DATE_TRUNC('month', ${now} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone})`
       ))
       .groupBy(payment.currencyPaid)
 
@@ -70,13 +70,14 @@ export const plansRepository = {
       }
     })
 
-    // 2. Total Active subscription (Using same 'active' logic as dashboard)
+    // 2. Total Active subscription (Using actual UTC 'now' for expiration check)
     const activeSubsResult = await db
       .select({ count: sql<number>`count(*)`.mapWith(Number) })
       .from(subscription)
       .where(and(
         eq(subscription.organizationId, organizationId), 
-        gte(subscription.endDate, now)
+        gte(subscription.endDate, now),
+        sql`${subscription.cancelledAt} IS NULL`
       ))
 
     return {

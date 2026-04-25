@@ -4,19 +4,26 @@ import { settingsService } from './settings.service'
 
 export const financeService = {
   async getDashboardAnalytics(organizationId: string) {
-    const now = await settingsService.getGymNow(organizationId)
+    const timezone = (await settingsService.getByKey(organizationId, 'timezone')) || 'America/Caracas'
+    const gymNow = await settingsService.getGymNow(organizationId)
+    const utcNow = new Date()
 
     // 1. Fetch KPI Data
     const pendingPayments = await paymentsRepository.getPendingPaymentsCount(organizationId)
-    const expiringSoon = await subscriptionsRepository.getExpiringSoonCount(organizationId, now)
-    const activeSubscriptions = await subscriptionsRepository.getActiveCount(organizationId, now)
-    const activeSubscriptionsByPlan = await subscriptionsRepository.getActiveCountByPlan(organizationId, now)
+    const expiringSoon = await subscriptionsRepository.getExpiringSoonCount(organizationId, utcNow)
+    const activeSubscriptions = await subscriptionsRepository.getActiveCount(organizationId, utcNow)
+    const activeSubscriptionsByPlan = await subscriptionsRepository.getActiveCountByPlan(organizationId, utcNow)
 
-    // Calculate today's revenue in base currency
-    const today = new Date(now)
-    today.setHours(0, 0, 0, 0)
+    // Calculate today's revenue in base currency (Local day)
+    // To get "Today" in local time, we use the gymNow (which is already shifted to local)
+    // but we need to be careful with how we query the DB.
+    const localTodayStart = new Date(gymNow)
+    localTodayStart.setHours(0, 0, 0, 0)
+    
+    // Convert localTodayStart (which is shifted) back to actual UTC for the DB query?
+    // Actually, it's easier to use the timezone in the repository.
 
-    const todayPayments = await paymentsRepository.getAggregatedPayments(organizationId, today)
+    const todayPayments = await paymentsRepository.getAggregatedPayments(organizationId, localTodayStart, timezone)
 
     // Create breakdown of actual collections today
     const todayRevenueBreakdown = todayPayments.map(p => ({
@@ -25,10 +32,11 @@ export const financeService = {
     }))
 
     // 2. Fetch Chart Data (last 30 days)
-    const startDate = new Date(now)
+    const startDate = new Date(gymNow)
     startDate.setDate(startDate.getDate() - 30)
+    startDate.setHours(0, 0, 0, 0)
 
-    const chartDataRaw = await paymentsRepository.getAggregatedPayments(organizationId, startDate)
+    const chartDataRaw = await paymentsRepository.getAggregatedPayments(organizationId, startDate, timezone)
 
     // Payment Methods
     const paymentMethodsRaw = await paymentsRepository.getPaymentsByMethod(organizationId, startDate)
@@ -51,15 +59,12 @@ export const financeService = {
     const paymentMethods = Object.values(methodsMap)
 
     // Renewals (next 30 days)
-    const futureDate = new Date(now)
+    const futureDate = new Date(gymNow)
     futureDate.setDate(futureDate.getDate() + 30)
-    const renewals = await subscriptionsRepository.getRenewalsProjection(organizationId, now, futureDate)
+    const renewals = await subscriptionsRepository.getRenewalsProjection(organizationId, gymNow, futureDate, timezone)
     
     // Net Growth (last 30 days)
-    const growth = await subscriptionsRepository.getNetGrowth(organizationId, startDate, now)
-
-    // The frontend will handle the specific grouping for the chart window
-    // but we return the raw aggregated records for efficiency.
+    const growth = await subscriptionsRepository.getNetGrowth(organizationId, startDate, utcNow, timezone)
 
     return {
       kpis: {
@@ -76,7 +81,7 @@ export const financeService = {
         day: d.day,
         currency: d.currency,
         amount: Number(d.amount),
-        normalizedAmount: Number(d.amount), // Will be accurately converted in the frontend layer
+        normalizedAmount: Number(d.amount), 
         originalExchangeRate: d.exchangeRate
       }))
     }

@@ -304,10 +304,10 @@ export const subscriptionsRepository = {
     return result;
   },
 
-  async getRenewalsProjection(organizationId: string, startDate: Date, endDate: Date) {
+  async getRenewalsProjection(organizationId: string, startDate: Date, endDate: Date, timezone: string = 'UTC') {
     return db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${subscription.endDate})`,
+        day: sql<string>`TO_CHAR(${subscription.endDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
@@ -315,31 +315,31 @@ export const subscriptionsRepository = {
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${startDate}`,
-        sql`${subscription.endDate} <= ${endDate}`,
+        sql`${subscription.endDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`,
+        sql`${subscription.endDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} <= ${endDate}`,
         eq(payment.status, 'validated')
       ))
       .groupBy(sql`1`)
       .orderBy(sql`1`);
   },
 
-  async getNetGrowth(organizationId: string, startDate: Date, now: Date) {
+  async getNetGrowth(organizationId: string, startDate: Date, now: Date, timezone: string = 'UTC') {
     const altas = await db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${subscription.startDate})`,
+        day: sql<string>`TO_CHAR(${subscription.startDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
       .where(and(
         eq(subscription.organizationId, organizationId),
-        sql`${subscription.startDate} >= ${startDate}`,
-        sql`${subscription.startDate} <= ${now}`
+        sql`${subscription.startDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`,
+        sql`${subscription.startDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} <= ${now}`
       ))
       .groupBy(sql`1`);
 
     const bajas = await db
       .select({
-        day: sql<string>`DATE_TRUNC('day', COALESCE(${subscription.cancelledAt}, ${subscription.endDate}))`,
+        day: sql<string>`TO_CHAR(COALESCE(${subscription.cancelledAt}, ${subscription.endDate}) AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
@@ -348,13 +348,13 @@ export const subscriptionsRepository = {
         or(
           and(
             sql`${subscription.cancelledAt} IS NOT NULL`,
-            sql`${subscription.cancelledAt} >= ${startDate}`,
-            sql`${subscription.cancelledAt} <= ${now}`
+            sql`${subscription.cancelledAt} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`,
+            sql`${subscription.cancelledAt} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} <= ${now}`
           ),
           and(
             sql`${subscription.cancelledAt} IS NULL`,
-            sql`${subscription.endDate} < ${now}`,
-            sql`${subscription.endDate} >= ${startDate}`
+            sql`${subscription.endDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} < ${now}`,
+            sql`${subscription.endDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`
           )
         )
       ))

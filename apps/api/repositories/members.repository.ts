@@ -1,6 +1,6 @@
-import { eq, ilike, and, or, count, desc, db, ne } from '@workspace/database/client';
+import { eq, ilike, and, or, count, desc, db, ne, sql } from '@workspace/database/client';
 import crypto from "node:crypto";
-import { gymMember, authMember, user } from '@workspace/database/schema';
+import { gymMember, authMember, user, subscription, payment } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
 import { subscriptionsRepository } from './subscriptions.repository';
 
@@ -196,11 +196,19 @@ export const membersRepository = {
     await db.delete(gymMember).where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
   },
 
-  async countActive(organizationId: string, _gymNow: Date) {
+  async countActive(organizationId: string, now: Date) {
     const result = await db
-      .select({ value: count() })
+      .select({ value: count(sql`DISTINCT ${gymMember.id}`) })
       .from(gymMember)
-      .where(and(eq(gymMember.organizationId, organizationId), eq(gymMember.isActive, true)));
+      .innerJoin(subscription, eq(gymMember.id, subscription.memberId))
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .where(and(
+        eq(gymMember.organizationId, organizationId),
+        eq(gymMember.isActive, true),
+        sql`${subscription.cancelledAt} IS NULL`,
+        sql`${subscription.endDate} >= ${now}`,
+        eq(payment.status, 'validated')
+      ));
     return Number(result[0]?.value ?? 0);
   },
 

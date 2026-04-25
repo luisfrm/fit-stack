@@ -81,10 +81,10 @@ export const paymentsRepository = {
     })
   },
 
-  async getAggregatedPayments(organizationId: string, startDate: Date) {
+  async getAggregatedPayments(organizationId: string, startDate: Date, timezone: string = 'UTC') {
     return db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${payment.paymentDate})`,
+        day: sql<string>`TO_CHAR(${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
         currency: payment.currencyPaid,
         amount: sql<number>`SUM(${payment.amountPaid})`,
         exchangeRate: payment.exchangeRateApplied,
@@ -93,16 +93,16 @@ export const paymentsRepository = {
       .where(and(
         eq(payment.organizationId, organizationId),
         eq(payment.status, 'validated'),
-        sql`${payment.paymentDate} >= ${startDate}`
+        sql`${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`
       ))
       .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
       .orderBy(sql`1`);
   },
 
-  async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date) {
+  async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date, timezone: string = 'UTC') {
     return db
       .select({
-        month: sql<string>`DATE_TRUNC('month', ${payment.paymentDate})`,
+        month: sql<string>`TO_CHAR(${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM')`,
         currency: payment.currencyPaid,
         amount: sql<number>`SUM(${payment.amountPaid})`,
         exchangeRate: payment.exchangeRateApplied,
@@ -111,7 +111,7 @@ export const paymentsRepository = {
       .where(and(
         eq(payment.organizationId, organizationId),
         eq(payment.status, 'validated'),
-        sql`${payment.paymentDate} >= ${startDate}`
+        sql`${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`
       ))
       .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
       .orderBy(sql`1`);

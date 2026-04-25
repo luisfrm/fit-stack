@@ -69,9 +69,9 @@ export function AnalyticsCarousel({ data, currencyFormat }: Readonly<AnalyticsCa
   // 3. Proyección de Renovaciones
   const renewalsData = React.useMemo(() => {
     return data.renewals?.map((item) => {
-      const dateObj = new Date(item.day);
+      const [y, m, d] = item.day.split('-');
       return {
-        dia: `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`,
+        dia: `${d}-${m}`,
         Vencimientos: item.count,
       };
     }) || [];
@@ -83,14 +83,14 @@ export function AnalyticsCarousel({ data, currencyFormat }: Readonly<AnalyticsCa
     const map: Record<string, { dia: string; Altas: number; Bajas: number }> = {};
     
     data.growth?.altas?.forEach(a => {
-      const dateObj = new Date(a.day);
-      const dia = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+      const [y, m, d] = a.day.split('-');
+      const dia = `${d}-${m}`;
       map[dia] = { dia, Altas: a.count, Bajas: 0 };
     });
 
     data.growth?.bajas?.forEach(b => {
-      const dateObj = new Date(b.day);
-      const dia = `${String(dateObj.getDate()).padStart(2, '0')}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+      const [y, m, d] = b.day.split('-');
+      const dia = `${d}-${m}`;
       if (!map[dia]) map[dia] = { dia, Altas: 0, Bajas: 0 };
       // Bajas represented as negative numbers for diverging bar chart
       map[dia].Bajas = -b.count; 

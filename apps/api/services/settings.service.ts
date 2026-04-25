@@ -57,5 +57,21 @@ export const settingsService = {
       Number.parseInt(partValue('minute'), 10),
       Number.parseInt(partValue('second'), 10)
     ));
+  },
+
+  async parseLocalDate(organizationId: string | null, dateStr: string): Promise<Date> {
+    const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
+    
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset'
+    }).formatToParts(new Date(dateStr));
+    
+    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT+00:00';
+    const offset = offsetPart.replace('GMT', '');
+    
+    const finalOffset = offset === '' ? '+00:00' : (!offset.includes(':') ? `${offset[0]}${offset.slice(1).padStart(2, '0')}:00` : offset);
+    
+    return new Date(`${dateStr}T00:00:00${finalOffset}`);
   }
 }
