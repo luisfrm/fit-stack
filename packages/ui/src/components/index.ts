@@ -55,6 +55,7 @@ export type { ActionDropdownItem, ActionDropdownSection } from "@workspace/ui/co
 // Next.js specific components
 export { AppSidebar, MobileNav, SettingsSidebar } from "@workspace/ui/components/next/sidebar";
 export type { SidebarUser, SidebarNavItem } from "@workspace/ui/components/next/sidebar";
+export { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 export { NextImage } from "@workspace/ui/components/next/image";
 
 // Special UI
