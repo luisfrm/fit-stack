@@ -41,6 +41,8 @@ export { ImageUpload } from "@workspace/ui/components/image-upload";
 export { CoachCard, AddCoachCard } from "@workspace/ui/components/coach-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "@workspace/ui/components/tabs";
+export { FormTabs } from "@workspace/ui/components/form-tabs";
 export { CountrySelector } from "@workspace/ui/components/country-selector";
 export { CurrencySelector } from "@workspace/ui/components/currency-selector";
 export { SimpleSelect } from "@workspace/ui/components/simple-select";
