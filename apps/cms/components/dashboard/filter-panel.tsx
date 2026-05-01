@@ -46,7 +46,6 @@ export function FilterPanel({
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
             leftIcon={<Search className="size-4 animate-in fade-in zoom-in duration-500" />}
-            className="bg-background/20"
           />
         </div>
       )}
