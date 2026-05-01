@@ -80,12 +80,14 @@ export const subscriptionsService = {
 
     // 3. Parsear fechas locales usando la zona horaria del gimnasio
     // El frontend ahora envía strings (ej: "2026-04-21") en lugar de ISO strings.
-    const startDate = typeof payload.startDate === 'string' && !payload.startDate.includes('T') 
-      ? await settingsService.parseLocalDate(organizationId, payload.startDate)
+    const startStr = payload.startDate as unknown as string;
+    const startDate = typeof startStr === 'string' && !startStr.includes('T') 
+      ? await settingsService.parseLocalDate(organizationId, startStr)
       : new Date(payload.startDate);
       
-    const endDate = typeof payload.endDate === 'string' && !payload.endDate.includes('T')
-      ? await settingsService.parseLocalDate(organizationId, payload.endDate)
+    const endStr = payload.endDate as unknown as string;
+    const endDate = typeof endStr === 'string' && !endStr.includes('T')
+      ? await settingsService.parseLocalDate(organizationId, endStr)
       : new Date(payload.endDate);
 
     // 4. Crear la suscripción

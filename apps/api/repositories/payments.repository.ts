@@ -1,5 +1,6 @@
-import { db, eq, and, sql } from '@workspace/database/client'
+import { db, eq, and, sql, gte } from '@workspace/database/client'
 import { payment } from '@workspace/database/schema'
+import { OrganizationDateManager } from '../lib/date-manager'
 
 export interface IPayment {
   id?: number
@@ -81,10 +82,10 @@ export const paymentsRepository = {
     })
   },
 
-  async getAggregatedPayments(organizationId: string, startDate: Date, timezone: string = 'UTC') {
+  async getAggregatedPayments(organizationId: string, startDate: Date, dateManager: OrganizationDateManager) {
     return db
       .select({
-        day: sql<string>`TO_CHAR(${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM-DD')`,
+        day: dateManager.formatDaySql(payment.paymentDate),
         currency: payment.currencyPaid,
         amount: sql<number>`SUM(${payment.amountPaid})`,
         exchangeRate: payment.exchangeRateApplied,
@@ -93,16 +94,16 @@ export const paymentsRepository = {
       .where(and(
         eq(payment.organizationId, organizationId),
         eq(payment.status, 'validated'),
-        sql`${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`
+        gte(payment.paymentDate, startDate)
       ))
       .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
       .orderBy(sql`1`);
   },
 
-  async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date, timezone: string = 'UTC') {
+  async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date, dateManager: OrganizationDateManager) {
     return db
       .select({
-        month: sql<string>`TO_CHAR(${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}, 'YYYY-MM')`,
+        month: dateManager.formatMonthSql(payment.paymentDate),
         currency: payment.currencyPaid,
         amount: sql<number>`SUM(${payment.amountPaid})`,
         exchangeRate: payment.exchangeRateApplied,
@@ -111,7 +112,7 @@ export const paymentsRepository = {
       .where(and(
         eq(payment.organizationId, organizationId),
         eq(payment.status, 'validated'),
-        sql`${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone} >= ${startDate}`
+        gte(payment.paymentDate, startDate)
       ))
       .groupBy(sql`1`, payment.currencyPaid, payment.exchangeRateApplied)
       .orderBy(sql`1`);
@@ -140,7 +141,7 @@ export const paymentsRepository = {
       .where(and(
         eq(payment.organizationId, organizationId),
         eq(payment.status, 'validated'),
-        sql`${payment.paymentDate} >= ${startDate}`
+        gte(payment.paymentDate, startDate)
       ))
       .groupBy(payment.paymentMethod, payment.currencyPaid)
       .orderBy(sql`count(*) DESC`);

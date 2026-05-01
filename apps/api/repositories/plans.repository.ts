@@ -1,5 +1,6 @@
 import { db, eq, sql, getTableColumns, sum, gte, and } from '@workspace/database/client'
 import { membershipPlan, subscription, payment } from '@workspace/database/schema'
+import { OrganizationDateManager } from '../lib/date-manager'
 
 export interface IMembershipPlan {
   id?: number
@@ -38,6 +39,7 @@ export const plansRepository = {
         .where(eq(membershipPlan.organizationId, organizationId))
         .groupBy(membershipPlan.id)
         .orderBy(membershipPlan.id)
+
       return records as unknown as IMembershipPlan[]
     }
 
@@ -47,7 +49,7 @@ export const plansRepository = {
     return records as unknown as IMembershipPlan[]
   },
 
-  async getSummary(organizationId: string, now: Date = new Date(), timezone: string = 'UTC'): Promise<IMembershipsSummary> {
+  async getSummary(organizationId: string, dateManager: OrganizationDateManager, now: Date = new Date()): Promise<IMembershipsSummary> {
     // 1. Monthly Revenue (Using PostgreSQL AT TIME ZONE for correct month truncation)
     const incomeResults = await db
       .select({ 
@@ -59,7 +61,7 @@ export const plansRepository = {
         eq(payment.organizationId, organizationId), 
         eq(payment.status, 'validated'),
         // Filter payments where the date truncated to month in local time matches current local month
-        sql`DATE_TRUNC('month', ${payment.paymentDate} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}) = DATE_TRUNC('month', ${now} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone})`
+        sql`DATE_TRUNC('month', ${dateManager.toLocalSql(payment.paymentDate)}) = DATE_TRUNC('month', ${dateManager.toLocalValueSql(now)})`
       ))
       .groupBy(payment.currencyPaid)
 

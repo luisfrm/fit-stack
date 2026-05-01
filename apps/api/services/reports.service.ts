@@ -3,16 +3,10 @@ import { settingsService } from './settings.service'
 
 export const reportsService = {
   async getMonthlyRevenue(organizationId: string, monthsCount: number = 12) {
-    const timezone = (await settingsService.getByKey(organizationId, 'timezone')) || 'America/Caracas'
-    const now = await settingsService.getGymNow(organizationId)
+    const dateManager = await settingsService.getDateManager(organizationId)
+    const startDate = dateManager.getStartOfMonthUtc(monthsCount)
 
-    // Start date is exactly N months ago
-    const startDate = new Date(now)
-    startDate.setMonth(startDate.getMonth() - monthsCount)
-    startDate.setDate(1) // Start of the month
-    startDate.setHours(0, 0, 0, 0)
-
-    const rawData = await paymentsRepository.getAggregatedPaymentsMonthly(organizationId, startDate, timezone)
+    const rawData = await paymentsRepository.getAggregatedPaymentsMonthly(organizationId, startDate, dateManager)
 
     return rawData.map(d => ({
       month: d.month,

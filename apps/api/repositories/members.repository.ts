@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, desc, db, ne, sql } from '@workspace/database/client';
+import { eq, ilike, and, or, count, desc, db, ne, sql, gte } from '@workspace/database/client';
 import crypto from "node:crypto";
 import { gymMember, authMember, user, subscription, payment } from '@workspace/database/schema';
 import { OrgRole } from '@workspace/shared';
@@ -206,7 +206,7 @@ export const membersRepository = {
         eq(gymMember.organizationId, organizationId),
         eq(gymMember.isActive, true),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${now}`,
+        gte(subscription.endDate, now),
         eq(payment.status, 'validated')
       ));
     return Number(result[0]?.value ?? 0);

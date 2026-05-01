@@ -5,7 +5,8 @@ import { settingsService } from './settings.service'
 
 export const dashboardService = {
   async getDashboardSummary(organizationId: string) {
-    const gymNow = await settingsService.getGymNow(organizationId)
+    const dateManager = await settingsService.getDateManager(organizationId)
+    const utcNow = new Date()
     
     const [
       activeMembers,
@@ -13,9 +14,9 @@ export const dashboardService = {
       membershipsSummary,
       recentSubscriptions
     ] = await Promise.all([
-      membersRepository.countActive(organizationId, gymNow),
+      membersRepository.countActive(organizationId, utcNow),
       membersRepository.countByRole(organizationId),
-      plansRepository.getSummary(organizationId, gymNow),
+      plansRepository.getSummary(organizationId, dateManager, utcNow),
       subscriptionsRepository.findRecent(organizationId, 5)
     ])
 

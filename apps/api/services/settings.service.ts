@@ -1,5 +1,6 @@
 import { settingsRepository } from '../repositories/settings.repository'
 import { platformSettingsRepository } from '../repositories/platform-settings.repository'
+import { OrganizationDateManager } from '../lib/date-manager'
 
 export const settingsService = {
   async getByKey(organizationId: string | null, key: string): Promise<string | undefined> {
@@ -31,47 +32,17 @@ export const settingsService = {
     }
   },
 
-  async getGymNow(organizationId: string | null): Promise<Date> {
+  /**
+   * Factory method to get a DateManager for a specific organization.
+   */
+  async getDateManager(organizationId: string | null): Promise<OrganizationDateManager> {
     const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
-    const now = new Date();
-
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-      hour12: false,
-    });
-
-    const parts = formatter.formatToParts(now);
-    const partValue = (type: string) => parts.find((p) => p.type === type)?.value || '0';
-
-    return new Date(Date.UTC(
-      Number.parseInt(partValue('year'), 10),
-      Number.parseInt(partValue('month'), 10) - 1,
-      Number.parseInt(partValue('day'), 10),
-      Number.parseInt(partValue('hour'), 10),
-      Number.parseInt(partValue('minute'), 10),
-      Number.parseInt(partValue('second'), 10)
-    ));
+    return new OrganizationDateManager(timezone);
   },
 
+
   async parseLocalDate(organizationId: string | null, dateStr: string): Promise<Date> {
-    const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
-    
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      timeZoneName: 'longOffset'
-    }).formatToParts(new Date(dateStr));
-    
-    const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT+00:00';
-    const offset = offsetPart.replace('GMT', '');
-    
-    const finalOffset = offset === '' ? '+00:00' : (!offset.includes(':') ? `${offset[0]}${offset.slice(1).padStart(2, '0')}:00` : offset);
-    
-    return new Date(`${dateStr}T00:00:00${finalOffset}`);
+    const manager = await this.getDateManager(organizationId);
+    return manager.parseLocalToUtc(dateStr);
   }
 }
