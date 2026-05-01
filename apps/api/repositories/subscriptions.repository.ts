@@ -1,6 +1,6 @@
 import { db, eq, desc, and, sql, or, count, ilike, gte, lte } from '@workspace/database/client'
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema'
-import { SubscriptionStatus } from '@workspace/shared'
+import { SubscriptionStatus, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from '@workspace/shared'
 import { OrganizationDateManager } from '../lib/date-manager'
 
 export interface ISubscriptionDTO {
@@ -54,11 +54,12 @@ export const subscriptionsRepository = {
     if (status) {
       if (status === "processing") {
         conditions.push(eq(payment.status, "processing"));
-      } else if (status === "active") {
+      } else if (status === SUBSCRIPTION_STATUSES.ACTIVE) {
         conditions.push(
           and(
             gte(subscription.endDate, now),
-            sql`${subscription.cancelledAt} IS NULL`
+            sql`${subscription.cancelledAt} IS NULL`,
+            sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
           )!
         );
       } else if (status === "expiring") {
@@ -85,11 +86,12 @@ export const subscriptionsRepository = {
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
         status: sql<SubscriptionStatus>`CASE 
-          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
-          WHEN ${subscription.endDate} < ${now} THEN 'expired'
-          ELSE 'active'
+          WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+          WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+          WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
+          ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
         END`.as('status'),
-        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
+        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`,
         memberName: members.firstName,
         memberLastName: members.lastName,
         memberEmail: members.email,

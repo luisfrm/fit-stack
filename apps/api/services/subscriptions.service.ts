@@ -4,6 +4,7 @@ import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
 import { emailService } from './email.service'
 import { pdfService } from './pdf/pdf-service'
+import { PAYMENT_STATUSES } from '@workspace/shared'
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
 
@@ -132,11 +133,17 @@ export const subscriptionsService = {
     return subscription
   },
 
-  async updatePaymentStatus(organizationId: string, paymentId: number, status: 'processing' | 'validated' | 'invalid' | 'voided') {
-    const updated = await paymentsRepository.updateStatus(organizationId, paymentId, status)
+  async updatePaymentStatus(organizationId: string, paymentId: number, status: string) {
+    const updated = await paymentsRepository.updateStatus(organizationId, paymentId, status as any)
     if (!updated) {
       throw new Error('Registro de pago no encontrado')
     }
+
+    // Auto-revocar acceso si el pago se anula o es inválido
+    if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
+      await this.cancel(organizationId, updated.subscriptionId);
+    }
+
     return updated
   },
 

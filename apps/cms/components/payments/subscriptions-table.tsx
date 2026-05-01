@@ -9,6 +9,7 @@ import {
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type ISubscription } from "@/types/dashboard";
+import { PAYMENT_STATUSES } from "@workspace/shared";
 import {
   Ban,
   Trash2,
@@ -222,6 +223,7 @@ const getColumns = (
                     label: sub.status === "active" ? "Revocar Acceso" : "Restaurar Acceso",
                     icon: sub.status === "active" ? <Ban size={14} /> : <CheckCircle2 size={14} />,
                     variant: sub.status === "active" ? "amber" : "primary",
+                    show: sub.paymentStatus !== PAYMENT_STATUSES.VOIDED && sub.paymentStatus !== PAYMENT_STATUSES.INVALID,
                     onClick: () => sub.id && onStatusChange(sub.id, sub.status === "active" ? "canceled" : "active")
                   },
                   {

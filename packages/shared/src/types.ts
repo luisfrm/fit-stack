@@ -1,4 +1,6 @@
-import { Role } from '@workspace/shared/constants';
+import { Role, SubscriptionStatus, PaymentStatus } from '@workspace/shared/constants';
+
+export type { SubscriptionStatus, PaymentStatus };
 
 /**
  * Standard interface for Better Auth errors.
@@ -210,7 +212,6 @@ export interface IMembershipsSummary {
   monthlyRevenue: Record<string, number>;
 }
 
-export type SubscriptionStatus = 'active' | 'cancelled' | 'expired';
 
 /**
  * Interface for a Member's Subscription.
@@ -247,7 +248,7 @@ export interface ISubscription {
   paymentMethod?: string;
   paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
   exchangeRateApplied?: string;
-  paymentStatus?: 'processing' | 'validated' | 'invalid' | 'voided';
+  paymentStatus?: PaymentStatus;
   paymentDate?: string;
 }
 
