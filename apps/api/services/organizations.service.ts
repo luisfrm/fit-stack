@@ -19,7 +19,7 @@ export const organizationsService = {
     if (!data.name) throw new Error('El nombre de la organización es requerido');
 
     // 2. Generar slug si no existe
-    let slug = data.slug || this.generateSlug(data.name);
+    const slug = data.slug || this.generateSlug(data.name);
 
     // 3. Validar unicidad de slug
     const existing = await organizationsRepository.findBySlug(slug);

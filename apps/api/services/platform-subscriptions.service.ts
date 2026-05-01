@@ -1,5 +1,5 @@
 import { eq, desc, db } from '@workspace/database/client';
-import { storeSubscription, platformInvoice, organization } from '@workspace/database/schema';
+import { storeSubscription, platformInvoice } from '@workspace/database/schema';
 import { PlatformSubscriptionStatus } from '@workspace/shared/types';
 
 export const platformSubscriptionsService = {
