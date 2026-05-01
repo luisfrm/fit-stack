@@ -7,8 +7,8 @@ export const plansService = {
     return plansRepository.findAll(organizationId, filters)
   },
 
-  async getSummary(organizationId: string): Promise<IMembershipsSummary> {
-    const dateManager = await settingsService.getDateManager(organizationId)
+  async getSummary(organizationId: string, timezone?: string): Promise<IMembershipsSummary> {
+    const dateManager = settingsService.getDateManager(timezone)
     const utcNow = new Date()
     return plansRepository.getSummary(organizationId, dateManager, utcNow)
   },

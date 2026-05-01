@@ -3,8 +3,8 @@ import { subscriptionsRepository } from '../repositories/subscriptions.repositor
 import { settingsService } from './settings.service'
 
 export const financeService = {
-  async getDashboardAnalytics(organizationId: string) {
-    const dateManager = await settingsService.getDateManager(organizationId)
+  async getDashboardAnalytics(organizationId: string, timezone?: string) {
+    const dateManager = settingsService.getDateManager(timezone)
     const utcNow = new Date()
 
     // 1. Fetch KPI Data

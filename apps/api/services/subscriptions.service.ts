@@ -65,7 +65,7 @@ export const subscriptionsService = {
     }))
   },
 
-  async create(organizationId: string, payload: ICreateSubscriptionPayload) {
+  async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone?: string) {
     // 1. Obtener datos del plan para el snapshot histórico
     const plan = await plansRepository.findById(organizationId, payload.planId)
     if (!plan) {
@@ -82,12 +82,12 @@ export const subscriptionsService = {
     // El frontend ahora envía strings (ej: "2026-04-21") en lugar de ISO strings.
     const startStr = payload.startDate as unknown as string;
     const startDate = typeof startStr === 'string' && !startStr.includes('T') 
-      ? await settingsService.parseLocalDate(organizationId, startStr)
+      ? await settingsService.parseLocalDate(timezone || 'America/Caracas', startStr)
       : new Date(payload.startDate);
       
     const endStr = payload.endDate as unknown as string;
     const endDate = typeof endStr === 'string' && !endStr.includes('T')
-      ? await settingsService.parseLocalDate(organizationId, endStr)
+      ? await settingsService.parseLocalDate(timezone || 'America/Caracas', endStr)
       : new Date(payload.endDate);
 
     // 4. Crear la suscripción
@@ -107,7 +107,7 @@ export const subscriptionsService = {
     // Si no, usamos el UTC absoluto actual (new Date).
     let paymentDateFinal: Date;
     if (payload.payment.paymentDate && typeof payload.payment.paymentDate === 'string' && !payload.payment.paymentDate.includes('T')) {
-      paymentDateFinal = await settingsService.parseLocalDate(organizationId, payload.payment.paymentDate);
+      paymentDateFinal = await settingsService.parseLocalDate(timezone || 'America/Caracas', payload.payment.paymentDate);
     } else {
       paymentDateFinal = new Date();
     }

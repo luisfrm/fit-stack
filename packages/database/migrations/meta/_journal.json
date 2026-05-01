@@ -50,6 +50,13 @@
       "when": 1776434160691,
       "tag": "0006_right_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777664165063,
+      "tag": "0007_loose_ricochet",
+      "breakpoints": true
     }
   ]
 }

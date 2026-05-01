@@ -10,6 +10,7 @@ export const ORGANIZATION_ADDITIONAL_FIELDS = {
   address: { type: "string", required: false },
   fiscalConfig: { type: "string", required: false },
   status: { type: "string", required: false },
+  timezone: { type: "string", required: false },
 } as const;
 
 export type OrganizationAdditionalFields = typeof ORGANIZATION_ADDITIONAL_FIELDS;

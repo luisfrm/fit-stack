@@ -108,6 +108,7 @@ export const organization = pgTable('organization', {
 
   // Localization & Fiscal (Optional)
   countryCode: text('country_code').default('VE').notNull(),
+  timezone: text('timezone').default('America/Caracas').notNull(),
   taxId: text('tax_id'),
   legalName: text('legal_name'),
   address: text('address'),

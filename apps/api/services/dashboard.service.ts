@@ -4,8 +4,8 @@ import { subscriptionsRepository } from '../repositories/subscriptions.repositor
 import { settingsService } from './settings.service'
 
 export const dashboardService = {
-  async getDashboardSummary(organizationId: string) {
-    const dateManager = await settingsService.getDateManager(organizationId)
+  async getDashboardSummary(organizationId: string, timezone?: string) {
+    const dateManager = settingsService.getDateManager(timezone)
     const utcNow = new Date()
     
     const [

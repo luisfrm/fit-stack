@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { reportsService } from '@/services/reports.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { auth } from '@/config/auth'
+import { headers } from 'next/headers'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,6 +13,13 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId
+    
+    // Fetch full organization to get timezone
+    const fullOrg = await auth.api.getFullOrganization({
+      headers: await headers()
+    })
+    
+    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
 
     const cacheKey = `org:${organizationId}:reports:revenue:12m`
     const cachedData = await cache.get(cacheKey)
@@ -18,7 +27,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(cachedData)
     }
 
-    const data = await reportsService.getMonthlyRevenue(organizationId, 12)
+    const data = await reportsService.getMonthlyRevenue(organizationId, timezone, 12)
 
     // Cache this for a long time as past months don't change
     await cache.set(cacheKey, data, 60 * 60) // 1 hour

@@ -34,15 +34,14 @@ export const settingsService = {
 
   /**
    * Factory method to get a DateManager for a specific organization.
+   * No longer async as it takes the timezone directly.
    */
-  async getDateManager(organizationId: string | null): Promise<OrganizationDateManager> {
-    const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
+  getDateManager(timezone: string = 'America/Caracas'): OrganizationDateManager {
     return new OrganizationDateManager(timezone);
   },
 
-
-  async parseLocalDate(organizationId: string | null, dateStr: string): Promise<Date> {
-    const manager = await this.getDateManager(organizationId);
+  async parseLocalDate(timezone: string, dateStr: string): Promise<Date> {
+    const manager = this.getDateManager(timezone);
     return manager.parseLocalToUtc(dateStr);
   }
 }
