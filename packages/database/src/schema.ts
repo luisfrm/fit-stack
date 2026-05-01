@@ -166,7 +166,7 @@ export const storeSubscription = pgTable('store_subscription', {
   planId: bigint('plan_id', { mode: 'number' })
     .references(() => fitstackPlan.id)
     .notNull(),
-  status: text('status').notNull(), // active, past_due, read_only, suspended, canceled
+  status: text('status').notNull(), // active, past_due, read_only, suspended, cancelled
   startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
   isTrial: boolean('is_trial').default(false).notNull(),
@@ -182,15 +182,15 @@ export const platformInvoice = pgTable('platform_invoice', {
   planId: bigint('plan_id', { mode: 'number' })
     .references(() => fitstackPlan.id)
     .notNull(),
-  
+
   amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').notNull(),
   paymentMethod: text('payment_method').notNull(),
   status: text('status').notNull(), // paid, pending, trial, void
-  
+
   dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
   paidAt: timestamp('paid_at', { withTimezone: true }),
-  
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -219,7 +219,7 @@ export const gymMember = pgTable('gym_member', {
   role: orgRoleEnum('role').default(ORG_ROLES.MEMBER).notNull(),
 
   // Biometric / Access Control (Optional)
-  biometricId: text('biometric_id'), 
+  biometricId: text('biometric_id'),
   isBiometricEnrolled: boolean('is_biometric_enrolled').default(false).notNull(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -239,15 +239,15 @@ export const staffProfile = pgTable('staff_profile', {
     .references(() => gymMember.id, { onDelete: 'cascade' })
     .notNull()
     .unique(),
-  
+
   // Professional Data
   specialities: jsonb('specialities'), // array of strings
   bio: text('bio'),
-  
+
   // CMS/App Visibility
   isVisible: boolean('is_visible').default(true).notNull(),
   displayOrder: integer('display_order').default(0).notNull(),
-  
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -329,11 +329,11 @@ export const accessControlLog = pgTable('access_control_log', {
     .references(() => organization.id, { onDelete: 'cascade' }),
   memberId: bigint('member_id', { mode: 'number' })
     .references(() => gymMember.id, { onDelete: 'set null' }),
-  
+
   documentId: text('document_id'), // Scanned ID from the device
   status: text('status'), // 'granted', 'denied', 'error'
   accessType: text('access_type'), // 'face', 'fingerprint', 'card'
-  
+
   metadata: jsonb('metadata'), // Original payload or error from device
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -349,11 +349,11 @@ export const biometricSyncTask = pgTable('biometric_sync_task', {
   memberId: bigint('member_id', { mode: 'number' })
     .references(() => gymMember.id, { onDelete: 'cascade' })
     .notNull(),
-  
+
   type: text('type').default('enroll').notNull(), // 'enroll', 'delete'
   status: text('status').default('pending').notNull(), // 'pending', 'syncing', 'completed', 'error'
   lastError: text('last_error'),
-  
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

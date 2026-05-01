@@ -361,7 +361,7 @@ export interface IPlatformPlan {
   createdAt?: string | Date;
 }
 
-export type PlatformSubscriptionStatus = 'active' | 'past_due' | 'read_only' | 'suspended' | 'canceled';
+export type PlatformSubscriptionStatus = 'active' | 'past_due' | 'read_only' | 'suspended' | 'cancelled';
 
 export interface IPlatformSubscription {
   id: number;

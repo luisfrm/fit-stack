@@ -32,7 +32,7 @@ export function useUpdatePaymentStatus() {
 }
 
 /**
- * Mutation to update subscription status (active, canceled, expired).
+ * Mutation to update subscription status (active, cancelled, expired).
  */
 export function useUpdateSubscriptionStatus() {
   const queryClient = useQueryClient();

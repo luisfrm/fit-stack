@@ -33,6 +33,29 @@ export interface PaginatedSubscriptionsResult {
 }
 
 export const subscriptionsRepository = {
+  // Helpers para evitar repetición de lógica
+  getSubscriptionStatusSql(now: Date) {
+    return sql<SubscriptionStatus>`CASE 
+      WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+      WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+      WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
+      ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
+    END`;
+  },
+
+  getSubscriptionIsActiveSql(now: Date) {
+    return sql<boolean>`${subscription.endDate} >= ${now} 
+      AND ${subscription.cancelledAt} IS NULL 
+      AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`;
+  },
+
+  getPaidAndNotRevokedCondition() {
+    return and(
+      sql`${subscription.cancelledAt} IS NULL`,
+      sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
+    );
+  },
+
   async findAllPaginated(filters: SubscriptionsFilter, now: Date = new Date()): Promise<PaginatedSubscriptionsResult> {
     const { organizationId, query, status, page = 1, limit = 10 } = filters;
     const offset = (page - 1) * limit;
@@ -58,8 +81,7 @@ export const subscriptionsRepository = {
         conditions.push(
           and(
             gte(subscription.endDate, now),
-            sql`${subscription.cancelledAt} IS NULL`,
-            sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
+            this.getPaidAndNotRevokedCondition()
           )!
         );
       } else if (status === "expiring") {
@@ -69,9 +91,11 @@ export const subscriptionsRepository = {
           and(
             gte(subscription.endDate, now),
             lte(subscription.endDate, limitDate),
-            sql`${subscription.cancelledAt} IS NULL`
+            this.getPaidAndNotRevokedCondition()
           )!
         );
+      } else if (status === PAYMENT_STATUSES.VOIDED) {
+        conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
       }
     }
 
@@ -85,13 +109,8 @@ export const subscriptionsRepository = {
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
-        status: sql<SubscriptionStatus>`CASE 
-          WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
-          WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
-          WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
-          ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
-        END`.as('status'),
-        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`,
+        status: this.getSubscriptionStatusSql(now).as('status'),
+        isActive: this.getSubscriptionIsActiveSql(now),
         memberName: members.firstName,
         memberLastName: members.lastName,
         memberEmail: members.email,
@@ -149,12 +168,8 @@ export const subscriptionsRepository = {
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
-        status: sql<SubscriptionStatus>`CASE 
-          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
-          WHEN ${subscription.endDate} < ${now} THEN 'expired'
-          ELSE 'active'
-        END`.as('status'),
-        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
+        status: this.getSubscriptionStatusSql(now).as('status'),
+        isActive: this.getSubscriptionIsActiveSql(now),
         memberName: members.firstName,
         memberLastName: members.lastName,
         memberEmail: members.email,
