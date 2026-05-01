@@ -151,9 +151,9 @@ export default function PaymentsPage() {
         >
           <div className="flex items-center gap-2">
             {[
-              { id: "processing", label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
-              { id: "expiring", label: "Por vencer", className: "text-red-500 border-red-500/20 bg-red-500/5 hover:bg-red-500/10" },
-              { id: "active", label: "Activas", className: "text-blue-500 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10" },
+              { id: PAYMENT_STATUSES.PROCESSING, label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
+              { id: SUBSCRIPTION_STATUSES.EXPIRED, label: "Por vencer", className: "text-red-500 border-red-500/20 bg-red-500/5 hover:bg-red-500/10" },
+              { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-blue-500 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10" },
               { id: PAYMENT_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
             ].map((btn) => (
               <Button
@@ -161,8 +161,10 @@ export default function PaymentsPage() {
                 size="sm"
                 variant={activeFilter === btn.id ? "primary" : "glass"}
                 className={cn(
-                  "cursor-pointer font-medium transition-all normal-case tracking-normal",
-                  activeFilter !== btn.id && btn.className
+                  "cursor-pointer font-medium transition-all normal-case tracking-normal border border-transparent",
+                  activeFilter === btn.id 
+                    ? "border-primary" 
+                    : btn.className
                 )}
                 onClick={() => setActiveFilter(activeFilter === btn.id ? null : btn.id)}
               >
