@@ -22,9 +22,24 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
 
-  // ── AUTO-LINK: If user is already logged in, skip register and link directly ──
+  // Refs to prevent double linkUser calls (race condition between handleSubmit and useEffect)
+  const hasLinked = React.useRef(false);
+  // Track if user had a session when the component first mounted (returned from login)
+  const hadSessionOnMount = React.useRef<boolean | null>(null);
+
+  // ── AUTO-LINK: If user was ALREADY logged in when page loaded (e.g. returned from /login) ──
   React.useEffect(() => {
-    if (!sessionPending && session && token) {
+    if (sessionPending) return;
+    
+    // Record initial session state on first non-pending render
+    if (hadSessionOnMount.current === null) {
+      hadSessionOnMount.current = !!session;
+    }
+
+    // Only auto-link if user had session on mount (came from login redirect)
+    // NOT if session appeared mid-lifecycle (signUp just happened in handleSubmit)
+    if (hadSessionOnMount.current && session && token && !hasLinked.current) {
+      hasLinked.current = true;
       const autoLink = async () => {
         try {
           const result = await membersService.linkUser(token);
@@ -114,11 +129,14 @@ function RegisterForm() {
       return;
     }
 
+    // Prevent useEffect from also calling linkUser
+    hasLinked.current = true;
+
     // Si Better-Auth creó el usuario exitosamente, vinculamos la cuenta
     try {
       await membersService.linkUser(token);
       toast.success("Cuenta configurada correctamente.");
-      router.push('/dashboard'); // Go directly to dashboard instead of login since they are authenticated
+      router.push('/dashboard');
     } catch (linkError: any) {
       toast.error(linkError.response?.data?.error || "Error al vincular el usuario al miembro.");
     } finally {
@@ -145,7 +163,7 @@ function RegisterForm() {
 
         <div className="max-w-md">
           <header className="mb-8">
-            <Title as="h1" size="section" className="mb-2">
+            <Title as="h1" size="section" className="mb-2 text-foreground">
               CREA TU CUENTA
             </Title>
             <Text variant="muted" size="md">Completa tu registro para acceder a la plataforma</Text>

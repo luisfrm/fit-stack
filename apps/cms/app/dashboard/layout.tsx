@@ -31,12 +31,22 @@ export default async function DashboardLayout({
   // 🛡️ Seguridad: Si no es admin y tiene una org activa, verificamos que su gymMember aún exista
   // Esto evita que usuarios eliminados de una sede sigan navegando en ella
   if (!isAdmin && activeOrgId) {
-    const { membersService } = await import("@/lib/services/members-service");
-    const member = await membersService.getCurrentMember();
-    
-    if (!member) {
-      // Si el miembro fue eliminado, revocamos el contexto de esa organización
-      redirect("/reset-org-context");
+    const { headers: nextHeaders } = await import("next/headers");
+    const cookieHeader = (await nextHeaders()).get("cookie") || "";
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
+    try {
+      const res = await fetch(`${apiBase}/api/members/me`, {
+        headers: { cookie: cookieHeader },
+        cache: "no-store",
+      });
+
+      if (res.status === 404) {
+        // gymMember fue eliminado → revocar contexto
+        redirect("/reset-org-context");
+      }
+    } catch (err) {
+      console.error("Error verifying membership in layout:", err);
     }
   }
 
