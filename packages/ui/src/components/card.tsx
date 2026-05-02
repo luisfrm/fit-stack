@@ -14,7 +14,7 @@ const cardVariants = cva(
        */
       variant: {
         glass:    "gap-4 rounded-xl bg-glass backdrop-blur-md border border-border py-4",
-        settings: "gap-8 rounded-2xl bg-glass backdrop-blur-md border border-border p-8 flex flex-col",
+        settings: "gap-6 sm:gap-8 rounded-none sm:rounded-2xl bg-glass backdrop-blur-md border-none sm:border border-border px-4 py-6 sm:p-8 flex flex-col -mx-4 sm:mx-0",
         plain:    "gap-4 rounded-xl bg-card py-4 ring-1 ring-foreground/10",
       },
       size: {

@@ -136,7 +136,7 @@ export default function OrganizationSettingsPage() {
   return (
     <form onSubmit={handleSave} className="space-y-12 pb-20">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-widest mb-2">
             <Building2 className="w-3.5 h-3.5" />

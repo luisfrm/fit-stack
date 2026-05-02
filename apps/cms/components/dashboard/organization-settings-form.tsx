@@ -111,7 +111,7 @@ export function OrganizationSettingsForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-12 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <Title as="h3" size="card" className="tracking-tight">{title}</Title>
           <Text variant="muted">{description}</Text>

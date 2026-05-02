@@ -117,7 +117,7 @@ export default function CurrencySettingsPage() {
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <Title as="h3" size="card" className="tracking-tight">Monedas</Title>
           <Text variant="muted">Configura las divisas activas y la moneda principal de reporte.</Text>
