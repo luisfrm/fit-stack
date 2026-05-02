@@ -78,7 +78,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [paymentCurrency, setPaymentCurrency] = React.useState<string>('USD');
   const [exchangeRate, setExchangeRate] = React.useState(1);
   const [finalAmount, setFinalAmount] = React.useState(0);
-  const [paymentMethodId, setPaymentMethodId] = React.useState<string>('cash');
+  const [paymentMethodId, setPaymentMethodId] = React.useState<string>('');
   const [paymentDetails, setPaymentDetails] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
@@ -193,18 +193,14 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     );
   }, [activePaymentMethods, paymentCurrency]);
 
-  // Set default payment currency and reset method when plan changes
-  React.useEffect(() => {
-    if (selectedPlan) {
-      setPaymentCurrency(selectedPlan.currency);
-      setPaymentMethodId(''); // Reset method to show placeholder
-    }
-  }, [selectedPlan]);
-
   // Fetch Exchange Rate and Calculate Amount
   React.useEffect(() => {
     const updateFinance = async () => {
-      if (!selectedPlan) return;
+      if (!selectedPlan) {
+        setFinalAmount(0);
+        setExchangeRate(1);
+        return;
+      }
 
       let rate = 1;
       if (paymentCurrency !== selectedPlan.currency) {
