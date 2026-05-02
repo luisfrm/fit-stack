@@ -6,8 +6,8 @@ import { getSession } from '@/config/get-session';
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session?.user || !session.session.activeOrganizationId) {
-      return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     const { token } = await req.json();
@@ -16,11 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = await tokenService.verifyInviteToken(token);
-    const organizationId = session.session.activeOrganizationId;
-    
-    if (payload.organizationId !== organizationId) {
-      return NextResponse.json({ error: 'El token pertenece a otra organización' }, { status: 403 });
-    }
+    const organizationId = payload.organizationId;
     
     const member = await membersRepository.findById(organizationId, payload.memberId);
     if (!member) {
@@ -31,11 +27,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Este miembro ya está vinculado' }, { status: 400 });
     }
 
-    // 1. Vinculamos el user.id dentro del registro gymMembers (el schema.ts actual lo soporta)
+    // 1. Vinculamos el user.id dentro del registro gymMembers
     await membersRepository.update(organizationId, member.id, { userId: session.user.id });
 
-    // 2. Agregamos el usuario a la organización en Better Auth con el rol que ya tiene definido el miembro
+    // 2. Agregamos el usuario a la organización en Better Auth
     await membersRepository.addToOrganization(session.user.id, organizationId, member.role);
+
+    // 3. Establecemos la organización activa en la sesión para el flujo inmediato
+    const { auth } = await import("@/config/auth");
+    await auth.api.setActiveOrganization({
+      headers: req.headers,
+      body: { organizationId }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

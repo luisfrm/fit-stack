@@ -14,11 +14,33 @@ import { toast } from "@workspace/ui/components";
 import { sessionService } from "@/lib/services/session-service";
 import { capitalize } from "@/lib/helper";
 import { membersService } from "@/lib/services/members-service";
+import { useSession } from "@/lib/auth-client";
 
 function RegisterForm() {
+  const { data: session, isPending: sessionPending } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams.get('token');
+
+  // ── AUTO-LINK: If user is already logged in, skip register and link directly ──
+  React.useEffect(() => {
+    if (!sessionPending && session && token) {
+      const autoLink = async () => {
+        try {
+          const result = await membersService.linkUser(token);
+          if (result.success) {
+            toast.success("Tu cuenta ha sido vinculada correctamente.");
+            router.push('/dashboard');
+          } else {
+            console.error("Auto-link failed: server returned success=false");
+          }
+        } catch (err) {
+          console.error("Auto-link exception:", err);
+        }
+      };
+      autoLink();
+    }
+  }, [session, sessionPending, token, router]);
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
@@ -79,12 +101,14 @@ function RegisterForm() {
     });
 
     if (error) {
-      if (error.message?.includes("already registered")) {
-        toast.error("El correo electrónico ya está registrado");
+      if (error.code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL') {
+        toast.info('Ya tienes una cuenta con este email. Inicia sesión para vincular tu acceso.');
+        const returnTo = encodeURIComponent(`/register?token=${token}`);
+        router.push(`/login?returnTo=${returnTo}`);
       } else if (error.message?.includes("Password too short")) {
         toast.error("La contraseña es muy corta");
       } else {
-        toast.error("Ocurrió un error inesperado al conectar con el servidor.");
+        toast.error(error.message || "Ocurrió un error inesperado al conectar con el servidor.");
       }
       setIsLoading(false);
       return;

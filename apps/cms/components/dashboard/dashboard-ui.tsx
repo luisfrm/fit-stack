@@ -21,6 +21,8 @@ import {
   PackageCheck,
   BarChart3,
   Globe,
+  ArrowLeft,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,12 +49,14 @@ import {
   Table,
   Button,
   type ColumnDef,
+  Modal,
+  SplashScreen,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { OrganizationPicker } from "./organization-picker";
 
 /* ─────────────────────────────────────────────
    SIDEBAR NAV SCHEMAS
@@ -109,6 +113,47 @@ function ReturnToSaaSButton() {
   );
 }
 
+export function SwitchOrganizationAction() {
+  const [organizations, setOrganizations] = React.useState<any[]>([]);
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    async function load() {
+      const { data } = await authClient.organization.list();
+      if (data) setOrganizations(data);
+    }
+    load();
+  }, []);
+
+  // Solo mostrar si pertenece a más de una organización
+  if (organizations.length <= 1) return null;
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={setOpen}
+      title="Cambiar de sede"
+      description="Selecciona la sede con la que deseas trabajar ahora."
+      trigger={
+        <Button
+          variant="link"
+          size="xs"
+          className="p-0 uppercase gap-1.5 text-primary hover:text-primary/80"
+          leftIcon={<ArrowLeftRight className="w-3 h-3" />}
+        >
+          Cambiar sede
+        </Button>
+      }
+    >
+      <div className="py-4">
+        <OrganizationPicker 
+          isModal 
+          onSelect={() => setOpen(false)} 
+        />
+      </div>
+    </Modal>
+  );
+}
 
 export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
@@ -120,6 +165,12 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
+  const brandingAction = React.useMemo(() => {
+    if (isSaaSMode) return undefined;
+    if (user.role === GLOBAL_ROLES.ADMIN) return <ReturnToSaaSButton />;
+    return <SwitchOrganizationAction />;
+  }, [isSaaSMode, user.role]);
+
   return (
     <UISidebar
       user={user}
@@ -130,7 +181,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
         isLoading: isBrandingLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
-        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
+        action: brandingAction,
       }}
       footer={<SignOutButton />}
     />
@@ -146,6 +197,12 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
+  const brandingAction = React.useMemo(() => {
+    if (isSaaSMode) return undefined;
+    if (user.role === GLOBAL_ROLES.ADMIN) return <ReturnToSaaSButton />;
+    return <SwitchOrganizationAction />;
+  }, [isSaaSMode, user.role]);
+
   return (
     <UIMobileNav
       user={user}
@@ -156,7 +213,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
         subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
         isLoading: isBrandingLoading,
         fallbackIcon: isSaaSMode ? Globe : Dumbbell,
-        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
+        action: brandingAction,
       }}
       footer={<SignOutButton />}
     />

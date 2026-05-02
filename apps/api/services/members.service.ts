@@ -2,6 +2,9 @@ import { membersRepository, MembersFilter, NewDbMember } from '../repositories/m
 import { accessControlRepository } from '../repositories/access-control.repository';
 import { tokenService } from './token.service';
 import { emailService } from './email.service';
+import { usersRepository } from '../repositories/users.repository';
+import { auth } from '@/config/auth';
+import { headers } from 'next/headers';
 
 const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
   const sanitized = { ...data };
@@ -27,6 +30,10 @@ export const membersService = {
     return member;
   },
 
+  async getMemberByUserId(organizationId: string, userId: string) {
+    return membersRepository.findByUserId(organizationId, userId);
+  },
+
   async createMember(organizationId: string, data: Omit<NewDbMember, "organizationId">, sendInvite: boolean = false) {
     const sanitizedData = sanitizeMemberData(data);
     const existing = await membersRepository.findByEmail(organizationId, sanitizedData.email);
@@ -46,8 +53,38 @@ export const membersService = {
     }
 
     if (sendInvite) {
-      const token = await tokenService.signInviteToken(organizationId, newMember.id, newMember.email);
-      await emailService.sendRegistrationInvite(newMember.email, token);
+      // 1. Check if email already exists as a Better Auth user
+      const existingUser = await usersRepository.findByEmail(sanitizedData.email);
+
+      if (existingUser) {
+        // Check if they are already a member of this organization
+        const isAlreadyMember = await membersRepository.findAuthMember(existingUser.id, organizationId);
+
+        if (isAlreadyMember) {
+          // AUTO-LINK: They are already in the organization (e.g. they are the Owner)
+          // We update the record we just created to include the userId
+          await membersRepository.update(organizationId, newMember.id, { userId: existingUser.id });
+        } else {
+          // FLOW: Existing User -> Better Auth Organization Invitation
+          try {
+            await auth.api.createInvitation({
+              headers: await headers(),
+              body: {
+                email: sanitizedData.email,
+                role: (sanitizedData.role as any) || 'member',
+                organizationId,
+                resend: true,
+              }
+            });
+          } catch (inviteError: any) {
+            console.error("Failed to create Better Auth invitation:", inviteError);
+          }
+        }
+      } else {
+        // FLOW: New User -> JWT Token + Registration Email
+        const token = await tokenService.signInviteToken(organizationId, newMember.id, newMember.email);
+        await emailService.sendRegistrationInvite(newMember.email, token);
+      }
     }
 
     // Trigger biometric sync task if member has a photo
@@ -89,6 +126,13 @@ export const membersService = {
   },
 
   async deleteMember(organizationId: string, id: number) {
+    const member = await membersRepository.findById(organizationId, id);
+
+    // Si el miembro tiene userId vinculado, revocar su acceso en Better Auth
+    if (member?.userId) {
+      await membersRepository.deleteAuthMember(member.userId, organizationId);
+    }
+
     // Trigger biometric sync task to remove from hardware
     await accessControlRepository.createSyncTask(organizationId, id, 'delete');
 
@@ -102,8 +146,34 @@ export const membersService = {
       throw new Error('El usuario ya tiene una cuenta vinculada');
     }
 
-    const token = await tokenService.signInviteToken(organizationId, member.id, member.email);
-    await emailService.sendRegistrationInvite(member.email, token);
+    // Smart detection for resend
+    const existingUser = await usersRepository.findByEmail(member.email);
+
+    if (existingUser) {
+      // Check if they are already a member of this organization
+      const isAlreadyMember = await membersRepository.findAuthMember(existingUser.id, organizationId);
+
+      if (isAlreadyMember) {
+        // AUTO-LINK: Link them retrospectively if they were stuck with null userId
+        await membersRepository.update(organizationId, member.id, { userId: existingUser.id });
+        return { success: true, linked: true };
+      }
+
+      // Re-send Better Auth invitation
+      await auth.api.createInvitation({
+        headers: await headers(),
+        body: {
+          email: member.email,
+          role: (member.authRole as any) || 'member',
+          organizationId,
+          resend: true,
+        }
+      });
+    } else {
+      // Re-send Registration Token
+      const token = await tokenService.signInviteToken(organizationId, member.id, member.email);
+      await emailService.sendRegistrationInvite(member.email, token);
+    }
 
     return { success: true };
   }
