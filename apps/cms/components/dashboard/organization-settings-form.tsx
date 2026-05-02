@@ -7,8 +7,6 @@ import {
   Save,
   RotateCcw,
   ChevronRight,
-  Moon,
-  Sun
 } from "lucide-react";
 import {
   Card,
@@ -19,8 +17,6 @@ import {
   Title,
   toast,
   SimpleSelect,
-  Switch,
-  Label,
   cn,
   CountrySelector
 } from "@workspace/ui/components";
@@ -151,52 +147,6 @@ export function OrganizationSettingsForm({
                   <Text variant="muted" size="xs">Nombre, logo y dirección gestionados en Organización.</Text>
                 </div>
               </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* PREFERENCIA DE APARIENCIA */}
-        <Card variant="settings" className="relative z-30">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-purple-500/10 text-purple-400">
-              {formData[SETTINGS_KEYS.THEME_MODE] === "light" ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-            </div>
-            <div className="flex flex-col">
-              <Text size="lg" weight="bold">Preferencia de Apariencia</Text>
-              <Text variant="muted" size="sm">Elige el ambiente visual que mejor se adapte a tu sede.</Text>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between p-4 sm:p-6 rounded-xl border border-border bg-foreground/3 gap-6">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-foreground-muted">
-                Modo Visual
-              </Label>
-              <Text variant="muted" size="xs" className="leading-relaxed">
-                {formData[SETTINGS_KEYS.THEME_MODE] === "light"
-                  ? "Tema claro activo para una mejor visibilidad diurna."
-                  : "Tema oscuro activo (predeterminado de la sede)."}
-              </Text>
-            </div>
-
-            <div className="flex items-center justify-center gap-6 px-6 py-4 rounded-2xl bg-foreground/10 border border-border w-full md:w-auto">
-              <Moon
-                className={cn(
-                  "size-5 transition-all duration-300",
-                  formData[SETTINGS_KEYS.THEME_MODE] === "light" ? "text-foreground/20 scale-90" : "text-primary fill-primary/20 scale-110"
-                )}
-              />
-              <Switch
-                checked={formData[SETTINGS_KEYS.THEME_MODE] === "light"}
-                onCheckedChange={(checked) => handleChange(SETTINGS_KEYS.THEME_MODE, checked ? "light" : "dark")}
-                className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-primary scale-125"
-              />
-              <Sun
-                className={cn(
-                  "size-5 transition-all duration-300",
-                  formData[SETTINGS_KEYS.THEME_MODE] === "light" ? "text-yellow-500 fill-yellow-500/20 scale-110" : "text-foreground/20 scale-90"
-                )}
-              />
             </div>
           </div>
         </Card>

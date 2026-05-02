@@ -11,7 +11,6 @@ export const SETTINGS_KEYS = {
   PRIMARY_CURRENCY: "primary_currency",
   CURRENCY_FORMAT: "currency_format",
   ACTIVE_PAYMENT_METHODS: "active_payment_methods",
-  THEME_MODE: "theme_mode",
 } as const;
 
 const EMPTY_SETTINGS: Record<string, string> = {};

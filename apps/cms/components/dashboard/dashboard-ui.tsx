@@ -35,6 +35,7 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { useTheme } from "@/lib/hooks/use-theme";
 import { useSettings } from "@/lib/hooks/use-settings";
 import {
   AppSidebar as UISidebar,
@@ -158,10 +159,10 @@ export function SwitchOrganizationAction() {
 export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
+  const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
 
-  // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
   const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
   const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
 
@@ -184,6 +185,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
         action: brandingAction,
       }}
       footer={<SignOutButton />}
+      themeToggle={{ isDark, toggle: toggleTheme }}
     />
   );
 }
@@ -191,6 +193,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
 export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
+  const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
 
@@ -216,6 +219,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
         action: brandingAction,
       }}
       footer={<SignOutButton />}
+      themeToggle={{ isDark, toggle: toggleTheme }}
     />
   );
 }

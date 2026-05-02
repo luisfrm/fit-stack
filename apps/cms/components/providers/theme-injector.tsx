@@ -1,5 +1,7 @@
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useTheme } from "@/lib/hooks/use-theme";
+import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
+import { useSettings } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import React from "react";
 
@@ -8,23 +10,23 @@ import React from "react";
  * This ensures that changes in the settings are reflected across the entire app
  * without a page reload or CSS recompilation.
  * Now handles intelligent hover and contrast calculation via OKLCH.
+ * Theme mode is now handled by useTheme (localStorage), not DB settings.
  */
 export function ThemeInjector() {
+  const { isDark } = useTheme();
   const { settings } = useSettings();
   const { activeOrganization } = useAuth();
   const activeOrganizationId = activeOrganization?.id;
 
-  // Handles switching between light and dark mode classes on the <html> element
   React.useEffect(() => {
-    const mode = settings[SETTINGS_KEYS.THEME_MODE] || "dark";
-    if (mode === "light") {
-      document.documentElement.classList.add("light");
-      document.documentElement.classList.remove("dark");
-    } else {
+    if (isDark) {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
     }
-  }, [settings[SETTINGS_KEYS.THEME_MODE]]);
+  }, [isDark]);
 
   // Fit-Stack Default Branding (sync with globals.css)
   const PLATFORM_PRIMARY = "oklch(0.853 0.199 91.26)";

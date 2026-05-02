@@ -3,12 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type LucideIcon, Menu, Building2 } from "lucide-react";
+import { type LucideIcon, Menu, Building2, Moon, Sun } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Text } from "@workspace/ui/components/text";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@workspace/ui/components/sheet";
 import { NextImage } from "@workspace/ui/components/next/image";
+import { Switch } from "@workspace/ui/components/switch";
 
 export interface SidebarNavItem {
   label: string;
@@ -31,20 +32,26 @@ export interface SidebarBranding {
   action?: React.ReactNode;
 }
 
+export interface SidebarThemeToggle {
+  isDark: boolean;
+  toggle: () => void;
+}
+
 interface SidebarProps {
   user: SidebarUser;
   branding: SidebarBranding;
   navigation: SidebarNavItem[];
   footer?: React.ReactNode;
+  themeToggle?: SidebarThemeToggle;
 }
 
 /**
  * Main App Sidebar for Desktop
  */
-export function AppSidebar({ user, branding, navigation, footer }: Readonly<SidebarProps>) {
+export function AppSidebar({ user, branding, navigation, footer, themeToggle }: Readonly<SidebarProps>) {
   return (
     <aside className="hidden lg:flex w-64 bg-background border-r border-border-dark flex-col py-6 shrink-0 h-svh sticky top-0 font-display">
-      <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} />
+      <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} themeToggle={themeToggle} />
     </aside>
   );
 }
@@ -52,11 +59,10 @@ export function AppSidebar({ user, branding, navigation, footer }: Readonly<Side
 /**
  * Mobile Navigation with Hamburger Menu
  */
-export function MobileNav({ user, branding, navigation, footer }: Readonly<SidebarProps>) {
+export function MobileNav({ user, branding, navigation, footer, themeToggle }: Readonly<SidebarProps>) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
 
-  // Close sheet on route change
   React.useEffect(() => {
     setOpen(false);
   }, [pathname]);
@@ -95,6 +101,9 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
       </div>
 
       <div className="flex items-center gap-2">
+        {themeToggle && (
+          <ThemeToggleButton isDark={themeToggle.isDark} toggle={themeToggle.toggle} />
+        )}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <button className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none">
@@ -106,7 +115,7 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
               <SheetTitle>Navegación</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col h-full py-6">
-              <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} />
+              <SidebarContent user={user} branding={branding} navigation={navigation} footer={footer} themeToggle={themeToggle} />
             </div>
           </SheetContent>
         </Sheet>
@@ -117,10 +126,14 @@ export function MobileNav({ user, branding, navigation, footer }: Readonly<Sideb
 
 const NAV_SKELETON_IDS = ["nav-sk-1", "nav-sk-2", "nav-sk-3", "nav-sk-4", "nav-sk-5"];
 
+interface SidebarContentProps extends Omit<SidebarProps, "navigation"> {
+  navigation: SidebarNavItem[];
+}
+
 /**
  * Shared sidebar content used by both Desktop Sidebar and Mobile Nav
  */
-export function SidebarContent({ user, branding, navigation, footer }: Readonly<SidebarProps>) {
+export function SidebarContent({ user, branding, navigation, footer, themeToggle }: Readonly<SidebarContentProps>) {
   const pathname = usePathname();
 
   const DesktopFallbackIcon = branding.fallbackIcon;
@@ -171,35 +184,40 @@ export function SidebarContent({ user, branding, navigation, footer }: Readonly<
         {/* Navigation - Scrollable Area */}
         <div className="flex-1 overflow-y-auto -mx-2 px-2 pb-6 scrollbar-thin scrollbar-thumb-border hover:scrollbar-thumb-foreground/20 transition-colors">
           <nav className="flex flex-col gap-1">
-          {branding.isLoading ? (
-            <>
-              {NAV_SKELETON_IDS.map((id) => (
-                <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-foreground/5 animate-pulse">
-                  <div className="w-5 h-5 rounded bg-foreground/10 shrink-0" />
-                  <div className="h-4 bg-foreground/10 rounded w-2/3" />
-                </div>
-              ))}
-            </>
-          ) : (
-            navigation.map((item) => {
-              const isActive = item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <SidebarNavItem
-                  key={item.href}
-                  {...item}
-                  active={isActive}
-                />
-              );
-            })
-          )}
+            {branding.isLoading ? (
+              <>
+                {NAV_SKELETON_IDS.map((id) => (
+                  <div key={id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-foreground/5 animate-pulse">
+                    <div className="w-5 h-5 rounded bg-foreground/10 shrink-0" />
+                    <div className="h-4 bg-foreground/10 rounded w-2/3" />
+                  </div>
+                ))}
+              </>
+            ) : (
+              navigation.map((item) => {
+                const isActive = item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <SidebarNavItem
+                    key={item.href}
+                    {...item}
+                    active={isActive}
+                  />
+                );
+              })
+            )}
           </nav>
         </div>
       </div>
 
       {/* Profile/Footer Section */}
-      <div className="px-4 mt-auto pt-10">
+      <div className="px-4 mt-auto pt-6">
+        {themeToggle && (
+          <div className="mb-4">
+            <ThemeToggleButton isDark={themeToggle.isDark} toggle={themeToggle.toggle} />
+          </div>
+        )}
         <div className="flex items-center gap-3 p-3 rounded-xl bg-foreground/5 border border-border min-h-[66px]">
           {branding.isLoading ? (
             <>
@@ -249,6 +267,27 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<SidebarNav
       <Icon className={cn("w-5 h-5 shrink-0 transition-colors", active ? "text-primary-foreground" : "")} />
       {label}
     </Link>
+  );
+}
+
+function ThemeToggleButton({ isDark, toggle }: Readonly<{ isDark: boolean; toggle: () => void }>) {
+  return (
+    <button
+      onClick={toggle}
+      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all border bg-foreground/5 border-border hover:bg-foreground/10"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {isDark ? (
+        <Moon className="w-5 h-5 text-primary" />
+      ) : (
+        <Sun className="w-5 h-5 text-yellow-500" />
+      )}
+      <Switch
+        checked={!isDark}
+        onCheckedChange={toggle}
+        className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-primary"
+      />
+    </button>
   );
 }
 
