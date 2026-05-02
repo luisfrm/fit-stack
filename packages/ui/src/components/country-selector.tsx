@@ -81,7 +81,7 @@ export function CountrySelector({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls="country-listbox"
-        className={open ? "ring-2 ring-primary/50" : ""}
+        className={cn("justify-between px-4", open ? "ring-2 ring-primary/50" : "")}
       >
         <div className="flex items-center gap-3">
           {selectedCountry ? (
