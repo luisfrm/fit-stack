@@ -27,7 +27,7 @@ export function PlanSelector({
     <div className={cn("space-y-3", disabled && "opacity-40 cursor-not-allowed transition-opacity")}>
       <Label id="plan-selection-label" className="text-sm font-medium">Plan de Membresía</Label>
       {plans.length === 0 ? (
-        <p className="text-sm text-yellow-500 bg-yellow-500/10 p-3 rounded-lg">
+        <p className="text-sm text-warning bg-warning/10 p-3 rounded-lg">
           Carga planes primero en el módulo de Membresías.
         </p>
       ) : (

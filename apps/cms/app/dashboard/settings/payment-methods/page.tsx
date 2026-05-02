@@ -356,7 +356,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
                       variant="ghost"
                       size="icon"
                       onClick={() => handleRemoveField(field.id)}
-                      className="h-9 w-9 text-foreground-dim hover:text-red-500 hover:bg-red-500/10"
+                      className="h-9 w-9 text-foreground-dim hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>

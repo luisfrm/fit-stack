@@ -364,15 +364,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       />
 
       {isPendingPayment && (
-        <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 animate-in fade-in zoom-in-95 duration-300">
+        <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 animate-in fade-in zoom-in-95 duration-300">
           <div className="flex items-start gap-3">
             <Badge variant="destructive" size="sm" className="mt-0.5 uppercase font-black tracking-tighter">
               Bloqueo de Seguridad
             </Badge>
             <div className="flex flex-col gap-1">
-              <Text weight="bold" size="sm" className="text-red-400">Pago pendiente detectado</Text>
+              <Text weight="bold" size="sm" className="text-destructive/80">Pago pendiente detectado</Text>
               <Text size="xs" variant="muted">
-                Este socio tiene una suscripción con pago en estado <span className="text-red-400 font-bold uppercase">Procesando</span>.
+                Este socio tiene una suscripción con pago en estado <span className="text-destructive/80 font-bold uppercase">Procesando</span>.
                 Debe validar o anular el pago anterior antes de registrar uno nuevo.
               </Text>
             </div>

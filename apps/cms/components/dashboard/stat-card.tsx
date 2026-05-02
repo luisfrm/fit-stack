@@ -19,15 +19,15 @@ export function StatCard({ title, value, change, icon, status, children }: StatC
         {icon}
         {status === 'online' && (
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Online</span>
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-[10px] font-bold text-success uppercase tracking-wider">Online</span>
           </div>
         )}
       </div>
       <div>
         <Text variant="muted" size="xs" weight="bold" uppercase className="mb-1 tracking-widest">{title}</Text>
         {value && <Text size="lg" weight="bold" className="mb-1">{value}</Text>}
-        {change && <Text size="xs" className="text-emerald-400 font-medium">{change}</Text>}
+        {change && <Text size="xs" className="text-success font-medium">{change}</Text>}
         {children}
       </div>
     </Card>

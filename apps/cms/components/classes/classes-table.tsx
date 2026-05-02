@@ -83,7 +83,7 @@ const getColumns = (
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-8 w-8 p-0 hover:bg-red-500/10 text-slate-400 hover:text-red-500"
+          className="h-8 w-8 p-0 hover:bg-destructive/10 text-slate-400 hover:text-destructive"
           onClick={(e) => {
             e.stopPropagation();
             cls.id && onDelete?.(cls.id);

@@ -106,7 +106,7 @@ export default function StaffPage() {
       {/* Tabla */}
       <section>
         {error ? (
-          <div className="flex items-center justify-center p-12 text-red-400 bg-red-500/10 rounded-xl">
+          <div className="flex items-center justify-center p-12 text-destructive bg-destructive/10 rounded-xl">
             {error}
           </div>
         ) : (

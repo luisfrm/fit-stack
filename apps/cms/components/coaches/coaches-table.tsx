@@ -56,7 +56,7 @@ const getColumns = (
     header: "Estado",
     cell: (coach) => (
       coach.isVisible ? (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-400">
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-success/20 text-success">
           Visible
         </span>
       ) : (
@@ -75,8 +75,8 @@ const getColumns = (
          <Button variant="ghost" size="icon" onClick={() => onEdit(coach)}>
           <Pencil size={18} className="text-slate-400" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => onDelete(coach)} className="hover:text-red-500 hover:bg-red-500/10 transition-colors">
-          <Trash2 size={18} className="text-slate-400 hover:text-red-400 transition-colors" />
+        <Button variant="ghost" size="icon" onClick={() => onDelete(coach)} className="hover:text-destructive hover:bg-destructive/10 transition-colors">
+          <Trash2 size={18} className="text-slate-400 hover:text-destructive transition-colors" />
         </Button>
       </div>
     )

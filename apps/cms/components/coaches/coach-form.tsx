@@ -290,7 +290,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
                     variant="ghost"
                     size="sm"
                     onClick={removeImage}
-                    className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <X size={14} />
                   </Button>

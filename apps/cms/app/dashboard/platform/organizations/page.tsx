@@ -113,9 +113,9 @@ export default function OrganizationsPage() {
         <div className="bg-white/5 border border-white/5 p-5 rounded-2xl flex items-center justify-between opacity-50 grayscale select-none">
           <div>
             <Text size="xs" variant="muted" className="uppercase font-black tracking-widest leading-none mb-1">Activos Hoy</Text>
-            <Text size="lg" weight="bold" className="text-emerald-400">---</Text>
+            <Text size="lg" weight="bold" className="text-success">---</Text>
           </div>
-          <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+          <div className="p-3 bg-success/10 rounded-xl text-success">
             <Users size={20} />
           </div>
         </div>

@@ -159,11 +159,11 @@ function RegisterForm() {
           )}
 
           {tokenError && (
-            <div className="flex flex-col items-center justify-center py-10 gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center px-4">
-              <AlertCircle className="text-red-500 w-12 h-12" />
+            <div className="flex flex-col items-center justify-center py-10 gap-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-center px-4">
+              <AlertCircle className="text-destructive w-12 h-12" />
               <div>
-                <h3 className="text-lg font-bold text-red-500">Invitación Inválida</h3>
-                <p className="text-sm text-red-400 mt-1">{tokenError}</p>
+                <h3 className="text-lg font-bold text-destructive">Invitación Inválida</h3>
+                <p className="text-sm text-destructive/80 mt-1">{tokenError}</p>
               </div>
             </div>
           )}

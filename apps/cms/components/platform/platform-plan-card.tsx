@@ -120,8 +120,8 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
   // Style Variants
   const styles = React.useMemo(() => ({
     statusWrapper: plan.isActive
-      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-      : "bg-red-500/10 text-red-500 border-red-500/20",
+      ? "bg-success/10 text-success border-success/20"
+      : "bg-destructive/10 text-destructive border-destructive/20",
     editButton: plan.isActive
       ? "bg-primary text-black hover:bg-primary/90"
       : "bg-white/5 text-white hover:bg-white/10",
@@ -201,9 +201,9 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
           size="icon"
           onClick={handleDelete}
           disabled={isDeleting}
-          className="h-11 w-11 border-red-500/10 hover:bg-red-500/10 bg-transparent"
+          className="h-11 w-11 border-destructive/10 hover:bg-destructive/10 bg-transparent"
         >
-          <Trash2 size={18} className="text-red-500/60" />
+          <Trash2 size={18} className="text-destructive/60" />
         </Button>
       </div>
     </div>

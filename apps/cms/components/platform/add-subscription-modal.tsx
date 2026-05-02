@@ -239,7 +239,7 @@ export function AddSubscriptionModal({
               onClick={() => setFormData({ ...formData, isTrial: !formData.isTrial })}
             >
               <div className="flex items-center gap-4">
-                <div className={cn("p-3 rounded-xl transition-colors", formData.isTrial ? "bg-blue-500/20 text-blue-400" : "bg-white/5 text-slate-500")}>
+                <div className={cn("p-3 rounded-xl transition-colors", formData.isTrial ? "bg-info/20 text-info" : "bg-white/5 text-slate-500")}>
                   <ShieldCheck size={20} />
                 </div>
                 <div>

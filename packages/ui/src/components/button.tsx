@@ -69,8 +69,8 @@ const buttonVariants = cva(
          * Danger — for destructive actions
          */
         danger: [
-          "bg-red-600 text-white",
-          "hover:bg-red-500",
+          "bg-destructive text-destructive-foreground",
+          "hover:bg-destructive/90",
         ],
 
         /**

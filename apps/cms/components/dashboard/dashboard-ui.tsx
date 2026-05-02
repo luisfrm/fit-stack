@@ -457,9 +457,9 @@ export type AlertSeverity = "warning" | "danger" | "success" | "info";
 
 const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string; icon: LucideIcon }> = {
   warning: { icon: AlertTriangle, borderClass: "border-l-primary", iconBg: "bg-primary/20", iconClass: "text-primary", buttonClass: "text-primary" },
-  danger: { icon: AlertCircle, borderClass: "border-l-rose-500", iconBg: "bg-rose-500/20", iconClass: "text-rose-500", buttonClass: "text-rose-400" },
-  success: { icon: BadgeCheck, borderClass: "border-l-emerald-500", iconBg: "bg-emerald-500/20", iconClass: "text-emerald-500", buttonClass: "text-emerald-400" },
-  info: { icon: AlertCircle, borderClass: "border-l-sky-500", iconBg: "bg-sky-500/20", iconClass: "text-sky-400", buttonClass: "text-sky-400" },
+  danger: { icon: AlertCircle, borderClass: "border-l-destructive", iconBg: "bg-destructive/20", iconClass: "text-destructive", buttonClass: "text-destructive" },
+  success: { icon: BadgeCheck, borderClass: "border-l-success", iconBg: "bg-success/20", iconClass: "text-success", buttonClass: "text-success" },
+  info: { icon: AlertCircle, borderClass: "border-l-info", iconBg: "bg-info/20", iconClass: "text-info", buttonClass: "text-info" },
 };
 
 interface AlertItemProps {
