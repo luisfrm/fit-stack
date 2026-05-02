@@ -67,9 +67,9 @@ export function SimpleSelect({
   }, [open]);
 
   return (
-    <div className={cn("space-y-1.5 w-full", className)}>
+    <div className={cn("flex flex-col gap-1.5 w-full", className)}>
       {label && (
-        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
           {label}
         </Label>
       )}

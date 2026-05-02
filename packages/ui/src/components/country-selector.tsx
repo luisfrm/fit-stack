@@ -64,7 +64,7 @@ export function CountrySelector({
   }, []);
 
   return (
-    <div className="space-y-2 relative" ref={containerRef}>
+    <div className="flex flex-col gap-1.5 relative" ref={containerRef}>
       {label && (
         <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
           {label}

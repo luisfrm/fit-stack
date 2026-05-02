@@ -50,5 +50,13 @@ export const organizationsService = {
 
   async join(id: string): Promise<void> {
     await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/join`);
+  },
+
+  async provisionOwner(id: string, data: any, sendInvite: boolean = false): Promise<any> {
+    const response = await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/staff`, {
+      ...data,
+      sendInvite
+    });
+    return response.data;
   }
 };
