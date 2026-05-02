@@ -271,6 +271,7 @@ export interface IPaymentMethodConfig {
   name: string;
   fields: IPaymentMethodField[];
   icon?: string;
+  currency: string | null; // null = any currency
 }
 
 export interface ITaxDetail {

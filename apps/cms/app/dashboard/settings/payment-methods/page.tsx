@@ -20,6 +20,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
+import { SimpleSelect } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
@@ -33,20 +34,23 @@ const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
       { id: "fld_pm1", label: "Referencia de Pago", type: "text", required: true },
       { id: "fld_pm2", label: "Banco Emisor", type: "text", required: true },
       { id: "fld_pm3", label: "Captura de Pantalla", type: "file", required: false },
-    ]
+    ],
+    currency: "VES"
   },
   {
     id: "zelle",
     name: "Zelle",
     fields: [
-      { id: "fld_z1", label: "Email de cuenta emisora", type: "text", required: true },
+      { id: "fld_z1", label: "Email de cuenta issuers", type: "text", required: true },
       { id: "fld_z2", label: "Nombre del titular", type: "text", required: false },
-    ]
+    ],
+    currency: "USD"
   },
   {
     id: "cash",
     name: "Efectivo",
-    fields: []
+    fields: [],
+    currency: null
   },
   {
     id: "transferencia",
@@ -54,7 +58,8 @@ const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
     fields: [
       { id: "fld_tb1", label: "Número de Referencia", type: "text", required: true },
       { id: "fld_tb2", label: "Banco Destino", type: "text", required: true },
-    ]
+    ],
+    currency: null
   }
 ];
 
@@ -85,7 +90,7 @@ export default function PaymentMethodsSettingsPage() {
 
   const handleOpenCreationModal = () => {
     const tempId = `method_${Date.now()}`;
-    setEditingMethod({ id: tempId, name: "", fields: [] });
+    setEditingMethod({ id: tempId, name: "", fields: [], currency: null });
     setIsModalOpen(true);
   };
 
@@ -193,9 +198,21 @@ export default function PaymentMethodsSettingsPage() {
                     <div className="w-2 h-2 rounded-full bg-primary/40 group-hover:bg-primary" />
                     <div className="flex flex-col">
                       <Text className="text-sm font-medium">{method.name}</Text>
-                      <Text className="text-[9px] text-foreground-dim uppercase font-bold tracking-tight">
-                        {method.fields.length} campos configurados
-                      </Text>
+                      <div className="flex items-center gap-2">
+                        <Text className="text-[9px] text-foreground-dim uppercase font-bold tracking-tight">
+                          {method.fields.length} campos
+                        </Text>
+                        {method.currency && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
+                            {method.currency}
+                          </span>
+                        )}
+                        {method.currency === null && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-foreground/10 text-foreground-dim font-bold">
+                            ANY
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
@@ -311,14 +328,30 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
       className="max-w-xl"
     >
       <div className="space-y-6">
-        <div className="space-y-2">
-          <Text className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Nombre del Método</Text>
-          <Input
-            value={localMethod.name}
-            onChange={(e) => setLocalMethod({ ...localMethod, name: e.target.value })}
-            wrapperClassName="border-border"
-            className="px-4"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Text className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Nombre del Método</Text>
+            <Input
+              value={localMethod.name}
+              onChange={(e) => setLocalMethod({ ...localMethod, name: e.target.value })}
+              wrapperClassName="border-border"
+              className="px-4"
+            />
+          </div>
+          <div className="space-y-2">
+            <Text className="text-[10px] font-bold text-foreground-muted uppercase tracking-widest">Moneda</Text>
+            <SimpleSelect
+              value={localMethod.currency ?? ""}
+              onChange={(val) => setLocalMethod({ ...localMethod, currency: val || null })}
+              options={[
+                { value: "", label: "Cualquiera" },
+                { value: "USD", label: "USD - Dólar" },
+                { value: "VES", label: "VES - Bolívar" },
+                { value: "EUR", label: "EUR - Euro" },
+              ]}
+              placeholder="Seleccionar..."
+            />
+          </div>
         </div>
 
         <div className="space-y-4">

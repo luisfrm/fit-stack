@@ -186,10 +186,18 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     [activePaymentMethods, paymentMethodId]
   );
 
-  // Set default payment currency when plan changes
+  // Filter payment methods by selected currency
+  const filteredPaymentMethods = React.useMemo(() => {
+    return activePaymentMethods.filter(m => 
+      m.currency === null || m.currency === paymentCurrency
+    );
+  }, [activePaymentMethods, paymentCurrency]);
+
+  // Set default payment currency and reset method when plan changes
   React.useEffect(() => {
     if (selectedPlan) {
       setPaymentCurrency(selectedPlan.currency);
+      setPaymentMethodId(''); // Reset method to show placeholder
     }
   }, [selectedPlan]);
 
@@ -347,6 +355,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const isPendingPayment = selectedMember?.latestSubscription?.paymentStatus === "processing";
   const isSectionDisabled = !selectedMember || isPendingPayment;
 
+  // Handler to change currency and reset payment method
+  const handleCurrencyChange = (value: string) => {
+    setPaymentCurrency(value);
+    setPaymentMethodId(''); // Reset to show placeholder when currency changes
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -393,7 +407,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentCurrency={paymentCurrency}
           paymentMethodId={paymentMethodId}
           activeCurrencies={activeCurrencies}
-          activePaymentMethods={activePaymentMethods}
+          activePaymentMethods={filteredPaymentMethods}
           finalAmount={finalAmount}
           currencyFormat={currencyFormat}
           selectedPaymentConfig={selectedPaymentConfig}
@@ -409,7 +423,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
             setFinalAmount((selectedPlan.price * val) / 100);
           }}
           onAmountChange={setFinalAmount}
-          onCurrencyChange={setPaymentCurrency}
+          onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
           paymentDate={paymentDate}
