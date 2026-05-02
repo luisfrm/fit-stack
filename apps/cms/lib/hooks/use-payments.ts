@@ -88,6 +88,7 @@ export function useRecentRegistrations(limit: number = 5) {
     queryFn: async () => {
       const data = await subscriptionsService.getRecent(limit);
       return data.map(sub => ({
+        id: sub.id,
         name: sub.name,
         time: getRelativeTime(sub.createdAt),
       }));

@@ -72,6 +72,7 @@ export interface IClassToday {
 }
 
 export interface IRecentRegistration {
+  id: number;
   name: string;
   time: string;
   avatarUrl?: string;

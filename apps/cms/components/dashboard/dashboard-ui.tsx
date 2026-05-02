@@ -447,7 +447,7 @@ export function RecentRegistrationsList({ registrations, loading }: Readonly<{ r
   return (
     <div className="flex flex-col flex-1 p-2 gap-1 animate-in fade-in duration-500">
       {registrations.map((member) => (
-        <ActivityItem key={member.name} {...member} />
+        <ActivityItem key={member.id} {...member} />
       ))}
     </div>
   );

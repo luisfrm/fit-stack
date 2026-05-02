@@ -272,9 +272,12 @@ function SidebarNavItem({ label, href, icon: Icon, active }: Readonly<SidebarNav
 
 function ThemeToggleButton({ isDark, toggle }: Readonly<{ isDark: boolean; toggle: () => void }>) {
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={toggle}
-      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all border bg-foreground/5 border-border hover:bg-foreground/10"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+      className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all border bg-foreground/5 border-border hover:bg-foreground/10 cursor-pointer"
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       {isDark ? (
@@ -287,7 +290,7 @@ function ThemeToggleButton({ isDark, toggle }: Readonly<{ isDark: boolean; toggl
         onCheckedChange={toggle}
         className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-primary"
       />
-    </button>
+    </div>
   );
 }
 
