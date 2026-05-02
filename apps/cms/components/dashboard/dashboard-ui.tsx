@@ -23,6 +23,7 @@ import {
   Globe,
   ArrowLeft,
   ArrowLeftRight,
+  User,
   type LucideIcon,
 } from "lucide-react";
 
@@ -147,9 +148,9 @@ export function SwitchOrganizationAction() {
       }
     >
       <div className="py-4">
-        <OrganizationPicker 
-          isModal 
-          onSelect={() => setOpen(false)} 
+        <OrganizationPicker
+          isModal
+          onSelect={() => setOpen(false)}
         />
       </div>
     </Modal>
@@ -352,15 +353,17 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
 interface ActivityItemProps {
   name: string;
   time: string;
-  avatarUrl?: string;
+  imageUrl?: string | null;
 }
 
-export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemProps>) {
+export function ActivityItem({ name, time, imageUrl }: Readonly<ActivityItemProps>) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
-      <Avatar size="default" fallback={""}>
-        {avatarUrl && <AvatarImage src={uploadService.getMediaUrl(avatarUrl)} alt={name} />}
-        <AvatarFallback>{name.charAt(0)}</AvatarFallback>
+      <Avatar size="default" fallback="">
+        <AvatarImage src={imageUrl ? uploadService.getMediaUrl(imageUrl) : undefined} />
+        <AvatarFallback className="bg-primary text-primary-foreground">
+          <User className="w-4 h-4" />
+        </AvatarFallback>
       </Avatar>
       <div className="flex-1 min-w-0">
         <Text as="p" size="base" weight="medium" truncate>

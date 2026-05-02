@@ -7,23 +7,23 @@ import { type IMember } from "@/types/dashboard";
 import { membersService } from "@/lib/services/members-service";
 
 interface MemberModalProps {
-  readonly member?: IMember;
+  readonly initialData?: IMember;
   readonly trigger: React.ReactNode;
   readonly onSuccess?: () => void;
 }
 
-export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
+export function MemberModal({ initialData, trigger, onSuccess }: MemberModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
-  const isEdit = !!member?.id;
+  const isEdit = !!initialData?.id;
 
   const handleSubmit = async (formData: Partial<IMember>, sendInvite: boolean) => {
     setIsLoading(true);
 
     try {
-      if (isEdit && member?.id) {
-        await membersService.updateMember(member.id, formData);
+      if (isEdit && initialData?.id) {
+        await membersService.updateMember(initialData.id, formData);
         toast.success("Miembro actualizado correctamente.");
       } else {
         await membersService.createMember(formData, sendInvite);
@@ -51,13 +51,13 @@ export function MemberModal({ member, trigger, onSuccess }: MemberModalProps) {
       title={isEdit ? "Editar Miembro" : "Nuevo Miembro"}
       description={
         isEdit
-          ? `Actualiza la información de ${member.firstName} ${member.lastName}.`
+          ? `Actualiza la información de ${initialData.firstName} ${initialData.lastName}.`
           : "Completa los datos para dar de alta a un nuevo miembro en el gimnasio."
       }
       isScrollable={true}
     >
       <MemberForm
-        initialData={member}
+        initialData={initialData}
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />

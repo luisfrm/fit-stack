@@ -204,6 +204,7 @@ export const subscriptionsRepository = {
         id: subscription.id,
         memberName: members.firstName,
         memberLastName: members.lastName,
+        memberImageUrl: members.imageUrl,
         createdAt: subscription.createdAt,
       })
       .from(subscription)

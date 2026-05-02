@@ -62,6 +62,7 @@ export const subscriptionsService = {
     return records.map((r: any) => ({
       id: r.id,
       name: `${r.memberName} ${r.memberLastName}`,
+      imageUrl: r.memberImageUrl,
       createdAt: r.createdAt.toISOString(),
     }))
   },

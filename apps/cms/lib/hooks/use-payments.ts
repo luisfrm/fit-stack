@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionsService } from "../services/subscriptions-service";
 import { financeService } from "../services/finance-service";
 import { type IRecentRegistration, type ISubscription, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
+import { useAuth } from "./use-auth";
 
 /**
  * Hook to fetch all subscriptions with pagination and filters.
@@ -83,13 +84,17 @@ function getRelativeTime(dateStr: string) {
  * Automatically formats the timestamp into relative time.
  */
 export function useRecentRegistrations(limit: number = 5) {
+  const { activeOrganization } = useAuth();
+  const activeOrganizationId = activeOrganization?.id;
+
   return useQuery<IRecentRegistration[]>({
-    queryKey: ["subscriptions", "recent", limit],
+    queryKey: ["subscriptions", "recent", activeOrganizationId, limit],
     queryFn: async () => {
       const data = await subscriptionsService.getRecent(limit);
       return data.map(sub => ({
         id: sub.id,
         name: sub.name,
+        imageUrl: sub.imageUrl,
         time: getRelativeTime(sub.createdAt),
       }));
     },
