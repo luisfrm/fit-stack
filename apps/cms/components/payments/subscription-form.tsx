@@ -25,6 +25,7 @@ import {
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { ORG_ROLES } from "@workspace/shared";
 
 // Sub-components
@@ -54,7 +55,8 @@ interface SubscriptionFormProps {
 
 export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initialMember }: SubscriptionFormProps) {
   const { settings } = useSettings();
-  const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+  const { activeOrganization } = useAuth();
+  const timezone = activeOrganization?.timezone || DEFAULT_TIMEZONE;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 
   // States 

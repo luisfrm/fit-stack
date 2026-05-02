@@ -116,16 +116,16 @@ export default function CurrencySettingsPage() {
   if (isLoading) return null;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div>
-        <Title className="text-3xl font-bold tracking-tight bg-linear-to-r from-white to-white/40 bg-clip-text text-transparent">
-          Monedas
-        </Title>
-        <Text className="text-white/40 text-sm mt-1">Configura las divisas activas y la moneda principal de reporte.</Text>
+    <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+        <div className="space-y-1">
+          <Title as="h3" size="card" className="tracking-tight">Monedas</Title>
+          <Text variant="muted">Configura las divisas activas y la moneda principal de reporte.</Text>
+        </div>
       </div>
 
-      <div className="max-w-2xl space-y-6">
-        <Card className="p-6 space-y-6">
+      <div className="space-y-8 max-w-4xl">
+        <Card variant="settings">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <Coins className="w-5 h-5 text-primary" />
@@ -261,18 +261,26 @@ export default function CurrencySettingsPage() {
           </div>
         </Card>
 
-        <div className="flex justify-end pt-8">
-          <Button
-            onClick={handleSave}
-            loading={isUpdating}
-            disabled={activeCurrencies.length === 0}
-            variant="primary"
-            size="md"
-            className="px-16"
-          >
-            Guardar Cambios de Moneda
-          </Button>
-        </div>
+        {/* ACCIONES FINALES */}
+        <Card variant="settings" className="justify-between relative z-10 p-6 sm:p-8">
+          <div className="flex flex-col gap-1.5">
+            <Text weight="bold" size="lg" className="tracking-tight">¿Deseas aplicar estos cambios?</Text>
+            <Text variant="muted" size="sm" className="leading-relaxed">
+              Las divisas seleccionadas estarán disponibles para pagos y reportes inmediatamente.
+            </Text>
+          </div>
+
+          <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+            <Button
+              onClick={handleSave}
+              loading={isUpdating}
+              disabled={activeCurrencies.length === 0}
+              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+            >
+              Guardar Cambios de Moneda
+            </Button>
+          </div>
+        </Card>
       </div>
     </div>
   );

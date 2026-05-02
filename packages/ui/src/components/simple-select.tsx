@@ -28,6 +28,7 @@ interface SimpleSelectProps {
   readonly className?: string;
   readonly variant?: "default" | "glass";
   readonly size?: "sm" | "md" | "lg" | "xl";
+  readonly leftIcon?: React.ReactNode;
 }
 
 export function SimpleSelect({
@@ -40,7 +41,8 @@ export function SimpleSelect({
   showSearch = false,
   className,
   variant = "default",
-  size = "md"
+  size = "md",
+  leftIcon
 }: SimpleSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -88,6 +90,7 @@ export function SimpleSelect({
             )}
           >
             <div className="flex items-center gap-2 overflow-hidden w-full">
+              {leftIcon && <div className="shrink-0 text-muted-foreground">{leftIcon}</div>}
               {selectedOption ? (
                 <span className="text-sm text-foreground truncate">
                   {selectedOption.label}

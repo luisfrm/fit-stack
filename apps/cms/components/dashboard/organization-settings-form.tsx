@@ -6,8 +6,6 @@ import {
   Palette,
   Save,
   RotateCcw,
-  Clock,
-  Globe,
   ChevronRight,
   Moon,
   Sun
@@ -28,8 +26,6 @@ import {
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { DEFAULT_TIMEZONE } from "@/lib/config/display";
-import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import Link from "next/link";
 
 const DEFAULT_BRANDING = {
@@ -59,13 +55,6 @@ export function OrganizationSettingsForm({
   const [formData, setFormData] = React.useState<Record<string, string>>({});
   const hasInitialized = React.useRef(false);
 
-  // Derive country code from timezone if possible, or fallback to VE
-  const currentCountryCode = React.useMemo(() => {
-    const tz = formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
-    const country = COUNTRY_LIST.find(c => c.timezone === tz);
-    return country?.code || "VE";
-  }, [formData]);
-
   // Sync state with initial data - only once
   React.useEffect(() => {
     if (!hasInitialized.current && Object.keys(initialData).length > 0) {
@@ -76,13 +65,6 @@ export function OrganizationSettingsForm({
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleCountryChange = (code: string) => {
-    const config = COUNTRIES[code];
-    if (config) {
-      handleChange(SETTINGS_KEYS.TIMEZONE, config.timezone);
-    }
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -117,19 +99,6 @@ export function OrganizationSettingsForm({
   // Calculate derivatives ONLY for preview
   const previewHover = ColorUtils.getHoverColor(currentPrimary);
   const previewPrimaryFg = ColorUtils.getContrastForeground(currentPrimary);
-
-  // Helper to show current time in a zone
-  const getTimeInZone = (zone?: string) => {
-    try {
-      const targetZone = zone || DEFAULT_TIMEZONE;
-      return new Intl.DateTimeFormat("es-VE", {
-        timeStyle: "short",
-        timeZone: targetZone,
-      }).format(new Date());
-    } catch {
-      return "--:--";
-    }
-  };
 
   if (isLoading) {
     return (
@@ -183,49 +152,6 @@ export function OrganizationSettingsForm({
                 </div>
               </div>
             </div>
-          </div>
-        </Card>
-
-        {/* CONFIGURACIÓN REGIONAL */}
-        <Card variant="settings" className="relative z-40">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
-              <Globe className="w-6 h-6" />
-            </div>
-            <div className="flex flex-col">
-              <Text size="lg" weight="bold">Configuración Regional</Text>
-              <Text variant="muted" size="sm">Define el país y zona horaria para agendas y recibos.</Text>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-            <CountrySelector
-              label="Región / País"
-              value={currentCountryCode}
-              onChange={handleCountryChange}
-              countries={COUNTRY_LIST}
-            />
-
-            <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
-              <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Hora Local (Sincronizada)</Text>
-                <Text size="lg" weight="bold" className="tabular-nums">
-                  {getTimeInZone(formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE)}
-                </Text>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-border/50">
-            <SimpleSelect
-              label="Zona Horaria (Avanzado)"
-              value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
-              onChange={(value) => handleChange(SETTINGS_KEYS.TIMEZONE, value)}
-              options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
-            />
           </div>
         </Card>
 

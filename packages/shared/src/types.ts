@@ -402,6 +402,7 @@ export interface IOrganization {
   address?: string | null;
   fiscalConfig?: Record<string, any> | null;
   slogan?: string | null;
+  timezone?: string | null;
   status?: string | null;
 
   createdAt?: string | Date;
