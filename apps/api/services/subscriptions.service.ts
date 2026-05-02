@@ -64,6 +64,10 @@ export const subscriptionsService = {
       name: `${r.memberName} ${r.memberLastName}`,
       imageUrl: r.memberImageUrl,
       createdAt: r.createdAt.toISOString(),
+      planName: r.planName || null,
+      amountPaid: r.amountPaid ? Number(r.amountPaid) : null,
+      currencyPaid: r.currencyPaid || 'USD',
+      endDate: r.endDate.toISOString(),
     }))
   },
 

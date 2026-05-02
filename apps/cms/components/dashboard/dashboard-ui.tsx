@@ -24,6 +24,7 @@ import {
   ArrowLeft,
   ArrowLeftRight,
   User,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,7 +38,8 @@ import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useTheme } from "@/lib/hooks/use-theme";
-import { useSettings } from "@/lib/hooks/use-settings";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import {
   AppSidebar as UISidebar,
   MobileNav as UIMobileNav,
@@ -352,26 +354,52 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
 
 interface ActivityItemProps {
   name: string;
-  time: string;
+  time?: string;
   imageUrl?: string | null;
+  planName?: string;
+  amountPaid?: number;
+  currencyPaid?: string;
+  endDate?: string;
 }
 
-export function ActivityItem({ name, time, imageUrl }: Readonly<ActivityItemProps>) {
+export function ActivityItem({ name, time, imageUrl, planName, amountPaid, currencyPaid, endDate }: Readonly<ActivityItemProps>) {
+  const { settings } = useSettings();
+  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
-      <Avatar size="default" fallback="">
-        <AvatarImage src={imageUrl ? uploadService.getMediaUrl(imageUrl) : undefined} />
-        <AvatarFallback className="bg-primary text-primary-foreground">
+      {imageUrl ? (
+        <img src={uploadService.getMediaUrl(imageUrl)} alt={name} className="w-12 h-12 rounded-full" />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
           <User className="w-4 h-4" />
-        </AvatarFallback>
-      </Avatar>
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <Text as="p" size="base" weight="medium" truncate>
           {name}
         </Text>
-        <Text as="span" size="xs" variant="subtle" uppercase>
-          {time}
-        </Text>
+        {planName && (
+          <Text as="p" size="xs" variant="primary" weight="semibold" className="truncate">
+            {planName}
+          </Text>
+        )}
+        <div className="flex items-center gap-2">
+          {amountPaid !== undefined && (
+            <Text as="span" size="xs" variant="muted" className="tabular-nums">
+              {ValueConverter.format(amountPaid / 100, currencyPaid || 'USD', currencyFormat)}
+            </Text>
+          )}
+          {endDate && (
+            <Text as="span" size="xs" variant="subtle" className="flex items-center gap-0.5">
+              <CalendarClock size={10} />
+              {new Date(endDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+            </Text>
+          )}
+          <Text as="span" size="xs" variant="subtle" className="ml-auto uppercase">
+            {time}
+          </Text>
+        </div>
       </div>
     </div>
   );
@@ -444,7 +472,7 @@ export function RecentRegistrationsList({ registrations, loading }: Readonly<{ r
   }
 
   if (registrations.length === 0) {
-    return <NoData message="No se han registrado nuevos miembros recientemente." className="py-12" />;
+    return <NoData message="No hay pagos registrados recientemente." className="py-12" />;
   }
 
   return (

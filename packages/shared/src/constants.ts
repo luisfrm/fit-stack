@@ -47,6 +47,7 @@ export const SUBSCRIPTION_STATUSES = {
   ACTIVE: "active",
   CANCELLED: "cancelled",
   EXPIRED: "expired",
+  EXPIRING: "expiring",
 } as const;
 
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSCRIPTION_STATUSES];

@@ -1,5 +1,5 @@
 import { apiClient } from '../api-client'
-import { ISubscription, SubscriptionStatus, PaginatedSubscriptions, SubscriptionsFilter } from '@/types/dashboard'
+import { ISubscription, SubscriptionStatus, PaginatedSubscriptions, SubscriptionsFilter, IRecentRegistration } from '@/types/dashboard'
 
 export const subscriptionsService = {
   getAll: async (params?: SubscriptionsFilter): Promise<PaginatedSubscriptions> => {
@@ -21,8 +21,8 @@ export const subscriptionsService = {
     await apiClient.delete(`/subscriptions/${id}`)
   },
 
-  getRecent: async (limit: number = 5): Promise<Array<{ id: number; name: string; imageUrl: string | null; createdAt: string }>> => {
-    const { data } = await apiClient.get<Array<{ id: number; name: string; imageUrl: string | null; createdAt: string }>>('/subscriptions/recent', {
+  getRecent: async (limit: number = 5): Promise<IRecentRegistration[]> => {
+    const { data } = await apiClient.get<IRecentRegistration[]>('/subscriptions/recent', {
       params: { limit }
     })
     return data

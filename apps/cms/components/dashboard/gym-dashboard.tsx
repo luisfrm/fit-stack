@@ -61,7 +61,7 @@ export function GymDashboard() {
 
         <Card className="overflow-hidden flex flex-col">
           <div className="p-6 border-b border-border">
-            <Text as="p" size="lg" weight="bold">Últimos Registros</Text>
+            <Text as="p" size="lg" weight="bold">Últimos Pagos</Text>
           </div>
           <RecentRegistrationsList registrations={recentRegistrations} loading={isLoadingRegistrations} />
         </Card>
