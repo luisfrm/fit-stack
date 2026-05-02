@@ -5,6 +5,7 @@ import { KpiGroup } from "./kpi-group";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { toast } from "@workspace/ui/components";
 
 export function DashboardStats() {
@@ -17,7 +18,8 @@ export function DashboardStats() {
   const [loading, setLoading] = React.useState(true);
 
   const { settings } = useSettings();
-  const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+  const { activeOrganization } = useAuth();
+  const timezone = activeOrganization?.timezone || DEFAULT_TIMEZONE;
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
 
   React.useEffect(() => {

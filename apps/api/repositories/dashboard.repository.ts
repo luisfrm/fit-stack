@@ -1,5 +1,6 @@
-import { db, sql, and, eq, or, gte, count, sum, isNull } from '@workspace/database/client';
+import { db, sql, and, eq, or, gte, count, sum, isNull, lte } from '@workspace/database/client';
 import { subscription, payment, cmsClass } from '@workspace/database/schema';
+import { OrganizationDateManager } from '../lib/date-manager';
 
 export interface DashboardStats {
   activeMembers: number;
@@ -9,12 +10,12 @@ export interface DashboardStats {
 }
 
 export const dashboardRepository = {
-  async getStats(organizationId: string, today: string, now: Date = new Date()): Promise<DashboardStats> {
+  async getStats(organizationId: string, today: string, dateManager: OrganizationDateManager, now: Date = new Date()): Promise<DashboardStats> {
     const sevenDaysFromNow = new Date(now);
     sevenDaysFromNow.setDate(now.getDate() + 7);
 
     // 1. Monthly Income (Groups of totals per currency)
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Using Postgres AT TIME ZONE to ensure we capture exactly the current local month
     const incomeResults = await db
       .select({ 
         currency: payment.currencyPaid, 
@@ -23,7 +24,8 @@ export const dashboardRepository = {
       .from(payment)
       .where(and(
         eq(payment.organizationId, organizationId),
-        gte(payment.paymentDate, firstDayOfMonth)
+        eq(payment.status, 'validated'),
+        sql`DATE_TRUNC('month', ${dateManager.toLocalSql(payment.paymentDate)}) = DATE_TRUNC('month', ${dateManager.toLocalValueSql(now)})`
       ))
       .groupBy(payment.currencyPaid);
 
@@ -38,10 +40,12 @@ export const dashboardRepository = {
     const activeMembersResult = await db
       .select({ count: count(sql`DISTINCT ${subscription.memberId}`) })
       .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
       .where(and(
         eq(subscription.organizationId, organizationId),
         gte(subscription.endDate, now),
-        isNull(subscription.cancelledAt)
+        isNull(subscription.cancelledAt),
+        eq(payment.status, 'validated')
       ));
     const activeMembers = Number(activeMembersResult[0]?.count ?? 0);
 
@@ -53,10 +57,12 @@ export const dashboardRepository = {
         maxEndDate: sql<Date>`max(${subscription.endDate})`.as('max_end_date'),
       })
       .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
       .where(and(
         eq(subscription.organizationId, organizationId),
         gte(subscription.endDate, now),
-        isNull(subscription.cancelledAt)
+        isNull(subscription.cancelledAt),
+        eq(payment.status, 'validated')
       ))
       .groupBy(subscription.memberId)
       .as('latest_subs');
@@ -64,11 +70,12 @@ export const dashboardRepository = {
     const expiringSoonResult = await db
       .select({ total: count() })
       .from(latestSubs)
-      .where(sql`${latestSubs.maxEndDate} <= ${sevenDaysFromNow}`);
+      .where(lte(latestSubs.maxEndDate, sevenDaysFromNow));
     
     const membershipsExpiring = Number(expiringSoonResult[0]?.total ?? 0);
 
     // 4. Classes Today
+    // Truncate today's start and end in local time to check classes correctly
     const parts = today.split('-').map(Number);
     const [year = 0, month = 1, day = 1] = parts;
     const dateObj = new Date(year, month - 1, day);

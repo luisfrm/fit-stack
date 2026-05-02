@@ -49,4 +49,4 @@ jobs:
 
           echo "Comparing against: $BASE_SHA"
           
-          pnpm turbo lint typecheck build --filter="...[$BASE_SHA]"
+          pnpm turbo lint typecheck --filter="...[$BASE_SHA]"

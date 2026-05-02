@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { financeService } from '@/services/finance.service'
 import { getSession } from '@/config/get-session'
+import { auth } from '@/config/auth'
+import { headers } from 'next/headers'
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,7 +12,14 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId
-    const stats = await financeService.getDashboardAnalytics(organizationId)
+    
+    // Fetch full organization to get timezone from metadata/additional fields
+    const fullOrg = await auth.api.getFullOrganization({
+      headers: await headers()
+    })
+    
+    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
+    const stats = await financeService.getDashboardAnalytics(organizationId, timezone)
 
     return NextResponse.json(stats)
   } catch (error: any) {

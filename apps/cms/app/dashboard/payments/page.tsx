@@ -12,7 +12,7 @@ import { RevenueChart } from "@/components/payments/revenue-chart";
 import { AnalyticsCarousel } from "@/components/payments/analytics-carousel";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { ORG_ROLES } from "@workspace/shared";
+import { ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { CurrencyFormat } from "@/lib/utils/value-converters";
@@ -54,10 +54,10 @@ export default function PaymentsPage() {
     setPage(1);
   }, [debouncedSearch, activeFilter]);
 
-  const handleStatusChange = async (id: number, status: 'active' | 'canceled' | 'expired') => {
-    updateStatusMutation.mutate({ id, status }, {
+  const handleStatusChange = async (id: number, status: string) => {
+    updateStatusMutation.mutate({ id, status: status as any }, {
       onSuccess: () => {
-        toast.success(`Suscripción ${status === 'active' ? 'activada' : 'revocada'}.`);
+        toast.success(`Suscripción ${status === SUBSCRIPTION_STATUSES.ACTIVE ? 'activada' : 'revocada'}.`);
       },
       onError: (err: any) => {
         toast.error(err.message || "Fallo al cambiar estado");
@@ -151,20 +151,25 @@ export default function PaymentsPage() {
         >
           <div className="flex items-center gap-2">
             {[
-              { id: "processing", label: "Por validar", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
-              { id: "expiring", label: "Por vencer", color: "bg-red-500/10 text-red-500 border-red-500/20" },
-              { id: "active", label: "Activas", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+              { id: PAYMENT_STATUSES.PROCESSING, label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
+              { id: SUBSCRIPTION_STATUSES.EXPIRED, label: "Por vencer", className: "text-red-500 border-red-500/20 bg-red-500/5 hover:bg-red-500/10" },
+              { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-blue-500 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10" },
+              { id: PAYMENT_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
             ].map((btn) => (
-              <Badge
+              <Button
                 key={btn.id}
-                variant={btn.id === activeFilter ? "info" : "outline"}
+                size="sm"
+                variant={activeFilter === btn.id ? "primary" : "glass"}
                 className={cn(
-                  "cursor-pointer hover:brightness-110 hover:scale-110",
+                  "cursor-pointer font-medium transition-all normal-case tracking-normal border border-transparent",
+                  activeFilter === btn.id 
+                    ? "border-primary" 
+                    : btn.className
                 )}
                 onClick={() => setActiveFilter(activeFilter === btn.id ? null : btn.id)}
               >
                 {btn.label}
-              </Badge>
+              </Button>
             ))}
             {activeFilter && (
               <Button

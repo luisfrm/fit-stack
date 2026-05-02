@@ -6,12 +6,13 @@ import {
   Button,
   toast,
   Text,
-  CountrySelector,
+  SimpleSelect,
   Separator,
+  CountrySelector,
   ImageUpload,
 } from "@workspace/ui/components";
-import { Building2, Globe, ShieldCheck, Send, MapPin, Fingerprint } from "lucide-react";
-import { LATAM_COUNTRIES } from "@workspace/shared/constants";
+import { Building2, Globe, ShieldCheck, Send, MapPin, Fingerprint, Clock } from "lucide-react";
+import { LATAM_COUNTRIES, COUNTRY_LIST } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
 import { IOrganization } from "@workspace/shared/types";
 
@@ -34,6 +35,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     taxId: initialData?.taxId ?? "",
     legalName: initialData?.legalName ?? "",
     address: initialData?.address ?? "",
+    timezone: initialData?.timezone ?? "America/Caracas",
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -128,11 +130,25 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         </Text>
       </div>
 
-      <CountrySelector
-        value={formData.countryCode || "VE"}
-        onChange={(code) => handleChange("countryCode", code)}
-        countries={LATAM_COUNTRIES}
-      />
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <CountrySelector
+          value={formData.countryCode || "VE"}
+          onChange={(code: string) => {
+            const config = LATAM_COUNTRIES.find(c => c.code === code);
+            handleChange("countryCode", code);
+            if (config) handleChange("timezone", config.timezone);
+          }}
+          countries={LATAM_COUNTRIES}
+        />
+
+        <SimpleSelect
+          label="Zona Horaria"
+          value={formData.timezone || "America/Caracas"}
+          onChange={(val) => handleChange("timezone", val)}
+          options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
+          leftIcon={<Clock size={16} />}
+        />
+      </div>
 
       <Input
         label="Nombre Legal / Razón Social"

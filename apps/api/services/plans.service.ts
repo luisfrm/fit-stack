@@ -4,13 +4,13 @@ export type { IMembershipPlan, IMembershipsSummary } from '../repositories/plans
 
 export const plansService = {
   async getAll(organizationId: string, filters: { includeStats?: boolean } = {}): Promise<IMembershipPlan[]> {
-    const gymNow = await settingsService.getGymNow(organizationId)
-    return plansRepository.findAll(organizationId, filters, gymNow)
+    return plansRepository.findAll(organizationId, filters)
   },
 
-  async getSummary(organizationId: string): Promise<IMembershipsSummary> {
-    const gymNow = await settingsService.getGymNow(organizationId)
-    return plansRepository.getSummary(organizationId, gymNow)
+  async getSummary(organizationId: string, timezone?: string): Promise<IMembershipsSummary> {
+    const dateManager = settingsService.getDateManager(timezone)
+    const utcNow = new Date()
+    return plansRepository.getSummary(organizationId, dateManager, utcNow)
   },
 
   async getById(organizationId: string, id: number): Promise<IMembershipPlan | undefined> {

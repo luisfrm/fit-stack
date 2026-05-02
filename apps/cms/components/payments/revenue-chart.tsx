@@ -75,15 +75,16 @@ export function RevenueChart({
 
     activeData.forEach((item: any) => {
       let dateLabel = '';
-      
+      const rawDate = item.day || item.month; // Backend returns TO_CHAR string
+
       if (timeframe === '30d') {
-        const dateObj = new Date(item.day);
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        dateLabel = `${day}-${month}`;
+        // rawDate is 'YYYY-MM-DD'
+        const [y, m, d] = rawDate.split('-');
+        dateLabel = `${d}-${m}`;
       } else {
-        const dateObj = new Date(item.month);
-        // "Ene", "Feb", etc.
+        // rawDate is 'YYYY-MM'
+        const [y, m] = rawDate.split('-');
+        const dateObj = new Date(Number(y), Number(m) - 1, 1);
         dateLabel = dateObj.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '');
         dateLabel = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
       }

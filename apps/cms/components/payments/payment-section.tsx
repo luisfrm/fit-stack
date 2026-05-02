@@ -44,6 +44,8 @@ interface PaymentSectionProps {
   readonly allowPriceOverride: boolean;
   readonly paymentDetails: string;
   readonly onPaymentDetailsChange: (value: string) => void;
+  readonly paymentDate: string;
+  readonly onPaymentDateChange: (value: string) => void;
   readonly disabled?: boolean;
 }
 
@@ -72,6 +74,8 @@ export function PaymentSection({
   allowPriceOverride,
   paymentDetails,
   onPaymentDetailsChange,
+  paymentDate,
+  onPaymentDateChange,
   disabled,
 }: PaymentSectionProps) {
   return (
@@ -96,7 +100,16 @@ export function PaymentSection({
             label="Moneda de Pago"
           />
 
+          <Input
+            id="payment-date"
+            type="date"
+            label="Fecha de Operación"
+            value={paymentDate}
+            onChange={(e) => onPaymentDateChange(e.target.value)}
+          />
+
           <SimpleSelect
+            className="md:col-span-2"
             label="Método de Pago"
             value={paymentMethodId}
             onChange={onMethodChange}

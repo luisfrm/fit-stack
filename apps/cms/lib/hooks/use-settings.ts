@@ -7,7 +7,6 @@ import { useAuth } from "./use-auth";
 
 export const SETTINGS_KEYS = {
   BRAND_PRIMARY: "brand_primary",
-  TIMEZONE: "timezone",
   ACTIVE_CURRENCIES: "active_currencies",
   PRIMARY_CURRENCY: "primary_currency",
   CURRENCY_FORMAT: "currency_format",

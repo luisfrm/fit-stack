@@ -6,8 +6,6 @@ import {
   Palette,
   Save,
   RotateCcw,
-  Clock,
-  Globe,
   ChevronRight,
   Moon,
   Sun
@@ -28,8 +26,6 @@ import {
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { DEFAULT_TIMEZONE } from "@/lib/config/display";
-import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import Link from "next/link";
 
 const DEFAULT_BRANDING = {
@@ -59,13 +55,6 @@ export function OrganizationSettingsForm({
   const [formData, setFormData] = React.useState<Record<string, string>>({});
   const hasInitialized = React.useRef(false);
 
-  // Derive country code from timezone if possible, or fallback to VE
-  const currentCountryCode = React.useMemo(() => {
-    const tz = formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
-    const country = COUNTRY_LIST.find(c => c.timezone === tz);
-    return country?.code || "VE";
-  }, [formData]);
-
   // Sync state with initial data - only once
   React.useEffect(() => {
     if (!hasInitialized.current && Object.keys(initialData).length > 0) {
@@ -76,13 +65,6 @@ export function OrganizationSettingsForm({
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleCountryChange = (code: string) => {
-    const config = COUNTRIES[code];
-    if (config) {
-      handleChange(SETTINGS_KEYS.TIMEZONE, config.timezone);
-    }
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -118,19 +100,6 @@ export function OrganizationSettingsForm({
   const previewHover = ColorUtils.getHoverColor(currentPrimary);
   const previewPrimaryFg = ColorUtils.getContrastForeground(currentPrimary);
 
-  // Helper to show current time in a zone
-  const getTimeInZone = (zone?: string) => {
-    try {
-      const targetZone = zone || DEFAULT_TIMEZONE;
-      return new Intl.DateTimeFormat("es-VE", {
-        timeStyle: "short",
-        timeZone: targetZone,
-      }).format(new Date());
-    } catch {
-      return "--:--";
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto">
@@ -141,33 +110,35 @@ export function OrganizationSettingsForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-12 pb-20 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+    <form onSubmit={handleSubmit} className="space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <Title as="h3" size="card" className="tracking-tight">{title}</Title>
           <Text variant="muted">{description}</Text>
         </div>
       </div>
 
-      <div className="space-y-8 max-w-3xl">
+      <div className="space-y-8 max-w-4xl">
 
         {/* INFORMACIÓN DEL GIMNASIO */}
         <Card variant="settings" className="relative z-50">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-primary/10 text-primary">
                 <Building2 className="w-6 h-6" />
               </div>
               <div className="flex flex-col">
                 <Text size="lg" weight="bold">Configuración de Marca</Text>
-                <Text variant="muted" size="sm">Configura los mensajes y lemas que definen a tu sede.</Text>
+                <Text variant="muted" size="sm" className="leading-tight">Configura los mensajes y lemas que definen a tu sede.</Text>
               </div>
             </div>
 
-            <Button variant="ghost" size="sm" asChild className="group">
-              <Link href={`${backUrl}/settings/organization`} className="flex items-center gap-2">
-                <span className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold uppercase tracking-tighter">Editar Identidad Legal</span>
-                <ChevronRight className="w-4 h-4" />
+            <Button variant="outlined" size="sm" asChild className="w-full sm:w-auto h-10 border-primary/20 hover:bg-primary/5 group">
+              <Link href={`${backUrl}/settings/organization`} className="flex items-center justify-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-primary sm:text-foreground/60 sm:group-hover:text-primary transition-colors">
+                  Editar Identidad Legal
+                </span>
+                <ChevronRight className="w-4 h-4 text-primary" />
               </Link>
             </Button>
           </div>
@@ -184,49 +155,6 @@ export function OrganizationSettingsForm({
           </div>
         </Card>
 
-        {/* CONFIGURACIÓN REGIONAL */}
-        <Card variant="settings" className="relative z-40">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-400">
-              <Globe className="w-6 h-6" />
-            </div>
-            <div className="flex flex-col">
-              <Text size="lg" weight="bold">Configuración Regional</Text>
-              <Text variant="muted" size="sm">Define el país y zona horaria para agendas y recibos.</Text>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-            <CountrySelector
-              label="Región / País"
-              value={currentCountryCode}
-              onChange={handleCountryChange}
-              countries={COUNTRY_LIST}
-            />
-
-            <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
-              <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Hora Local (Sincronizada)</Text>
-                <Text size="lg" weight="bold" className="tabular-nums">
-                  {getTimeInZone(formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE)}
-                </Text>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-border/50">
-            <SimpleSelect
-              label="Zona Horaria (Avanzado)"
-              value={formData[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE}
-              onChange={(value) => handleChange(SETTINGS_KEYS.TIMEZONE, value)}
-              options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
-            />
-          </div>
-        </Card>
-
         {/* PREFERENCIA DE APARIENCIA */}
         <Card variant="settings" className="relative z-30">
           <div className="flex items-center gap-4">
@@ -239,19 +167,19 @@ export function OrganizationSettingsForm({
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-6 rounded-xl border border-border bg-foreground/3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between p-4 sm:p-6 rounded-xl border border-border bg-foreground/3 gap-6">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+              <Label className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-foreground-muted">
                 Modo Visual
               </Label>
-              <Text variant="muted" size="xs">
+              <Text variant="muted" size="xs" className="leading-relaxed">
                 {formData[SETTINGS_KEYS.THEME_MODE] === "light"
                   ? "Tema claro activo para una mejor visibilidad diurna."
                   : "Tema oscuro activo (predeterminado de la sede)."}
               </Text>
             </div>
 
-            <div className="flex items-center gap-4 px-4 py-3 rounded-2xl bg-foreground/10 border border-border">
+            <div className="flex items-center justify-center gap-6 px-6 py-4 rounded-2xl bg-foreground/10 border border-border w-full md:w-auto">
               <Moon
                 className={cn(
                   "size-5 transition-all duration-300",
@@ -275,7 +203,7 @@ export function OrganizationSettingsForm({
 
         {/* COLOR DE MARCA */}
         <Card variant="settings" className="relative z-20">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-xl bg-primary/10 text-primary/40">
                 <Palette className="w-6 h-6" />
@@ -292,6 +220,7 @@ export function OrganizationSettingsForm({
               size="sm"
               onClick={handleReset}
               leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+              className="w-fit"
             >
               Restaurar Base
             </Button>
@@ -311,7 +240,7 @@ export function OrganizationSettingsForm({
             </div>
 
             <div
-              className="rounded-2xl border p-10 flex flex-col gap-8 transition-all duration-700 border-input-border relative"
+              className="rounded-2xl border p-6 sm:p-10 flex flex-col gap-8 transition-all duration-700 border-input-border relative"
               style={{
                 color: "#ffffff",
                 borderColor: `${currentPrimary}20`,
@@ -336,16 +265,16 @@ export function OrganizationSettingsForm({
                 />
               </div>
 
-              <div className="flex items-center gap-4 mt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-6 mt-4">
                 <Button
                   type="button"
-                  className="bg-(--p)! text-(--pf)! hover:bg-(--ph)! transition-all h-12 px-10 font-bold"
+                  className="bg-(--p)! text-(--pf)! hover:bg-(--ph)! transition-all h-12 px-10 font-bold w-full sm:w-fit"
                 >
                   Botón de Acción
                 </Button>
 
                 <div className="flex flex-col">
-                  <Text size="xs" weight="bold" style={{ color: currentPrimary }}>Interacción Automática</Text>
+                  <Text size="xs" weight="bold" style={{ color: currentPrimary }} className="uppercase tracking-widest">Interacción Automática</Text>
                   <Text size="xs" className="opacity-40 italic">Hover calculado matemáticamente</Text>
                 </div>
               </div>
@@ -354,20 +283,20 @@ export function OrganizationSettingsForm({
         </Card>
 
         {/* ACCIONES FINALES */}
-        <Card variant="settings" className="justify-between relative z-10">
-          <div className="flex flex-col gap-1">
-            <Text weight="bold" size="lg">¿Deseas aplicar estos cambios?</Text>
-            <Text variant="muted" size="sm">
+        <Card variant="settings" className="justify-between relative z-10 p-6 sm:p-8">
+          <div className="flex flex-col gap-1.5">
+            <Text weight="bold" size="lg" className="tracking-tight">¿Deseas aplicar estos cambios?</Text>
+            <Text variant="muted" size="sm" className="leading-relaxed">
               La identidad visual se actualizará para todos los usuarios de la sede inmediatamente.
             </Text>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
             <Button
               type="button"
               variant="ghost"
               asChild
-              className="flex-1 md:flex-none"
+              className="w-full md:w-auto font-bold uppercase tracking-widest text-xs"
             >
               <Link href={backUrl}>Cancelar</Link>
             </Button>
@@ -376,7 +305,7 @@ export function OrganizationSettingsForm({
               loading={isUpdating}
               disabled={isUpdating}
               leftIcon={<Save className="w-4 h-4" />}
-              className="flex-1 md:flex-none px-12 h-12"
+              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
             >
               Guardar Ajustes
             </Button>

@@ -130,16 +130,16 @@ export default function PaymentMethodsSettingsPage() {
   if (isLoading) return null;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div>
-        <Title className="text-3xl font-bold tracking-tight bg-linear-to-r from-white to-white/40 bg-clip-text text-transparent">
-          Métodos de Pago
-        </Title>
-        <Text className="text-white/40 text-sm mt-1">Configura las formas de pago aceptadas y sus campos requeridos.</Text>
+    <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <Title as="h3" size="card" className="tracking-tight">Métodos de Pago</Title>
+          <Text variant="muted">Configura las formas de pago aceptadas y sus campos requeridos.</Text>
+        </div>
       </div>
 
-      <div className="max-w-2xl space-y-6">
-        <Card className="p-6 space-y-6">
+      <div className="space-y-8 max-w-4xl">
+        <Card variant="settings">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
               <CreditCard className="w-5 h-5 text-primary" />
@@ -230,15 +230,26 @@ export default function PaymentMethodsSettingsPage() {
           </div>
         </Card>
 
-        {/* Action Bar */}
-        <div className="flex justify-end pt-4 border-t border-border">
-          <Button
-            onClick={handleSave}
-            disabled={isUpdating}
-          >
-            {isUpdating ? "Guardando..." : "Guardar Métodos"}
-          </Button>
-        </div>
+        {/* ACCIONES FINALES */}
+        <Card variant="settings" className="justify-between relative z-10 p-6 sm:p-8">
+          <div className="flex flex-col gap-1.5">
+            <Text weight="bold" size="lg" className="tracking-tight">¿Deseas guardar estos métodos?</Text>
+            <Text variant="muted" size="sm" className="leading-relaxed">
+              La configuración de pagos se actualizará para todos los miembros de la sede.
+            </Text>
+          </div>
+
+          <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
+            <Button
+              onClick={handleSave}
+              loading={isUpdating}
+              disabled={isUpdating}
+              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+            >
+              Guardar Métodos
+            </Button>
+          </div>
+        </Card>
       </div>
 
       <PaymentMethodEditor

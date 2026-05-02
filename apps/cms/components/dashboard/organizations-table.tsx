@@ -175,7 +175,7 @@ const getColumns = (
           past_due: 'warning',
           read_only: 'default',
           suspended: 'destructive',
-          canceled: 'destructive'
+          cancelled: 'destructive'
         };
 
         return (

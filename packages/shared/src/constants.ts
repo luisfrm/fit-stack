@@ -41,6 +41,17 @@ export const PAYMENT_STATUSES = {
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
 
 /**
+ * Subscription statuses for access control.
+ */
+export const SUBSCRIPTION_STATUSES = {
+  ACTIVE: "active",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
+} as const;
+
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSCRIPTION_STATUSES];
+
+/**
  * Detailed configuration for each supported country.
  * Includes labels for identification and tax registration to avoid hardcoding.
  */

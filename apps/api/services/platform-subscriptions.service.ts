@@ -1,5 +1,5 @@
 import { eq, desc, db } from '@workspace/database/client';
-import { storeSubscription, platformInvoice, organization } from '@workspace/database/schema';
+import { storeSubscription, platformInvoice } from '@workspace/database/schema';
 import { PlatformSubscriptionStatus } from '@workspace/shared/types';
 
 export const platformSubscriptionsService = {
@@ -19,7 +19,7 @@ export const platformSubscriptionsService = {
       .limit(1);
 
     if (!subscription) return 'suspended';
-    if (subscription.status === 'canceled') return 'canceled';
+    if (subscription.status === 'cancelled') return 'cancelled';
 
     const now = new Date();
     const endDate = new Date(subscription.currentPeriodEnd);
@@ -32,7 +32,7 @@ export const platformSubscriptionsService = {
 
     if (diffDays <= 7) return 'past_due';
     if (diffDays <= 14) return 'read_only';
-    
+
     return 'suspended';
   },
 

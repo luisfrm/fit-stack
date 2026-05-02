@@ -1,6 +1,7 @@
-import { db, eq, desc, and, sql, or, count, ilike } from '@workspace/database/client'
+import { db, eq, desc, and, sql, or, count, ilike, gte, lte } from '@workspace/database/client'
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema'
-import { SubscriptionStatus } from '@workspace/shared'
+import { SubscriptionStatus, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from '@workspace/shared'
+import { OrganizationDateManager } from '../lib/date-manager'
 
 export interface ISubscriptionDTO {
   id?: number
@@ -32,6 +33,29 @@ export interface PaginatedSubscriptionsResult {
 }
 
 export const subscriptionsRepository = {
+  // Helpers para evitar repetición de lógica
+  getSubscriptionStatusSql(now: Date) {
+    return sql<SubscriptionStatus>`CASE 
+      WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+      WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
+      WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
+      ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
+    END`;
+  },
+
+  getSubscriptionIsActiveSql(now: Date) {
+    return sql<boolean>`${subscription.endDate} >= ${now} 
+      AND ${subscription.cancelledAt} IS NULL 
+      AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`;
+  },
+
+  getPaidAndNotRevokedCondition() {
+    return and(
+      sql`${subscription.cancelledAt} IS NULL`,
+      sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
+    );
+  },
+
   async findAllPaginated(filters: SubscriptionsFilter, now: Date = new Date()): Promise<PaginatedSubscriptionsResult> {
     const { organizationId, query, status, page = 1, limit = 10 } = filters;
     const offset = (page - 1) * limit;
@@ -53,11 +77,11 @@ export const subscriptionsRepository = {
     if (status) {
       if (status === "processing") {
         conditions.push(eq(payment.status, "processing"));
-      } else if (status === "active") {
+      } else if (status === SUBSCRIPTION_STATUSES.ACTIVE) {
         conditions.push(
           and(
-            sql`${subscription.endDate} >= ${now}`,
-            sql`${subscription.cancelledAt} IS NULL`
+            gte(subscription.endDate, now),
+            this.getPaidAndNotRevokedCondition()
           )!
         );
       } else if (status === "expiring") {
@@ -65,11 +89,13 @@ export const subscriptionsRepository = {
         limitDate.setDate(now.getDate() + 7);
         conditions.push(
           and(
-            sql`${subscription.endDate} >= ${now}`,
-            sql`${subscription.endDate} <= ${limitDate}`,
-            sql`${subscription.cancelledAt} IS NULL`
+            gte(subscription.endDate, now),
+            lte(subscription.endDate, limitDate),
+            this.getPaidAndNotRevokedCondition()
           )!
         );
+      } else if (status === PAYMENT_STATUSES.VOIDED) {
+        conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
       }
     }
 
@@ -83,12 +109,8 @@ export const subscriptionsRepository = {
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
-        status: sql<SubscriptionStatus>`CASE 
-          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
-          WHEN ${subscription.endDate} < ${now} THEN 'expired'
-          ELSE 'active'
-        END`.as('status'),
-        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
+        status: this.getSubscriptionStatusSql(now).as('status'),
+        isActive: this.getSubscriptionIsActiveSql(now),
         memberName: members.firstName,
         memberLastName: members.lastName,
         memberEmail: members.email,
@@ -146,12 +168,8 @@ export const subscriptionsRepository = {
         startDate: subscription.startDate,
         endDate: subscription.endDate,
         cancelledAt: subscription.cancelledAt,
-        status: sql<SubscriptionStatus>`CASE 
-          WHEN ${subscription.cancelledAt} IS NOT NULL THEN 'cancelled'
-          WHEN ${subscription.endDate} < ${now} THEN 'expired'
-          ELSE 'active'
-        END`.as('status'),
-        isActive: sql<boolean>`${subscription.endDate} >= ${now} AND ${subscription.cancelledAt} IS NULL`,
+        status: this.getSubscriptionStatusSql(now).as('status'),
+        isActive: this.getSubscriptionIsActiveSql(now),
         memberName: members.firstName,
         memberLastName: members.lastName,
         memberEmail: members.email,
@@ -264,8 +282,8 @@ export const subscriptionsRepository = {
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${now}`,
-        sql`${subscription.endDate} <= ${limitDate}`
+        gte(subscription.endDate, now),
+        lte(subscription.endDate, limitDate)
       ));
     return result[0]?.count || 0;
   },
@@ -278,7 +296,7 @@ export const subscriptionsRepository = {
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${now}`,
+        gte(subscription.endDate, now),
         eq(payment.status, 'validated')
       ));
     return result[0]?.count || 0;
@@ -295,7 +313,7 @@ export const subscriptionsRepository = {
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${now}`,
+        gte(subscription.endDate, now),
         eq(payment.status, 'validated')
       ))
       .groupBy(payment.planSnapshotName)
@@ -304,10 +322,10 @@ export const subscriptionsRepository = {
     return result;
   },
 
-  async getRenewalsProjection(organizationId: string, startDate: Date, endDate: Date) {
+  async getRenewalsProjection(organizationId: string, startDate: Date, endDate: Date, dateManager: OrganizationDateManager) {
     return db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${subscription.endDate})`,
+        day: dateManager.formatDaySql(subscription.endDate),
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
@@ -315,31 +333,31 @@ export const subscriptionsRepository = {
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${subscription.endDate} >= ${startDate}`,
-        sql`${subscription.endDate} <= ${endDate}`,
+        gte(subscription.endDate, startDate),
+        lte(subscription.endDate, endDate),
         eq(payment.status, 'validated')
       ))
       .groupBy(sql`1`)
       .orderBy(sql`1`);
   },
 
-  async getNetGrowth(organizationId: string, startDate: Date, now: Date) {
+  async getNetGrowth(organizationId: string, startDate: Date, now: Date, dateManager: OrganizationDateManager) {
     const altas = await db
       .select({
-        day: sql<string>`DATE_TRUNC('day', ${subscription.startDate})`,
+        day: dateManager.formatDaySql(subscription.startDate),
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
       .where(and(
         eq(subscription.organizationId, organizationId),
-        sql`${subscription.startDate} >= ${startDate}`,
-        sql`${subscription.startDate} <= ${now}`
+        gte(subscription.startDate, startDate),
+        lte(subscription.startDate, now)
       ))
       .groupBy(sql`1`);
 
     const bajas = await db
       .select({
-        day: sql<string>`DATE_TRUNC('day', COALESCE(${subscription.cancelledAt}, ${subscription.endDate}))`,
+        day: dateManager.formatDaySql(sql`COALESCE(${subscription.cancelledAt}, ${subscription.endDate})`),
         count: sql<number>`count(distinct ${subscription.memberId})`.mapWith(Number)
       })
       .from(subscription)
@@ -348,13 +366,13 @@ export const subscriptionsRepository = {
         or(
           and(
             sql`${subscription.cancelledAt} IS NOT NULL`,
-            sql`${subscription.cancelledAt} >= ${startDate}`,
-            sql`${subscription.cancelledAt} <= ${now}`
+            gte(subscription.cancelledAt, startDate),
+            lte(subscription.cancelledAt, now)
           ),
           and(
             sql`${subscription.cancelledAt} IS NULL`,
             sql`${subscription.endDate} < ${now}`,
-            sql`${subscription.endDate} >= ${startDate}`
+            gte(subscription.endDate, startDate)
           )
         )
       ))

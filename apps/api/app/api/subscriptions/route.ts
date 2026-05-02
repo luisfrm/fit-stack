@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { auth } from '@/config/auth'
+import { headers } from 'next/headers'
 
 export async function GET(req: NextRequest) {
   try {
@@ -42,7 +44,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     // Validar body...
     const organizationId = session.session.activeOrganizationId;
-    const newSubscription = await subscriptionsService.create(organizationId, body)
+    
+    // Fetch full organization to get timezone
+    const fullOrg = await auth.api.getFullOrganization({
+      headers: await headers()
+    })
+    
+    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
+    
+    const newSubscription = await subscriptionsService.create(organizationId, body, timezone)
 
     await cache.invalidate(`org:${organizationId}:subscriptions`);
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);

@@ -25,6 +25,7 @@ import {
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { ORG_ROLES } from "@workspace/shared";
 
 // Sub-components
@@ -54,7 +55,8 @@ interface SubscriptionFormProps {
 
 export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initialMember }: SubscriptionFormProps) {
   const { settings } = useSettings();
-  const timezone = settings[SETTINGS_KEYS.TIMEZONE] || DEFAULT_TIMEZONE;
+  const { activeOrganization } = useAuth();
+  const timezone = activeOrganization?.timezone || DEFAULT_TIMEZONE;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 
   // States 
@@ -95,6 +97,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const [startDate, setStartDate] = React.useState(todayStr);
+  const [paymentDate, setPaymentDate] = React.useState(todayStr);
   const [endDate, setEndDate] = React.useState(() => {
     const date = new Date();
     date.setMonth(date.getMonth() + 1);
@@ -289,9 +292,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     try {
       const finalDetails = await handleUploads();
 
-      const startDateObj = parseDateAsConfigTimezone(startDate, timezone);
-      const endDateObj = parseDateAsConfigTimezone(endDate, timezone);
-
       let finalPaymentMethodDetails: IPaymentMethodDetail[] | Record<string, any> | undefined = undefined;
 
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
@@ -314,8 +314,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       await onSubmit({
         memberId: memberId!,
         planId: planId!,
-        startDate: startDateObj.toISOString(),
-        endDate: endDateObj.toISOString(),
+        startDate: startDate, // Raw YYYY-MM-DD string, backend will handle timezone
+        endDate: endDate, // Raw YYYY-MM-DD string, backend will handle timezone
         payment: {
           amountPaid: Math.round(finalAmount * 100),
           currencyPaid: paymentCurrency,
@@ -323,7 +323,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
           paymentMethodDetails: finalPaymentMethodDetails,
           status: paymentValidated ? 'validated' : 'processing',
-          paymentDate: new Date(),
+          paymentDate: paymentDate, // Send the selected date string
         }
       });
     } catch (err: any) {
@@ -412,6 +412,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           onCurrencyChange={setPaymentCurrency}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
+          paymentDate={paymentDate}
+          onPaymentDateChange={setPaymentDate}
           onMethodChange={(v) => {
             setPaymentMethodId(v);
             setDynamicFieldValues({});

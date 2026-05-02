@@ -8,6 +8,7 @@ import {
   Fingerprint,
   MapPin,
   Save,
+  Clock,
 } from "lucide-react";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
@@ -15,7 +16,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { CountrySelector, toast, Title } from "@workspace/ui";
+import { CountrySelector, toast, Title, SimpleSelect } from "@workspace/ui";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
@@ -34,6 +35,7 @@ export default function OrganizationSettingsPage() {
     taxId: "",
     address: "",
     countryCode: "VE",
+    timezone: "America/Caracas",
   });
 
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
@@ -54,6 +56,7 @@ export default function OrganizationSettingsPage() {
         taxId: org.taxId || "",
         address: org.address || "",
         countryCode: org.countryCode || "VE",
+        timezone: org.timezone || "America/Caracas",
       });
       setLogoUrl(org.logo || null);
       hasInitialized.current = true;
@@ -85,6 +88,7 @@ export default function OrganizationSettingsPage() {
         taxId: formData.taxId,
         legalName: formData.legalName,
         address: formData.address,
+        timezone: formData.timezone,
         slogan: formData.slogan || undefined,
       });
 
@@ -103,6 +107,19 @@ export default function OrganizationSettingsPage() {
       setIsUpdating(false);
     }
   };
+  
+  // Helper to show current time in a zone
+  const getTimeInZone = (zone?: string) => {
+    try {
+      const targetZone = zone || "America/Caracas";
+      return new Intl.DateTimeFormat("es-VE", {
+        timeStyle: "short",
+        timeZone: targetZone,
+      }).format(new Date());
+    } catch {
+      return "--:--";
+    }
+  };
 
   // Get current country labels for placeholder/logic
   const currentCountry = COUNTRIES[formData.countryCode] || COUNTRIES.VE;
@@ -117,9 +134,9 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-12 pb-20 max-w-7xl mx-auto">
+    <form onSubmit={handleSave} className="space-y-12 pb-20">
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-4 sm:px-0">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-widest mb-2">
             <Building2 className="w-3.5 h-3.5" />
@@ -214,7 +231,11 @@ export default function OrganizationSettingsPage() {
               <CountrySelector
                 label="País de Operación"
                 value={formData.countryCode}
-                onChange={(code) => handleChange("countryCode", code)}
+                onChange={(code) => {
+                  const config = COUNTRY_LIST.find(c => c.code === code);
+                  handleChange("countryCode", code);
+                  if (config) handleChange("timezone", config.timezone);
+                }}
                 countries={COUNTRY_LIST}
               />
 
@@ -237,33 +258,44 @@ export default function OrganizationSettingsPage() {
                 required
               />
 
-              <Input
-                label="Dirección de Sede"
-                placeholder="Av. Principal, Edificio Fit..."
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-                leftIcon={<MapPin className="w-4 h-4" />}
-                required
+              <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
+                <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col">
+                  <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Hora Local (Sincronizada)</Text>
+                  <Text size="lg" weight="bold" className="tabular-nums">
+                    {getTimeInZone(formData.timezone)}
+                  </Text>
+                </div>
+              </div>
+
+              <SimpleSelect
+                label="Zona Horaria (Avanzado)"
+                value={formData.timezone}
+                onChange={(value) => handleChange("timezone", value)}
+                options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
+                leftIcon={<Clock size={16} />}
               />
             </div>
           </div>
         </Card>
 
-        {/* ACCIONES */}
-        <Card variant="settings">
-          <div className="flex flex-col gap-1">
-            <Text weight="bold" size="lg">¿Guardar cambios institucionales?</Text>
-            <Text variant="muted" size="sm">
-              Estos cambios afectarán la marca y facturación de la sede.
+        {/* ACCIONES FINALES */}
+        <Card variant="settings" className="justify-between relative z-10 p-6 sm:p-8">
+          <div className="flex flex-col gap-1.5">
+            <Text weight="bold" size="lg" className="tracking-tight">¿Guardar cambios institucionales?</Text>
+            <Text variant="muted" size="sm" className="leading-relaxed">
+              Estos cambios afectarán la marca y facturación de la sede inmediatamente.
             </Text>
           </div>
 
-          <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
             <Button
               type="button"
               variant="ghost"
               onClick={() => router.back()}
-              className="flex-1 md:flex-none h-12 px-8"
+              className="w-full md:w-auto font-bold uppercase tracking-widest text-xs"
             >
               Cancelar
             </Button>
@@ -272,7 +304,7 @@ export default function OrganizationSettingsPage() {
               loading={isUpdating}
               disabled={isUpdating}
               leftIcon={<Save className="w-4 h-4" />}
-              className="flex-1 md:flex-none h-12 px-12 shadow-primary/10 shadow-lg"
+              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em] shadow-primary/10 shadow-lg"
             >
               Actualizar Sede
             </Button>

@@ -3,20 +3,20 @@ import { subscriptionsRepository } from '../repositories/subscriptions.repositor
 import { settingsService } from './settings.service'
 
 export const financeService = {
-  async getDashboardAnalytics(organizationId: string) {
-    const now = await settingsService.getGymNow(organizationId)
+  async getDashboardAnalytics(organizationId: string, timezone?: string) {
+    const dateManager = settingsService.getDateManager(timezone)
+    const utcNow = new Date()
 
     // 1. Fetch KPI Data
     const pendingPayments = await paymentsRepository.getPendingPaymentsCount(organizationId)
-    const expiringSoon = await subscriptionsRepository.getExpiringSoonCount(organizationId, now)
-    const activeSubscriptions = await subscriptionsRepository.getActiveCount(organizationId, now)
-    const activeSubscriptionsByPlan = await subscriptionsRepository.getActiveCountByPlan(organizationId, now)
+    const expiringSoon = await subscriptionsRepository.getExpiringSoonCount(organizationId, utcNow)
+    const activeSubscriptions = await subscriptionsRepository.getActiveCount(organizationId, utcNow)
+    const activeSubscriptionsByPlan = await subscriptionsRepository.getActiveCountByPlan(organizationId, utcNow)
 
-    // Calculate today's revenue in base currency
-    const today = new Date(now)
-    today.setHours(0, 0, 0, 0)
+    // Calculate today's revenue in base currency (Local day)
+    const localTodayStart = dateManager.getStartOfDayUtc()
 
-    const todayPayments = await paymentsRepository.getAggregatedPayments(organizationId, today)
+    const todayPayments = await paymentsRepository.getAggregatedPayments(organizationId, localTodayStart, dateManager)
 
     // Create breakdown of actual collections today
     const todayRevenueBreakdown = todayPayments.map(p => ({
@@ -25,10 +25,10 @@ export const financeService = {
     }))
 
     // 2. Fetch Chart Data (last 30 days)
-    const startDate = new Date(now)
-    startDate.setDate(startDate.getDate() - 30)
+    const startDate = new Date(localTodayStart)
+    startDate.setUTCDate(startDate.getUTCDate() - 30)
 
-    const chartDataRaw = await paymentsRepository.getAggregatedPayments(organizationId, startDate)
+    const chartDataRaw = await paymentsRepository.getAggregatedPayments(organizationId, startDate, dateManager)
 
     // Payment Methods
     const paymentMethodsRaw = await paymentsRepository.getPaymentsByMethod(organizationId, startDate)
@@ -51,15 +51,12 @@ export const financeService = {
     const paymentMethods = Object.values(methodsMap)
 
     // Renewals (next 30 days)
-    const futureDate = new Date(now)
-    futureDate.setDate(futureDate.getDate() + 30)
-    const renewals = await subscriptionsRepository.getRenewalsProjection(organizationId, now, futureDate)
+    const futureDate = new Date(localTodayStart)
+    futureDate.setUTCDate(futureDate.getUTCDate() + 30)
+    const renewals = await subscriptionsRepository.getRenewalsProjection(organizationId, localTodayStart, futureDate, dateManager)
     
     // Net Growth (last 30 days)
-    const growth = await subscriptionsRepository.getNetGrowth(organizationId, startDate, now)
-
-    // The frontend will handle the specific grouping for the chart window
-    // but we return the raw aggregated records for efficiency.
+    const growth = await subscriptionsRepository.getNetGrowth(organizationId, startDate, utcNow, dateManager)
 
     return {
       kpis: {
@@ -76,7 +73,7 @@ export const financeService = {
         day: d.day,
         currency: d.currency,
         amount: Number(d.amount),
-        normalizedAmount: Number(d.amount), // Will be accurately converted in the frontend layer
+        normalizedAmount: Number(d.amount), 
         originalExchangeRate: d.exchangeRate
       }))
     }

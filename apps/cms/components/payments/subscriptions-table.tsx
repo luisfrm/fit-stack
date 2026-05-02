@@ -9,6 +9,7 @@ import {
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type ISubscription } from "@/types/dashboard";
+import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/shared";
 import {
   Ban,
   Trash2,
@@ -26,22 +27,22 @@ import { useAuth } from "@/lib/hooks/use-auth";
 
 const getPaymentStatusBadge = (status?: string) => {
   switch (status) {
-    case "validated": return (
-      <Badge variant="success" className="border-none flex items-center gap-1 px-2 py-0.5 pointer-events-none">
+    case PAYMENT_STATUSES.VALIDATED: return (
+      <Badge variant="success" className="flex items-center gap-1 px-2 py-0.5 pointer-events-none">
         <CheckCircle2 size={12} /> Validado
       </Badge>
     );
-    case "processing": return (
-      <Badge variant="warning" className="border-none flex items-center gap-1 px-2 py-0.5 pointer-events-none">
-        <Clock size={12} /> Procesando
+    case PAYMENT_STATUSES.PROCESSING: return (
+      <Badge variant="warning" className="flex items-center gap-1 px-2 py-0.5 pointer-events-none">
+        <Clock size={12} /> Por Validar
       </Badge>
     );
-    case "invalid": return (
-      <Badge variant="destructive" className="border-none flex items-center gap-1 px-2 py-0.5 pointer-events-none">
+    case PAYMENT_STATUSES.INVALID: return (
+      <Badge variant="destructive" className="flex items-center gap-1 px-2 py-0.5 pointer-events-none">
         <XCircle size={12} /> Inválido
       </Badge>
     );
-    case "voided": return (
+    case PAYMENT_STATUSES.VOIDED: return (
       <Badge className="bg-slate-500/10 text-slate-400 border-none flex items-center gap-1 px-2 py-0.5 pointer-events-none">
         <AlertCircle size={12} /> Anulado
       </Badge>
@@ -56,15 +57,15 @@ const getPaymentStatusBadge = (status?: string) => {
 
 const getSubscriptionStatusBadge = (status: string) => {
   switch (status) {
-    case "active": return <Badge variant="success" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">ACTIVA</Badge>;
-    case "canceled": return <Badge variant="destructive" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">CANCELADA</Badge>;
-    case "expired": return <Badge className="bg-slate-500/5 text-slate-400 border-slate-500/20 text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">EXPIRADA</Badge>;
+    case SUBSCRIPTION_STATUSES.ACTIVE: return <Badge variant="success" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">ACTIVA</Badge>;
+    case SUBSCRIPTION_STATUSES.CANCELLED: return <Badge variant="destructive" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">CANCELADA</Badge>;
+    case SUBSCRIPTION_STATUSES.EXPIRED: return <Badge className="bg-slate-500/5 text-slate-400 border-slate-500/20 text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">EXPIRADA</Badge>;
     default: return <Badge variant="outline" className="pointer-events-none">{status}</Badge>;
   }
 };
 
 const getColumns = (
-  onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void | Promise<void>,
+  onStatusChange: (id: number, status: string) => void | Promise<void>,
   onPaymentStatusChange: (paymentId: number, status: string) => void | Promise<void>,
   onDelete: (id: number) => void | Promise<void>,
   currencyFormat: CurrencyFormat,
@@ -222,7 +223,8 @@ const getColumns = (
                     label: sub.status === "active" ? "Revocar Acceso" : "Restaurar Acceso",
                     icon: sub.status === "active" ? <Ban size={14} /> : <CheckCircle2 size={14} />,
                     variant: sub.status === "active" ? "amber" : "primary",
-                    onClick: () => sub.id && onStatusChange(sub.id, sub.status === "active" ? "canceled" : "active")
+                    show: sub.paymentStatus !== PAYMENT_STATUSES.VOIDED && sub.paymentStatus !== PAYMENT_STATUSES.INVALID,
+                    onClick: () => sub.id && onStatusChange(sub.id, sub.status === "active" ? "cancelled" : "active")
                   },
                   {
                     label: "Eliminar Registro",
@@ -247,7 +249,7 @@ const getColumns = (
 interface SubscriptionsTableProps {
   readonly subscriptions: ISubscription[];
   readonly onDelete: (id: number) => void;
-  readonly onStatusChange: (id: number, status: 'active' | 'canceled' | 'expired') => void;
+  readonly onStatusChange: (id: number, status: string) => void;
   readonly onPaymentStatusChange: (paymentId: number, status: string) => void;
   readonly loading?: boolean;
   readonly pagination?: any;

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dashboardService } from "../../../../services/dashboard.service";
 import { getSession } from '@/config/get-session';
 import { cache } from '@/lib/cache';
+import { auth } from '@/config/auth';
+import { headers } from 'next/headers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,6 +20,14 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId;
+    
+    // Fetch full organization to get timezone
+    const fullOrg = await auth.api.getFullOrganization({
+      headers: await headers()
+    });
+    
+    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas';
+
     const cacheKey = `org:${organizationId}:dashboard:stats:${today}`;
 
     // Try to get from cache
@@ -26,7 +36,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(cachedStats);
     }
 
-    const stats = await dashboardService.getDashboardSummary(organizationId);
+    const stats = await dashboardService.getDashboardSummary(organizationId, timezone);
 
     // Cache for 5 minutes (300 seconds)
     await cache.set(cacheKey, stats, 300);

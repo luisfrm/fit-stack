@@ -1,5 +1,6 @@
 import { settingsRepository } from '../repositories/settings.repository'
 import { platformSettingsRepository } from '../repositories/platform-settings.repository'
+import { OrganizationDateManager } from '../lib/date-manager'
 
 export const settingsService = {
   async getByKey(organizationId: string | null, key: string): Promise<string | undefined> {
@@ -31,31 +32,16 @@ export const settingsService = {
     }
   },
 
-  async getGymNow(organizationId: string | null): Promise<Date> {
-    const timezone = (await this.getByKey(organizationId, 'timezone')) || 'America/Caracas';
-    const now = new Date();
+  /**
+   * Factory method to get a DateManager for a specific organization.
+   * No longer async as it takes the timezone directly.
+   */
+  getDateManager(timezone: string = 'America/Caracas'): OrganizationDateManager {
+    return new OrganizationDateManager(timezone);
+  },
 
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-      hour12: false,
-    });
-
-    const parts = formatter.formatToParts(now);
-    const partValue = (type: string) => parts.find((p) => p.type === type)?.value || '0';
-
-    return new Date(Date.UTC(
-      Number.parseInt(partValue('year'), 10),
-      Number.parseInt(partValue('month'), 10) - 1,
-      Number.parseInt(partValue('day'), 10),
-      Number.parseInt(partValue('hour'), 10),
-      Number.parseInt(partValue('minute'), 10),
-      Number.parseInt(partValue('second'), 10)
-    ));
+  async parseLocalDate(timezone: string, dateStr: string): Promise<Date> {
+    const manager = this.getDateManager(timezone);
+    return manager.parseLocalToUtc(dateStr);
   }
 }

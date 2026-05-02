@@ -4,6 +4,7 @@ import { paymentsRepository } from '../repositories/payments.repository'
 import { plansRepository } from '../repositories/plans.repository'
 import { emailService } from './email.service'
 import { pdfService } from './pdf/pdf-service'
+import { PAYMENT_STATUSES } from '@workspace/shared'
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository'
 
@@ -22,11 +23,11 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
 export const subscriptionsService = {
   // Obtener todas las suscripciones unidas a la data de Miembro y Plan para la tabla (paginado)
   async getAllPaginated(organizationId: string, filters: any) {
-    const gymNow = await settingsService.getGymNow(organizationId)
+    const utcNow = new Date()
     const result = await subscriptionsRepository.findAllPaginated({
       ...filters,
       organizationId
-    }, gymNow)
+    }, utcNow)
 
     // Formatear la salida para el frontend
     return {
@@ -43,8 +44,8 @@ export const subscriptionsService = {
 
   // Obtener todas las suscripciones unidas a la data de Miembro y Plan para la tabla
   async getAllVisible(organizationId: string) {
-    const gymNow = await settingsService.getGymNow(organizationId)
-    const records = await subscriptionsRepository.findAllVisible(organizationId, gymNow)
+    const utcNow = new Date()
+    const records = await subscriptionsRepository.findAllVisible(organizationId, utcNow)
 
     // Formatear la salida para el frontend (fechas a string ISO y fusionar el nombre completo)
     return records.map((r: any) => ({
@@ -65,7 +66,7 @@ export const subscriptionsService = {
     }))
   },
 
-  async create(organizationId: string, payload: ICreateSubscriptionPayload) {
+  async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone?: string) {
     // 1. Obtener datos del plan para el snapshot histórico
     const plan = await plansRepository.findById(organizationId, payload.planId)
     if (!plan) {
@@ -78,19 +79,41 @@ export const subscriptionsService = {
       throw new Error('No es posible registrar un nuevo pago mientras el anterior esté pendiente de validación');
     }
 
-    // 3. Crear la suscripción
+    // 3. Parsear fechas locales usando la zona horaria del gimnasio
+    // El frontend ahora envía strings (ej: "2026-04-21") en lugar de ISO strings.
+    const startStr = payload.startDate as unknown as string;
+    const startDate = typeof startStr === 'string' && !startStr.includes('T') 
+      ? await settingsService.parseLocalDate(timezone || 'America/Caracas', startStr)
+      : new Date(payload.startDate);
+      
+    const endStr = payload.endDate as unknown as string;
+    const endDate = typeof endStr === 'string' && !endStr.includes('T')
+      ? await settingsService.parseLocalDate(timezone || 'America/Caracas', endStr)
+      : new Date(payload.endDate);
+
+    // 4. Crear la suscripción
     const subscription = await subscriptionsRepository.create(organizationId, {
       memberId: payload.memberId,
       planId: payload.planId,
-      startDate: new Date(payload.startDate),
-      endDate: new Date(payload.endDate),
+      startDate: startDate,
+      endDate: endDate,
     })
 
     if (!subscription?.id) {
       throw new Error('Error al generar el registro de suscripción')
     }
 
-    // 3. Crear el registro de pago (Snapshot atómico)
+    // 5. Determinar la fecha contable (paymentDate)
+    // Si el cajero especificó una fecha manual (retroactiva), la parseamos.
+    // Si no, usamos el UTC absoluto actual (new Date).
+    let paymentDateFinal: Date;
+    if (payload.payment.paymentDate && typeof payload.payment.paymentDate === 'string' && !payload.payment.paymentDate.includes('T')) {
+      paymentDateFinal = await settingsService.parseLocalDate(timezone || 'America/Caracas', payload.payment.paymentDate);
+    } else {
+      paymentDateFinal = new Date();
+    }
+
+    // 6. Crear el registro de pago (Snapshot atómico)
     await paymentsRepository.create(organizationId, {
       memberId: payload.memberId,
       subscriptionId: subscription.id,
@@ -103,17 +126,24 @@ export const subscriptionsService = {
       paymentMethod: payload.payment.paymentMethod,
       paymentMethodDetails: payload.payment.paymentMethodDetails,
       status: payload.payment.status as any,
-      paymentDate: payload.payment.paymentDate ? new Date(payload.payment.paymentDate) : new Date(),
+      paymentDate: paymentDateFinal,
+      // Nota: createdAt será manejado automáticamente por la base de datos o el repositorio
     })
 
     return subscription
   },
 
-  async updatePaymentStatus(organizationId: string, paymentId: number, status: 'processing' | 'validated' | 'invalid' | 'voided') {
-    const updated = await paymentsRepository.updateStatus(organizationId, paymentId, status)
+  async updatePaymentStatus(organizationId: string, paymentId: number, status: string) {
+    const updated = await paymentsRepository.updateStatus(organizationId, paymentId, status as any)
     if (!updated) {
       throw new Error('Registro de pago no encontrado')
     }
+
+    // Auto-revocar acceso si el pago se anula o es inválido
+    if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
+      await this.cancel(organizationId, updated.subscriptionId);
+    }
+
     return updated
   },
 

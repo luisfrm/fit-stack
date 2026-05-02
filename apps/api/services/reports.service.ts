@@ -2,16 +2,11 @@ import { paymentsRepository } from '../repositories/payments.repository'
 import { settingsService } from './settings.service'
 
 export const reportsService = {
-  async getMonthlyRevenue(organizationId: string, monthsCount: number = 12) {
-    const now = await settingsService.getGymNow(organizationId)
+  async getMonthlyRevenue(organizationId: string, timezone?: string, monthsCount: number = 12) {
+    const dateManager = settingsService.getDateManager(timezone)
+    const startDate = dateManager.getStartOfMonthUtc(monthsCount)
 
-    // Start date is exactly N months ago
-    const startDate = new Date(now)
-    startDate.setMonth(startDate.getMonth() - monthsCount)
-    startDate.setDate(1) // Start of the month
-    startDate.setHours(0, 0, 0, 0)
-
-    const rawData = await paymentsRepository.getAggregatedPaymentsMonthly(organizationId, startDate)
+    const rawData = await paymentsRepository.getAggregatedPaymentsMonthly(organizationId, startDate, dateManager)
 
     return rawData.map(d => ({
       month: d.month,
