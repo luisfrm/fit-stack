@@ -200,7 +200,7 @@ function Table<T>({
       </TablePrimitive>
 
       {pagination && (
-        <div className="p-4 border-t border-border bg-black/20">
+        <div className="p-4 border-t border-border bg-table-header">
           <Pagination {...pagination} />
         </div>
       )}

@@ -29,6 +29,7 @@ interface SimpleSelectProps {
   readonly variant?: "default" | "glass";
   readonly size?: "sm" | "md" | "lg" | "xl";
   readonly leftIcon?: React.ReactNode;
+  readonly disabled?: boolean;
 }
 
 export function SimpleSelect({
@@ -42,7 +43,8 @@ export function SimpleSelect({
   className,
   variant = "default",
   size = "md",
-  leftIcon
+  leftIcon,
+  disabled
 }: SimpleSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -74,7 +76,7 @@ export function SimpleSelect({
         </Label>
       )}
 
-      <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Root open={open && !disabled} onOpenChange={disabled ? undefined : setOpen}>
         <Popover.Trigger asChild>
           <Button
             type="button"
@@ -83,10 +85,12 @@ export function SimpleSelect({
             fullWidth
             role="combobox"
             aria-expanded={open}
+            disabled={disabled}
             className={cn(
               "justify-between font-medium normal-case tracking-normal",
               open && "border-primary ring-1 ring-primary",
-              error && "border-red-500 ring-red-500"
+              error && "border-red-500 ring-red-500",
+              disabled && "opacity-40 cursor-not-allowed"
             )}
           >
             <div className="flex items-center gap-2 overflow-hidden w-full">

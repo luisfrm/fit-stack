@@ -44,6 +44,7 @@ export function PlanSelector({
             <ToggleGroupItem
               key={plan.id}
               value={String(plan.id)}
+              disabled={disabled}
               className="rounded-xl border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground h-auto py-3 px-4 flex flex-col items-start gap-1 transition-all duration-300 hover:border-primary/50"
             >
               <div className="flex items-center justify-between w-full gap-4">

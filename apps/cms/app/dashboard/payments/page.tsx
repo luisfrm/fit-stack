@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Plus, X } from "lucide-react";
 import { Button, toast, Badge } from "@workspace/ui/components";
+import { FloatingActionButton, DEFAULT_FAB_ITEMS } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -27,6 +28,7 @@ import {
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [isNewPaymentModalOpen, setIsNewPaymentModalOpen] = React.useState(false);
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(1);
@@ -148,6 +150,15 @@ export default function PaymentsPage() {
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por usuario o nivel de plan..."
+          filterOptions={[
+            { value: PAYMENT_STATUSES.PROCESSING, label: "Por validar" },
+            { value: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer" },
+            { value: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas" },
+            { value: PAYMENT_STATUSES.VOIDED, label: "Anuladas" },
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          filterLabel="Filtros"
         >
           <div className="flex items-center gap-2">
             {[
@@ -200,6 +211,29 @@ export default function PaymentsPage() {
             }}
           />
         </section>
+
+        <FloatingActionButton
+          config={{
+            items: [
+              {
+                id: "new-payment",
+                icon: Plus,
+                label: "Nuevo pago",
+                onClick: () => setIsNewPaymentModalOpen(true)
+              }
+            ]
+          }}
+        />
+
+        <SubscriptionModal
+          open={isNewPaymentModalOpen}
+          onOpenChange={setIsNewPaymentModalOpen}
+          onSuccess={() => {
+            refetch();
+            refetchAnalytics();
+          }}
+          trigger={<span />}
+        />
       </div>
     </div>
   );

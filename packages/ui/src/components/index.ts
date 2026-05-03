@@ -51,6 +51,8 @@ export { Separator } from "@workspace/ui/components/separator";
 export { Textarea } from "@workspace/ui/components/textarea";
 export { ActionsDropdown } from "@workspace/ui/components/actions-dropdown";
 export type { ActionDropdownItem, ActionDropdownSection } from "@workspace/ui/components/actions-dropdown";
+export { FloatingActionButton, DEFAULT_FAB_ITEMS } from "@workspace/ui/components/floating-action-button";
+export type { FabItem, FabConfig } from "@workspace/ui/components/floating-action-button";
 
 // Next.js specific components
 export { AppSidebar, MobileNav, SettingsSidebar } from "@workspace/ui/components/next/sidebar";

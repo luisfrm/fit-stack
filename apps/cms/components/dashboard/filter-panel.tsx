@@ -1,6 +1,7 @@
 import * as React from "react";
-import { Search } from "lucide-react";
-import { Input } from "@workspace/ui/components/input";
+import { Search, Settings2, X } from "lucide-react";
+import { Input, Button } from "@workspace/ui/components";
+import { SimpleSelect, type SimpleSelectOption } from "@workspace/ui/components/simple-select";
 import { cn } from "@workspace/ui/lib/utils";
 
 /**
@@ -17,6 +18,14 @@ export interface FilterPanelProps {
   readonly children?: React.ReactNode;
   /** Optional extra className for the container */
   readonly className?: string;
+  /** Filter options for mobile dropdown */
+  readonly filterOptions?: readonly SimpleSelectOption[];
+  /** Currently active filter value */
+  readonly activeFilter?: string | null;
+  /** Callback fired when filter changes */
+  readonly onFilterChange?: (value: string | null) => void;
+  /** Label for the filter dropdown */
+  readonly filterLabel?: string;
 }
 
 /**
@@ -30,7 +39,20 @@ export function FilterPanel({
   searchPlaceholder = "Buscar...",
   children,
   className,
+  filterOptions,
+  activeFilter,
+  onFilterChange,
+  filterLabel = "Filtros",
 }: FilterPanelProps) {
+  const hasFilters = !!children || !!filterOptions;
+  const hasActiveFilter = activeFilter && activeFilter !== null;
+
+  const selectedFilterLabel = React.useMemo(() => {
+    if (!activeFilter || !filterOptions) return filterLabel;
+    const option = filterOptions.find(o => o.value === activeFilter);
+    return option?.label || filterLabel;
+  }, [activeFilter, filterOptions, filterLabel]);
+
   return (
     <section
       className={cn(
@@ -51,10 +73,30 @@ export function FilterPanel({
       )}
 
       {/* Extra Filters Section */}
-      {children && (
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-          {children}
-        </div>
+      {hasFilters && (
+        <>
+          {/* Mobile: Dropdown Select */}
+          {filterOptions && (
+            <div className="block md:hidden w-full">
+              <SimpleSelect
+                value={activeFilter || ""}
+                onChange={(value) => onFilterChange?.(value === activeFilter ? null : value)}
+                options={filterOptions}
+                placeholder={filterLabel}
+                size="sm"
+                variant="default"
+                leftIcon={<Settings2 className="size-4" />}
+              />
+            </div>
+          )}
+
+          {/* Desktop: Inline buttons (hidden on mobile, shown on md+) */}
+          {children && (
+            <div className="hidden md:flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              {children}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

@@ -10,6 +10,7 @@ interface CurrencySelectorProps {
   readonly label?: string;
   readonly error?: string;
   readonly placeholder?: string;
+  readonly disabled?: boolean;
 }
 
 export function CurrencySelector({
@@ -18,7 +19,8 @@ export function CurrencySelector({
   currencies,
   label = "Moneda Base",
   error,
-  placeholder = "Seleccionar Moneda"
+  placeholder = "Seleccionar Moneda",
+  disabled
 }: CurrencySelectorProps) {
   const options: SimpleSelectOption[] = React.useMemo(() => 
     currencies.map(c => ({
@@ -36,6 +38,7 @@ export function CurrencySelector({
       label={label}
       error={error}
       placeholder={placeholder}
+      disabled={disabled}
     />
   );
 }

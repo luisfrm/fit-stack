@@ -8,11 +8,12 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
+pnpm format      # Format code (Prettier)
 
 # Database (Drizzle ORM)
 pnpm db:generate  # Generate migrations
 pnpm db:migrate   # Run migrations
-pnpm db:push      # Push schema (LOCAL ONLY)
+pnpm db:push      # Push schema (LOCAL ONLY - never on shared branches)
 pnpm db:check     # Verify schema
 pnpm db:studio    # Open DB studio
 
@@ -50,10 +51,27 @@ cd apps/cms && pnpm dev  # Port 3001
 - All mutations: wrap in `try/catch` with `toast.success`/`toast.error`
 - Use `router.refresh()` to sync server state after auth/org changes
 
-## Existing Agent Rules
+## Important Constraints
 
-Reference `.agents/rules/` for domain-specific guidance:
-- `project-rules.md` — Core architecture rules (trigger: always_on)
-- `project-best-practices.md` — Detailed Spanish architecture guide
-- `best-practices-database.md`, `best-practices-security.md`, etc.
-- `.agents/skills/vercel-react-best-practices/` — Next.js performance rules
+- **No test suite** — `pnpm test` does not exist
+- **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
+- **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
+
+## Skills Available
+
+Use skill tool for specialized tasks:
+
+| Skill | When to use |
+|-------|-------------|
+| `brainstorming` | Any creative work or feature creation |
+| `python-best-practices` | Python code (Bridge app) |
+| `neon-postgres` | Neon database questions |
+| `interface-design` | Admin panels, dashboards |
+| `copywriting` | Marketing copy changes |
+| `vercel-react-best-practices` | React/Next.js performance |
+
+## Key Files to Read First
+
+- `.agents/rules/project-rules.md` — Core architecture rules
+- `apps/*/package.json` — App-specific scripts
+- `packages/*/package.json` — Package dependencies
