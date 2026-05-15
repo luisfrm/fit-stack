@@ -53,6 +53,7 @@ cd apps/cms && pnpm dev  # Port 3001
 
 ## Important Constraints
 
+- **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
 - **No test suite** — `pnpm test` does not exist
 - **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches

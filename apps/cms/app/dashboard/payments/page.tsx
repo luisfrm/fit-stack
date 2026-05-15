@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Plus, X } from "lucide-react";
 import { Button, toast, Badge } from "@workspace/ui/components";
-import { FloatingActionButton, DEFAULT_FAB_ITEMS } from "@workspace/ui/components";
+import { FloatingActionButton } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -17,6 +17,7 @@ import { ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/s
 import { cn } from "@workspace/ui/lib/utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { CurrencyFormat } from "@/lib/utils/value-converters";
+import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 
 import {
   useSubscriptions,
@@ -215,6 +216,7 @@ export default function PaymentsPage() {
         <FloatingActionButton
           config={{
             items: [
+              ...GLOBAL_FAB_ITEMS,
               {
                 id: "new-payment",
                 icon: Plus,
