@@ -214,7 +214,7 @@ export default function LoginPage() {
         {/* Floating quote */}
         <div className="absolute bottom-16 left-16 z-20 max-w-[360px]">
           <div className="mb-6 rounded-full h-[3px] w-12 bg-[--color-primary]" />
-          <Title as="h3" size="card" className="text-white mb-3">
+          <Title as="h3" size="card" className="mb-3">
             Sin Límites
           </Title>
           <Text variant="subtle" className="text-foreground-muted font-light leading-relaxed">

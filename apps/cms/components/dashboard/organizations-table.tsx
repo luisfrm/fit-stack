@@ -79,7 +79,7 @@ const getColumns = (
               )}
             </div>
             <div className="flex flex-col min-w-0">
-              <Text size="sm" weight="bold" className="text-white truncate uppercase tracking-tight font-display italic leading-tight">
+              <Text size="sm" weight="bold" className="truncate uppercase tracking-tight italic leading-tight">
                 {org.name}
               </Text>
               <Text size="xs" variant="muted" className="truncate opacity-60 font-medium">
@@ -135,13 +135,13 @@ const getColumns = (
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-1.5" title="Usuarios con acceso a la App (Registrados)">
               <Users size={12} className="text-primary" />
-              <span className="text-sm font-bold text-gray-200">{org.userCount || 0}</span>
-              <span className="text-[10px] text-gray-500 uppercase font-black tracking-tighter italic">Registrados</span>
+              <Text size="sm" weight="bold">{org.userCount || 0}</Text>
+              <Text size="xs" weight="bold" className="uppercase">Registrados</Text>
             </div>
             <div className="flex items-center gap-1.5" title="Total de miembros en la base de datos local">
               <div className="w-1 h-1 rounded-full bg-slate-500" />
-              <span className="text-[11px] font-bold text-gray-400">{org.memberCount || 0}</span>
-              <span className="text-[9px] text-gray-500 uppercase font-medium tracking-tighter opacity-70">Total Gym</span>
+              <Text size="sm" weight="bold" className="text-gray-400">{org.memberCount || 0}</Text>
+              <Text size="xs" weight="bold" className="text-gray-500 uppercase font-medium tracking-tighter opacity-70">Total Gym</Text>
             </div>
           </div>
         );
