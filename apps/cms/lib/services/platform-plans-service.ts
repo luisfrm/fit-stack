@@ -3,9 +3,32 @@ import { IPlatformPlan } from "@workspace/shared/types";
 
 const PLATFORM_PLANS_PATH = "/platform/plans";
 
+export interface PlatformPlanWithStats extends IPlatformPlan {
+  organizationCount: number;
+}
+
+export interface PlatformPlansSummary {
+  totalPlans: number;
+  activePlans: number;
+  totalSubscriptions: number;
+  activeSubscriptions: number;
+  monthlyRevenue: Record<string, number>;
+  trialPlans: number;
+}
+
 export const platformPlansService = {
   async getAll(): Promise<IPlatformPlan[]> {
     const response = await apiClient.get(PLATFORM_PLANS_PATH);
+    return response.data;
+  },
+
+  async getAllWithStats(): Promise<PlatformPlanWithStats[]> {
+    const response = await apiClient.get(`${PLATFORM_PLANS_PATH}/with-stats`);
+    return response.data;
+  },
+
+  async getSummary(): Promise<PlatformPlansSummary> {
+    const response = await apiClient.get(`${PLATFORM_PLANS_PATH}/summary`);
     return response.data;
   },
 

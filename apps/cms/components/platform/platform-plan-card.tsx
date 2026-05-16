@@ -15,7 +15,8 @@ import {
   Smartphone,
   Globe,
   BookOpen,
-  Clock
+  Clock,
+  Building2
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { PlatformPlanModal } from "./platform-plan-modal";
@@ -112,9 +113,10 @@ function PlanFeatures({ features }: { readonly features: any }) {
 interface PlatformPlanCardProps {
   readonly plan: IPlatformPlan;
   readonly onUpdate: () => void;
+  readonly organizationCount?: number;
 }
 
-export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
+export function PlatformPlanCard({ plan, onUpdate, organizationCount }: PlatformPlanCardProps) {
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Style Variants
@@ -173,11 +175,19 @@ export function PlatformPlanCard({ plan, onUpdate }: PlatformPlanCardProps) {
       </div>
 
       {/* Persistence Label */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-4">
         <Clock size={14} className="text-slate-500" />
         <Text size="xs" variant="muted">Periodicidad: <span className="text-slate-300 font-bold">
           {plan.durationValue} {getDurationText(plan.durationValue, plan.durationUnit, true)}
         </span></Text>
+        {organizationCount !== undefined && (
+          <div className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
+            <Building2 size={12} className="text-primary" />
+            <Text size="xs" weight="bold" className="text-primary uppercase tracking-widest">
+              {organizationCount} org{organizationCount !== 1 ? 's' : ''}
+            </Text>
+          </div>
+        )}
       </div>
 
       <Separator className="bg-white/10 mb-6" />

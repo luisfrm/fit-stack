@@ -13,6 +13,7 @@ import {
 import { type IPlatformPlan } from "@workspace/shared/types";
 import { Users, Globe } from "lucide-react";
 import { cleanNumericInput } from "@/lib/utils/helper";
+import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
 
 interface PlatformPlanFormProps {
   readonly initialData?: Partial<IPlatformPlan>;
@@ -21,10 +22,27 @@ interface PlatformPlanFormProps {
 }
 
 export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformPlanFormProps) {
+  const { settings } = usePlatformSettings();
+
+  const activeCurrencies: string[] = React.useMemo(() => {
+    const active = settings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    if (!active) return ["USD"];
+    try {
+      return JSON.parse(active);
+    } catch {
+      return ["USD"];
+    }
+  }, [settings]);
+
+  const defaultCurrency = React.useMemo(() => {
+    const primary = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
+    return primary && activeCurrencies.includes(primary) ? primary : (activeCurrencies[0] || "USD");
+  }, [settings, activeCurrencies]);
+
   const [formData, setFormData] = React.useState({
     name: initialData?.name || "",
     price: initialData?.price ? (initialData.price / 100).toString() : "0",
-    currency: initialData?.currency || "USD",
+    currency: initialData?.currency || defaultCurrency,
     durationValue: initialData?.durationValue?.toString() || "1",
     durationUnit: initialData?.durationUnit || "month",
     isActive: initialData?.isActive ?? true,
@@ -160,7 +178,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
           label="Moneda"
           value={formData.currency}
           onChange={(v) => setFormData(p => ({ ...p, currency: v }))}
-          currencies={["USD", "VES", "COP"]}
+          currencies={activeCurrencies}
         />
       </div>
 
