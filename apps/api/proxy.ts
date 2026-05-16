@@ -5,9 +5,8 @@ import { getSessionCookie } from "better-auth/cookies";
 
 const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token", "/api/init"];
 
-const LOCAL_ORIGINS = [
+const DEV_ORIGINS = [
   "http://localhost:3001",
-  "http://localhost:3002",
   "http://localhost:3003",
 ];
 
@@ -15,7 +14,7 @@ const PROD_ORIGINS = env.trustedOrigins
   ? env.trustedOrigins.split(",").map((s: string) => s.trim()).filter(Boolean)
   : [];
 
-const ALLOWED_ORIGINS = [...LOCAL_ORIGINS, ...PROD_ORIGINS];
+const ALLOWED_ORIGINS = env.isProduction ? PROD_ORIGINS : DEV_ORIGINS;
 
 function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
@@ -23,7 +22,7 @@ function isPublicRoute(pathname: string) {
 
 function isOriginAllowed(origin: string | null) {
   if (!origin) return false;
-  return ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed));
+  return ALLOWED_ORIGINS.some((allowed: string) => origin.startsWith(allowed));
 }
 
 function setCorsHeaders(response: NextResponse, origin: string) {

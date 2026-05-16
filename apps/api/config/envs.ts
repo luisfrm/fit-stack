@@ -3,9 +3,6 @@ import { z } from "zod";
 const envSchema = z.object({
   APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
 
-  // Frontend
-  FRONTEND_URL: z.string().url(),
-
   // Trusted Origins (comma-separated for production)
   TRUSTED_ORIGINS: z.string().optional(),
 
@@ -45,15 +42,14 @@ if (!_parsed.success) {
   }
 }
 
-const _env = _parsed.success 
-  ? _parsed.data 
+const _env = _parsed.success
+  ? _parsed.data
   : (isBuildTime && !isProduction)
-    ? { APP_ENV: "development", FRONTEND_URL: "http://localhost:3000", BETTER_AUTH_SECRET: "dummy-secret-at-least-16-chars" } as any
+    ? { APP_ENV: "development", BETTER_AUTH_SECRET: "dummy-secret-at-least-16-chars" } as any
     : ({} as any);
 
 export const env = {
   appEnv: _env.APP_ENV,
-  frontendUrl: _env.FRONTEND_URL,
   isLocal: _env.APP_ENV === "development",
   isProduction: _env.APP_ENV === "production",
 

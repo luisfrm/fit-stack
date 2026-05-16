@@ -1,13 +1,13 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import { urls } from '@/config/urls';
 
 export const emailService = {
   /**
    * Sends an invitation email to the member.
    */
   async sendRegistrationInvite(email: string, token: string) {
-    const cmsUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-    const inviteLink = `${cmsUrl}/register?token=${token}`;
+    const inviteLink = `${urls.cms}/register?token=${token}`;
     const provider = process.env.EMAIL_PROVIDER || 'gmail';
 
     const htmlContent = `

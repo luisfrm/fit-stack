@@ -3,20 +3,22 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
+import { urls } from "./urls";
 import { organization } from "better-auth/plugins";
 import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
 
-const LOCAL_ORIGINS = [
+const DEV_ORIGINS = [
   "http://localhost:3001",
-  "http://localhost:3002",
   "http://localhost:3003",
 ];
 
 const PROD_ORIGINS = env.trustedOrigins
   ? env.trustedOrigins.split(",").map((s: string) => s.trim()).filter(Boolean)
   : [];
+
+const ALLOWED_ORIGINS = env.isProduction ? PROD_ORIGINS : DEV_ORIGINS;
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -28,7 +30,7 @@ export const auth = betterAuth({
   }),
   secret: env.betterAuthSecret!,
 
-  trustedOrigins: [...LOCAL_ORIGINS, ...PROD_ORIGINS],
+  trustedOrigins: ALLOWED_ORIGINS,
   user: {
     additionalFields: {
       role: {
@@ -48,8 +50,7 @@ export const auth = betterAuth({
       },
       roles: orgRoleDefinitions,
       async sendInvitationEmail(data) {
-        const cmsUrl = process.env.FRONTEND_URL || "http://localhost:3001";
-        const inviteLink = `${cmsUrl}/accept-invitation/${data.id}`;
+        const inviteLink = `${urls.cms}/accept-invitation/${data.id}`;
         await emailService.sendOrganizationInvite(
           data.email,
           data.organization.name,
