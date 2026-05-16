@@ -57,6 +57,13 @@
       "when": 1777664165063,
       "tag": "0007_loose_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778905702045,
+      "tag": "0008_gorgeous_thena",
+      "breakpoints": true
     }
   ]
 }

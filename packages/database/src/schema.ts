@@ -171,6 +171,8 @@ export const storeSubscription = pgTable('store_subscription', {
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
   isTrial: boolean('is_trial').default(false).notNull(),
   priceOverride: numeric('price_override', { precision: 10, scale: 2 }), // For commercial exceptions
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
