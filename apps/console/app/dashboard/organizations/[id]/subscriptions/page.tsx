@@ -42,7 +42,7 @@ export default function OrganizationSubscriptionsPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/dashboard/platform/subscriptions")}
+          onClick={() => router.push("/dashboard/subscriptions")}
           className="gap-2 text-foreground/60 hover:text-foreground font-bold uppercase tracking-wider"
         >
           <ChevronLeft className="size-4" />

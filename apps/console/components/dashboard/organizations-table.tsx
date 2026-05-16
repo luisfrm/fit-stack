@@ -223,7 +223,7 @@ const getColumns = (
               organization={org}
               status={calcStatus}
               onEdit={() => onEdit?.(org)}
-              onSettings={() => router?.push(`/dashboard/platform/organizations/${org.id}/settings`)}
+              onSettings={() => router?.push(`/dashboard/organizations/${org.id}/settings`)}
               onAddSubscription={() => onAddSubscription?.(org)}
               onSuccess={onSuccess}
               EditModal={EditModal}

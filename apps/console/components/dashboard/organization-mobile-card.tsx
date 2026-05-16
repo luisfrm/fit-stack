@@ -116,7 +116,7 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
         <Button
           variant="primary"
           size="sm"
-          onClick={() => window.open(`/dashboard/platform/organizations/${org.id}`, '_blank')}
+          onClick={() => window.open(`/dashboard/organizations/${org.id}`, '_blank')}
           className="h-auto py-3 text-[10px] font-black uppercase tracking-widest"
         >
           <ExternalLink size={14} className="mr-2" />

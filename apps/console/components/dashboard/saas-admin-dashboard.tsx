@@ -93,7 +93,7 @@ export function SaaSAdminDashboard() {
             <Text size="sm" variant="muted">Monitoreo y gestión de inquilinos de la plataforma.</Text>
           </div>
           <Button asChild variant="ghost" size="sm" className="text-primary font-bold hover:bg-primary/5">
-            <Link href="/dashboard/platform/organizations">
+            <Link href="/dashboard/organizations">
               Ver todas las organizaciones
             </Link>
           </Button>

@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { SaaSAdminDashboard } from "@/components/dashboard/saas-admin-dashboard";
 
 export default function DashboardPage() {
-  redirect("/dashboard/organizations");
+  return <SaaSAdminDashboard />;
 }

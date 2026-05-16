@@ -112,7 +112,7 @@ export function SubscriptionsTable({
       headerClassName: "pl-6",
       cell: (sub) => (
         <button
-          onClick={() => router.push(`/dashboard/platform/organizations/${sub.organizationId}/subscriptions`)}
+          onClick={() => router.push(`/dashboard/organizations/${sub.organizationId}/subscriptions`)}
           className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
         >
           <Text weight="bold" className="text-foreground hover:text-primary transition-colors leading-tight">

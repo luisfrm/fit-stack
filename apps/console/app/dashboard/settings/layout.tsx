@@ -10,8 +10,8 @@ import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
 
 const PLATFORM_SETTINGS_NAV_ITEMS = [
-  { label: "Monedas", href: "/dashboard/platform/settings/currencies", icon: Coins, disabled: false },
-  { label: "Métodos de Pago", href: "/dashboard/platform/settings/payment-methods", icon: Wallet, disabled: false },
+  { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
+  { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
 ];
 
 export default function PlatformSettingsLayout({
@@ -20,7 +20,7 @@ export default function PlatformSettingsLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const isRoot = pathname === "/dashboard/platform/settings";
+  const isRoot = pathname === "/dashboard/settings";
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -46,7 +46,7 @@ export default function PlatformSettingsLayout({
             asChild
             className="gap-2 -ml-2 text-foreground/60 hover:text-foreground font-bold uppercase tracking-wider"
           >
-            <Link href="/dashboard/platform/settings">
+            <Link href="/dashboard/settings">
               <ChevronLeft className="size-4" />
               Volver a Configuración
             </Link>
