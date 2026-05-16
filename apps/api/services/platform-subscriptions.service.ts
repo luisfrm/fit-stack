@@ -1,8 +1,35 @@
-import { eq, desc, db } from '@workspace/database/client';
-import { storeSubscription, platformInvoice } from '@workspace/database/schema';
-import { PlatformSubscriptionStatus } from '@workspace/shared/types';
+import { platformSubscriptionsRepository, type SubscriptionFilters, type SubscriptionWithDetails, type PaginatedSubscriptions } from '../repositories/platform-subscriptions.repository';
+import { PLATFORM_SUBSCRIPTION_STATUSES, type PlatformSubscriptionStatus } from '@workspace/shared/constants';
 
 export const platformSubscriptionsService = {
+  async getAllSubscriptions(filters: SubscriptionFilters = {}): Promise<PaginatedSubscriptions> {
+    return platformSubscriptionsRepository.findAll(filters);
+  },
+
+  async getSubscriptionById(id: number): Promise<SubscriptionWithDetails | null> {
+    return platformSubscriptionsRepository.findById(id);
+  },
+
+  async getSubscriptionsByOrganization(organizationId: string): Promise<SubscriptionWithDetails[]> {
+    return platformSubscriptionsRepository.findByOrganization(organizationId);
+  },
+
+  async cancelSubscription(id: number, reason?: string) {
+    return platformSubscriptionsRepository.cancel(id, reason);
+  },
+
+  async extendSubscription(id: number, newEndDate: Date) {
+    return platformSubscriptionsRepository.extendPeriod(id, newEndDate);
+  },
+
+  async deleteSubscription(id: number) {
+    return platformSubscriptionsRepository.delete(id);
+  },
+
+  async getStats() {
+    return platformSubscriptionsRepository.getStats();
+  },
+
   /**
    * Determina el estado actual de la suscripción de una organización basado en la fecha de expiración.
    * Flujo de Grace Period:
@@ -11,29 +38,11 @@ export const platformSubscriptionsService = {
    * - 15+ días vencida: SUSPENDED (Bloqueo total)
    */
   async getOrganizationStatus(organizationId: string): Promise<PlatformSubscriptionStatus> {
-    const [subscription] = await db
-      .select()
-      .from(storeSubscription)
-      .where(eq(storeSubscription.organizationId, organizationId))
-      .orderBy(desc(storeSubscription.createdAt))
-      .limit(1);
+    const subs = await platformSubscriptionsRepository.findByOrganization(organizationId);
+    if (subs.length === 0) return PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED;
 
-    if (!subscription) return 'suspended';
-    if (subscription.status === 'cancelled') return 'cancelled';
-
-    const now = new Date();
-    const endDate = new Date(subscription.currentPeriodEnd);
-
-    if (now <= endDate) return 'active';
-
-    // Cálculo de días de retraso
-    const diffTime = Math.abs(now.getTime() - endDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 7) return 'past_due';
-    if (diffDays <= 14) return 'read_only';
-
-    return 'suspended';
+    const latest = subs[0]!;
+    return latest.computedStatus;
   },
 
   /**
@@ -50,37 +59,10 @@ export const platformSubscriptionsService = {
     paymentMethod: string;
     currency: string;
   }) {
-    // 1. Crear suscripción
-    const [newSub] = await db.insert(storeSubscription).values({
-      organizationId: data.organizationId,
-      planId: data.planId,
-      status: 'active',
-      startDate: data.startDate,
-      currentPeriodEnd: data.endDate,
-      isTrial: data.isTrial,
-      priceOverride: data.priceOverride,
-    }).returning();
-
-    // 2. Generar Invoice correspondiente
-    await db.insert(platformInvoice).values({
-      organizationId: data.organizationId,
-      planId: data.planId,
-      amount: data.isTrial ? "0.00" : (data.priceOverride || "0.00"), // Asumimos 0 si no se provee precio
-      currency: data.currency,
-      paymentMethod: data.paymentMethod,
-      status: data.isTrial ? 'trial' : 'pending',
-      dueDate: data.startDate,
-      createdAt: new Date(),
-    });
-
-    return newSub;
+    return platformSubscriptionsRepository.createManualSubscription(data);
   },
 
   async getOrganizationInvoices(organizationId: string) {
-    return db
-      .select()
-      .from(platformInvoice)
-      .where(eq(platformInvoice.organizationId, organizationId))
-      .orderBy(desc(platformInvoice.createdAt));
-  }
+    return platformSubscriptionsRepository.getOrganizationInvoices(organizationId);
+  },
 };
