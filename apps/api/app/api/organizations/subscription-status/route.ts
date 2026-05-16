@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@/config/auth';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
+import { cache } from '@/lib/cache';
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
@@ -18,8 +19,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const cacheKey = `org:${activeOrganizationId}:subscription-status`;
+    const cached = await cache.get<{ status: string }>(cacheKey);
+    if (cached) {
+      return Response.json(cached);
+    }
+
     const status = await platformSubscriptionsService.getOrganizationStatus(activeOrganizationId);
-    return Response.json({ status });
+    const data = { status };
+    await cache.set(cacheKey, data, 60);
+
+    return Response.json(data);
   } catch (error: any) {
     console.error('[GET /api/organizations/subscription-status] Error:', error);
     return Response.json(

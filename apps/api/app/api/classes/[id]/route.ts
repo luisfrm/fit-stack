@@ -15,7 +15,15 @@ export async function GET(
     }
 
     const { id } = await params
+    const cacheKey = `org:${organizationId}:classes:${id}`
+    const cached = await cache.get(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     const cls = await classesService.getById(organizationId, Number(id))
+    await cache.set(cacheKey, cls, 300)
+
     return NextResponse.json(cls)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 404 })
