@@ -2,10 +2,7 @@ import * as React from "react";
 import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
 import { GLOBAL_ROLES } from "@workspace/shared";
-import { AppSidebar, type SidebarUser } from "@workspace/ui/components";
-import { ConsoleSidebarNav } from "./console-sidebar-nav";
-import SignOutButton from "@/components/sign-out-button";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { AppSidebar } from "@/components/dashboard/dashboard-ui";
 
 export default async function DashboardLayout({
   children,
@@ -31,7 +28,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
-      <AppSidebarWithTheme
+      <AppSidebar
         user={{
           name: session.user?.name || "Admin",
           role: userRole,
@@ -42,23 +39,5 @@ export default async function DashboardLayout({
         {children}
       </main>
     </div>
-  );
-}
-
-function AppSidebarWithTheme({ user }: { user: SidebarUser }) {
-  const { isDark, toggleTheme } = useTheme();
-
-  return (
-    <AppSidebar
-      user={user}
-      branding={{
-        title: "Fit Stack Console",
-        subtitle: "Administración SaaS",
-        fallbackIcon: undefined,
-      }}
-      navigation={ConsoleSidebarNav}
-      footer={<SignOutButton />}
-      themeToggle={{ isDark, toggle: toggleTheme }}
-    />
   );
 }
