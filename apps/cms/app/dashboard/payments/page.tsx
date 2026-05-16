@@ -13,7 +13,7 @@ import { RevenueChart } from "@/components/payments/revenue-chart";
 import { AnalyticsCarousel } from "@/components/payments/analytics-carousel";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/shared";
+import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, SubscriptionStatus } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { CurrencyFormat } from "@/lib/utils/value-converters";
@@ -58,11 +58,11 @@ export default function PaymentsPage() {
   }, [debouncedSearch, activeFilter]);
 
   const handleStatusChange = async (id: number, status: string) => {
-    updateStatusMutation.mutate({ id, status: status as any }, {
+    updateStatusMutation.mutate({ id, status: status as SubscriptionStatus }, {
       onSuccess: () => {
         toast.success(`Suscripción ${status === SUBSCRIPTION_STATUSES.ACTIVE ? 'activada' : 'revocada'}.`);
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast.error(err.message || "Fallo al cambiar estado");
       }
     });

@@ -19,6 +19,7 @@ interface OrganizationMobileCardProps {
   readonly onEdit?: (org: IPlatformOrganization) => void;
   readonly onAddSubscription?: (org: IPlatformOrganization) => void;
   readonly onSuccess?: () => void;
+  readonly status?: 'active' | 'inactive' | 'pending';
   readonly EditModal?: React.ComponentType<{
     initialData: IPlatformOrganization;
     onSuccess: () => void;
@@ -26,7 +27,7 @@ interface OrganizationMobileCardProps {
   }>;
 }
 
-export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription, onSuccess, EditModal }: OrganizationMobileCardProps) {
+export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscription, onSuccess, status: propStatus, EditModal }: OrganizationMobileCardProps) {
   if (isLoading) {
     return (
       <Card className="p-5 space-y-4">
@@ -55,14 +56,13 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
     );
   }
 
-  const status = org.latestSubscription?.status || 'pending';
-  
-  let displayStatus: 'active' | 'inactive' | 'pending' = 'pending';
-  if (status === 'active') {
-    displayStatus = 'active';
-  } else if (org.latestSubscription) {
-    displayStatus = 'inactive';
-  }
+  const computedStatus: 'active' | 'inactive' | 'pending' = propStatus ?? (() => {
+    if (org.status === 'active') return 'active';
+    if (org.latestSubscription) return 'inactive';
+    return 'pending';
+  })();
+
+  let displayStatus: 'active' | 'inactive' | 'pending' = computedStatus;
 
   const statusVariants: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
     active: 'default',
@@ -94,10 +94,9 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
           <Text size="xs" variant="muted" weight="bold" uppercase className="tracking-tighter font-medium">Miembros</Text>
           <Text weight="bold">{org.memberCount || 0}</Text>
         </div>
-        {/* Usamos el componente de acciones también en mobile */}
         <OrganizationActions
           organization={org}
-          status={displayStatus as any}
+          status={displayStatus}
           onEdit={() => onEdit?.(org)}
           onSuccess={onSuccess}
           EditModal={EditModal}
@@ -105,18 +104,18 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-        <Button 
-          variant="outlined" 
-          size="sm" 
+        <Button
+          variant="outlined"
+          size="sm"
           onClick={() => onAddSubscription?.(org)}
           className="bg-transparent border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest py-3 h-auto"
         >
           <CreditCard size={14} className="mr-2 text-primary" />
           Plan
         </Button>
-        <Button 
-          variant="primary" 
-          size="sm" 
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => window.open(`/dashboard/platform/organizations/${org.id}`, '_blank')}
           className="h-auto py-3 text-[10px] font-black uppercase tracking-widest"
         >

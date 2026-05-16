@@ -5,6 +5,7 @@ import { subscriptionsService } from "../services/subscriptions-service";
 import { financeService } from "../services/finance-service";
 import { type IRecentRegistration, type ISubscription, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
 import { useAuth } from "./use-auth";
+import { SubscriptionStatus } from "@workspace/shared/constants";
 
 /**
  * Hook to fetch all subscriptions with pagination and filters.
@@ -38,8 +39,8 @@ export function useUpdatePaymentStatus() {
 export function useUpdateSubscriptionStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      subscriptionsService.updateStatus(id, status as any),
+    mutationFn: ({ id, status }: { id: number; status: SubscriptionStatus }) =>
+      subscriptionsService.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["payments", "analytics"] });

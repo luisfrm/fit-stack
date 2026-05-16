@@ -42,7 +42,7 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
-            <OrganizationMobileCard key={`mobile-skeleton-${crypto.randomUUID?.() || i}`} org={{} as any} isLoading={true} />
+            <OrganizationMobileCard key={`mobile-skeleton-${crypto.randomUUID?.() || i}`} org={{} as IPlatformOrganization} isLoading={true} />
           ))
         ) : (
           organizations.map((org) => (

@@ -55,7 +55,7 @@ export default function OrganizationAdminSettingsPage() {
 
   return (
     <OrganizationSettingsForm
-      initialData={(org as any)?.settings || {}}
+      initialData={(org as { settings?: Record<string, string> })?.settings ?? {}}
       onSave={handleSave}
       isLoading={isLoading}
       isUpdating={isUpdating}
