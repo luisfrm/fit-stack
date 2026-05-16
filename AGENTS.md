@@ -51,6 +51,37 @@ cd apps/cms && pnpm dev  # Port 3001
 - All mutations: wrap in `try/catch` with `toast.success`/`toast.error`
 - Use `router.refresh()` to sync server state after auth/org changes
 
+## Platform Subscription Status (Organization Billing)
+
+Subscription status is **computed dynamically** via SQL CASE — NOT stored in DB.
+
+**Constants** (`@workspace/shared/constants`):
+```ts
+PLATFORM_SUBSCRIPTION_STATUSES = {
+  ACTIVE: "active",      // currentPeriodEnd >= now
+  PAST_DUE: "past_due",  // 1-7 days overdue
+  READ_ONLY: "read_only", // 8-14 days overdue
+  SUSPENDED: "suspended", // 15+ days overdue
+  CANCELLED: "cancelled", // manually cancelled or invoice void
+}
+```
+
+**Computation** (`platform-subscriptions.repository.ts`):
+- `cancelledAt IS NOT NULL` → `cancelled`
+- Latest invoice `status = VOIDED` → `cancelled`
+- `currentPeriodEnd >= CURRENT_TIMESTAMP` → `active`
+- Days overdue ≤ 7 → `past_due`
+- Days overdue ≤ 14 → `read_only`
+- Days overdue > 14 → `suspended`
+
+**Validation flow** (`dashboard/layout.tsx`):
+- `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
+- `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
+- `ACTIVE` → normal render
+
+**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session)
+- **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
+
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
