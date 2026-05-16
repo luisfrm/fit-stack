@@ -18,10 +18,6 @@ import {
   BadgeCheck,
   ShieldCheck,
   Building2,
-  PackageCheck,
-  BarChart3,
-  Globe,
-  ArrowLeft,
   ArrowLeftRight,
   User,
   CalendarClock,
@@ -78,46 +74,6 @@ const GYM_NAV_ITEMS: SidebarNavItem[] = [
   { label: "Configuración", href: "/dashboard/settings", icon: Settings },
 ];
 
-const SAAS_NAV_ITEMS: SidebarNavItem[] = [
-  { label: "Dashboard Global", href: "/dashboard", icon: BarChart3 },
-  { label: "Organizaciones", href: "/dashboard/platform/organizations", icon: Building2 },
-  { label: "Planes", href: "/dashboard/platform/plans", icon: PackageCheck },
-  { label: "Suscripciones", href: "/dashboard/platform/subscriptions", icon: CalendarCheck },
-  { label: "Finanzas", href: "/dashboard/platform/revenue", icon: TrendingUp },
-  { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
-];
-
-function ReturnToSaaSButton() {
-  const router = useRouter();
-  const [loading, setLoading] = React.useState(false);
-
-  const handleReturn = async () => {
-    try {
-      setLoading(true);
-      await authClient.organization.setActive({ organizationId: null });
-      router.push("/dashboard");
-      router.refresh();
-    } catch (error) {
-      console.error("Error returning to SaaS:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Button
-      variant="link"
-      size="xs"
-      onClick={handleReturn}
-      loading={loading}
-      className="p-0 uppercase gap-1.5"
-      leftIcon={<ArrowLeft className="w-3 h-3" />}
-    >
-      Volver a SaaS
-    </Button>
-  );
-}
-
 export function SwitchOrganizationAction() {
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [open, setOpen] = React.useState(false);
@@ -166,26 +122,22 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
   const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
-
-  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
-  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
+  const navigation = GYM_NAV_ITEMS;
 
   const brandingAction = React.useMemo(() => {
-    if (isSaaSMode) return undefined;
-    if (user.role === GLOBAL_ROLES.ADMIN) return <ReturnToSaaSButton />;
     return <SwitchOrganizationAction />;
-  }, [isSaaSMode, user.role]);
+  }, []);
 
   return (
     <UISidebar
       user={user}
       navigation={navigation}
       branding={{
-        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Gym unnamed"),
-        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: activeOrganization?.name || "Gym unnamed",
+        subtitle: (activeOrganization as IOrganization)?.slogan || "",
         isLoading: isBrandingLoading,
-        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
+        fallbackIcon: Dumbbell,
         action: brandingAction,
       }}
       footer={<SignOutButton />}
@@ -200,26 +152,22 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
   const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
-
-  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
-  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
+  const navigation = GYM_NAV_ITEMS;
 
   const brandingAction = React.useMemo(() => {
-    if (isSaaSMode) return undefined;
-    if (user.role === GLOBAL_ROLES.ADMIN) return <ReturnToSaaSButton />;
     return <SwitchOrganizationAction />;
-  }, [isSaaSMode, user.role]);
+  }, []);
 
   return (
     <UIMobileNav
       user={user}
       navigation={navigation}
       branding={{
-        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
-        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: activeOrganization?.name || "Elite Fitness",
+        subtitle: (activeOrganization as IOrganization)?.slogan || "",
         isLoading: isBrandingLoading,
-        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
+        fallbackIcon: Dumbbell,
         action: brandingAction,
       }}
       footer={<SignOutButton />}
