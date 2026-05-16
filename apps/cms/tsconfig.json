@@ -5,7 +5,8 @@
     "paths": {
       "@/*": ["./*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"],
-      "@workspace/shared/*": ["../../packages/shared/src/*"]
+      "@workspace/shared/*": ["../../packages/shared/src/*"],
+      "@workspace/auth/*": ["../../packages/auth/src/*"]
     },
     "plugins": [
       {
