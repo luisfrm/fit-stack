@@ -148,7 +148,6 @@ export default function OrganizationsPage() {
                 isLoading={loading}
                 onSuccess={loadOrganizations}
                 onAddSubscription={handleAddSubscription}
-                variant="detailed"
                 EditModal={OrganizationModal}
               />
             </div>

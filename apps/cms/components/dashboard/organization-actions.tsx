@@ -18,7 +18,6 @@ import { useOrganizationActivation } from "@/lib/hooks/use-organization-activati
 interface OrganizationActionsProps {
   readonly organization: IPlatformOrganization;
   readonly status: 'active' | 'inactive' | 'pending';
-  readonly layout?: 'dropdown' | 'inline';
   readonly onActivate?: () => void;
   readonly onEdit?: () => void;
   readonly onSettings?: () => void;
@@ -35,7 +34,6 @@ interface OrganizationActionsProps {
 export function OrganizationActions({
   organization,
   status,
-  layout = 'dropdown',
   onActivate,
   onEdit,
   onSettings,
@@ -90,64 +88,6 @@ export function OrganizationActions({
     },
   ], [EditModal, onEdit, onAddSubscription, status, onToggleStatus]);
 
-  if (layout === 'inline') {
-    return (
-      <div className="flex items-center justify-end gap-2">
-        {/* Main CTA: Subscription/Plan */}
-        <Button
-          variant={organization.latestSubscription ? "outlined" : "primary"}
-          size="sm"
-          leftIcon={<CreditCard size={16} />}
-          onClick={onAddSubscription}
-          title={organization.latestSubscription ? "Gestionar Plan" : "Vincular Plan"}
-          className="font-black"
-        >
-          {organization.latestSubscription ? 'Plan' : 'Vincular'}
-        </Button>
-
-        {/* Edit Action */}
-        {EditModal ? (
-          <EditModal
-            initialData={organization}
-            onSuccess={onSuccess ?? (() => { })}
-            trigger={
-              <Button variant="ghost" size="icon" title="Editar Información">
-                <Edit2 size={18} />
-              </Button>
-            }
-          />
-        ) : (
-          <Button variant="ghost" size="icon" onClick={onEdit} title="Editar Información">
-            <Edit2 size={18} />
-          </Button>
-        )}
-
-        {/* Technical Settings */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Configuración Técnica"
-          onClick={onSettings}
-        >
-          <Settings size={18} />
-        </Button>
-
-        {/* Activation Action (matches brand style) */}
-        <Button
-          variant="ghost"
-          size="icon"
-          title="Activar Contexto"
-          className="text-primary hover:bg-primary/10"
-          onClick={handleActivate}
-          loading={isActivating}
-        >
-          <ArrowUpRight size={18} />
-        </Button>
-      </div>
-    );
-  }
-
-  // Default: Dropdown layout
   return (
     <div className="flex items-center justify-end gap-1">
       <Button

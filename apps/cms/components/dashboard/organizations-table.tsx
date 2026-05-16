@@ -25,7 +25,6 @@ interface OrganizationsTableProps {
   readonly onSuccess?: () => void;
   readonly onEdit?: (org: IPlatformOrganization) => void;
   readonly onAddSubscription?: (org: IPlatformOrganization) => void;
-  readonly variant?: 'simple' | 'detailed';
   readonly EditModal?: React.ComponentType<{
     initialData: IPlatformOrganization;
     onSuccess: () => void;
@@ -37,7 +36,6 @@ const getColumns = (
   onSuccess: () => void,
   onEdit?: (org: IPlatformOrganization) => void,
   onAddSubscription?: (org: IPlatformOrganization) => void,
-  variant: 'simple' | 'detailed' = 'simple',
   isLoading?: boolean,
   router?: AppRouterInstance,
   EditModal?: React.ComponentType<{
@@ -224,7 +222,6 @@ const getColumns = (
             <OrganizationActions
               organization={org}
               status={calcStatus}
-              layout={variant === 'detailed' ? 'inline' : 'dropdown'}
               onEdit={() => onEdit?.(org)}
               onSettings={() => router?.push(`/dashboard/platform/organizations/${org.id}/settings`)}
               onAddSubscription={() => onAddSubscription?.(org)}
@@ -248,13 +245,12 @@ export function OrganizationsTable({
   onSuccess,
   onEdit,
   onAddSubscription,
-  variant = 'simple',
   EditModal
 }: OrganizationsTableProps) {
   const router = useRouter();
   const columns = React.useMemo(() =>
-    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, variant, isLoading, router, EditModal),
-    [onSuccess, onEdit, onAddSubscription, variant, isLoading, router, EditModal]
+    getColumns(onSuccess ?? (() => { }), onEdit, onAddSubscription, isLoading, router, EditModal),
+    [onSuccess, onEdit, onAddSubscription, isLoading, router, EditModal]
   );
 
   const displayData = React.useMemo(() => {

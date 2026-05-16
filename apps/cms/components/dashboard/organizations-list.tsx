@@ -32,7 +32,6 @@ export function OrganizationsList({ organizations, isLoading, onSuccess }: Organ
             organizations={organizations}
             isLoading={isLoading}
             onSuccess={onSuccess}
-            variant="simple"
             EditModal={OrganizationModal}
           />
         </Card>
