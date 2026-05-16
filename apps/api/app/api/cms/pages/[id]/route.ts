@@ -13,7 +13,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (Number.isNaN(pageId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     const organizationId = session.session.activeOrganizationId;
+    const cacheKey = `org:${organizationId}:cms:pages:${pageId}`
+    const cached = await cache.get(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     const page = await cmsPagesService.getPageById(organizationId, pageId)
+    await cache.set(cacheKey, page, 300)
+
     return NextResponse.json(page)
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -34,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const updatedPage = await cmsPagesService.updatePage(organizationId, pageId, body)
 
     await cache.invalidate(`org:${organizationId}:public:page:*`);
+    await cache.invalidate(`org:${organizationId}:cms:pages*`);
 
     return NextResponse.json(updatedPage)
   } catch (error: any) {
@@ -54,6 +63,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await cmsPagesService.deletePage(organizationId, pageId)
 
     await cache.invalidate(`org:${organizationId}:public:page:*`);
+    await cache.invalidate(`org:${organizationId}:cms:pages*`);
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
