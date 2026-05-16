@@ -70,3 +70,8 @@ export type { ChartHeaderOption, ChartHeaderProps } from "@workspace/ui/componen
 export type { ChartConfig } from "@workspace/ui/components/chart";
 export { ChartCarousel } from "@workspace/ui/components/chart-carousel";
 export type { ChartCarouselProps, ChartView } from "@workspace/ui/components/chart-carousel";
+
+// Dashboard utilities
+export { DashboardHeader } from "@workspace/ui/components/dashboard-header";
+export { FilterPanel } from "@workspace/ui/components/filter-panel";
+export type { FilterPanelProps } from "@workspace/ui/components/filter-panel";
