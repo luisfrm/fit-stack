@@ -33,8 +33,8 @@
     },
     "neon-postgres": {
       "source": "neondatabase/agent-skills",
-      "sourceType": "github",
-      "computedHash": "574cf4b7c901ebc7d88d34e2c3e3d08fdec127bd0047f888de148ff0af787d4e"
+      "sourceType": "autoskills-registry",
+      "computedHash": "afa90370212ed99bb472c8d64ca6a5169e3608a6c0d3e570565e7997b1dc81b2"
     },
     "organization": {
       "source": "better-auth/skills",
