@@ -1,0 +1,32 @@
+{
+  "name": "@workspace/auth",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./service": "./src/service.ts",
+    "./hooks": "./src/hooks.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "better-auth": "^1.5.5",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "eslint": "^9.39.2",
+    "next": "16.1.6",
+    "typescript": "^5.0.0"
+  }
+}
