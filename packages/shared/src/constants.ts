@@ -53,6 +53,19 @@ export const SUBSCRIPTION_STATUSES = {
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSCRIPTION_STATUSES];
 
 /**
+ * Platform subscription statuses for SaaS org billing.
+ */
+export const PLATFORM_SUBSCRIPTION_STATUSES = {
+  ACTIVE: "active",
+  PAST_DUE: "past_due",
+  READ_ONLY: "read_only",
+  SUSPENDED: "suspended",
+  CANCELLED: "cancelled",
+} as const;
+
+export type PlatformSubscriptionStatus = typeof PLATFORM_SUBSCRIPTION_STATUSES[keyof typeof PLATFORM_SUBSCRIPTION_STATUSES];
+
+/**
  * Detailed configuration for each supported country.
  * Includes labels for identification and tax registration to avoid hardcoding.
  */

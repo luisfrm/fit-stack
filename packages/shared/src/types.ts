@@ -1,6 +1,6 @@
-import { Role, SubscriptionStatus, PaymentStatus } from '@workspace/shared/constants';
+import { Role, SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
 
-export type { SubscriptionStatus, PaymentStatus };
+export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
 /**
  * Standard interface for Better Auth errors.
@@ -368,8 +368,6 @@ export interface IPlatformPlan {
   createdAt?: string | Date;
 }
 
-export type PlatformSubscriptionStatus = 'active' | 'past_due' | 'read_only' | 'suspended' | 'cancelled';
-
 export interface IPlatformSubscription {
   id: number;
   organizationId: string;
@@ -389,7 +387,7 @@ export interface IPlatformInvoice {
   amount: number;
   currency: string;
   paymentMethod: string;
-  status: 'paid' | 'pending' | 'trial' | 'void';
+  status: PaymentStatus;
   dueDate: string | Date;
   paidAt?: string | Date | null;
   createdAt?: string | Date;
