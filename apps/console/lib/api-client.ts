@@ -1,19 +1,23 @@
 import axios from "axios";
+import { env } from "@/lib/config/envs";
 
-const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000",
-  withCredentials: true,
+const API_BASE_URL = env.apiBaseUrl || "http://localhost:3000";
+
+export const apiClient = axios.create({
+  baseURL: API_BASE_URL + '/api',
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("API Error:", error.response?.data || error.message);
+    const errorCode = error.response?.data?.code;
+    if (errorCode === 'ORGANIZATION_NOT_FOUND' && typeof window !== 'undefined') {
+      window.location.href = '/reset-org-context';
+    }
     return Promise.reject(error);
   }
 );
-
-export { apiClient };
