@@ -3,6 +3,7 @@ import { auth } from '@/config/auth';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
 import { platformPlansService } from '@/services/platform-plans.service';
+import { cache } from '@/lib/cache';
 
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
@@ -20,6 +21,12 @@ export async function GET(req: NextRequest) {
     const organizationId = searchParams.get('organizationId') || undefined;
     const isTrialParam = searchParams.get('isTrial');
 
+    const cacheKey = `platform:subscriptions:${searchParams.toString()}`
+    const cached = await cache.get(cacheKey)
+    if (cached) {
+      return Response.json(cached)
+    }
+
     const filters: any = { page, limit };
     if (status && status !== 'all') filters.status = status;
     if (planId) filters.planId = planId;
@@ -28,6 +35,8 @@ export async function GET(req: NextRequest) {
     if (isTrialParam === 'false') filters.isTrial = false;
 
     const result = await platformSubscriptionsService.getAllSubscriptions(filters);
+    await cache.set(cacheKey, result, 300)
+
     return Response.json(result);
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });
@@ -58,6 +67,12 @@ export async function POST(req: NextRequest) {
       paymentMethod: body.paymentMethod || 'manual_admin',
       currency: body.currency || 'USD',
     });
+
+    await cache.invalidate('platform:subscriptions*')
+    await cache.invalidate('platform:subscriptions:stats')
+    await cache.invalidate('platform:plans:with-stats')
+    await cache.invalidate('platform:plans:summary')
+    await cache.invalidate(`org:${body.organizationId}:subscription-status`)
 
     return Response.json(subscription, { status: 201 });
   } catch (error: any) {

@@ -3,6 +3,7 @@ import { organizationsService } from '@/services/organizations.service';
 import { settingsService } from '@/services/settings.service';
 import { getSession } from '@/config/get-session';
 import { canManageOrganization } from '@/config/auth-utils';
+import { cache } from '@/lib/cache';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -21,16 +22,25 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const cacheKey = `platform:organizations:${id}`
+    const cached = await cache.get(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     // 1. Fetch organization basic info
     const organization = await organizationsService.getOrganizationById(id);
 
     // 2. Fetch specialized settings (branding, timezone, etc.)
     const settings = await settingsService.getAll(id);
 
-    return NextResponse.json({
+    const data = {
       ...organization,
       settings
-    });
+    }
+    await cache.set(cacheKey, data, 300)
+
+    return NextResponse.json(data);
   } catch (error: any) {
     const status = error.message === 'Organización no encontrada' ? 404 : 500;
     return NextResponse.json({ error: error.message }, { status });
@@ -65,6 +75,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     } else {
       updatedOrg = await organizationsService.getOrganizationById(id);
     }
+
+    await cache.invalidate('platform:organizations*')
 
     return NextResponse.json(updatedOrg);
   } catch (error: any) {

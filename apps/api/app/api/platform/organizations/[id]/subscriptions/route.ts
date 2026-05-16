@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
 import { getSession } from '@/config/get-session';
 import { GLOBAL_ROLES } from "@workspace/shared";
+import { cache } from '@/lib/cache';
 
 export async function POST(
   req: NextRequest,
@@ -33,6 +34,13 @@ export async function POST(
       paymentMethod: body.paymentMethod || 'manual_admin',
       currency: body.currency || 'USD',
     });
+
+    await cache.invalidate('platform:subscriptions*')
+    await cache.invalidate('platform:subscriptions:stats')
+    await cache.invalidate('platform:organizations:' + id)
+    await cache.invalidate('org:' + id + ':subscription-status')
+    await cache.invalidate('platform:plans:with-stats')
+    await cache.invalidate('platform:plans:summary')
 
     return NextResponse.json(subscription, { status: 201 });
   } catch (error: any) {

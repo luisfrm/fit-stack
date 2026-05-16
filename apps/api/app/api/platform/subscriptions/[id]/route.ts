@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/config/auth';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
+import { cache } from '@/lib/cache';
 
 export async function GET(
   req: NextRequest,
@@ -15,11 +16,19 @@ export async function GET(
 
   try {
     const { id } = await params;
+    const cacheKey = `platform:subscriptions:${id}`
+    const cached = await cache.get(cacheKey)
+    if (cached) {
+      return Response.json(cached)
+    }
+
     const subscription = await platformSubscriptionsService.getSubscriptionById(Number(id));
 
     if (!subscription) {
       return Response.json({ error: 'Suscripción no encontrada' }, { status: 404 });
     }
+
+    await cache.set(cacheKey, subscription, 300)
 
     return Response.json(subscription);
   } catch (error: any) {
@@ -39,13 +48,29 @@ export async function PATCH(
 
   try {
     const { id } = await params;
+    const subscriptionId = Number(id)
+
+    // Get current subscription to know organizationId for invalidation
+    const currentSub = await platformSubscriptionsService.getSubscriptionById(subscriptionId)
+    const organizationId = currentSub?.organizationId
+
     const body = await req.json();
 
     if (body.action === 'cancel') {
       const result = await platformSubscriptionsService.cancelSubscription(
-        Number(id),
+        subscriptionId,
         body.reason
       );
+
+      // Invalidate cache
+      await cache.invalidate('platform:subscriptions*')
+      await cache.invalidate('platform:subscriptions:stats')
+      await cache.invalidate('platform:plans:with-stats')
+      await cache.invalidate('platform:plans:summary')
+      if (organizationId) {
+        await cache.invalidate(`org:${organizationId}:subscription-status`)
+      }
+
       return Response.json(result);
     }
 
@@ -54,9 +79,19 @@ export async function PATCH(
         return Response.json({ error: 'newEndDate es requerido para extender' }, { status: 400 });
       }
       const result = await platformSubscriptionsService.extendSubscription(
-        Number(id),
+        subscriptionId,
         new Date(body.newEndDate)
       );
+
+      // Invalidate cache
+      await cache.invalidate('platform:subscriptions*')
+      await cache.invalidate('platform:subscriptions:stats')
+      await cache.invalidate('platform:plans:with-stats')
+      await cache.invalidate('platform:plans:summary')
+      if (organizationId) {
+        await cache.invalidate(`org:${organizationId}:subscription-status`)
+      }
+
       return Response.json(result);
     }
 
@@ -78,7 +113,23 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    await platformSubscriptionsService.deleteSubscription(Number(id));
+    const subscriptionId = Number(id)
+
+    // Get current subscription to know organizationId for invalidation
+    const currentSub = await platformSubscriptionsService.getSubscriptionById(subscriptionId)
+    const organizationId = currentSub?.organizationId
+
+    await platformSubscriptionsService.deleteSubscription(subscriptionId);
+
+    // Invalidate cache
+    await cache.invalidate('platform:subscriptions*')
+    await cache.invalidate('platform:subscriptions:stats')
+    await cache.invalidate('platform:plans:with-stats')
+    await cache.invalidate('platform:plans:summary')
+    if (organizationId) {
+      await cache.invalidate(`org:${organizationId}:subscription-status`)
+    }
+
     return Response.json({ success: true });
   } catch (error: any) {
     return Response.json({ error: error.message }, { status: 500 });
