@@ -6,6 +6,9 @@ const envSchema = z.object({
   // Frontend
   FRONTEND_URL: z.string().url(),
 
+  // Trusted Origins (comma-separated for production)
+  TRUSTED_ORIGINS: z.string().optional(),
+
   // Better-Auth
   BETTER_AUTH_SECRET: z.string().min(16),
   COOKIE_DOMAIN: z.string().optional(),
@@ -53,6 +56,9 @@ export const env = {
   frontendUrl: _env.FRONTEND_URL,
   isLocal: _env.APP_ENV === "development",
   isProduction: _env.APP_ENV === "production",
+
+  // Trusted Origins
+  trustedOrigins: _env.TRUSTED_ORIGINS,
 
   // Cloudflare R2
   r2AccountId: _env.R2_ACCOUNT_ID,

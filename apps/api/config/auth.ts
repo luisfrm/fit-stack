@@ -8,18 +8,27 @@ import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
 
+const LOCAL_ORIGINS = [
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "http://localhost:3003",
+];
+
+const PROD_ORIGINS = env.trustedOrigins
+  ? env.trustedOrigins.split(",").map((s: string) => s.trim()).filter(Boolean)
+  : [];
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
       ...schema,
-      member: schema.authMember, // Map 'authMember' to 'member' for Better Auth
+      member: schema.authMember,
     },
   }),
   secret: env.betterAuthSecret!,
 
-  trustedOrigins: [env.frontendUrl!],
+  trustedOrigins: [...LOCAL_ORIGINS, ...PROD_ORIGINS],
   user: {
     additionalFields: {
       role: {
