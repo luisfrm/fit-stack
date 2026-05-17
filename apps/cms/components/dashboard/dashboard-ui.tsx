@@ -17,14 +17,13 @@ import {
   AlertCircle,
   BadgeCheck,
   ShieldCheck,
-  Building2,
   ArrowLeftRight,
   User,
   CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
-import { GLOBAL_ROLES, IOrganization } from "@workspace/shared";
+import { IOrganization } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -42,20 +41,15 @@ import {
   type SidebarUser,
   type SidebarNavItem,
   Text,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
   Card,
   Table,
   Button,
   type ColumnDef,
   Modal,
-  SplashScreen,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 import { OrganizationPicker } from "./organization-picker";
 
 /* ─────────────────────────────────────────────
@@ -77,14 +71,23 @@ const GYM_NAV_ITEMS: SidebarNavItem[] = [
 export function SwitchOrganizationAction() {
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [open, setOpen] = React.useState(false);
+  const loadedRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (loadedRef.current) return;
+    let cancelled = false;
     async function load() {
       const { data } = await authClient.organization.list();
+      if (cancelled) return;
       if (data) setOrganizations(data);
+      loadedRef.current = true;
     }
     load();
+    return () => { cancelled = true; };
   }, []);
+
+  // Memoize the callback to avoid unstable references
+  const handleSelect = React.useCallback(() => setOpen(false), []);
 
   // Solo mostrar si pertenece a más de una organización
   if (organizations.length <= 1) return null;
@@ -109,7 +112,7 @@ export function SwitchOrganizationAction() {
       <div className="py-4">
         <OrganizationPicker
           isModal
-          onSelect={() => setOpen(false)}
+          onSelect={handleSelect}
         />
       </div>
     </Modal>
@@ -175,9 +178,6 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
     />
   );
 }
-
-
-
 
 /* ─────────────────────────────────────────────
    KPI CARD

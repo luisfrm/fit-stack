@@ -51,8 +51,8 @@ export default async function DashboardLayout({
     }
   }
 
-  // If no active organization AND not a global admin, show the picker
-  if (!activeOrgId && !isAdmin) {
+  // If no active organization, show the picker
+  if (!activeOrgId) {
     return <OrganizationPicker />;
   }
 
@@ -95,7 +95,7 @@ export default async function DashboardLayout({
       <AppSidebar
         user={{
           name: user?.name,
-          role: userRole,
+          role: session.member?.role || userRole,
           avatarUrl: user?.image || undefined,
         }}
         activeOrganizationId={session.session?.activeOrganizationId || undefined}
@@ -104,7 +104,7 @@ export default async function DashboardLayout({
       <MobileNav
         user={{
           name: user?.name || "Usuario",
-          role: userRole,
+          role: session.member?.role || userRole,
           avatarUrl: user?.image || undefined,
         }}
         activeOrganizationId={session.session?.activeOrganizationId || undefined}

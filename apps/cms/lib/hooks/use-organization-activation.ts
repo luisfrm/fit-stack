@@ -14,17 +14,15 @@ export function useOrganizationActivation() {
   const [isActivating, setIsActivating] = React.useState(false);
   const router = useRouter();
 
-  const activate = async (organizationId: string) => {
+  const activate = React.useCallback(async (organizationId: string) => {
     setIsActivating(true);
     try {
       let { error } = await sessionService.setActiveOrganization(organizationId);
 
-      // Auto-join if user is a global admin but not a member of this specific organization
       if (error?.code === "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") {
         toast.info("Vinculando perfil de administrador...");
         try {
           await organizationsService.join(organizationId);
-          // Retry activation after successful join
           const retry = await sessionService.setActiveOrganization(organizationId);
           error = retry.error;
         } catch (joinErr: any) {
@@ -49,7 +47,7 @@ export function useOrganizationActivation() {
     } finally {
       setIsActivating(false);
     }
-  };
+  }, [router]);
 
   return {
     activate,

@@ -20,14 +20,17 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const { activate, isActivating } = useOrganizationActivation();
+  const activatedRef = React.useRef(false);
 
   React.useEffect(() => {
+    if (activatedRef.current) return;
+    activatedRef.current = true;
+
     async function loadOrgs() {
       const { data, error } = await authClient.organization.list();
       if (data) {
         setOrganizations(data);
 
-        // Auto-select if only 1 organization exists and NOT in modal mode
         if (!isModal && data.length === 1 && data[0]) {
           await activate(data[0].id);
           onSelect?.(data[0].id);
@@ -36,7 +39,7 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
       setIsLoading(false);
     }
     loadOrgs();
-  }, [activate, onSelect]);
+  }, [activate, isModal, onSelect]);
 
   const handleLogout = async () => {
     await authClient.signOut();
