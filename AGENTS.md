@@ -82,6 +82,78 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 **Endpoint**: `GET /api/organizations/subscription-status` (reads org from session)
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
 
+## Role-Based Access Control (RBAC)
+
+Fit-Stack uses **two levels of roles**: Global (platform) and Organization (tenant).
+
+### Organization Roles (`ORG_ROLES`)
+
+Roles are defined in `packages/shared/src/constants.ts`:
+```ts
+ORG_ROLES = {
+  OWNER: "owner",     // Super Admin / Creator - total control
+  MANAGER: "manager", // Gym Owner/Manager - full tenant control
+  CASHIER: "cashier", // Staff/Cashier - payments and check-ins
+  COACH: "coach",     // Trainer - routines and athlete progress
+  MEMBER: "member",   // Gym client - app access to their own data
+}
+```
+
+### Permission Matrix
+
+| Action | Owner | Manager | Cashier | Coach | Member |
+|--------|:-----:|:-------:|:-------:|:-----:|:------:|
+| **Members** |
+| View list | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Create/Edit/Delete | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Payments** |
+| View/Register | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Change status (validate/void) | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Subscriptions** |
+| Create | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Cancel | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Classes** |
+| View | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Create/Edit/Delete | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Routines** |
+| View | ✅ | ✅ | ✅ | ✅ | ❌ (own only) |
+| Create/Edit | ✅ | ✅ | ❌ | ✅ | ❌ |
+| **Settings** |
+| View/Edit | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+### How to Verify Permissions
+
+**In API routes (server-side)**: Use auth-utils helpers from `@/config/auth-utils`
+```ts
+import { canManageMembers, canReadMembers, canManagePayments } from '@/config/auth-utils'
+
+// In route handler
+if (!canReadMembers(session, organizationId)) {
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+}
+```
+
+**Available helpers** (`apps/api/config/auth-utils.ts`):
+- `canManageOrganization` — Org settings (name, logo, plan)
+- `canManageMembers` — Create, update, delete gym_member records
+- `canReadMembers` — List/View members (includes Coach)
+- `canManageClasses` — Create, update, delete classes
+- `canManageRoutines` — Create, update, delete routines
+- `canManagePayments` — Register and manage payments
+- `canManageSettings` — Gym settings (billing, payment methods, currencies)
+
+**In UI (client-side)**: Use `useAuth()` hook from `@/lib/hooks/use-auth`
+```tsx
+const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
+```
+
+### Security Rules
+
+1. **Never trust client-side role checks** — Always re-verify in API
+2. **Session-based authorization** — Use `session.member.role` from Better Auth
+3. **Organization scoping** — All queries MUST filter by `organizationId`
+4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
+
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
