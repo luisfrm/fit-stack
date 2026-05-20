@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { coachesService } from '@/services/coaches.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { canManageMembers, canReadMembers } from '@/config/auth-utils'
 
 import { z } from 'zod';
 import { CoachesFilter, CreateCoachDTO } from '@workspace/shared/types';
@@ -28,8 +29,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
-    const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
+
+    if (!canReadMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { searchParams } = req.nextUrl
 
     const cacheKey = `org:${organizationId}:coaches:${searchParams.toString()}`;
     const cachedData = await cache.get(cacheKey);
@@ -66,6 +72,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
+    const organizationId = session.session.activeOrganizationId;
+
+    if (!canManageMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const validation = coachSchema.safeParse(body);
 
@@ -74,7 +86,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: firstError, details: validation.error.format() }, { status: 400 })
     }
 
-    const organizationId = session.session.activeOrganizationId;
     const { roleId, ...coachData } = validation.data;
     const newCoach = await coachesService.createCoach(organizationId, coachData as CreateCoachDTO)
     

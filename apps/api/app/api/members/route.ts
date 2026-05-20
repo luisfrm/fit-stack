@@ -3,6 +3,7 @@ import { membersService } from '@/services/members.service'
 import { getSession } from '@/config/get-session'
 import { OrgRole } from '@workspace/shared'
 import { cache } from '@/lib/cache'
+import { canReadMembers, canManageMembers } from '@/config/auth-utils'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,8 +12,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
-    const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
+
+    if (!canReadMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { searchParams } = req.nextUrl
 
     const cacheKey = `org:${organizationId}:members:${searchParams.toString()}`;
     const cachedData = await cache.get(cacheKey);
@@ -50,15 +56,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
+    const organizationId = session.session.activeOrganizationId;
+
+    if (!canManageMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
-    // Destructure sendInvite if it's sent from the frontend
     const { sendInvite, ...memberData } = body;
 
     if (!memberData.firstName || !memberData.lastName || !memberData.email) {
       return NextResponse.json({ error: 'Nombre, apellido y correo son requeridos' }, { status: 400 })
     }
-
-    const organizationId = session.session.activeOrganizationId;
 
     const newMember = await membersService.createMember(organizationId, memberData, sendInvite === true)
 

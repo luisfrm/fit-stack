@@ -4,14 +4,20 @@ import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
 import { auth } from '@/config/auth'
 import { headers } from 'next/headers'
+import { canManageMembers, canReadMembers } from '@/config/auth-utils'
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { searchParams } = req.nextUrl
     const organizationId = session.session.activeOrganizationId;
+
+    if (!canReadMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { searchParams } = req.nextUrl
 
     const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`;
     const cachedData = await cache.get(cacheKey);
@@ -41,11 +47,14 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const body = await req.json()
-    // Validar body...
     const organizationId = session.session.activeOrganizationId;
-    
-    // Fetch full organization to get timezone
+
+    if (!canManageMembers(session, organizationId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const body = await req.json()
+
     const fullOrg = await auth.api.getFullOrganization({
       headers: await headers()
     })
