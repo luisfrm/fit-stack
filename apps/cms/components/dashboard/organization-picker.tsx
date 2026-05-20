@@ -91,10 +91,11 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
           >
             <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center shrink-0 overflow-hidden border border-white/5 group-hover:border-primary/20 relative">
               {org.logo ? (
-                <NextImage 
+                <NextImage
                   src={uploadService.getMediaUrl(org.logo)} 
                   alt={org.name} 
-                  fill
+                  width={100}
+                  height={100}
                   className="h-full w-full object-cover" 
                 />
               ) : (
