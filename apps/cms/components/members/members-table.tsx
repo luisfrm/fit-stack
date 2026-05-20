@@ -4,7 +4,6 @@ import * as React from "react";
 import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip, NextImage } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-react";
-import { GLOBAL_ROLES } from "@workspace/shared";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
@@ -89,7 +88,7 @@ const getColumns = (
     ...(hideRoleColumn ? [] : [{
       header: "Rol",
       cell: (m: IMember) => (
-        <Badge variant={m.role === GLOBAL_ROLES.ADMIN ? "default" : "secondary"}>
+        <Badge variant="secondary">
           {m.role || "Sin rol"}
         </Badge>
       )

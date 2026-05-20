@@ -10,7 +10,7 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
-import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
+import { ORG_ROLES } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
@@ -189,10 +189,10 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           value={formData.role ?? ORG_ROLES.MANAGER}
           onChange={(v) => handleChange("role", v)}
           options={[
-            { value: ORG_ROLES.MANAGER, label: "Manager / Dueño" },
+            { value: ORG_ROLES.OWNER, label: "Owner / Propietario" },
+            { value: ORG_ROLES.MANAGER, label: "Manager / Administrador" },
             { value: ORG_ROLES.COACH, label: "Entrenador" },
-            { value: ORG_ROLES.CASHIER, label: "Cajero / Staff" },
-            { value: GLOBAL_ROLES.ADMIN, label: "Super Admin (Global)" }
+            { value: ORG_ROLES.CASHIER, label: "Cajero / Staff" }
           ]}
         />
       </div>
