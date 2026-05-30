@@ -124,6 +124,54 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 
 ---
 
+## Redis Caching (Upstash)
+
+The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compatible caching.
+
+### Setup
+
+- **Client**: `apps/api/lib/redis.ts` — Configures `Redis` with REST URL + token
+- **Wrapper**: `apps/api/lib/cache.ts` — Centralized cache abstraction with error handling
+- **Env vars**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (both optional, cache degrades gracefully)
+
+### Cache Methods (`apps/api/lib/cache.ts`)
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `get` | `get<T>(key: string)` | Fetch cached value by key |
+| `set` | `set(key, data, ttlSeconds?)` | Store value with optional TTL (default 5 min) |
+| `invalidate` | `invalidate(pattern: string)` | Delete all keys matching a glob pattern (uses SCAN) |
+| `invalidateExact` | `invalidateExact(key: string)` | Delete a single key |
+
+### Cache Key Conventions
+
+| Pattern | TTL | Used For |
+|---------|-----|----------|
+| `org:${orgId}:settings` | 10 min | Organization settings |
+| `org:${orgId}:plans:*` | 5 min | Membership plans |
+| `org:${orgId}:classes:*` | 5 min | Classes |
+| `org:${orgId}:members:*` | 5 min | Gym members |
+| `org:${orgId}:subscriptions` | 5 min | Member subscriptions |
+| `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
+| `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
+| `org:${orgId}:cms:pages*` | 5 min | CMS content pages |
+| `org:${orgId}:public:page:*` | 5 min | Public page slugs |
+| `org:${orgId}:subscription-status` | 1 min | Org billing status |
+| `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
+| `platform:settings` | 10 min | SaaS-level global settings |
+| `platform:organizations*` | 5 min | Organization list (SaaS admin) |
+| `platform:plans*` | 10 min | Platform plan catalog |
+| `platform:subscriptions*` | 5 min | SaaS subscriptions |
+| `platform:subscriptions:stats` | 5 min | Subscription KPI stats |
+
+### Cache Invalidation Strategy
+
+- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`
+- **Role invalidation**: `afterUpdateMemberRole` hook in Better Auth invalidates `member:role:${userId}:${orgId}` so role changes take effect instantly
+- **Graceful degradation**: All cache methods wrap errors with `console.error` and return `null`/void — Redis being down never blocks requests
+
+---
+
 ## Platform Subscription Status (Organization Billing)
 
 Subscription status is **computed dynamically** via SQL CASE — NOT stored in DB.
