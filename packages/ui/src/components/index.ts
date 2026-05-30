@@ -75,3 +75,4 @@ export type { ChartCarouselProps, ChartView } from "@workspace/ui/components/cha
 export { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 export { FilterPanel } from "@workspace/ui/components/filter-panel";
 export type { FilterPanelProps } from "@workspace/ui/components/filter-panel";
+export { StatCard } from "@workspace/ui/components/stat-card";

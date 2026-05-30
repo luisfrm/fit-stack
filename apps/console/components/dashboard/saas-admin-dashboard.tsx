@@ -13,7 +13,7 @@ import {
   Text
 } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
-import { StatCard } from "./stat-card";
+import { StatCard } from "@workspace/ui/components";
 import { OrganizationModal } from "./organization-modal";
 import { OrganizationsList } from "./organizations-list";
 import { organizationsService } from "@/lib/services/organizations-service";
