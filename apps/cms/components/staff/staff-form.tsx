@@ -10,7 +10,8 @@ import {
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
-import { ORG_ROLES } from "@workspace/shared";
+import { canAssignRole, ORG_ROLES, type OrgRole } from "@workspace/shared";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
@@ -21,7 +22,15 @@ interface StaffFormProps {
   readonly isLoading?: boolean;
 }
 
+const STAFF_ROLE_OPTIONS = [
+  { value: ORG_ROLES.OWNER, label: "Owner / Propietario" },
+  { value: ORG_ROLES.MANAGER, label: "Manager / Administrador" },
+  { value: ORG_ROLES.COACH, label: "Entrenador" },
+  { value: ORG_ROLES.CASHIER, label: "Cajero / Staff" },
+] as const;
+
 export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) {
+  const { orgRole } = useAuth();
   const isEdit = !!initialData?.id;
   const [sendInvite, setSendInvite] = React.useState(!isEdit);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -91,8 +100,9 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
       };
 
       await onSubmit(payload, sendInvite);
-    } catch (error: any) {
-      toast.error(error.message || "Error al procesar el formulario");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error interno del servidor'
+      toast.error(message || "Error al procesar el formulario");
     } finally {
       setIsUploading(false);
     }
@@ -188,12 +198,9 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           label="Rol Administrativo"
           value={formData.role ?? ORG_ROLES.MANAGER}
           onChange={(v) => handleChange("role", v)}
-          options={[
-            { value: ORG_ROLES.OWNER, label: "Owner / Propietario" },
-            { value: ORG_ROLES.MANAGER, label: "Manager / Administrador" },
-            { value: ORG_ROLES.COACH, label: "Entrenador" },
-            { value: ORG_ROLES.CASHIER, label: "Cajero / Staff" }
-          ]}
+          options={STAFF_ROLE_OPTIONS.filter(
+            (opt) => orgRole && canAssignRole(orgRole as OrgRole, opt.value as OrgRole),
+          )}
         />
       </div>
 

@@ -9,7 +9,7 @@ import {
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type ISubscription } from "@/types/dashboard";
-import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/shared";
+import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, PERMISSION_ACTIONS, PERMISSION_MODULES } from "@workspace/shared";
 import {
   Ban,
   Trash2,
@@ -23,7 +23,7 @@ import {
 import { ReceiptDialog } from "./receipt-dialog";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { usePermissions } from "@/lib/hooks/use-auth";
 
 const getPaymentStatusBadge = (status?: string) => {
   switch (status) {
@@ -266,10 +266,10 @@ export function SubscriptionsTable({
   pagination
 }: SubscriptionsTableProps) {
   const { settings } = useSettings();
-  const { isCashier } = useAuth();
+  const { can } = usePermissions();
   const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
-  const canDelete = !isCashier;
+  const canDelete = can(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE);
 
   const columns = React.useMemo(() => getColumns(
     onStatusChange,

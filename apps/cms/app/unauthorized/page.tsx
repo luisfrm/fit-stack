@@ -23,7 +23,8 @@ export default function UnauthorizedPage() {
           </h1>
           
           <p className="text-slate-400 mb-8 leading-relaxed">
-            Lo sentimos, tu cuenta no tiene permisos suficientes para acceder a la administración del sistema (CMS).
+            Tu rol (entrenador o cliente) no tiene acceso al panel de administración del gimnasio.
+            La app móvil para entrenamiento y seguimiento estará disponible próximamente.
           </p>
           
           <div className="flex flex-col gap-3">

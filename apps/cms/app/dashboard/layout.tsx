@@ -3,7 +3,7 @@ import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";
-import { PLATFORM_SUBSCRIPTION_STATUSES } from "@workspace/shared/index";
+import { PLATFORM_SUBSCRIPTION_STATUSES, canAccessCms, type OrgRole } from "@workspace/shared";
 import { SubscriptionWarningBanner } from "@/components/dashboard/subscription/subscription-warning-banner";
 
 export default async function DashboardLayout({
@@ -26,6 +26,11 @@ export default async function DashboardLayout({
 
   if (!activeOrgId) {
     return <OrganizationPicker />;
+  }
+
+  const orgRole = session.member?.role as OrgRole | undefined;
+  if (orgRole && !canAccessCms(orgRole)) {
+    redirect("/unauthorized");
   }
 
   // Check organization subscription status

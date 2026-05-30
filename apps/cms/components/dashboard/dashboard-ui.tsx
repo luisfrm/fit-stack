@@ -32,6 +32,12 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { usePermissions } from "@workspace/auth/hooks";
+import {
+  PERMISSION_ACTIONS,
+  PERMISSION_MODULES,
+  type PermissionModule,
+} from "@workspace/shared";
 import { useTheme } from "@/lib/hooks/use-theme";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
@@ -47,6 +53,7 @@ import {
   type ColumnDef,
   Modal,
 } from "@workspace/ui/components";
+import { NextImage } from "@workspace/ui/components/next/image";
 import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
 import { authClient } from "@/lib/auth-client";
@@ -56,20 +63,29 @@ import { OrganizationPicker } from "./organization-picker";
    SIDEBAR NAV SCHEMAS
    ───────────────────────────────────────────── */
 
-const GYM_NAV_ITEMS: SidebarNavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck },
-  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
-  { label: "Clientes", href: "/dashboard/members", icon: Users },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard },
-  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
-  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays },
-  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell },
-  { label: "Configuración", href: "/dashboard/settings", icon: Settings },
+type GymNavItem = SidebarNavItem & { module: PermissionModule };
+
+const GYM_NAV_ITEMS: GymNavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: PERMISSION_MODULES.DASHBOARD },
+  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
+  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
+  { label: "Clientes", href: "/dashboard/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT },
+  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
+  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
+  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
+  { label: "Configuración", href: "/dashboard/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
 ];
 
+function useFilteredNavItems(): SidebarNavItem[] {
+  const { can } = usePermissions();
+  return GYM_NAV_ITEMS.filter((item) =>
+    can(item.module, PERMISSION_ACTIONS.READ),
+  );
+}
+
 export function SwitchOrganizationAction() {
-  const [organizations, setOrganizations] = React.useState<any[]>([]);
+  const [organizations, setOrganizations] = React.useState<IOrganization[]>([]);
   const [open, setOpen] = React.useState(false);
   const loadedRef = React.useRef(false);
 
@@ -79,7 +95,7 @@ export function SwitchOrganizationAction() {
     async function load() {
       const { data } = await authClient.organization.list();
       if (cancelled) return;
-      if (data) setOrganizations(data);
+      if (data) setOrganizations(data as IOrganization[]);
       loadedRef.current = true;
     }
     load();
@@ -119,13 +135,13 @@ export function SwitchOrganizationAction() {
   );
 }
 
-export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
+export function AppSidebar({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
-  const navigation = GYM_NAV_ITEMS;
+  const navigation = useFilteredNavItems();
 
   const brandingAction = React.useMemo(() => {
     return <SwitchOrganizationAction />;
@@ -138,7 +154,7 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
       branding={{
         logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
         title: activeOrganization?.name || "Gym unnamed",
-        subtitle: (activeOrganization as IOrganization)?.slogan || "",
+        subtitle: activeOrganization?.slogan || "",
         isLoading: isBrandingLoading,
         fallbackIcon: Dumbbell,
         action: brandingAction,
@@ -149,13 +165,13 @@ export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: Side
   );
 }
 
-export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
+export function MobileNav({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
-  const navigation = GYM_NAV_ITEMS;
+  const navigation = useFilteredNavItems();
 
   const brandingAction = React.useMemo(() => {
     return <SwitchOrganizationAction />;
@@ -168,7 +184,7 @@ export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: Sideb
       branding={{
         logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
         title: activeOrganization?.name || "Elite Fitness",
-        subtitle: (activeOrganization as IOrganization)?.slogan || "",
+        subtitle: activeOrganization?.slogan || "",
         isLoading: isBrandingLoading,
         fallbackIcon: Dumbbell,
         action: brandingAction,
@@ -318,7 +334,14 @@ export function ActivityItem({ name, time, imageUrl, planName, amountPaid, curre
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
       {imageUrl ? (
-        <img src={uploadService.getMediaUrl(imageUrl)} alt={name} className="w-12 h-12 rounded-full" />
+        <NextImage
+          src={uploadService.getMediaUrl(imageUrl)}
+          alt={name}
+          width={48}
+          height={48}
+          containerClassName="h-12 w-12 shrink-0 rounded-full"
+          className="rounded-full"
+        />
       ) : (
         <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
           <User className="w-4 h-4" />
