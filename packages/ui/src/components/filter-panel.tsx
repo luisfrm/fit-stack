@@ -28,13 +28,6 @@ export function FilterPanel({
   filterLabel = "Filtros",
 }: FilterPanelProps) {
   const hasFilters = !!children || !!filterOptions;
-  const hasActiveFilter = activeFilter && activeFilter !== null;
-
-  const selectedFilterLabel = React.useMemo(() => {
-    if (!activeFilter || !filterOptions) return filterLabel;
-    const option = filterOptions.find(o => o.value === activeFilter);
-    return option?.label || filterLabel;
-  }, [activeFilter, filterOptions, filterLabel]);
 
   return (
     <section

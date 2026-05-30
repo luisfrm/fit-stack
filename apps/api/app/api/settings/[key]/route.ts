@@ -5,7 +5,7 @@ import { cache } from '@/lib/cache'
 import { authorize } from '@/config/auth-utils'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
-export async function GET({ params }: { params: Promise<{ key: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ key: string }> }) {
   try {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
