@@ -58,6 +58,8 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --spacing-section: 6rem;
+  --z-navbar: 50;
   --radius: 0.625rem;
   --sidebar: var(--surface);
   --sidebar-foreground: var(--foreground);
@@ -223,4 +225,25 @@
   .mask-fade-right {
     mask-image: linear-gradient(to right, black 85%, transparent 100%);
   }
+
+  .section-container {
+    @apply max-w-7xl mx-auto px-6;
+  }
+
+  .hero-gradient {
+    background: linear-gradient(
+      to bottom,
+      oklch(0 0 0 / 0.7) 0%,
+      oklch(0 0 0 / 0.5) 40%,
+      oklch(0 0 0 / 0.8) 100%
+    );
+  }
+}
+
+@utility section-container {
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
