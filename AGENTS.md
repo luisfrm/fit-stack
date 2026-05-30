@@ -236,6 +236,17 @@ const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
 - **No test suite** — `pnpm test` does not exist
 - **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
+- **Keep AGENTS.md updated** — After any structural change, update AGENTS.md to reflect it. When in doubt, update it.
+
+### When to update AGENTS.md
+
+- New API endpoints or route restructuring (e.g., `/api/platform/settings`)
+- Changes to RBAC (new roles, permission matrix changes)
+- New business rules or module changes
+- New apps or packages added to the monorepo
+- Changes to dev commands or database workflow
+- New auth patterns or security rules
+- New skills or hooks that become project-wide conventions
 
 ---
 
