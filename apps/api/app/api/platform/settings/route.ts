@@ -2,29 +2,23 @@ import { NextResponse, NextRequest } from "next/server";
 import { getSession } from "@/config/get-session";
 import { settingsService } from "@/services/settings.service";
 import { cache } from "@/lib/cache";
-import { authorize } from "@/config/auth-utils";
-import { PERMISSION_ACTIONS, PERMISSION_MODULES } from "@workspace/shared";
+import { requireGlobalAdmin } from "@/config/auth-utils";
 
 export async function GET() {
   try {
     const session = await getSession();
-    const organizationId = session?.session?.activeOrganizationId;
 
-    if (!organizationId) {
+    if (!requireGlobalAdmin(session)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.READ)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const cacheKey = `org:${organizationId}:settings`;
+    const cacheKey = "platform:settings";
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
       return NextResponse.json(cachedData);
     }
 
-    const settings = await settingsService.getAll(organizationId);
+    const settings = await settingsService.getAll(null);
 
     await cache.set(cacheKey, settings, 600);
 
@@ -38,20 +32,15 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    const organizationId = session?.session?.activeOrganizationId;
 
-    if (!organizationId) {
+    if (!requireGlobalAdmin(session)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.UPDATE)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const settings = await req.json();
-    await settingsService.updateAll(organizationId, settings);
+    await settingsService.updateAll(null, settings);
 
-    await cache.invalidate(`org:${organizationId}:settings*`);
+    await cache.invalidate("platform:settings*");
 
     return NextResponse.json({ success: true });
   } catch (error) {

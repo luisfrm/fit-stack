@@ -19,14 +19,14 @@ export function usePlatformSettings() {
   const query = useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const response = await apiClient.get<Record<string, string>>("/settings");
+      const response = await apiClient.get<Record<string, string>>("/platform/settings");
       return response.data;
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (settings: Record<string, string>) => {
-      const response = await apiClient.post("/settings", settings);
+      const response = await apiClient.post("/platform/settings", settings);
       return response.data;
     },
     onSuccess: () => {
