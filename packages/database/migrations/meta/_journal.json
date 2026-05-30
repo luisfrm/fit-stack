@@ -64,6 +64,13 @@
       "when": 1778905702045,
       "tag": "0008_gorgeous_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779000000000,
+      "tag": "0009_petite_sentinel",
+      "breakpoints": true
     }
   ]
 }

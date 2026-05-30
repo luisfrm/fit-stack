@@ -176,7 +176,7 @@ export const storeSubscription = pgTable('store_subscription', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const platformInvoice = pgTable('platform_invoice', {
+export const platformPayment = pgTable('platform_payment', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .notNull()

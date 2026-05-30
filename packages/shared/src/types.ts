@@ -380,7 +380,7 @@ export interface IPlatformSubscription {
   createdAt?: string | Date;
 }
 
-export interface IPlatformInvoice {
+export interface IPlatformPayment {
   id: number;
   organizationId: string;
   planId: number;
