@@ -1,5 +1,5 @@
 import { eq, desc, and, gte, lte, sql, count, inArray, db } from '@workspace/database/client';
-import { storeSubscription, fitstackPlan, organization, platformInvoice } from '@workspace/database/schema';
+import { storeSubscription, fitstackPlan, organization, platformPayment } from '@workspace/database/schema';
 import { PLATFORM_SUBSCRIPTION_STATUSES, type PlatformSubscriptionStatus } from '@workspace/shared/constants';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
@@ -47,8 +47,9 @@ export const platformSubscriptionsRepository = {
    * Uses SQL CASE for database-level computation.
    */
   getSubscriptionStatusSql() {
-    const latestInvoiceStatus = sql`(SELECT status FROM platform_invoice 
+    const latestInvoiceStatus = sql`(SELECT status FROM platform_payment 
       WHERE plan_id = ${fitstackPlan.id} 
+      AND organization_id = ${storeSubscription.organizationId}
       ORDER BY created_at DESC LIMIT 1)`;
 
     return sql<PlatformSubscriptionStatus>`CASE 
@@ -246,6 +247,11 @@ export const platformSubscriptionsRepository = {
     priceOverride?: string;
     paymentMethod: string;
     currency: string;
+    amount?: string;
+    paymentStatus?: string;
+    exchangeRateApplied?: string;
+    paymentMethodDetails?: any;
+    paymentDate?: Date;
   }) {
     const [newSub] = await db.insert(storeSubscription).values({
       organizationId: data.organizationId,
@@ -257,14 +263,18 @@ export const platformSubscriptionsRepository = {
       priceOverride: data.priceOverride,
     }).returning();
 
-    await db.insert(platformInvoice).values({
+    const paymentAmount = data.amount || (data.isTrial ? "0.00" : (data.priceOverride || "0.00"));
+    const paymentStatus = data.isTrial ? PAYMENT_STATUSES.VALIDATED : (data.paymentStatus || PAYMENT_STATUSES.PROCESSING);
+
+    await db.insert(platformPayment).values({
       organizationId: data.organizationId,
       planId: data.planId,
-      amount: data.isTrial ? "0.00" : (data.priceOverride || "0.00"),
+      amount: paymentAmount,
       currency: data.currency,
       paymentMethod: data.paymentMethod,
-      status: data.isTrial ? PAYMENT_STATUSES.VALIDATED : PAYMENT_STATUSES.PROCESSING,
-      dueDate: data.startDate,
+      status: paymentStatus,
+      dueDate: data.paymentDate || data.startDate,
+      paidAt: paymentStatus === PAYMENT_STATUSES.VALIDATED ? new Date() : null,
       createdAt: new Date(),
     });
 
@@ -274,9 +284,9 @@ export const platformSubscriptionsRepository = {
   async getOrganizationInvoices(organizationId: string) {
     return db
       .select()
-      .from(platformInvoice)
-      .where(eq(platformInvoice.organizationId, organizationId))
-      .orderBy(desc(platformInvoice.createdAt));
+      .from(platformPayment)
+      .where(eq(platformPayment.organizationId, organizationId))
+      .orderBy(desc(platformPayment.createdAt));
   },
 
   async getStats(): Promise<{

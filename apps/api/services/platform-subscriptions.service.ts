@@ -58,6 +58,11 @@ export const platformSubscriptionsService = {
     priceOverride?: string;
     paymentMethod: string;
     currency: string;
+    amount?: string;
+    paymentStatus?: string;
+    exchangeRateApplied?: string;
+    paymentMethodDetails?: any;
+    paymentDate?: Date;
   }) {
     return platformSubscriptionsRepository.createManualSubscription(data);
   },

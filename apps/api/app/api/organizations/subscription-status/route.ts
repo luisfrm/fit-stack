@@ -12,9 +12,12 @@ export async function GET(req: NextRequest) {
   }
 
   const userRole = session.user.role;
-  const activeOrganizationId = (session as any).activeOrganizationId;
+  const activeOrganizationId = session.session?.activeOrganizationId;
 
-  if (!activeOrganizationId && userRole !== GLOBAL_ROLES.ADMIN) {
+  if (!activeOrganizationId) {
+    if (userRole === GLOBAL_ROLES.ADMIN) {
+      return Response.json({ status: 'active' });
+    }
     return Response.json({ error: 'No active organization' }, { status: 400 });
   }
 

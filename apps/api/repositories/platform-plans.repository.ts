@@ -1,5 +1,5 @@
 import { eq, db, sql, desc, count, getTableColumns } from '@workspace/database/client';
-import { fitstackPlan, storeSubscription, platformInvoice } from '@workspace/database/schema';
+import { fitstackPlan, storeSubscription, platformPayment } from '@workspace/database/schema';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
 export type DbPlatformPlan = typeof fitstackPlan.$inferSelect;
@@ -96,12 +96,12 @@ export const platformPlansRepository = {
 
     const revenueResult = await db
       .select({
-        currency: platformInvoice.currency,
-        total: sql<number>`sum(${platformInvoice.amount})`.mapWith(Number)
+        currency: platformPayment.currency,
+        total: sql<number>`sum(${platformPayment.amount})`.mapWith(Number)
       })
-      .from(platformInvoice)
-      .where(eq(platformInvoice.status, PAYMENT_STATUSES.VALIDATED))
-      .groupBy(platformInvoice.currency);
+      .from(platformPayment)
+      .where(eq(platformPayment.status, PAYMENT_STATUSES.VALIDATED))
+      .groupBy(platformPayment.currency);
 
     const monthlyRevenue: Record<string, number> = {};
     revenueResult.forEach(row => {

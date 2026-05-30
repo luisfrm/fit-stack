@@ -31,8 +31,13 @@ export async function POST(
       endDate: new Date(body.endDate),
       isTrial: !!body.isTrial,
       priceOverride: body.priceOverride,
-      paymentMethod: body.paymentMethod || 'manual_admin',
-      currency: body.currency || 'USD',
+      paymentMethod: body.payment?.paymentMethod || 'manual_admin',
+      currency: body.payment?.currencyPaid || 'USD',
+      amount: body.payment?.amountPaid ? String(body.payment.amountPaid / 100) : undefined,
+      paymentStatus: body.payment?.status || 'processing',
+      exchangeRateApplied: body.payment?.exchangeRateApplied,
+      paymentMethodDetails: body.payment?.paymentMethodDetails,
+      paymentDate: body.payment?.paymentDate ? new Date(body.payment.paymentDate) : undefined,
     });
 
     await cache.invalidate('platform:subscriptions*')
