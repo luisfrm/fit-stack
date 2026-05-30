@@ -1,91 +1,54 @@
-import { ORG_ROLES } from "@workspace/shared";
+import {
+  can,
+  GLOBAL_ROLES,
+  PERMISSION_ACTIONS,
+  PERMISSION_MODULES,
+  type OrgRole,
+  type PermissionAction,
+  type PermissionModule,
+} from "@workspace/shared";
 import { auth } from "./auth";
 
 type AnySession = (typeof auth.$Infer.Session & { member?: { role: string } }) | null;
 
-function getOrgContext(session: AnySession, organizationId: string) {
+export function getOrgContext(session: AnySession, organizationId: string) {
   if (!session) return null;
 
   const activeOrgId = session.session?.activeOrganizationId;
   if (activeOrgId !== organizationId) return null;
 
-  return {
-    memberRole: session.member?.role,
-  };
+  const memberRole = session.member?.role;
+  if (!memberRole) return null;
+
+  return { memberRole: memberRole as OrgRole };
 }
 
-export function canManageOrganization(session: AnySession, organizationId: string): boolean {
+/**
+ * Server-side permission check for tenant API routes.
+ * @example authorize(session, orgId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)
+ */
+export function authorize(
+  session: AnySession,
+  organizationId: string,
+  module: PermissionModule,
+  action: PermissionAction,
+): boolean {
   const ctx = getOrgContext(session, organizationId);
   if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER
-  );
+  return can(ctx.memberRole, module, action);
 }
 
-export function canManageMembers(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER ||
-    ctx.memberRole === ORG_ROLES.CASHIER
-  );
+export function requireGlobalAdmin(session: AnySession): boolean {
+  return session?.user?.role === GLOBAL_ROLES.ADMIN;
 }
 
-export function canReadMembers(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
+/** Media uploads: CMS content (owner/manager) or member/staff avatars (cashier+). */
+export function authorizeUpload(
+  session: AnySession,
+  organizationId: string,
+): boolean {
   return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER ||
-    ctx.memberRole === ORG_ROLES.CASHIER ||
-    ctx.memberRole === ORG_ROLES.COACH
-  );
-}
-
-export function canManageClasses(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER ||
-    ctx.memberRole === ORG_ROLES.CASHIER
-  );
-}
-
-export function canManageRoutines(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER ||
-    ctx.memberRole === ORG_ROLES.COACH
-  );
-}
-
-export function canManagePayments(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER ||
-    ctx.memberRole === ORG_ROLES.CASHIER
-  );
-}
-
-export function canManageSettings(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return false;
-
-  return (
-    ctx.memberRole === ORG_ROLES.OWNER ||
-    ctx.memberRole === ORG_ROLES.MANAGER
+    authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE) ||
+    authorize(session, organizationId, PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.UPDATE)
   );
 }

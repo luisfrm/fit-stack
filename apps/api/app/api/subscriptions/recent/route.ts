@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,8 +13,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl
     const limit = Number(searchParams.get('limit')) || 5
 
-    const organizationId = session.session.activeOrganizationId;
-    
+    const organizationId = session.session.activeOrganizationId
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const cacheKey = `org:${organizationId}:subscriptions:recent:${limit}`;
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
@@ -24,7 +30,8 @@ export async function GET(req: NextRequest) {
     await cache.set(cacheKey, records, 300);
 
     return NextResponse.json(records)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

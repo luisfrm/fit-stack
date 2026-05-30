@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { coachesService } from '@/services/coaches.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
-import { canManageMembers, canReadMembers } from '@/config/auth-utils'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
 import { z } from 'zod';
-import { CoachesFilter, CreateCoachDTO } from '@workspace/shared/types';
+import { CoachesFilter } from '@workspace/shared/types';
 
 const coachSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -29,18 +30,18 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
-    const organizationId = session.session.activeOrganizationId;
+    const organizationId = session.session.activeOrganizationId
 
-    if (!canReadMembers(session, organizationId)) {
+    if (!authorize(session, organizationId, PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = req.nextUrl
 
-    const cacheKey = `org:${organizationId}:coaches:${searchParams.toString()}`;
-    const cachedData = await cache.get(cacheKey);
+    const cacheKey = `org:${organizationId}:coaches:${searchParams.toString()}`
+    const cachedData = await cache.get(cacheKey)
     if (cachedData) {
-      return NextResponse.json(cachedData);
+      return NextResponse.json(cachedData)
     }
 
     const filters: CoachesFilter = {
@@ -55,12 +56,12 @@ export async function GET(req: NextRequest) {
     }
 
     const result = await coachesService.getAllCoaches(organizationId, filters)
-    
-    await cache.set(cacheKey, result, 300); // Cache for 5 minutes
-    
+
+    await cache.set(cacheKey, result, 300)
+
     return NextResponse.json(result)
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Error interno del servidor';
+    const errorMessage = error instanceof Error ? error.message : 'Error interno del servidor'
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
@@ -72,28 +73,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado o sin organización activa' }, { status: 401 })
     }
 
-    const organizationId = session.session.activeOrganizationId;
+    const organizationId = session.session.activeOrganizationId
 
-    if (!canManageMembers(session, organizationId)) {
+    if (!authorize(session, organizationId, PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.CREATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()
-    const validation = coachSchema.safeParse(body);
+    const validation = coachSchema.safeParse(body)
 
     if (!validation.success) {
-      const firstError = validation.error.errors[0]?.message || 'Datos de formulario inválidos';
+      const firstError = validation.error.errors[0]?.message || 'Datos de formulario inválidos'
       return NextResponse.json({ error: firstError, details: validation.error.format() }, { status: 400 })
     }
 
-    const { roleId, ...coachData } = validation.data;
-    const newCoach = await coachesService.createCoach(organizationId, coachData as CreateCoachDTO)
-    
-    await cache.invalidate(`org:${organizationId}:coaches:*`);
+    const { ...coachData } = validation.data
+    const newCoach = await coachesService.createCoach(organizationId, coachData)
+
+    await cache.invalidate(`org:${organizationId}:coaches:*`)
 
     return NextResponse.json(newCoach, { status: 201 })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Error al crear el entrenador';
+    const errorMessage = error instanceof Error ? error.message : 'Error al crear el entrenador'
     return NextResponse.json({ error: errorMessage }, { status: 400 })
   }
 }

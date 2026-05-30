@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
 import { getSession } from '@/config/get-session'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { cache } from '@/lib/cache'
 
 export async function GET(
@@ -14,6 +16,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
     }
 
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { id } = await params
     const cacheKey = `org:${organizationId}:classes:${id}`
     const cached = await cache.get(cacheKey)
@@ -25,8 +31,9 @@ export async function GET(
     await cache.set(cacheKey, cls, 300)
 
     return NextResponse.json(cls)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 404 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -41,6 +48,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
     }
 
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { id } = await params
     const body = await req.json()
     const updatedClass = await classesService.update(organizationId, Number(id), body)
@@ -50,8 +61,9 @@ export async function PUT(
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
 
     return NextResponse.json(updatedClass)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -66,6 +78,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
     }
 
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.DELETE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const { id } = await params
     await classesService.delete(organizationId, Number(id))
 
@@ -74,7 +90,8 @@ export async function DELETE(
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
 
     return new NextResponse(null, { status: 204 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

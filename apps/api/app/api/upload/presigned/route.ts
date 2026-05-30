@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { r2Service } from '@/services/r2.service';
 import { getSession } from '@/config/get-session';
+import { authorizeUpload } from '@/config/auth-utils';
 
 /**
  * Extracts the file extension from a filename.
@@ -42,18 +43,20 @@ function constructStorageKey(orgId: string, folder: string, filename: string, cu
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { filename, contentType, folder, customName, organizationId } = await req.json();
+    const { filename, contentType, folder, customName, organizationId: bodyOrgId } = await req.json();
 
     if (!filename || !contentType) {
       return NextResponse.json({ error: 'Filename and content type are required' }, { status: 400 });
     }
 
-    // Priority: Body organizationId > Session activeOrganizationId > 'public'
-    const orgId = organizationId || session.session.activeOrganizationId || 'public';
+    const orgId = bodyOrgId || session?.session?.activeOrganizationId;
+    if (!orgId || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!authorizeUpload(session, orgId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const uniqueKey = constructStorageKey(orgId, folder || 'general', filename, customName);
 
     const result = await r2Service.getPresignedUploadUrl(uniqueKey, contentType);

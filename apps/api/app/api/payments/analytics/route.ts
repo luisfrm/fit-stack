@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { financeService } from '@/services/finance.service'
 import { getSession } from '@/config/get-session'
 import { auth } from '@/config/auth'
 import { headers } from 'next/headers'
 import { cache } from '@/lib/cache'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) {
@@ -13,6 +15,11 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.REPORTS, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const cacheKey = `org:${organizationId}:payments:analytics`
 
     const cached = await cache.get(cacheKey)
@@ -25,14 +32,15 @@ export async function GET(req: NextRequest) {
       headers: await headers()
     })
 
-    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
+    const timezone = fullOrg?.timezone ?? 'America/Caracas'
     const stats = await financeService.getDashboardAnalytics(organizationId, timezone)
 
     await cache.set(cacheKey, stats, 300)
 
     return NextResponse.json(stats)
-  } catch (error: any) {
-    console.error('[PAYMENTS_ANALYTICS_ERROR]', error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    console.error('[PAYMENTS_ANALYTICS_ERROR]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

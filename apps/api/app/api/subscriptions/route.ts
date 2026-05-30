@@ -4,25 +4,26 @@ import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
 import { auth } from '@/config/auth'
 import { headers } from 'next/headers'
-import { canManageMembers, canReadMembers } from '@/config/auth-utils'
+import { IOrganization, PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
+import { authorize } from '@/config/auth-utils'
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId;
+    const organizationId = session.session.activeOrganizationId
 
-    if (!canReadMembers(session, organizationId)) {
+    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { searchParams } = req.nextUrl
 
-    const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`;
-    const cachedData = await cache.get(cacheKey);
+    const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`
+    const cachedData = await cache.get(cacheKey)
     if (cachedData) {
-      return NextResponse.json(cachedData);
+      return NextResponse.json(cachedData)
     }
 
     const filters = {
@@ -34,11 +35,12 @@ export async function GET(req: NextRequest) {
 
     const result = await subscriptionsService.getAllPaginated(organizationId, filters)
 
-    await cache.set(cacheKey, result, 300);
+    await cache.set(cacheKey, result, 300)
 
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -47,9 +49,9 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId;
+    const organizationId = session.session.activeOrganizationId
 
-    if (!canManageMembers(session, organizationId)) {
+    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.CREATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -58,17 +60,18 @@ export async function POST(req: NextRequest) {
     const fullOrg = await auth.api.getFullOrganization({
       headers: await headers()
     })
-    
-    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
-    
+
+    const timezone = (fullOrg as IOrganization)?.timezone || 'America/Caracas'
+
     const newSubscription = await subscriptionsService.create(organizationId, body, timezone)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`);
-    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${organizationId}:members:*`); // members use subscription data
+    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(newSubscription, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

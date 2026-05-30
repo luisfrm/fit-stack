@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/config/get-session'
 import { subscriptionsService } from '@/services/subscriptions.service'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
 export async function POST(
   _req: NextRequest,
@@ -12,6 +14,10 @@ export async function POST(
 
     if (!organizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
+    }
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.UPDATE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params

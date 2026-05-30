@@ -4,6 +4,8 @@ import { getSession } from '@/config/get-session';
 import { cache } from '@/lib/cache';
 import { auth } from '@/config/auth';
 import { headers } from 'next/headers';
+import { authorize } from '@/config/auth-utils';
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,13 +22,17 @@ export async function GET(req: NextRequest) {
     }
 
     const organizationId = session.session.activeOrganizationId;
-    
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.DASHBOARD, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Fetch full organization to get timezone
     const fullOrg = await auth.api.getFullOrganization({
       headers: await headers()
     });
     
-    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas';
+    const timezone = fullOrg?.timezone ?? 'America/Caracas';
 
     const cacheKey = `org:${organizationId}:dashboard:stats:${today}`;
 

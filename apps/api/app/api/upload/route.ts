@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { r2Service } from '@/services/r2.service';
 import { getSession } from '@/config/get-session';
+import { authorizeUpload } from '@/config/auth-utils';
 
 /**
  * Handle listing of files in a specific folder.
@@ -9,13 +10,17 @@ import { getSession } from '@/config/get-session';
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session) {
+    if (!session?.session?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const orgId = session.session.activeOrganizationId;
+    if (!authorizeUpload(session, orgId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
     const folder = searchParams.get('folder') || '';
-    const orgId = session.session.activeOrganizationId || 'public';
 
     // El prefijo siempre empieza por 'cms/' y el ID de la organización
     const folderPath = folder && folder !== 'general' ? `${folder}/` : '';
@@ -35,8 +40,13 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session) {
+    if (!session?.session?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const orgId = session.session.activeOrganizationId;
+    if (!authorizeUpload(session, orgId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -47,7 +57,6 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Verificación de seguridad: el usuario solo puede borrar archivos de su organización dentro de 'cms/'
-    const orgId = session.session.activeOrganizationId || 'public';
     if (!key.startsWith(`cms/${orgId}/`)) {
       return NextResponse.json({ error: 'Forbidden: No tienes permiso para borrar este archivo.' }, { status: 403 });
     }

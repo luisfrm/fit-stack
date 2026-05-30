@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
 import { getSession } from '@/config/get-session'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { cache } from '@/lib/cache';
 
 /**
@@ -74,6 +76,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { searchParams } = req.nextUrl
     const cacheKey = `org:${organizationId}:classes:${searchParams.toString()}`
 
@@ -105,8 +111,9 @@ export async function GET(req: NextRequest) {
     const result = await classesService.getAll(organizationId, filters)
     await cache.set(cacheKey, result, 300) // 5 minutes
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -122,6 +129,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.CREATE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
     const errors = validateClassBody(body)
     if (errors.length > 0) {
@@ -130,7 +141,8 @@ export async function POST(req: NextRequest) {
 
     const newClass = await classesService.create(organizationId, body)
     return NextResponse.json(newClass, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

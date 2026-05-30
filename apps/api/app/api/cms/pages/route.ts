@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cmsPagesService } from '@/services/cms-pages.service'
 import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId;
+    const organizationId = session.session.activeOrganizationId
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.READ)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const cacheKey = `org:${organizationId}:cms:pages`
     const cached = await cache.get(cacheKey)
     if (cached) {
@@ -19,8 +26,9 @@ export async function GET(req: NextRequest) {
     await cache.set(cacheKey, pages, 300)
 
     return NextResponse.json(pages)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -29,16 +37,22 @@ export async function POST(req: NextRequest) {
     const session = await getSession()
     if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const organizationId = session.session.activeOrganizationId
+
+    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await req.json()
-    const organizationId = session.session.activeOrganizationId;
-    const { id, ...data } = body;
+    const { ...data } = body
 
     const newPage = await cmsPagesService.createPage(organizationId, data)
 
     await cache.invalidate(`org:${organizationId}:cms:pages*`)
 
     return NextResponse.json(newPage, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error interno del servidor'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
