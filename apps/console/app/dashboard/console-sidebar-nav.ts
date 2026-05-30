@@ -3,6 +3,11 @@ import { SidebarNavItem } from "@workspace/ui/components";
 
 export const ConsoleSidebarNav: SidebarNavItem[] = [
   {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: Icons.LayoutGrid,
+  },
+  {
     label: "Organizaciones",
     href: "/dashboard/organizations",
     icon: Icons.Building2,
@@ -21,15 +26,5 @@ export const ConsoleSidebarNav: SidebarNavItem[] = [
     label: "Configuración",
     href: "/dashboard/settings",
     icon: Icons.Settings,
-  },
-  {
-    label: "Monedas",
-    href: "/dashboard/settings/currencies",
-    icon: Icons.Coins,
-  },
-  {
-    label: "Métodos de Pago",
-    href: "/dashboard/settings/payment-methods",
-    icon: Icons.Wallet,
   },
 ];

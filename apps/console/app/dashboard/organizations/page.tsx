@@ -18,7 +18,7 @@ import { organizationsService } from "@/lib/services/organizations-service";
 import { OrganizationsTable } from "@/components/dashboard/organizations-table";
 import { OrganizationMobileCard } from "@/components/dashboard/organization-mobile-card";
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
-import { AddSubscriptionModal } from "@/components/platform/add-subscription-modal";
+import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { FilterPanel } from "@workspace/ui/components/filter-panel";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -203,10 +203,10 @@ export default function OrganizationsPage() {
 
 
       {selectedOrg && (
-        <AddSubscriptionModal
+        <PlatformSubscriptionModal
           open={isSubModalOpen}
           onOpenChange={setIsSubModalOpen}
-          organization={selectedOrg}
+          initialOrganization={selectedOrg}
           onSuccess={loadOrganizations}
         />
       )}

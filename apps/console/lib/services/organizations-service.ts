@@ -43,6 +43,15 @@ export const organizationsService = {
     endDate: string;
     isTrial: boolean;
     priceOverride?: string;
+    payment?: {
+      amountPaid: number;
+      currencyPaid: string;
+      exchangeRateApplied?: string;
+      paymentMethod: string;
+      paymentMethodDetails?: any;
+      status?: string;
+      paymentDate?: string;
+    };
   }): Promise<IPlatformSubscription> {
     const response = await apiClient.post(`${ORGANIZATIONS_PATH}/${id}/subscriptions`, data);
     return response.data;

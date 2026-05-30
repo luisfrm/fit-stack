@@ -13,6 +13,7 @@ import { usePlatformSubscriptionStats, useCancelSubscription, useExtendSubscript
 import { PlatformSubscriptionStatus } from "@workspace/shared/types";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { X, Plus } from "lucide-react";
+import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
 import { cn } from "@workspace/ui/lib/utils";
 import { type CurrencyFormat } from "@/lib/utils/value-converters";
 import { toast } from "@workspace/ui/components";
@@ -79,7 +80,18 @@ export default function PlatformSubscriptionsPage() {
         title="Suscripciones SaaS"
         description="Gestiona las suscripciones de todas las organizaciones al plataforma Fit-Stack."
         iconName="CalendarCheck"
-      />
+      >
+        <PlatformSubscriptionModal
+          onSuccess={() => {
+            refetch();
+          }}
+          trigger={
+            <Button size="sm" rightIcon={<Plus size={18} />}>
+              NUEVA SUSCRIPCIÓN
+            </Button>
+          }
+        />
+      </DashboardHeader>
 
       <SubscriptionsKpiSection
         stats={stats}

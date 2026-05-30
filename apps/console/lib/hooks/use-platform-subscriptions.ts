@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
+import { organizationsService } from "@/lib/services/organizations-service";
 import { PlatformSubscriptionStatus } from "@workspace/shared/types";
 
 export function usePlatformSubscriptionStats() {
@@ -19,6 +20,21 @@ export function usePlatformSubscriptionStats() {
     isError: query.isError,
     refetch: query.refetch,
   };
+}
+
+export function useCreatePlatformSubscription() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orgId, data }: {
+      orgId: string;
+      data: Parameters<typeof organizationsService.addSubscription>[1];
+    }) => organizationsService.addSubscription(orgId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-subscriptions"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-subscriptions-stats"] });
+    },
+  });
 }
 
 export function useCancelSubscription() {

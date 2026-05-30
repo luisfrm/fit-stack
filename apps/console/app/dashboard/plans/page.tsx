@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { Plus, ShieldCheck, Loader2, Users, CreditCard, TrendingUp } from "lucide-react";
-import { Button, toast, Text } from "@workspace/ui/components";
+import { Button, toast, Text, SimpleTooltip, TooltipProvider } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { StatCard } from "@workspace/ui/components";
 import { PlatformPlanCard } from "@/components/platform/platform-plan-card";
 import { PlatformPlanModal } from "@/components/platform/platform-plan-modal";
 import { platformPlansService, type PlatformPlansSummary } from "@/lib/services/platform-plans-service";
 import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
+import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
 import { type IPlatformPlan } from "@workspace/shared/types";
 
 export default function PlatformPlansPage() {
@@ -27,7 +28,10 @@ export default function PlatformPlansPage() {
     }
   }, [settings]);
 
+  const primaryCurrency = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
   const currencyFormat = settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] || "latam";
+
+  const { data: rates } = useExchangeRates(primaryCurrency);
 
   const loadPlans = async () => {
     try {
@@ -49,41 +53,80 @@ export default function PlatformPlansPage() {
     loadPlans();
   }, []);
 
-  const formatMonthlyRevenue = (revenue: Record<string, number>) => {
-    const revenueKeys = Object.keys(revenue);
-    const allDisplayCurrencies = Array.from(new Set([...activeCurrencies, ...revenueKeys]));
+  const locale = currencyFormat === "usa" ? "en-US" : "es-ES";
 
-    if (allDisplayCurrencies.length === 0) return null;
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
+    }).format(amount);
+  };
+
+  const computeRevenueBreakdown = (revenue: Record<string, number>) => {
+    let totalInPrimary = 0;
+    const breakdown: { currency: string; amount: number; converted: number; rate: number }[] = [];
+
+    for (const [cur, rawAmount] of Object.entries(revenue)) {
+      const amount = Number(rawAmount) / 100;
+      if (amount === 0) continue;
+
+      let rate = 1;
+      if (cur !== primaryCurrency && rates) {
+        rate = rates[cur] ?? 1;
+      }
+
+      const converted = cur === primaryCurrency ? amount : amount * rate;
+      totalInPrimary += converted;
+      breakdown.push({ currency: cur, amount, converted, rate });
+    }
+
+    return { totalInPrimary, breakdown };
+  };
+
+  const renderRevenueCard = (revenue: Record<string, number>) => {
+    const { totalInPrimary, breakdown } = computeRevenueBreakdown(revenue);
+    const hasMultiple = breakdown.length > 1;
+
+    const card = (
+      <StatCard
+        title="Ingresos Mensuales"
+        value={loading ? "..." : formatCurrency(totalInPrimary, primaryCurrency)}
+        icon={<CreditCard className="text-emerald-400 size-5" />}
+      />
+    );
+
+    if (!hasMultiple || loading) return card;
 
     return (
-      <div className="flex flex-col gap-0.5">
-        {allDisplayCurrencies.map(cur => {
-          const rawAmount = revenue[cur] ?? 0;
-          const amount = Number(rawAmount) / 100;
-          const locale = currencyFormat === "usa" ? "en-US" : "es-ES";
-
-          if (!activeCurrencies.includes(cur) && rawAmount === 0) return null;
-
-          const formatted = new Intl.NumberFormat(locale, {
-            style: "currency",
-            currency: cur,
-            minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
-          }).format(amount);
-
-          return (
-            <div key={cur} className="flex items-center gap-2">
-              <Text size="lg" weight="bold" className="text-primary truncate">
-                {formatted}
+      <TooltipProvider>
+        <SimpleTooltip
+          side="bottom"
+          delayDuration={200}
+          content={
+            <div className="flex flex-col gap-1.5 py-1 min-w-[180px]">
+              <Text size="xs" weight="bold" className="text-background/80 uppercase tracking-widest">
+                Desglose por Moneda
               </Text>
-              {!activeCurrencies.includes(cur) && (
-                <span className="text-[10px] px-1.5 py-0.5 bg-white/5 border border-white/10 rounded-md text-white/40 uppercase font-bold tracking-tighter">
-                  Inactiva
-                </span>
-              )}
+              {breakdown.map(({ currency, amount, converted, rate }) => (
+                <div key={currency} className="flex items-center justify-between gap-3">
+                  <Text size="xs" className="text-background/70">
+                    {formatCurrency(amount, currency)}
+                  </Text>
+                  {currency !== primaryCurrency && (
+                    <Text size="xs" className="text-background/50">
+                      ≈ {formatCurrency(converted, primaryCurrency)}
+                      <span className="ml-1 opacity-60">({rate.toFixed(2)})</span>
+                    </Text>
+                  )}
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          }
+        >
+          {card}
+        </SimpleTooltip>
+      </TooltipProvider>
     );
   };
 
@@ -162,13 +205,13 @@ export default function PlatformPlansPage() {
           value={loading ? "..." : (summary?.activeSubscriptions ?? 0).toString()}
           icon={<Users className="text-blue-400 size-5" />}
         />
-        <StatCard
-          title="Ingresos Mensuales"
-          value={loading ? "..." : ""}
-          icon={<CreditCard className="text-emerald-400 size-5" />}
-        >
-          {!loading && summary?.monthlyRevenue && formatMonthlyRevenue(summary.monthlyRevenue)}
-        </StatCard>
+        {summary?.monthlyRevenue ? renderRevenueCard(summary.monthlyRevenue) : (
+          <StatCard
+            title="Ingresos Mensuales"
+            value={loading ? "..." : formatCurrency(0, primaryCurrency)}
+            icon={<CreditCard className="text-emerald-400 size-5" />}
+          />
+        )}
         <StatCard
           title="Esquema Trial"
           value={loading ? "..." : trialPlanStatus}
