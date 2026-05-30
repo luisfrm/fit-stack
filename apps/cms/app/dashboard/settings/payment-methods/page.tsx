@@ -88,6 +88,12 @@ export default function PaymentMethodsSettingsPage() {
     }
   }, [settings]);
 
+  const activeCurrencies = React.useMemo(() => {
+    const val = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    if (!val) return ["USD", "VES"];
+    try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
+  }, [settings]);
+
   const handleOpenCreationModal = () => {
     const tempId = `method_${Date.now()}`;
     setEditingMethod({ id: tempId, name: "", fields: [], currency: null });
@@ -274,6 +280,7 @@ export default function PaymentMethodsSettingsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleUpdateMethod}
+        activeCurrencies={activeCurrencies}
       />
     </div>
   );
@@ -284,9 +291,10 @@ interface PaymentMethodEditorProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
   readonly onSave: (method: IPaymentMethodConfig) => void;
+  readonly activeCurrencies: string[];
 }
 
-function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<PaymentMethodEditorProps>) {
+function PaymentMethodEditor({ method, isOpen, onClose, onSave, activeCurrencies }: Readonly<PaymentMethodEditorProps>) {
   const [localMethod, setLocalMethod] = React.useState<IPaymentMethodConfig | null>(null);
 
   React.useEffect(() => {
@@ -345,9 +353,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave }: Readonly<Payme
               onChange={(val) => setLocalMethod({ ...localMethod, currency: val || null })}
               options={[
                 { value: "", label: "Cualquiera" },
-                { value: "USD", label: "USD - Dólar" },
-                { value: "VES", label: "VES - Bolívar" },
-                { value: "EUR", label: "EUR - Euro" },
+                ...activeCurrencies.map(c => ({ value: c, label: c }))
               ]}
               placeholder="Seleccionar..."
             />
