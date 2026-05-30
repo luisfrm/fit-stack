@@ -43,3 +43,5 @@ export function useAuth() {
     refetch,
   };
 }
+
+export { usePermissions } from "./permissions";

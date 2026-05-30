@@ -5,4 +5,13 @@ export { sessionService } from './service';
 export type { IAuthError } from '@workspace/shared';
 
 export { useAuth } from './hooks';
-export { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared';
+export { usePermissions } from './permissions';
+export {
+  GLOBAL_ROLES,
+  ORG_ROLES,
+  PERMISSION_MODULES,
+  PERMISSION_ACTIONS,
+  can,
+  canAccessCms,
+  canAssignRole,
+} from '@workspace/shared';
