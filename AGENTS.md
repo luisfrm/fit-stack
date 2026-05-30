@@ -29,27 +29,100 @@ cd apps/cms && pnpm dev  # Port 3001
 - **Packages**: `ui` (shadcn/ui components), `shared` (shared types/DTOs), `database` (Drizzle ORM + Neon Postgres)
 - **Bridge is Python** - not part of Turbo, managed separately with `uv`
 
-## Architecture Rules (from `.agents/rules/project-rules.md`)
+---
 
-- Backend: 3-layer strict separation — Route Handler → Service → Repository
-- Repository: Drizzle ORM, filter by `organizationId` for multi-tenancy
-- UI: Import from `@workspace/ui`, use predefined variants only
-- Auth: Better Auth — use `useAuth()` in client, `session-service.ts` on server
-- `params`/`searchParams` in Next.js 15+ are **Promises** — use `await`
-- Implementation plans in **Spanish** — always ask for explicit approval before implementing
+## Project Context (Business Overview)
 
-## Database Workflow
+### 1. Vision
 
-1. `db:generate` → Review SQL → `db:migrate`
-2. **NEVER** run `db:push` on shared branches (local prototyping only)
-3. CI runs `db:check` on PRs automatically
+Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily serving the Venezuelan market. It solves the complexity of multi-currency billing, member retention, and automated physical access control.
 
-## Key Conventions
+- **Multi-tenancy**: Every gym is an `Organization`. Data isolation strictly enforced via `organizationId`.
+- **B2B SaaS Model**: "Platform" layer (SaaS Admins) + "CMS" layer (Gym Admins).
 
-- State in URL for shareable/persistent state (pagination, tabs, search)
-- Keep `"use client"` at leaf nodes only — default to Server Components
-- All mutations: wrap in `try/catch` with `toast.success`/`toast.error`
-- Use `router.refresh()` to sync server state after auth/org changes
+### 2. Module Breakdown
+
+| Module | Purpose |
+|--------|---------|
+| **Members** | Centralized identity for gym clients. Tracks historical behavior and preferences. |
+| **Membership Plans** | Commercial product catalog. Defines durations (Daily, Weekly, Monthly) and precise pricing in a configurable base currency (USD by default). |
+| **Subscriptions** | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to the current end date so no paid day is lost. |
+| **Payments** | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots) for manual transfer validation. Prevents duplicate registrations while a payment is `processing`. |
+| **Platform (Super Admin)** | SaaS lifecycle management. Create gyms (Organizations), manage tiers, monitor system health. |
+| **Staff & Trainers** | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers). |
+| **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with attendance tracking and capacity management. |
+| **Content** | Dynamic UI communication. Admins update dashboard sections without code changes. |
+| **Settings** | Localization and branding per gym (Timezone, currency formats, colors/logos via dynamic OKLCH injection). |
+
+### 3. The Bridge App (Hardware Integration)
+
+A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
+
+### 4. Business Rules Summary
+
+1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both base currency and active currencies are managed dynamically in **Settings**.
+2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
+3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session.
+4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
+
+---
+
+## Project Rules (Technical Standards)
+
+### 1. Monorepo Architecture & Boundaries
+
+- **Package Separation**: Respect boundaries between `apps/` and `packages/`. Logic belonging to a package MUST NEVER be duplicated in an app.
+- **Strict Isolation**: Don't mix API and Frontend contexts. Never import anything between apps directly; the only allowed interaction is through shared packages (`packages/shared`).
+- **Shared Logic & Types**: Use `@workspace/shared` for interfaces, DTOs, or constants shared between backend, frontend, or other consumers.
+- **Type Safety**: Avoid `any`. Prioritize strict, strong typing everywhere.
+- **Backend 3-Layer Strict Separation**: Route Handler → Service → Repository.
+  - Repository: Drizzle ORM, filter by `organizationId` for multi-tenancy.
+  - Service: Business logic layer.
+  - Route Handler: HTTP concerns only.
+
+### 2. UI Design System & Hierarchy
+
+- **Library Origins**: All UI components MUST be imported from `@workspace/ui` (`packages/ui`).
+- **Variant Enforcement**: Use predefined variants. Do not use ad-hoc Tailwind classes to override sizes/spacing/styles unless absolutely necessary and after notifying the user.
+- **Mathematical Scale + Premium Aesthetic**:
+  - **Backgrounds**: `bg-input`, `bg-card`, `bg-surface`, translucent scales (`bg-white/5`, `bg-white/10`).
+  - **Borders**: Low opacity boundaries (`border-white/5`, `border-white/10`, `border-input-border`) over solid hexes. Limit solid colors to focus rings.
+  - **Border Radius**:
+    - Inputs, Buttons, CheckboxCards → `rounded-md`
+    - Cards, Containers → `rounded-xl`
+    - Modals, Dialogs → `rounded-2xl`
+
+### 3. Database Integrity & ORM
+
+- **ORM**: Always Drizzle ORM. All DB code from `@workspace/database`.
+- **Workflow**: `generate` → `review` → `migrate`. NO `push`, `generate`, `migrate`, or `seed` without explicit user approval.
+- **Push Restriction**: `db:push` is EXCLUSIVELY for local prototyping. Strictly prohibited on shared branches or production.
+- **Naming**: Table names are **singular** (`user`, `organization`). Repositories and Services are **plural** (`users.service.ts`).
+- **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
+
+### 4. Next.js Patterns & Best Practices
+
+- **Server First**: `"use client"` only at leaf nodes. Default to Server Components. Fetch data server-side where possible.
+- **State in URL**: Prefer URL state (`?search=foo`) over `useState` for pagination, tabs, global searches.
+- **Async Params**: `params` and `searchParams` are **Promises** in Next.js 15+. Declare as `Promise<...>` and `await`.
+- **Navigation**: Use `useRouter` from `next/navigation`, never `window.location`. Use `router.refresh()` to sync server state after auth/org changes.
+- **Proxy/Middleware**: Keep heavy logic out of middleware. Use solely for CORS, header manipulation, and early session validation.
+
+### 5. Security & Authentication Architecture
+
+- **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
+- **Layered Structure**:
+  - **Config (`auth-client.ts`)**: Setup and native exports.
+  - **Client Hook (`use-auth.ts`)**: Wraps native hooks with role flags. Client MUST use `useAuth()`. NEVER use `useSession()` directly or read `session.activeOrganization` directly — use `useActiveOrganization()`.
+  - **Server Service (`session-service.ts`)**: For Server Components, Layouts, and API layers.
+- **Auth Library**: Better Auth — `useAuth()` on client, `session-service.ts` on server.
+
+### 6. Error Handling & Mutations
+
+- **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
+- **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
+
+---
 
 ## Platform Subscription Status (Organization Billing)
 
@@ -82,13 +155,15 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 **Endpoint**: `GET /api/organizations/subscription-status` (reads org from session)
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
 
+---
+
 ## Role-Based Access Control (RBAC)
 
 Fit-Stack uses **two levels of roles**: Global (platform) and Organization (tenant).
 
-### Organization Roles (`ORG_ROLES`)
+### Organization Roles
 
-Roles are defined in `packages/shared/src/constants.ts`:
+Roles defined in `packages/shared/src/constants.ts`:
 ```ts
 ORG_ROLES = {
   OWNER: "owner",     // Super Admin / Creator - total control
@@ -127,7 +202,6 @@ ORG_ROLES = {
 ```ts
 import { canManageMembers, canReadMembers, canManagePayments } from '@/config/auth-utils'
 
-// In route handler
 if (!canReadMembers(session, organizationId)) {
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 }
@@ -154,12 +228,16 @@ const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
 3. **Organization scoping** — All queries MUST filter by `organizationId`
 4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
 
+---
+
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
 - **No test suite** — `pnpm test` does not exist
 - **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
+
+---
 
 ## Skills Available
 
@@ -174,8 +252,9 @@ Use skill tool for specialized tasks:
 | `copywriting` | Marketing copy changes |
 | `vercel-react-best-practices` | React/Next.js performance |
 
+---
+
 ## Key Files to Read First
 
-- `.agents/rules/project-rules.md` — Core architecture rules
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
