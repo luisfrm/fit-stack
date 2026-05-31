@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { ShieldOff, Phone, Mail, MessageCircle, LogOut } from "lucide-react";
-import { Button, Text } from "@workspace/ui/components";
+import { ShieldOff, Phone, Mail, MessageCircle, LogOut, Building2 } from "lucide-react";
+import { Button, Text, Modal } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
 import { sessionService } from "@/lib/services/session-service";
+import { authClient } from "@/lib/auth-client";
+import { OrganizationPicker } from "@/components/dashboard/organization-picker";
+import type { IOrganization } from "@workspace/shared/types";
+import { cn } from "@workspace/ui/lib/utils";
 
 const CONTACT_PHONE = "+58 424-1234567";
 const CONTACT_WHATSAPP = "https://wa.me/584241234567";
@@ -12,6 +16,19 @@ const CONTACT_EMAIL = "soporte@fit-stack.com";
 
 export default function NoSubscriptionPage() {
   const router = useRouter();
+
+  const [organizations, setOrganizations] = React.useState<IOrganization[]>([]);
+  const [isLoadingOrgs, setIsLoadingOrgs] = React.useState(true);
+  const [isSwitcherOpen, setIsSwitcherOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    async function loadOrgs() {
+      const { data } = await authClient.organization.list();
+      if (data) setOrganizations(data as IOrganization[]);
+      setIsLoadingOrgs(false);
+    }
+    loadOrgs();
+  }, []);
 
   const handleCopyPhone = async () => {
     try {
@@ -26,6 +43,11 @@ export default function NoSubscriptionPage() {
       router.push("/");
       router.refresh();
     });
+  };
+
+  const handleSelectOrg = async (orgId: string) => {
+    setIsSwitcherOpen(false);
+    router.push("/dashboard");
   };
 
   return (
@@ -107,6 +129,34 @@ export default function NoSubscriptionPage() {
           <LogOut className="w-4 h-4 mr-2" />
           Cerrar sesión
         </Button>
+
+        <div className={cn("mt-3", isLoadingOrgs ? "block" : "hidden")}>
+          <div className="h-8 w-full rounded-md bg-white/5 animate-pulse" />
+        </div>
+
+        {!isLoadingOrgs && organizations.length > 1 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsSwitcherOpen(true)}
+            className="w-full mt-3"
+            leftIcon={<Building2 className="w-4 h-4" />}
+          >
+            Cambiar sede
+          </Button>
+        )}
+
+        <Modal
+          open={isSwitcherOpen}
+          onOpenChange={setIsSwitcherOpen}
+          title="Cambiar de sede"
+          description="Selecciona otra sede para acceder a su panel."
+          trigger={<span />}
+        >
+          <div className="py-4">
+            <OrganizationPicker isModal onSelect={handleSelectOrg} />
+          </div>
+        </Modal>
       </div>
     </div>
   );
