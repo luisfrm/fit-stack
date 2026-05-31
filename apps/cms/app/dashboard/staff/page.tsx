@@ -7,7 +7,7 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { MembersTable } from "@/components/members/members-table";
+import { StaffTable } from "@/components/staff/staff-table";
 import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -111,13 +111,13 @@ export default function StaffPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <MembersTable
-              members={staff}
+            <StaffTable
+              staff={staff}
               onDelete={handleDelete}
               onSuccess={() => loadStaff()}
               loading={loading}
               EditModal={StaffModal}
-              emptyDescription="Aún no se han registrado miembros del personal administrativo."
+              emptyDescription="Aún no se han registrado miembros del staff."
             />
 
             {/* Paginación */}
