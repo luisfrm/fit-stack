@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { cache } from '@/lib/cache'

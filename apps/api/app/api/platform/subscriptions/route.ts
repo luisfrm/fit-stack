@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/config/auth';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
-import { platformPlansService } from '@/services/platform-plans.service';
 import { cache } from '@/lib/cache';
 
 export async function GET(req: NextRequest) {

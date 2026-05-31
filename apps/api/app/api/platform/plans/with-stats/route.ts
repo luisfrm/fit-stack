@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@/config/auth';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformPlansService } from '@/services/platform-plans.service';

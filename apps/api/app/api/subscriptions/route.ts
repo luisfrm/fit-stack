@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
 import { cache } from '@/lib/cache'
 import { auth } from '@/config/auth'
