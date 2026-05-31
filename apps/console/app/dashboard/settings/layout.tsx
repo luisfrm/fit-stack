@@ -3,7 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Coins, Wallet, Settings, ChevronLeft } from "lucide-react";
+import { Coins, Wallet, ChevronLeft } from "lucide-react";
 import { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { Button } from "@workspace/ui/components/button";

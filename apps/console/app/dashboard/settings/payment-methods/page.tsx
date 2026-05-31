@@ -378,7 +378,7 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave, activeCurrencies
                 <Text className="text-xs text-foreground-muted">No hay campos adicionales configurados.</Text>
               </div>
             ) : (
-              localMethod.fields.map((field, idx) => (
+              localMethod.fields.map((field) => (
                 <div key={field.id} className="p-4 rounded-2xl bg-foreground/3 border border-border space-y-4 group">
                   <div className="flex items-end gap-3">
                     <div className="flex-1 space-y-1">

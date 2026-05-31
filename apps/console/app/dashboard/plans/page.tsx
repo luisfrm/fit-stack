@@ -18,16 +18,6 @@ export default function PlatformPlansPage() {
   const [loading, setLoading] = React.useState(true);
   const { settings } = usePlatformSettings();
 
-  const activeCurrencies: string[] = React.useMemo(() => {
-    const active = settings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!active) return ["USD"];
-    try {
-      return JSON.parse(active);
-    } catch {
-      return ["USD"];
-    }
-  }, [settings]);
-
   const primaryCurrency = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
   const currencyFormat = settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] || "latam";
 

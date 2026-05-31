@@ -2,21 +2,19 @@
 
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { Button, Text } from "@workspace/ui/components";
+import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { SubscriptionsKpiSection } from "@/components/platform/subscriptions-kpi-section";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
 import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
-import { usePlatformSubscriptionStats, useCancelSubscription, useExtendSubscription, useDeleteSubscription } from "@/lib/hooks/use-platform-subscriptions";
+import { usePlatformSubscriptionStats } from "@/lib/hooks/use-platform-subscriptions";
 import { PlatformSubscriptionStatus } from "@workspace/shared/types";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { X, Plus } from "lucide-react";
 import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
 import { cn } from "@workspace/ui/lib/utils";
 import { type CurrencyFormat } from "@/lib/utils/value-converters";
-import { toast } from "@workspace/ui/components";
 
 export default function PlatformSubscriptionsPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -39,36 +37,6 @@ export default function PlatformSubscriptionsPage() {
   });
 
   const { stats, isLoading: isStatsLoading } = usePlatformSubscriptionStats();
-  const cancelMutation = useCancelSubscription();
-  const extendMutation = useExtendSubscription();
-  const deleteMutation = useDeleteSubscription();
-
-  const handleCancel = async (id: number, reason?: string) => {
-    try {
-      await cancelMutation.mutateAsync({ id, reason });
-      toast.success("Suscripción cancelada correctamente");
-    } catch (error) {
-      toast.error("Error al cancelar la suscripción");
-    }
-  };
-
-  const handleExtend = async (id: number, newEndDate: string) => {
-    try {
-      await extendMutation.mutateAsync({ id, newEndDate });
-      toast.success("Período extendido correctamente");
-    } catch (error) {
-      toast.error("Error al extender el período");
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteMutation.mutateAsync(id);
-      toast.success("Suscripción eliminada correctamente");
-    } catch (error) {
-      toast.error("Error al eliminar la suscripción");
-    }
-  };
 
   React.useEffect(() => {
     setPage(1);

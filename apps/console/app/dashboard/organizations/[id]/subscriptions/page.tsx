@@ -2,15 +2,13 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import { Loader2, ChevronLeft, Plus } from "lucide-react";
-import { Button, Text } from "@workspace/ui/components";
+import { ChevronLeft } from "lucide-react";
+import { Button } from "@workspace/ui/components";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
 import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
-import { cn } from "@workspace/ui/lib/utils";
 import { type CurrencyFormat } from "@/lib/utils/value-converters";
 
 export default function OrganizationSubscriptionsPage() {
@@ -18,7 +16,6 @@ export default function OrganizationSubscriptionsPage() {
   const router = useRouter();
   const organizationId = params.id as string;
 
-  const [searchTerm, setSearchTerm] = React.useState("");
   const [page, setPage] = React.useState(1);
   const limit = 15;
 
