@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Card, Text, Skeleton } from "@workspace/ui/components";
+import { Text, Skeleton } from "@workspace/ui/components";
 import { Users, CalendarCheck, AlertTriangle, ShieldOff } from "lucide-react";
 
 interface SubscriptionsStats {

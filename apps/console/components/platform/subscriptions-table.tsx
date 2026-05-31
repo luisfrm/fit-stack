@@ -14,17 +14,13 @@ import {
 } from "@workspace/ui/components";
 import { platformSubscriptionsService, type SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 import { SubscriptionStatusBadge } from "./subscription-status-badge";
-import { PlatformSubscriptionStatus } from "@workspace/shared/types";
 import {
   Trash2,
   Calendar,
-  CheckCircle2,
   XCircle,
   ExternalLink,
-  AlertTriangle,
   CalendarPlus,
 } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 
 interface SubscriptionsTableProps {

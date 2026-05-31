@@ -3,10 +3,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { PlatformSubscriptionStatus } from "@workspace/shared/types";
 
 export function usePlatformSubscriptionStats() {
-  const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["platform-subscriptions-stats"],

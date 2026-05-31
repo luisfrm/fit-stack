@@ -53,7 +53,7 @@ export function OrganizationModal({
         
         if (!newOrg?.id) throw new Error("No se pudo obtener el ID de la nueva organización.");
 
-        let finalOrgId = newOrg.id;
+        const finalOrgId = newOrg.id;
 
         // 2. Si hay logo, subirlo y actualizar la organización
         if (logoFile) {

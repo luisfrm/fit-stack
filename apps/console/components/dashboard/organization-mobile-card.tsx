@@ -62,7 +62,7 @@ export function OrganizationMobileCard({ org, isLoading, onEdit, onAddSubscripti
     return 'pending';
   })();
 
-  let displayStatus: 'active' | 'inactive' | 'pending' = computedStatus;
+  const displayStatus: 'active' | 'inactive' | 'pending' = computedStatus;
 
   const statusVariants: Record<string, "default" | "outline" | "destructive" | "secondary"> = {
     active: 'default',
