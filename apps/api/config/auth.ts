@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "@workspace/database/client";
+import { customSession } from "better-auth/plugins";
+import { db, eq, and } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
 import { urls } from "./urls";
@@ -8,6 +9,7 @@ import { organization } from "better-auth/plugins";
 import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
+import { cache } from "@/lib/cache";
 
 const DEV_ORIGINS = [
   "http://localhost:3001",
@@ -60,7 +62,6 @@ export const auth = betterAuth({
       },
       organizationHooks: {
         afterAcceptInvitation: async ({ user, organization }) => {
-          // Link gymMember.userId when invitation is accepted
           const gymMemberRecord = await membersRepository.findByEmail(
             organization.id,
             user.email
@@ -71,7 +72,51 @@ export const auth = betterAuth({
             });
           }
         },
+        afterUpdateMemberRole: async ({ member }) => {
+          await cache.invalidateExact(`member:role:${member.userId}:${member.organizationId}`);
+        },
       },
+    }),
+    customSession(async ({ user, session }) => {
+      const activeOrgId = (session as { activeOrganizationId?: string }).activeOrganizationId;
+      if (!activeOrgId) {
+        return { user, session };
+      }
+
+      const cacheKey = `member:role:${user.id}:${activeOrgId}`;
+      const cached = await cache.get<{ id: string; role: string }>(cacheKey);
+      if (cached) {
+        return {
+          user,
+          session,
+          member: { id: cached.id, organizationId: activeOrgId, userId: user.id, role: cached.role, createdAt: new Date() },
+        };
+      }
+
+      const [member] = await db
+        .select({
+          id: schema.authMember.id,
+          organizationId: schema.authMember.organizationId,
+          userId: schema.authMember.userId,
+          role: schema.authMember.role,
+          createdAt: schema.authMember.createdAt,
+        })
+        .from(schema.authMember)
+        .where(and(
+          eq(schema.authMember.userId, user.id),
+          eq(schema.authMember.organizationId, activeOrgId)
+        ))
+        .limit(1);
+
+      if (member) {
+        await cache.set(cacheKey, { id: member.id, role: member.role }, 60);
+      }
+
+      return {
+        user,
+        session,
+        member: member || null,
+      };
     }),
   ],
 
