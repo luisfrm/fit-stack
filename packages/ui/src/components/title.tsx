@@ -100,7 +100,7 @@ const Title = React.forwardRef<HTMLHeadingElement, TitleProps>(
     return (
       <Tag
         ref={ref}
-        className={cn(titleVariants({ size, accent }), className)}
+        className={cn(titleVariants({ size, accent }), "text-foreground", className)}
         {...props}
       >
         {children}
