@@ -6,7 +6,6 @@ import {
   Globe,
   ShieldCheck,
   Fingerprint,
-  MapPin,
   Save,
   Clock,
 } from "lucide-react";

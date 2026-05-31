@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Plus, X } from "lucide-react";
-import { Button, toast, Badge } from "@workspace/ui/components";
+import { Button, toast } from "@workspace/ui/components";
 import { FloatingActionButton } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
@@ -35,7 +35,7 @@ export default function PaymentsPage() {
   const [page, setPage] = React.useState(1);
   const limit = 10;
 
-  const { data: subsResult, isLoading, isPlaceholderData, refetch } = useSubscriptions({
+  const { data: subsResult, isLoading, refetch } = useSubscriptions({
     page,
     limit,
     query: debouncedSearch,

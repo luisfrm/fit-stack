@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus, Edit2, Globe, Trash2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Plus, Edit2, Globe, Trash2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";

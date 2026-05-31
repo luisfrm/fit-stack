@@ -7,7 +7,7 @@ import { toast, SplashScreen } from "@workspace/ui/components";
 import { useAuth } from "@/lib/hooks/use-auth";
 
 export default function DashboardPage() {
-  const { session, isPending } = useAuth();
+  const { isPending } = useAuth();
   const searchParams = useSearchParams();
 
   React.useEffect(() => {
