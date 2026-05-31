@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -85,6 +86,7 @@ function useFilteredNavItems(): SidebarNavItem[] {
 }
 
 export function SwitchOrganizationAction() {
+  const router = useRouter();
   const [organizations, setOrganizations] = React.useState<IOrganization[]>([]);
   const [open, setOpen] = React.useState(false);
   const loadedRef = React.useRef(false);
@@ -102,8 +104,10 @@ export function SwitchOrganizationAction() {
     return () => { cancelled = true; };
   }, []);
 
-  // Memoize the callback to avoid unstable references
-  const handleSelect = React.useCallback(() => setOpen(false), []);
+  const handleSelect = React.useCallback(() => {
+    setOpen(false);
+    router.refresh();
+  }, [router]);
 
   // Solo mostrar si pertenece a más de una organización
   if (organizations.length <= 1) return null;
