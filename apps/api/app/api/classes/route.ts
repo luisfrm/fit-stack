@@ -99,6 +99,10 @@ export const POST = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.CREA
     }
 
     const newClass = await classesService.create(organizationId, body)
+
+    await cache.invalidate(`org:${organizationId}:classes:*`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+
     return NextResponse.json(newClass, { status: 201 })
   }
 )
