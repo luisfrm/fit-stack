@@ -79,7 +79,7 @@ function PlanFeatures({ features }: { readonly features: any }) {
         <FeatureItem
           icon={ShieldCheck}
           label="Coaches"
-          detail={features.limits?.coaches ? `${features.limits.coaches} Coaches máx.` : "Ilimitados"}
+          detail={features.limits?.trainers ? `${features.limits.trainers} Entrenadores máx.` : "Ilimitados"}
         />
       </div>
 

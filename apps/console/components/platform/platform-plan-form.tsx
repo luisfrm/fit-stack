@@ -49,7 +49,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
     features: {
       limits: {
         members: initialData?.features?.limits?.members?.toString() || "0",
-        coaches: initialData?.features?.limits?.coaches?.toString() || "0"
+        trainers: initialData?.features?.limits?.trainers?.toString() || "0"
       },
       access: initialData?.features?.access || {
         pwa: false,
@@ -124,7 +124,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
         ...formData.features,
         limits: {
           members: Number.parseInt(formData.features.limits.members, 10) || 0,
-          coaches: Number.parseInt(formData.features.limits.coaches, 10) || 0,
+          trainers: Number.parseInt(formData.features.limits.trainers, 10) || 0,
         }
       }
     };
@@ -238,11 +238,11 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformP
             onChange={(e) => updateLimit('members', e.target.value)}
           />
           <Input
-            label="Máx. Coaches"
+            label="Máx. Entrenadores"
             type="number"
             min="0"
-            value={formData.features.limits?.coaches}
-            onChange={(e) => updateLimit('coaches', e.target.value)}
+            value={formData.features.limits?.trainers}
+            onChange={(e) => updateLimit('trainers', e.target.value)}
           />
         </div>
       </div>
