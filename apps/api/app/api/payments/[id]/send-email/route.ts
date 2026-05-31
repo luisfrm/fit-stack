@@ -10,13 +10,13 @@ export async function POST(
 ) {
   try {
     const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId
-
-    if (!organizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

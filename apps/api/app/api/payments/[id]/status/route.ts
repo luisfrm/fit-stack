@@ -11,21 +11,22 @@ export async function POST(
 ) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+const organizationId = sessionOrg.activeOrganizationId;
 
-    const { id } = await params
-    const { status } = await req.json()
-    const organizationId = session.session.activeOrganizationId
-
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const { id: paymentId } = await params;
+    const { status } = await req.json();
+
     const updated = await subscriptionsService.updatePaymentStatus(
       organizationId,
-      Number(id),
+      Number(paymentId),
       status
     )
 

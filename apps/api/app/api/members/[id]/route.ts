@@ -20,11 +20,11 @@ function memberPermissionModule(role: string | undefined) {
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
-
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
     const { id: rawId } = await params
     const id = Number(rawId)
     if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
@@ -32,13 +32,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const existing = await membersService.getMemberById(organizationId, id)
     const permissionModule = memberPermissionModule(existing.role)
 
-    if (!authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await req.json()
     if (body.role) {
-      const ctx = getOrgContext(session, organizationId)
+      const ctx = await getOrgContext(session, organizationId)
       const targetRole = body.role as OrgRole
       if (!ctx || !canAssignRole(ctx.memberRole, targetRole)) {
         return NextResponse.json({ error: 'Forbidden: cannot assign this role' }, { status: 403 })
@@ -50,6 +50,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await cache.invalidate(`org:${organizationId}:members:*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
 
+    if (body.role && updatedMember?.userId) {
+      await cache.invalidateExact(`member:role:${updatedMember.userId}:${organizationId}`)
+    }
+
     return NextResponse.json(updatedMember)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno del servidor'
@@ -60,11 +64,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
-
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
     const { id: rawId } = await params
     const id = Number(rawId)
     if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
@@ -72,7 +76,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const existing = await membersService.getMemberById(organizationId, id)
     const permissionModule = memberPermissionModule(existing.role)
 
-    if (!authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.DELETE)) {
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.DELETE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

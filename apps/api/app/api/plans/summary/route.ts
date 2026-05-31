@@ -10,11 +10,12 @@ import { IOrganization, PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspac
 export async function GET() {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.PLANS, PERMISSION_ACTIONS.READ)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.PLANS, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     const cacheKey = `org:${organizationId}:plans:summary`

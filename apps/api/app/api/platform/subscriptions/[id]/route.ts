@@ -10,7 +10,7 @@ export async function GET(
 ) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+  if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -42,7 +42,7 @@ export async function PATCH(
 ) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+  if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -107,7 +107,7 @@ export async function DELETE(
 ) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+  if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 

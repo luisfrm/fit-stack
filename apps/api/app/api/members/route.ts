@@ -14,17 +14,17 @@ import { authorize, getOrgContext } from '@/config/auth-utils'
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
-
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
     const { searchParams } = req.nextUrl
 
     const isStaffList = searchParams.get('excludeRole') === ORG_ROLES.MEMBER
     const permissionModule = isStaffList ? PERMISSION_MODULES.STAFF : PERMISSION_MODULES.MEMBERS
 
-    if (!authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.READ)) {
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -61,11 +61,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
-
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
     const body = await req.json()
     const { sendInvite, ...memberData } = body
 
@@ -77,11 +77,11 @@ export async function POST(req: NextRequest) {
     const isStaff = targetRole !== ORG_ROLES.MEMBER
     const permissionModule = isStaff ? PERMISSION_MODULES.STAFF : PERMISSION_MODULES.MEMBERS
 
-    if (!authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.CREATE)) {
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.CREATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const ctx = getOrgContext(session, organizationId)
+    const ctx = await getOrgContext(session, organizationId)
     if (!ctx || !canAssignRole(ctx.memberRole, targetRole)) {
       return NextResponse.json({ error: 'Forbidden: cannot assign this role' }, { status: 403 })
     }

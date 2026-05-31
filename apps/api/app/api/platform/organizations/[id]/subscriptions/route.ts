@@ -12,7 +12,7 @@ export async function POST(
     const session = await getSession();
 
     // Admin only
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

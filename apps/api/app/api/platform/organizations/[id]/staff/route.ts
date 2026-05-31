@@ -11,7 +11,8 @@ export async function POST(
     const session = await getSession();
     
     // Security: Only SaaS Admin can provision owners directly via this route
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    const userRole = (session?.user as { role?: string })?.role;
+    if (userRole !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

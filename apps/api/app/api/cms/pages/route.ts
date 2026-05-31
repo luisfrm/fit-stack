@@ -8,11 +8,12 @@ import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 export async function GET() {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.READ)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -35,11 +36,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

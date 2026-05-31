@@ -8,11 +8,12 @@ import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.READ)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -39,11 +40,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -67,11 +69,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const organizationId = session.session.activeOrganizationId
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.DELETE)) {
+    if (!await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.DELETE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -7,7 +7,7 @@ import { cache } from '@/lib/cache';
 export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+  if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+  if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 

@@ -10,12 +10,13 @@ import { authorizeUpload } from '@/config/auth-utils';
 export async function GET(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string } | undefined;
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const orgId = session.session.activeOrganizationId;
-    if (!authorizeUpload(session, orgId)) {
+    const orgId = sessionOrg.activeOrganizationId;
+    if (!await authorizeUpload(session, orgId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -40,12 +41,13 @@ export async function GET(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getSession();
-    if (!session?.session?.activeOrganizationId) {
+    const sessionOrg = session?.session as { activeOrganizationId?: string } | undefined;
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const orgId = session.session.activeOrganizationId;
-    if (!authorizeUpload(session, orgId)) {
+    const orgId = sessionOrg.activeOrganizationId;
+    if (!await authorizeUpload(session, orgId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Filename and content type are required' }, { status: 400 });
     }
 
-    const orgId = bodyOrgId || session?.session?.activeOrganizationId;
+    const orgId = bodyOrgId || (session?.session as { activeOrganizationId?: string })?.activeOrganizationId;
     if (!orgId || !session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!authorizeUpload(session, orgId)) {
+    if (!await authorizeUpload(session, orgId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const uniqueKey = constructStorageKey(orgId, folder || 'general', filename, customName);

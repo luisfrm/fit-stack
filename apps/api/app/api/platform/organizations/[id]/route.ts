@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const session = await getSession();
     const { id } = await params;
 
-    if (!authorize(session, id, PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.READ)) {
+    if (!await authorize(session, id, PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.READ)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     const session = await getSession();
     const { id } = await params;
 
-    if (!authorize(session, id, PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, id, PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

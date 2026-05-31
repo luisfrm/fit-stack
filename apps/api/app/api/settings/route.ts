@@ -1,23 +1,11 @@
 import { NextResponse, NextRequest } from "next/server";
-import { getSession } from "@/config/get-session";
 import { settingsService } from "@/services/settings.service";
 import { cache } from "@/lib/cache";
-import { authorize } from "@/config/auth-utils";
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from "@workspace/shared";
+import { withAuth } from "@/lib/route-handler";
 
-export async function GET() {
-  try {
-    const session = await getSession();
-    const organizationId = session?.session?.activeOrganizationId;
-
-    if (!organizationId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.READ)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+export const GET = withAuth(PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId }) => {
     const cacheKey = `org:${organizationId}:settings`;
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
@@ -29,33 +17,16 @@ export async function GET() {
     await cache.set(cacheKey, settings, 600);
 
     return NextResponse.json(settings);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error interno del servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+)
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    const organizationId = session?.session?.activeOrganizationId;
-
-    if (!organizationId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.UPDATE)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
+export const POST = withAuth(PERMISSION_MODULES.SETTINGS, PERMISSION_ACTIONS.UPDATE)(
+  async (req, { organizationId }) => {
     const settings = await req.json();
     await settingsService.updateAll(organizationId, settings);
 
     await cache.invalidate(`org:${organizationId}:settings*`);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error interno del servidor";
-    return NextResponse.json({ error: message }, { status: 500 });
   }
-}
+)

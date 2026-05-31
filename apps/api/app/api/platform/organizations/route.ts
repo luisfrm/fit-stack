@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     
     // Security: Only SaaS Admin (Role 1 or specific ADMIN string)
     // We assume Role 1 is Super Admin based on project patterns
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
     
-    if (session?.user?.role !== GLOBAL_ROLES.ADMIN) {
+    if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

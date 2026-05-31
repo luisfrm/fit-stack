@@ -10,29 +10,24 @@ export async function POST(
 ) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
-    const { id } = await params
-    const memberId = Number(id)
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (Number.isNaN(memberId)) {
-      return NextResponse.json({ error: 'ID de miembro inválido' }, { status: 400 })
-    }
-
-    const organizationId = session.session.activeOrganizationId
-
-    const member = await membersService.getMemberById(organizationId, memberId)
+    const { id: memberId } = await params
+    const member = await membersService.getMemberById(organizationId, Number(memberId))
     const permissionModule = member.role === ORG_ROLES.MEMBER
       ? PERMISSION_MODULES.MEMBERS
       : PERMISSION_MODULES.STAFF
 
-    if (!authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.UPDATE)) {
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.UPDATE)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const result = await membersService.resendInvite(organizationId, memberId)
+    const result = await membersService.resendInvite(organizationId, Number(memberId))
     return NextResponse.json(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error al reenviar la invitación'

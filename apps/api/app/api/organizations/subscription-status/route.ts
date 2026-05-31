@@ -5,7 +5,7 @@ import { platformSubscriptionsService } from '@/services/platform-subscriptions.
 import { cache } from '@/lib/cache';
 
 export async function GET(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers });
+  const session = await auth.api.getSession({ headers: req.headers }) as { user?: { role?: string }, session?: { activeOrganizationId?: string } } | null;
 
   if (!session?.user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });

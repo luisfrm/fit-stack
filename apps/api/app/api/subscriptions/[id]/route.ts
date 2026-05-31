@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
-import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
-import { authorize } from '@/config/auth-utils'
+import { withAuth } from '@/lib/route-handler'
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+interface RouteParams {
+  id: string
+}
 
-    const { id } = await params
-    const subId = Number(id)
+export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)(
+  async (req, { organizationId, params }) => {
+    const subId = Number(params?.id)
     if (Number.isNaN(subId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-
-    const organizationId = session.session.activeOrganizationId
 
     const { status } = await req.json()
 
@@ -25,10 +22,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       )
     }
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const updated = await subscriptionsService.cancel(organizationId, subId)
 
     await cache.invalidate(`org:${organizationId}:subscriptions`)
@@ -36,36 +29,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(updated)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error interno del servidor'
-    return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+)
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)(
+  async (req, { organizationId, params }) => {
+    const id = Number(params?.id)
+    if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-    const { id } = await params
-    const subId = Number(id)
-    if (Number.isNaN(subId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
-
-    const organizationId = session.session.activeOrganizationId
-
-    if (!authorize(session, organizationId, PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    await subscriptionsService.delete(organizationId, subId)
+    await subscriptionsService.delete(organizationId, id)
 
     await cache.invalidate(`org:${organizationId}:subscriptions`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
     await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error interno del servidor'
-    return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+)

@@ -1,97 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
-import { getSession } from '@/config/get-session'
-import { authorize } from '@/config/auth-utils'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { cache } from '@/lib/cache'
+import { withAuth } from '@/lib/route-handler'
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
-    }
+interface RouteParams {
+  id: string
+}
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params
-    const cacheKey = `org:${organizationId}:classes:${id}`
+export const GET = withAuth<RouteParams>(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId, params }) => {
+    const cacheKey = `org:${organizationId}:classes:${params?.id}`
     const cached = await cache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
 
-    const cls = await classesService.getById(organizationId, Number(id))
+    const cls = await classesService.getById(organizationId, Number(params?.id))
     await cache.set(cacheKey, cls, 300)
 
     return NextResponse.json(cls)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error interno del servidor'
-    return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+)
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
-    }
-
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params
+export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)(
+  async (req, { organizationId, params }) => {
     const body = await req.json()
-    const updatedClass = await classesService.update(organizationId, Number(id), body)
+    const updatedClass = await classesService.update(organizationId, Number(params?.id), body)
 
-    // Invalidate cache
     await cache.invalidate(`org:${organizationId}:classes:*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
 
     return NextResponse.json(updatedClass)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error interno del servidor'
-    return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+)
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 });
-    }
+export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.DELETE)(
+  async (req, { organizationId, params }) => {
+    await classesService.delete(organizationId, Number(params?.id))
 
-    if (!authorize(session, organizationId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.DELETE)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { id } = await params
-    await classesService.delete(organizationId, Number(id))
-
-    // Invalidate cache
     await cache.invalidate(`org:${organizationId}:classes:*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
 
     return new NextResponse(null, { status: 204 })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error interno del servidor'
-    return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+)
