@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql, count, inArray, db } from '@workspace/database/client';
+import { eq, desc, and, sql, count, db } from '@workspace/database/client';
 import { storeSubscription, fitstackPlan, organization, platformPayment } from '@workspace/database/schema';
 import { PLATFORM_SUBSCRIPTION_STATUSES, type PlatformSubscriptionStatus } from '@workspace/shared/constants';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';

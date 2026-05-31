@@ -184,7 +184,7 @@ export const subscriptionsService = {
         }))
     } else {
       paymentDetails = Object.entries(details)
-        .filter(([_, value]) => {
+        .filter(([, value]) => {
           // Heurística para excluir archivos en formato legado (rutas o URLs)
           const valStr = String(value);
           return !valStr.startsWith('http') && !valStr.includes('/media/') && !valStr.includes('files/');

@@ -183,7 +183,7 @@ export const coachesRepository = {
       };
 
       const filteredMemberFields = Object.fromEntries(
-        Object.entries(memberFields).filter(([_, v]) => v !== undefined)
+        Object.entries(memberFields).filter(([, v]) => v !== undefined)
       );
 
       if (Object.keys(filteredMemberFields).length > 0) {
@@ -202,7 +202,7 @@ export const coachesRepository = {
       };
 
       const filteredProfileFields = Object.fromEntries(
-        Object.entries(profileFields).filter(([_, v]) => v !== undefined)
+        Object.entries(profileFields).filter(([, v]) => v !== undefined)
       );
 
       if (Object.keys(filteredProfileFields).length > 0) {

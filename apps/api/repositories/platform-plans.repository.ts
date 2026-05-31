@@ -69,8 +69,6 @@ export const platformPlansRepository = {
   },
 
   async getSummary(): Promise<PlatformPlansSummary> {
-    const now = new Date();
-
     const plansResult = await db
       .select({ count: count() })
       .from(fitstackPlan);
@@ -88,11 +86,6 @@ export const platformPlansRepository = {
       .select({ count: count() })
       .from(storeSubscription)
       .where(eq(storeSubscription.status, 'active'));
-
-    const trialSubscriptionsResult = await db
-      .select({ count: count() })
-      .from(storeSubscription)
-      .where(eq(storeSubscription.isTrial, true));
 
     const revenueResult = await db
       .select({

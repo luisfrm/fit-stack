@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Session } from "@/config/auth";
 import { getSession } from "@/config/get-session";
 import { authorize } from "@/config/auth-utils";
-import { PERMISSION_ACTIONS, PERMISSION_MODULES, type PermissionAction, type PermissionModule } from "@workspace/shared";
+import { type PermissionAction, type PermissionModule } from "@workspace/shared";
 
 export interface AuthContext {
   session: Session;
