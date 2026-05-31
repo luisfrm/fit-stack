@@ -2,25 +2,62 @@
 
 import * as React from "react";
 import { authClient } from "@/lib/auth-client";
-import { useOrganizationActivation } from "@/lib/hooks/use-organization-activation";
 import { Button } from "@workspace/ui/components/button";
 import { Text } from "@workspace/ui/components/text";
-import { SplashScreen } from "@workspace/ui/components";
-import { Building2, ChevronRight, LogOut } from "lucide-react";
+import { SplashScreen, toast } from "@workspace/ui/components";
+import { Building2, ChevronRight, LogOut, Loader2 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { uploadService } from "@/lib/services/upload-service";
 import { NextImage } from "@workspace/ui/components/next/image";
+import { sessionService } from "@/lib/services/session-service";
+import { organizationsService } from "@/lib/services/organizations-service";
 
 interface OrganizationPickerProps {
   onSelect?: (orgId: string) => void;
   isModal?: boolean;
 }
 
+function OrgItemSkeleton() {
+  return (
+    <div className="flex items-center gap-4 py-3">
+      <div className="h-10 w-10 rounded-full bg-white/5 animate-pulse shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-3 w-32 bg-white/5 rounded animate-pulse" />
+        <div className="h-2 w-20 bg-white/5 rounded animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProps) {
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const { activate, isActivating } = useOrganizationActivation();
+  const [activatingId, setActivatingId] = React.useState<string | null>(null);
   const activatedRef = React.useRef(false);
+
+  const activateOrg = async (orgId: string): Promise<boolean> => {
+    let { error } = await sessionService.setActiveOrganization(orgId);
+
+    if (error?.code === "USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") {
+      toast.info("Vinculando perfil de administrador...");
+      try {
+        await organizationsService.join(orgId);
+        const retry = await sessionService.setActiveOrganization(orgId);
+        error = retry.error;
+      } catch (joinErr: any) {
+        console.error("Failed to auto-join organization:", joinErr);
+        error = { code: "AUTO_JOIN_ERROR", message: "No se pudo vincular automáticamente al gimnasio." };
+      }
+    }
+
+    if (error) {
+      toast.error(error.message || "Error al cambiar de organización");
+      return false;
+    }
+
+    toast.success("Contexto activado correctamente");
+    return true;
+  };
 
   React.useEffect(() => {
     if (activatedRef.current) return;
@@ -32,25 +69,55 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
         setOrganizations(data);
 
         if (!isModal && data.length === 1 && data[0]) {
-          await activate(data[0].id);
-          onSelect?.(data[0].id);
+          setActivatingId(data[0].id);
+          await activateOrg(data[0].id);
+          setActivatingId(null);
         }
       }
       setIsLoading(false);
     }
     loadOrgs();
-  }, [activate, isModal, onSelect]);
+  }, [isModal]);
 
   const handleLogout = async () => {
     await authClient.signOut();
     window.location.href = "/login";
   };
 
-  if (isLoading || isActivating) {
-    return <SplashScreen message={isActivating ? "Cargando sede..." : "Buscando sedes..."} />;
+  const handleActivate = async (orgId: string) => {
+    if (activatingId !== null) return;
+    setActivatingId(orgId);
+    try {
+      const success = await activateOrg(orgId);
+      if (success) onSelect?.(orgId);
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={cn("w-full max-w-md", !isModal && "px-4")}>
+        {!isModal && (
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold tracking-tight mb-2 uppercase italic text-foreground">
+              Fit<span className="text-primary">Stack</span>
+            </h1>
+            <Text variant="muted" size="lg">¿Con qué sede deseas trabajar hoy?</Text>
+          </div>
+        )}
+        <div className="flex flex-col">
+          <OrgItemSkeleton />
+          <OrgItemSkeleton />
+        </div>
+      </div>
+    );
   }
 
-  // If no organizations found (edge case for global admins without org membership)
+  if (activatingId !== null && !isModal) {
+    return <SplashScreen message="Cargando sede..." />;
+  }
+
   if (organizations.length === 0) {
     return (
       <div className="flex h-svh w-full items-center justify-center bg-background p-4">
@@ -79,44 +146,58 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
         </div>
       )}
 
-      <div className="grid gap-3">
-        {organizations.map((org) => (
-          <button
-            key={org.id}
-            onClick={() => activate(org.id)}
-            className={cn(
-              "group flex items-center gap-4 p-4 rounded-2xl border border-white/5 bg-surface text-left transition-all",
-              "hover:border-primary/30 hover:bg-white/5 active:scale-[0.98]"
-            )}
-          >
-            <div className="h-12 w-12 rounded-xl bg-white/5 flex items-center justify-center shrink-0 overflow-hidden border border-white/5 group-hover:border-primary/20 relative">
-              {org.logo ? (
-                <NextImage
-                  src={uploadService.getMediaUrl(org.logo)} 
-                  alt={org.name} 
-                  width={100}
-                  height={100}
-                  className="h-full w-full object-cover" 
-                />
-              ) : (
-                <Building2 size={24} className="text-foreground-muted opacity-50 group-hover:text-primary transition-colors" />
+      <div className="flex flex-col divide-y divide-white/5">
+        {organizations.map((org) => {
+          const isActivatingThis = activatingId === org.id;
+          const isDisabled = activatingId !== null && !isActivatingThis;
+
+          return (
+            <button
+              key={org.id}
+              onClick={() => handleActivate(org.id)}
+              disabled={isDisabled}
+              className={cn(
+                "group flex items-center gap-4 py-3 text-left transition-all rounded-lg",
+                "hover:bg-white/[0.06] hover:text-primary active:scale-[0.98]",
+                isDisabled && "opacity-40 pointer-events-none cursor-not-allowed",
+                isActivatingThis && "opacity-80"
               )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <Text weight="semibold" className="truncate text-foreground group-hover:text-primary transition-colors">
-                {org.name}
-              </Text>
-              <Text size="xs" variant="muted" className="truncate">
-                {org.slug}
-              </Text>
-            </div>
-            <ChevronRight size={18} className="text-foreground-dim opacity-30 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </button>
-        ))}
+            >
+              <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center shrink-0 overflow-hidden">
+                {org.logo ? (
+                  <NextImage
+                    src={uploadService.getMediaUrl(org.logo)}
+                    alt={org.name}
+                    width={80}
+                    height={80}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Building2 size={18} className="text-foreground-dim" />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <Text weight="medium" className="truncate text-foreground">
+                  {org.name}
+                </Text>
+                <Text size="xs" variant="muted" className="truncate">
+                  {org.slug}
+                </Text>
+              </div>
+
+              {isActivatingThis ? (
+                <Loader2 size={14} className="text-primary animate-spin shrink-0" />
+              ) : (
+                <ChevronRight size={14} className="text-foreground-dim opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {!isModal && (
-        <div className="mt-10 pt-6 border-t border-white/5 flex justify-center">
+        <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
           <Button variant="ghost-muted" size="sm" onClick={handleLogout} leftIcon={<LogOut size={14} />}>
             Cerrar sesión
           </Button>
