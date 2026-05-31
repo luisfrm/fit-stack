@@ -10,13 +10,11 @@ import { formatTimeRange } from "@/lib/config/display";
 interface ClassesTableProps {
   readonly classes: ICmsClass[];
   readonly onDelete?: (id: number) => void;
-  readonly onUpdate?: () => void;
   readonly loading?: boolean;
 }
 
 const getColumns = (
-  onDelete?: (id: number) => void,
-  onUpdate?: () => void
+  onDelete?: (id: number) => void
 ): ColumnDef<ICmsClass>[] => [
   {
     header: "Clase",
@@ -73,7 +71,6 @@ const getColumns = (
       <div className="flex justify-end gap-2">
         <ClassModal 
           classData={cls}
-          onSuccess={onUpdate}
           trigger={
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-white/10 text-slate-400 hover:text-white">
               <Edit2 size={14} />
@@ -96,8 +93,8 @@ const getColumns = (
   },
 ];
 
-export function ClassesTable({ classes, onDelete, onUpdate, loading }: ClassesTableProps) {
-  const columns = React.useMemo(() => getColumns(onDelete, onUpdate), [onDelete, onUpdate]);
+export function ClassesTable({ classes, onDelete, loading }: ClassesTableProps) {
+  const columns = React.useMemo(() => getColumns(onDelete), [onDelete]);
 
   const emptyState = (
     <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
