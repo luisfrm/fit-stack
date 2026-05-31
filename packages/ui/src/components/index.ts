@@ -38,7 +38,7 @@ export { Skeleton } from "@workspace/ui/components/skeleton";
 export { ColorPicker } from "@workspace/ui/components/color-picker";
 export { ImageUpload } from "@workspace/ui/components/image-upload";
 
-export { CoachCard, AddCoachCard } from "@workspace/ui/components/coach-card";
+export { TrainerCard, AddTrainerCard } from "@workspace/ui/components/trainer-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "@workspace/ui/components/tabs";

@@ -8,7 +8,7 @@ import { Text } from "./text"
 import { Switch } from "./switch"
 import { Pencil, UserPlus, Trash2, ShieldCheck, Mail, Loader2, ImageOff } from "lucide-react"
 
-export interface CoachCardProps {
+export interface TrainerCardProps {
   readonly firstName: string;
   readonly lastName: string;
   readonly role?: string;
@@ -24,7 +24,7 @@ export interface CoachCardProps {
   readonly className?: string;
 }
 
-export function CoachCard({
+export function TrainerCard({
   firstName,
   lastName,
   role,
@@ -38,7 +38,7 @@ export function CoachCard({
   onResendInvite,
   isResendingInvite,
   className,
-}: Readonly<CoachCardProps>) {
+}: Readonly<TrainerCardProps>) {
   return (
     <div className={cn(
       "bg-card rounded-xl overflow-hidden border group flex flex-col min-h-[450px]",
@@ -148,9 +148,9 @@ export function CoachCard({
 }
 
 /**
- * AddCoachCard — Placeholder card for adding new profiles
+ * AddTrainerCard — Placeholder card for adding new profiles
  */
-export function AddCoachCard({ onClick, className }: Readonly<{ onClick?: () => void; className?: string }>) {
+export function AddTrainerCard({ onClick, className }: Readonly<{ onClick?: () => void; className?: string }>) {
   return (
     <button
       onClick={onClick}
