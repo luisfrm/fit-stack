@@ -117,7 +117,38 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
   - **Server Service (`session-service.ts`)**: For Server Components, Layouts, and API layers.
 - **Auth Library**: Better Auth — `useAuth()` on client, `session-service.ts` on server.
 
-### 6. Error Handling & Mutations
+### 6. Route Handler Pattern (`route-handler.ts`)
+
+API route handlers use centralized wrappers from `apps/api/lib/route-handler.ts` — never write auth/error boilerplate manually.
+
+| Wrapper | When to use | Auth check |
+|---------|-------------|------------|
+| `withAuth(module, action)` | Org-scoped CRUD routes | Session + orgId + permission check |
+| `withSession()` | Org-scoped routes without permission check | Session + orgId only |
+| `withPlatformAuth()` | SaaS admin routes (`/api/platform/*`) | Session + global admin role |
+
+```ts
+// Before (old pattern — 15+ lines of boilerplate per handler)
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getSession()
+    if (!session?.session?.activeOrganizationId) return ...
+    if (!authorize(session, orgId, MODULE, ACTION)) return ...
+    // ... handler logic ...
+  } catch (error) { return handleError(error) }
+}
+
+// After (new pattern — clean handler only)
+export const GET = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId }) => {
+    // ... handler logic ...
+  }
+)
+```
+
+Params are auto-resolved from Promises — no manual `await params` needed.
+
+### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
 - **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
@@ -310,6 +341,7 @@ Use skill tool for specialized tasks:
 | `interface-design` | Admin panels, dashboards |
 | `copywriting` | Marketing copy changes |
 | `vercel-react-best-practices` | React/Next.js performance |
+| `next-best-practices` | Next.js route handlers, data fetching, bundling, image optimization |
 
 ---
 
