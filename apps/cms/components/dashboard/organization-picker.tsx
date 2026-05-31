@@ -27,7 +27,7 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
     activatedRef.current = true;
 
     async function loadOrgs() {
-      const { data, error } = await authClient.organization.list();
+      const { data } = await authClient.organization.list();
       if (data) {
         setOrganizations(data);
 

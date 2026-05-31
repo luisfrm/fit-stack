@@ -22,9 +22,11 @@ export function ClassModal({ classData, trigger, onSuccess }: ClassModalProps) {
     setIsLoading(true);
 
     try {
-      isEdit && classData?.id ?
-        await classesService.updateClass(classData.id, formData) :
+      if (isEdit && classData?.id) {
+        await classesService.updateClass(classData.id, formData);
+      } else {
         await classesService.createClass(formData);
+      }
 
       const action = isEdit ? "actualizada" : "creada";
       toast.success(`Clase ${action} correctamente.`);

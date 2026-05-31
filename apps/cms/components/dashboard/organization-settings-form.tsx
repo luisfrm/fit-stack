@@ -16,9 +16,6 @@ import {
   ColorPicker,
   Title,
   toast,
-  SimpleSelect,
-  cn,
-  CountrySelector
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";

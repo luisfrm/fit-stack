@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Text } from "@workspace/ui/components";
 
 export function SubscriptionWarningBanner() {

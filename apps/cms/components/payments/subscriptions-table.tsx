@@ -233,7 +233,7 @@ const getColumns = (
                     show: canDelete,
                     onClick: () => {
                       if (globalThis.confirm(`¿Seguro que deseas eliminar este registro de pago de ${sub.memberName}?`)) {
-                        sub.id && onDelete(sub.id);
+                        if (sub.id) onDelete(sub.id);
                       }
                     }
                   }

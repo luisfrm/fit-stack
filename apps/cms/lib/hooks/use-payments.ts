@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionsService } from "../services/subscriptions-service";
 import { financeService } from "../services/finance-service";
-import { type IRecentRegistration, type ISubscription, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
+import { type IRecentRegistration, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
 import { useAuth } from "./use-auth";
 import { SubscriptionStatus } from "@workspace/shared/constants";
 
@@ -119,7 +119,7 @@ export function useAnalytics(baseCurrency: string) {
 export function useRevenueReport(baseCurrency: string, timeframe: '12m' = '12m') {
   return useQuery({
     queryKey: ["payments", "report-revenue", baseCurrency, timeframe],
-    queryFn: () => financeService.getRevenueReport(baseCurrency, timeframe),
+    queryFn: () => financeService.getRevenueReport(baseCurrency),
     enabled: !!baseCurrency,
     staleTime: 1000 * 60 * 60, // 1 hour
   });

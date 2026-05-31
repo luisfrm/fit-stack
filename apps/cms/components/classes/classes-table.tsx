@@ -86,7 +86,7 @@ const getColumns = (
           className="h-8 w-8 p-0 hover:bg-destructive/10 text-slate-400 hover:text-destructive"
           onClick={(e) => {
             e.stopPropagation();
-            cls.id && onDelete?.(cls.id);
+            if (cls.id) onDelete?.(cls.id);
           }}
         >
           <Trash2 size={14} />
