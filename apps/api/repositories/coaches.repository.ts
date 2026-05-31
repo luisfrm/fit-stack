@@ -1,12 +1,12 @@
 import { eq, ilike, and, or, db, count, asc, type SQL } from '@workspace/database/client';
-import { gymMember, staffProfile, authMember, user } from '@workspace/database/schema';
+import { gymMember, coachProfile, authMember, user } from '@workspace/database/schema';
 import { ORG_ROLES } from '@workspace/shared';
 import { type CoachesFilter as ICoachesFilter, type CreateCoachDTO as ICreateCoachDTO, type UpdateCoachDTO as IUpdateCoachDTO } from '@workspace/shared/types';
 export type { CoachesFilter, CreateCoachDTO, UpdateCoachDTO } from '@workspace/shared/types';
 
 export const coachesRepository = {
   /**
-   * Finds all coaches by joining gymMember with staffProfile and authMember.
+   * Finds all coaches by joining gymMember with coachProfile and authMember.
    * Filters by authMember.role === ORG_ROLES.COACH.
    */
   async findAll(organizationId: string, filters: ICoachesFilter = {}) {
@@ -28,12 +28,12 @@ export const coachesRepository = {
     }
 
     if (isVisible !== undefined) {
-      conditions.push(eq(staffProfile.isVisible, isVisible));
+      conditions.push(eq(coachProfile.isVisible, isVisible));
     }
 
     const whereClause = and(...conditions) as SQL;
 
-    // Join gymMember with staffProfile and authMember
+    // Join gymMember with coachProfile and authMember
     const rowsQuery = db
       .select({
         id: gymMember.id,
@@ -45,10 +45,10 @@ export const coachesRepository = {
         imageUrl: gymMember.imageUrl,
         isActive: gymMember.isActive,
         documentId: gymMember.documentId,
-        specialities: staffProfile.specialities,
-        bio: staffProfile.bio,
-        isVisible: staffProfile.isVisible,
-        displayOrder: staffProfile.displayOrder,
+        specialities: coachProfile.specialities,
+        bio: coachProfile.bio,
+        isVisible: coachProfile.isVisible,
+        displayOrder: coachProfile.displayOrder,
         role: authMember.role,
         user: {
           id: user.id,
@@ -56,12 +56,12 @@ export const coachesRepository = {
         }
       })
       .from(gymMember)
-      .leftJoin(staffProfile, eq(gymMember.id, staffProfile.memberId))
+      .leftJoin(coachProfile, eq(gymMember.id, coachProfile.memberId))
       // authMember and user might not exist initially if the user hasn't completed sign up
       .leftJoin(user, eq(gymMember.userId, user.id))
       .innerJoin(authMember, eq(user.id, authMember.userId))
       .where(whereClause)
-      .orderBy(asc(staffProfile.displayOrder), asc(gymMember.id))
+      .orderBy(asc(coachProfile.displayOrder), asc(gymMember.id))
       .limit(limit)
       .offset(offset);
 
@@ -75,7 +75,7 @@ export const coachesRepository = {
       db
         .select({ total: count() })
         .from(gymMember)
-        .leftJoin(staffProfile, eq(gymMember.id, staffProfile.memberId))
+        .leftJoin(coachProfile, eq(gymMember.id, coachProfile.memberId))
         .leftJoin(user, eq(gymMember.userId, user.id))
         .innerJoin(authMember, eq(user.id, authMember.userId))
         .where(whereClause),
@@ -104,10 +104,10 @@ export const coachesRepository = {
         imageUrl: gymMember.imageUrl,
         isActive: gymMember.isActive,
         documentId: gymMember.documentId,
-        specialities: staffProfile.specialities,
-        bio: staffProfile.bio,
-        isVisible: staffProfile.isVisible,
-        displayOrder: staffProfile.displayOrder,
+        specialities: coachProfile.specialities,
+        bio: coachProfile.bio,
+        isVisible: coachProfile.isVisible,
+        displayOrder: coachProfile.displayOrder,
         role: authMember.role,
         user: {
           id: user.id,
@@ -115,7 +115,7 @@ export const coachesRepository = {
         }
       })
       .from(gymMember)
-      .leftJoin(staffProfile, eq(gymMember.id, staffProfile.memberId))
+      .leftJoin(coachProfile, eq(gymMember.id, coachProfile.memberId))
       .leftJoin(user, eq(gymMember.userId, user.id))
       .innerJoin(authMember, eq(user.id, authMember.userId))
       .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId), eq(authMember.role, ORG_ROLES.COACH)));
@@ -124,7 +124,7 @@ export const coachesRepository = {
   },
 
   /**
-   * Creates a coach by inserting into gymMember and then staffProfile.
+   * Creates a coach by inserting into gymMember and then coachProfile.
    */
   async create(organizationId: string, data: ICreateCoachDTO) {
     return db.transaction(async (tx) => {
@@ -148,7 +148,7 @@ export const coachesRepository = {
 
       // 2. Create the Coach Profile
       const [profile] = await tx
-        .insert(staffProfile)
+        .insert(coachProfile)
         .values({
           organizationId,
           memberId: member.id,
@@ -166,7 +166,7 @@ export const coachesRepository = {
   },
 
   /**
-   * Updates a coach by updating both gymMember and staffProfile.
+   * Updates a coach by updating both gymMember and coachProfile.
    */
   async update(organizationId: string, id: number, data: IUpdateCoachDTO) {
     return db.transaction(async (tx) => {
@@ -207,14 +207,14 @@ export const coachesRepository = {
 
       if (Object.keys(filteredProfileFields).length > 0) {
         await tx
-          .insert(staffProfile)
+          .insert(coachProfile)
           .values({
             organizationId,
             memberId: id,
             ...filteredProfileFields,
           })
           .onConflictDoUpdate({
-            target: [staffProfile.memberId],
+            target: [coachProfile.memberId],
             set: filteredProfileFields,
           });
       }

@@ -71,6 +71,13 @@
       "when": 1779000000000,
       "tag": "0009_petite_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780206898578,
+      "tag": "0010_outstanding_cyclops",
+      "breakpoints": true
     }
   ]
 }

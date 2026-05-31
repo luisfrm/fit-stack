@@ -229,10 +229,10 @@ export const gymMember = pgTable('gym_member', {
 });
 
 /**
- * Unified staff profile for Trainers and Coaches.
- * Connects a gym_member with additional fitness/cms meta-data.
+ * Coach profile: extends gym_member with additional fitness/cms meta-data.
+ * A coach is a gym_member with role 'coach' that optionally has a coach_profile.
  */
-export const staffProfile = pgTable('staff_profile', {
+export const coachProfile = pgTable('coach_profile', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .notNull()
@@ -382,7 +382,7 @@ export const routineTemplate = pgTable('routine_template', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   trainerProfileId: bigint('trainer_profile_id', { mode: 'number' })
-    .references(() => staffProfile.id, { onDelete: 'set null' }),
+    .references(() => coachProfile.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
   description: text('description'),
 });
@@ -527,7 +527,7 @@ export const authMemberRelations = relations(authMember, ({ one }) => ({
 
 export const gymMemberRelations = relations(gymMember, ({ one, many }) => ({
   organization: one(organization, { fields: [gymMember.organizationId], references: [organization.id] }),
-  staffProfile: one(staffProfile, { fields: [gymMember.id], references: [staffProfile.memberId] }),
+  coachProfile: one(coachProfile, { fields: [gymMember.id], references: [coachProfile.memberId] }),
   asCoachAssignments: many(coachAssignment, { relationName: 'coach_assignments_coach' }),
   asClientAssignments: many(coachAssignment, { relationName: 'coach_assignments_client' }),
   accessLogs: many(accessControlLog),
@@ -542,6 +542,11 @@ export const accessControlLogRelations = relations(accessControlLog, ({ one }) =
 export const biometricSyncTaskRelations = relations(biometricSyncTask, ({ one }) => ({
   organization: one(organization, { fields: [biometricSyncTask.organizationId], references: [organization.id] }),
   member: one(gymMember, { fields: [biometricSyncTask.memberId], references: [gymMember.id] }),
+}));
+
+export const coachProfileRelations = relations(coachProfile, ({ one }) => ({
+  organization: one(organization, { fields: [coachProfile.organizationId], references: [organization.id] }),
+  member: one(gymMember, { fields: [coachProfile.memberId], references: [gymMember.id] }),
 }));
 
 export const membershipPlanRelations = relations(membershipPlan, ({ one, many }) => ({

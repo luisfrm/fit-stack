@@ -1,5 +1,5 @@
 {
-  "id": "efd4cac4-89f4-4a5e-87e6-d121554c628c",
+  "id": "935b5735-152a-41a9-b8b4-429a9d391c28",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -235,7 +235,8 @@
         },
         "role": {
           "name": "role",
-          "type": "text",
+          "type": "org_role",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -842,6 +843,123 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.coach_profile": {
+      "name": "coach_profile",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "coach_profile_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "specialities": {
+          "name": "specialities",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bio": {
+          "name": "bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_visible": {
+          "name": "is_visible",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "coach_profile_organization_id_organization_id_fk": {
+          "name": "coach_profile_organization_id_organization_id_fk",
+          "tableFrom": "coach_profile",
+          "tableTo": "organization",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "coach_profile_member_id_gym_member_id_fk": {
+          "name": "coach_profile_member_id_gym_member_id_fk",
+          "tableFrom": "coach_profile",
+          "tableTo": "gym_member",
+          "columnsFrom": [
+            "member_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "coach_profile_member_id_unique": {
+          "name": "coach_profile_member_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "member_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.exercise": {
       "name": "exercise",
       "schema": "",
@@ -962,27 +1080,37 @@
           "primaryKey": false,
           "notNull": true
         },
-        "monthly_price": {
-          "name": "monthly_price",
+        "price": {
+          "name": "price",
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
         },
-        "yearly_price": {
-          "name": "yearly_price",
-          "type": "numeric(10, 2)",
+        "currency": {
+          "name": "currency",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'USD'"
+        },
+        "duration_value": {
+          "name": "duration_value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "duration_unit": {
+          "name": "duration_unit",
+          "type": "membership_duration_unit",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'month'"
         },
         "features": {
           "name": "features",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "suggested_duration_days": {
-          "name": "suggested_duration_days",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -1096,6 +1224,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "role": {
+          "name": "role",
+          "type": "org_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
         },
         "biometric_id": {
           "name": "biometric_id",
@@ -1386,6 +1522,21 @@
           "notNull": true,
           "default": "'USD'"
         },
+        "duration_value": {
+          "name": "duration_value",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "duration_unit": {
+          "name": "duration_unit",
+          "type": "membership_duration_unit",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'month'"
+        },
         "features": {
           "name": "features",
           "type": "jsonb",
@@ -1471,6 +1622,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "slogan": {
+          "name": "slogan",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
@@ -1483,6 +1640,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'VE'"
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'America/Caracas'"
         },
         "tax_id": {
           "name": "tax_id",
@@ -1715,8 +1879,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.platform_invoice": {
-      "name": "platform_invoice",
+    "public.platform_payment": {
+      "name": "platform_payment",
       "schema": "",
       "columns": {
         "id": {
@@ -1726,7 +1890,7 @@
           "notNull": true,
           "identity": {
             "type": "always",
-            "name": "platform_invoice_id_seq",
+            "name": "platform_payment_id_seq",
             "schema": "public",
             "increment": "1",
             "startWith": "1",
@@ -1794,9 +1958,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "platform_invoice_organization_id_organization_id_fk": {
-          "name": "platform_invoice_organization_id_organization_id_fk",
-          "tableFrom": "platform_invoice",
+        "platform_payment_organization_id_organization_id_fk": {
+          "name": "platform_payment_organization_id_organization_id_fk",
+          "tableFrom": "platform_payment",
           "tableTo": "organization",
           "columnsFrom": [
             "organization_id"
@@ -1807,9 +1971,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "platform_invoice_plan_id_fitstack_plan_id_fk": {
-          "name": "platform_invoice_plan_id_fitstack_plan_id_fk",
-          "tableFrom": "platform_invoice",
+        "platform_payment_plan_id_fitstack_plan_id_fk": {
+          "name": "platform_payment_plan_id_fitstack_plan_id_fk",
+          "tableFrom": "platform_payment",
           "tableTo": "fitstack_plan",
           "columnsFrom": [
             "plan_id"
@@ -1945,10 +2109,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "routine_template_trainer_profile_id_staff_profile_id_fk": {
-          "name": "routine_template_trainer_profile_id_staff_profile_id_fk",
+        "routine_template_trainer_profile_id_coach_profile_id_fk": {
+          "name": "routine_template_trainer_profile_id_coach_profile_id_fk",
           "tableFrom": "routine_template",
-          "tableTo": "staff_profile",
+          "tableTo": "coach_profile",
           "columnsFrom": [
             "trainer_profile_id"
           ],
@@ -2149,123 +2313,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.staff_profile": {
-      "name": "staff_profile",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigint",
-          "primaryKey": true,
-          "notNull": true,
-          "identity": {
-            "type": "always",
-            "name": "staff_profile_id_seq",
-            "schema": "public",
-            "increment": "1",
-            "startWith": "1",
-            "minValue": "1",
-            "maxValue": "9223372036854775807",
-            "cache": "1",
-            "cycle": false
-          }
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "member_id": {
-          "name": "member_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "specialities": {
-          "name": "specialities",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bio": {
-          "name": "bio",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_visible": {
-          "name": "is_visible",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "display_order": {
-          "name": "display_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "staff_profile_organization_id_organization_id_fk": {
-          "name": "staff_profile_organization_id_organization_id_fk",
-          "tableFrom": "staff_profile",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "staff_profile_member_id_gym_member_id_fk": {
-          "name": "staff_profile_member_id_gym_member_id_fk",
-          "tableFrom": "staff_profile",
-          "tableTo": "gym_member",
-          "columnsFrom": [
-            "member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "staff_profile_member_id_unique": {
-          "name": "staff_profile_member_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "member_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.store_subscription": {
       "name": "store_subscription",
       "schema": "",
@@ -2328,6 +2375,18 @@
         "price_override": {
           "name": "price_override",
           "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancellation_reason": {
+          "name": "cancellation_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2425,13 +2484,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "status": {
-          "name": "status",
-          "type": "subscription_status",
-          "typeSchema": "public",
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -2526,9 +2583,11 @@
         },
         "role": {
           "name": "role",
-          "type": "text",
+          "type": "global_role",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'user'"
         },
         "created_at": {
           "name": "created_at",
@@ -2837,6 +2896,35 @@
         "weekly"
       ]
     },
+    "public.global_role": {
+      "name": "global_role",
+      "schema": "public",
+      "values": [
+        "admin",
+        "user"
+      ]
+    },
+    "public.membership_duration_unit": {
+      "name": "membership_duration_unit",
+      "schema": "public",
+      "values": [
+        "day",
+        "week",
+        "month",
+        "year"
+      ]
+    },
+    "public.org_role": {
+      "name": "org_role",
+      "schema": "public",
+      "values": [
+        "owner",
+        "manager",
+        "cashier",
+        "coach",
+        "member"
+      ]
+    },
     "public.payment_status": {
       "name": "payment_status",
       "schema": "public",
@@ -2845,15 +2933,6 @@
         "validated",
         "invalid",
         "voided"
-      ]
-    },
-    "public.subscription_status": {
-      "name": "subscription_status",
-      "schema": "public",
-      "values": [
-        "active",
-        "expired",
-        "cancelled"
       ]
     }
   },
