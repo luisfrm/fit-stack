@@ -1,15 +1,15 @@
 import { eq, ilike, and, or, db, count, asc, type SQL } from '@workspace/database/client';
 import { gymMember, coachProfile, authMember, user } from '@workspace/database/schema';
 import { ORG_ROLES } from '@workspace/shared';
-import { type CoachesFilter as ICoachesFilter, type CreateCoachDTO as ICreateCoachDTO, type UpdateCoachDTO as IUpdateCoachDTO } from '@workspace/shared/types';
-export type { CoachesFilter, CreateCoachDTO, UpdateCoachDTO } from '@workspace/shared/types';
+import { type TrainersFilter as ITrainersFilter, type CreateTrainerDTO as ICreateTrainerDTO, type UpdateTrainerDTO as IUpdateTrainerDTO } from '@workspace/shared/types';
+export type { TrainersFilter, CreateTrainerDTO, UpdateTrainerDTO } from '@workspace/shared/types';
 
-export const coachesRepository = {
+export const trainersRepository = {
   /**
-   * Finds all coaches by joining gymMember with coachProfile and authMember.
+   * Finds all trainers by joining gymMember with coachProfile and authMember.
    * Filters by authMember.role === ORG_ROLES.COACH.
    */
-  async findAll(organizationId: string, filters: ICoachesFilter = {}) {
+  async findAll(organizationId: string, filters: ITrainersFilter = {}) {
     const { name, isVisible, page = 1, limit = 10, requireTotal = true } = filters;
     const offset = (page - 1) * limit;
 
@@ -33,7 +33,6 @@ export const coachesRepository = {
 
     const whereClause = and(...conditions) as SQL;
 
-    // Join gymMember with coachProfile and authMember
     const rowsQuery = db
       .select({
         id: gymMember.id,
@@ -57,7 +56,6 @@ export const coachesRepository = {
       })
       .from(gymMember)
       .leftJoin(coachProfile, eq(gymMember.id, coachProfile.memberId))
-      // authMember and user might not exist initially if the user hasn't completed sign up
       .leftJoin(user, eq(gymMember.userId, user.id))
       .innerJoin(authMember, eq(user.id, authMember.userId))
       .where(whereClause)
@@ -124,11 +122,10 @@ export const coachesRepository = {
   },
 
   /**
-   * Creates a coach by inserting into gymMember and then coachProfile.
+   * Creates a trainer by inserting into gymMember and then coachProfile.
    */
-  async create(organizationId: string, data: ICreateCoachDTO) {
+  async create(organizationId: string, data: ICreateTrainerDTO) {
     return db.transaction(async (tx) => {
-      // 1. Create the gymMember
       const [member] = await tx
         .insert(gymMember)
         .values({
@@ -146,7 +143,6 @@ export const coachesRepository = {
 
       if (!member) throw new Error("Fallo al crear el miembro entrenador");
 
-      // 2. Create the Coach Profile
       const [profile] = await tx
         .insert(coachProfile)
         .values({
@@ -166,11 +162,10 @@ export const coachesRepository = {
   },
 
   /**
-   * Updates a coach by updating both gymMember and coachProfile.
+   * Updates a trainer by updating both gymMember and coachProfile.
    */
-  async update(organizationId: string, id: number, data: IUpdateCoachDTO) {
+  async update(organizationId: string, id: number, data: IUpdateTrainerDTO) {
     return db.transaction(async (tx) => {
-      // 1. Update gymMember part
       const memberFields = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -193,7 +188,6 @@ export const coachesRepository = {
           .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
       }
 
-      // 2. Update Profile part
       const profileFields = {
         specialities: data.specialities,
         bio: data.bio,

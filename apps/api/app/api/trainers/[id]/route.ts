@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { coachesService } from '@/services/coaches.service'
+import { trainersService } from '@/services/trainers.service'
 import { cache } from '@/lib/cache'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { withAuth } from '@/lib/route-handler'
@@ -14,11 +14,11 @@ export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.STAFF, PERMISSION_AC
     if (Number.isNaN(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
     const body = await req.json()
-    const updatedCoach = await coachesService.updateCoach(organizationId, id, body)
+    const updatedTrainer = await trainersService.updateTrainer(organizationId, id, body)
 
-    await cache.invalidate(`org:${organizationId}:coaches:*`)
+    await cache.invalidate(`org:${organizationId}:trainers:*`)
 
-    return NextResponse.json(updatedCoach)
+    return NextResponse.json(updatedTrainer)
   }
 )
 
@@ -27,9 +27,9 @@ export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.STAFF, PERMISSION
     const id = Number(params?.id)
     if (Number.isNaN(id)) return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
 
-    await coachesService.deleteCoach(organizationId, id)
+    await trainersService.deleteTrainer(organizationId, id)
 
-    await cache.invalidate(`org:${organizationId}:coaches:*`)
+    await cache.invalidate(`org:${organizationId}:trainers:*`)
 
     return NextResponse.json({ success: true })
   }

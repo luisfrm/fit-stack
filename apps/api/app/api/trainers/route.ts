@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { coachesService } from '@/services/coaches.service'
+import { trainersService } from '@/services/trainers.service'
 import { cache } from '@/lib/cache'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 import { withAuth } from '@/lib/route-handler'
 import { z } from 'zod'
-import { CoachesFilter } from '@workspace/shared/types'
+import { TrainersFilter } from '@workspace/shared/types'
 
-const coachSchema = z.object({
+const trainerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email address'),
@@ -25,13 +25,13 @@ export const GET = withAuth(PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.READ)(
   async (req, { organizationId }) => {
     const { searchParams } = req.nextUrl
 
-    const cacheKey = `org:${organizationId}:coaches:${searchParams.toString()}`
+    const cacheKey = `org:${organizationId}:trainers:${searchParams.toString()}`
     const cachedData = await cache.get(cacheKey)
     if (cachedData) {
       return NextResponse.json(cachedData)
     }
 
-    const filters: CoachesFilter = {
+    const filters: TrainersFilter = {
       name: searchParams.get('name') ?? undefined,
       role: searchParams.get('role') ?? undefined,
       isVisible: searchParams.has('isVisible')
@@ -42,7 +42,7 @@ export const GET = withAuth(PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.READ)(
       requireTotal: true,
     }
 
-    const result = await coachesService.getAllCoaches(organizationId, filters)
+    const result = await trainersService.getAllTrainers(organizationId, filters)
 
     await cache.set(cacheKey, result, 300)
 
@@ -53,18 +53,18 @@ export const GET = withAuth(PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.READ)(
 export const POST = withAuth(PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.CREATE)(
   async (req, { organizationId }) => {
     const body = await req.json()
-    const validation = coachSchema.safeParse(body)
+    const validation = trainerSchema.safeParse(body)
 
     if (!validation.success) {
       const firstError = validation.error.errors[0]?.message || 'Datos de formulario inválidos'
       return NextResponse.json({ error: firstError, details: validation.error.format() }, { status: 400 })
     }
 
-    const { ...coachData } = validation.data
-    const newCoach = await coachesService.createCoach(organizationId, coachData)
+    const { ...trainerData } = validation.data
+    const newTrainer = await trainersService.createTrainer(organizationId, trainerData)
 
-    await cache.invalidate(`org:${organizationId}:coaches:*`)
+    await cache.invalidate(`org:${organizationId}:trainers:*`)
 
-    return NextResponse.json(newCoach, { status: 201 })
+    return NextResponse.json(newTrainer, { status: 201 })
   }
 )
