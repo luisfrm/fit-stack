@@ -8,28 +8,27 @@ import {
   toast,
   Textarea
 } from "@workspace/ui/components";
-import { type ICoach } from "@/types/dashboard";
+import { type ITrainer } from "@/types/dashboard";
 import { User, Star, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { ORG_ROLES } from "@workspace/shared";
 
-interface CoachFormProps {
-  readonly initialData?: ICoach;
-  readonly onSubmit: (data: Partial<ICoach>) => void;
+interface TrainerFormProps {
+  readonly initialData?: ITrainer;
+  readonly onSubmit: (data: Partial<ITrainer>) => void;
   readonly isLoading?: boolean;
 }
 
-export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) {
+export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormProps) {
   const isEdit = !!initialData?.id;
 
-  // specialities in DB is jsonb.
   const [specialities, setSpecialities] = React.useState<string[]>(
     initialData?.specialities ?? []
   );
   const [newSpeciality, setNewSpeciality] = React.useState("");
 
-  const [formData, setFormData] = React.useState<Partial<ICoach>>({
+  const [formData, setFormData] = React.useState<Partial<ITrainer>>({
     firstName: initialData?.firstName ?? "",
     lastName: initialData?.lastName ?? "",
     email: initialData?.email ?? "",
@@ -50,7 +49,6 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Cleanup object URLs to avoid memory leaks
   React.useEffect(() => {
     return () => {
       if (previewUrl?.startsWith("blob:")) {
@@ -59,7 +57,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
     };
   }, [previewUrl]);
 
-  const handleChange = (field: keyof ICoach, value: unknown) => {
+  const handleChange = (field: keyof ITrainer, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -90,12 +88,11 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
     try {
       let finalImageUrl = formData.imageUrl;
 
-      // 1. If a new file is selected, upload it first
       if (selectedFile) {
         finalImageUrl = await uploadService.uploadFile(selectedFile);
       }
 
-      const payload: Partial<ICoach> = {
+      const payload: Partial<ITrainer> = {
         ...formData,
         imageUrl: finalImageUrl,
         specialities: specialities.length > 0 ? specialities : null
@@ -138,7 +135,7 @@ export function CoachForm({ initialData, onSubmit, isLoading }: CoachFormProps) 
         <Input
           label="Correo Electrónico"
           type="email"
-          placeholder="Ej: coach@empresa.com"
+          placeholder="Ej: trainer@empresa.com"
           value={formData.email}
           onChange={(e) => handleChange("email", e.target.value)}
           required

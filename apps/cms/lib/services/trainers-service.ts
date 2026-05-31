@@ -1,40 +1,40 @@
 import { apiClient } from "../api-client";
-import { ICoach, CoachFilter, PaginatedCoaches } from "@/types/dashboard";
+import { ITrainer, TrainerFilter, PaginatedTrainers } from "@/types/dashboard";
 
 /**
- * Service to handle coach-related API operations.
+ * Service to handle trainer-related API operations.
  */
-export const coachesService = {
+export const trainersService = {
   /**
-   * Fetches all coaches from the API with optional filters and pagination.
+   * Fetches all trainers from the API with optional filters and pagination.
    */
-  async getCoaches(filters: CoachFilter = {}): Promise<PaginatedCoaches> {
-    const response = await apiClient.get<PaginatedCoaches>("/coaches", {
+  async getTrainers(filters: TrainerFilter = {}): Promise<PaginatedTrainers> {
+    const response = await apiClient.get<PaginatedTrainers>("/trainers", {
       params: filters,
     });
     return response.data;
   },
 
   /**
-   * Deletes a coach by its ID.
+   * Deletes a trainer by its ID.
    */
-  async deleteCoach(id: number): Promise<void> {
-    await apiClient.delete(`/coaches/${id}`);
+  async deleteTrainer(id: number): Promise<void> {
+    await apiClient.delete(`/trainers/${id}`);
   },
 
   /**
-   * Creates a new coach.
+   * Creates a new trainer.
    */
-  async createCoach(data: Partial<ICoach>): Promise<ICoach> {
-    const response = await apiClient.post<ICoach>("/coaches", data);
+  async createTrainer(data: Partial<ITrainer>): Promise<ITrainer> {
+    const response = await apiClient.post<ITrainer>("/trainers", data);
     return response.data;
   },
 
   /**
-   * Updates an existing coach.
+   * Updates an existing trainer.
    */
-  async updateCoach(id: number, data: Partial<ICoach>): Promise<ICoach> {
-    const response = await apiClient.put<ICoach>(`/coaches/${id}`, data);
+  async updateTrainer(id: number, data: Partial<ITrainer>): Promise<ITrainer> {
+    const response = await apiClient.put<ITrainer>(`/trainers/${id}`, data);
     return response.data;
   },
 
@@ -42,7 +42,7 @@ export const coachesService = {
 
 /**
  * ─────────────────────────────────────────────
- * COACH MUTATION HOOKS
+ * TRAINER MUTATION HOOKS
  * ─────────────────────────────────────────────
  */
 
@@ -50,15 +50,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@workspace/ui/components";
 
 /**
- * Hook to create a coach.
+ * Hook to create a trainer.
  */
-export function useCreateCoachMutation() {
+export function useCreateTrainerMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: Partial<ICoach>) => coachesService.createCoach(data),
+    mutationFn: (data: Partial<ITrainer>) => trainersService.createTrainer(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      queryClient.invalidateQueries({ queryKey: ["trainers"] });
       toast.success("Entrenador creado correctamente");
     },
     onError: (error: any) => {
@@ -69,16 +69,16 @@ export function useCreateCoachMutation() {
 }
 
 /**
- * Hook to update a coach (including visibility).
+ * Hook to update a trainer (including visibility).
  */
-export function useUpdateCoachMutation() {
+export function useUpdateTrainerMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<ICoach> }) => 
-      coachesService.updateCoach(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<ITrainer> }) =>
+      trainersService.updateTrainer(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      queryClient.invalidateQueries({ queryKey: ["trainers"] });
       toast.success("Entrenador actualizado correctamente");
     },
     onError: (error: any) => {
@@ -89,15 +89,15 @@ export function useUpdateCoachMutation() {
 }
 
 /**
- * Hook to delete a coach.
+ * Hook to delete a trainer.
  */
-export function useDeleteCoachMutation() {
+export function useDeleteTrainerMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => coachesService.deleteCoach(id),
+    mutationFn: (id: number) => trainersService.deleteTrainer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["coaches"] });
+      queryClient.invalidateQueries({ queryKey: ["trainers"] });
       toast.success("Entrenador eliminado correctamente");
     },
     onError: (error: any) => {
@@ -106,4 +106,3 @@ export function useDeleteCoachMutation() {
     }
   });
 }
-

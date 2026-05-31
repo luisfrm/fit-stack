@@ -2,15 +2,15 @@
 
 import * as React from "react";
 import { Dumbbell, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Text, CoachCard, AddCoachCard, Skeleton, ConfirmationModal, toast } from "@workspace/ui/components";
-import { CoachModal } from "@/components/coaches/coach-modal";
+import { Button, Text, TrainerCard, AddTrainerCard, Skeleton, ConfirmationModal, toast } from "@workspace/ui/components";
+import { TrainerModal } from "@/components/trainers/trainer-modal";
 import { membersService } from "@/lib/services/members-service";
 import {
-  useDeleteCoachMutation,
-  useUpdateCoachMutation
-} from "@/lib/services/coaches-service";
-import { type CoachFilter, type ICoach } from "@/types/dashboard";
-import { useCoaches } from "@/lib/hooks/use-trainers";
+  useDeleteTrainerMutation,
+  useUpdateTrainerMutation
+} from "@/lib/services/trainers-service";
+import { type TrainerFilter, type ITrainer } from "@/types/dashboard";
+import { useTrainers } from "@/lib/hooks/use-trainers";
 import { uploadService } from "@/lib/services/upload-service";
 import { NoData } from "@/components/dashboard/dashboard-ui";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
@@ -20,74 +20,69 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 const ITEMS_PER_PAGE = 10;
 
 export default function TrainersPage() {
-  const [filters, setFilters] = React.useState<CoachFilter>({
+  const [filters, setFilters] = React.useState<TrainerFilter>({
     page: 1,
     limit: ITEMS_PER_PAGE,
   });
   const [searchTerm, setSearchTerm] = React.useState("");
   const debouncedSearch = useDebounce(searchTerm, 500);
 
-  // For editing
-  const [coachToEdit, setCoachToEdit] = React.useState<ICoach | undefined>(undefined);
-  const [coachToDelete, setCoachToDelete] = React.useState<ICoach | undefined>(undefined);
+  const [trainerToEdit, setTrainerToEdit] = React.useState<ITrainer | undefined>(undefined);
+  const [trainerToDelete, setTrainerToDelete] = React.useState<ITrainer | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
-  const [resendingCoachId, setResendingCoachId] = React.useState<number | null>(null);
+  const [resendingTrainerId, setResendingTrainerId] = React.useState<number | null>(null);
 
-  // React Query fetch
-  const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useCoaches(filters);
+  const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useTrainers(filters);
 
-  // Debounced search
-  // Sync debounced search with filters
   React.useEffect(() => {
     setFilters((prev) => ({ ...prev, name: debouncedSearch || undefined, page: 1 }));
   }, [debouncedSearch]);
 
-  // Mutations from service
-  const deleteMutation = useDeleteCoachMutation();
-  const updateMutation = useUpdateCoachMutation();
+  const deleteMutation = useDeleteTrainerMutation();
+  const updateMutation = useUpdateTrainerMutation();
 
   const handlePageChange = (newPage: number) => {
     setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
-  const handleEdit = (coach: ICoach) => {
-    setCoachToEdit(coach);
+  const handleEdit = (trainer: ITrainer) => {
+    setTrainerToEdit(trainer);
     setIsEditModalOpen(true);
   };
 
-  const handleToggleVisibility = (coach: ICoach, isVisible: boolean) => {
-    if (!coach.id) return;
-    updateMutation.mutate({ id: coach.id, data: { isVisible } });
+  const handleToggleVisibility = (trainer: ITrainer, isVisible: boolean) => {
+    if (!trainer.id) return;
+    updateMutation.mutate({ id: trainer.id, data: { isVisible } });
   };
 
-  const handleDelete = (coach: ICoach) => {
-    setCoachToDelete(coach);
+  const handleDelete = (trainer: ITrainer) => {
+    setTrainerToDelete(trainer);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!coachToDelete?.id) return;
+    if (!trainerToDelete?.id) return;
     try {
-      await deleteMutation.mutateAsync(coachToDelete.id);
+      await deleteMutation.mutateAsync(trainerToDelete.id);
     } catch (error) {
-      console.error("Error deleting coach:", error);
+      console.error("Error deleting trainer:", error);
     } finally {
       setIsDeleteModalOpen(false);
-      setCoachToDelete(undefined);
+      setTrainerToDelete(undefined);
     }
   };
 
-  const handleResendInvite = async (coach: ICoach) => {
-    if (!coach.id) return;
-    setResendingCoachId(coach.id);
+  const handleResendInvite = async (trainer: ITrainer) => {
+    if (!trainer.id) return;
+    setResendingTrainerId(trainer.id);
     try {
-      await membersService.resendInvite(coach.id);
-      toast.success(`Invitación reenviada a ${coach.email}`);
+      await membersService.resendInvite(trainer.id);
+      toast.success(`Invitación reenviada a ${trainer.email}`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || "Error al reenviar invitación");
     } finally {
-      setResendingCoachId(null);
+      setResendingTrainerId(null);
     }
   };
 
@@ -106,7 +101,7 @@ export default function TrainersPage() {
       if (!debouncedSearch) {
         return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <CoachModal trigger={<AddCoachCard />} />
+            <TrainerModal trigger={<AddTrainerCard />} />
           </div>
         );
       }
@@ -120,25 +115,25 @@ export default function TrainersPage() {
 
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {result.data.map((coach) => (
-          <CoachCard
-            key={coach.id}
-            firstName={coach.firstName}
-            lastName={coach.lastName}
-            role={coach.role}
-            specialities={coach.specialities}
-            imageUrl={coach.imageUrl ? uploadService.getMediaUrl(coach.imageUrl) : null}
-            isVisible={coach.isVisible}
-            hasUser={!!coach.user}
-            onEdit={() => handleEdit(coach)}
-            onDelete={() => handleDelete(coach)}
-            onToggleVisibility={(visible) => handleToggleVisibility(coach, visible)}
-            onResendInvite={() => handleResendInvite(coach)}
-            isResendingInvite={resendingCoachId === coach.id}
+        {result.data.map((trainer) => (
+          <TrainerCard
+            key={trainer.id}
+            firstName={trainer.firstName}
+            lastName={trainer.lastName}
+            role={trainer.role}
+            specialities={trainer.specialities}
+            imageUrl={trainer.imageUrl ? uploadService.getMediaUrl(trainer.imageUrl) : null}
+            isVisible={trainer.isVisible}
+            hasUser={!!trainer.user}
+            onEdit={() => handleEdit(trainer)}
+            onDelete={() => handleDelete(trainer)}
+            onToggleVisibility={(visible) => handleToggleVisibility(trainer, visible)}
+            onResendInvite={() => handleResendInvite(trainer)}
+            isResendingInvite={resendingTrainerId === trainer.id}
           />
         ))}
         {filters.page === 1 && !debouncedSearch && !filters.isVisible && (
-          <CoachModal trigger={<AddCoachCard />} />
+          <TrainerModal trigger={<AddTrainerCard />} />
         )}
       </div>
     );
@@ -152,7 +147,7 @@ export default function TrainersPage() {
         description="Gestión de entrenadores y perfiles del gimnasio."
         iconName="Dumbbell"
       >
-        <CoachModal
+        <TrainerModal
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
               Nuevo Entrenador
@@ -251,15 +246,15 @@ export default function TrainersPage() {
         open={isDeleteModalOpen}
         onOpenChange={setIsDeleteModalOpen}
         title="¿Eliminar entrenador?"
-        description={`Esta acción eliminará permanentemente a ${coachToDelete?.firstName} y todos sus datos asociados (perfil, suscripciones, pagos y rutinas). Esta acción no se puede deshacer.`}
+        description={`Esta acción eliminará permanentemente a ${trainerToDelete?.firstName} y todos sus datos asociados (perfil, suscripciones, pagos y rutinas). Esta acción no se puede deshacer.`}
         confirmText="Eliminar permanentemente"
         variant="danger"
         onConfirm={confirmDelete}
       />
 
       {/* ── Modal de Edición ── */}
-      <CoachModal
-        initialData={coachToEdit}
+      <TrainerModal
+        initialData={trainerToEdit}
         open={isEditModalOpen}
         onOpenChange={setIsEditModalOpen}
         onSuccess={() => { }}

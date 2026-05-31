@@ -1,39 +1,39 @@
 "use client";
 
 import * as React from "react";
-import { type ICoach } from "@/types/dashboard";
+import { type ITrainer } from "@/types/dashboard";
 import { Modal } from "@workspace/ui/components";
-import { CoachForm } from "./coach-form";
-import { 
-  useCreateCoachMutation, 
-  useUpdateCoachMutation 
-} from "@/lib/services/coaches-service";
+import { TrainerForm } from "./trainer-form";
+import {
+  useCreateTrainerMutation,
+  useUpdateTrainerMutation
+} from "@/lib/services/trainers-service";
 
-interface CoachModalProps {
-  readonly initialData?: ICoach;
+interface TrainerModalProps {
+  readonly initialData?: ITrainer;
   readonly onSuccess?: () => void;
   readonly trigger?: React.ReactNode;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
 }
 
-export function CoachModal({
+export function TrainerModal({
   initialData,
   onSuccess,
   trigger,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
-}: CoachModalProps) {
+}: TrainerModalProps) {
   const isEdit = !!initialData?.id;
   const [internalOpen, setInternalOpen] = React.useState(false);
-  
-  const createMutation = useCreateCoachMutation();
-  const updateMutation = useUpdateCoachMutation();
+
+  const createMutation = useCreateTrainerMutation();
+  const updateMutation = useUpdateTrainerMutation();
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
 
-  const handleSubmit = async (data: Partial<ICoach>) => {
+  const handleSubmit = async (data: Partial<ITrainer>) => {
     try {
       if (isEdit && initialData.id) {
         await updateMutation.mutateAsync({ id: initialData.id, data });
@@ -43,8 +43,7 @@ export function CoachModal({
       setOpen(false);
       onSuccess?.();
     } catch (error) {
-      // Error handling is managed by the mutation hooks (toasts)
-      console.error("Error submitting coach form:", error);
+      console.error("Error submitting trainer form:", error);
     }
   };
 
@@ -63,7 +62,7 @@ export function CoachModal({
       }
       isScrollable={true}
     >
-      <CoachForm
+      <TrainerForm
         initialData={initialData}
         onSubmit={handleSubmit}
         isLoading={isLoading}

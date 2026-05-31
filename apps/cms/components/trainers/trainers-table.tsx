@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { type ICoach } from "@/types/dashboard";
+import { type ITrainer } from "@/types/dashboard";
 import { NoData } from "../dashboard/dashboard-ui";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -10,33 +10,33 @@ import { Table, type ColumnDef } from "@workspace/ui/components";
 import { Button } from "@workspace/ui/components/button";
 import { Pencil, Trash2 } from "lucide-react";
 
-interface CoachesTableProps {
-  readonly coaches: ICoach[];
-  readonly onEdit: (coach: ICoach) => void;
-  readonly onDelete: (coach: ICoach) => void;
+interface TrainersTableProps {
+  readonly trainers: ITrainer[];
+  readonly onEdit: (trainer: ITrainer) => void;
+  readonly onDelete: (trainer: ITrainer) => void;
   readonly loading?: boolean;
 }
 
 const getColumns = (
-  onEdit: (coach: ICoach) => void,
-  onDelete: (coach: ICoach) => void
-): ColumnDef<ICoach>[] => [
+  onEdit: (trainer: ITrainer) => void,
+  onDelete: (trainer: ITrainer) => void
+): ColumnDef<ITrainer>[] => [
   {
     header: "Entrenador",
     className: "pl-6",
     headerClassName: "pl-6",
-    cell: (coach) => (
+    cell: (trainer) => (
       <div className="flex items-center gap-3">
         <Avatar size="default">
-          {coach.imageUrl && <AvatarImage src={uploadService.getMediaUrl(coach.imageUrl)} alt={`${coach.firstName} ${coach.lastName}`} />}
-          <AvatarFallback>{coach.firstName.charAt(0)}</AvatarFallback>
+          {trainer.imageUrl && <AvatarImage src={uploadService.getMediaUrl(trainer.imageUrl)} alt={`${trainer.firstName} ${trainer.lastName}`} />}
+          <AvatarFallback>{trainer.firstName.charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col min-w-0">
           <Text as="span" size="base" weight="medium" truncate>
-            {coach.firstName} {coach.lastName}
+            {trainer.firstName} {trainer.lastName}
           </Text>
           <Text as="span" size="xs" variant="subtle" truncate>
-            {coach.role || "Sin rol"}
+            {trainer.role || "Sin rol"}
           </Text>
         </div>
       </div>
@@ -44,18 +44,18 @@ const getColumns = (
   },
   {
     header: "Especialidades",
-    cell: (coach) => (
+    cell: (trainer) => (
       <Text as="span" size="sm" variant="muted">
-        {coach.specialities && coach.specialities.length > 0 
-          ? coach.specialities.join(", ") 
+        {trainer.specialities && trainer.specialities.length > 0
+          ? trainer.specialities.join(", ")
           : "Ninguna"}
       </Text>
     )
   },
   {
     header: "Estado",
-    cell: (coach) => (
-      coach.isVisible ? (
+    cell: (trainer) => (
+      trainer.isVisible ? (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-success/20 text-success">
           Visible
         </span>
@@ -70,12 +70,12 @@ const getColumns = (
     header: "Acciones",
     className: "pr-6 text-right flex justify-end",
     headerClassName: "pr-6 text-right",
-    cell: (coach) => (
+    cell: (trainer) => (
       <div className="flex items-center justify-end gap-2">
-         <Button variant="ghost" size="icon" onClick={() => onEdit(coach)}>
+         <Button variant="ghost" size="icon" onClick={() => onEdit(trainer)}>
           <Pencil size={18} className="text-slate-400" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => onDelete(coach)} className="hover:text-destructive hover:bg-destructive/10 transition-colors">
+        <Button variant="ghost" size="icon" onClick={() => onDelete(trainer)} className="hover:text-destructive hover:bg-destructive/10 transition-colors">
           <Trash2 size={18} className="text-slate-400 hover:text-destructive transition-colors" />
         </Button>
       </div>
@@ -83,13 +83,13 @@ const getColumns = (
   }
 ];
 
-export function CoachesTable({ coaches, onEdit, onDelete, loading }: CoachesTableProps) {
+export function TrainersTable({ trainers, onEdit, onDelete, loading }: TrainersTableProps) {
   const columns = React.useMemo(() => getColumns(onEdit, onDelete), [onEdit, onDelete]);
 
   return (
-    <Table 
-      columns={columns} 
-      data={coaches} 
+    <Table
+      columns={columns}
+      data={trainers}
       loading={loading}
       emptyState={<NoData message="No hay entrenadores registrados. Intenta ajustando los filtros o añade uno nuevo." className="py-20" />}
     />
