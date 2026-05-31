@@ -31,6 +31,12 @@
       "sourceType": "github",
       "computedHash": "4d5fe1dacfebc0c1b3837b061405150ed2e4971c096543afc46c23161c5a4f7a"
     },
+    "neon-drizzle": {
+      "source": "neondatabase/ai-rules",
+      "sourceType": "github",
+      "skillPath": "neon-plugin/skills/neon-drizzle/SKILL.md",
+      "computedHash": "0482bc2eb4cd2a93f005843800969eb3d76f5ef32c781efab4f194b03edbd431"
+    },
     "neon-postgres": {
       "source": "neondatabase/agent-skills",
       "sourceType": "autoskills-registry",
