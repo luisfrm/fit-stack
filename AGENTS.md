@@ -54,11 +54,34 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily ser
 | **Content** | Dynamic UI communication. Admins update dashboard sections without code changes. |
 | **Settings** | Localization and branding per gym (Timezone, currency formats, colors/logos via dynamic OKLCH injection). |
 
-### 3. The Bridge App (Hardware Integration)
+### 3. Staff & Trainers Architecture
+
+**Data model:**
+- `gym_member` (base table) — all gym members: clients, staff, trainers
+- `coach_profile` (extension) — optional 1:1 extension for gym_members with role `COACH`. Fields: `specialities`, `bio`, `isVisible`, `displayOrder`
+- `auth_member` — Better Auth membership linking user ↔ organization with role (`OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`)
+
+**Staff (`/dashboard/staff`):**
+- Table view for gym_members with roles: Owner, Manager, Cashier, Coach
+- Component: `StaffTable` (`apps/cms/components/staff/staff-table.tsx`)
+- Modal: `StaffModal` (`apps/cms/components/staff/staff-modal.tsx`)
+- Columns: Avatar+Name, Email, Role, Status, Actions
+- Service: `membersService` (shared with Members module)
+
+**Trainers (`/dashboard/trainers`):**
+- Card grid view for gym_members with role `COACH` that have a `coach_profile`
+- Component: `CoachCard`, `TrainerModal` (under `apps/cms/components/coaches/`)
+- Fields: name, photo, specialities, bio, visibility toggle, display order
+- Service: `coachesService` (joins gym_member + coach_profile)
+- API routes: `/api/coaches`
+
+**Note**: Coaches appear in both views (staff table + trainers grid) because they are gym_members with role `COACH`.
+
+### 5. The Bridge App (Hardware Integration)
 
 A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
 
-### 4. Business Rules Summary
+### 6. Business Rules Summary
 
 1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both base currency and active currencies are managed dynamically in **Settings**.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
