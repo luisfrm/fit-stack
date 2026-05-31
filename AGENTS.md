@@ -70,12 +70,12 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily ser
 
 **Trainers (`/dashboard/trainers`):**
 - Card grid view for gym_members with role `COACH` that have a `coach_profile`
-- Component: `CoachCard`, `TrainerModal` (under `apps/cms/components/coaches/`)
+- Component: `TrainerCard`, `AddTrainerCard`, `TrainerModal` (under `apps/cms/components/trainers/`)
 - Fields: name, photo, specialities, bio, visibility toggle, display order
-- Service: `coachesService` (joins gym_member + coach_profile)
-- API routes: `/api/coaches`
+- Service: `trainersService` (joins gym_member + coach_profile)
+- API routes: `/api/trainers`
 
-**Note**: Coaches appear in both views (staff table + trainers grid) because they are gym_members with role `COACH`.
+**Note**: Trainers appear in both views (staff table + trainers grid) because they are gym_members with role `COACH`.
 
 ### 5. The Bridge App (Hardware Integration)
 
