@@ -3,7 +3,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { subscriptionsService } from "../services/subscriptions-service";
 import { financeService } from "../services/finance-service";
-import { type IRecentRegistration, type ISubscription, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
+import { type IRecentRegistration, type SubscriptionsFilter, type PaginatedSubscriptions } from "@/types/dashboard";
+import { useAuth } from "./use-auth";
+import { SubscriptionStatus } from "@workspace/shared/constants";
 
 /**
  * Hook to fetch all subscriptions with pagination and filters.
@@ -37,8 +39,8 @@ export function useUpdatePaymentStatus() {
 export function useUpdateSubscriptionStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      subscriptionsService.updateStatus(id, status as any),
+    mutationFn: ({ id, status }: { id: number; status: SubscriptionStatus }) =>
+      subscriptionsService.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subscriptions"] });
       queryClient.invalidateQueries({ queryKey: ["payments", "analytics"] });
@@ -83,13 +85,16 @@ function getRelativeTime(dateStr: string) {
  * Automatically formats the timestamp into relative time.
  */
 export function useRecentRegistrations(limit: number = 5) {
+  const { activeOrganization } = useAuth();
+  const activeOrganizationId = activeOrganization?.id;
+
   return useQuery<IRecentRegistration[]>({
-    queryKey: ["subscriptions", "recent", limit],
+    queryKey: ["subscriptions", "recent", activeOrganizationId, limit],
     queryFn: async () => {
       const data = await subscriptionsService.getRecent(limit);
       return data.map(sub => ({
-        name: sub.name,
-        time: getRelativeTime(sub.createdAt),
+        ...sub,
+        time: getRelativeTime(sub.createdAt || new Date().toISOString()),
       }));
     },
     staleTime: 1000 * 60 * 2,
@@ -114,7 +119,7 @@ export function useAnalytics(baseCurrency: string) {
 export function useRevenueReport(baseCurrency: string, timeframe: '12m' = '12m') {
   return useQuery({
     queryKey: ["payments", "report-revenue", baseCurrency, timeframe],
-    queryFn: () => financeService.getRevenueReport(baseCurrency, timeframe),
+    queryFn: () => financeService.getRevenueReport(baseCurrency),
     enabled: !!baseCurrency,
     staleTime: 1000 * 60 * 60, // 1 hour
   });

@@ -178,6 +178,12 @@ export const membersRepository = {
     });
   },
 
+  async findByUserId(organizationId: string, userId: string) {
+    return db.query.gymMember.findFirst({
+      where: and(eq(gymMember.userId, userId), eq(gymMember.organizationId, organizationId)),
+    });
+  },
+
   async create(data: NewDbMember) {
     const [newMember] = await db.insert(gymMember).values(data).returning();
     return newMember;
@@ -194,6 +200,13 @@ export const membersRepository = {
 
   async delete(organizationId: string, id: number) {
     await db.delete(gymMember).where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
+  },
+
+  async deleteAuthMember(userId: string, organizationId: string) {
+    await db.delete(authMember).where(and(
+      eq(authMember.userId, userId),
+      eq(authMember.organizationId, organizationId)
+    ));
   },
 
   async countActive(organizationId: string, now: Date) {
@@ -255,5 +268,14 @@ export const membersRepository = {
       .where(and(eq(authMember.userId, userId), eq(authMember.organizationId, organizationId)))
       .returning();
     return updated;
+  },
+
+  async findAuthMember(userId: string, organizationId: string) {
+    const [result] = await db
+      .select()
+      .from(authMember)
+      .where(and(eq(authMember.userId, userId), eq(authMember.organizationId, organizationId)))
+      .limit(1);
+    return result;
   }
 };

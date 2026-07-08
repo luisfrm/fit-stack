@@ -38,7 +38,7 @@ export { Skeleton } from "@workspace/ui/components/skeleton";
 export { ColorPicker } from "@workspace/ui/components/color-picker";
 export { ImageUpload } from "@workspace/ui/components/image-upload";
 
-export { CoachCard, AddCoachCard } from "@workspace/ui/components/coach-card";
+export { TrainerCard, AddTrainerCard } from "@workspace/ui/components/trainer-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
 export { Switch } from "@workspace/ui/components/switch";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "@workspace/ui/components/tabs";
@@ -51,6 +51,8 @@ export { Separator } from "@workspace/ui/components/separator";
 export { Textarea } from "@workspace/ui/components/textarea";
 export { ActionsDropdown } from "@workspace/ui/components/actions-dropdown";
 export type { ActionDropdownItem, ActionDropdownSection } from "@workspace/ui/components/actions-dropdown";
+export { FloatingActionButton, DEFAULT_FAB_ITEMS } from "@workspace/ui/components/floating-action-button";
+export type { FabItem, FabConfig } from "@workspace/ui/components/floating-action-button";
 
 // Next.js specific components
 export { AppSidebar, MobileNav, SettingsSidebar } from "@workspace/ui/components/next/sidebar";
@@ -68,3 +70,9 @@ export type { ChartHeaderOption, ChartHeaderProps } from "@workspace/ui/componen
 export type { ChartConfig } from "@workspace/ui/components/chart";
 export { ChartCarousel } from "@workspace/ui/components/chart-carousel";
 export type { ChartCarouselProps, ChartView } from "@workspace/ui/components/chart-carousel";
+
+// Dashboard utilities
+export { DashboardHeader } from "@workspace/ui/components/dashboard-header";
+export { FilterPanel } from "@workspace/ui/components/filter-panel";
+export type { FilterPanelProps } from "@workspace/ui/components/filter-panel";
+export { StatCard } from "@workspace/ui/components/stat-card";

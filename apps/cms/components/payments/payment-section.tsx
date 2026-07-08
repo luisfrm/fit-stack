@@ -98,6 +98,7 @@ export function PaymentSection({
             onChange={onCurrencyChange}
             currencies={activeCurrencies}
             label="Moneda de Pago"
+            disabled={disabled}
           />
 
           <Input
@@ -106,6 +107,7 @@ export function PaymentSection({
             label="Fecha de Operación"
             value={paymentDate}
             onChange={(e) => onPaymentDateChange(e.target.value)}
+            disabled={disabled}
           />
 
           <SimpleSelect
@@ -114,6 +116,7 @@ export function PaymentSection({
             value={paymentMethodId}
             onChange={onMethodChange}
             placeholder="Seleccionar Método"
+            disabled={disabled}
             options={[
               ...activePaymentMethods.map(method => ({
                 value: method.id,
@@ -140,6 +143,7 @@ export function PaymentSection({
                 onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
                 variant="default"
                 leftIcon={<CircleDollarSign size={16} />}
+                disabled={disabled}
               />
             </div>
           )}
@@ -158,6 +162,7 @@ export function PaymentSection({
               variant="default"
               className={allowPriceOverride ? "" : "opacity-70"}
               leftIcon={<CreditCard size={16} />}
+              disabled={disabled}
             />
             {!allowPriceOverride && (
               <p className="text-[10px] text-muted-foreground italic">Basado en el plan. No editable.</p>
@@ -173,6 +178,7 @@ export function PaymentSection({
         <Switch
           checked={paymentValidated}
           onCheckedChange={onPaymentValidatedChange}
+          disabled={disabled}
         />
       </div>
       {/* Dynamic Fields */}
@@ -191,6 +197,7 @@ export function PaymentSection({
                   onChange={(file) => onDynamicChange(field.id, file)}
                   onRemove={() => onDynamicChange(field.id, null)}
                   className="w-full"
+                  disabled={disabled}
                 />
               ) : (
                 <Input
@@ -198,6 +205,7 @@ export function PaymentSection({
                   placeholder="Escribe aquí..."
                   value={dynamicFieldValues[field.id] || ""}
                   onChange={(e) => onDynamicChange(field.id, e.target.value)}
+                  disabled={disabled}
                 />
               )}
             </div>
@@ -215,6 +223,7 @@ export function PaymentSection({
             onChange={(e) => onPaymentDetailsChange(e.target.value)}
             variant="default"
             aria-labelledby="other-method-details-label"
+            disabled={disabled}
           />
         </div>
       )}

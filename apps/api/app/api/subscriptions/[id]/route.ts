@@ -1,57 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
-import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
+import { withAuth } from '@/lib/route-handler'
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+interface RouteParams {
+  id: string
+}
 
-    const { id } = await params;
-    const subId = Number(id)
+export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)(
+  async (req, { organizationId, params }) => {
+    const subId = Number(params?.id)
     if (Number.isNaN(subId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
     const { status } = await req.json()
-    const organizationId = session.session.activeOrganizationId;
 
     if (status !== 'cancelled') {
       return NextResponse.json(
-        { error: 'Los estados "active" y "expired" son calculados automáticamente. Solo se permite el cambio manual a "cancelled".' }, 
+        { error: 'Los estados "active" y "expired" son calculados automáticamente. Solo se permite el cambio manual a "cancelled".' },
         { status: 400 }
       )
     }
 
     const updated = await subscriptionsService.cancel(organizationId, subId)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`);
-    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${organizationId}:members:*`);
+    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(updated)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
-}
+)
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE)(
+  async (req, { organizationId, params }) => {
+    const id = Number(params?.id)
+    if (Number.isNaN(id)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
 
-    const { id } = await params;
-    const subId = Number(id)
-    if (Number.isNaN(subId)) return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+    await subscriptionsService.delete(organizationId, id)
 
-    const organizationId = session.session.activeOrganizationId;
-    await subscriptionsService.delete(organizationId, subId)
-
-    await cache.invalidate(`org:${organizationId}:subscriptions`);
-    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${organizationId}:members:*`);
+    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
-}
+)

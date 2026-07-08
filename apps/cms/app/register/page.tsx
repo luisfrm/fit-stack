@@ -14,11 +14,48 @@ import { toast } from "@workspace/ui/components";
 import { sessionService } from "@/lib/services/session-service";
 import { capitalize } from "@/lib/helper";
 import { membersService } from "@/lib/services/members-service";
+import { useSession } from "@/lib/auth-client";
 
 function RegisterForm() {
+  const { data: session, isPending: sessionPending } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams.get('token');
+
+  // Refs to prevent double linkUser calls (race condition between handleSubmit and useEffect)
+  const hasLinked = React.useRef(false);
+  // Track if user had a session when the component first mounted (returned from login)
+  const hadSessionOnMount = React.useRef<boolean | null>(null);
+
+  // ── AUTO-LINK: If user was ALREADY logged in when page loaded (e.g. returned from /login) ──
+  React.useEffect(() => {
+    if (sessionPending) return;
+    
+    // Record initial session state on first non-pending render
+    if (hadSessionOnMount.current === null) {
+      hadSessionOnMount.current = !!session;
+    }
+
+    // Only auto-link if user had session on mount (came from login redirect)
+    // NOT if session appeared mid-lifecycle (signUp just happened in handleSubmit)
+    if (hadSessionOnMount.current && session && token && !hasLinked.current) {
+      hasLinked.current = true;
+      const autoLink = async () => {
+        try {
+          const result = await membersService.linkUser(token);
+          if (result.success) {
+            toast.success("Tu cuenta ha sido vinculada correctamente.");
+            router.push('/dashboard');
+          } else {
+            console.error("Auto-link failed: server returned success=false");
+          }
+        } catch (err) {
+          console.error("Auto-link exception:", err);
+        }
+      };
+      autoLink();
+    }
+  }, [session, sessionPending, token, router]);
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
@@ -79,22 +116,27 @@ function RegisterForm() {
     });
 
     if (error) {
-      if (error.message?.includes("already registered")) {
-        toast.error("El correo electrónico ya está registrado");
+      if (error.code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL') {
+        toast.info('Ya tienes una cuenta con este email. Inicia sesión para vincular tu acceso.');
+        const returnTo = encodeURIComponent(`/register?token=${token}`);
+        router.push(`/login?returnTo=${returnTo}`);
       } else if (error.message?.includes("Password too short")) {
         toast.error("La contraseña es muy corta");
       } else {
-        toast.error("Ocurrió un error inesperado al conectar con el servidor.");
+        toast.error(error.message || "Ocurrió un error inesperado al conectar con el servidor.");
       }
       setIsLoading(false);
       return;
     }
 
+    // Prevent useEffect from also calling linkUser
+    hasLinked.current = true;
+
     // Si Better-Auth creó el usuario exitosamente, vinculamos la cuenta
     try {
       await membersService.linkUser(token);
       toast.success("Cuenta configurada correctamente.");
-      router.push('/dashboard'); // Go directly to dashboard instead of login since they are authenticated
+      router.push('/dashboard');
     } catch (linkError: any) {
       toast.error(linkError.response?.data?.error || "Error al vincular el usuario al miembro.");
     } finally {
@@ -121,7 +163,7 @@ function RegisterForm() {
 
         <div className="max-w-md">
           <header className="mb-8">
-            <Title as="h1" size="section" className="mb-2">
+            <Title as="h1" size="section" className="mb-2 text-foreground">
               CREA TU CUENTA
             </Title>
             <Text variant="muted" size="md">Completa tu registro para acceder a la plataforma</Text>
@@ -135,11 +177,11 @@ function RegisterForm() {
           )}
 
           {tokenError && (
-            <div className="flex flex-col items-center justify-center py-10 gap-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center px-4">
-              <AlertCircle className="text-red-500 w-12 h-12" />
+            <div className="flex flex-col items-center justify-center py-10 gap-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-center px-4">
+              <AlertCircle className="text-destructive w-12 h-12" />
               <div>
-                <h3 className="text-lg font-bold text-red-500">Invitación Inválida</h3>
-                <p className="text-sm text-red-400 mt-1">{tokenError}</p>
+                <h3 className="text-lg font-bold text-destructive">Invitación Inválida</h3>
+                <p className="text-sm text-destructive/80 mt-1">{tokenError}</p>
               </div>
             </div>
           )}

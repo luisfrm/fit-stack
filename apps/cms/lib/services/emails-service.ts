@@ -14,7 +14,7 @@ export const emailsService = {
   },
 
   /**
-   * Sends an invitation email to a new member or coach.
+   * Sends an invitation email to a new member or trainer.
    * [STUB] Ready for future implementation.
    */
   sendInvitationEmail: async (email: string, role: string, payload?: any): Promise<void> => {

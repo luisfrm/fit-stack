@@ -85,7 +85,7 @@ export function ConfirmationModal({
               className={cn(
                 "shrink-0 size-12 rounded-full flex items-center justify-center",
                 isDanger
-                  ? "bg-red-600/10 text-red-600"
+                  ? "bg-destructive/10 text-destructive"
                   : "bg-primary/10 text-primary"
               )}
             >

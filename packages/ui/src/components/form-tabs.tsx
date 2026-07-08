@@ -51,7 +51,7 @@ export function FormTabs({
     >
       <TabsList
         variant={variant}
-        className={cn("w-full justify-start p-1.5 h-auto", listClassName)}
+        className={cn("w-fit justify-start p-1.5 h-auto", listClassName)}
       >
         {steps.map((step, index) => (
           <TabsTrigger

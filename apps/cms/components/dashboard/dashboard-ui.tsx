@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -17,14 +18,13 @@ import {
   AlertCircle,
   BadgeCheck,
   ShieldCheck,
-  Building2,
-  PackageCheck,
-  BarChart3,
-  Globe,
+  ArrowLeftRight,
+  User,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
 
-import { GLOBAL_ROLES, IOrganization } from "@workspace/shared";
+import { IOrganization } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -33,138 +33,171 @@ import {
 import { formatTimeRange } from "@/lib/config/display";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useSettings } from "@/lib/hooks/use-settings";
+import { usePermissions } from "@workspace/auth/hooks";
+import {
+  PERMISSION_ACTIONS,
+  PERMISSION_MODULES,
+  type PermissionModule,
+} from "@workspace/shared";
+import { useTheme } from "@/lib/hooks/use-theme";
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import {
   AppSidebar as UISidebar,
   MobileNav as UIMobileNav,
   type SidebarUser,
   type SidebarNavItem,
   Text,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
   Card,
   Table,
   Button,
   type ColumnDef,
+  Modal,
 } from "@workspace/ui/components";
+import { NextImage } from "@workspace/ui/components/next/image";
 import { cn } from "@workspace/ui/lib/utils";
 import SignOutButton from "../SignOutButton";
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { OrganizationPicker } from "./organization-picker";
 
 /* ─────────────────────────────────────────────
    SIDEBAR NAV SCHEMAS
    ───────────────────────────────────────────── */
 
-const GYM_NAV_ITEMS: SidebarNavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck },
-  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard },
-  { label: "Clientes", href: "/dashboard/members", icon: Users },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard },
-  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet },
-  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays },
-  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell },
-  { label: "Configuración", href: "/dashboard/settings", icon: Settings },
+type GymNavItem = SidebarNavItem & { module: PermissionModule };
+
+const GYM_NAV_ITEMS: GymNavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: PERMISSION_MODULES.DASHBOARD },
+  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
+  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
+  { label: "Clientes", href: "/dashboard/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT },
+  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
+  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
+  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
+  { label: "Configuración", href: "/dashboard/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
 ];
 
-const SAAS_NAV_ITEMS: SidebarNavItem[] = [
-  { label: "Dashboard Global", href: "/dashboard", icon: BarChart3 },
-  { label: "Organizaciones", href: "/dashboard/platform/organizations", icon: Building2 },
-  { label: "Planes", href: "/dashboard/platform/plans", icon: PackageCheck },
-  { label: "Finanzas", href: "/dashboard/platform/revenue", icon: TrendingUp },
-  { label: "Ajustes Globales", href: "/dashboard/platform/settings", icon: Globe },
-];
-
-function ReturnToSaaSButton() {
-  const router = useRouter();
-  const [loading, setLoading] = React.useState(false);
-
-  const handleReturn = async () => {
-    try {
-      setLoading(true);
-      await authClient.organization.setActive({ organizationId: null });
-      router.push("/dashboard");
-      router.refresh();
-    } catch (error) {
-      console.error("Error returning to SaaS:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Button
-      variant="link"
-      size="xs"
-      onClick={handleReturn}
-      loading={loading}
-      className="p-0 uppercase gap-1.5"
-      leftIcon={<ArrowLeft className="w-3 h-3" />}
-    >
-      Volver a SaaS
-    </Button>
+function useFilteredNavItems(): SidebarNavItem[] {
+  const { can } = usePermissions();
+  return GYM_NAV_ITEMS.filter((item) =>
+    can(item.module, PERMISSION_ACTIONS.READ),
   );
 }
 
+export function SwitchOrganizationAction() {
+  const router = useRouter();
+  const [organizations, setOrganizations] = React.useState<IOrganization[]>([]);
+  const [open, setOpen] = React.useState(false);
+  const loadedRef = React.useRef(false);
 
-export function AppSidebar({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
+  React.useEffect(() => {
+    if (loadedRef.current) return;
+    let cancelled = false;
+    async function load() {
+      const { data } = await authClient.organization.list();
+      if (cancelled) return;
+      if (data) setOrganizations(data as IOrganization[]);
+      loadedRef.current = true;
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSelect = React.useCallback(() => {
+    setOpen(false);
+    router.refresh();
+  }, [router]);
+
+  // Solo mostrar si pertenece a más de una organización
+  if (organizations.length <= 1) return null;
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={setOpen}
+      title="Cambiar de sede"
+      description="Selecciona la sede con la que deseas trabajar ahora."
+      trigger={
+        <Button
+          variant="link"
+          size="xs"
+          className="p-0 uppercase gap-1.5 text-primary hover:text-primary/80"
+          leftIcon={<ArrowLeftRight className="w-3 h-3" />}
+        >
+          Cambiar sede
+        </Button>
+      }
+    >
+      <div className="py-4">
+        <OrganizationPicker
+          isModal
+          onSelect={handleSelect}
+        />
+      </div>
+    </Modal>
+  );
+}
+
+export function AppSidebar({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
+  const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
+  const navigation = useFilteredNavItems();
 
-  // Si es ADMIN pero TIENE una organización activa, usamos el menú de GYM
-  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
-  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
+  const brandingAction = React.useMemo(() => {
+    return <SwitchOrganizationAction />;
+  }, []);
 
   return (
     <UISidebar
       user={user}
       navigation={navigation}
       branding={{
-        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Gym unnamed"),
-        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: activeOrganization?.name || "Gym unnamed",
+        subtitle: activeOrganization?.slogan || "",
         isLoading: isBrandingLoading,
-        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
-        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
+        fallbackIcon: Dumbbell,
+        action: brandingAction,
       }}
       footer={<SignOutButton />}
+      themeToggle={{ isDark, toggle: toggleTheme }}
     />
   );
 }
 
-export function MobileNav({ user, activeOrganizationId }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
+export function MobileNav({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
   const { isPending: sessionLoading, activeOrganization } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
+  const { isDark, toggleTheme } = useTheme();
 
   const isBrandingLoading = sessionLoading || settingsLoading;
+  const navigation = useFilteredNavItems();
 
-  const isSaaSMode = user.role === GLOBAL_ROLES.ADMIN && !activeOrganizationId;
-  const navigation = isSaaSMode ? SAAS_NAV_ITEMS : GYM_NAV_ITEMS;
+  const brandingAction = React.useMemo(() => {
+    return <SwitchOrganizationAction />;
+  }, []);
 
   return (
     <UIMobileNav
       user={user}
       navigation={navigation}
       branding={{
-        logo: !isSaaSMode && activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: isSaaSMode ? "FitStack" : (activeOrganization?.name || "Elite Fitness"),
-        subtitle: isSaaSMode ? "Administración Master" : ((activeOrganization as IOrganization)?.slogan || ""),
+        logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
+        title: activeOrganization?.name || "Elite Fitness",
+        subtitle: activeOrganization?.slogan || "",
         isLoading: isBrandingLoading,
-        fallbackIcon: isSaaSMode ? Globe : Dumbbell,
-        action: !isSaaSMode && user.role === GLOBAL_ROLES.ADMIN ? <ReturnToSaaSButton /> : undefined,
+        fallbackIcon: Dumbbell,
+        action: brandingAction,
       }}
       footer={<SignOutButton />}
+      themeToggle={{ isDark, toggle: toggleTheme }}
     />
   );
 }
-
-
-
 
 /* ─────────────────────────────────────────────
    KPI CARD
@@ -290,24 +323,59 @@ export function NoData({ message, className, icon: Icon = Inbox }: Readonly<NoDa
 
 interface ActivityItemProps {
   name: string;
-  time: string;
-  avatarUrl?: string;
+  time?: string;
+  imageUrl?: string | null;
+  planName?: string;
+  amountPaid?: number;
+  currencyPaid?: string;
+  endDate?: string;
 }
 
-export function ActivityItem({ name, time, avatarUrl }: Readonly<ActivityItemProps>) {
+export function ActivityItem({ name, time, imageUrl, planName, amountPaid, currencyPaid, endDate }: Readonly<ActivityItemProps>) {
+  const { settings } = useSettings();
+  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
-      <Avatar size="default" fallback={""}>
-        {avatarUrl && <AvatarImage src={uploadService.getMediaUrl(avatarUrl)} alt={name} />}
-        <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-      </Avatar>
+      {imageUrl ? (
+        <NextImage
+          src={uploadService.getMediaUrl(imageUrl)}
+          alt={name}
+          width={48}
+          height={48}
+          containerClassName="h-12 w-12 shrink-0 rounded-full"
+          className="rounded-full"
+        />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+          <User className="w-4 h-4" />
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <Text as="p" size="base" weight="medium" truncate>
           {name}
         </Text>
-        <Text as="span" size="xs" variant="subtle" uppercase>
-          {time}
-        </Text>
+        {planName && (
+          <Text as="p" size="xs" variant="primary" weight="semibold" className="truncate">
+            {planName}
+          </Text>
+        )}
+        <div className="flex items-center gap-2">
+          {amountPaid !== undefined && (
+            <Text as="span" size="xs" variant="muted" className="tabular-nums">
+              {ValueConverter.format(amountPaid / 100, currencyPaid || 'USD', currencyFormat)}
+            </Text>
+          )}
+          {endDate && (
+            <Text as="span" size="xs" variant="subtle" className="flex items-center gap-0.5">
+              <CalendarClock size={10} />
+              {new Date(endDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+            </Text>
+          )}
+          <Text as="span" size="xs" variant="subtle" className="ml-auto uppercase">
+            {time}
+          </Text>
+        </div>
       </div>
     </div>
   );
@@ -380,13 +448,13 @@ export function RecentRegistrationsList({ registrations, loading }: Readonly<{ r
   }
 
   if (registrations.length === 0) {
-    return <NoData message="No se han registrado nuevos miembros recientemente." className="py-12" />;
+    return <NoData message="No hay pagos registrados recientemente." className="py-12" />;
   }
 
   return (
     <div className="flex flex-col flex-1 p-2 gap-1 animate-in fade-in duration-500">
       {registrations.map((member) => (
-        <ActivityItem key={member.name} {...member} />
+        <ActivityItem key={member.id} {...member} />
       ))}
     </div>
   );
@@ -400,9 +468,9 @@ export type AlertSeverity = "warning" | "danger" | "success" | "info";
 
 const ALERT_CONFIG: Record<AlertSeverity, { borderClass: string; iconBg: string; iconClass: string; buttonClass: string; icon: LucideIcon }> = {
   warning: { icon: AlertTriangle, borderClass: "border-l-primary", iconBg: "bg-primary/20", iconClass: "text-primary", buttonClass: "text-primary" },
-  danger: { icon: AlertCircle, borderClass: "border-l-rose-500", iconBg: "bg-rose-500/20", iconClass: "text-rose-500", buttonClass: "text-rose-400" },
-  success: { icon: BadgeCheck, borderClass: "border-l-emerald-500", iconBg: "bg-emerald-500/20", iconClass: "text-emerald-500", buttonClass: "text-emerald-400" },
-  info: { icon: AlertCircle, borderClass: "border-l-sky-500", iconBg: "bg-sky-500/20", iconClass: "text-sky-400", buttonClass: "text-sky-400" },
+  danger: { icon: AlertCircle, borderClass: "border-l-destructive", iconBg: "bg-destructive/20", iconClass: "text-destructive", buttonClass: "text-destructive" },
+  success: { icon: BadgeCheck, borderClass: "border-l-success", iconBg: "bg-success/20", iconClass: "text-success", buttonClass: "text-success" },
+  info: { icon: AlertCircle, borderClass: "border-l-info", iconBg: "bg-info/20", iconClass: "text-info", buttonClass: "text-info" },
 };
 
 interface AlertItemProps {

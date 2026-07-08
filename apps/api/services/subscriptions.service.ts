@@ -62,7 +62,12 @@ export const subscriptionsService = {
     return records.map((r: any) => ({
       id: r.id,
       name: `${r.memberName} ${r.memberLastName}`,
+      imageUrl: r.memberImageUrl,
       createdAt: r.createdAt.toISOString(),
+      planName: r.planName || null,
+      amountPaid: r.amountPaid ? Number(r.amountPaid) : null,
+      currencyPaid: r.currencyPaid || 'USD',
+      endDate: r.endDate.toISOString(),
     }))
   },
 
@@ -179,7 +184,7 @@ export const subscriptionsService = {
         }))
     } else {
       paymentDetails = Object.entries(details)
-        .filter(([_, value]) => {
+        .filter(([, value]) => {
           // Heurística para excluir archivos en formato legado (rutas o URLs)
           const valStr = String(value);
           return !valStr.startsWith('http') && !valStr.includes('/media/') && !valStr.includes('files/');

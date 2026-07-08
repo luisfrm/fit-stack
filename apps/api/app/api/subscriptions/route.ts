@@ -1,22 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { subscriptionsService } from '@/services/subscriptions.service'
-import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
 import { auth } from '@/config/auth'
 import { headers } from 'next/headers'
+import { IOrganization, PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
+import { withAuth } from '@/lib/route-handler'
 
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const GET = withAuth(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId }) => {
     const { searchParams } = req.nextUrl
-    const organizationId = session.session.activeOrganizationId;
 
-    const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`;
-    const cachedData = await cache.get(cacheKey);
+    const cacheKey = `org:${organizationId}:subscriptions:${searchParams.toString()}`
+    const cachedData = await cache.get(cacheKey)
     if (cachedData) {
-      return NextResponse.json(cachedData);
+      return NextResponse.json(cachedData)
     }
 
     const filters = {
@@ -28,38 +25,28 @@ export async function GET(req: NextRequest) {
 
     const result = await subscriptionsService.getAllPaginated(organizationId, filters)
 
-    await cache.set(cacheKey, result, 300);
+    await cache.set(cacheKey, result, 300)
 
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-}
+)
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const POST = withAuth(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.CREATE)(
+  async (req, { organizationId }) => {
     const body = await req.json()
-    // Validar body...
-    const organizationId = session.session.activeOrganizationId;
-    
-    // Fetch full organization to get timezone
+
     const fullOrg = await auth.api.getFullOrganization({
       headers: await headers()
     })
-    
-    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
-    
+
+    const timezone = (fullOrg as IOrganization)?.timezone || 'America/Caracas'
+
     const newSubscription = await subscriptionsService.create(organizationId, body, timezone)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`);
-    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${organizationId}:members:*`); // members use subscription data
+    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(newSubscription, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
-}
+)

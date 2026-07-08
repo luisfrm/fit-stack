@@ -71,8 +71,8 @@ export function ActionsDropdown<T = unknown>({
 
     const variantClasses = {
       default: "",
-      destructive: "text-red-500 hover:bg-red-500/10 focus:bg-red-500/10 focus:text-red-500",
-      amber: "text-amber-500 hover:bg-amber-500/10 focus:bg-amber-500/10 focus:text-amber-500",
+      destructive: "text-destructive hover:bg-destructive/10 focus:bg-destructive/10 focus:text-destructive",
+      amber: "text-warning hover:bg-warning/10 focus:bg-warning/10 focus:text-warning",
       primary: "text-primary hover:bg-primary/10 focus:bg-primary/10 focus:text-primary",
     };
 

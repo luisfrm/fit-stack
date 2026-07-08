@@ -14,7 +14,6 @@ function customTooltipFormatter(
   payload: readonly unknown[],
   baseCurrency: string,
   currencyFormat: CurrencyFormat,
-  timeframe: '30d' | '12m'
 ) {
   // Convert ValueType (which could be an array in Recharts) to a single value
   const finalValue = Array.isArray(value) ? value[0] : value;
@@ -79,7 +78,7 @@ export function RevenueChart({
 
       if (timeframe === '30d') {
         // rawDate is 'YYYY-MM-DD'
-        const [y, m, d] = rawDate.split('-');
+        const [, m, d] = rawDate.split('-');
         dateLabel = `${d}-${m}`;
       } else {
         // rawDate is 'YYYY-MM'
@@ -204,7 +203,7 @@ export function RevenueChart({
                 return Number(val) >= 1000 ? `${(Number(val) / 1000).toFixed(0)}k` : String(val);
               }}
               tooltipFormatter={(value, name, item, index, payload) =>
-                customTooltipFormatter(value, name, item, index, payload, baseCurrency, currencyFormat, timeframe)
+                customTooltipFormatter(value, name, item, index, payload, baseCurrency, currencyFormat)
               }
             />
           ) : (

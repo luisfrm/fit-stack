@@ -1,0 +1,227 @@
+"use client";
+
+import * as React from "react";
+import { Calculator, CircleDollarSign, CreditCard } from "lucide-react";
+import {
+  Card,
+  Text,
+  Label,
+  Input,
+  SimpleSelect,
+  CurrencySelector,
+  Switch
+} from "@workspace/ui/components";
+import { ImageUpload } from "@workspace/ui/components/image-upload";
+import { type IPlatformPlan, type IPaymentMethodConfig } from "@workspace/shared/types";
+import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { cn } from "@workspace/ui/lib/utils";
+
+interface PaymentSectionProps {
+  readonly selectedPlan: IPlatformPlan;
+  readonly paymentCurrency: string;
+  readonly paymentMethodId: string;
+  readonly activeCurrencies: string[];
+  readonly activePaymentMethods: IPaymentMethodConfig[];
+  readonly finalAmount: number;
+  readonly currencyFormat: CurrencyFormat;
+  readonly selectedPaymentConfig?: IPaymentMethodConfig;
+  readonly dynamicFieldValues: Record<string, any>;
+  readonly onDynamicChange: (id: string, value: any) => void;
+  readonly exchangeRate: number;
+  readonly rateFocus: boolean;
+  readonly amountFocus: boolean;
+  readonly onRateFocus: (focused: boolean) => void;
+  readonly onAmountFocus: (focused: boolean) => void;
+  readonly onRateChange: (value: number) => void;
+  readonly onAmountChange: (value: number) => void;
+  readonly onCurrencyChange: (value: string) => void;
+  readonly onMethodChange: (value: string) => void;
+  readonly paymentValidated: boolean;
+  readonly onPaymentValidatedChange: (value: boolean) => void;
+  readonly allowPriceOverride: boolean;
+  readonly paymentDetails: string;
+  readonly onPaymentDetailsChange: (value: string) => void;
+  readonly paymentDate: string;
+  readonly onPaymentDateChange: (value: string) => void;
+  readonly disabled?: boolean;
+}
+
+export function PaymentSection({
+  selectedPlan,
+  paymentCurrency,
+  paymentMethodId,
+  activeCurrencies,
+  activePaymentMethods,
+  finalAmount,
+  currencyFormat,
+  selectedPaymentConfig,
+  dynamicFieldValues,
+  onDynamicChange,
+  exchangeRate,
+  rateFocus,
+  amountFocus,
+  onRateFocus,
+  onAmountFocus,
+  onRateChange,
+  onAmountChange,
+  onCurrencyChange,
+  onMethodChange,
+  paymentValidated,
+  onPaymentValidatedChange,
+  allowPriceOverride,
+  paymentDetails,
+  onPaymentDetailsChange,
+  paymentDate,
+  onPaymentDateChange,
+  disabled,
+}: PaymentSectionProps) {
+  return (
+    <Card className={cn(
+      "p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500",
+      disabled && "opacity-40 cursor-not-allowed transition-opacity"
+    )}>
+      <div className="flex items-center gap-2 mb-2">
+        <Calculator className="w-5 h-5 text-primary" />
+        <Text weight="bold" uppercase size="base" as="div">Detalles del Pago</Text>
+      </div>
+
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CurrencySelector
+            value={paymentCurrency}
+            onChange={onCurrencyChange}
+            currencies={activeCurrencies}
+            label="Moneda de Pago"
+            disabled={disabled}
+          />
+
+          <Input
+            id="payment-date"
+            type="date"
+            label="Fecha de Operación"
+            value={paymentDate}
+            onChange={(e) => onPaymentDateChange(e.target.value)}
+            disabled={disabled}
+          />
+
+          <SimpleSelect
+            className="md:col-span-2"
+            label="Método de Pago"
+            value={paymentMethodId}
+            onChange={onMethodChange}
+            placeholder="Seleccionar Método"
+            disabled={disabled}
+            options={[
+              ...activePaymentMethods.map(method => ({
+                value: method.id,
+                label: method.name
+              })),
+              { value: "other", label: "Otro / Personalizado" }
+            ]}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
+          {paymentCurrency !== selectedPlan.currency && (
+            <div className="space-y-2">
+              <Label htmlFor="exchange-rate" className="text-xs font-semibold text-muted-foreground uppercase">
+                Tasa ({selectedPlan.currency} {"\u2192"} {paymentCurrency})
+              </Label>
+              <Input
+                id="exchange-rate"
+                type={rateFocus ? "number" : "text"}
+                step="0.01"
+                value={rateFocus ? exchangeRate : ValueConverter.format(exchangeRate, "", currencyFormat)}
+                onFocus={() => onRateFocus(true)}
+                onBlur={() => onRateFocus(false)}
+                onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
+                variant="default"
+                leftIcon={<CircleDollarSign size={16} />}
+                disabled={disabled}
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="final-amount" className="text-xs font-semibold text-muted-foreground uppercase">Monto Total a Recibir</Label>
+            <Input
+              id="final-amount"
+              type={amountFocus ? "number" : "text"}
+              step="0.01"
+              value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
+              onFocus={() => onAmountFocus(true)}
+              onBlur={() => onAmountFocus(false)}
+              onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
+              readOnly={!allowPriceOverride}
+              variant="default"
+              className={allowPriceOverride ? "" : "opacity-70"}
+              leftIcon={<CreditCard size={16} />}
+              disabled={disabled}
+            />
+            {!allowPriceOverride && (
+              <p className="text-[10px] text-muted-foreground italic">Basado en el plan. No editable.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between p-4 rounded-xl border border-dashed border-border bg-accent/5">
+        <div className="flex flex-col gap-0.5">
+          <Text weight="bold" size="sm">Registrar pago como validado</Text>
+          <Text size="xs" variant="muted">El pago se marcará como confirmado inmediatamente</Text>
+        </div>
+        <Switch
+          checked={paymentValidated}
+          onCheckedChange={onPaymentValidatedChange}
+          disabled={disabled}
+        />
+      </div>
+
+      {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
+          {selectedPaymentConfig.fields.map(field => (
+            <div key={field.id} className={cn("space-y-2", field.type === 'file' && "md:col-span-2")}>
+              <Text as="label" variant="muted" size="xs" weight="bold" uppercase className="flex items-center gap-1">
+                {field.label}
+                {field.required && <span className="text-red-500">*</span>}
+              </Text>
+
+              {field.type === 'file' ? (
+                <ImageUpload
+                  value={typeof dynamicFieldValues[field.id] === 'string' ? dynamicFieldValues[field.id] : undefined}
+                  onChange={(file) => onDynamicChange(field.id, file)}
+                  onRemove={() => onDynamicChange(field.id, null)}
+                  className="w-full"
+                  disabled={disabled}
+                />
+              ) : (
+                <Input
+                  type={field.type === 'number' ? 'number' : 'text'}
+                  placeholder="Escribe aquí..."
+                  value={dynamicFieldValues[field.id] || ""}
+                  onChange={(e) => onDynamicChange(field.id, e.target.value)}
+                  disabled={disabled}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {paymentMethodId === 'other' && (
+        <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+          <Label id="other-method-details-label" className="text-xs font-semibold text-muted-foreground uppercase">Especificar Método / Referencia</Label>
+          <Input
+            id="other-method-details"
+            placeholder="Ej: Transferencia Banco Mercantil..."
+            value={paymentDetails}
+            onChange={(e) => onPaymentDetailsChange(e.target.value)}
+            variant="default"
+            aria-labelledby="other-method-details-label"
+            disabled={disabled}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}

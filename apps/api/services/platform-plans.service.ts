@@ -1,8 +1,16 @@
-import { NewDbPlatformPlan, platformPlansRepository } from '../repositories/platform-plans.repository';
+import { NewDbPlatformPlan, platformPlansRepository, type PlatformPlansSummary, type PlatformPlanWithStats } from '../repositories/platform-plans.repository';
 
 export const platformPlansService = {
   async getAllPlans() {
     return platformPlansRepository.findAll();
+  },
+
+  async getAllPlansWithStats(): Promise<PlatformPlanWithStats[]> {
+    return platformPlansRepository.findAllWithStats();
+  },
+
+  async getSummary(): Promise<PlatformPlansSummary> {
+    return platformPlansRepository.getSummary();
   },
 
   async getPlanById(id: number) {

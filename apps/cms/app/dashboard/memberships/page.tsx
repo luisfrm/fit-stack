@@ -9,7 +9,7 @@ import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { StatCard } from "@/components/dashboard/stat-card";
+import { StatCard } from "@workspace/ui/components";
 import { NoData } from "@/components/dashboard/dashboard-ui";
 
 export default function MembershipsPage() {

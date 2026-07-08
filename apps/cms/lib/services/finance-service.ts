@@ -93,7 +93,7 @@ export const financeService = {
     return data;
   },
 
-  getRevenueReport: async (baseCurrency: string, timeframe: '12m' = '12m'): Promise<Array<{
+  getRevenueReport: async (baseCurrency: string): Promise<Array<{
     month: string
     currency: string
     amount: number

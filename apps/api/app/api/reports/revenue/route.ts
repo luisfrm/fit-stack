@@ -1,25 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { reportsService } from '@/services/reports.service'
-import { getSession } from '@/config/get-session'
 import { cache } from '@/lib/cache'
 import { auth } from '@/config/auth'
 import { headers } from 'next/headers'
+import { IOrganization, PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
+import { withAuth } from '@/lib/route-handler'
 
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const organizationId = session.session.activeOrganizationId
-    
-    // Fetch full organization to get timezone
+export const GET = withAuth(PERMISSION_MODULES.REPORTS, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId }) => {
     const fullOrg = await auth.api.getFullOrganization({
       headers: await headers()
     })
     
-    const timezone = (fullOrg as any)?.organization?.timezone || 'America/Caracas'
+    const timezone = (fullOrg as IOrganization)?.timezone || 'America/Caracas'
 
     const cacheKey = `org:${organizationId}:reports:revenue:12m`
     const cachedData = await cache.get(cacheKey)
@@ -29,12 +22,8 @@ export async function GET(req: NextRequest) {
 
     const data = await reportsService.getMonthlyRevenue(organizationId, timezone, 12)
 
-    // Cache this for a long time as past months don't change
-    await cache.set(cacheKey, data, 60 * 60) // 1 hour
+    await cache.set(cacheKey, data, 60 * 60)
 
     return NextResponse.json(data)
-  } catch (error: any) {
-    console.error('[REPORTS_REVENUE_ERROR]', error)
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
-}
+)

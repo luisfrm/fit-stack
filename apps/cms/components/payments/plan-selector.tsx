@@ -27,7 +27,7 @@ export function PlanSelector({
     <div className={cn("space-y-3", disabled && "opacity-40 cursor-not-allowed transition-opacity")}>
       <Label id="plan-selection-label" className="text-sm font-medium">Plan de Membresía</Label>
       {plans.length === 0 ? (
-        <p className="text-sm text-yellow-500 bg-yellow-500/10 p-3 rounded-lg">
+        <p className="text-sm text-warning bg-warning/10 p-3 rounded-lg">
           Carga planes primero en el módulo de Membresías.
         </p>
       ) : (
@@ -44,6 +44,7 @@ export function PlanSelector({
             <ToggleGroupItem
               key={plan.id}
               value={String(plan.id)}
+              disabled={disabled}
               className="rounded-xl border border-border data-[state=on]:bg-primary data-[state=on]:text-primary-foreground h-auto py-3 px-4 flex flex-col items-start gap-1 transition-all duration-300 hover:border-primary/50"
             >
               <div className="flex items-center justify-between w-full gap-4">

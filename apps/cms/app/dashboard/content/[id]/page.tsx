@@ -41,7 +41,7 @@ const BLOCK_TYPES: { type: CmsBlockType; label: string; description: string }[] 
   { type: 'testimonials', label: 'Testimonios',      description: 'Reseñas de clientes y estrellas' },
   { type: 'gallery',      label: 'Galería',          description: 'Malla de imágenes con descripción' },
   { type: 'contact',      label: 'Contacto',         description: 'Formulario, mapa y redes sociales' },
-  { type: 'team_info',    label: 'Info de Equipo',   description: 'Título para el staff de coaches' },
+  { type: 'team_info',    label: 'Info de Equipo',   description: 'Título para el staff de entrenadores' },
 ];
 
 export default function CMSPageEditor() {

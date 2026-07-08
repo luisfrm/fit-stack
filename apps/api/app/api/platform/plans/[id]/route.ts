@@ -10,7 +10,7 @@ interface RouteContext {
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== GLOBAL_ROLES.ADMIN) {
+  if (!session || (session.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 
@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 export async function DELETE(req: NextRequest, { params }: RouteContext) {
   const session = await auth.api.getSession({ headers: req.headers });
 
-  if (!session || session.user.role !== GLOBAL_ROLES.ADMIN) {
+  if (!session || (session.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
     return Response.json({ error: 'Unauthorized: Admin access required' }, { status: 403 });
   }
 

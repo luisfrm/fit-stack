@@ -84,7 +84,7 @@ export const subscriptionsRepository = {
             this.getPaidAndNotRevokedCondition()
           )!
         );
-      } else if (status === "expiring") {
+      } else if (status === SUBSCRIPTION_STATUSES.EXPIRING) {
         const limitDate = new Date(now);
         limitDate.setDate(now.getDate() + 7);
         conditions.push(
@@ -204,11 +204,24 @@ export const subscriptionsRepository = {
         id: subscription.id,
         memberName: members.firstName,
         memberLastName: members.lastName,
+        memberImageUrl: members.imageUrl,
+        planName: membershipPlan.name,
+        amountPaid: payment.amountPaid,
+        currencyPaid: payment.currencyPaid,
+        endDate: subscription.endDate,
         createdAt: subscription.createdAt,
       })
       .from(subscription)
       .innerJoin(members, eq(subscription.memberId, members.id))
-      .where(eq(subscription.organizationId, organizationId))
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+      .leftJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
+      .where(and(
+        eq(subscription.organizationId, organizationId),
+        or(
+          eq(payment.status, 'validated'),
+          eq(payment.status, 'processing')
+        )
+      ))
       .orderBy(desc(subscription.createdAt))
       .limit(limit)
   },
@@ -279,9 +292,11 @@ export const subscriptionsRepository = {
     const result = await db
       .select({ count: sql<number>`count(distinct ${subscription.memberId})` })
       .from(subscription)
+      .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
       .where(and(
         eq(subscription.organizationId, organizationId),
         sql`${subscription.cancelledAt} IS NULL`,
+        eq(payment.status, 'validated'),
         gte(subscription.endDate, now),
         lte(subscription.endDate, limitDate)
       ));

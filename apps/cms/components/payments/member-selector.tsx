@@ -102,7 +102,7 @@ function SelectedMemberSection({ member, onClear }: SelectedMemberSectionProps) 
           size="icon"
           variant="ghost"
           onClick={onClear}
-          className="hover:bg-red-500/10 hover:text-red-500 rounded-lg h-9 w-9 transition-colors"
+          className="hover:bg-destructive/10 hover:text-destructive rounded-lg h-9 w-9 transition-colors"
         >
           <X className="w-4 h-4" />
         </Button>
@@ -111,10 +111,10 @@ function SelectedMemberSection({ member, onClear }: SelectedMemberSectionProps) 
       {sub && (
         <div className={cn(
           "px-4 py-3 rounded-xl border flex items-center justify-between animate-in zoom-in-95 duration-500",
-          isActive ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"
+          isActive ? "border-success/20 bg-success/5" : "border-destructive/20 bg-destructive/5"
         )}>
           <div className="flex flex-col gap-0.5">
-            <Text size="xs" weight="bold" className={cn("uppercase tracking-widest", isActive ? "text-emerald-500" : "text-red-500")}>
+            <Text size="xs" weight="bold" className={cn("uppercase tracking-widest", isActive ? "text-success" : "text-destructive")}>
               {isActive ? "Suscripción Vigente" : "Suscripción Expirada"}
             </Text>
             <Text size="sm" weight="semibold">

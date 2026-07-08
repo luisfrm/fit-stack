@@ -6,7 +6,6 @@ import {
   Globe,
   ShieldCheck,
   Fingerprint,
-  MapPin,
   Save,
   Clock,
 } from "lucide-react";
@@ -44,23 +43,21 @@ export default function OrganizationSettingsPage() {
 
   const hasInitialized = React.useRef(false);
 
-  // Sync with active organization data
   React.useEffect(() => {
-    const org = activeOrg as any;
-    if (org && !hasInitialized.current) {
-      setFormData({
-        name: org.name || "",
-        slug: org.slug || "",
-        slogan: org.slogan || "",
-        legalName: org.legalName || "",
-        taxId: org.taxId || "",
-        address: org.address || "",
-        countryCode: org.countryCode || "VE",
-        timezone: org.timezone || "America/Caracas",
-      });
-      setLogoUrl(org.logo || null);
-      hasInitialized.current = true;
-    }
+    if (!activeOrg || hasInitialized.current) return;
+    const org = activeOrg;
+    hasInitialized.current = true;
+    setFormData({
+      name: org.name || "",
+      slug: org.slug || "",
+      slogan: org.slogan || "",
+      legalName: org.legalName || "",
+      taxId: org.taxId || "",
+      address: org.address || "",
+      countryCode: org.countryCode || "VE",
+      timezone: org.timezone || "America/Caracas",
+    });
+    setLogoUrl(org.logo || null);
   }, [activeOrg]);
 
   const handleChange = (field: string, value: string) => {

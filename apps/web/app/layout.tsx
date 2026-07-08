@@ -13,6 +13,12 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
+export const metadata = {
+  title: "Fit-Stack | Gestion Fitness Sin Limites",
+  description:
+    "La plataforma todo-en-uno para controlar miembros, pagos, clases y acceso fisico de tu centro deportivo.",
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,8 +26,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+          rel="stylesheet"
+        />
+      </head>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}
+        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

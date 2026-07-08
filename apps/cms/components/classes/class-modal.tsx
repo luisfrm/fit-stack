@@ -1,41 +1,35 @@
 "use client";
 
 import * as React from "react";
-import { Modal, toast } from "@workspace/ui/components";
+import { Modal } from "@workspace/ui/components";
 import { ClassForm } from "./class-form";
 import { type ICmsClass } from "@/types/dashboard";
-import { classesService } from "@/lib/services/classes-service";
+import { useCreateClass, useUpdateClass } from "@/lib/hooks/use-classes";
 
 interface ClassModalProps {
   readonly classData?: ICmsClass;
   readonly trigger: React.ReactNode;
-  readonly onSuccess?: () => void;
 }
 
-export function ClassModal({ classData, trigger, onSuccess }: ClassModalProps) {
+export function ClassModal({ classData, trigger }: ClassModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(false);
+
+  const createMutation = useCreateClass();
+  const updateMutation = useUpdateClass();
 
   const isEdit = !!classData?.id;
+  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const handleSubmit = async (formData: Partial<ICmsClass>) => {
-    setIsLoading(true);
-
     try {
-      isEdit && classData?.id ?
-        await classesService.updateClass(classData.id, formData) :
-        await classesService.createClass(formData);
-
-      const action = isEdit ? "actualizada" : "creada";
-      toast.success(`Clase ${action} correctamente.`);
-
-      onSuccess?.();
+      if (isEdit && classData?.id) {
+        await updateMutation.mutateAsync({ id: classData.id, data: formData });
+      } else {
+        await createMutation.mutateAsync(formData);
+      }
       setIsOpen(false);
-    } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "Algo salió mal";
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
+    } catch {
+      // Error handled in hook
     }
   };
 

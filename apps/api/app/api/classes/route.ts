@@ -1,11 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { classesService } from '@/services/classes.service'
-import { getSession } from '@/config/get-session'
-import { cache } from '@/lib/cache';
+import { PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
+import { cache } from '@/lib/cache'
+import { withAuth } from '@/lib/route-handler'
 
-/**
- * Validates the body of a POST/PUT class request.
- */
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type Validator = (body: Record<string, unknown>) => string | null;
@@ -57,27 +55,11 @@ function validateClassBody(body: Record<string, unknown>): string[] {
   return CLASS_VALIDATORS.map((v) => v(body)).filter((e): e is string => e !== null);
 }
 
-/**
- * GET /api/classes
- *
- * Mode A — Clases del día (dashboard):
- *   ?date=2026-03-30  → devuelve array de clases para esa fecha (once + weekly que apliquen)
- *
- * Mode B — Listado paginado (CMS):
- *   ?name=yoga&trainerName=carlos&isVisible=true&page=1&limit=10
- */
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
-    }
-
+export const GET = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)(
+  async (req, { organizationId }) => {
     const { searchParams } = req.nextUrl
     const cacheKey = `org:${organizationId}:classes:${searchParams.toString()}`
 
-    // Try to get from cache
     const cachedData = await cache.get(cacheKey)
     if (cachedData) {
       return NextResponse.json(cachedData)
@@ -87,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     if (date) {
       const classes = await classesService.getByDate(organizationId, date)
-      await cache.set(cacheKey, classes, 300) // 5 minutes
+      await cache.set(cacheKey, classes, 300)
       return NextResponse.json(classes)
     }
 
@@ -99,29 +81,17 @@ export async function GET(req: NextRequest) {
         : undefined,
       page: searchParams.has('page') ? Number(searchParams.get('page')) : 1,
       limit: searchParams.has('limit') ? Number(searchParams.get('limit')) : 10,
-      requireTotal: true, // needed for CMS pagination UI
+      requireTotal: true,
     }
 
     const result = await classesService.getAll(organizationId, filters)
-    await cache.set(cacheKey, result, 300) // 5 minutes
+    await cache.set(cacheKey, result, 300)
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-}
+)
 
-/**
- * POST /api/classes
- * Body: { name, timeInfo, description?, trainerName?, isVisible? }
- */
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession()
-    const organizationId = session?.session?.activeOrganizationId;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
-    }
-
+export const POST = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.CREATE)(
+  async (req, { organizationId }) => {
     const body = await req.json()
     const errors = validateClassBody(body)
     if (errors.length > 0) {
@@ -129,8 +99,10 @@ export async function POST(req: NextRequest) {
     }
 
     const newClass = await classesService.create(organizationId, body)
+
+    await cache.invalidate(`org:${organizationId}:classes:*`)
+    await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
+
     return NextResponse.json(newClass, { status: 201 })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
-}
+)

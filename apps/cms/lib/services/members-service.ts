@@ -16,6 +16,21 @@ export const membersService = {
   },
 
   /**
+   * Fetches the member record for the currently authenticated user.
+   */
+  async getCurrentMember(): Promise<IMember | null> {
+    try {
+      const response = await apiClient.get<IMember>("/members/me");
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.data?.code === 'MEMBER_NOT_FOUND') {
+        return null;
+      }
+      throw error;
+    }
+  },
+
+  /**
    * Deletes a member by its ID.
    */
   async deleteMember(id: number): Promise<void> {

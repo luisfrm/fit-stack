@@ -21,6 +21,11 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Si la organización no existe o fue eliminada, redirigimos para limpiar el contexto
+    const errorCode = error.response?.data?.code;
+    if (errorCode === 'ORGANIZATION_NOT_FOUND' && typeof window !== 'undefined') {
+      window.location.href = '/reset-org-context';
+    }
     return Promise.reject(error);
   }
 );

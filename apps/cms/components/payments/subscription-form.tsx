@@ -78,7 +78,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [paymentCurrency, setPaymentCurrency] = React.useState<string>('USD');
   const [exchangeRate, setExchangeRate] = React.useState(1);
   const [finalAmount, setFinalAmount] = React.useState(0);
-  const [paymentMethodId, setPaymentMethodId] = React.useState<string>('cash');
+  const [paymentMethodId, setPaymentMethodId] = React.useState<string>('');
   const [paymentDetails, setPaymentDetails] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
@@ -186,17 +186,21 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     [activePaymentMethods, paymentMethodId]
   );
 
-  // Set default payment currency when plan changes
-  React.useEffect(() => {
-    if (selectedPlan) {
-      setPaymentCurrency(selectedPlan.currency);
-    }
-  }, [selectedPlan]);
+  // Filter payment methods by selected currency
+  const filteredPaymentMethods = React.useMemo(() => {
+    return activePaymentMethods.filter(m => 
+      m.currency === null || m.currency === paymentCurrency
+    );
+  }, [activePaymentMethods, paymentCurrency]);
 
   // Fetch Exchange Rate and Calculate Amount
   React.useEffect(() => {
     const updateFinance = async () => {
-      if (!selectedPlan) return;
+      if (!selectedPlan) {
+        setFinalAmount(0);
+        setExchangeRate(1);
+        return;
+      }
 
       let rate = 1;
       if (paymentCurrency !== selectedPlan.currency) {
@@ -347,6 +351,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const isPendingPayment = selectedMember?.latestSubscription?.paymentStatus === "processing";
   const isSectionDisabled = !selectedMember || isPendingPayment;
 
+  // Handler to change currency and reset payment method
+  const handleCurrencyChange = (value: string) => {
+    setPaymentCurrency(value);
+    setPaymentMethodId(''); // Reset to show placeholder when currency changes
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
 
@@ -364,15 +374,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       />
 
       {isPendingPayment && (
-        <div className="p-4 rounded-xl border border-red-500/20 bg-red-500/5 animate-in fade-in zoom-in-95 duration-300">
+        <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 animate-in fade-in zoom-in-95 duration-300">
           <div className="flex items-start gap-3">
             <Badge variant="destructive" size="sm" className="mt-0.5 uppercase font-black tracking-tighter">
               Bloqueo de Seguridad
             </Badge>
             <div className="flex flex-col gap-1">
-              <Text weight="bold" size="sm" className="text-red-400">Pago pendiente detectado</Text>
+              <Text weight="bold" size="sm" className="text-destructive/80">Pago pendiente detectado</Text>
               <Text size="xs" variant="muted">
-                Este socio tiene una suscripción con pago en estado <span className="text-red-400 font-bold uppercase">Procesando</span>.
+                Este socio tiene una suscripción con pago en estado <span className="text-destructive/80 font-bold uppercase">Procesando</span>.
                 Debe validar o anular el pago anterior antes de registrar uno nuevo.
               </Text>
             </div>
@@ -393,7 +403,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentCurrency={paymentCurrency}
           paymentMethodId={paymentMethodId}
           activeCurrencies={activeCurrencies}
-          activePaymentMethods={activePaymentMethods}
+          activePaymentMethods={filteredPaymentMethods}
           finalAmount={finalAmount}
           currencyFormat={currencyFormat}
           selectedPaymentConfig={selectedPaymentConfig}
@@ -409,7 +419,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
             setFinalAmount((selectedPlan.price * val) / 100);
           }}
           onAmountChange={setFinalAmount}
-          onCurrencyChange={setPaymentCurrency}
+          onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
           paymentDate={paymentDate}

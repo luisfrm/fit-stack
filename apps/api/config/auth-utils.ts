@@ -1,95 +1,75 @@
-import { GLOBAL_ROLES, ORG_ROLES } from "@workspace/shared";
+import {
+  can,
+  GLOBAL_ROLES,
+  PERMISSION_ACTIONS,
+  PERMISSION_MODULES,
+  type OrgRole,
+  type PermissionAction,
+  type PermissionModule,
+} from "@workspace/shared";
+import { db, eq, and } from "@workspace/database/client";
+import { authMember } from "@workspace/database/schema";
+import type { Session } from "./auth";
 
-import { auth } from "./auth";
+type MemberSession = Session & {
+  member?: { id: string; organizationId: string; userId: string; role: string; createdAt: Date } | null;
+};
 
-// ── TYPE ──────────────────────────────────────────────────────────────────────
+export function getActiveOrgId(session: Session | null): string | null {
+  if (!session) return null;
+  return (session.session as { activeOrganizationId?: string }).activeOrganizationId ?? null;
+}
 
-type AnySession = (typeof auth.$Infer.Session & { member?: { role: string } }) | null;
-
-// ── HELPERS ───────────────────────────────────────────────────────────────────
-
-/**
- * Returns the active organization ID and member role from a session.
- * Returns null if the session is invalid or has no active org.
- */
-function getOrgContext(session: AnySession, organizationId: string) {
+export async function getOrgContext(session: Session | null, organizationId: string) {
   if (!session) return null;
 
-  const activeOrgId = session.session?.activeOrganizationId;
+  const activeOrgId = getActiveOrgId(session);
   if (activeOrgId !== organizationId) return null;
 
-  return {
-    memberRole: session.member?.role,
-    isGlobalAdmin: session.user?.role === GLOBAL_ROLES.ADMIN,
-  };
-}
+  const memberRole = (session as MemberSession).member?.role;
+  if (memberRole) {
+    return { memberRole: memberRole as OrgRole };
+  }
 
-// ── AUTH HELPERS ──────────────────────────────────────────────────────────────
+  const [member] = await db
+    .select({ role: authMember.role })
+    .from(authMember)
+    .where(and(
+      eq(authMember.userId, session.user.id),
+      eq(authMember.organizationId, organizationId)
+    ))
+    .limit(1);
 
-/**
- * Can manage organization settings (name, logo, plan, etc.).
- * Allowed: Global Admin, Owner, Manager.
- */
-export function canManageOrganization(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return session?.user?.role === GLOBAL_ROLES.ADMIN; // global admin bypass
-
-  const { memberRole, isGlobalAdmin } = ctx;
-  return isGlobalAdmin ||
-    memberRole === ORG_ROLES.OWNER ||
-    memberRole === ORG_ROLES.MANAGER;
+  if (!member) return null;
+  return { memberRole: member.role as OrgRole };
 }
 
 /**
- * Can manage gym members (create, update, delete gym_member records).
- * Allowed: Global Admin, Owner, Manager, Cashier.
+ * Server-side permission check for tenant API routes.
+ * @example await authorize(session, orgId, PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)
  */
-export function canManageMembers(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return session?.user?.role === GLOBAL_ROLES.ADMIN;
-
-  const { memberRole, isGlobalAdmin } = ctx;
-  return isGlobalAdmin ||
-    memberRole === ORG_ROLES.OWNER ||
-    memberRole === ORG_ROLES.MANAGER ||
-    memberRole === ORG_ROLES.CASHIER;
+export async function authorize(
+  session: Session | null,
+  organizationId: string,
+  module: PermissionModule,
+  action: PermissionAction,
+): Promise<boolean> {
+  const ctx = await getOrgContext(session, organizationId);
+  if (!ctx) return false;
+  return can(ctx.memberRole, module, action);
 }
 
-/**
- * Can read/list gym members.
- * Allowed: Global Admin, Owner, Manager, Cashier, Coach.
- */
-export function canReadMembers(session: AnySession, organizationId: string): boolean {
-  const ctx = getOrgContext(session, organizationId);
-  if (!ctx) return session?.user?.role === GLOBAL_ROLES.ADMIN;
-
-  const { memberRole, isGlobalAdmin } = ctx;
-  return isGlobalAdmin ||
-    memberRole === ORG_ROLES.OWNER ||
-    memberRole === ORG_ROLES.MANAGER ||
-    memberRole === ORG_ROLES.CASHIER
+export function requireGlobalAdmin(session: Session | null): boolean {
+  return (session?.user as { role?: string })?.role === GLOBAL_ROLES.ADMIN;
 }
 
-/**
- * Can manage classes and schedules (create, update, delete).
- * Allowed: Global Admin, Owner, Manager.
- */
-export function canManageClasses(session: AnySession, organizationId: string): boolean {
-  return canManageOrganization(session, organizationId);
-}
-
-/**
- * Can manage payments (register, validate, void).
- * Allowed: Global Admin, Owner, Manager, Cashier.
- */
-export function canManagePayments(session: AnySession, organizationId: string): boolean {
-  return canManageMembers(session, organizationId); // Same audience as member management
-}
-
-/**
- * Can manage gym settings (gym_setting table).
- * Allowed: Global Admin, Owner, Manager.
- */
-export function canManageSettings(session: AnySession, organizationId: string): boolean {
-  return canManageOrganization(session, organizationId); // Same audience
+/** Media uploads: CMS content (owner/manager) or member/staff avatars (cashier+). */
+export async function authorizeUpload(
+  session: Session | null,
+  organizationId: string,
+): Promise<boolean> {
+  return (
+    await authorize(session, organizationId, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE) ||
+    await authorize(session, organizationId, PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.UPDATE)
+  );
 }

@@ -4,7 +4,6 @@ import * as React from "react";
 import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip, NextImage } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-react";
-import { GLOBAL_ROLES } from "@workspace/shared";
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
@@ -46,7 +45,10 @@ const getColumns = (
     initialMember: IMember;
     onSuccess: () => void;
     trigger: React.ReactNode;
-  }>
+  }>,
+  canUpdate = true,
+  canDelete = true,
+  canCreateSubscription = true,
 ): ColumnDef<IMember>[] => [
     {
       header: "Miembro",
@@ -89,7 +91,7 @@ const getColumns = (
     ...(hideRoleColumn ? [] : [{
       header: "Rol",
       cell: (m: IMember) => (
-        <Badge variant={m.role === GLOBAL_ROLES.ADMIN ? "default" : "secondary"}>
+        <Badge variant="secondary">
           {m.role || "Sin rol"}
         </Badge>
       )
@@ -138,7 +140,7 @@ const getColumns = (
       headerClassName: "pr-6 text-right",
       cell: (m: IMember) => (
         <div className="flex items-center justify-end">
-          {SubscriptionModal && m.isActive && (
+          {SubscriptionModal && m.isActive && canCreateSubscription && (
             <SubscriptionModal
               initialMember={m}
               onSuccess={onSuccess}
@@ -155,12 +157,12 @@ const getColumns = (
               }
             />
           )}
-          {!m.user && m.id && (
+          {!m.user && m.id && canUpdate && (
             <SimpleTooltip content="Reenviar invitación de registro">
               <ResendInviteButton memberId={m.id} />
             </SimpleTooltip>
           )}
-          <EditModal
+          {canUpdate && <EditModal
             initialData={m}
             onSuccess={onSuccess}
             trigger={
@@ -173,7 +175,8 @@ const getColumns = (
                 </Button>
               </SimpleTooltip>
             }
-          />
+          />}
+          {canDelete && (
           <SimpleTooltip content="Eliminar miembro">
             <Button
               variant="ghost-danger"
@@ -183,6 +186,7 @@ const getColumns = (
               <Trash2 size={16} />
             </Button>
           </SimpleTooltip>
+          )}
         </div>
       )
     }
@@ -196,8 +200,9 @@ function ResendInviteButton({ memberId }: { readonly memberId: number }) {
       setLoading(true);
       await membersService.resendInvite(memberId);
       toast.success("Invitación enviada correctamente.");
-    } catch (err: any) {
-      toast.error(err.message || "Error al enviar invitación.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error interno del servidor'
+      toast.error(message || "Error al enviar invitación.");
     } finally {
       setLoading(false);
     }

@@ -18,7 +18,8 @@ export async function POST(
   }
 
   // 2. Security Check: Only Global Admins can use this endpoint
-  if (session.user.role !== GLOBAL_ROLES.ADMIN) {
+  const userRole = (session.user as { role?: string }).role;
+  if (userRole !== GLOBAL_ROLES.ADMIN) {
     return NextResponse.json({
       error: "Solo los administradores globales pueden unirse automáticamente a organizaciones"
     }, { status: 403 });

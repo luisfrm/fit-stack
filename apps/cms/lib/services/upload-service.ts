@@ -42,7 +42,7 @@ export const uploadService = {
 
   /**
    * Lists files in a specific folder (filtered by active organization).
-   * @param folder Subfolder to list (e.g., 'logos', 'coaches')
+   * @param folder Subfolder to list (e.g., 'logos', 'trainers')
    */
   async listFiles(folder: string = ""): Promise<FileItem[]> {
     const { data } = await apiClient.get<FileItem[]>("/upload", {

@@ -36,7 +36,7 @@ export function KpiCard({
     <Card
       className={cn(
         "select-none transition-all",
-        isClickable && "cursor-pointer hover:border-white/20 hover:bg-white/8",
+        isClickable && "cursor-pointer hover:bg-accent hover:border-border",
         !isClickable && "cursor-default",
         isActive && "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
       )}

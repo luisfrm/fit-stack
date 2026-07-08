@@ -1,6 +1,6 @@
-import { Role, SubscriptionStatus, PaymentStatus } from '@workspace/shared/constants';
+import { Role, SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
 
-export type { SubscriptionStatus, PaymentStatus };
+export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
 /**
  * Standard interface for Better Auth errors.
@@ -72,9 +72,15 @@ export interface IClassToday {
 }
 
 export interface IRecentRegistration {
+  id: number;
   name: string;
-  time: string;
-  avatarUrl?: string;
+  imageUrl?: string | null;
+  createdAt?: string;
+  time?: string;
+  planName?: string;
+  amountPaid?: number;
+  currencyPaid?: string;
+  endDate?: string;
 }
 
 /**
@@ -164,7 +170,7 @@ export interface PaginatedSubscriptions {
   totalPages: number;
 }
 
-export interface CoachFilter {
+export interface TrainerFilter {
   name?: string;
   role?: string;
   isVisible?: boolean;
@@ -172,8 +178,8 @@ export interface CoachFilter {
   limit?: number;
 }
 
-export interface PaginatedCoaches {
-  data: ICoach[];
+export interface PaginatedTrainers {
+  data: ITrainer[];
   total: number;
   page: number;
   limit: number;
@@ -181,11 +187,10 @@ export interface PaginatedCoaches {
 }
 
 /**
- * Interface for a Coach (Trainer) in the CMS.
+ * Interface for a Trainer in the CMS.
  * This represents a Member with a Coach role and its associated Profile.
  */
-export interface ICoach extends IMember {
-  // IMember fields are inherited (firstName, lastName, imageUrl, etc.)
+export interface ITrainer extends IMember {
   specialities: string[] | null;
   bio?: string | null;
   isVisible: boolean;
@@ -270,6 +275,7 @@ export interface IPaymentMethodConfig {
   name: string;
   fields: IPaymentMethodField[];
   icon?: string;
+  currency: string | null; // null = any currency
 }
 
 export interface ITaxDetail {
@@ -310,7 +316,7 @@ export interface IPayment {
 
 /* ── API DTOs ── */
 
-export interface CoachesFilter {
+export interface TrainersFilter {
   name?: string;
   role?: string;
   isVisible?: boolean;
@@ -319,7 +325,7 @@ export interface CoachesFilter {
   requireTotal?: boolean;
 }
 
-export interface CreateCoachDTO {
+export interface CreateTrainerDTO {
   firstName: string;
   lastName: string;
   email: string;
@@ -333,14 +339,14 @@ export interface CreateCoachDTO {
   displayOrder?: number;
 }
 
-export type UpdateCoachDTO = Partial<CreateCoachDTO> & { isActive?: boolean };
+export type UpdateTrainerDTO = Partial<CreateTrainerDTO> & { isActive?: boolean };
 
 /* ── SAAS PLATFORM TYPES ── */
 
 export interface PlanFeatures {
   limits?: {
     members?: number;
-    coaches?: number;
+    trainers?: number;
   };
   access?: {
     pwa?: boolean;
@@ -361,8 +367,6 @@ export interface IPlatformPlan {
   createdAt?: string | Date;
 }
 
-export type PlatformSubscriptionStatus = 'active' | 'past_due' | 'read_only' | 'suspended' | 'cancelled';
-
 export interface IPlatformSubscription {
   id: number;
   organizationId: string;
@@ -375,14 +379,14 @@ export interface IPlatformSubscription {
   createdAt?: string | Date;
 }
 
-export interface IPlatformInvoice {
+export interface IPlatformPayment {
   id: number;
   organizationId: string;
   planId: number;
   amount: number;
   currency: string;
   paymentMethod: string;
-  status: 'paid' | 'pending' | 'trial' | 'void';
+  status: PaymentStatus;
   dueDate: string | Date;
   paidAt?: string | Date | null;
   createdAt?: string | Date;

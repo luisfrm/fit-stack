@@ -50,7 +50,8 @@ function PaginationLink({
       variant={isActive ? "secondary" : "ghost"}
       size={size}
       className={cn(
-        isActive && "bg-primary/20 hover:bg-primary/20 text-primary ",
+        isActive && "bg-primary/20 hover:bg-primary/20 text-primary",
+        !isActive && "hover:bg-accent",
         className
       )}
     >
@@ -268,7 +269,7 @@ export function Pagination({
       </PaginationRoot>
 
       {showInfo && total !== undefined && (
-        <div className="text-[10px] text-foreground-dim font-bold uppercase tracking-[0.2em] opacity-60">
+        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em]">
           Mostrando {limit ? Math.min((page - 1) * limit + 1, total) : '---'} - {limit ? Math.min(page * limit, total) : '---'} de {total} registros
         </div>
       )}

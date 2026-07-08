@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { membersService } from '@/services/members.service'
 import { getSession } from '@/config/get-session'
+import { authorize } from '@/config/auth-utils'
+import { ORG_ROLES, PERMISSION_ACTIONS, PERMISSION_MODULES } from '@workspace/shared'
 
 export async function POST(
   _req: NextRequest,
@@ -8,24 +10,27 @@ export async function POST(
 ) {
   try {
     const session = await getSession()
-    if (!session?.session?.activeOrganizationId) {
+const sessionOrg = session?.session as { activeOrganizationId?: string };
+    if (!sessionOrg?.activeOrganizationId) {
       return NextResponse.json({ error: 'Unauthorized or no active organization' }, { status: 401 })
     }
 
-    const { id } = await params
-    const memberId = Number(id)
+    const organizationId = sessionOrg.activeOrganizationId;
 
-    if (Number.isNaN(memberId)) {
-      return NextResponse.json({ error: 'ID de miembro inválido' }, { status: 400 })
+    const { id: memberId } = await params
+    const member = await membersService.getMemberById(organizationId, Number(memberId))
+    const permissionModule = member.role === ORG_ROLES.MEMBER
+      ? PERMISSION_MODULES.MEMBERS
+      : PERMISSION_MODULES.STAFF
+
+    if (!await authorize(session, organizationId, permissionModule, PERMISSION_ACTIONS.UPDATE)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const organizationId = session.session.activeOrganizationId;
-    const result = await membersService.resendInvite(organizationId, memberId)
+    const result = await membersService.resendInvite(organizationId, Number(memberId))
     return NextResponse.json(result)
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Error al reenviar la invitación' },
-      { status: 400 }
-    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error al reenviar la invitación'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

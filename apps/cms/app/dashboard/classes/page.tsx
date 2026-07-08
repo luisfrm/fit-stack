@@ -2,52 +2,29 @@
 
 import * as React from "react";
 import { CalendarDays, Plus, Filter, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Text, toast } from "@workspace/ui/components";
+import { Button, Text } from "@workspace/ui/components";
 import { ClassesTable } from "@/components/classes/classes-table";
 import { ClassModal } from "@/components/classes/class-modal";
-import { classesService, type ClassesFilter, type PaginatedClasses } from "@/lib/services/classes-service";
+import { type ClassesFilter } from "@/lib/services/classes-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+import { useClasses, useDeleteClass } from "@/lib/hooks/use-classes";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function ClassesPage() {
-  const [result, setResult] = React.useState<PaginatedClasses>({
-    data: [],
-    total: 0,
-    page: 1,
-    limit: ITEMS_PER_PAGE,
-    totalPages: 0,
-  });
-  const [isLoading, setIsLoading] = React.useState(true);
   const [filters, setFilters] = React.useState<ClassesFilter>({
     page: 1,
     limit: ITEMS_PER_PAGE,
   });
   const [searchInput, setSearchInput] = React.useState("");
 
-  const fetchClasses = React.useCallback(async (activeFilters: ClassesFilter) => {
-    setIsLoading(true);
-    try {
-      const data = await classesService.getClasses(activeFilters);
-      setResult(data);
-    } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "No se pudo conectar con el servidor";
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { data: result, isLoading } = useClasses(filters);
+  const deleteMutation = useDeleteClass();
 
-  React.useEffect(() => {
-    fetchClasses(filters);
-  }, [filters, fetchClasses]);
-
-  // Search with debounce — fires 400ms after user stops typing
   React.useEffect(() => {
     const timeout = setTimeout(() => {
       setFilters(prev => {
         const nextName = searchInput || undefined;
-        // Solo actualizar si el nombre realmente ha cambiado respecto al filtro actual
         if (prev.name === nextName) return prev;
         return { ...prev, name: nextName, page: 1 };
       });
@@ -55,33 +32,31 @@ export default function ClassesPage() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
     if (!confirm("¿Estás seguro de que deseas eliminar esta clase?")) return;
-
-    try {
-      await classesService.deleteClass(id);
-      toast.success("Clase eliminada correctamente");
-      fetchClasses(filters);
-    } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "Error al eliminar la clase";
-      toast.error(message);
-    }
+    deleteMutation.mutate(id);
   };
 
   const handlePageChange = (newPage: number) => {
     setFilters(prev => ({ ...prev, page: newPage }));
   };
 
+  const displayResult = result ?? {
+    data: [],
+    total: 0,
+    page: 1,
+    limit: ITEMS_PER_PAGE,
+    totalPages: 0,
+  };
+
   return (
     <>
-      {/* ── Header ── */}
       <DashboardHeader
         title="Gestión de Clases"
         description="Administra el horario y la visibilidad de tus clases diarias."
         iconName="CalendarDays"
       >
         <ClassModal
-          onSuccess={() => fetchClasses(filters)}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
               Nueva Clase
@@ -90,7 +65,6 @@ export default function ClassesPage() {
         />
       </DashboardHeader>
 
-      {/* ── Filters ── */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
@@ -133,7 +107,6 @@ export default function ClassesPage() {
         </div>
       </div>
 
-      {/* ── Classes List ── */}
       <section className="animate-in fade-in slide-in-from-bottom-3 duration-500">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-slate-400">
@@ -141,44 +114,44 @@ export default function ClassesPage() {
             <Text size="sm" weight="bold" className="uppercase tracking-widest">Listado de Clases</Text>
           </div>
           {!isLoading && (
-            <Text size="xs" variant="muted">{result.total} clase{result.total === 1 ? "" : "s"} encontrada{result.total === 1 ? "" : "s"}</Text>
+            <Text size="xs" variant="muted">
+              {displayResult.total} clase{displayResult.total === 1 ? "" : "s"} encontrada{displayResult.total === 1 ? "" : "s"}
+            </Text>
           )}
         </div>
 
         <ClassesTable
-          classes={result.data}
+          classes={displayResult.data}
           onDelete={handleDelete}
-          onUpdate={() => fetchClasses(filters)}
           loading={isLoading}
         />
 
-          {/* ── Pagination ── */}
-          {result.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6 px-1">
-              <Text size="sm" variant="muted">
-                Página {result.page} de {result.totalPages}
-              </Text>
-              <div className="flex gap-2">
-                <Button
-                  variant="glass"
-                  size="sm"
-                  disabled={result.page <= 1}
-                  leftIcon={<ChevronLeft className="w-4 h-4" />}
-                  onClick={() => handlePageChange(result.page - 1)}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="glass"
-                  size="sm"
-                  disabled={result.page >= result.totalPages}
-                  onClick={() => handlePageChange(result.page + 1)}
-                >
-                  Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
+        {displayResult.totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 px-1">
+            <Text size="sm" variant="muted">
+              Página {displayResult.page} de {displayResult.totalPages}
+            </Text>
+            <div className="flex gap-2">
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={displayResult.page <= 1}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+                onClick={() => handlePageChange(displayResult.page - 1)}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="glass"
+                size="sm"
+                disabled={displayResult.page >= displayResult.totalPages}
+                onClick={() => handlePageChange(displayResult.page + 1)}
+              >
+                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
-          )}
+          </div>
+        )}
       </section>
     </>
   );

@@ -12,11 +12,29 @@ interface SubscriptionModalProps {
   readonly trigger: React.ReactNode;
   readonly onSuccess?: () => void;
   readonly initialMember?: IMember | null;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
-export function SubscriptionModal({ trigger, onSuccess, initialMember }: SubscriptionModalProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onOpenChange }: Readonly<SubscriptionModalProps>) {
+  const [isControlled, setIsControlled] = React.useState(open);
+  const isOpen = open ?? isControlled;
+  const setIsOpen = (value: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(value);
+    } else {
+      setIsControlled(value);
+    }
+  };
+  
   const [isLoading, setIsLoading] = React.useState(false);
+
+  // Sync with external open state
+  React.useEffect(() => {
+    if (open !== undefined) {
+      setIsControlled(open);
+    }
+  }, [open]);
 
   // Workflow states
   const [view, setView] = React.useState<'payment' | 'member'>('payment');

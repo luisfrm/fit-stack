@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Plus, X } from "lucide-react";
-import { Button, toast, Badge } from "@workspace/ui/components";
+import { Button, toast } from "@workspace/ui/components";
+import { FloatingActionButton } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -12,10 +13,11 @@ import { RevenueChart } from "@/components/payments/revenue-chart";
 import { AnalyticsCarousel } from "@/components/payments/analytics-carousel";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from "@workspace/shared";
+import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, SubscriptionStatus } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { CurrencyFormat } from "@/lib/utils/value-converters";
+import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 
 import {
   useSubscriptions,
@@ -27,12 +29,13 @@ import {
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [isNewPaymentModalOpen, setIsNewPaymentModalOpen] = React.useState(false);
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(1);
   const limit = 10;
 
-  const { data: subsResult, isLoading, isPlaceholderData, refetch } = useSubscriptions({
+  const { data: subsResult, isLoading, refetch } = useSubscriptions({
     page,
     limit,
     query: debouncedSearch,
@@ -55,11 +58,11 @@ export default function PaymentsPage() {
   }, [debouncedSearch, activeFilter]);
 
   const handleStatusChange = async (id: number, status: string) => {
-    updateStatusMutation.mutate({ id, status: status as any }, {
+    updateStatusMutation.mutate({ id, status: status as SubscriptionStatus }, {
       onSuccess: () => {
         toast.success(`Suscripción ${status === SUBSCRIPTION_STATUSES.ACTIVE ? 'activada' : 'revocada'}.`);
       },
-      onError: (err: any) => {
+      onError: (err: Error) => {
         toast.error(err.message || "Fallo al cambiar estado");
       }
     });
@@ -148,12 +151,21 @@ export default function PaymentsPage() {
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por usuario o nivel de plan..."
+          filterOptions={[
+            { value: PAYMENT_STATUSES.PROCESSING, label: "Por validar" },
+            { value: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer" },
+            { value: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas" },
+            { value: PAYMENT_STATUSES.VOIDED, label: "Anuladas" },
+          ]}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+          filterLabel="Filtros"
         >
           <div className="flex items-center gap-2">
             {[
               { id: PAYMENT_STATUSES.PROCESSING, label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
-              { id: SUBSCRIPTION_STATUSES.EXPIRED, label: "Por vencer", className: "text-red-500 border-red-500/20 bg-red-500/5 hover:bg-red-500/10" },
-              { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-blue-500 border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10" },
+              { id: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer", className: "text-destructive border-destructive/20 bg-destructive/5 hover:bg-destructive/10" },
+              { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-info border-info/20 bg-info/5 hover:bg-info/10" },
               { id: PAYMENT_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
             ].map((btn) => (
               <Button
@@ -200,6 +212,30 @@ export default function PaymentsPage() {
             }}
           />
         </section>
+
+        <FloatingActionButton
+          config={{
+            items: [
+              ...GLOBAL_FAB_ITEMS,
+              {
+                id: "new-payment",
+                icon: Plus,
+                label: "Nuevo pago",
+                onClick: () => setIsNewPaymentModalOpen(true)
+              }
+            ]
+          }}
+        />
+
+        <SubscriptionModal
+          open={isNewPaymentModalOpen}
+          onOpenChange={setIsNewPaymentModalOpen}
+          onSuccess={() => {
+            refetch();
+            refetchAnalytics();
+          }}
+          trigger={<span />}
+        />
       </div>
     </div>
   );

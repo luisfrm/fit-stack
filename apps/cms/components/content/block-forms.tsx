@@ -45,18 +45,6 @@ const GallerySchema = z.object({
   })),
 });
 
-const ContactSchema = z.object({
-  address: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().optional(),
-  googleMapsUrl: z.string().optional(),
-  social: z.object({
-    instagram: z.string().optional(),
-    facebook: z.string().optional(),
-    whatsapp: z.string().optional(),
-  }),
-});
-
 /* ─────────────────────────────────────────────
    BLOCK RENDERER / FACTORY
    ───────────────────────────────────────────── */
