@@ -157,7 +157,7 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
               onClick={() => handleActivate(org.id)}
               disabled={isDisabled}
               className={cn(
-                "group flex items-center gap-4 py-3 text-left transition-all rounded-lg",
+                "group flex items-center gap-4 p-3 text-left transition-all rounded-lg",
                 "hover:bg-white/[0.06] hover:text-primary active:scale-[0.98]",
                 isDisabled && "opacity-40 pointer-events-none cursor-not-allowed",
                 isActivatingThis && "opacity-80"
@@ -197,7 +197,7 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
       </div>
 
       {!isModal && (
-        <div className="mt-8 pt-6 border-t border-white/5 flex justify-center">
+        <div className="pt-6 border-t border-white/5 flex justify-center">
           <Button variant="ghost-muted" size="sm" onClick={handleLogout} leftIcon={<LogOut size={14} />}>
             Cerrar sesión
           </Button>
