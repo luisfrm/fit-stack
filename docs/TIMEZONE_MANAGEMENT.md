@@ -1,6 +1,6 @@
 # 🕒 Isomorphic Timezone Management
 
-In Fit-Stack, time precision isn't just a technical detail; it's a critical business rule. If a gym in **Caracas** receives a payment at 11:30 PM, that income must appear in **today's** report, not tomorrow's due to the UTC offset.
+In Fit-Stack, time precision isn't just a technical detail; it's a critical business rule. If a gym operating in a non-UTC timezone receives a payment at 11:30 PM local time, that income must appear in **today's** report, not tomorrow's due to the UTC offset.
 
 This document explains how we've centralized and optimized date handling across the entire ecosystem.
 
@@ -11,7 +11,7 @@ This document explains how we've centralized and optimized date handling across 
 Historically, systems query the timezone on every request or depend on the server's configuration (UTC). We've implemented an **Isomorphic and Decoupled** model.
 
 ### 1. The Organization as an Anchor
-The timezone (e.g., `America/Caracas`, `Europe/Madrid`) is stored directly in the `organization` table in the database. 
+The timezone (e.g., `Europe/Madrid`, `America/Bogota`) is stored directly in the `organization` table in the database. 
 - **Benefit:** Each branch or gym operates in its own time reality regardless of where our servers are located.
 
 ### 2. Enriched Session

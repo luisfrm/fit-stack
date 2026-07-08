@@ -1,6 +1,6 @@
 # Fit-Stack
 
-Multi-tenant SaaS platform for the gym & fitness industry, primarily serving the Venezuelan market. Solves multi-currency billing, member retention, and automated physical access control.
+Multi-tenant SaaS platform for the gym & fitness industry, primarily targeting the Latin American market. Solves multi-currency billing, member retention, and automated physical access control.
 
 > **Status:** Active development.
 
