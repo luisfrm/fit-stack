@@ -246,7 +246,7 @@ async function getCachedUser(id: number) {
 ```typescript
 import { Redis } from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL);
+const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL);
 
 async function getCachedData<T>(
   key: string,

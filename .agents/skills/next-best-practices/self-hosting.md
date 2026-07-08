@@ -141,7 +141,7 @@ module.exports = {
 // cache-handler.js
 const Redis = require('ioredis');
 
-const redis = new Redis(process.env.REDIS_URL);
+const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL);
 const CACHE_PREFIX = 'nextjs:';
 
 module.exports = class CacheHandler {
