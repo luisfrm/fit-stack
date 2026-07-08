@@ -8,26 +8,34 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
-pnpm format      # Format code (Prettier)
+pnpm format       # Format code (Prettier)
 
-# Database (Drizzle ORM)
+# Database (Drizzle ORM — all run via @workspace/database)
 pnpm db:generate  # Generate migrations
 pnpm db:migrate   # Run migrations
-pnpm db:push      # Push schema (LOCAL ONLY - never on shared branches)
-pnpm db:check     # Verify schema
-pnpm db:studio    # Open DB studio
+pnpm db:push      # Push schema (LOCAL ONLY — never on shared branches)
+pnpm db:pull      # Pull schema (LOCAL ONLY)
+pnpm db:check     # Verify schema consistency
+pnpm db:studio    # Open Drizzle Studio
+pnpm db:seed      # Seed demo data (tsx src/seed.ts)
 
 # Individual apps
-cd apps/web && pnpm dev  # Port 3002
-cd apps/api && pnpm dev  # Port 3000
-cd apps/cms && pnpm dev  # Port 3001
+cd apps/api      && pnpm dev  # Port 3000
+cd apps/cms      && pnpm dev  # Port 3001
+cd apps/web      && pnpm dev  # Port 3002
+cd apps/console  && pnpm dev  # Port 3003
+
+# Bridge (Python/Flet — managed separately with uv)
+cd apps/bridge
+uv sync
+uv run python main.py
 ```
 
 ## Monorepo Structure
 
-- **Apps**: `api` (Next.js 16), `cms` (Next.js 16), `web` (Next.js 16), `bridge` (Python/Flet desktop)
-- **Packages**: `ui` (shadcn/ui components), `shared` (shared types/DTOs), `database` (Drizzle ORM + Neon Postgres)
-- **Bridge is Python** - not part of Turbo, managed separately with `uv`
+- **Apps**: `api` (Next.js 16, port 3000), `cms` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop)
+- **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/permissions), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
+- **Bridge is Python** — not part of Turbo, managed separately with `uv`
 
 ---
 
@@ -45,48 +53,59 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily ser
 | Module | Purpose |
 |--------|---------|
 | **Members** | Centralized identity for gym clients. Tracks historical behavior and preferences. |
-| **Membership Plans** | Commercial product catalog. Defines durations (Daily, Weekly, Monthly) and precise pricing in a configurable base currency (USD by default). |
-| **Subscriptions** | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to the current end date so no paid day is lost. |
-| **Payments** | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots) for manual transfer validation. Prevents duplicate registrations while a payment is `processing`. |
-| **Platform (Super Admin)** | SaaS lifecycle management. Create gyms (Organizations), manage tiers, monitor system health. |
+| **Membership Plans** | Commercial product catalog. Defines durations (Daily, Weekly, Monthly, Yearly) and pricing in a configurable base currency (USD by default). |
+| **Subscriptions** | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to current `endDate` so no paid day is lost. |
+| **Payments** | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots). Prevents duplicate registrations while `processing`. |
+| **Platform (SaaS Admin)** | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods. |
 | **Staff & Trainers** | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers). |
-| **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with attendance tracking and capacity management. |
-| **Content** | Dynamic UI communication. Admins update dashboard sections without code changes. |
-| **Settings** | Localization and branding per gym (Timezone, currency formats, colors/logos via dynamic OKLCH injection). |
+| **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
+| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. |
+| **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
+| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. |
+| **Reports** | Revenue analytics with multi-currency normalization. |
+| **Settings** | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection). |
 
 ### 3. Staff & Trainers Architecture
 
 **Data model:**
 - `gym_member` (base table) — all gym members: clients, staff, trainers
-- `coach_profile` (extension) — optional 1:1 extension for gym_members with role `COACH`. Fields: `specialities`, `bio`, `isVisible`, `displayOrder`
+- `coach_profile` (extension) — optional 1:1 for gym_members with role `COACH`. Fields: `specialities`, `bio`, `isVisible`, `displayOrder`
 - `auth_member` — Better Auth membership linking user ↔ organization with role (`OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`)
+- `coach_assignment` — links a coach (gym_member) to a client (gym_member)
 
 **Staff (`/dashboard/staff`):**
 - Table view for gym_members with roles: Owner, Manager, Cashier, Coach
-- Component: `StaffTable` (`apps/cms/components/staff/staff-table.tsx`)
-- Modal: `StaffModal` (`apps/cms/components/staff/staff-modal.tsx`)
+- Components: `StaffTable`, `StaffModal`, `StaffForm` (`apps/cms/components/staff/`)
 - Columns: Avatar+Name, Email, Role, Status, Actions
 - Service: `membersService` (shared with Members module)
 
 **Trainers (`/dashboard/trainers`):**
-- Card grid view for gym_members with role `COACH` that have a `coach_profile`
-- Component: `TrainerCard`, `AddTrainerCard`, `TrainerModal` (under `apps/cms/components/trainers/`)
+- Table view for gym_members with role `COACH` that have a `coach_profile`
+- Components: `TrainersTable`, `TrainerModal`, `TrainerForm` (`apps/cms/components/trainers/`)
 - Fields: name, photo, specialities, bio, visibility toggle, display order
 - Service: `trainersService` (joins gym_member + coach_profile)
 - API routes: `/api/trainers`
 
-**Note**: Trainers appear in both views (staff table + trainers grid) because they are gym_members with role `COACH`.
+**Note**: Trainers appear in both views (staff table + trainers table) because they are gym_members with role `COACH`.
 
-### 5. The Bridge App (Hardware Integration)
+### 4. The Bridge App (Hardware Integration)
 
 A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
 
-### 6. Business Rules Summary
+**API contract** (authenticated via `x-api-key`):
+- `POST /api/access-control/verify` — validate `documentId` + `organizationId`, returns access decision, creates audit log
+- `GET /api/access-control/sync-tasks` — poll pending biometric enroll/delete tasks
+- `POST /api/access-control/mark-synced` — confirm task completion
 
-1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both base currency and active currencies are managed dynamically in **Settings**.
+**Tables**: `access_control_log` (audit trail of every access attempt), `biometric_sync_task` (queue of sync tasks for devices)
+
+### 5. Business Rules Summary
+
+1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both configurable dynamically in **Settings**.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
+5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
 
 ---
 
@@ -96,7 +115,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 
 - **Package Separation**: Respect boundaries between `apps/` and `packages/`. Logic belonging to a package MUST NEVER be duplicated in an app.
 - **Strict Isolation**: Don't mix API and Frontend contexts. Never import anything between apps directly; the only allowed interaction is through shared packages (`packages/shared`).
-- **Shared Logic & Types**: Use `@workspace/shared` for interfaces, DTOs, or constants shared between backend, frontend, or other consumers.
+- **Shared Logic & Types**: Use `@workspace/shared` for interfaces, DTOs, constants, and permission helpers shared between backend, frontend, or other consumers.
 - **Type Safety**: Avoid `any`. Prioritize strict, strong typing everywhere.
 - **Backend 3-Layer Strict Separation**: Route Handler → Service → Repository.
   - Repository: Drizzle ORM, filter by `organizationId` for multi-tenancy.
@@ -129,16 +148,24 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 - **State in URL**: Prefer URL state (`?search=foo`) over `useState` for pagination, tabs, global searches.
 - **Async Params**: `params` and `searchParams` are **Promises** in Next.js 15+. Declare as `Promise<...>` and `await`.
 - **Navigation**: Use `useRouter` from `next/navigation`, never `window.location`. Use `router.refresh()` to sync server state after auth/org changes.
-- **Proxy/Middleware**: Keep heavy logic out of middleware. Use solely for CORS, header manipulation, and early session validation.
+- **Proxy/Middleware**: Heavy logic stays out of the proxy file. Use solely for CORS, header manipulation, and early session validation. The proxy file is **`proxy.ts`** (Next.js 16 convention, replaces `middleware.ts`).
 
 ### 5. Security & Authentication Architecture
 
+Fit-Stack uses **Better Auth** for authentication.
+
+**Package layers:**
+- **`@workspace/auth`** — canonical auth package. Entry points:
+  - `@workspace/auth/client` — raw `authClient`, `useSession`, `useActiveOrganization`, `organization`
+  - `@workspace/auth/service` — `sessionService.getSession()` for server components
+  - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)`
+- **`apps/cms/lib/auth-client.ts`** and `apps/console/lib/auth-client.ts` — re-export `@workspace/auth/client`
+- **`apps/cms/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
+
+**Conventions:**
+- Client MUST use `useAuth()`. NEVER use `useSession()` directly or read `session.activeOrganization` directly — use `useActiveOrganization()`.
+- For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
-- **Layered Structure**:
-  - **Config (`auth-client.ts`)**: Setup and native exports.
-  - **Client Hook (`use-auth.ts`)**: Wraps native hooks with role flags. Client MUST use `useAuth()`. NEVER use `useSession()` directly or read `session.activeOrganization` directly — use `useActiveOrganization()`.
-  - **Server Service (`session-service.ts`)**: For Server Components, Layouts, and API layers.
-- **Auth Library**: Better Auth — `useAuth()` on client, `session-service.ts` on server.
 
 ### 6. Route Handler Pattern (`route-handler.ts`)
 
@@ -170,6 +197,12 @@ export const GET = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)
 ```
 
 Params are auto-resolved from Promises — no manual `await params` needed.
+
+For platform/super-admin endpoints that don't use the wrapper pattern, use:
+```ts
+import { requireGlobalAdmin } from '@/config/auth-utils';
+if (!requireGlobalAdmin(session)) return Response.json({ error: 'Forbidden' }, { status: 403 });
+```
 
 ### 7. Error Handling & Mutations
 
@@ -209,8 +242,9 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
 | `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
 | `org:${orgId}:cms:pages*` | 5 min | CMS content pages |
-| `org:${orgId}:public:page:*` | 5 min | Public page slugs |
+| `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
+| `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
 | `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
 | `platform:settings` | 10 min | SaaS-level global settings |
 | `platform:organizations*` | 5 min | Organization list (SaaS admin) |
@@ -263,64 +297,85 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 
 Fit-Stack uses **two levels of roles**: Global (platform) and Organization (tenant).
 
+### Global Roles
+
+```ts
+// packages/shared/src/constants.ts
+GLOBAL_ROLES = {
+  ADMIN: "admin",  // Global super-admin — full access to /api/platform/* + apps/console
+  USER: "user",    // Default platform user
+}
+```
+
 ### Organization Roles
 
-Roles defined in `packages/shared/src/constants.ts`:
 ```ts
 ORG_ROLES = {
-  OWNER: "owner",     // Super Admin / Creator - total control
-  MANAGER: "manager", // Gym Owner/Manager - full tenant control
-  CASHIER: "cashier", // Staff/Cashier - payments and check-ins
-  COACH: "coach",     // Trainer - routines and athlete progress
-  MEMBER: "member",   // Gym client - app access to their own data
+  OWNER: "owner",     // Super Admin / Creator — total control
+  MANAGER: "manager", // Gym Owner/Manager — full tenant control
+  CASHIER: "cashier", // Staff/Cashier — payments and check-ins
+  COACH: "coach",     // Trainer — routines and athlete progress
+  MEMBER: "member",   // Gym client — app access to their own data
 }
 ```
 
 ### Permission Matrix
 
-| Action | Owner | Manager | Cashier | Coach | Member |
+Defined in `packages/shared/src/permissions/matrix.ts` using presets (`NONE`, `READ`, `READ_UPDATE`, `READ_CREATE_UPDATE`, `CRUD`):
+
+| Module | Owner | Manager | Cashier | Coach | Member |
 |--------|:-----:|:-------:|:-------:|:-----:|:------:|
-| **Members** |
-| View list | ✅ | ✅ | ✅ | ✅ | ❌ |
-| Create/Edit/Delete | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Payments** |
-| View/Register | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Change status (validate/void) | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Subscriptions** |
-| Create | ✅ | ✅ | ✅ | ❌ | ❌ |
-| Cancel | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Classes** |
-| View | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Create/Edit/Delete | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Routines** |
-| View | ✅ | ✅ | ✅ | ✅ | ❌ (own only) |
-| Create/Edit | ✅ | ✅ | ❌ | ✅ | ❌ |
-| **Settings** |
-| View/Edit | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Dashboard** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Reports** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Members** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Staff** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Subscriptions** | ✅ | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
+| **Plans** | ✅ | ✅ | ✅ (read) | ❌ | ❌ |
+| **Classes** | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Content** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Settings** | ✅ (r+w) | ✅ (r+w) | ✅ (read) | ❌ | ❌ |
+| **Organization** | ✅ (r+w) | ✅ (r+w) | ❌ | ❌ | ❌ |
 
 ### How to Verify Permissions
 
-**In API routes (server-side)**: Use auth-utils helpers from `@/config/auth-utils`
+**In API routes (server-side)**: Use `authorize()` from `apps/api/config/auth-utils.ts`
 ```ts
-import { canManageMembers, canReadMembers, canManagePayments } from '@/config/auth-utils'
+import { authorize } from '@/config/auth-utils'
+import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
 
-if (!canReadMembers(session, organizationId)) {
+if (!await authorize(session, organizationId, PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ)) {
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 }
 ```
 
 **Available helpers** (`apps/api/config/auth-utils.ts`):
-- `canManageOrganization` — Org settings (name, logo, plan)
-- `canManageMembers` — Create, update, delete gym_member records
-- `canReadMembers` — List/View members (includes Coach)
-- `canManageClasses` — Create, update, delete classes
-- `canManageRoutines` — Create, update, delete routines
-- `canManagePayments` — Register and manage payments
-- `canManageSettings` — Gym settings (billing, payment methods, currencies)
+- `getActiveOrgId(session)` — Returns `activeOrganizationId` or null
+- `getOrgContext(session, organizationId)` — Returns `{ memberRole }` or null
+- `authorize(session, orgId, module, action)` — Returns boolean
+- `requireGlobalAdmin(session)` — Returns boolean (for SaaS platform routes)
+- `authorizeUpload(session, orgId)` — Composite check for upload routes (MEMBERS.CREATE or CONTENT.CREATE)
 
-**In UI (client-side)**: Use `useAuth()` hook from `@/lib/hooks/use-auth`
+**In UI (client-side)**: Use `useAuth()` and `usePermissions()` from `@workspace/auth/hooks`
 ```tsx
+import { useAuth, usePermissions } from '@workspace/auth/hooks'
 const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
+const { can } = usePermissions()
+const canEditClasses = can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)
+```
+
+### Anti-escalation
+
+Use `canAssignRole(actor, target)` from `@workspace/shared` to prevent role escalation:
+- `OWNER` → can assign any role
+- `MANAGER` → cannot assign `OWNER`
+- `CASHIER` → can only assign `MEMBER`
+
+### CMS Access Control
+
+Only `OWNER`, `MANAGER`, `CASHIER` can use the CMS app (`apps/cms`):
+```ts
+import { canAccessCms } from '@workspace/shared'
+if (orgRole && !canAccessCms(orgRole)) redirect('/unauthorized')
 ```
 
 ### Security Rules
@@ -329,6 +384,95 @@ const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
 2. **Session-based authorization** — Use `session.member.role` from Better Auth
 3. **Organization scoping** — All queries MUST filter by `organizationId`
 4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
+
+---
+
+## Shared Package Exports (`packages/shared`)
+
+```ts
+// Entry point: @workspace/shared
+// Re-exports: constants, types, access-control, auth-config, permissions
+
+// constants.ts
+GLOBAL_ROLES, ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
+PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
+DEFAULT_COUNTRY, COUNTRY_LIST, ICountryConfig
+
+// types.ts
+IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
+PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization
+
+// access-control.ts
+statement, ac, owner/manager/cashier/coach/member (Better Auth org roles), orgRoleDefinitions
+
+// auth-config.ts
+ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone, status)
+
+// permissions/
+  modules.ts:    PERMISSION_MODULES (10 modules)
+  actions.ts:    PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE)
+  matrix.ts:     ORG_ROLE_PERMISSIONS (owner/manager/cashier/coach/member matrices)
+  can.ts:         can(role, module, action), canAny()
+  cms-access.ts: CMS_ALLOWED_ORG_ROLES, canAccessCms()
+  role-assignment.ts: canAssignRole(actor, target)
+```
+
+---
+
+## Auth Package (`@workspace/auth`)
+
+```ts
+// Entry: @workspace/auth (re-exports client, service, hooks, permissions + shared constants)
+
+// client.ts — createAuthClient with customSession + organization plugin
+authClient, useSession, useActiveOrganization, organization
+Types: User, Session, SignInParams, SignUpParams
+
+// service.ts — sessionService (works client & server)
+sessionService.getSession(headers?) → { data: Session | null, error: IAuthError | null }
+sessionService.getServerSession(headers) → { data, error }
+sessionService.signIn({ email, password }) → { data, error }
+sessionService.signUp({ email, password, name }) → { data, error }
+
+// hooks.ts — "use client"
+useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, error, roleName,
+              orgRole, isAdmin, isOwner, isManager, isCashier, isCoach, isMember, refetch }
+usePermissions() → { orgRole, can(module, action), canAccessCms() }
+```
+
+---
+
+## Database Schema (28 tables)
+
+### Better Auth Core
+`user`, `session`, `account`, `verification`
+
+### Organization & Membership
+`organization` (includes: slogan, countryCode, timezone, taxId, legalName, address, fiscalConfig)
+`member` (auth_member — Better Auth plugin), `invitation`
+
+### Platform Billing (SaaS)
+`fitstack_plan` (plan catalog with features as PlanFeatures), `store_subscription` (org subscriptions),
+`platform_payment` (platform invoices)
+
+### Gym Domain
+`gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
+`coach_assignment` (coach ↔ client)
+
+### Memberships & Payments
+`membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail)
+
+### Access Control
+`access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
+
+### Routines (Fitness)
+`exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
+
+### CMS & Web
+`cms_class`, `cms_page`, `cms_page_block`, `cms_class`
+
+### Settings
+`platform_setting`, `gym_setting`
 
 ---
 
@@ -343,12 +487,15 @@ const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
 ### When to update AGENTS.md
 
 - New API endpoints or route restructuring (e.g., `/api/platform/settings`)
-- Changes to RBAC (new roles, permission matrix changes)
+- Changes to RBAC (new roles, permission matrix changes, new modules)
 - New business rules or module changes
-- New apps or packages added to the monorepo
+- New apps or packages added to the monorepo (e.g., `console`, `auth`)
 - Changes to dev commands or database workflow
 - New auth patterns or security rules
 - New skills or hooks that become project-wide conventions
+- New CMS block types or page schema changes
+- New Bridge endpoints or device management
+- New cache key patterns
 
 ---
 
@@ -365,6 +512,9 @@ Use skill tool for specialized tasks:
 | `copywriting` | Marketing copy changes |
 | `vercel-react-best-practices` | React/Next.js performance |
 | `next-best-practices` | Next.js route handlers, data fetching, bundling, image optimization |
+| `drizzle-orm` | Type-safe SQL ORM operations |
+| `better-auth-best-practices` | Better Auth configuration and plugins |
+| `organization-best-practices` | Better Auth organizations, members, RBAC |
 
 ---
 
@@ -372,3 +522,9 @@ Use skill tool for specialized tasks:
 
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
+- `packages/database/src/schema.ts` — Full DB schema (28 tables)
+- `packages/shared/src/permissions/matrix.ts` — RBAC permission matrix
+- `apps/api/config/auth.ts` — Better Auth server config
+- `apps/api/lib/route-handler.ts` — Route handler wrappers
+- `apps/api/proxy.ts` — CORS + session validation middleware
+- `packages/auth/src/` — Shared auth client, service, hooks, permissions
