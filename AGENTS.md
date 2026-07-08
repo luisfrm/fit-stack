@@ -43,7 +43,7 @@ uv run python main.py
 
 ### 1. Vision
 
-Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily serving the Venezuelan market. It solves the complexity of multi-currency billing, member retention, and automated physical access control.
+Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily targeting the Latin American market. It solves the complexity of multi-currency billing, member retention, and automated physical access control.
 
 - **Multi-tenancy**: Every gym is an `Organization`. Data isolation strictly enforced via `organizationId`.
 - **B2B SaaS Model**: "Platform" layer (SaaS Admins) + "CMS" layer (Gym Admins).

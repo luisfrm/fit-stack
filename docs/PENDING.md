@@ -1,6 +1,6 @@
 # Próximas Tareas de Facturación e Internacionalización
 
-Lista de pendientes para preparar el sistema para facturación formal (Venezuela) y escalabilidad internacional (Colombia, etc.).
+Lista de pendientes para preparar el sistema para facturación fiscal formal multi-país, alineada con los requerimientos regulatorios locales de cada país.
 
 ## 1. Preparación de Base de Datos (Estructura de Localización)
 - [ ] **Tabla `organization`**: Añadir campos legales:
@@ -21,8 +21,8 @@ Lista de pendientes para preparar el sistema para facturación formal (Venezuela
 - [ ] **Disclaimer Legal**: Añadir nota en pie de página de recibos/correos: *"Este documento no es factura fiscal. Exija su factura legal en el establecimiento"*.
 
 ## 3. Integraciones de Facturación (Fase 2)
-- [ ] **Filtro de Adaptadores**: Crear interfaz para conectarse a PAC/PAD en Venezuela o Proveedores Tecnológicos en Colombia.
-- [ ] **Gestión de Impuestos Dinámicos**: Implementar lógica que calcule el IGTF (3%) automáticamente para pagos en Divisas en organizaciones de Venezuela.
+- [ ] **Filtro de Adaptadores**: Crear interfaz genérica de adaptadores para integrarse con PAC/PAD, Proveedores Tecnológicos u otros sistemas fiscales locales según el `country_code` de la organización.
+- [ ] **Gestión de Impuestos Dinámicos**: Implementar lógica que calcule impuestos locales dinámicamente (ej. IGTF 3%, IVA 16%, etc.) según el `country_code` de la organización y el tipo de pago.
 
 ---
 ## 4. Control de Acceso Biométrico (Fase 2)
