@@ -15,4 +15,11 @@ const URLS: Record<AppEnvironment, { cms: string; console: string; api: string }
   },
 };
 
+// Dominios base para los sitios web multi-tenant (gimnasios).
+// En producción, cualquier subdominio de estos dominios será válido como origin.
+// Para añadir un dominio custom (ej. un gimnasio compra "powerfit.com"),
+// simplemente agregarlo a este array.
+const WEB_BASE_DOMAINS: string[] = ["luisrivas.work"];
+
 export const urls = URLS[env.appEnv as AppEnvironment];
+export const webBaseDomains = WEB_BASE_DOMAINS;

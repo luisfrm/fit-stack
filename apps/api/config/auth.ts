@@ -5,22 +5,12 @@ import { db, eq, and } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
 import { urls } from "./urls";
+import { ALLOWED_ORIGINS } from "./allowed-origins";
 import { organization } from "better-auth/plugins";
 import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
 import { cache } from "@/lib/cache";
-
-const DEV_ORIGINS = [
-  "http://localhost:3001",
-  "http://localhost:3003",
-];
-
-const PROD_ORIGINS = env.trustedOrigins
-  ? env.trustedOrigins.split(",").map((s: string) => s.trim()).filter(Boolean)
-  : [];
-
-const ALLOWED_ORIGINS = env.isProduction ? PROD_ORIGINS : DEV_ORIGINS;
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {

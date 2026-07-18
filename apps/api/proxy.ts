@@ -1,28 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { env } from "@/config/envs";
+import { isOriginAllowed } from "@/config/allowed-origins";
 import { getSessionCookie } from "better-auth/cookies";
 
 const publicRoutes = ["/api/auth", "/api/health", "/api/members/validate-token", "/api/init"];
 
-const DEV_ORIGINS = [
-  "http://localhost:3001",
-  "http://localhost:3003",
-];
-
-const PROD_ORIGINS = env.trustedOrigins
-  ? env.trustedOrigins.split(",").map((s: string) => s.trim()).filter(Boolean)
-  : [];
-
-const ALLOWED_ORIGINS = env.isProduction ? PROD_ORIGINS : DEV_ORIGINS;
-
 function isPublicRoute(pathname: string) {
   return publicRoutes.some((route) => pathname.startsWith(route));
-}
-
-function isOriginAllowed(origin: string | null) {
-  if (!origin) return false;
-  return ALLOWED_ORIGINS.some((allowed: string) => origin.startsWith(allowed));
 }
 
 function setCorsHeaders(response: NextResponse, origin: string) {
@@ -36,15 +21,16 @@ function setCorsHeaders(response: NextResponse, origin: string) {
 export async function proxy(request: NextRequest) {
   const origin = request.headers.get("origin");
   const { pathname } = request.nextUrl;
+  const originAllowed = isOriginAllowed(origin);
 
   if (request.method === "OPTIONS") {
     const res = new NextResponse(null, { status: 200 });
-    if (isOriginAllowed(origin)) setCorsHeaders(res, origin!);
+    if (originAllowed) setCorsHeaders(res, origin!);
     return res;
   }
 
   const response = NextResponse.next();
-  if (isOriginAllowed(origin)) setCorsHeaders(response, origin!);
+  if (originAllowed) setCorsHeaders(response, origin!);
 
   if (isPublicRoute(pathname)) return response;
 
@@ -57,7 +43,7 @@ export async function proxy(request: NextRequest) {
 
   if (!sessionCookie) {
     const errorResponse = NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    if (isOriginAllowed(origin)) setCorsHeaders(errorResponse, origin!);
+    if (originAllowed) setCorsHeaders(errorResponse, origin!);
     return errorResponse;
   }
 

@@ -167,6 +167,24 @@ Fit-Stack uses **Better Auth** for authentication.
 - For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
 
+#### CORS & Allowed Origins
+
+The CORS allowlist is defined **in code only** — no env vars. Single source of truth in `apps/api/config/allowed-origins.ts`, consumed by both:
+- `apps/api/config/auth.ts` → `trustedOrigins` of Better Auth
+- `apps/api/proxy.ts` → preflight and CORS headers
+
+| Ambiente | Origins permitidos |
+|---|---|
+| `development` | `http://localhost:3001` (cms), `http://localhost:3002` (web), `http://localhost:3003` (console) |
+| `production` | Exact: `cms.luisrivas.work`, `console.luisrivas.work`, `api.luisrivas.work`, `luisrivas.work` · Wildcards: `https://*.luisrivas.work` |
+
+**Multi-tenant web domains** live in `apps/api/config/urls.ts` → `WEB_BASE_DOMAINS`. Any subdomain of a listed base domain is automatically trusted (Better Auth wildcards + custom matcher in the proxy). To support a custom domain for a specific gym (e.g. `powerfit.com`), add it to that array — no redeploy of auth logic needed.
+
+**Proxy rules** (`apps/api/proxy.ts`):
+- `OPTIONS` preflight → 200 with CORS headers if origin is allowed
+- CORS headers always attached to responses (success or error) when origin is allowed
+- Public routes skip auth: `/api/auth`, `/api/health`, `/api/members/validate-token`, `/api/init`, `GET /api/settings`
+
 ### 6. Route Handler Pattern (`route-handler.ts`)
 
 API route handlers use centralized wrappers from `apps/api/lib/route-handler.ts` — never write auth/error boilerplate manually.

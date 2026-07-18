@@ -3,9 +3,6 @@ import { z } from "zod";
 const envSchema = z.object({
   APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
 
-  // Trusted Origins (comma-separated for production)
-  TRUSTED_ORIGINS: z.string().optional(),
-
   // Better-Auth
   BETTER_AUTH_SECRET: z.string().min(16),
   COOKIE_DOMAIN: z.string().optional(),
@@ -52,9 +49,6 @@ export const env = {
   appEnv: _env.APP_ENV,
   isLocal: _env.APP_ENV === "development",
   isProduction: _env.APP_ENV === "production",
-
-  // Trusted Origins
-  trustedOrigins: _env.TRUSTED_ORIGINS,
 
   // Cloudflare R2
   r2AccountId: _env.R2_ACCOUNT_ID,
