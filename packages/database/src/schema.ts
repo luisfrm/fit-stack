@@ -5,7 +5,6 @@ import {
   boolean,
   integer,
   jsonb,
-  pgEnum,
   date,
   uniqueIndex,
   bigint,
@@ -13,22 +12,6 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { type PlanFeatures, type PlatformRole, type OrganizationRole } from '@workspace/shared';
-
-// ── ENUMS ──
-export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
-export const paymentStatusEnum = pgEnum('payment_status', ['processing', 'validated', 'invalid', 'voided']);
-export const frequencyTypeEnum = pgEnum('frequency_type', ['once', 'weekly']);
-export const membershipDurationUnitEnum = pgEnum('membership_duration_unit', ['day', 'week', 'month', 'year']);
-export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
-  'hero',
-  'services',
-  'classes_info',
-  'testimonials',
-  'gallery',
-  'contact',
-  'team_info'
-]);
-
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
@@ -140,7 +123,7 @@ export const fitstackPlan = pgTable('fitstack_plan', {
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
-  durationUnit: membershipDurationUnitEnum('duration_unit').default('month').notNull(),
+  durationUnit: text('duration_unit').$type<'day' | 'week' | 'month' | 'year'>().default('month').notNull(),
   features: jsonb('features').$type<PlanFeatures | null>(), // PlanFeatures interface from shared/types.ts
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -253,7 +236,7 @@ export const membershipPlan = pgTable('membership_plan', {
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
-  durationUnit: membershipDurationUnitEnum('duration_unit').default('month').notNull(),
+  durationUnit: text('duration_unit').$type<'day' | 'week' | 'month' | 'year'>().default('month').notNull(),
   features: jsonb('features').$type<string[] | null>(),
   isPopular: boolean('is_popular').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
@@ -294,7 +277,7 @@ export const payment = pgTable('payment', {
   currencyPaid: text('currency_paid').notNull(),
   exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
-  status: paymentStatusEnum('status').default('validated').notNull(),
+  status: text('status').$type<'processing' | 'validated' | 'invalid' | 'voided'>().default('validated').notNull(),
   paymentMethod: text('payment_method').notNull(),
   paymentMethodDetails: jsonb('payment_method_details'),
 
@@ -356,7 +339,7 @@ export const exercise = pgTable('exercise', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  type: exerciseTypeEnum('type').notNull(),
+  type: text('type').$type<'compound' | 'isolated'>().notNull(),
   primaryMuscle: text('primary_muscle').notNull(),
   secondaryMuscles: text('secondary_muscles').array(),
   mediaUrl: text('media_url'),
@@ -437,7 +420,7 @@ export const cmsClass = pgTable('cms_class', {
   isVisible: boolean('is_visible').default(true).notNull(),
   startTime: text('start_time').notNull(),
   endTime: text('end_time'),
-  frequencyType: frequencyTypeEnum('frequency_type').default('weekly').notNull(),
+  frequencyType: text('frequency_type').$type<'once' | 'weekly'>().default('weekly').notNull(),
   scheduledDate: date('scheduled_date'),
   daysOfWeek: integer('days_of_week').array(),
   capacity: integer('capacity'),
@@ -486,7 +469,7 @@ export const cmsPageBlock = pgTable('cms_page_block', {
     .references(() => organization.id, { onDelete: 'cascade' }),
   pageId: bigint('page_id', { mode: 'number' })
     .references(() => cmsPage.id, { onDelete: 'cascade' }).notNull(),
-  blockType: cmsBlockTypeEnum('block_type').notNull(),
+  blockType: text('block_type').$type<'hero' | 'services' | 'classes_info' | 'testimonials' | 'gallery' | 'contact' | 'team_info'>().notNull(),
   data: jsonb('data').notNull(),
   isVisible: boolean('is_visible').default(true).notNull(),
   displayOrder: integer('display_order').notNull(),
