@@ -1,0 +1,103 @@
+﻿
+> console@0.0.1 build C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console
+> next build
+
+Ôû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 8.9s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/8) ...
+pnpm.exe : Error fetching session on server: Error: Dynamic server usage: Route /dashboard/settings/currencies 
+couldn't be rendered statically because it used `headers`. See more info here: 
+https://nextjs.org/docs/messages/dynamic-server-error
+En C:\Users\LAPTOP\AppData\Local\pnpm\pnpm.ps1: 14 Carácter: 3
++   & "$basedir/.tools/@pnpm+exe/11.5.3/node_modules/@pnpm/exe/pnpm.exe ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error fetching ...ic-server-error:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    at w (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_dist_fa57edf3._.
+js:1:7349)
+    at m 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_293e8a35._.js:1:14202)
+    at Object.getSession (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\packages_au
+th_src_service_ts_8b18dcae._.js:1:44422)
+    at async g 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\_0edf3878._.js:1:10833) {
+  description: "Route /dashboard/settings/currencies couldn't be rendered statically because it used `headers`. See 
+more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error fetching session on server: Error: Dynamic server usage: Route /dashboard/settings couldn't be rendered 
+statically because it used `headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at w (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_dist_fa57edf3._.
+js:1:7349)
+    at m 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_293e8a35._.js:1:14202)
+    at Object.getSession (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\packages_au
+th_src_service_ts_8b18dcae._.js:1:44422)
+    at async g 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\_0edf3878._.js:1:10833) {
+  description: "Route /dashboard/settings couldn't be rendered statically because it used `headers`. See more info 
+here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error fetching session on server: Error: Dynamic server usage: Route /dashboard/settings/payment-methods couldn't be 
+rendered statically because it used `headers`. See more info here: 
+https://nextjs.org/docs/messages/dynamic-server-error
+    at w (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_dist_fa57edf3._.
+js:1:7349)
+    at m 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_293e8a35._.js:1:14202)
+    at Object.getSession (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\packages_au
+th_src_service_ts_8b18dcae._.js:1:44422)
+    at async g 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\_0edf3878._.js:1:10833) {
+  description: "Route /dashboard/settings/payment-methods couldn't be rendered statically because it used `headers`. 
+See more info here: https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error fetching session on server: Error: Dynamic server usage: Route / couldn't be rendered statically because it used 
+`headers`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at w (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_dist_fa57edf3._.
+js:1:7349)
+    at m 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\90696_next_293e8a35._.js:1:14202)
+    at Object.getSession (C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\packages_au
+th_src_service_ts_8b18dcae._.js:1:44422)
+    at async d 
+(C:\Users\LAPTOP\Documents\PROJECTS\fit-stack\apps\console\.next\server\chunks\ssr\_54765209._.js:1:9970) {
+  description: "Route / couldn't be rendered statically because it used `headers`. See more info here: 
+https://nextjs.org/docs/messages/dynamic-server-error",
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+  Generating static pages using 15 workers (2/8) 
+  Generating static pages using 15 workers (4/8) 
+  Generating static pages using 15 workers (6/8) 
+Ô£ô Generating static pages using 15 workers (8/8) in 889.3ms
+  Finalizing page optimization ...
+
+Route (app)
+Ôöî ãÆ /
+Ôö£ Ôùï /_not-found
+Ôö£ ãÆ /dashboard
+Ôö£ ãÆ /dashboard/organizations
+Ôö£ ãÆ /dashboard/organizations/[id]/settings
+Ôö£ ãÆ /dashboard/organizations/[id]/subscriptions
+Ôö£ ãÆ /dashboard/plans
+Ôö£ ãÆ /dashboard/settings
+Ôö£ ãÆ /dashboard/settings/currencies
+Ôö£ ãÆ /dashboard/settings/payment-methods
+Ôö£ ãÆ /dashboard/subscriptions
+Ôö£ Ôùï /init
+Ôöö Ôùï /login
+
+
+ãÆ Proxy (Middleware)
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+
