@@ -1,5 +1,10 @@
-import axios from "axios";
-import { EUR_EXCHANGE_URL } from "../config/constants";
+/**
+ * Legacy currency service — superseded by `lib/api/exchange-rates.ts`.
+ * Kept for backward compatibility with `useExchangeRates` hook (Type C pages).
+ * For RSC pages, import `getExchangeRates` from `@/lib/api/exchange-rates` instead.
+ */
+import { ofetch } from "ofetch";
+import { EUR_EXCHANGE_URL } from "@/lib/config/constants";
 
 export interface ExchangeRatesResponse {
   result: string;
@@ -8,18 +13,14 @@ export interface ExchangeRatesResponse {
   time_last_update_unix: number;
 }
 
-/**
- * Service to handle external currency exchange rate fetching.
- */
+// Dedicated ofetch instance for external public exchange rates API.
+// Does not use internal `api` client to prevent prepending local API baseURL and session headers.
+const exchangeFetcher = ofetch.create({ retry: 1, timeout: 15_000 });
+
 export const currencyService = {
-  /**
-   * Fetches the latest exchange rates for a given base currency.
-   * @param url The endpoint to fetch rates from (default: EUR_EXCHANGE_URL)
-   * @returns Exchange rate data
-   */
-  getExchangeRates: async (url: string = EUR_EXCHANGE_URL): Promise<ExchangeRatesResponse> => {
-    // We use direct axios here because apiClient has a fixed baseURL for our own API
-    const { data } = await axios.get<ExchangeRatesResponse>(url);
-    return data;
-  }
+  getExchangeRates: async (
+    url: string = EUR_EXCHANGE_URL,
+  ): Promise<ExchangeRatesResponse> => {
+    return await exchangeFetcher<ExchangeRatesResponse>(url);
+  },
 };

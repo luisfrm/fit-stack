@@ -1,5 +1,5 @@
-import { apiClient } from "@/lib/api-client";
-import { PlatformSubscriptionStatus } from "@workspace/shared/types";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { PlatformSubscriptionStatus, IPaginatedResult } from "@workspace/shared/types";
 
 export interface SubscriptionWithDetails {
   id: number;
@@ -21,16 +21,10 @@ export interface SubscriptionWithDetails {
   planCurrency: string;
 }
 
-export interface PaginatedSubscriptions {
-  data: SubscriptionWithDetails[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+export type PaginatedSubscriptions = IPaginatedResult<SubscriptionWithDetails>;
 
 export interface SubscriptionFilters {
-  status?: PlatformSubscriptionStatus | 'all';
+  status?: PlatformSubscriptionStatus | "all";
   planId?: number;
   organizationId?: string;
   isTrial?: boolean;
@@ -48,50 +42,96 @@ export interface SubscriptionStats {
 
 const SUBSCRIPTIONS_PATH = "/platform/subscriptions";
 
+function buildSubscriptionQuery(filters: SubscriptionFilters) {
+  const q: Record<string, string | number | boolean> = {};
+  if (filters.page) q.page = filters.page;
+  if (filters.limit) q.limit = filters.limit;
+  if (filters.status && filters.status !== "all") q.status = filters.status;
+  if (filters.planId) q.planId = filters.planId;
+  if (filters.organizationId) q.organizationId = filters.organizationId;
+  if (filters.isTrial !== undefined) q.isTrial = filters.isTrial;
+  if (filters.search) q.search = filters.search;
+  return q;
+}
+
+/**
+ * Service to manage platform subscriptions and billing stats for organizations.
+ */
 export const platformSubscriptionsService = {
-  async getAll(filters: SubscriptionFilters = {}): Promise<PaginatedSubscriptions> {
-    const params = new URLSearchParams();
-    if (filters.page) params.set('page', filters.page.toString());
-    if (filters.limit) params.set('limit', filters.limit.toString());
-    if (filters.status && filters.status !== 'all') params.set('status', filters.status);
-    if (filters.planId) params.set('planId', filters.planId.toString());
-    if (filters.organizationId) params.set('organizationId', filters.organizationId);
-    if (filters.isTrial !== undefined) params.set('isTrial', filters.isTrial.toString());
-
-    const response = await apiClient.get(`${SUBSCRIPTIONS_PATH}?${params.toString()}`);
-    return response.data;
+  /**
+   * Retrieves a paginated list of subscriptions filtered by status, plan, or search query.
+   */
+  async getAll(
+    filters: SubscriptionFilters = {},
+    options?: ApiFetchOptions,
+  ): Promise<PaginatedSubscriptions> {
+    return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
+      query: buildSubscriptionQuery(filters),
+      ...options,
+    });
   },
 
-  async getById(id: number): Promise<SubscriptionWithDetails> {
-    const response = await apiClient.get(`${SUBSCRIPTIONS_PATH}/${id}`);
-    return response.data;
+  /**
+   * Retrieves detailed subscription information by ID.
+   */
+  async getById(
+    id: number,
+    options?: ApiFetchOptions,
+  ): Promise<SubscriptionWithDetails> {
+    return await api<SubscriptionWithDetails>(
+      `${SUBSCRIPTIONS_PATH}/${id}`,
+      options,
+    );
   },
 
-  async getByOrganization(organizationId: string): Promise<SubscriptionWithDetails[]> {
-    const response = await apiClient.get(`${SUBSCRIPTIONS_PATH}?organizationId=${organizationId}`);
-    return response.data.data;
+  /**
+   * Retrieves all subscriptions associated with a specific organization ID.
+   */
+  async getByOrganization(
+    organizationId: string,
+    options?: ApiFetchOptions,
+  ): Promise<SubscriptionWithDetails[]> {
+    return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
+      query: { organizationId },
+      ...options,
+    }).then((res) => res.data);
   },
 
+  /**
+   * Cancels an active platform subscription.
+   */
   async cancel(id: number, reason?: string): Promise<void> {
-    await apiClient.patch(`${SUBSCRIPTIONS_PATH}/${id}`, {
-      action: 'cancel',
-      reason,
+    await api(`${SUBSCRIPTIONS_PATH}/${id}`, {
+      method: "PATCH",
+      body: { action: "cancel", reason },
     });
   },
 
+  /**
+   * Extends the end date of an existing platform subscription.
+   */
   async extend(id: number, newEndDate: string): Promise<void> {
-    await apiClient.patch(`${SUBSCRIPTIONS_PATH}/${id}`, {
-      action: 'extend',
-      newEndDate,
+    await api(`${SUBSCRIPTIONS_PATH}/${id}`, {
+      method: "PATCH",
+      body: { action: "extend", newEndDate },
     });
   },
 
+  /**
+   * Deletes a subscription record.
+   */
   async delete(id: number): Promise<void> {
-    await apiClient.delete(`${SUBSCRIPTIONS_PATH}/${id}`);
+    await api(`${SUBSCRIPTIONS_PATH}/${id}`, { method: "DELETE" });
   },
 
-  async getStats(): Promise<SubscriptionStats> {
-    const response = await apiClient.get(`${SUBSCRIPTIONS_PATH}/stats`);
-    return response.data;
+  /**
+   * Retrieves platform subscription KPI statistics.
+   */
+  async getStats(options?: ApiFetchOptions): Promise<SubscriptionStats> {
+    return await api<SubscriptionStats>(
+      `${SUBSCRIPTIONS_PATH}/stats`,
+      options,
+    );
   },
 };
+

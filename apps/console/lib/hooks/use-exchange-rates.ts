@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import { ofetch } from "ofetch";
 import { BASE_EXCHANGE_API_URL } from "@/lib/config/constants";
 
 interface ExchangeRatesResponse {
@@ -11,11 +11,14 @@ interface ExchangeRatesResponse {
   time_last_update_unix: number;
 }
 
+/**
+ * Hook to fetch currency exchange rates using ofetch.
+ */
 export function useExchangeRates(baseCurrency: string) {
   return useQuery({
     queryKey: ["exchange-rates", baseCurrency],
     queryFn: async () => {
-      const { data } = await axios.get<ExchangeRatesResponse>(
+      const data = await ofetch<ExchangeRatesResponse>(
         `${BASE_EXCHANGE_API_URL}/${baseCurrency}`
       );
       return data.rates;
@@ -25,3 +28,4 @@ export function useExchangeRates(baseCurrency: string) {
     enabled: !!baseCurrency,
   });
 }
+

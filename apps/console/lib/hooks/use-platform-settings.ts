@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { api } from "@/lib/api/client";
 import { toast } from "@workspace/ui";
 
 export const PLATFORM_SETTINGS_KEYS = {
@@ -19,22 +19,23 @@ export function usePlatformSettings() {
   const query = useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const response = await apiClient.get<Record<string, string>>("/platform/settings");
-      return response.data;
+      return await api<Record<string, string>>("/platform/settings");
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (settings: Record<string, string>) => {
-      const response = await apiClient.post("/platform/settings", settings);
-      return response.data;
+      return await api("/platform/settings", {
+        method: "POST",
+        body: settings,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platform-settings"] });
       toast.success("Configuración actualizada correctamente");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || "Error al actualizar la configuración");
+      toast.error(error?.data?.error || "Error al actualizar la configuración");
     },
   });
 

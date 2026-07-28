@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import { api } from "@/lib/api/client";
 import { toast } from "@workspace/ui";
 import { useAuth } from "./use-auth";
 
@@ -23,23 +23,21 @@ export function useSettings() {
   const query = useQuery({
     queryKey: ["settings", activeOrganizationId || "global"],
     queryFn: async () => {
-      const response = await apiClient.get<Record<string, string>>("/settings");
-      return response.data;
+      return await api<Record<string, string>>("/settings");
     },
     enabled: !!activeOrganizationId,
   });
 
   const updateMutation = useMutation({
     mutationFn: async (settings: Record<string, string>) => {
-      const response = await apiClient.post("/settings", settings);
-      return response.data;
+      return await api("/settings", { method: "POST", body: settings });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Ajustes actualizados correctamente");
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || "Error al actualizar los ajustes");
+      toast.error(error?.data?.error || "Error al actualizar los ajustes");
     },
   });
 

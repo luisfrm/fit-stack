@@ -1,22 +1,25 @@
-import { apiClient } from "@/lib/api-client";
+import { api } from "@/lib/api/client";
+import type { IInitCheckResponse, IInitSystemPayload } from "@workspace/shared/types";
 
+/**
+ * Service to handle platform initial setup and readiness status checks.
+ */
 export const initService = {
-  async checkNeedsInit() {
-    try {
-      const response = await apiClient.get('/init');
-      return response.data as { needsInit: boolean; timestamp: string };
-    } catch (error) {
-      console.error("Error checking init status:", error);
-      return { needsInit: false, error: "Failed to check status" };
-    }
+  /**
+   * Checks whether the system requires initial setup.
+   */
+  async checkNeedsInit(): Promise<IInitCheckResponse> {
+    return await api<IInitCheckResponse>("/init");
   },
 
-  async performInit(data: any) {
-    try {
-      const response = await apiClient.post('/init', data);
-      return response.data;
-    } catch (error: any) {
-      throw error.response?.data?.error || "Error al inicializar el sistema";
-    }
-  }
+  /**
+   * Executes initial system setup with master administrator credentials.
+   */
+  async performInit(data: IInitSystemPayload): Promise<{ success: boolean; [key: string]: unknown }> {
+    return await api<{ success: boolean; [key: string]: unknown }>("/init", {
+      method: "POST",
+      body: data,
+    });
+  },
 };
+

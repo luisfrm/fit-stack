@@ -1,5 +1,5 @@
-import { apiClient } from "@/lib/api-client";
-import { IPlatformPlan } from "@workspace/shared/types";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { IPlatformPlan } from "@workspace/shared/types";
 
 const PLATFORM_PLANS_PATH = "/platform/plans";
 
@@ -16,38 +16,82 @@ export interface PlatformPlansSummary {
   trialPlans: number;
 }
 
+/**
+ * Service to manage platform plans catalog and plan statistics.
+ */
 export const platformPlansService = {
-  async getAll(): Promise<IPlatformPlan[]> {
-    const response = await apiClient.get(PLATFORM_PLANS_PATH);
-    return response.data;
+  /**
+   * Retrieves all platform plans.
+   */
+  async getAll(options?: ApiFetchOptions): Promise<IPlatformPlan[]> {
+    return await api<IPlatformPlan[]>(PLATFORM_PLANS_PATH, options);
   },
 
-  async getAllWithStats(): Promise<PlatformPlanWithStats[]> {
-    const response = await apiClient.get(`${PLATFORM_PLANS_PATH}/with-stats`);
-    return response.data;
+  /**
+   * Retrieves all platform plans enriched with usage statistics.
+   */
+  async getAllWithStats(
+    options?: ApiFetchOptions,
+  ): Promise<PlatformPlanWithStats[]> {
+    return await api<PlatformPlanWithStats[]>(
+      `${PLATFORM_PLANS_PATH}/with-stats`,
+      options,
+    );
   },
 
-  async getSummary(): Promise<PlatformPlansSummary> {
-    const response = await apiClient.get(`${PLATFORM_PLANS_PATH}/summary`);
-    return response.data;
+  /**
+   * Retrieves high-level platform plans summary statistics.
+   */
+  async getSummary(options?: ApiFetchOptions): Promise<PlatformPlansSummary> {
+    return await api<PlatformPlansSummary>(
+      `${PLATFORM_PLANS_PATH}/summary`,
+      options,
+    );
   },
 
-  async getById(id: number): Promise<IPlatformPlan> {
-    const response = await apiClient.get(`${PLATFORM_PLANS_PATH}/${id}`);
-    return response.data;
+  /**
+   * Retrieves a single platform plan by ID.
+   */
+  async getById(
+    id: number,
+    options?: ApiFetchOptions,
+  ): Promise<IPlatformPlan> {
+    return await api<IPlatformPlan>(
+      `${PLATFORM_PLANS_PATH}/${id}`,
+      options,
+    );
   },
 
-  async create(data: Omit<IPlatformPlan, "id" | "createdAt">): Promise<IPlatformPlan> {
-    const response = await apiClient.post(PLATFORM_PLANS_PATH, data);
-    return response.data;
+  /**
+   * Creates a new platform plan in the catalog.
+   */
+  async create(
+    data: Omit<IPlatformPlan, "id" | "createdAt">,
+  ): Promise<IPlatformPlan> {
+    return await api<IPlatformPlan>(PLATFORM_PLANS_PATH, {
+      method: "POST",
+      body: data,
+    });
   },
 
-  async update(id: number, data: Partial<IPlatformPlan>): Promise<IPlatformPlan> {
-    const response = await apiClient.patch(`${PLATFORM_PLANS_PATH}/${id}`, data);
-    return response.data;
+  /**
+   * Updates an existing platform plan.
+   */
+  async update(
+    id: number,
+    data: Partial<IPlatformPlan>,
+  ): Promise<IPlatformPlan> {
+    return await api<IPlatformPlan>(`${PLATFORM_PLANS_PATH}/${id}`, {
+      method: "PATCH",
+      body: data,
+    });
   },
 
+  /**
+   * Deletes a platform plan by ID.
+   */
   async delete(id: number): Promise<void> {
-    await apiClient.delete(`${PLATFORM_PLANS_PATH}/${id}`);
-  }
+    await api(`${PLATFORM_PLANS_PATH}/${id}`, { method: "DELETE" });
+  },
 };
+

@@ -1,5 +1,5 @@
-import axios from "axios";
-import { apiClient } from "../api-client";
+import { ofetch } from "ofetch";
+import { api } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
 export interface FileItem {
@@ -20,21 +20,28 @@ export const uploadService = {
     file: File,
     customName?: string,
     organizationId?: string,
-    folder?: string
+    folder?: string,
   ): Promise<string> {
-    const { data } = await apiClient.post<{ presignedUrl: string; key: string }>("/upload/presigned", {
-      filename: file.name,
-      customName: customName || undefined,
-      organizationId: organizationId || undefined,
-      folder: folder || undefined,
-      contentType: file.type,
-    });
-
-    // We use direct axios here because apiClient has a fixed baseURL for our own API
-    await axios.put(data.presignedUrl, file, {
-      headers: {
-        "Content-Type": file.type,
+    const data = await api<{ presignedUrl: string; key: string }>(
+      "/upload/presigned",
+      {
+        method: "POST",
+        body: {
+          filename: file.name,
+          customName: customName || undefined,
+          organizationId: organizationId || undefined,
+          folder: folder || undefined,
+          contentType: file.type,
+        },
       },
+    );
+
+    // Direct binary PUT to external R2 presigned URL.
+    // Uses standalone ofetch to bypass internal api client's baseURL and session cookie headers.
+    await ofetch(data.presignedUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "Content-Type": file.type },
     });
 
     return data.key;
@@ -45,10 +52,7 @@ export const uploadService = {
    * @param folder Subfolder to list (e.g., 'logos', 'coaches')
    */
   async listFiles(folder: string = ""): Promise<FileItem[]> {
-    const { data } = await apiClient.get<FileItem[]>("/upload", {
-      params: { folder }
-    });
-    return data;
+    return await api<FileItem[]>("/upload", { query: { folder } });
   },
 
   /**
@@ -56,9 +60,7 @@ export const uploadService = {
    * @param key The full key of the file (e.g., 'org123/logos/image.png')
    */
   async deleteFile(key: string): Promise<void> {
-    await apiClient.delete("/upload", {
-      params: { key }
-    });
+    await api("/upload", { method: "DELETE", query: { key } });
   },
 
   /**
@@ -68,18 +70,12 @@ export const uploadService = {
    */
   getMediaUrl(key: string | null | undefined): string {
     if (!key) return "";
-
-    // If it's already an absolute URL (e.g. starts with http), return it as is
-    if (key.startsWith("http")) {
-      return key;
-    }
+    if (key.startsWith("http")) return key;
 
     const baseUrl = env.r2Url;
-
-    // Ensure we don't have double slashes
     const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
     const cleanKey = key.startsWith("/") ? key.slice(1) : key;
 
     return `${cleanBaseUrl}/${cleanKey}`;
-  }
+  },
 };
