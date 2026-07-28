@@ -31,7 +31,7 @@ export function PlatformPlanModal({ planData, trigger, onSuccess }: PlatformPlan
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || error.message || "Error al guardar el plan");
+      toast.error(error?.data?.error || error.message || "Error al guardar el plan");
     } finally {
       setIsLoading(false);
     }

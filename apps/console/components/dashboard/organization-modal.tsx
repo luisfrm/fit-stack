@@ -87,7 +87,7 @@ export function OrganizationModal({
       }
       handleSuccess();
     } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "Algo salió mal";
+      const message = error?.data?.error ?? error.message ?? "Algo salió mal";
       toast.error(message);
     }
   };
