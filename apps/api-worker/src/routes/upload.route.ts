@@ -86,10 +86,19 @@ export const uploadRoutes = new Hono<AppEnv>()
   // POST /api/upload/presigned
   .post('/presigned', requireAuth(), zValidator('json', presignedSchema), async (c) => {
     const session = c.get('session')!;
+    const user = c.get('user')!;
     const body = c.req.valid('json');
     const orgId = body.organizationId || session.activeOrganizationId;
 
-    if (!orgId || !authorizeUpload(session, orgId)) {
+    if (!orgId) {
+      return c.json({ error: 'Organization ID is required' }, 400);
+    }
+
+    const platformRole = (user as any)?.role;
+    const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
+    const isOrgUser = Boolean((session as any).member && authorizeUpload(session, orgId));
+
+    if (!isPlatformUser && !isOrgUser) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
