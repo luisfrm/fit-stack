@@ -406,6 +406,7 @@ if (orgRole && !canAccessCms(orgRole)) redirect('/unauthorized')
 2. **Session-based authorization** — Use `session.member.role` from Better Auth
 3. **Organization scoping** — All queries MUST filter by `organizationId`
 4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
+5. **Platform user upload bypass** — Users with global roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + `authorizeUpload(session, orgId)`.
 
 ---
 
@@ -662,3 +663,5 @@ Use skill tool for specialized tasks:
 - `apps/api/lib/route-handler.ts` — Route handler wrappers
 - `apps/api/proxy.ts` — CORS + session validation middleware
 - `packages/auth/src/` — Shared auth client, service, hooks, permissions
+- `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
+- `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI

@@ -1,4 +1,4 @@
-# Fit-Stack: Arquitectura del Sistema y Decisiones de Diseño
+nece# Fit-Stack: Arquitectura del Sistema y Decisiones de Diseño
 
 Este documento consolida la arquitectura del sistema, el modelo de datos, los patrones de diseño y las decisiones técnicas fundamentales de **Fit-Stack**.
 
@@ -207,6 +207,25 @@ Existen dos niveles de acceso:
   }
   ```
 * **Uso de Constantes**: Se prohíbe escribir *magic strings* arbitrarias. Todas las consultas de permisos consumen `PERMISSION_MODULES` y `PERMISSION_ACTIONS`.
+
+### 5.3. Autorización de Subida de Archivos (Upload Bypass)
+
+La ruta `POST /api/upload/presigned` aplica una lógica de autorización dual:
+
+```ts
+const platformRole = (user as any)?.role;
+const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
+const isOrgUser = Boolean((session as any).member && authorizeUpload(session, orgId));
+
+if (!isPlatformUser && !isOrgUser) {
+  return c.json({ error: 'Forbidden' }, 403);
+}
+```
+
+**Regla**:
+- **Usuarios de plataforma** (`admin`, `owner`, `support` global roles) pueden subir archivos a **cualquier organización** sin requerir membresía orgánica.
+- **Usuarios de organización** deben tener membresía en la org destino **y** pasar `authorizeUpload` (permiso `MEMBERS.CREATE` o `CONTENT.CREATE`).
+- Esto permite que super-admins suban logos, imágenes CMS, etc., a organizaciones sin necesidad de ser agregados como miembros de cada una.
 
 ---
 
