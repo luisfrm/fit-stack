@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
@@ -24,6 +24,6 @@
     "@types/react": "^19.0.10",
     "@workspace/typescript-config": "workspace:*",
     "typescript": "^5.9.3",
-    "wrangler": "^3.111.0"
+    "wrangler": "^4.114.0"
   }
 }
