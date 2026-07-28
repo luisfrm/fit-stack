@@ -8,10 +8,10 @@ export const ALLOWED_ORIGINS = [
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:3003',
-  'https://cms.luisrivas.work',
-  'https://console.luisrivas.work',
-  'https://api.luisrivas.work',
-  'https://luisrivas.work',
+  'https://cms.luisrivas.site',
+  'https://console.luisrivas.site',
+  'https://api.luisrivas.site',
+  'https://luisrivas.site',
 ] as const;
 
 export const corsMiddleware = cors({
@@ -19,7 +19,7 @@ export const corsMiddleware = cors({
     if (!origin) return null;
     if (ALLOWED_ORIGINS.includes(origin as any)) return origin;
     // Allow dynamic gym subdomains on production base domain
-    if (origin.endsWith('.luisrivas.work')) return origin;
+    if (origin.endsWith('.luisrivas.site')) return origin;
     return null;
   },
   credentials: true,

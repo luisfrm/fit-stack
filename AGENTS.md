@@ -176,7 +176,7 @@ The CORS allowlist is defined **in code only** — no env vars. Single source of
 | Ambiente | Origins permitidos |
 |---|---|
 | `development` | `http://localhost:3001` (cms), `http://localhost:3002` (web), `http://localhost:3003` (console) |
-| `production` | Exact: `cms.luisrivas.work`, `console.luisrivas.work`, `api.luisrivas.work`, `luisrivas.work` · Wildcards: `https://*.luisrivas.work` |
+| `production` | Exact: `cms.luisrivas.site`, `console.luisrivas.site`, `api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
 
 **Multi-tenant web domains** live in `apps/api/config/urls.ts` → `WEB_BASE_DOMAINS`. Any subdomain of a listed base domain is automatically trusted (Better Auth wildcards + custom matcher in the proxy). To support a custom domain for a specific gym (e.g. `powerfit.com`), add it to that array — no redeploy of auth logic needed.
 
