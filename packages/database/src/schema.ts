@@ -12,7 +12,7 @@ import {
   numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { GLOBAL_ROLES, ORG_ROLES, type PlanFeatures } from '@workspace/shared';
+import { type PlanFeatures, type PlatformRole, type OrganizationRole } from '@workspace/shared';
 
 // ── ENUMS ──
 export const exerciseTypeEnum = pgEnum('exercise_type', ['compound', 'isolated']);
@@ -29,18 +29,6 @@ export const cmsBlockTypeEnum = pgEnum('cms_block_type', [
   'team_info'
 ]);
 
-export const globalRoleEnum = pgEnum('global_role', [
-  GLOBAL_ROLES.ADMIN,
-  GLOBAL_ROLES.USER,
-]);
-
-export const orgRoleEnum = pgEnum('org_role', [
-  ORG_ROLES.OWNER,
-  ORG_ROLES.MANAGER,
-  ORG_ROLES.CASHIER,
-  ORG_ROLES.COACH,
-  ORG_ROLES.MEMBER,
-]);
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
@@ -50,7 +38,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  role: globalRoleEnum('role').default(GLOBAL_ROLES.USER), // Global role (e.g. 'admin')
+  role: text('role').$type<PlatformRole>().default('user'), // Global role ('admin' | 'user')
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -126,7 +114,7 @@ export const authMember = pgTable('member', {
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
-  role: orgRoleEnum('role').notNull(), // 'manager', 'cashier', 'coach', 'member'
+  role: text('role').$type<OrganizationRole>().notNull(), // 'owner', 'manager', 'cashier', 'coach', 'member'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -218,7 +206,7 @@ export const gymMember = pgTable('gym_member', {
   imageUrl: text('image_url'),
   address: text('address'),
   isActive: boolean('is_active').default(true).notNull(),
-  role: orgRoleEnum('role').default(ORG_ROLES.MEMBER).notNull(),
+  role: text('role').$type<OrganizationRole>().default('member').notNull(),
 
   // Biometric / Access Control (Optional)
   biometricId: text('biometric_id'),

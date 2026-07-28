@@ -1,13 +1,19 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { customSession } from "better-auth/plugins";
+import { customSession, admin as adminPlugin, organization } from "better-auth/plugins";
 import { db, eq, and } from "@workspace/database/client";
 import * as schema from "@workspace/database/schema";
 import { env } from "./envs";
 import { urls } from "./urls";
 import { ALLOWED_ORIGINS } from "./allowed-origins";
-import { organization } from "better-auth/plugins";
-import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from "@workspace/shared";
+import {
+  GLOBAL_ROLES,
+  ORGANIZATION_ADDITIONAL_FIELDS,
+  platformAc,
+  platformRoles,
+  organizationAc,
+  organizationRoles,
+} from "@workspace/shared";
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
 import { cache } from "@/lib/cache";
@@ -28,19 +34,25 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: false,
-        defaultValue: GLOBAL_ROLES.USER, // El rol global en la DB. Para Master Admin será "admin"
+        defaultValue: GLOBAL_ROLES.USER,
         input: false,
       },
     },
   },
   plugins: [
+    adminPlugin({
+      ac: platformAc,
+      roles: platformRoles,
+      defaultRole: "user",
+    }),
     organization({
+      ac: organizationAc,
+      roles: organizationRoles,
       schema: {
         organization: {
-          additionalFields: ORGANIZATION_ADDITIONAL_FIELDS
-        }
+          additionalFields: ORGANIZATION_ADDITIONAL_FIELDS,
+        },
       },
-      roles: orgRoleDefinitions,
       async sendInvitationEmail(data) {
         const inviteLink = `${urls.cms}/accept-invitation/${data.id}`;
         await emailService.sendOrganizationInvite(
@@ -58,7 +70,7 @@ export const auth = betterAuth({
           );
           if (gymMemberRecord && !gymMemberRecord.userId) {
             await membersRepository.update(organization.id, gymMemberRecord.id, {
-              userId: user.id
+              userId: user.id,
             });
           }
         },
@@ -92,10 +104,12 @@ export const auth = betterAuth({
           createdAt: schema.authMember.createdAt,
         })
         .from(schema.authMember)
-        .where(and(
-          eq(schema.authMember.userId, user.id),
-          eq(schema.authMember.organizationId, activeOrgId)
-        ))
+        .where(
+          and(
+            eq(schema.authMember.userId, user.id),
+            eq(schema.authMember.organizationId, activeOrgId)
+          )
+        )
         .limit(1);
 
       if (member) {

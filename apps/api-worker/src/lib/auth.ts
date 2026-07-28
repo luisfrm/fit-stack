@@ -1,9 +1,16 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { customSession, organization } from 'better-auth/plugins';
+import { customSession, organization, admin as adminPlugin } from 'better-auth/plugins';
 import { createDb } from '@workspace/database/factory';
 import * as schema from '@workspace/database/schema';
-import { GLOBAL_ROLES, orgRoleDefinitions, ORGANIZATION_ADDITIONAL_FIELDS } from '@workspace/shared';
+import {
+  GLOBAL_ROLES,
+  ORGANIZATION_ADDITIONAL_FIELDS,
+  platformAc,
+  platformRoles,
+  organizationAc,
+  organizationRoles,
+} from '@workspace/shared';
 import { ALLOWED_ORIGINS } from './cors';
 import { createCache } from './cache';
 import { createMembersRepository } from '../repositories/members.repository';
@@ -42,15 +49,21 @@ export function createAuth(env: Env) {
       },
     },
     plugins: [
+      adminPlugin({
+        ac: platformAc,
+        roles: platformRoles,
+        defaultRole: 'user',
+      }),
       organization({
+        ac: organizationAc,
+        roles: organizationRoles,
         schema: {
           organization: {
             additionalFields: ORGANIZATION_ADDITIONAL_FIELDS,
           },
         },
-        roles: orgRoleDefinitions,
         async sendInvitationEmail(data) {
-          const cmsBaseUrl = isLocal ? 'http://localhost:3001' : 'https://cms.luisrivas.work';
+          const cmsBaseUrl = isLocal ? 'http://localhost:3001' : 'https://cms.luisrivas.site';
           const inviteLink = `${cmsBaseUrl}/accept-invitation/${data.id}`;
 
           if (env.TASK_QUEUE) {
@@ -65,10 +78,7 @@ export function createAuth(env: Env) {
         },
         organizationHooks: {
           afterAcceptInvitation: async ({ user, organization: org }) => {
-            const gymMemberRecord = await membersRepo.findByEmail(
-              org.id,
-              user.email
-            );
+            const gymMemberRecord = await membersRepo.findByEmail(org.id, user.email);
             if (gymMemberRecord && !gymMemberRecord.userId) {
               await membersRepo.update(org.id, gymMemberRecord.id, {
                 userId: user.id,
