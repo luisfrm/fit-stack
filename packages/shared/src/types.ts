@@ -147,13 +147,18 @@ export interface MemberFilter {
   includeLatestSubscription?: boolean;
 }
 
-export interface PaginatedMembers {
-  data: IMember[];
+/**
+ * Generic paginated response wrapper.
+ */
+export interface IPaginatedResult<T> {
+  data: T[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
 }
+
+export type PaginatedMembers = IPaginatedResult<IMember>;
 
 export interface SubscriptionsFilter {
   query?: string;
@@ -162,13 +167,7 @@ export interface SubscriptionsFilter {
   limit?: number;
 }
 
-export interface PaginatedSubscriptions {
-  data: ISubscription[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+export type PaginatedSubscriptions = IPaginatedResult<ISubscription>;
 
 export interface TrainerFilter {
   name?: string;
@@ -178,13 +177,7 @@ export interface TrainerFilter {
   limit?: number;
 }
 
-export interface PaginatedTrainers {
-  data: ITrainer[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
+export type PaginatedTrainers = IPaginatedResult<ITrainer>;
 
 /**
  * Interface for a Trainer in the CMS.
@@ -418,3 +411,36 @@ export interface IPlatformOrganization extends IOrganization {
   memberCount?: number;
   userCount?: number;
 }
+
+/**
+ * System initialization check response DTO.
+ */
+export interface IInitCheckResponse {
+  needsInit: boolean;
+  timestamp: string;
+}
+
+/**
+ * System initialization setup payload DTO.
+ */
+export interface IInitSystemPayload {
+  name?: string;
+  email?: string;
+  password?: string;
+  adminEmail?: string;
+  adminName?: string;
+  adminPassword?: string;
+  organizationName?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Organization owner provisioning payload DTO.
+ */
+export interface IProvisionOwnerDTO {
+  email: string;
+  name?: string;
+  role?: string;
+  [key: string]: unknown;
+}
+
