@@ -1,8 +1,9 @@
 import * as React from "react";
 import { Upload, X, Lock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
-import { Button } from "@workspace/ui/components/button";
-import { Text } from "@workspace/ui/components/text";
+import { Button } from "./button";
+import { Text } from "./text";
+import { SafeImage } from "./safe-image";
 
 export interface ImageUploadProps {
   value?: string;
@@ -83,10 +84,11 @@ export function ImageUpload({
           />
 
           {preview ? (
-            <img
+            <SafeImage
               src={preview}
               alt="Preview"
               className="w-full h-full object-contain"
+              fallbackText="Imagen no válida"
             />
           ) : (
             <div className="flex flex-col items-center gap-3 p-6 text-center">

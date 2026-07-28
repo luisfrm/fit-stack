@@ -37,6 +37,7 @@ export { Skeleton } from "@workspace/ui/components/skeleton";
 
 export { ColorPicker } from "@workspace/ui/components/color-picker";
 export { ImageUpload } from "@workspace/ui/components/image-upload";
+export { SafeImage } from "@workspace/ui/components/safe-image";
 
 export { TrainerCard, AddTrainerCard } from "@workspace/ui/components/trainer-card";
 export { PlanCard } from "@workspace/ui/components/plan-card";
