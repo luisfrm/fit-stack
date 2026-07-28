@@ -494,6 +494,117 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ---
 
+## Console API Layer (ofetch)
+
+`apps/console` usa **ofetch** como wrapper unificado de `fetch` nativo. Reemplaza axios con una API más liviana (~6kb) y soporte nativo para `next: { revalidate, tags }`.
+
+### Estructura
+
+```
+lib/
+├── api/
+│   ├── client.ts          ← ofetch.create() context-aware
+│   ├── types.ts           ← ApiFetchOptions (extiende FetchOptions + next)
+│   └── exchange-rates.ts  ← fetch externo (sin auth)
+├── services/              ← métodos tipados (reusables desde RSC y client)
+│   ├── organizations-service.ts
+│   ├── platform-plans-service.ts
+│   ├── platform-subscriptions-service.ts
+│   ├── currency-service.ts (legacy, usar lib/api/exchange-rates en RSC)
+│   ├── init-service.ts
+│   ├── upload-service.ts
+│   └── session-service.ts (usa authClient, sin cambios)
+└── hooks/                 ← useTanStackQuery sobre los services
+```
+
+### Comportamiento context-aware (`lib/api/client.ts`)
+
+| Contexto | Manejo de cookies | Interceptors |
+|----------|------------------|--------------|
+| **Server (RSC)** | Lee `cookies()` de `next/headers` y los forwardea como `Cookie` header | Sin `window.location` (no-op) |
+| **Client (browser)** | `credentials: 'include'` (browser envía cookies automáticamente) | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
+
+### Patrón de uso en services
+
+```ts
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+
+export const exampleService = {
+  // RSC: pasa { next: { revalidate, tags } } para cachear
+  async getAll(
+    params?: { page?: number; limit?: number },
+    options?: ApiFetchOptions,
+  ) {
+    return await api("/example", { query: params, ...options });
+  },
+
+  // Client: sin options, ofetch no cachea
+  async create(data: any) {
+    return await api("/example", { method: "POST", body: data });
+  },
+};
+```
+
+### Convención post-mutation
+
+Toda mutación desde un client component (modal/form) debe:
+
+```ts
+// 1. Llamar el service
+// 2. Invalidar el cache tag
+// 3. Refrescar el RSC
+
+import { updateTag } from "next/cache";
+import { useRouter } from "next/navigation";
+
+const router = useRouter();
+const refresh = async () => {
+  "use server";
+  updateTag("console:orgs");  // tag del cache del server component
+};
+
+const handleSuccess = async () => {
+  await organizationsService.create(data);
+  router.refresh();  // re-fetchea el server component
+};
+```
+
+> **Nota Next.js 16**: `revalidateTag(tag, profile)` ahora requiere un `profile` (string o `CacheLifeConfig`). Para server actions usar `updateTag(tag)` (nuevo en Next 16, sin profile).
+
+### Console Cache Tags
+
+| Tag | Endpoint |
+|-----|----------|
+| `console:orgs` | `/api/platform/organizations*` |
+| `console:plans` | `/api/platform/plans*` (with-stats, summary) |
+| `console:subs` | `/api/platform/subscriptions*` (incluye /stats) |
+| `console:settings` | `/api/platform/settings` |
+
+### RSC Pattern en `apps/console`
+
+- **Páginas son Server Components** (sin `"use client"`) que llaman services directo con caching options.
+- **Filtros y paginación en URL** (`searchParams` es `Promise<...>` en Next 15+):
+  ```tsx
+  export default async function Page({
+    searchParams,
+  }: {
+    searchParams: Promise<{ query?: string; page?: string }>;
+  }) {
+    const { query, page = "1" } = await searchParams;
+    const result = await service.getAll({ query, page });
+    // ...
+  }
+  ```
+- **Hojas cliente** (search inputs, pagination buttons, modales) usan `useRouter` + `searchParams` de `next/navigation` para modificar la URL → re-render server.
+- **Type C pages** (full-client forms: currencies, payment-methods, `[id]/settings`) siguen con `"use client"`. Follow-up: envolverlas en server parent que pase `initialData` para eliminar loading flash.
+- **`QueryClient` (TanStack Query)**: solo sirve mutaciones y Type C pages. No se usa para reads iniciales en RSC.
+
+### Constante de settings (`PLATFORM_SETTINGS_KEYS`)
+
+Definida en `apps/console/lib/config/platform-settings.ts`. Replica de la que está en `lib/hooks/use-platform-settings.ts` para uso en server components (los hooks no son accesibles desde server).
+
+---
+
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
@@ -514,6 +625,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 - New CMS block types or page schema changes
 - New Bridge endpoints or device management
 - New cache key patterns
+- New RSC patterns or RSC migrations in any app
 
 ---
 
