@@ -87,6 +87,20 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     return c.json(updatedOrg);
   })
 
+  // PATCH /api/platform/organizations/:id
+  .patch('/:id', requirePlatformAuth(), zValidator('json', createOrgSchema.partial()), async (c) => {
+    const id = c.req.param('id');
+    const data = c.req.valid('json');
+    const cache = createCache(c.env);
+
+    const repo = createOrganizationsRepository(c.get('db'));
+    const service = createOrganizationsService(repo);
+
+    const updatedOrg = await service.updateOrganization(id, data as any);
+    await cache.invalidate('platform:organizations*');
+    return c.json(updatedOrg);
+  })
+
   // DELETE /api/platform/organizations/:id
   .delete('/:id', requirePlatformAuth(), async (c) => {
     const id = c.req.param('id');
