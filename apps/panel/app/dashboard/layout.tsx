@@ -3,7 +3,7 @@ import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";
-import { PLATFORM_SUBSCRIPTION_STATUSES, canAccessCms, type OrgRole } from "@workspace/shared";
+import { PLATFORM_SUBSCRIPTION_STATUSES, hasAccess, PERMISSION_MODULES, PERMISSION_ACTIONS, type OrgRole } from "@workspace/shared";
 import { SubscriptionWarningBanner } from "@/components/dashboard/subscription/subscription-warning-banner";
 
 export default async function DashboardLayout({
@@ -29,7 +29,7 @@ export default async function DashboardLayout({
   }
 
   const orgRole = session.member?.role as OrgRole | undefined;
-  if (orgRole && !canAccessCms(orgRole)) {
+  if (orgRole && !hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     redirect("/unauthorized");
   }
 

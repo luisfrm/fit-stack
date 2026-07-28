@@ -6,6 +6,7 @@ export const PERMISSION_ACTIONS = {
   CREATE: "create",
   UPDATE: "update",
   DELETE: "delete",
+  ACCESS: "access",
 } as const;
 
 export type PermissionAction =

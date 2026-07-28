@@ -40,6 +40,7 @@ export type PlatformRole = keyof typeof platformRoles | 'user';
 
 // --- ORGANIZATION ACCESS CONTROL (Tenant Gym) ---
 const organizationStatement = {
+  panel: ["access"],
   dashboard: ["read"],
   reports: ["read"],
   members: ["read", "create", "update", "delete"],
@@ -56,6 +57,7 @@ export const organizationAc = createAccessControl(organizationStatement);
 
 export const organizationRoles = {
   member: organizationAc.newRole({
+    panel: [],
     dashboard: [],
     reports: [],
     members: [],
@@ -67,6 +69,7 @@ export const organizationRoles = {
     settings: [],
   }),
   coach: organizationAc.newRole({
+    panel: [],
     dashboard: [],
     reports: [],
     members: [],
@@ -78,6 +81,7 @@ export const organizationRoles = {
     settings: [],
   }),
   cashier: organizationAc.newRole({
+    panel: ["access"],
     dashboard: ["read"],
     reports: ["read"],
     members: ["read", "create", "update"],
@@ -89,6 +93,7 @@ export const organizationRoles = {
     settings: ["read"],
   }),
   manager: organizationAc.newRole({
+    panel: ["access"],
     dashboard: ["read"],
     reports: ["read"],
     members: ["read", "create", "update"],
@@ -100,6 +105,7 @@ export const organizationRoles = {
     settings: ["read", "update"],
   }),
   owner: organizationAc.newRole({
+    panel: ["access"],
     dashboard: ["read"],
     reports: ["read"],
     members: ["read", "create", "update", "delete"],
@@ -115,22 +121,7 @@ export const organizationRoles = {
 export type OrganizationRole = keyof typeof organizationRoles;
 export const orgRoleDefinitions = organizationRoles;
 
-export const PERMISSION_MODULES = {
-  DASHBOARD: 'dashboard',
-  REPORTS: 'reports',
-  MEMBERS: 'members',
-  STAFF: 'staff',
-  SUBSCRIPTIONS: 'subscriptions',
-  PLANS: 'plans',
-  CLASSES: 'classes',
-  CONTENT: 'content',
-  SETTINGS: 'settings',
-} as const;
+export { PERMISSION_MODULES } from "./permissions/modules";
+export { PERMISSION_ACTIONS } from "./permissions/actions";
 
-export const PERMISSION_ACTIONS = {
-  READ: 'read',
-  CREATE: 'create',
-  UPDATE: 'update',
-  DELETE: 'delete',
-} as const;
 

@@ -12,6 +12,5 @@ export {
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
   can,
-  canAccessCms,
   canAssignRole,
 } from '@workspace/shared';
