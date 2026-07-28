@@ -41,6 +41,7 @@ export const uploadService = {
     await ofetch(data.presignedUrl, {
       method: "PUT",
       body: file,
+      credentials: "include",
       headers: { "Content-Type": file.type },
     });
 

@@ -118,7 +118,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
 
       await onSubmit(payload, isEdit ? undefined : ownerData, selectedFile);
     } catch (error: any) {
-      toast.error(error.message || "Error al procesar el formulario");
+      console.error("Error al procesar el formulario de organización:", error);
+      toast.error("No se pudo guardar la organización. Por favor, verifica la información e intenta nuevamente.");
     } finally {
       setIsUploading(false);
     }
