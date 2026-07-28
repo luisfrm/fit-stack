@@ -83,6 +83,39 @@ export const uploadRoutes = new Hono<AppEnv>()
     return c.json({ success: true });
   })
 
+  // PUT /api/upload/direct?key=cms/orgId/...
+  .put('/direct', requireAuth(), async (c) => {
+    const session = c.get('session')!;
+    const user = c.get('user')!;
+    const key = c.req.query('key');
+
+    if (!key) {
+      return c.json({ error: 'Key is required' }, 400);
+    }
+
+    const orgId = key.split('/')[1] || session.activeOrganizationId;
+    const platformRole = (user as any)?.role;
+    const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
+    const isOrgUser = Boolean(orgId && (session as any).member && authorizeUpload(session, orgId));
+
+    if (!isPlatformUser && !isOrgUser) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    if (!c.env.FILES_BUCKET) {
+      return c.json({ error: 'FILES_BUCKET binding is missing' }, 500);
+    }
+
+    const contentType = c.req.header('content-type') || 'application/octet-stream';
+    const body = await c.req.arrayBuffer();
+
+    await c.env.FILES_BUCKET.put(key, body, {
+      httpMetadata: { contentType },
+    });
+
+    return c.json({ success: true, key });
+  })
+
   // POST /api/upload/presigned
   .post('/presigned', requireAuth(), zValidator('json', presignedSchema), async (c) => {
     const session = c.get('session')!;
@@ -104,7 +137,9 @@ export const uploadRoutes = new Hono<AppEnv>()
 
     const uniqueKey = constructStorageKey(orgId, body.folder || 'general', body.filename, body.customName);
     const r2Service = createR2Service(c.env);
-    const result = await r2Service.getPresignedUploadUrl(uniqueKey, body.contentType);
+    const requestUrl = new URL(c.req.url);
+    const apiBaseUrl = `${requestUrl.protocol}//${requestUrl.host}/api`;
+    const result = await r2Service.getUploadUrl(uniqueKey, apiBaseUrl);
 
     return c.json(result);
   });

@@ -1,5 +1,3 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Env } from './env';
 
 export function createR2Service(env: Env) {
@@ -7,35 +5,12 @@ export function createR2Service(env: Env) {
 
   return {
     /**
-     * Generates a presigned URL for direct client-side S3 uploads to Cloudflare R2.
+     * Generates a direct upload URL via Worker's native R2 storage endpoint.
      */
-    async getPresignedUploadUrl(filename: string, contentType: string) {
-      const accountId = process.env.R2_ACCOUNT_ID;
-      const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-      const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-      const bucketName = process.env.R2_BUCKET_NAME || 'fit-stack-files';
-
-      if (!accountId || !accessKeyId || !secretAccessKey) {
-        throw new Error('Cloudflare R2 S3 credentials are not configured.');
-      }
-
-      const s3 = new S3Client({
-        region: 'auto',
-        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
-      });
-
-      const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: filename,
-        ContentType: contentType,
-      });
-
-      const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
-      return { presignedUrl, key: filename };
+    async getUploadUrl(key: string, apiBaseUrl: string) {
+      const cleanBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+      const presignedUrl = `${cleanBaseUrl}/upload/direct?key=${encodeURIComponent(key)}`;
+      return { presignedUrl, key };
     },
 
     /**
@@ -46,7 +21,7 @@ export function createR2Service(env: Env) {
         throw new Error('FILES_BUCKET binding is missing');
       }
 
-      const publicDomain = env.R2_PUBLIC_URL || process.env.R2_PUBLIC_DOMAIN || 'http://localhost:8787/api/public/files';
+      const publicDomain = env.R2_PUBLIC_URL || 'http://localhost:8788/api/public/files';
       const listed = await bucket.list({ prefix });
 
       return (listed.objects || []).map((object) => {
