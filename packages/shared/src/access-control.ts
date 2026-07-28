@@ -114,3 +114,23 @@ export const organizationRoles = {
 
 export type OrganizationRole = keyof typeof organizationRoles;
 export const orgRoleDefinitions = organizationRoles;
+
+export const PERMISSION_MODULES = {
+  DASHBOARD: 'dashboard',
+  REPORTS: 'reports',
+  MEMBERS: 'members',
+  STAFF: 'staff',
+  SUBSCRIPTIONS: 'subscriptions',
+  PLANS: 'plans',
+  CLASSES: 'classes',
+  CONTENT: 'content',
+  SETTINGS: 'settings',
+} as const;
+
+export const PERMISSION_ACTIONS = {
+  READ: 'read',
+  CREATE: 'create',
+  UPDATE: 'update',
+  DELETE: 'delete',
+} as const;
+

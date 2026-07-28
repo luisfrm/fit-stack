@@ -2,21 +2,25 @@
 
 import { useAuth } from "./hooks";
 import {
-  can,
-  canAccessCms,
-  type OrgRole,
-  type PermissionAction,
-  type PermissionModule,
+  organizationRoles,
+  type OrganizationRole,
 } from "@workspace/shared";
 
 export function usePermissions() {
   const { orgRole } = useAuth();
-  const role = orgRole as OrgRole | undefined;
+  const role = orgRole as OrganizationRole | undefined;
 
   return {
     orgRole: role,
-    can: (module: PermissionModule, action: PermissionAction) =>
-      role ? can(role, module, action) : false,
-    canAccessCms: () => (role ? canAccessCms(role) : false),
+    can: (moduleName: string, actionName: string) => {
+      if (!role) return false;
+      const roleDef = organizationRoles[role];
+      if (!roleDef) return false;
+      return (roleDef as any).authorize({ [moduleName]: [actionName] }).success;
+    },
+    canAccessCms: () => {
+      if (!role) return false;
+      return role === 'owner' || role === 'manager' || role === 'cashier';
+    },
   };
 }
