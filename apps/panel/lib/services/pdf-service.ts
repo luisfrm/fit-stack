@@ -1,31 +1,23 @@
-import { apiClient } from "../api-client";
+import { apiBlob } from "@/lib/api/client";
 
 /**
- * Servicio encargado de gestionar la generación y obtención de documentos PDF.
- * Por ahora actúa como puente hacia la API para documentos persistentes.
+ * Service for generating and fetching PDF documents (e.g. payment receipts).
  */
 class PdfService {
-  /**
-   * Obtiene un PDF persistente (blob) desde la API para un pago específico.
-   * Útil para descarga o previsualización de documentos generados en el servidor.
-   */
   async getPersistentReceiptPDF(paymentId: number): Promise<Blob> {
-    const response = await apiClient.get(`/payments/${paymentId}/pdf`, {
-      responseType: 'blob'
-    });
-    return response.data;
+    return await apiBlob<Blob>(`/payments/${paymentId}/pdf`);
   }
 
-  /**
-   * Descarga un PDF persistente directamente al navegador.
-   */
-  async downloadReceiptPDF(paymentId: number, filename: string = 'recibo.pdf'): Promise<void> {
+  async downloadReceiptPDF(
+    paymentId: number,
+    filename: string = "recibo.pdf",
+  ): Promise<void> {
     try {
       const blob = await this.getPersistentReceiptPDF(paymentId);
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.setAttribute('download', filename);
+      link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
       link.remove();

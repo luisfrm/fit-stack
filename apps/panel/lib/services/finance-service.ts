@@ -1,122 +1,115 @@
-import axios from "axios";
-import { BASE_EXCHANGE_API_URL } from "../config/constants";
-import { apiClient } from "../api-client";
+import { api } from "@/lib/api/client";
+import { getExchangeRates } from "@/lib/api/exchange-rates";
+
+const PAYMENTS_PATH = "/payments";
+const REPORTS_PATH = "/reports";
+
+type AnalyticsKpis = {
+  todayRevenue: Array<{ currency: string; amount: number }>;
+  pendingPayments: number;
+  expiringSoon: number;
+  activeSubscriptions: number;
+};
+
+type AnalyticsResponse = {
+  kpis: AnalyticsKpis;
+  plansDistribution: Array<{ planName: string; count: number }>;
+  paymentMethods: Array<{
+    method: string;
+    count: number;
+    breakdown: Record<string, number>;
+  }>;
+  renewals: Array<{ day: string; count: number }>;
+  growth: {
+    altas: Array<{ day: string; count: number }>;
+    bajas: Array<{ day: string; count: number }>;
+  };
+  chartData: Array<{
+    day: string;
+    currency: string;
+    amount: number;
+    normalizedAmount: number;
+    originalExchangeRate: string;
+  }>;
+};
+
+type RevenueRow = {
+  month: string;
+  currency: string;
+  amount: number;
+  normalizedAmount: number;
+  originalExchangeRate: string;
+};
 
 /**
- * Service to handle financial operations like exchange rate fetching.
+ * Service to handle financial operations: exchange rate fetching,
+ * payment status mutations, and analytics/revenue aggregations.
  */
 export const financeService = {
   /**
-   * Fetches the exchange rate for a given base currency and target currency.
-   * Uses an external public API.
-   */
-  getExchangeRate: async (base: string, target: string): Promise<number> => {
-    if (base === target) return 1;
-
-    try {
-      const url = `${BASE_EXCHANGE_API_URL}/${base}`;
-      const { data } = await axios.get(url);
-
-      // The API returns an object where 'rates' contains the conversion mappings
-      const rates = data.rates || {};
-      const rate = rates[target];
-
-      if (rate === undefined) {
-        console.warn(`Rate not found for ${target} with base ${base}. Defaulting to 1.`);
-        return 1;
-      }
-
-      return rate;
-    } catch (error) {
-      console.error("Error fetching exchange rate:", error);
-      // Fallback to 1 to avoid breaking calculations
-      return 1;
-    }
-  },
-
-  /**
    * Updates the status of a payment.
    */
-  updatePaymentStatus: async (paymentId: number, status: string): Promise<void> => {
-    await apiClient.post(`/payments/${paymentId}/status`, { status });
+  async updatePaymentStatus(
+    paymentId: number,
+    status: string,
+  ): Promise<void> {
+    await api(`${PAYMENTS_PATH}/${paymentId}/status`, {
+      method: "POST",
+      body: { status },
+    });
   },
 
-  getAnalytics: async (baseCurrency: string): Promise<{
-    kpis: {
-      todayRevenue: Array<{ currency: string; amount: number }>
-      pendingPayments: number
-      expiringSoon: number
-      activeSubscriptions: number
-    }
-    plansDistribution: Array<{
-      planName: string
-      count: number
-    }>
-    paymentMethods: Array<{
-      method: string
-      count: number
-      breakdown: Record<string, number>
-    }>
-    renewals: Array<{
-      day: string
-      count: number
-    }>
-    growth: {
-      altas: Array<{ day: string; count: number }>
-      bajas: Array<{ day: string; count: number }>
-    }
-    chartData: Array<{
-      day: string
-      currency: string
-      amount: number
-      normalizedAmount: number
-      originalExchangeRate: string
-    }>
-  }> => {
-    const { data } = await apiClient.get("/payments/analytics");
+  async getAnalytics(baseCurrency: string): Promise<AnalyticsResponse> {
+    const data = (await api(`${PAYMENTS_PATH}/analytics`)) as AnalyticsResponse;
 
-    // Convert all chart currencies to the real base currency on the fly
     if (data.chartData && baseCurrency) {
-      const currencies = Array.from(new Set(data.chartData.map((d: any) => d.currency)));
-      const rates: Record<string, number> = {};
+      const currencies = Array.from(
+        new Set(data.chartData.map((d) => d.currency)),
+      );
 
+      const rates: Record<string, number> = {};
       for (const curr of currencies) {
-        rates[curr as string] = await financeService.getExchangeRate(curr as string, baseCurrency);
+        try {
+          const exchangeRates = await getExchangeRates(curr);
+          rates[curr] = exchangeRates[baseCurrency] ?? 1;
+        } catch {
+          rates[curr] = 1;
+        }
       }
 
-      data.chartData = data.chartData.map((d: any) => ({
+      data.chartData = data.chartData.map((d) => ({
         ...d,
-        normalizedAmount: d.amount * (rates[d.currency] ?? 1)
+        normalizedAmount: d.amount * (rates[d.currency] ?? 1),
       }));
     }
 
     return data;
   },
 
-  getRevenueReport: async (baseCurrency: string): Promise<Array<{
-    month: string
-    currency: string
-    amount: number
-    normalizedAmount: number
-    originalExchangeRate: string
-  }>> => {
-    const { data } = await apiClient.get("/reports/revenue");
+  async getRevenueReport(baseCurrency: string): Promise<RevenueRow[]> {
+    const data = (await api(`${REPORTS_PATH}/revenue`)) as RevenueRow[];
 
-    // Convert all chart currencies to the real base currency on the fly
     if (data && baseCurrency) {
-      const currencies = Array.from(new Set(data.map((d: any) => d.currency)));
-      const rates: Record<string, number> = {};
+      const currencies = Array.from(
+        new Set(data.map((d) => d.currency)),
+      );
 
+      const rates: Record<string, number> = {};
       for (const curr of currencies) {
-        rates[curr as string] = await financeService.getExchangeRate(curr as string, baseCurrency);
+        try {
+          const exchangeRates = await getExchangeRates(curr);
+          rates[curr] = exchangeRates[baseCurrency] ?? 1;
+        } catch {
+          rates[curr] = 1;
+        }
       }
 
-      return data.map((d: any) => ({
+      return data.map((d) => ({
         ...d,
-        normalizedAmount: d.amount * (rates[d.currency] ?? 1)
+        normalizedAmount: d.amount * (rates[d.currency] ?? 1),
       }));
     }
 
     return data;
-  }
+  },
 };

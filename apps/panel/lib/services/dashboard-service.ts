@@ -1,4 +1,4 @@
-import { apiClient } from "../api-client";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
 
 export interface DashboardStats {
   activeMembers: number;
@@ -7,15 +7,16 @@ export interface DashboardStats {
   membershipsExpiring: number;
 }
 
+const DASHBOARD_PATH = "/dashboard";
+
 export const dashboardService = {
-  /**
-   * Fetches the 4 key metrics for the dashboard KPI cards.
-   * @param today - Current date in YYYY-MM-DD format (matches gym's timezone).
-   */
-  async getStats(today: string): Promise<DashboardStats> {
-    const response = await apiClient.get<DashboardStats>("/dashboard/stats", {
-      params: { today },
+  async getStats(
+    today: string,
+    options?: ApiFetchOptions,
+  ): Promise<DashboardStats> {
+    return await api<DashboardStats>(`${DASHBOARD_PATH}/stats`, {
+      query: { today },
+      ...options,
     });
-    return response.data;
   },
 };

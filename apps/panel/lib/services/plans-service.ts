@@ -1,29 +1,49 @@
-import { apiClient } from '../api-client'
-import { IMembershipPlan, IMembershipsSummary } from '@/types/dashboard'
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { IMembershipPlan, IMembershipsSummary } from "@workspace/shared/types";
+
+const PLANS_PATH = "/plans";
+
+export interface GetPlansOptions {
+  includeStats?: boolean;
+}
 
 export const plansService = {
-  getAll: async (options?: { includeStats?: boolean }): Promise<IMembershipPlan[]> => {
-    const params = options?.includeStats ? { includeStats: true } : {}
-    const { data } = await apiClient.get<IMembershipPlan[]>('/plans', { params })
-    return data
+  async getAll(
+    params?: GetPlansOptions,
+    options?: ApiFetchOptions,
+  ): Promise<IMembershipPlan[]> {
+    return await api<IMembershipPlan[]>(PLANS_PATH, {
+      query: params?.includeStats ? { includeStats: true } : undefined,
+      ...options,
+    });
   },
 
-  getSummary: async (): Promise<IMembershipsSummary> => {
-    const { data } = await apiClient.get<IMembershipsSummary>('/plans/summary')
-    return data
+  async getSummary(
+    options?: ApiFetchOptions,
+  ): Promise<IMembershipsSummary> {
+    return await api<IMembershipsSummary>(`${PLANS_PATH}/summary`, options);
   },
 
-  create: async (plan: Omit<IMembershipPlan, 'id'>): Promise<IMembershipPlan> => {
-    const { data } = await apiClient.post<IMembershipPlan>('/plans', plan)
-    return data
+  async create(
+    plan: Omit<IMembershipPlan, "id">,
+  ): Promise<IMembershipPlan> {
+    return await api<IMembershipPlan>(PLANS_PATH, {
+      method: "POST",
+      body: plan,
+    });
   },
 
-  update: async (id: number, plan: Partial<IMembershipPlan>): Promise<IMembershipPlan> => {
-    const { data } = await apiClient.put<IMembershipPlan>(`/plans/${id}`, plan)
-    return data
+  async update(
+    id: number,
+    plan: Partial<IMembershipPlan>,
+  ): Promise<IMembershipPlan> {
+    return await api<IMembershipPlan>(`${PLANS_PATH}/${id}`, {
+      method: "PUT",
+      body: plan,
+    });
   },
 
-  delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/plans/${id}`)
-  }
-}
+  async delete(id: number): Promise<void> {
+    await api(`${PLANS_PATH}/${id}`, { method: "DELETE" });
+  },
+};

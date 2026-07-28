@@ -3,9 +3,9 @@
 import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Text, Button, toast } from "@workspace/ui/components";
+import { ofetch } from "ofetch";
 import { cmsContentService } from "@/lib/services/cms-content-service";
 import { uploadService } from "@/lib/services/upload-service";
-import axios from "axios";
 
 interface ImageUploaderProps {
   value?: string;
@@ -39,10 +39,10 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
       const { presignedUrl, key } = await cmsContentService.getPresignedUrl(file.name, file.type, 'cms');
       
       // 2. Subir directamente a R2 usando la URL firmada
-      await axios.put(presignedUrl, file, {
-        headers: {
-          "Content-Type": file.type,
-        },
+      await ofetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
       });
 
       // 3. Notificar éxito y actualizar el padre con la KEY del objeto

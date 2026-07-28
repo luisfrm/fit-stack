@@ -24,10 +24,19 @@ export function SafeImage({
 }: SafeImageProps) {
   const [hasError, setHasError] = React.useState(false);
   const [isLoaded, setIsLoaded] = React.useState(false);
+  const imgRef = React.useRef<HTMLImageElement>(null);
 
   React.useEffect(() => {
     setHasError(false);
     setIsLoaded(false);
+
+    if (imgRef.current && imgRef.current.complete) {
+      if (imgRef.current.naturalWidth > 0) {
+        setIsLoaded(true);
+      } else {
+        setHasError(true);
+      }
+    }
   }, [src]);
 
   if (!src || hasError) {
@@ -54,9 +63,10 @@ export function SafeImage({
         <Skeleton className={cn("absolute inset-0 w-full h-full", className)} />
       )}
       <img
+        ref={imgRef}
         src={src}
         alt={alt || ""}
-        className={cn(className, !isLoaded && "opacity-0 invisible absolute")}
+        className={cn(className, !isLoaded && "opacity-0 pointer-events-none")}
         onLoad={(e) => {
           setIsLoaded(true);
           if (onLoad) onLoad(e);

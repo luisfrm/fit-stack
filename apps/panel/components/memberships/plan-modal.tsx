@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Modal, toast } from "@workspace/ui/components";
 import { PlanForm } from "./plan-form";
-import { type IMembershipPlan } from "@/types/dashboard";
+import { type IMembershipPlan } from "@workspace/shared/types";
 import { plansService } from "@/lib/services/plans-service";
 
 interface PlanModalProps {
@@ -13,6 +14,7 @@ interface PlanModalProps {
 }
 
 export function PlanModal({ planData, trigger, onSuccess }: PlanModalProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -20,7 +22,7 @@ export function PlanModal({ planData, trigger, onSuccess }: PlanModalProps) {
 
   const handleSubmit = async (formData: Omit<IMembershipPlan, "id">) => {
     setIsLoading(true);
-    
+
     try {
       if (isEdit && planData?.id) {
         await plansService.update(planData.id, formData);
@@ -29,11 +31,16 @@ export function PlanModal({ planData, trigger, onSuccess }: PlanModalProps) {
         await plansService.create(formData);
         toast.success("Plan creado exitosamente.");
       }
-      
+
       onSuccess?.();
       setIsOpen(false);
-    } catch (error: any) {
-      toast.error(error.message || "Algo salió mal guardando el plan");
+      router.refresh();
+    } catch (error) {
+      const message =
+        (error as { data?: { error?: string }; message?: string }).data?.error ??
+        (error as Error).message ??
+        "Algo salió mal guardando el plan";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -48,10 +55,10 @@ export function PlanModal({ planData, trigger, onSuccess }: PlanModalProps) {
       description="Configura los detalles de facturación y visibilidad de este plan."
       isScrollable={true}
     >
-      <PlanForm 
-        initialData={planData} 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading} 
+      <PlanForm
+        initialData={planData}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
       />
     </Modal>
   );

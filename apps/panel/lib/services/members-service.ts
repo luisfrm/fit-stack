@@ -1,83 +1,76 @@
-import { apiClient } from "../api-client";
-import { IMember, MemberFilter, PaginatedMembers } from "@/types/dashboard";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { IMember, MemberFilter, PaginatedMembers } from "@workspace/shared/types";
+
+const MEMBERS_PATH = "/members";
 
 /**
- * Service to handle member-related API operations using axios.
+ * Service to handle member-related API operations.
  */
 export const membersService = {
-  /**
-   * Fetches all members from the API with optional filters and pagination.
-   */
-  async getMembers(filters: MemberFilter = {}): Promise<PaginatedMembers> {
-    const response = await apiClient.get<PaginatedMembers>("/members", {
-      params: filters,
+  async getMembers(
+    filters: MemberFilter = {},
+    options?: ApiFetchOptions,
+  ): Promise<PaginatedMembers> {
+    return await api<PaginatedMembers>(MEMBERS_PATH, {
+      query: filters,
+      ...options,
     });
-    return response.data;
   },
 
-  /**
-   * Fetches the member record for the currently authenticated user.
-   */
-  async getCurrentMember(): Promise<IMember | null> {
+  async getCurrentMember(
+    options?: ApiFetchOptions,
+  ): Promise<IMember | null> {
     try {
-      const response = await apiClient.get<IMember>("/members/me");
-      return response.data;
-    } catch (error: any) {
-      if (error.response?.data?.code === 'MEMBER_NOT_FOUND') {
-        return null;
-      }
+      return await api<IMember>(`${MEMBERS_PATH}/me`, options);
+    } catch (error) {
+      const data = (error as { data?: { code?: string } }).data;
+      if (data?.code === "MEMBER_NOT_FOUND") return null;
       throw error;
     }
   },
 
-  /**
-   * Deletes a member by its ID.
-   */
   async deleteMember(id: number): Promise<void> {
-    await apiClient.delete(`/members/${id}`);
+    await api(`${MEMBERS_PATH}/${id}`, { method: "DELETE" });
   },
 
-  /**
-   * Creates a new member.
-   * Features a flag to trigger the registration email link.
-   */
-  async createMember(data: Partial<IMember>, sendInvite: boolean = false): Promise<IMember> {
-    const response = await apiClient.post<IMember>("/members", {
-      ...data,
-      sendInvite
+  async createMember(
+    data: Partial<IMember>,
+    sendInvite: boolean = false,
+  ): Promise<IMember> {
+    return await api<IMember>(MEMBERS_PATH, {
+      method: "POST",
+      body: { ...data, sendInvite },
     });
-    return response.data;
   },
 
-  /**
-   * Updates an existing member.
-   */
-  async updateMember(id: number, data: Partial<IMember>): Promise<IMember> {
-    const response = await apiClient.put<IMember>(`/members/${id}`, data);
-    return response.data;
+  async updateMember(
+    id: number,
+    data: Partial<IMember>,
+  ): Promise<IMember> {
+    return await api<IMember>(`${MEMBERS_PATH}/${id}`, {
+      method: "PUT",
+      body: data,
+    });
   },
 
-  /**
-   * Validates a registration token for a new member.
-   */
-  async validateToken(token: string): Promise<{ valid: boolean; email: string; firstName: string; lastName: string; }> {
-    const response = await apiClient.get(`/members/validate-token?token=${token}`);
-    return response.data;
+  async validateToken(
+    token: string,
+  ): Promise<{ valid: boolean; email: string; firstName: string; lastName: string }> {
+    return await api(`${MEMBERS_PATH}/validate-token`, {
+      query: { token },
+    });
   },
 
-  /**
-   * Links an authenticated user to an existing member record using a token.
-   */
   async linkUser(token: string): Promise<{ success: boolean }> {
-    const response = await apiClient.post("/members/link-user", { token });
-    return response.data;
+    return await api(`${MEMBERS_PATH}/link-user`, {
+      method: "POST",
+      body: { token },
+    });
   },
 
-  /**
-   * Resends the registration email for a member.
-   */
   async resendInvite(id: number): Promise<{ success: boolean }> {
-    const response = await apiClient.post(`/members/${id}/resend-invite`);
-    return response.data;
-  }
+    return await api(`${MEMBERS_PATH}/${id}/resend-invite`, {
+      method: "POST",
+    });
+  },
 };

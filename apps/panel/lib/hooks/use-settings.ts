@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { settingsService } from "@/lib/services/settings-service";
 import { toast } from "@workspace/ui";
-import { useAuth } from "./use-auth";
 
 export const SETTINGS_KEYS = {
   BRAND_PRIMARY: "brand_primary",
@@ -14,39 +14,135 @@ export const SETTINGS_KEYS = {
 } as const;
 
 const EMPTY_SETTINGS: Record<string, string> = {};
+const SETTINGS_CACHE_KEY = "fitstack:settings";
+const SETTINGS_TTL_MS = 1000 * 60 * 2;
 
+function readCache(): { data: Record<string, string>; ts: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data: Record<string, string>; ts: number };
+    if (Date.now() - parsed.ts > SETTINGS_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: Record<string, string>) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      SETTINGS_CACHE_KEY,
+      JSON.stringify({ data, ts: Date.now() }),
+    );
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function clearCache() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(SETTINGS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Hook for reading and mutating organization settings from client components.
+ * Uses a sessionStorage cache to avoid refetching on every mount within the TTL.
+ *
+ * For initial SSR data, prefer loading settings in the parent Server Component
+ * and passing them down as props.
+ */
 export function useSettings() {
-  const queryClient = useQueryClient();
-  const { activeOrganization } = useAuth();
-  const activeOrganizationId = activeOrganization?.id;
+  const router = useRouter();
+  const [settings, setSettings] = React.useState<Record<string, string>>(
+    () => readCache()?.data ?? EMPTY_SETTINGS,
+  );
+  const [isLoading, setIsLoading] = React.useState(
+    () => readCache() === null,
+  );
+  const [isUpdating, setIsUpdating] = React.useState(false);
 
-  const query = useQuery({
-    queryKey: ["settings", activeOrganizationId || "global"],
-    queryFn: async () => {
-      const response = await apiClient.get<Record<string, string>>("/settings");
-      return response.data;
-    },
-    enabled: !!activeOrganizationId,
-  });
+  React.useEffect(() => {
+    const cached = readCache();
+    if (cached) {
+      setSettings(cached.data);
+      setIsLoading(false);
+      return;
+    }
 
-  const updateMutation = useMutation({
-    mutationFn: async (settings: Record<string, string>) => {
-      const response = await apiClient.post("/settings", settings);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
-      toast.success("Ajustes actualizados correctamente");
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || "Error al actualizar los ajustes");
-    },
-  });
+    let cancelled = false;
+    settingsService
+      .getAll()
+      .then((data) => {
+        if (cancelled) return;
+        setSettings(data);
+        writeCache(data);
+      })
+      .catch(() => {
+        // Silent failure — settings are non-critical for many views.
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-  return {
-    settings: query.data || EMPTY_SETTINGS,
-    isLoading: query.isLoading,
-    isUpdating: updateMutation.isPending,
-    updateSettings: updateMutation.mutateAsync,
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updateSettings = React.useCallback(
+    async (next: Record<string, string>) => {
+      try {
+        setIsUpdating(true);
+        await settingsService.update(next);
+        setSettings(next);
+        writeCache(next);
+        toast.success("Ajustes actualizados correctamente");
+        router.refresh();
+      } catch (error) {
+        const message =
+          (error as { data?: { error?: string }; message?: string }).data
+            ?.error ?? "Error al actualizar los ajustes";
+        toast.error(message);
+        throw error;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [router],
+  );
+
+  return { settings, isLoading, isUpdating, updateSettings };
+}
+
+/**
+ * Hook for mutating settings from a client component that already
+ * has settings loaded as props (e.g. via a parent Server Component).
+ */
+export function useSettingsMutation() {
+  const router = useRouter();
+
+  return React.useCallback(
+    async (settings: Record<string, string>) => {
+      try {
+        await settingsService.update(settings);
+        clearCache();
+        toast.success("Ajustes actualizados correctamente");
+        router.refresh();
+      } catch (error) {
+        const message =
+          (error as { data?: { error?: string }; message?: string }).data
+            ?.error ?? "Error al actualizar los ajustes";
+        toast.error(message);
+        throw error;
+      }
+    },
+    [router],
+  );
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Modal } from "@workspace/ui/components";
+import { useRouter } from "next/navigation";
+import { Modal, toast } from "@workspace/ui/components";
 import { ClassForm } from "./class-form";
-import { type ICmsClass } from "@/types/dashboard";
-import { useCreateClass, useUpdateClass } from "@/lib/hooks/use-classes";
+import { type ICmsClass } from "@workspace/shared/types";
+import { classesService } from "@/lib/services/classes-service";
 
 interface ClassModalProps {
   readonly classData?: ICmsClass;
@@ -12,24 +13,32 @@ interface ClassModalProps {
 }
 
 export function ClassModal({ classData, trigger }: ClassModalProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
-
-  const createMutation = useCreateClass();
-  const updateMutation = useUpdateClass();
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const isEdit = !!classData?.id;
-  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const handleSubmit = async (formData: Partial<ICmsClass>) => {
+    setIsLoading(true);
     try {
       if (isEdit && classData?.id) {
-        await updateMutation.mutateAsync({ id: classData.id, data: formData });
+        await classesService.updateClass(classData.id, formData);
+        toast.success("Clase actualizada correctamente");
       } else {
-        await createMutation.mutateAsync(formData);
+        await classesService.createClass(formData);
+        toast.success("Clase creada correctamente");
       }
       setIsOpen(false);
-    } catch {
-      // Error handled in hook
+      router.refresh();
+    } catch (error) {
+      const message =
+        (error as { data?: { error?: string }; message?: string }).data?.error ??
+        (error as Error).message ??
+        "Algo salió mal";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
 

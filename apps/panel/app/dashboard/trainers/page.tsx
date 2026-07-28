@@ -1,264 +1,64 @@
-"use client";
+import { trainersService } from "@/lib/services/trainers-service";
+import { TrainersClient } from "./trainers-client";
+import { updateTag } from "next/cache";
 
-import * as React from "react";
-import { Dumbbell, Plus, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button, Text, TrainerCard, AddTrainerCard, Skeleton, ConfirmationModal, toast } from "@workspace/ui/components";
-import { TrainerModal } from "@/components/trainers/trainer-modal";
-import { membersService } from "@/lib/services/members-service";
-import {
-  useDeleteTrainerMutation,
-  useUpdateTrainerMutation
-} from "@/lib/services/trainers-service";
-import { type TrainerFilter, type ITrainer } from "@/types/dashboard";
-import { useTrainers } from "@/lib/hooks/use-trainers";
-import { uploadService } from "@/lib/services/upload-service";
-import { NoData } from "@/components/dashboard/dashboard-ui";
-import { FilterPanel } from "@/components/dashboard/filter-panel";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { DashboardHeader } from "@/components/dashboard/dashboard-header";
+export const dynamic = "force-dynamic";
 
-const ITEMS_PER_PAGE = 10;
+const PAGE_LIMIT = 10;
 
-export default function TrainersPage() {
-  const [filters, setFilters] = React.useState<TrainerFilter>({
-    page: 1,
-    limit: ITEMS_PER_PAGE,
+export default async function TrainersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    query?: string;
+    page?: string;
+    isVisible?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const query = params.query || "";
+  const page = Math.max(1, Number(params.page) || 1);
+  const isVisibleParam = params.isVisible;
+  const initialVisibility: "all" | "visible" | "hidden" =
+    isVisibleParam === "true"
+      ? "visible"
+      : isVisibleParam === "false"
+        ? "hidden"
+        : "all";
+
+  const filters: {
+    page: number;
+    limit: number;
+    name?: string;
+    isVisible?: boolean;
+  } = {
+    page,
+    limit: PAGE_LIMIT,
+  };
+  if (query) filters.name = query;
+  if (initialVisibility === "visible") filters.isVisible = true;
+  if (initialVisibility === "hidden") filters.isVisible = false;
+
+  const result = await trainersService.getTrainers(filters, {
+    next: { revalidate: 60, tags: ["panel:trainers"] },
   });
-  const [searchTerm, setSearchTerm] = React.useState("");
-  const debouncedSearch = useDebounce(searchTerm, 500);
 
-  const [trainerToEdit, setTrainerToEdit] = React.useState<ITrainer | undefined>(undefined);
-  const [trainerToDelete, setTrainerToDelete] = React.useState<ITrainer | undefined>(undefined);
-  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
-  const [resendingTrainerId, setResendingTrainerId] = React.useState<number | null>(null);
-
-  const { data: result = { data: [], total: 0, page: 1, limit: ITEMS_PER_PAGE, totalPages: 0 }, isLoading } = useTrainers(filters);
-
-  React.useEffect(() => {
-    setFilters((prev) => ({ ...prev, name: debouncedSearch || undefined, page: 1 }));
-  }, [debouncedSearch]);
-
-  const deleteMutation = useDeleteTrainerMutation();
-  const updateMutation = useUpdateTrainerMutation();
-
-  const handlePageChange = (newPage: number) => {
-    setFilters((prev) => ({ ...prev, page: newPage }));
+  const refreshTrainers = async () => {
+    "use server";
+    updateTag("panel:trainers");
   };
 
-  const handleEdit = (trainer: ITrainer) => {
-    setTrainerToEdit(trainer);
-    setIsEditModalOpen(true);
-  };
-
-  const handleToggleVisibility = (trainer: ITrainer, isVisible: boolean) => {
-    if (!trainer.id) return;
-    updateMutation.mutate({ id: trainer.id, data: { isVisible } });
-  };
-
-  const handleDelete = (trainer: ITrainer) => {
-    setTrainerToDelete(trainer);
-    setIsDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!trainerToDelete?.id) return;
-    try {
-      await deleteMutation.mutateAsync(trainerToDelete.id);
-    } catch (error) {
-      console.error("Error deleting trainer:", error);
-    } finally {
-      setIsDeleteModalOpen(false);
-      setTrainerToDelete(undefined);
-    }
-  };
-
-  const handleResendInvite = async (trainer: ITrainer) => {
-    if (!trainer.id) return;
-    setResendingTrainerId(trainer.id);
-    try {
-      await membersService.resendInvite(trainer.id);
-      toast.success(`Invitación reenviada a ${trainer.email}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Error al reenviar invitación");
-    } finally {
-      setResendingTrainerId(null);
-    }
-  };
-
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="aspect-4/5 w-full rounded-xl" />
-          ))}
-        </div>
-      );
-    }
-
-    if (result.data.length === 0) {
-      if (!debouncedSearch) {
-        return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <TrainerModal trigger={<AddTrainerCard />} />
-          </div>
-        );
-      }
-      return (
-        <NoData
-          message="No hay entrenadores registrados. Intenta ajustando los filtros o añade uno nuevo."
-          className="py-20"
-        />
-      );
-    }
-
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {result.data.map((trainer) => (
-          <TrainerCard
-            key={trainer.id}
-            firstName={trainer.firstName}
-            lastName={trainer.lastName}
-            role={trainer.role}
-            specialities={trainer.specialities}
-            imageUrl={trainer.imageUrl ? uploadService.getMediaUrl(trainer.imageUrl) : null}
-            isVisible={trainer.isVisible}
-            hasUser={!!trainer.user}
-            onEdit={() => handleEdit(trainer)}
-            onDelete={() => handleDelete(trainer)}
-            onToggleVisibility={(visible) => handleToggleVisibility(trainer, visible)}
-            onResendInvite={() => handleResendInvite(trainer)}
-            isResendingInvite={resendingTrainerId === trainer.id}
-          />
-        ))}
-        {filters.page === 1 && !debouncedSearch && !filters.isVisible && (
-          <TrainerModal trigger={<AddTrainerCard />} />
-        )}
-      </div>
-    );
-  };
+  void refreshTrainers;
 
   return (
-    <>
-      {/* ── Header ── */}
-      <DashboardHeader
-        title="Entrenadores"
-        description="Gestión de entrenadores y perfiles del gimnasio."
-        iconName="Dumbbell"
-      >
-        <TrainerModal
-          trigger={
-            <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
-              Nuevo Entrenador
-            </Button>
-          }
-        />
-      </DashboardHeader>
-
-      {/* ── Filters ── */}
-      <FilterPanel
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar por nombre..."
-        className="mb-8"
-      >
-        <div className="flex gap-2">
-          <Button
-            variant={filters.isVisible === true ? "primary" : "glass"}
-            size="sm"
-            leftIcon={<Filter className="w-4 h-4" />}
-            onClick={() =>
-              setFilters((prev) => ({
-                ...prev,
-                isVisible: prev.isVisible === true ? undefined : true,
-                page: 1,
-              }))
-            }
-          >
-            Visibles
-          </Button>
-          <Button
-            variant={filters.isVisible === false ? "primary" : "glass"}
-            size="sm"
-            onClick={() =>
-              setFilters((prev) => ({
-                ...prev,
-                isVisible: prev.isVisible === false ? undefined : false,
-                page: 1,
-              }))
-            }
-          >
-            Ocultos
-          </Button>
-        </div>
-      </FilterPanel>
-
-      {/* ── Listado ── */}
-      <section className="animate-in fade-in slide-in-from-bottom-3 duration-500">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Dumbbell size={18} />
-            <Text size="sm" weight="bold" className="uppercase tracking-widest">
-              Staff Oficial
-            </Text>
-          </div>
-          {!isLoading && (
-            <Text size="xs" variant="muted">
-              {result.total} entrenador{result.total === 1 ? "" : "es"} encontrad{result.total === 1 ? "o" : "os"}
-            </Text>
-          )}
-        </div>
-
-        {renderContent()}
-
-        {/* ── Pagination ── */}
-        {result.totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6 px-1">
-            <Text size="sm" variant="muted">
-              Página {result.page} de {result.totalPages}
-            </Text>
-            <div className="flex gap-2">
-              <Button
-                variant="glass"
-                size="sm"
-                disabled={result.page <= 1}
-                leftIcon={<ChevronLeft className="w-4 h-4" />}
-                onClick={() => handlePageChange(result.page - 1)}
-              >
-                Anterior
-              </Button>
-              <Button
-                variant="glass"
-                size="sm"
-                disabled={result.page >= result.totalPages}
-                onClick={() => handlePageChange(result.page + 1)}
-              >
-                Siguiente <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── Modal de Eliminación ── */}
-      <ConfirmationModal
-        open={isDeleteModalOpen}
-        onOpenChange={setIsDeleteModalOpen}
-        title="¿Eliminar entrenador?"
-        description={`Esta acción eliminará permanentemente a ${trainerToDelete?.firstName} y todos sus datos asociados (perfil, suscripciones, pagos y rutinas). Esta acción no se puede deshacer.`}
-        confirmText="Eliminar permanentemente"
-        variant="danger"
-        onConfirm={confirmDelete}
-      />
-
-      {/* ── Modal de Edición ── */}
-      <TrainerModal
-        initialData={trainerToEdit}
-        open={isEditModalOpen}
-        onOpenChange={setIsEditModalOpen}
-        onSuccess={() => { }}
-      />
-    </>
+    <TrainersClient
+      initialTrainers={result.data}
+      initialPage={result.page}
+      initialTotalPages={result.totalPages}
+      initialTotal={result.total}
+      initialQuery={query}
+      initialVisibility={initialVisibility}
+      limit={PAGE_LIMIT}
+    />
   );
 }

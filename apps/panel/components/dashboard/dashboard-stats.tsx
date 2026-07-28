@@ -2,93 +2,96 @@
 
 import * as React from "react";
 import { KpiGroup } from "./kpi-group";
-import { dashboardService } from "@/lib/services/dashboard-service";
 import { DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { toast } from "@workspace/ui/components";
+import type { DashboardStats } from "@/lib/services/dashboard-service";
+import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import { ValueConverter } from "@/lib/utils/value-converters";
 
-export function DashboardStats() {
-  const [stats, setStats] = React.useState<{
-    activeMembers: number;
-    classesToday: number;
-    monthlyIncome: Record<string, number>;
-    membershipsExpiring: number;
-  } | null>(null);
-  const [loading, setLoading] = React.useState(true);
+interface DashboardStatsViewProps {
+  readonly stats: DashboardStats;
+  readonly primaryCurrency?: string;
+  readonly timezone?: string;
+}
 
+function getRelativeTime(dateStr: string): string {
+  const now = new Date();
+  const past = new Date(dateStr);
+  const diffInMs = now.getTime() - past.getTime();
+  const diffInMins = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInMins < 2) return "Ahora mismo";
+  if (diffInMins < 60) return `Hace ${diffInMins} min`;
+  if (diffInHours < 24) return `Hace ${diffInHours} ${diffInHours === 1 ? "hora" : "horas"}`;
+  if (diffInDays === 1) return "Ayer";
+  return past.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+export function DashboardStatsView({ stats }: DashboardStatsViewProps) {
   const { settings } = useSettings();
-  const { activeOrganization } = useAuth();
-  const timezone = activeOrganization?.timezone || DEFAULT_TIMEZONE;
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
+  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
-  React.useEffect(() => {
-    const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-    }).format(new Date());
-
-    dashboardService.getStats(today)
-      .then(setStats)
-      .catch((err) => {
-        console.error("Failed to fetch dashboard stats", err);
-        toast.error("Error al cargar estadísticas");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DEFAULT_TIMEZONE,
+  }).format(new Date());
+  void today;
 
   const formatIncome = (income: Record<string, number>): React.ReactNode => {
     if (!income || Object.keys(income).length === 0) {
-      return new Intl.NumberFormat("es-ES", {
-        style: "currency",
-        currency: primaryCurrency,
-      }).format(0);
+      return ValueConverter.format(0, primaryCurrency, currencyFormat);
     }
 
     const keys = Object.keys(income);
 
     return (
       <div className="flex flex-col gap-1">
-        {keys.map(cur => {
+        {keys.map((cur) => {
           const amount = (income[cur] ?? 0) / 100;
-          const formatted = new Intl.NumberFormat("es-ES", {
-            style: "currency",
-            currency: cur,
-            minimumFractionDigits: amount % 1 > 0 ? 2 : 0,
-          }).format(amount);
-
-          return <div key={cur}>{formatted}</div>;
+          return (
+            <div key={cur}>
+              {ValueConverter.format(amount, cur, currencyFormat)}
+            </div>
+          );
         })}
       </div>
     );
   };
 
-  const items = React.useMemo(() => [
-    {
-      label: "Miembros Activos",
-      value: stats ? String(stats.activeMembers) : "0",
-      icon: "users" as const,
-      trend: { value: "Total actual", direction: "neutral" as const },
-    },
-    {
-      label: "Clases Hoy",
-      value: stats?.classesToday ? String(stats.classesToday) : "0",
-      icon: "calendar" as const,
-      trend: { value: "Programadas", direction: "neutral" as const },
-    },
-    {
-      label: "Ingresos del Mes",
-      value: stats ? formatIncome(stats.monthlyIncome) : "$0",
-      icon: "wallet" as const,
-      trend: { value: "Este mes", direction: "up" as const },
-    },
-    {
-      label: "Membresías por Vencer",
-      value: stats?.membershipsExpiring ? String(stats.membershipsExpiring) : "0",
-      icon: "alert" as const,
-      trend: { value: "Próx. 7 días", direction: "neutral" as const },
-      accent: true,
-    },
-  ], [stats]);
+  const items = React.useMemo(
+    () => [
+      {
+        label: "Miembros Activos",
+        value: String(stats.activeMembers),
+        icon: "users" as const,
+        trend: { value: "Total actual", direction: "neutral" as const },
+      },
+      {
+        label: "Clases Hoy",
+        value: String(stats.classesToday),
+        icon: "calendar" as const,
+        trend: { value: "Programadas", direction: "neutral" as const },
+      },
+      {
+        label: "Ingresos del Mes",
+        value: formatIncome(stats.monthlyIncome),
+        icon: "wallet" as const,
+        trend: { value: "Este mes", direction: "up" as const },
+      },
+      {
+        label: "Membresías por Vencer",
+        value: String(stats.membershipsExpiring),
+        icon: "alert" as const,
+        trend: { value: "Próx. 7 días", direction: "neutral" as const },
+        accent: true,
+      },
+    ],
+    [stats],
+  );
 
-  return <KpiGroup items={items} loading={loading} />;
+  return <KpiGroup items={items} />;
 }
+
+export { getRelativeTime };

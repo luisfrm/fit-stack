@@ -1,13 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { type ITrainer } from "@/types/dashboard";
-import { Modal } from "@workspace/ui/components";
+import { useRouter } from "next/navigation";
+import { type ITrainer } from "@workspace/shared/types";
+import { Modal, toast } from "@workspace/ui/components";
 import { TrainerForm } from "./trainer-form";
-import {
-  useCreateTrainerMutation,
-  useUpdateTrainerMutation
-} from "@/lib/services/trainers-service";
+import { trainersService } from "@/lib/services/trainers-service";
 
 interface TrainerModalProps {
   readonly initialData?: ITrainer;
@@ -24,30 +22,37 @@ export function TrainerModal({
   open: controlledOpen,
   onOpenChange: setControlledOpen,
 }: TrainerModalProps) {
+  const router = useRouter();
   const isEdit = !!initialData?.id;
   const [internalOpen, setInternalOpen] = React.useState(false);
-
-  const createMutation = useCreateTrainerMutation();
-  const updateMutation = useUpdateTrainerMutation();
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = setControlledOpen ?? setInternalOpen;
 
   const handleSubmit = async (data: Partial<ITrainer>) => {
+    setIsLoading(true);
     try {
       if (isEdit && initialData.id) {
-        await updateMutation.mutateAsync({ id: initialData.id, data });
+        await trainersService.updateTrainer(initialData.id, data);
+        toast.success("Entrenador actualizado correctamente");
       } else {
-        await createMutation.mutateAsync(data);
+        await trainersService.createTrainer(data);
+        toast.success("Entrenador creado correctamente");
       }
       setOpen(false);
       onSuccess?.();
+      router.refresh();
     } catch (error) {
-      console.error("Error submitting trainer form:", error);
+      const message =
+        (error as { data?: { error?: string }; message?: string }).data?.error ??
+        (error as Error).message ??
+        "Error al guardar entrenador";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Modal

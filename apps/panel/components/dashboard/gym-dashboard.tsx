@@ -11,20 +11,32 @@ import {
   RecentRegistrationsList,
   AlertItem,
 } from "@/components/dashboard/dashboard-ui";
-import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { DashboardStatsView } from "@/components/dashboard/dashboard-stats";
 import { MemberModal } from "@/components/members/member-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { DEFAULT_TIMEZONE } from "@/lib/config/display";
-import { useTodayClasses } from "@/lib/hooks/use-classes";
-import { useRecentRegistrations } from "@/lib/hooks/use-payments";
+import { useRouter } from "next/navigation";
+import type {
+  IClassToday,
+  IRecentRegistration,
+} from "@workspace/shared/types";
+import type { DashboardStats } from "@/lib/services/dashboard-service";
 
-export function GymDashboard() {
-  const today = new Intl.DateTimeFormat('en-CA', {
-    timeZone: DEFAULT_TIMEZONE,
-  }).format(new Date());
+interface GymDashboardProps {
+  readonly stats: DashboardStats;
+  readonly todayClasses: IClassToday[];
+  readonly recentRegistrations: IRecentRegistration[];
+}
 
-  const { data: todayClasses = [], isLoading: isLoadingClasses } = useTodayClasses(today);
-  const { data: recentRegistrations = [], isLoading: isLoadingRegistrations } = useRecentRegistrations(5);
+export function GymDashboard({
+  stats,
+  todayClasses,
+  recentRegistrations,
+}: GymDashboardProps) {
+  const router = useRouter();
+
+  const onMemberCreated = () => {
+    router.refresh();
+  };
 
   return (
     <>
@@ -37,7 +49,7 @@ export function GymDashboard() {
           Reporte
         </Button>
         <MemberModal
-          onSuccess={() => { }}
+          onSuccess={onMemberCreated}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               Nuevo Miembro
@@ -46,7 +58,7 @@ export function GymDashboard() {
         />
       </DashboardHeader>
 
-      <DashboardStats />
+      <DashboardStatsView stats={stats} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
         <Card className="lg:col-span-2 overflow-hidden pb-0">
@@ -56,14 +68,14 @@ export function GymDashboard() {
               Ver todas
             </Link>
           </div>
-          <TodayClassesTable classes={todayClasses} loading={isLoadingClasses} />
+          <TodayClassesTable classes={todayClasses} />
         </Card>
 
         <Card className="overflow-hidden flex flex-col">
           <div className="p-6 border-b border-border">
             <Text as="p" size="lg" weight="bold">Últimos Pagos</Text>
           </div>
-          <RecentRegistrationsList registrations={recentRegistrations} loading={isLoadingRegistrations} />
+          <RecentRegistrationsList registrations={recentRegistrations} />
         </Card>
       </div>
 

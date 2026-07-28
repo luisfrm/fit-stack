@@ -1,30 +1,41 @@
-import { apiClient } from "@/lib/api-client";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+
+const INIT_PATH = "/init";
 
 export const initService = {
-  /**
-   * Check if the system needs initial setup.
-   * @returns NeedsInit response data
-   */
-  async checkNeedsInit() {
-    try {
-      const response = await apiClient.get('/init');
-      return response.data as { needsInit: boolean; timestamp: string };
-    } catch (error) {
-      console.error("Error checking init status:", error);
-      return { needsInit: false, error: "Failed to check status" };
-    }
+  async checkNeedsInit(
+    options?: ApiFetchOptions,
+  ): Promise<{ needsInit: boolean }> {
+    return await api<{ needsInit: boolean }>(INIT_PATH, options);
   },
 
-  /**
-   * Performs the initial registration for the first admin user.
-   * @param data { name, email, password }
-   */
-  async performInit(data: any) {
-    try {
-      const response = await apiClient.post('/init', data);
-      return response.data;
-    } catch (error: any) {
-      throw error.response?.data?.error || "Error al inicializar el sistema";
-    }
-  }
+  async performInit(
+    data: { name: string; email: string; password: string },
+    options?: ApiFetchOptions,
+  ): Promise<{ success: boolean }> {
+    return await api<{ success: boolean }>(INIT_PATH, {
+      method: "POST",
+      body: data,
+      ...options,
+    });
+  },
+
+  async getStatus(
+    options?: ApiFetchOptions,
+  ): Promise<{ needsInit: boolean }> {
+    return this.checkNeedsInit(options);
+  },
+
+  async init(data: {
+    name: string;
+    email: string;
+    password: string;
+    organizationName: string;
+  }): Promise<{ success: boolean }> {
+    return this.performInit({
+      name: data.name,
+      email: data.email,
+      password: data.password,
+    });
+  },
 };

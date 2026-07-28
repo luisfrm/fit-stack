@@ -1,30 +1,55 @@
-import { apiClient } from '../api-client'
-import { ISubscription, SubscriptionStatus, PaginatedSubscriptions, SubscriptionsFilter, IRecentRegistration } from '@/types/dashboard'
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type {
+  ISubscription,
+  SubscriptionStatus,
+  PaginatedSubscriptions,
+  SubscriptionsFilter,
+  IRecentRegistration,
+} from "@workspace/shared/types";
+
+const SUBSCRIPTIONS_PATH = "/subscriptions";
 
 export const subscriptionsService = {
-  getAll: async (params?: SubscriptionsFilter): Promise<PaginatedSubscriptions> => {
-    const { data } = await apiClient.get<PaginatedSubscriptions>('/subscriptions', { params })
-    return data
+  async getAll(
+    params?: SubscriptionsFilter,
+    options?: ApiFetchOptions,
+  ): Promise<PaginatedSubscriptions> {
+    return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
+      query: params,
+      ...options,
+    });
   },
 
-  create: async (subscription: Omit<ISubscription, 'id' | 'memberName' | 'planName'>): Promise<ISubscription> => {
-    const { data } = await apiClient.post<ISubscription>('/subscriptions', subscription)
-    return data
+  async create(
+    subscription: Omit<ISubscription, "id" | "memberName" | "planName">,
+  ): Promise<ISubscription> {
+    return await api<ISubscription>(SUBSCRIPTIONS_PATH, {
+      method: "POST",
+      body: subscription,
+    });
   },
 
-  updateStatus: async (id: number, status: SubscriptionStatus): Promise<ISubscription> => {
-    const { data } = await apiClient.put<ISubscription>(`/subscriptions/${id}`, { status })
-    return data
+  async updateStatus(
+    id: number,
+    status: SubscriptionStatus,
+  ): Promise<ISubscription> {
+    return await api<ISubscription>(`${SUBSCRIPTIONS_PATH}/${id}`, {
+      method: "PUT",
+      body: { status },
+    });
   },
 
-  delete: async (id: number): Promise<void> => {
-    await apiClient.delete(`/subscriptions/${id}`)
+  async delete(id: number): Promise<void> {
+    await api(`${SUBSCRIPTIONS_PATH}/${id}`, { method: "DELETE" });
   },
 
-  getRecent: async (limit: number = 5): Promise<IRecentRegistration[]> => {
-    const { data } = await apiClient.get<IRecentRegistration[]>('/subscriptions/recent', {
-      params: { limit }
-    })
-    return data
-  }
-}
+  async getRecent(
+    limit: number = 5,
+    options?: ApiFetchOptions,
+  ): Promise<IRecentRegistration[]> {
+    return await api<IRecentRegistration[]>(`${SUBSCRIPTIONS_PATH}/recent`, {
+      query: { limit },
+      ...options,
+    });
+  },
+};

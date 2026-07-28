@@ -76,8 +76,9 @@ apps/cms/
 └── lib/
     ├── auth-client.ts             # Re-export de @workspace/auth/client
     ├── auth-utils.ts              # Cookie helpers
-    ├── hooks/                     # use-auth, use-classes, use-trainers...
-    ├── services/                  # members, plans, payments, sessions...
+    ├── hooks/                     # use-auth, use-settings, use-theme, use-debounce
+    ├── services/                  # members, plans, payments, sessions, settings...
+    ├── api/                       # ofetch client + exchange-rates helper
     └── config/                    # envs, constants, display config
 ```
 

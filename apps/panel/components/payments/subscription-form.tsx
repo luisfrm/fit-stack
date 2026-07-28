@@ -13,7 +13,7 @@ import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
 import { plansService } from "@/lib/services/plans-service";
 import { settingsService } from "@/lib/services/settings-service";
-import { financeService } from "@/lib/services/finance-service";
+import { getExchangeRates } from "@/lib/api/exchange-rates";
 import {
   Input,
   Button,
@@ -204,7 +204,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
       let rate = 1;
       if (paymentCurrency !== selectedPlan.currency) {
-        rate = await financeService.getExchangeRate(selectedPlan.currency, paymentCurrency);
+        try {
+          const rates = await getExchangeRates(selectedPlan.currency);
+          rate = rates[paymentCurrency] ?? 1;
+        } catch {
+          rate = 1;
+        }
       }
 
       setExchangeRate(rate);

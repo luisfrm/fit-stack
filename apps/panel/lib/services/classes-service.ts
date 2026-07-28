@@ -1,5 +1,5 @@
-import { apiClient } from "../api-client";
-import { ICmsClass } from "@/types/dashboard";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { ICmsClass } from "@workspace/shared/types";
 
 export interface ClassesFilter {
   name?: string;
@@ -7,6 +7,7 @@ export interface ClassesFilter {
   isVisible?: boolean;
   page?: number;
   limit?: number;
+  date?: string;
 }
 
 export interface PaginatedClasses {
@@ -17,52 +18,50 @@ export interface PaginatedClasses {
   totalPages: number;
 }
 
+const CLASSES_PATH = "/classes";
+
 /**
  * Service to handle class-related API operations.
  */
 export const classesService = {
-  /**
-   * Fetches all classes from the API with optional filters and pagination.
-   */
-  async getClasses(filters: ClassesFilter = {}): Promise<PaginatedClasses> {
-    const response = await apiClient.get<PaginatedClasses>("/classes", {
-      params: filters,
+  async getClasses(
+    filters: ClassesFilter = {},
+    options?: ApiFetchOptions,
+  ): Promise<PaginatedClasses> {
+    return await api<PaginatedClasses>(CLASSES_PATH, {
+      query: filters,
+      ...options,
     });
-    return response.data;
   },
 
-  /**
-   * Fetches classes for a specific date (for the dashboard 'Today' widget).
-   * Returns 'once' classes whose scheduledDate matches and 'weekly' classes
-   * whose daysOfWeek includes the respective day-of-week.
-   */
-  async getClassesByDate(date: string): Promise<ICmsClass[]> {
-    const response = await apiClient.get<ICmsClass[]>('/classes', {
-      params: { date },
+  async getClassesByDate(
+    date: string,
+    options?: ApiFetchOptions,
+  ): Promise<ICmsClass[]> {
+    return await api<ICmsClass[]>(CLASSES_PATH, {
+      query: { date },
+      ...options,
     });
-    return response.data;
   },
 
-  /**
-   * Deletes a class by its ID.
-   */
   async deleteClass(id: number): Promise<void> {
-    await apiClient.delete(`/classes/${id}`);
+    await api(`${CLASSES_PATH}/${id}`, { method: "DELETE" });
   },
 
-  /**
-   * Creates a new class.
-   */
   async createClass(data: Partial<ICmsClass>): Promise<ICmsClass> {
-    const response = await apiClient.post<ICmsClass>("/classes", data);
-    return response.data;
+    return await api<ICmsClass>(CLASSES_PATH, {
+      method: "POST",
+      body: data,
+    });
   },
 
-  /**
-   * Updates an existing class.
-   */
-  async updateClass(id: number, data: Partial<ICmsClass>): Promise<ICmsClass> {
-    const response = await apiClient.put<ICmsClass>(`/classes/${id}`, data);
-    return response.data;
+  async updateClass(
+    id: number,
+    data: Partial<ICmsClass>,
+  ): Promise<ICmsClass> {
+    return await api<ICmsClass>(`${CLASSES_PATH}/${id}`, {
+      method: "PUT",
+      body: data,
+    });
   },
 };

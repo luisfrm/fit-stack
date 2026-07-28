@@ -1,24 +1,64 @@
-"use client";
-
-import * as React from "react";
-import { useSearchParams } from "next/navigation";
+import { sessionService } from "@workspace/auth/service";
+import { dashboardService } from "@/lib/services/dashboard-service";
+import { classesService } from "@/lib/services/classes-service";
+import { subscriptionsService } from "@/lib/services/subscriptions-service";
+import { settingsService } from "@/lib/services/settings-service";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
-import { toast, SplashScreen } from "@workspace/ui/components";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { DashboardStatusToaster } from "@/components/dashboard/dashboard-status-toaster";
+import { DEFAULT_TIMEZONE } from "@/lib/config/display";
+import type { IClassToday } from "@workspace/shared/types";
 
-export default function DashboardPage() {
-  const { isPending } = useAuth();
-  const searchParams = useSearchParams();
+export const dynamic = "force-dynamic";
 
-  React.useEffect(() => {
-    if (searchParams.get("status") === "unauthorized") {
-      toast.error("No tienes permisos para acceder a este módulo");
-    }
-  }, [searchParams]);
+export default async function DashboardPage() {
+  const { data: session } = await sessionService.getSession();
+  const orgTimezone = session?.session?.activeOrganizationId
+    ? DEFAULT_TIMEZONE
+    : DEFAULT_TIMEZONE;
 
-  if (isPending) {
-    return <SplashScreen fullScreen={false} message="Cargando entorno..." />;
-  }
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: orgTimezone,
+  }).format(new Date());
 
-  return <GymDashboard />;
+  const [stats, todayClassesRaw, recentRegistrations, settings] =
+    await Promise.all([
+      dashboardService.getStats(today, {
+        next: { revalidate: 60, tags: ["panel:dashboard:stats"] },
+      }),
+      classesService
+        .getClassesByDate(today, {
+          next: { revalidate: 60, tags: ["panel:classes"] },
+        })
+        .catch(() => []),
+      subscriptionsService
+        .getRecent(5, { next: { revalidate: 60, tags: ["panel:subscriptions"] } })
+        .catch(() => []),
+      settingsService
+        .getAll({ next: { revalidate: 600, tags: ["panel:settings"] } })
+        .catch(() => ({})),
+    ]);
+
+  const todayClasses: IClassToday[] = todayClassesRaw
+    .map((cls) => ({
+      id: cls.id,
+      name: cls.name,
+      startTime: cls.startTime,
+      endTime: cls.endTime,
+      trainerName: cls.trainerName,
+      capacity: cls.capacity,
+    }))
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  void settings;
+
+  return (
+    <>
+      <DashboardStatusToaster />
+      <GymDashboard
+        stats={stats}
+        todayClasses={todayClasses}
+        recentRegistrations={recentRegistrations}
+      />
+    </>
+  );
 }

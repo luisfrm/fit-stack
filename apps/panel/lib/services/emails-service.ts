@@ -1,31 +1,32 @@
-import { apiClient } from "../api-client";
+import { api } from "@/lib/api/client";
 
 /**
  * Service to handle all email-related operations.
  * Centralizes the communication with the backend email dispatchers.
  */
 export const emailsService = {
-  /**
-   * Triggers the sending of a payment receipt by email for a specific payment.
-   */
-  sendReceiptByEmail: async (paymentId: number): Promise<void> => {
-    // Note: The apiClient base URL already includes '/api'
-    await apiClient.post(`/payments/${paymentId}/send-email`);
+  async sendReceiptByEmail(paymentId: number): Promise<void> {
+    await api(`/payments/${paymentId}/send-email`, { method: "POST" });
   },
 
-  /**
-   * Sends an invitation email to a new member or trainer.
-   * [STUB] Ready for future implementation.
-   */
-  sendInvitationEmail: async (email: string, role: string, payload?: any): Promise<void> => {
-    await apiClient.post("/emails/invite", { email, role, ...payload });
+  async sendInvitationEmail(
+    email: string,
+    role: string,
+    payload?: Record<string, unknown>,
+  ): Promise<void> {
+    await api("/emails/invite", {
+      method: "POST",
+      body: { email, role, ...payload },
+    });
   },
 
-  /**
-   * Sends a registration confirmation email.
-   * [STUB] Ready for future implementation.
-   */
-  sendRegistrationEmail: async (userId: string, payload?: any): Promise<void> => {
-    await apiClient.post(`/emails/register/${userId}`, payload);
-  }
+  async sendRegistrationEmail(
+    userId: string,
+    payload?: Record<string, unknown>,
+  ): Promise<void> {
+    await api(`/emails/register/${userId}`, {
+      method: "POST",
+      body: payload,
+    });
+  },
 };

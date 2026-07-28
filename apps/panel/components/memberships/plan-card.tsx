@@ -1,14 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { type IMembershipPlan } from "@/types/dashboard";
-import { 
-  Button, 
-  Checkbox, 
-  Modal, 
-  toast, 
-  PlanCard as SharedPlanCard, 
-  Text 
+import { useRouter } from "next/navigation";
+import { type IMembershipPlan } from "@workspace/shared/types";
+import {
+  Button,
+  Checkbox,
+  Modal,
+  toast,
+  PlanCard as SharedPlanCard,
+  Text,
 } from "@workspace/ui/components";
 import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
@@ -17,29 +18,37 @@ import { plansService } from "@/lib/services/plans-service";
 
 interface PlanCardProps {
   readonly plan: IMembershipPlan;
-  readonly onUpdate: () => void;
-  readonly activeMembersCount?: number; 
+  readonly activeMembersCount?: number;
 }
 
-export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardProps) {
+export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isToggling, setIsToggling] = React.useState(false);
+
+  const refresh = React.useCallback(() => {
+    router.refresh();
+  }, [router]);
 
   const handleToggleVisibility = async () => {
     if (!plan.id) return;
     try {
       setIsToggling(true);
-      await plansService.update(plan.id, { 
-        isVisibleOnSite: !plan.isVisibleOnSite 
+      await plansService.update(plan.id, {
+        isVisibleOnSite: !plan.isVisibleOnSite,
       });
       toast.success(
-        plan.isVisibleOnSite 
-          ? "Plan ocultado correctamente" 
-          : "Plan publicado correctamente"
+        plan.isVisibleOnSite
+          ? "Plan ocultado correctamente"
+          : "Plan publicado correctamente",
       );
-      onUpdate();
-    } catch (error: any) {
-      toast.error(error.message || "Error al cambiar visibilidad");
+      router.refresh();
+    } catch (error) {
+      const message =
+        (error as { data?: { error?: string }; message?: string }).data?.error ??
+        (error as Error).message ??
+        "Error al cambiar visibilidad";
+      toast.error(message);
     } finally {
       setIsToggling(false);
     }
@@ -51,9 +60,13 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
       setIsDeleting(true);
       await plansService.delete(plan.id);
       toast.success("Plan eliminado correctamente");
-      onUpdate();
-    } catch (error: any) {
-      toast.error(error.message || "Error al eliminar el plan");
+      router.refresh();
+    } catch (error) {
+      const message =
+        (error as { data?: { error?: string }; message?: string }).data?.error ??
+        (error as Error).message ??
+        "Error al eliminar el plan";
+      toast.error(message);
     } finally {
       setIsDeleting(false);
     }
@@ -73,9 +86,9 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
       }
       headerExtra={
         <div className="flex flex-col items-end gap-1.5">
-          <Checkbox 
-            checked={plan.isVisibleOnSite} 
-            disabled 
+          <Checkbox
+            checked={plan.isVisibleOnSite}
+            disabled
           />
           <Text as="span" size="xs" className="text-foreground-muted text-[9px] uppercase font-bold tracking-wide">
             {plan.isVisibleOnSite ? "Web Visible" : "Web Oculto"}
@@ -84,15 +97,15 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
       }
       footer={
         <>
-          <PlanModal 
-            planData={plan} 
-            onSuccess={onUpdate}
+          <PlanModal
+            planData={plan}
+            onSuccess={refresh}
             trigger={
-              <Button 
+              <Button
                 className={cn(
                   "flex-1 uppercase font-black tracking-widest h-11 text-xs transition-all",
-                  plan.isPopular 
-                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/10" 
+                  plan.isPopular
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/10"
                     : "bg-foreground/5 text-foreground hover:bg-foreground/10"
                 )}
               >
@@ -100,10 +113,10 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
               </Button>
             }
           />
-          
-          <Button 
-            variant="outlined" 
-            size="icon" 
+
+          <Button
+            variant="outlined"
+            size="icon"
             className={cn(
               "h-11 w-11 shrink-0 border-border hover:bg-foreground/5 bg-transparent transition-colors",
               isToggling && "opacity-50 cursor-not-allowed"
@@ -126,9 +139,9 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
             title="Eliminar Plan"
             description={`¿Deseas eliminar el plan "${plan.name}"?`}
             trigger={
-              <Button 
-                variant="outlined" 
-                size="icon" 
+              <Button
+                variant="outlined"
+                size="icon"
                 className="h-11 w-11 shrink-0 border-destructive/10 hover:bg-destructive/10 bg-transparent"
                 title="Eliminar Plan"
               >
@@ -137,15 +150,15 @@ export function PlanCard({ plan, onUpdate, activeMembersCount = 0 }: PlanCardPro
             }
             footer={
               <div className="flex justify-end gap-3 w-full">
-                <Button 
-                  variant="outlined" 
-                  onClick={() => {}} 
+                <Button
+                  variant="outlined"
+                  onClick={() => {}}
                   className="border-border"
                 >
                   Cancelar
                 </Button>
-                <Button 
-                  variant="danger" 
+                <Button
+                  variant="danger"
                   onClick={handleDelete}
                   disabled={isDeleting}
                   className="font-bold"

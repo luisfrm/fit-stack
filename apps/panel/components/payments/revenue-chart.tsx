@@ -3,7 +3,6 @@
 import * as React from "react";
 import { Card, CardContent, SimpleChart, ChartConfig, ChartHeader, useChartPagination, Spinner } from "@workspace/ui";
 import { CurrencyFormat, ValueConverter } from "@/lib/utils/value-converters";
-import { useRevenueReport } from "@/lib/hooks/use-payments";
 
 // Helper function extracted to prevent unstable nested components warning
 function customTooltipFormatter(
@@ -15,7 +14,6 @@ function customTooltipFormatter(
   baseCurrency: string,
   currencyFormat: CurrencyFormat,
 ) {
-  // Convert ValueType (which could be an array in Recharts) to a single value
   const finalValue = Array.isArray(value) ? value[0] : value;
   const finalName = Array.isArray(name) ? name[0] : name;
 
@@ -44,47 +42,49 @@ function customTooltipFormatter(
   );
 }
 
+type RevenuePoint = {
+  day?: string;
+  month?: string;
+  currency: string;
+  amount: number;
+  normalizedAmount: number;
+};
+
 interface RevenueChartProps {
-  data: Array<{
-    day: string;
-    currency: string;
-    amount: number;
-    normalizedAmount: number;
-  }>;
+  data: RevenuePoint[];
+  monthlyData: RevenuePoint[];
   baseCurrency: string;
   currencyFormat: CurrencyFormat;
 }
 
 export function RevenueChart({
   data,
+  monthlyData,
   baseCurrency,
-  currencyFormat
+  currencyFormat,
 }: Readonly<RevenueChartProps>) {
-  const [timeframe, setTimeframe] = React.useState<'30d' | '12m'>('30d');
+  const [timeframe, setTimeframe] = React.useState<"30d" | "12m">("30d");
+  const isMonthlyLoading = false;
 
-  // Fetch 12m data only when requested
-  const { data: monthlyData, isLoading: isMonthlyLoading } = useRevenueReport(baseCurrency, '12m');
-
-  // 1. Transform raw data into grouped format for SimpleChart
   const processedData = React.useMemo(() => {
-    const activeData = timeframe === '30d' ? data : (monthlyData || []);
+    const activeData = timeframe === "30d" ? data : monthlyData || [];
     if (!activeData || activeData.length === 0) return [];
 
     const grouped: Record<string, Record<string, string | number>> = {};
 
-    activeData.forEach((item: any) => {
-      let dateLabel = '';
-      const rawDate = item.day || item.month; // Backend returns TO_CHAR string
+    activeData.forEach((item) => {
+      let dateLabel = "";
+      const rawDate = item.day || item.month || "";
 
-      if (timeframe === '30d') {
-        // rawDate is 'YYYY-MM-DD'
-        const [, m, d] = rawDate.split('-');
+      if (timeframe === "30d") {
+        const [, m, d] = rawDate.split("-");
         dateLabel = `${d}-${m}`;
       } else {
-        // rawDate is 'YYYY-MM'
-        const [y, m] = rawDate.split('-');
+        const [y, m] = rawDate.split("-");
         const dateObj = new Date(Number(y), Number(m) - 1, 1);
-        dateLabel = dateObj.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '');
+        dateLabel = dateObj
+          .toLocaleDateString("es-ES", { month: "short" })
+          .replace(".", "");
         dateLabel = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
       }
 
@@ -94,17 +94,15 @@ export function RevenueChart({
         grouped[dateLabel] = group;
       }
 
-      // El valor para la gráfica es el normalizado
-      group[item.currency] = (group[item.currency] as number || 0) + (item.normalizedAmount / 100);
-      // Guardamos el original para el tooltip
-      group[`${item.currency}_raw`] = (group[`${item.currency}_raw`] as number || 0) + (item.amount / 100);
+      group[item.currency] = ((group[item.currency] as number) || 0) + (item.normalizedAmount / 100);
+      group[`${item.currency}_raw`] = ((group[`${item.currency}_raw`] as number) || 0) + (item.amount / 100);
     });
 
-    const currencies = Array.from(new Set(activeData.map((d: any) => d.currency)));
+    const currencies = Array.from(new Set(activeData.map((d) => d.currency)));
 
-    return Object.values(grouped).map(group => {
+    return Object.values(grouped).map((group) => {
       const g = { ...group };
-      currencies.forEach(curr => {
+      currencies.forEach((curr) => {
         if (g[curr] === undefined) {
           g[curr] = 0;
           g[`${curr}_raw`] = 0;
@@ -114,7 +112,6 @@ export function RevenueChart({
     });
   }, [data, monthlyData, timeframe]);
 
-  // 2. Handle Pagination
   const {
     slicedData,
     viewWindow,
@@ -122,14 +119,13 @@ export function RevenueChart({
     onNext,
     canPrev,
     canNext,
-    setViewWindow
-  } = useChartPagination(processedData, { initialWindow: timeframe === '30d' ? 7 : 12 });
+    setViewWindow,
+  } = useChartPagination(processedData, { initialWindow: timeframe === "30d" ? 7 : 12 });
 
-  // 3. Generate Chart Config
-  const chartConfig = React.useMemo(() => {
+  const chartConfig = React.useMemo<ChartConfig>(() => {
     const config: ChartConfig = {};
-    const activeData = timeframe === '30d' ? data : (monthlyData || []);
-    const currencies = Array.from(new Set(activeData.map((d: any) => d.currency)));
+    const activeData = timeframe === "30d" ? data : monthlyData || [];
+    const currencies = Array.from(new Set(activeData.map((d) => d.currency)));
 
     currencies.forEach((curr, idx) => {
       const colors = ["#EAB308", "#3B82F6", "#EF4444", "#10B981", "#8B5CF6"];
@@ -144,24 +140,25 @@ export function RevenueChart({
 
   const categories = Object.keys(chartConfig);
 
-  const windowOptions = timeframe === '30d' 
-    ? [
-        { label: "7d", value: 7 },
-        { label: "14d", value: 14 },
-        { label: "30d", value: 30 },
-        { label: "12m", value: "12m" }, // Switch to monthly
-      ]
-    : [
-        { label: "30d", value: "30d" }, // Switch back to daily
-        { label: "6m", value: 6 },
-        { label: "12m", value: 12 },
-      ];
+  const windowOptions =
+    timeframe === "30d"
+      ? [
+          { label: "7d", value: 7 },
+          { label: "14d", value: 14 },
+          { label: "30d", value: 30 },
+          { label: "12m", value: "12m" },
+        ]
+      : [
+          { label: "30d", value: "30d" },
+          { label: "6m", value: 6 },
+          { label: "12m", value: 12 },
+        ];
 
   const handleViewChange = (val: string | number) => {
-    if (val === '12m' && timeframe === '30d') {
-      setTimeframe('12m');
-    } else if (val === '30d' && timeframe === '12m') {
-      setTimeframe('30d');
+    if (val === "12m" && timeframe === "30d") {
+      setTimeframe("12m");
+    } else if (val === "30d" && timeframe === "12m") {
+      setTimeframe("30d");
     } else {
       setViewWindow(val);
     }
@@ -170,8 +167,12 @@ export function RevenueChart({
   return (
     <Card variant="glass" className="w-full h-full flex flex-col">
       <ChartHeader
-        title={timeframe === '30d' ? "Ingresos (Diario)" : "Ingresos (Mensual)"}
-        description={timeframe === '30d' ? "Recaudación real de los últimos 30 días." : "Consolidado histórico de los últimos 12 meses."}
+        title={timeframe === "30d" ? "Ingresos (Diario)" : "Ingresos (Mensual)"}
+        description={
+          timeframe === "30d"
+            ? "Recaudación real de los últimos 30 días."
+            : "Consolidado histórico de los últimos 12 meses."
+        }
         viewWindow={viewWindow}
         onViewWindowChange={handleViewChange}
         onPrev={onPrev}
@@ -182,12 +183,12 @@ export function RevenueChart({
         className="flex-none"
       />
       <CardContent className="flex-1 flex flex-col relative">
-        {isMonthlyLoading && timeframe === '12m' && (
+        {isMonthlyLoading && timeframe === "12m" && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/20 backdrop-blur-sm rounded-xl">
             <Spinner className="size-8 text-primary" />
           </div>
         )}
-        
+
         <div className="h-[300px] w-full mt-auto">
           {processedData.length > 0 ? (
             <SimpleChart

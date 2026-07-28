@@ -1,71 +1,111 @@
-import { apiClient } from '../api-client'
-import { ICmsPage, ICmsBlock, IPageWithBlocks, CmsBlockType } from '@/types/cms'
+import { api, type ApiFetchOptions } from "@/lib/api/client";
+import type { ICmsPage, ICmsBlock, IPageWithBlocks, CmsBlockType } from "@/types/cms";
+
+const CMS_PATH = "/cms";
 
 export const cmsContentService = {
   // --- PAGES ---
-  
-  getPages: async (): Promise<ICmsPage[]> => {
-    const { data } = await apiClient.get<ICmsPage[]>('/cms/pages')
-    return data
+
+  async getPages(options?: ApiFetchOptions): Promise<ICmsPage[]> {
+    return await api<ICmsPage[]>(`${CMS_PATH}/pages`, options);
   },
 
-  getPage: async (id: number): Promise<ICmsPage> => {
-    const { data } = await apiClient.get<ICmsPage>(`/cms/pages/${id}`)
-    return data
+  async getPage(
+    id: number,
+    options?: ApiFetchOptions,
+  ): Promise<ICmsPage> {
+    return await api<ICmsPage>(`${CMS_PATH}/pages/${id}`, options);
   },
 
-  createPage: async (page: Omit<ICmsPage, 'id'>): Promise<ICmsPage> => {
-    const { data } = await apiClient.post<ICmsPage>('/cms/pages', page)
-    return data
+  async createPage(page: Omit<ICmsPage, "id">): Promise<ICmsPage> {
+    return await api<ICmsPage>(`${CMS_PATH}/pages`, {
+      method: "POST",
+      body: page,
+    });
   },
 
-  updatePage: async (id: number, page: Partial<ICmsPage>): Promise<ICmsPage> => {
-    const { data } = await apiClient.patch<ICmsPage>(`/cms/pages/${id}`, page)
-    return data
+  async updatePage(
+    id: number,
+    page: Partial<ICmsPage>,
+  ): Promise<ICmsPage> {
+    return await api<ICmsPage>(`${CMS_PATH}/pages/${id}`, {
+      method: "PATCH",
+      body: page,
+    });
   },
 
-  deletePage: async (id: number): Promise<void> => {
-    await apiClient.delete(`/cms/pages/${id}`)
+  async deletePage(id: number): Promise<void> {
+    await api(`${CMS_PATH}/pages/${id}`, { method: "DELETE" });
   },
 
   // --- BLOCKS ---
 
-  getBlocks: async (pageId: number): Promise<ICmsBlock[]> => {
-    const { data } = await apiClient.get<ICmsBlock[]>(`/cms/pages/${pageId}/blocks`)
-    return data
+  async getBlocks(
+    pageId: number,
+    options?: ApiFetchOptions,
+  ): Promise<ICmsBlock[]> {
+    return await api<ICmsBlock[]>(
+      `${CMS_PATH}/pages/${pageId}/blocks`,
+      options,
+    );
   },
 
-  createBlock: async (pageId: number, block: { blockType: CmsBlockType, data: any, displayOrder: number }): Promise<ICmsBlock> => {
-    const { data } = await apiClient.post<ICmsBlock>(`/cms/pages/${pageId}/blocks`, block)
-    return data
+  async createBlock(
+    pageId: number,
+    block: { blockType: CmsBlockType; data: unknown; displayOrder: number },
+  ): Promise<ICmsBlock> {
+    return await api<ICmsBlock>(`${CMS_PATH}/pages/${pageId}/blocks`, {
+      method: "POST",
+      body: block,
+    });
   },
 
-  updateBlock: async (id: number, block: Partial<ICmsBlock>): Promise<ICmsBlock> => {
-    const { data } = await apiClient.patch<ICmsBlock>(`/cms/blocks/${id}`, block)
-    return data
+  async updateBlock(
+    id: number,
+    block: Partial<ICmsBlock>,
+  ): Promise<ICmsBlock> {
+    return await api<ICmsBlock>(`${CMS_PATH}/blocks/${id}`, {
+      method: "PATCH",
+      body: block,
+    });
   },
 
-  deleteBlock: async (id: number): Promise<void> => {
-    await apiClient.delete(`/cms/blocks/${id}`)
+  async deleteBlock(id: number): Promise<void> {
+    await api(`${CMS_PATH}/blocks/${id}`, { method: "DELETE" });
   },
 
-  reorderBlocks: async (pageId: number, orders: { id: number, displayOrder: number }[]): Promise<void> => {
-    await apiClient.put(`/cms/pages/${pageId}/blocks`, { orders })
+  async reorderBlocks(
+    pageId: number,
+    orders: { id: number; displayOrder: number }[],
+  ): Promise<void> {
+    await api(`${CMS_PATH}/pages/${pageId}/blocks`, {
+      method: "PUT",
+      body: { orders },
+    });
   },
 
   // --- PUBLIC ---
 
-  getPublicPage: async (slug: string): Promise<IPageWithBlocks> => {
-    const { data } = await apiClient.get<IPageWithBlocks>(`/public/pages/${slug}`)
-    return data
+  async getPublicPage(
+    slug: string,
+    options?: ApiFetchOptions,
+  ): Promise<IPageWithBlocks> {
+    return await api<IPageWithBlocks>(`/public/pages/${slug}`, options);
   },
 
   // --- MEDIA ---
 
-  getPresignedUrl: async (filename: string, contentType: string, folder: string = 'cms'): Promise<{ presignedUrl: string, key: string }> => {
-    const { data } = await apiClient.post('/upload/presigned', {
-      filename, contentType, folder
-    })
-    return data
-  }
-}
+  async getPresignedUrl(
+    filename: string,
+    contentType: string,
+    folder: string = "cms",
+  ): Promise<{ presignedUrl: string; key: string }> {
+    return await api<{ presignedUrl: string; key: string }>(
+      "/upload/presigned",
+      {
+        method: "POST",
+        body: { filename, contentType, folder },
+      },
+    );
+  },
+};
