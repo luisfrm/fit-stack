@@ -64,7 +64,7 @@ const getColumns = (
         return (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 overflow-hidden shadow-lg shadow-primary/5 transition-transform hover:scale-105 duration-300">
-              {org.logo ? (
+              {org.logo && org.logo.trim() !== "" ? (
                 <NextImage
                   src={uploadService.getMediaUrl(org.logo)}
                   alt={org.name}

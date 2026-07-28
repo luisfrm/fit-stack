@@ -113,7 +113,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
 
       const payload: Partial<IOrganization> = {
         ...formData,
-        logo: finalLogoUrl || undefined,
+        logo: previewUrl ? (finalLogoUrl || null) : null,
       };
 
       await onSubmit(payload, isEdit ? undefined : ownerData, selectedFile);
