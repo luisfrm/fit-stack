@@ -63,8 +63,8 @@ export function createAuth(env: Env) {
           },
         },
         async sendInvitationEmail(data) {
-          const cmsBaseUrl = isLocal ? 'http://localhost:3001' : 'https://cms.luisrivas.site';
-          const inviteLink = `${cmsBaseUrl}/accept-invitation/${data.id}`;
+          const panelBaseUrl = isLocal ? 'http://localhost:3001' : 'https://panel.luisrivas.site';
+          const inviteLink = `${panelBaseUrl}/accept-invitation/${data.id}`;
 
           if (env.TASK_QUEUE) {
             await env.TASK_QUEUE.send({

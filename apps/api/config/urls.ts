@@ -9,7 +9,7 @@ const URLS: Record<AppEnvironment, { cms: string; console: string; api: string }
     api: "http://localhost:3000",
   },
   production: {
-    cms: "https://cms.luisrivas.site",
+    cms: "https://panel.luisrivas.site",
     console: "https://console.luisrivas.site",
     api: "https://api.luisrivas.site",
   },

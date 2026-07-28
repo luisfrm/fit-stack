@@ -13,8 +13,8 @@ export async function handleRegistrationInvite(
   env: EmailHandlerEnv,
   payload: { email: string; token: string }
 ) {
-  const cmsUrl = process.env.CMS_URL || 'http://localhost:3001';
-  const inviteLink = `${cmsUrl}/register?token=${payload.token}`;
+  const panelUrl = process.env.PANEL_URL || 'http://localhost:3001';
+  const inviteLink = `${panelUrl}/register?token=${payload.token}`;
   const provider = env.EMAIL_PROVIDER || 'gmail';
 
   const htmlContent = `
