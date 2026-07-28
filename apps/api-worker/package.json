@@ -1,0 +1,31 @@
+{
+  "name": "api-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
+    "@hono/zod-validator": "^0.4.3",
+    "@neondatabase/serverless": "^1.0.2",
+    "@upstash/redis": "^1.37.0",
+    "@workspace/database": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "better-auth": "^1.5.5",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.7.4",
+    "jose": "^6.0.8",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "@workspace/typescript-config": "workspace:*",
+    "typescript": "^5.9.3",
+    "wrangler": "^3.111.0"
+  }
+}

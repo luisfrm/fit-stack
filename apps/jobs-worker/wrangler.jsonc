@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fit-stack-jobs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "queues": {
+    "consumers": [
+      {
+        "queue": "fit-task-events",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "fit-task-events-dlq"
+      }
+    ]
+  },
+
+  "r2_buckets": [
+    {
+      "binding": "FILES_BUCKET",
+      "bucket_name": "fit-stack-files"
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

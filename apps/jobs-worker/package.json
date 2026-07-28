@@ -1,0 +1,29 @@
+{
+  "name": "jobs-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@react-pdf/renderer": "^4.2.1",
+    "@workspace/database": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "nodemailer": "^6.10.0",
+    "react": "^19.0.0",
+    "resend": "^4.1.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19.0.10",
+    "@workspace/typescript-config": "workspace:*",
+    "typescript": "^5.9.3",
+    "wrangler": "^3.111.0"
+  }
+}
