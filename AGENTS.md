@@ -20,10 +20,12 @@ pnpm db:studio    # Open Drizzle Studio
 pnpm db:seed      # Seed demo data (tsx src/seed.ts)
 
 # Individual apps
-cd apps/api      && pnpm dev  # Port 3000
-cd apps/cms      && pnpm dev  # Port 3001
-cd apps/web      && pnpm dev  # Port 3002
-cd apps/console  && pnpm dev  # Port 3003
+cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active)
+cd apps/jobs-worker # Cloudflare Queues Worker
+cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
+cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
+cd apps/console     && pnpm dev  # Port 3003 (Platform SaaS Admin)
+cd apps/api         # [DEPRECATED] Next.js legacy API
 
 # Bridge (Python/Flet — managed separately with uv)
 cd apps/bridge
@@ -33,8 +35,10 @@ uv run python main.py
 
 ## Monorepo Structure
 
-- **Apps**: `api` (Next.js 16, port 3000), `cms` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop)
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - Active), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop), `api` (Next.js 16, DEPRECATED).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/permissions), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
+- **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
+
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
 
 ---
