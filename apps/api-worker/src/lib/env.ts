@@ -13,6 +13,8 @@ export type Env = {
   // Upstash Redis Caching
   UPSTASH_REDIS_REST_URL?: string;
   UPSTASH_REDIS_REST_TOKEN?: string;
+  R2_PUBLIC_URL?: string;
+
 
   // Resend Email Services
   RESEND_API_KEY?: string;

@@ -46,7 +46,7 @@ export function createR2Service(env: Env) {
         throw new Error('FILES_BUCKET binding is missing');
       }
 
-      const publicDomain = process.env.R2_PUBLIC_DOMAIN || 'https://assets.luisrivas.site';
+      const publicDomain = env.R2_PUBLIC_URL || process.env.R2_PUBLIC_DOMAIN || 'http://localhost:8787/api/public/files';
       const listed = await bucket.list({ prefix });
 
       return (listed.objects || []).map((object) => {

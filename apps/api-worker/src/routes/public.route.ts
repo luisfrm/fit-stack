@@ -27,4 +27,22 @@ export const publicRoutes = new Hono<AppEnv>()
     const pageData = await blocksService.getPublicPage(organizationId, slug);
     await cache.set(cacheKey, pageData, 900); // Cache for 15 minutes
     return c.json(pageData);
+  })
+
+  // GET /api/public/files/*
+  .get('/files/*', async (c) => {
+    const key = c.req.path.replace('/api/public/files/', '');
+    if (!c.env.FILES_BUCKET) {
+      return c.text('FILES_BUCKET binding is missing', 500);
+    }
+    const object = await c.env.FILES_BUCKET.get(key);
+    if (!object) {
+      return c.text('File not found', 404);
+    }
+
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('etag', object.httpEtag);
+    return new Response(object.body, { headers });
   });
+
