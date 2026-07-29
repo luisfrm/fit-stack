@@ -11,16 +11,16 @@ import { Badge } from "@workspace/ui/components/badge";
 import { toast, Modal } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
 import { Input } from "@workspace/ui/components/input";
-import { cmsContentService } from "@/lib/services/cms-content-service";
-import type { ICmsPage } from "@/types/cms";
+import { contentService } from "@/lib/services/content-service";
+import type { IContentPage } from "@/types/content";
 
 interface ContentListClientProps {
-  readonly initialPages: ICmsPage[];
+  readonly initialPages: IContentPage[];
 }
 
 export function ContentListClient({ initialPages }: ContentListClientProps) {
   const router = useRouter();
-  const [pages, setPages] = React.useState<ICmsPage[]>(initialPages);
+  const [pages, setPages] = React.useState<IContentPage[]>(initialPages);
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
   React.useEffect(() => {
@@ -31,7 +31,7 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
     if (!confirm("¿Estás seguro de eliminar esta página? Se borrarán todos sus bloques.")) return;
     setDeletingId(id);
     try {
-      await cmsContentService.deletePage(id);
+      await contentService.deletePage(id);
       toast.success("Página eliminada");
       router.refresh();
     } catch (error) {
@@ -44,7 +44,7 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
     }
   };
 
-  const columns: ColumnDef<ICmsPage>[] = [
+  const columns: ColumnDef<IContentPage>[] = [
     {
       header: "Título",
       className: "pl-6",
@@ -186,7 +186,7 @@ function PageCreationModal({
 
     try {
       setIsSubmitting(true);
-      const newPage = await cmsContentService.createPage({
+      const newPage = await contentService.createPage({
         title,
         slug,
         description,

@@ -4,11 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Modal, toast } from "@workspace/ui/components";
 import { ClassForm } from "./class-form";
-import { type ICmsClass } from "@workspace/shared/types";
+import { type IGymClass } from "@workspace/shared/types";
 import { classesService } from "@/lib/services/classes-service";
 
 interface ClassModalProps {
-  readonly classData?: ICmsClass;
+  readonly classData?: IGymClass;
   readonly trigger: React.ReactNode;
 }
 
@@ -19,7 +19,7 @@ export function ClassModal({ classData, trigger }: ClassModalProps) {
 
   const isEdit = !!classData?.id;
 
-  const handleSubmit = async (formData: Partial<ICmsClass>) => {
+  const handleSubmit = async (formData: Partial<IGymClass>) => {
     setIsLoading(true);
     try {
       if (isEdit && classData?.id) {

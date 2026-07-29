@@ -1,11 +1,11 @@
-import { cmsContentService } from "@/lib/services/cms-content-service";
+import { contentService } from "@/lib/services/content-service";
 import { ContentListClient } from "./content-list-client";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContentPage() {
-  const pages = await cmsContentService.getPages({
+  const pages = await contentService.getPages({
     next: { revalidate: 60, tags: ["panel:cms:pages"] },
   });
 

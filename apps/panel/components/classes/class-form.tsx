@@ -9,7 +9,7 @@ import {
   Textarea,
   CheckboxCard,
 } from "@workspace/ui/components";
-import { type ICmsClass } from "@/types/dashboard";
+import { type IGymClass } from "@/types/dashboard";
 import { Calendar, Clock, User, Repeat } from "lucide-react";
 import { parseDateAsConfigTimezone } from "@/lib/config/display";
 
@@ -24,8 +24,8 @@ const DAYS_OF_WEEK = [
 ];
 
 interface ClassFormProps {
-  readonly initialData?: ICmsClass;
-  readonly onSubmit: (data: Partial<ICmsClass>) => void;
+  readonly initialData?: IGymClass;
+  readonly onSubmit: (data: Partial<IGymClass>) => void;
   readonly isLoading?: boolean;
 }
 
@@ -40,7 +40,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
       : raw;
   })();
 
-  const [formData, setFormData] = React.useState<Partial<ICmsClass>>({
+  const [formData, setFormData] = React.useState<Partial<IGymClass>>({
     name: initialData?.name ?? "",
     description: initialData?.description ?? "",
     trainerName: initialData?.trainerName ?? "",
@@ -53,7 +53,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
     capacity: initialData?.capacity ?? undefined,
   });
 
-  const handleChange = (field: keyof ICmsClass, value: unknown) => {
+  const handleChange = (field: keyof IGymClass, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -62,7 +62,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
     e.preventDefault();
 
     // Clean up unused frequency fields before sending
-    const payload: Partial<ICmsClass> = { ...formData };
+    const payload: Partial<IGymClass> = { ...formData };
     if (payload.frequencyType === "once") {
       delete payload.daysOfWeek;
       // Send as predictable ISO to backend if needed, or simply string if API handles string well

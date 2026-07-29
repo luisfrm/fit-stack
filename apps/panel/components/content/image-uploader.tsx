@@ -4,7 +4,7 @@ import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Text, Button, toast } from "@workspace/ui/components";
 import { ofetch } from "ofetch";
-import { cmsContentService } from "@/lib/services/cms-content-service";
+import { contentService } from "@/lib/services/content-service";
 import { uploadService } from "@/lib/services/upload-service";
 
 interface ImageUploaderProps {
@@ -36,7 +36,7 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
       setIsUploading(true);
       
       // 1. Obtener Presigned URL desde nuestra API (carpeta 'cms' por defecto)
-      const { presignedUrl, key } = await cmsContentService.getPresignedUrl(file.name, file.type, 'cms');
+      const { presignedUrl, key } = await contentService.getPresignedUrl(file.name, file.type, 'cms');
       
       // 2. Subir directamente a R2 usando la URL firmada
       await ofetch(presignedUrl, {

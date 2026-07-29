@@ -2,20 +2,20 @@
 
 import * as React from "react";
 import { Table, ColumnDef, Badge, Button, Text } from "@workspace/ui/components";
-import { type ICmsClass } from "@/types/dashboard";
+import { type IGymClass } from "@/types/dashboard";
 import { Edit2, Trash2, Eye, EyeOff, Calendar } from "lucide-react";
 import { ClassModal } from "./class-modal";
 import { formatTimeRange } from "@/lib/config/display";
 
 interface ClassesTableProps {
-  readonly classes: ICmsClass[];
+  readonly classes: IGymClass[];
   readonly onDelete?: (id: number) => void;
   readonly loading?: boolean;
 }
 
 const getColumns = (
   onDelete?: (id: number) => void
-): ColumnDef<ICmsClass>[] => [
+): ColumnDef<IGymClass>[] => [
   {
     header: "Clase",
     className: "pl-6",

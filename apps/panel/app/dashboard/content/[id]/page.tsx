@@ -29,26 +29,26 @@ import {
 } from "@workspace/ui/components/accordion";
 import { toast, Modal } from "@workspace/ui/components";
 
-import { cmsContentService } from "@/lib/services/cms-content-service";
-import { ICmsPage, ICmsBlock, CmsBlockType } from "@/types/cms";
+import { contentService } from "@/lib/services/content-service";
+import { IContentPage, IContentBlock, ContentBlockType } from "@/types/content";
 import { cn } from "@workspace/ui/lib/utils";
 
 // Mock de tipos de bloques permitidos (en un futuro esto viene del backend o config compartida)
-const BLOCK_TYPES: { type: CmsBlockType; label: string; description: string }[] = [
+const BLOCK_TYPES: { type: ContentBlockType; label: string; description: string }[] = [
   { type: 'hero',         label: 'Sección Hero',     description: 'Banner principal con título e imagen' },
   { type: 'services',     label: 'Nuestros Servicios',description: 'Cuadrícula de servicios con iconos' },
-  { type: 'classes_info', label: 'Info de Clases',   description: 'Título y botón para sección de clases' },
+  { type: 'classes',      label: 'Clases',           description: 'Título y botón para sección de clases' },
   { type: 'testimonials', label: 'Testimonios',      description: 'Reseñas de clientes y estrellas' },
   { type: 'gallery',      label: 'Galería',          description: 'Malla de imágenes con descripción' },
   { type: 'contact',      label: 'Contacto',         description: 'Formulario, mapa y redes sociales' },
-  { type: 'team_info',    label: 'Info de Equipo',   description: 'Título para el staff de entrenadores' },
+  { type: 'team',         label: 'Equipo',           description: 'Título para el staff de entrenadores' },
 ];
 
 export default function CMSPageEditor() {
   const params = useParams();
   const router = useRouter();
-  const [page, setPage] = React.useState<ICmsPage | null>(null);
-  const [blocks, setBlocks] = React.useState<ICmsBlock[]>([]);
+  const [page, setPage] = React.useState<IContentPage | null>(null);
+  const [blocks, setBlocks] = React.useState<IContentBlock[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [isUpdatingMeta, setIsUpdatingMeta] = React.useState(false);
@@ -62,8 +62,8 @@ export default function CMSPageEditor() {
       setIsLoading(true);
       const pageId = Number(params.id);
       const [pageData, blocksData] = await Promise.all([
-        cmsContentService.getPage(pageId),
-        cmsContentService.getBlocks(pageId)
+        contentService.getPage(pageId),
+        contentService.getBlocks(pageId)
       ]);
       setPage(pageData);
       setMetaTitle(pageData.title);
@@ -102,7 +102,7 @@ export default function CMSPageEditor() {
     }
     try {
       setIsUpdatingMeta(true);
-      const updated = await cmsContentService.updatePage(Number(params.id), {
+      const updated = await contentService.updatePage(Number(params.id), {
         title: metaTitle,
         slug: metaSlug
       });
@@ -136,7 +136,7 @@ export default function CMSPageEditor() {
     if (!page) return;
     try {
       setIsSaving(true);
-      await cmsContentService.reorderBlocks(page.id, blocks.map(b => ({
+      await contentService.reorderBlocks(page.id, blocks.map(b => ({
         id: b.id,
         displayOrder: b.displayOrder
       })));
@@ -152,7 +152,7 @@ export default function CMSPageEditor() {
   const handleDeleteBlock = async (id: number) => {
     if (!confirm("¿Estás seguro de eliminar este bloque?")) return;
     try {
-      await cmsContentService.deleteBlock(id);
+      await contentService.deleteBlock(id);
       toast.success("Bloque eliminado");
       fetchPageAndBlocks();
     } catch (error: any) {
@@ -161,9 +161,9 @@ export default function CMSPageEditor() {
     }
   };
 
-  const handleToggleVisibility = async (block: ICmsBlock) => {
+  const handleToggleVisibility = async (block: IContentBlock) => {
     try {
-      await cmsContentService.updateBlock(block.id, { isVisible: !block.isVisible });
+      await contentService.updateBlock(block.id, { isVisible: !block.isVisible });
       fetchPageAndBlocks();
     } catch (error: any) {
       console.error("Error al cambiar visibilidad", error);
@@ -300,10 +300,10 @@ export default function CMSPageEditor() {
    ───────────────────────────────────────────── */
 
 interface DraggableBlockProps {
-  readonly block: ICmsBlock;
+  readonly block: IContentBlock;
   readonly index: number;
   readonly onDelete: (id: number) => void;
-  readonly onToggleVisibility: (block: ICmsBlock) => void;
+  readonly onToggleVisibility: (block: IContentBlock) => void;
   readonly refresh: () => void;
 }
 
@@ -401,10 +401,10 @@ function BlockCreationModal({
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const handleCreate = async (type: CmsBlockType) => {
+  const handleCreate = async (type: ContentBlockType) => {
     try {
       setIsSubmitting(true);
-      await cmsContentService.createBlock(pageId, {
+      await contentService.createBlock(pageId, {
         blockType: type,
         data: { title: "Nuevo Bloque" }, // Pass a base valid structure for Zod
         displayOrder: currentBlockCount // Al final de la lista

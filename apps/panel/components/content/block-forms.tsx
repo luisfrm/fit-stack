@@ -10,8 +10,8 @@ import { Input } from "@workspace/ui/components/input";
 import { Text } from "@workspace/ui/components/text";
 import { toast } from "@workspace/ui/components";
 import { ImageUploader } from "./image-uploader";
-import { ICmsBlock } from "@/types/cms";
-import { cmsContentService } from "@/lib/services/cms-content-service";
+import { IContentBlock } from "@/types/content";
+import { contentService } from "@/lib/services/content-service";
 
 import { z } from "zod";
 
@@ -50,7 +50,7 @@ const GallerySchema = z.object({
    ───────────────────────────────────────────── */
 
 interface BlockFormProps {
-  block: ICmsBlock;
+  block: IContentBlock;
   onSuccess: () => void;
 }
 
@@ -60,7 +60,7 @@ export function BlockDataForm({ block, onSuccess }: Readonly<BlockFormProps>) {
   const handleUpdate = async (data: any) => {
     try {
       setIsSaving(true);
-      await cmsContentService.updateBlock(block.id, { data });
+      await contentService.updateBlock(block.id, { data });
       toast.success("Contenido actualizado");
       onSuccess();
     } catch (error: any) {
@@ -80,8 +80,8 @@ export function BlockDataForm({ block, onSuccess }: Readonly<BlockFormProps>) {
       return <GalleryForm data={block.data} onSave={handleUpdate} isLoading={isSaving} />;
     case "contact":
       return <ContactForm data={block.data} onSave={handleUpdate} isLoading={isSaving} />;
-    case "classes_info":
-    case "team_info":
+    case "classes":
+    case "team":
     case "services":
       return <GeneralInfoForm data={block.data} onSave={handleUpdate} isLoading={isSaving} titleLabel={block.blockType} />;
     default:

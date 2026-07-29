@@ -1,13 +1,13 @@
-export type CmsBlockType = 
-  | 'hero' 
-  | 'services' 
-  | 'classes_info' 
-  | 'testimonials' 
-  | 'gallery' 
-  | 'contact' 
-  | 'team_info';
+export type ContentBlockType =
+  | 'hero'
+  | 'services'
+  | 'classes'
+  | 'testimonials'
+  | 'gallery'
+  | 'contact'
+  | 'team';
 
-export interface ICmsPage {
+export interface IContentPage {
   id: number;
   slug: string;
   title: string;
@@ -17,10 +17,10 @@ export interface ICmsPage {
   updatedAt?: string;
 }
 
-export interface ICmsBlock {
+export interface IContentBlock {
   id: number;
   pageId: number;
-  blockType: CmsBlockType;
+  blockType: ContentBlockType;
   data: any; // Tipado dinámico según blockType
   isVisible: boolean;
   displayOrder: number;
@@ -28,6 +28,6 @@ export interface ICmsBlock {
   updatedAt?: string;
 }
 
-export interface IPageWithBlocks extends ICmsPage {
-  blocks: ICmsBlock[];
+export interface IContentPageWithBlocks extends IContentPage {
+  blocks: IContentBlock[];
 }

@@ -1,24 +1,29 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import type { ICmsPage, ICmsBlock, IPageWithBlocks, CmsBlockType } from "@/types/cms";
+import type {
+  IContentPage,
+  IContentBlock,
+  IContentPageWithBlocks,
+  ContentBlockType,
+} from "@/types/content";
 
 const CMS_PATH = "/cms";
 
-export const cmsContentService = {
+export const contentService = {
   // --- PAGES ---
 
-  async getPages(options?: ApiFetchOptions): Promise<ICmsPage[]> {
-    return await api<ICmsPage[]>(`${CMS_PATH}/pages`, options);
+  async getPages(options?: ApiFetchOptions): Promise<IContentPage[]> {
+    return await api<IContentPage[]>(`${CMS_PATH}/pages`, options);
   },
 
   async getPage(
     id: number,
     options?: ApiFetchOptions,
-  ): Promise<ICmsPage> {
-    return await api<ICmsPage>(`${CMS_PATH}/pages/${id}`, options);
+  ): Promise<IContentPage> {
+    return await api<IContentPage>(`${CMS_PATH}/pages/${id}`, options);
   },
 
-  async createPage(page: Omit<ICmsPage, "id">): Promise<ICmsPage> {
-    return await api<ICmsPage>(`${CMS_PATH}/pages`, {
+  async createPage(page: Omit<IContentPage, "id">): Promise<IContentPage> {
+    return await api<IContentPage>(`${CMS_PATH}/pages`, {
       method: "POST",
       body: page,
     });
@@ -26,9 +31,9 @@ export const cmsContentService = {
 
   async updatePage(
     id: number,
-    page: Partial<ICmsPage>,
-  ): Promise<ICmsPage> {
-    return await api<ICmsPage>(`${CMS_PATH}/pages/${id}`, {
+    page: Partial<IContentPage>,
+  ): Promise<IContentPage> {
+    return await api<IContentPage>(`${CMS_PATH}/pages/${id}`, {
       method: "PATCH",
       body: page,
     });
@@ -43,8 +48,8 @@ export const cmsContentService = {
   async getBlocks(
     pageId: number,
     options?: ApiFetchOptions,
-  ): Promise<ICmsBlock[]> {
-    return await api<ICmsBlock[]>(
+  ): Promise<IContentBlock[]> {
+    return await api<IContentBlock[]>(
       `${CMS_PATH}/pages/${pageId}/blocks`,
       options,
     );
@@ -52,9 +57,9 @@ export const cmsContentService = {
 
   async createBlock(
     pageId: number,
-    block: { blockType: CmsBlockType; data: unknown; displayOrder: number },
-  ): Promise<ICmsBlock> {
-    return await api<ICmsBlock>(`${CMS_PATH}/pages/${pageId}/blocks`, {
+    block: { blockType: ContentBlockType; data: unknown; displayOrder: number },
+  ): Promise<IContentBlock> {
+    return await api<IContentBlock>(`${CMS_PATH}/pages/${pageId}/blocks`, {
       method: "POST",
       body: block,
     });
@@ -62,9 +67,9 @@ export const cmsContentService = {
 
   async updateBlock(
     id: number,
-    block: Partial<ICmsBlock>,
-  ): Promise<ICmsBlock> {
-    return await api<ICmsBlock>(`${CMS_PATH}/blocks/${id}`, {
+    block: Partial<IContentBlock>,
+  ): Promise<IContentBlock> {
+    return await api<IContentBlock>(`${CMS_PATH}/blocks/${id}`, {
       method: "PATCH",
       body: block,
     });
@@ -89,8 +94,8 @@ export const cmsContentService = {
   async getPublicPage(
     slug: string,
     options?: ApiFetchOptions,
-  ): Promise<IPageWithBlocks> {
-    return await api<IPageWithBlocks>(`/public/pages/${slug}`, options);
+  ): Promise<IContentPageWithBlocks> {
+    return await api<IContentPageWithBlocks>(`/public/pages/${slug}`, options);
   },
 
   // --- MEDIA ---

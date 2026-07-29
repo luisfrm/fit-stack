@@ -1,5 +1,5 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import type { ICmsClass } from "@workspace/shared/types";
+import type { IGymClass } from "@workspace/shared/types";
 
 export interface ClassesFilter {
   name?: string;
@@ -11,7 +11,7 @@ export interface ClassesFilter {
 }
 
 export interface PaginatedClasses {
-  data: ICmsClass[];
+  data: IGymClass[];
   total: number;
   page: number;
   limit: number;
@@ -37,8 +37,8 @@ export const classesService = {
   async getClassesByDate(
     date: string,
     options?: ApiFetchOptions,
-  ): Promise<ICmsClass[]> {
-    return await api<ICmsClass[]>(CLASSES_PATH, {
+  ): Promise<IGymClass[]> {
+    return await api<IGymClass[]>(CLASSES_PATH, {
       query: { date },
       ...options,
     });
@@ -48,8 +48,8 @@ export const classesService = {
     await api(`${CLASSES_PATH}/${id}`, { method: "DELETE" });
   },
 
-  async createClass(data: Partial<ICmsClass>): Promise<ICmsClass> {
-    return await api<ICmsClass>(CLASSES_PATH, {
+  async createClass(data: Partial<IGymClass>): Promise<IGymClass> {
+    return await api<IGymClass>(CLASSES_PATH, {
       method: "POST",
       body: data,
     });
@@ -57,9 +57,9 @@ export const classesService = {
 
   async updateClass(
     id: number,
-    data: Partial<ICmsClass>,
-  ): Promise<ICmsClass> {
-    return await api<ICmsClass>(`${CLASSES_PATH}/${id}`, {
+    data: Partial<IGymClass>,
+  ): Promise<IGymClass> {
+    return await api<IGymClass>(`${CLASSES_PATH}/${id}`, {
       method: "PUT",
       body: data,
     });

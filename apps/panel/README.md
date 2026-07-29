@@ -94,7 +94,7 @@ El layout del dashboard verifica el estado de suscripción de la organización v
 Si no hay `activeOrganizationId` en sesión, se muestra `<OrganizationPicker />`.
 
 ### CMS Content
-Páginas dinámicas con bloques arrastrables: hero, services, classes_info, testimonials, gallery, contact, team_info.
+Páginas dinámicas con bloques arrastrables: hero, services, classes, testimonials, gallery, contact, team.
 
 ---
 
