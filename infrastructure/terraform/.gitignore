@@ -1,0 +1,13 @@
+# Terraform .gitignore (state files are stored remotely in R2)
+
+# Local state files
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+
+# Variable files with real values
+# Commit only the *.<workspace> files with non-sensitive defaults
+# Override locally with TF_VAR_* environment variables for real secrets
