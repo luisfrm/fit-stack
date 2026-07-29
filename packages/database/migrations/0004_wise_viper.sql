@@ -1,1 +1,0 @@
-ALTER TYPE "public"."org_role" ADD VALUE 'owner' BEFORE 'manager';

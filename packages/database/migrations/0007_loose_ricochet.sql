@@ -1,1 +1,0 @@
-ALTER TABLE "organization" ADD COLUMN "timezone" text DEFAULT 'America/Caracas' NOT NULL;
