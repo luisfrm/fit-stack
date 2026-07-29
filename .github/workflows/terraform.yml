@@ -1,0 +1,85 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - dev
+      action:
+        description: 'Action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+
+concurrency:
+  group: terraform-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action }} (${{ github.event.inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    env:
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_api_worker_name: ${{ vars.API_WORKER_NAME }}
+      TF_VAR_jobs_worker_name: ${{ vars.JOBS_WORKER_NAME }}
+      TF_VAR_files_bucket_name: ${{ vars.FILES_BUCKET_NAME }}
+      TF_VAR_queue_name: ${{ vars.QUEUE_NAME }}
+      TF_VAR_dlq_queue_name: ${{ vars.DLQ_QUEUE_NAME }}
+      TF_VAR_better_auth_url: ${{ secrets.BETTER_AUTH_URL }}
+      TF_VAR_r2_public_url: ${{ secrets.R2_PUBLIC_URL }}
+      TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+      TF_VAR_better_auth_secret: ${{ secrets.BETTER_AUTH_SECRET }}
+      TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+      TF_VAR_cookie_domain: ${{ secrets.COOKIE_DOMAIN }}
+      TF_VAR_upstash_redis_rest_url: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      TF_VAR_upstash_redis_rest_token: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
+      TF_VAR_resend_from_email: ${{ secrets.RESEND_FROM_EMAIL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform init
+        working-directory: infrastructure/terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=fit-stack-terraform-state" \
+            -backend-config="key=${{ github.event.inputs.environment }}/terraform.tfstate" \
+            -backend-config="endpoint=https://${{ secrets.TFSTATE_R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            -input=false
+
+      - name: Terraform plan
+        if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        working-directory: infrastructure/terraform
+        run: terraform plan -out=plan.tfplan
+
+      - name: Terraform apply
+        if: github.event.inputs.action == 'apply'
+        working-directory: infrastructure/terraform
+        run: terraform apply -auto-approve plan.tfplan
+
+      - name: Show outputs
+        if: always()
+        working-directory: infrastructure/terraform
+        run: terraform output
