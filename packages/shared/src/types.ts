@@ -96,7 +96,7 @@ export type FrequencyType = 'once' | 'weekly';
 /**
  * Interface for a class in the CMS.
  */
-export interface ICmsClass {
+export interface IGymClass {
   id?: number;
   name: string;
   description?: string;
@@ -115,6 +115,9 @@ export interface ICmsClass {
   // Capacidad
   capacity?: number;
 }
+
+/** @deprecated Use IGymClass */
+export type ICmsClass = IGymClass;
 
 /**
  * Interface for a gym member.
@@ -357,33 +360,73 @@ export interface IPlatformPlan {
   durationUnit: 'day' | 'week' | 'month' | 'year';
   features: PlanFeatures | null;
   isActive: boolean;
+  trialDays: number; // 0 = sin trial
   createdAt?: string | Date;
+  organizationCount?: number;
 }
 
 export interface IPlatformSubscription {
   id: number;
   organizationId: string;
   planId: number;
+  /** Status computado (no se guarda en DB) */
   status: PlatformSubscriptionStatus;
   startDate: string | Date;
-  endDate: string | Date;
+  currentPeriodEnd: string | Date;
   isTrial: boolean;
+  /** Override del precio (en centavos). null = usar precio del plan */
   priceOverride?: number | null;
+  cancelledAt?: string | Date | null;
+  cancellationReason?: string | null;
   createdAt?: string | Date;
+
+  // Optional joined fields
+  planName?: string;
+  planPrice?: number;
+  planCurrency?: string;
+  planDurationValue?: number;
+  planDurationUnit?: 'day' | 'week' | 'month' | 'year';
+  organizationName?: string;
+  latestPaymentStatus?: PaymentStatus;
+  paymentsCount?: number;
 }
 
-export interface IPlatformPayment {
+export interface IPlatformSubscriptionPayment {
   id: number;
+  subscriptionId?: number | null;
   organizationId: string;
   planId: number;
-  amount: number;
-  currency: string;
+
+  // Snapshot comercial
+  planSnapshotName: string;
+  planSnapshotPrice: number; // centavos
+  planSnapshotCurrency: string;
+  planSnapshotDurationValue: number;
+  planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
+
+  // Datos del pago
+  amountPaid: number; // centavos
+  currencyPaid: string;
+  exchangeRateApplied?: string | null;
+  baseAmount?: number | null; // centavos en moneda base
+
+  // Método
   paymentMethod: string;
-  status: PaymentStatus;
+  paymentMethodDetails?: Record<string, any> | null;
+
+  // Fechas
+  paymentDate: string | Date;
   dueDate: string | Date;
   paidAt?: string | Date | null;
+  refundedAt?: string | Date | null;
   createdAt?: string | Date;
+
+  // Estado
+  status: PaymentStatus;
 }
+
+/** @deprecated usar IPlatformSubscriptionPayment */
+export type IPlatformPayment = IPlatformSubscriptionPayment;
 
 export interface IOrganization {
   id: string;

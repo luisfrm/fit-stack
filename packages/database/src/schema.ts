@@ -11,7 +11,7 @@ import {
   numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { type PlanFeatures, type PlatformRole, type OrganizationRole } from '@workspace/shared';
+import { type PlanFeatures } from '@workspace/shared';
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
@@ -21,7 +21,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  role: text('role').$type<PlatformRole>().default('user'), // Global role ('admin' | 'user')
+  role: text('role').default('user'), // Global role ('admin' | 'user')
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -97,7 +97,7 @@ export const authMember = pgTable('member', {
   userId: text('user_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
-  role: text('role').$type<OrganizationRole>().notNull(), // 'owner', 'manager', 'cashier', 'coach', 'member'
+  role: text('role').notNull(), // 'owner', 'manager', 'cashier', 'coach', 'member'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -117,52 +117,88 @@ export const invitation = pgTable('invitation', {
 
 // ── B2B PLATFORM BILLING ──
 
-export const fitstackPlan = pgTable('fitstack_plan', {
+/**
+ * platform_plan: catálogo de planes SaaS que vende FitStack.
+ * El precio se guarda en CENTAVOS (bigint) para evitar problemas de punto flotante.
+ */
+export const platformPlan = pgTable('platform_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   name: text('name').notNull(),
-  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+  price: bigint('price', { mode: 'number' }).notNull(), // centavos
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
-  durationUnit: text('duration_unit').$type<'day' | 'week' | 'month' | 'year'>().default('month').notNull(),
+  durationUnit: text('duration_unit').default('month').notNull(),
   features: jsonb('features').$type<PlanFeatures | null>(), // PlanFeatures interface from shared/types.ts
   isActive: boolean('is_active').default(true).notNull(),
+  trialDays: integer('trial_days').default(0).notNull(), // 0 = sin trial
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const storeSubscription = pgTable('store_subscription', {
+/**
+ * platform_subscription: suscripción de una Organization a un platform_plan.
+ * El estado NO se guarda; se computa en SQL según currentPeriodEnd y el último pago.
+ * Mantenemos `status` como columna legacy (a remover en migración futura).
+ */
+export const platformSubscription = pgTable('platform_subscription', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .references(() => organization.id, { onDelete: 'cascade' })
     .notNull(),
   planId: bigint('plan_id', { mode: 'number' })
-    .references(() => fitstackPlan.id)
+    .references(() => platformPlan.id)
     .notNull(),
-  status: text('status').notNull(), // active, past_due, read_only, suspended, cancelled
+  // legacy column — a dropear una vez validada la migración a status computado
+  status: text('status').notNull().default('active'),
   startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
   isTrial: boolean('is_trial').default(false).notNull(),
-  priceOverride: numeric('price_override', { precision: 10, scale: 2 }), // For commercial exceptions
+  priceOverride: bigint('price_override', { mode: 'number' }), // centavos — excepción comercial
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const platformPayment = pgTable('platform_payment', {
+/**
+ * platform_subscription_payment: pagos asociados a una platform_subscription.
+ * Guarda snapshot comercial completo para preservar la integridad histórica
+ * aunque cambien los datos del plan.
+ */
+export const platformSubscriptionPayment = pgTable('platform_subscription_payment', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+
+  // Relaciones
+  subscriptionId: bigint('subscription_id', { mode: 'number' })
+    .references(() => platformSubscription.id, { onDelete: 'cascade' }),
   organizationId: text('organization_id')
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   planId: bigint('plan_id', { mode: 'number' })
-    .references(() => fitstackPlan.id)
+    .references(() => platformPlan.id)
     .notNull(),
 
-  amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
-  currency: text('currency').notNull(),
-  paymentMethod: text('payment_method').notNull(),
-  status: text('status').notNull(), // paid, pending, trial, void
+  // Snapshot comercial
+  planSnapshotName: text('plan_snapshot_name').notNull(),
+  planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
+  planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
+  planSnapshotDurationValue: integer('plan_snapshot_duration_value').notNull(),
+  planSnapshotDurationUnit: text('plan_snapshot_duration_unit').notNull(),
 
+  // Datos del pago
+  amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
+  currencyPaid: text('currency_paid').notNull(),
+  exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
+  baseAmount: bigint('base_amount', { mode: 'number' }), // centavos en moneda base
+
+  // Método y metadata
+  paymentMethod: text('payment_method').notNull(), // incluye 'trial' | 'free' | 'manual' | etc
+  paymentMethodDetails: jsonb('payment_method_details'),
+  paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
+
+  // Estados
+  status: text('status').notNull().default('pending'),
   dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
   paidAt: timestamp('paid_at', { withTimezone: true }),
+  refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -189,7 +225,7 @@ export const gymMember = pgTable('gym_member', {
   imageUrl: text('image_url'),
   address: text('address'),
   isActive: boolean('is_active').default(true).notNull(),
-  role: text('role').$type<OrganizationRole>().default('member').notNull(),
+  role: text('role').default('member').notNull(),
 
   // Biometric / Access Control (Optional)
   biometricId: text('biometric_id'),
@@ -236,8 +272,8 @@ export const membershipPlan = pgTable('membership_plan', {
   price: numeric('price', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
-  durationUnit: text('duration_unit').$type<'day' | 'week' | 'month' | 'year'>().default('month').notNull(),
-  features: jsonb('features').$type<string[] | null>(),
+  durationUnit: text('duration_unit').default('month').notNull(),
+  features: jsonb('features'),
   isPopular: boolean('is_popular').default(false).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
@@ -277,7 +313,7 @@ export const payment = pgTable('payment', {
   currencyPaid: text('currency_paid').notNull(),
   exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
-  status: text('status').$type<'processing' | 'validated' | 'invalid' | 'voided'>().default('validated').notNull(),
+  status: text('status').default('validated').notNull(),
   paymentMethod: text('payment_method').notNull(),
   paymentMethodDetails: jsonb('payment_method_details'),
 
@@ -339,7 +375,7 @@ export const exercise = pgTable('exercise', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  type: text('type').$type<'compound' | 'isolated'>().notNull(),
+  type: text('type').notNull(),
   primaryMuscle: text('primary_muscle').notNull(),
   secondaryMuscles: text('secondary_muscles').array(),
   mediaUrl: text('media_url'),
@@ -409,7 +445,7 @@ export const coachAssignment = pgTable('coach_assignment', {
   assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const cmsClass = pgTable('cms_class', {
+export const gymClass = pgTable('gym_class', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .notNull()
@@ -420,7 +456,7 @@ export const cmsClass = pgTable('cms_class', {
   isVisible: boolean('is_visible').default(true).notNull(),
   startTime: text('start_time').notNull(),
   endTime: text('end_time'),
-  frequencyType: text('frequency_type').$type<'once' | 'weekly'>().default('weekly').notNull(),
+  frequencyType: text('frequency_type').default('weekly').notNull(),
   scheduledDate: date('scheduled_date'),
   daysOfWeek: integer('days_of_week').array(),
   capacity: integer('capacity'),
@@ -447,7 +483,7 @@ export const gymSetting = pgTable('gym_setting', {
   uniqueIndex('settings_org_key_idx').on(table.organizationId, table.key),
 ]);
 
-export const cmsPage = pgTable('cms_page', {
+export const contentPage = pgTable('content_page', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .notNull()
@@ -459,24 +495,24 @@ export const cmsPage = pgTable('cms_page', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex('page_org_slug_idx').on(table.organizationId, table.slug),
+  uniqueIndex('content_page_org_slug_idx').on(table.organizationId, table.slug),
 ]);
 
-export const cmsPageBlock = pgTable('cms_page_block', {
+export const contentBlock = pgTable('content_block', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   organizationId: text('organization_id')
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   pageId: bigint('page_id', { mode: 'number' })
-    .references(() => cmsPage.id, { onDelete: 'cascade' }).notNull(),
-  blockType: text('block_type').$type<'hero' | 'services' | 'classes_info' | 'testimonials' | 'gallery' | 'contact' | 'team_info'>().notNull(),
+    .references(() => contentPage.id, { onDelete: 'cascade' }).notNull(),
+  blockType: text('block_type').notNull(),
   data: jsonb('data').notNull(),
   isVisible: boolean('is_visible').default(true).notNull(),
   displayOrder: integer('display_order').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex('page_order_idx').on(table.pageId, table.displayOrder),
+  uniqueIndex('content_block_page_order_idx').on(table.pageId, table.displayOrder),
 ]);
 
 // ── RELATIONS ──
@@ -536,4 +572,65 @@ export const paymentRelations = relations(payment, ({ one }) => ({
   organization: one(organization, { fields: [payment.organizationId], references: [organization.id] }),
   member: one(gymMember, { fields: [payment.memberId], references: [gymMember.id] }),
   subscription: one(subscription, { fields: [payment.subscriptionId], references: [subscription.id] }),
+}));
+
+export const platformPlanRelations = relations(platformPlan, ({ many }) => ({
+  subscriptions: many(platformSubscription),
+  payments: many(platformSubscriptionPayment),
+}));
+
+export const platformSubscriptionRelations = relations(platformSubscription, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [platformSubscription.organizationId],
+    references: [organization.id],
+  }),
+  plan: one(platformPlan, {
+    fields: [platformSubscription.planId],
+    references: [platformPlan.id],
+  }),
+  payments: many(platformSubscriptionPayment),
+}));
+
+export const platformSubscriptionPaymentRelations = relations(
+  platformSubscriptionPayment,
+  ({ one }) => ({
+    organization: one(organization, {
+      fields: [platformSubscriptionPayment.organizationId],
+      references: [organization.id],
+    }),
+    plan: one(platformPlan, {
+      fields: [platformSubscriptionPayment.planId],
+      references: [platformPlan.id],
+    }),
+    subscription: one(platformSubscription, {
+      fields: [platformSubscriptionPayment.subscriptionId],
+      references: [platformSubscription.id],
+    }),
+  })
+);
+
+export const gymClassRelations = relations(gymClass, ({ one }) => ({
+  organization: one(organization, {
+    fields: [gymClass.organizationId],
+    references: [organization.id],
+  }),
+}));
+
+export const contentPageRelations = relations(contentPage, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [contentPage.organizationId],
+    references: [organization.id],
+  }),
+  blocks: many(contentBlock),
+}));
+
+export const contentBlockRelations = relations(contentBlock, ({ one }) => ({
+  organization: one(organization, {
+    fields: [contentBlock.organizationId],
+    references: [organization.id],
+  }),
+  page: one(contentPage, {
+    fields: [contentBlock.pageId],
+    references: [contentPage.id],
+  }),
 }));

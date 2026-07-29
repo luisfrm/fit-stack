@@ -3,10 +3,10 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireOrgPermission } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
-import { createCmsPagesRepository } from '../repositories/cms-pages.repository';
-import { createCmsBlocksRepository } from '../repositories/cms-blocks.repository';
-import { createCmsPagesService } from '../services/cms-pages.service';
-import { createCmsBlocksService } from '../services/cms-blocks.service';
+import { createContentPagesRepository } from '../repositories/content-pages.repository';
+import { createContentBlocksRepository } from '../repositories/content-blocks.repository';
+import { createContentPagesService } from '../services/content-pages.service';
+import { createContentBlocksService } from '../services/content-blocks.service';
 import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
@@ -19,7 +19,7 @@ const pageSchema = z.object({
 
 const blockSchema = z.object({
   pageId: z.number().int().positive(),
-  blockType: z.enum(['hero', 'services', 'classes_info', 'testimonials', 'gallery', 'contact', 'team_info']),
+  blockType: z.enum(['hero', 'services', 'classes', 'testimonials', 'gallery', 'contact', 'team']),
   data: z.record(z.string(), z.any()),
   isVisible: z.boolean().default(true),
   displayOrder: z.number().int().default(0),
@@ -29,8 +29,8 @@ export const cmsRoutes = new Hono<AppEnv>()
   // GET /api/cms/pages
   .get('/pages', requireOrgPermission(PM.CONTENT, PA.READ), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const pagesService = createCmsPagesService(pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const pagesService = createContentPagesService(pagesRepo);
 
     const pages = await pagesService.getAllPages(orgId);
     return c.json(pages);
@@ -41,8 +41,8 @@ export const cmsRoutes = new Hono<AppEnv>()
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const pagesService = createCmsPagesService(pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const pagesService = createContentPagesService(pagesRepo);
 
     const page = await pagesService.getPageById(orgId, id);
     return c.json(page);
@@ -54,8 +54,8 @@ export const cmsRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const pagesService = createCmsPagesService(pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const pagesService = createContentPagesService(pagesRepo);
 
     const newPage = await pagesService.createPage(orgId, data as any);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -70,8 +70,8 @@ export const cmsRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const pagesService = createCmsPagesService(pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const pagesService = createContentPagesService(pagesRepo);
 
     const updatedPage = await pagesService.updatePage(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -85,8 +85,8 @@ export const cmsRoutes = new Hono<AppEnv>()
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const pagesService = createCmsPagesService(pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const pagesService = createContentPagesService(pagesRepo);
 
     await pagesService.deletePage(orgId, id);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -99,9 +99,9 @@ export const cmsRoutes = new Hono<AppEnv>()
     const orgId = c.get('session')!.activeOrganizationId!;
     const pageId = Number(c.req.param('id'));
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const blocksRepo = createCmsBlocksRepository(c.get('db'));
-    const blocksService = createCmsBlocksService(blocksRepo, pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const blocksRepo = createContentBlocksRepository(c.get('db'));
+    const blocksService = createContentBlocksService(blocksRepo, pagesRepo);
 
     const blocks = await blocksService.getPageBlocks(orgId, pageId);
     return c.json(blocks);
@@ -113,9 +113,9 @@ export const cmsRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const blocksRepo = createCmsBlocksRepository(c.get('db'));
-    const blocksService = createCmsBlocksService(blocksRepo, pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const blocksRepo = createContentBlocksRepository(c.get('db'));
+    const blocksService = createContentBlocksService(blocksRepo, pagesRepo);
 
     const newBlock = await blocksService.createBlock(orgId, data as any);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -130,9 +130,9 @@ export const cmsRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const blocksRepo = createCmsBlocksRepository(c.get('db'));
-    const blocksService = createCmsBlocksService(blocksRepo, pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const blocksRepo = createContentBlocksRepository(c.get('db'));
+    const blocksService = createContentBlocksService(blocksRepo, pagesRepo);
 
     const updatedBlock = await blocksService.updateBlock(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -146,9 +146,9 @@ export const cmsRoutes = new Hono<AppEnv>()
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const blocksRepo = createCmsBlocksRepository(c.get('db'));
-    const blocksService = createCmsBlocksService(blocksRepo, pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const blocksRepo = createContentBlocksRepository(c.get('db'));
+    const blocksService = createContentBlocksService(blocksRepo, pagesRepo);
 
     await blocksService.deleteBlock(orgId, id);
     await cache.invalidate(`org:${orgId}:cms:*`);
@@ -163,9 +163,9 @@ export const cmsRoutes = new Hono<AppEnv>()
     const { orders } = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const pagesRepo = createCmsPagesRepository(c.get('db'));
-    const blocksRepo = createCmsBlocksRepository(c.get('db'));
-    const blocksService = createCmsBlocksService(blocksRepo, pagesRepo);
+    const pagesRepo = createContentPagesRepository(c.get('db'));
+    const blocksRepo = createContentBlocksRepository(c.get('db'));
+    const blocksService = createContentBlocksService(blocksRepo, pagesRepo);
 
     await blocksService.reorderBlocks(orgId, pageId, orders);
     await cache.invalidate(`org:${orgId}:cms:*`);

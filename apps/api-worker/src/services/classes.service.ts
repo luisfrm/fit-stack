@@ -1,4 +1,4 @@
-import type { ClassesRepository, ClassesFilter, PaginatedClasses, NewCmsClass } from '../repositories/classes.repository';
+import type { ClassesRepository, ClassesFilter, PaginatedClasses, NewGymClass } from '../repositories/classes.repository';
 
 export function createClassesService(classesRepo: ClassesRepository) {
   return {
@@ -21,11 +21,11 @@ export function createClassesService(classesRepo: ClassesRepository) {
       return classItem;
     },
 
-    async create(organizationId: string, data: Omit<NewCmsClass, 'organizationId'>) {
+    async create(organizationId: string, data: Omit<NewGymClass, 'organizationId'>) {
       return classesRepo.create(organizationId, data);
     },
 
-    async update(organizationId: string, id: number, data: Partial<Omit<NewCmsClass, 'organizationId'>>) {
+    async update(organizationId: string, id: number, data: Partial<Omit<NewGymClass, 'organizationId'>>) {
       const classItem = await classesRepo.findById(organizationId, id);
       if (!classItem) {
         throw new Error('Clase no encontrada');

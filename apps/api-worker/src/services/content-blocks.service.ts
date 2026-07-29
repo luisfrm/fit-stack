@@ -1,10 +1,10 @@
-import type { CmsBlocksRepository, ICmsBlock } from '../repositories/cms-blocks.repository';
-import type { CmsPagesRepository } from '../repositories/cms-pages.repository';
-import { validateBlockData } from '../lib/cms-block-config';
+import type { ContentBlocksRepository, IContentBlock } from '../repositories/content-blocks.repository';
+import type { ContentPagesRepository } from '../repositories/content-pages.repository';
+import { validateBlockData } from '../lib/content-block-config';
 
-export function createCmsBlocksService(
-  blocksRepo: CmsBlocksRepository,
-  pagesRepo: CmsPagesRepository
+export function createContentBlocksService(
+  blocksRepo: ContentBlocksRepository,
+  pagesRepo: ContentPagesRepository
 ) {
   return {
     async getPageBlocks(organizationId: string, pageId: number) {
@@ -24,7 +24,7 @@ export function createCmsBlocksService(
       };
     },
 
-    async createBlock(organizationId: string, data: Omit<ICmsBlock, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>) {
+    async createBlock(organizationId: string, data: Omit<IContentBlock, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>) {
       const validatedData = validateBlockData(data.blockType, data.data);
 
       return blocksRepo.create(organizationId, {
@@ -33,7 +33,7 @@ export function createCmsBlocksService(
       });
     },
 
-    async updateBlock(organizationId: string, id: number, data: Partial<ICmsBlock>) {
+    async updateBlock(organizationId: string, id: number, data: Partial<IContentBlock>) {
       const block = await blocksRepo.findById(organizationId, id);
       if (!block) throw new Error('Bloque no encontrado');
 
@@ -56,4 +56,4 @@ export function createCmsBlocksService(
   };
 }
 
-export type CmsBlocksService = ReturnType<typeof createCmsBlocksService>;
+export type ContentBlocksService = ReturnType<typeof createContentBlocksService>;

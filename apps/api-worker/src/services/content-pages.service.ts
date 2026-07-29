@@ -1,6 +1,6 @@
-import type { CmsPagesRepository, ICmsPage } from '../repositories/cms-pages.repository';
+import type { ContentPagesRepository, IContentPage } from '../repositories/content-pages.repository';
 
-export function createCmsPagesService(pagesRepo: CmsPagesRepository) {
+export function createContentPagesService(pagesRepo: ContentPagesRepository) {
   return {
     async getAllPages(organizationId: string) {
       return pagesRepo.findAll(organizationId);
@@ -18,14 +18,14 @@ export function createCmsPagesService(pagesRepo: CmsPagesRepository) {
       return page;
     },
 
-    async createPage(organizationId: string, data: Omit<ICmsPage, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>) {
+    async createPage(organizationId: string, data: Omit<IContentPage, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>) {
       const existing = await pagesRepo.findBySlug(organizationId, data.slug);
       if (existing) throw new Error('El slug ya está en uso en esta organización');
 
       return pagesRepo.create(organizationId, data);
     },
 
-    async updatePage(organizationId: string, id: number, data: Partial<ICmsPage>) {
+    async updatePage(organizationId: string, id: number, data: Partial<IContentPage>) {
       return pagesRepo.update(organizationId, id, data);
     },
 
@@ -35,4 +35,4 @@ export function createCmsPagesService(pagesRepo: CmsPagesRepository) {
   };
 }
 
-export type CmsPagesService = ReturnType<typeof createCmsPagesService>;
+export type ContentPagesService = ReturnType<typeof createContentPagesService>;

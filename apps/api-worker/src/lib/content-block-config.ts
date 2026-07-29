@@ -22,7 +22,7 @@ export const ServicesBlockSchema = z.object({
     .default([]),
 });
 
-export const ClassesInfoBlockSchema = z.object({
+export const ClassesBlockSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().optional(),
   buttonText: z.string().default('Ir a clases'),
@@ -70,7 +70,7 @@ export const ContactBlockSchema = z.object({
     .optional(),
 });
 
-export const TeamInfoBlockSchema = z.object({
+export const TeamBlockSchema = z.object({
   title: z.string().min(1),
   subtitle: z.string().optional(),
 });
@@ -78,11 +78,11 @@ export const TeamInfoBlockSchema = z.object({
 export const BLOCK_SCHEMAS: Record<string, z.ZodObject<any>> = {
   hero: HeroBlockSchema,
   services: ServicesBlockSchema,
-  classes_info: ClassesInfoBlockSchema,
+  classes: ClassesBlockSchema,
   testimonials: TestimonialsBlockSchema,
   gallery: GalleryBlockSchema,
   contact: ContactBlockSchema,
-  team_info: TeamInfoBlockSchema,
+  team: TeamBlockSchema,
 };
 
 export function validateBlockData(type: string, data: any) {
