@@ -1,7 +1,7 @@
 output "name" {
-  value = cloudflare_queue.this.name
+  value = cloudflare_queue.this.queue_name
 }
 
 output "id" {
-  value = cloudflare_queue.this.id
+  value = cloudflare_queue.this.queue_id
 }

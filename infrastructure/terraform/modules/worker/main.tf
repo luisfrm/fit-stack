@@ -12,18 +12,29 @@ resource "cloudflare_workers_script" "this" {
     ignore_changes = [content]
   }
 
-  r2_bucket_binding = var.r2_bucket_bindings
-
-  queue_binding = var.queue_producer_bindings
-
-  plain_text_binding = [
-    for k, v in var.plain_text_bindings : {
+  # R2 bucket bindings
+  bindings = concat(
+    [for b in var.r2_bucket_bindings : {
+      name        = b.name
+      type        = "r2_bucket"
+      bucket_name = b.bucket_name
+    }],
+    [for b in var.queue_producer_bindings : {
+      name  = b.name
+      type  = "queue"
+      queue = b.queue
+    }],
+    [for k, v in var.plain_text_bindings : {
       name = k
+      type = "plain_text"
       text = v
-    }
-  ]
-
-  secret_text_binding = var.secret_text_bindings
+    }],
+    [for b in var.secret_text_bindings : {
+      name = b.name
+      type = "secret_text"
+      text = b.text
+    }]
+  )
 }
 
 resource "cloudflare_queue_consumer" "this" {

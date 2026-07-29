@@ -1,5 +1,5 @@
 output "name" {
-  value = cloudflare_workers_script.this.name
+  value = cloudflare_workers_script.this.script_name
 }
 
 output "id" {
