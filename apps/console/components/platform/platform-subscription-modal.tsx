@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
-import { type IPlatformOrganization } from "@workspace/shared/types";
+import { type IPlatformOrganization, type PaymentStatus, type IPaymentMethodDetail } from "@workspace/shared/types";
 import { PlatformSubscriptionForm } from "./platform-subscription-form";
 import { organizationsService } from "@/lib/services/organizations-service";
 
@@ -38,16 +38,16 @@ export function PlatformSubscriptionModal({
     organizationId: string;
     planId: number;
     startDate: string;
-    endDate: string;
     isTrial: boolean;
-    priceOverride?: string;
+    priceOverrideCents?: number;
     payment: {
-      amountPaid: number;
+      amountPaidCents: number;
       currencyPaid: string;
       exchangeRateApplied?: string;
+      baseAmountCents?: number;
       paymentMethod: string;
-      paymentMethodDetails?: any;
-      status?: string;
+      paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, unknown>;
+      status: PaymentStatus;
       paymentDate?: string;
     };
   }) => {
@@ -55,9 +55,8 @@ export function PlatformSubscriptionModal({
       await organizationsService.addSubscription(formData.organizationId, {
         planId: formData.planId,
         startDate: formData.startDate,
-        endDate: formData.endDate,
         isTrial: formData.isTrial,
-        priceOverride: formData.priceOverride,
+        priceOverrideCents: formData.priceOverrideCents,
         payment: formData.payment,
       });
       toast.success("Suscripción registrada exitosamente.");

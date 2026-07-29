@@ -5,6 +5,7 @@ import type {
   IPaymentMethodDetail,
   IProvisionOwnerDTO,
   IPaginatedResult,
+  PaymentStatus,
 } from "@workspace/shared/types";
 
 const ORGANIZATIONS_PATH = "/platform/organizations";
@@ -13,17 +14,17 @@ export type PaginatedOrganizationsResult = IPaginatedResult<IPlatformOrganizatio
 
 export interface AddSubscriptionPayload {
   planId: number;
-  startDate: string;
-  endDate: string;
-  isTrial: boolean;
-  priceOverride?: string;
-  payment?: {
-    amountPaid: number;
+  startDate?: string;
+  isTrial?: boolean;
+  priceOverrideCents?: number;
+  payment: {
+    amountPaidCents: number;
     currencyPaid: string;
     exchangeRateApplied?: string;
+    baseAmountCents?: number;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, unknown>;
-    status?: string;
+    status: PaymentStatus;
     paymentDate?: string;
   };
 }
@@ -90,6 +91,7 @@ export const organizationsService = {
 
   /**
    * Adds a new platform subscription to an organization.
+   * The payload uses cents (amountPaidCents) and supports trial/free plans.
    */
   async addSubscription(
     id: string,
@@ -122,4 +124,3 @@ export const organizationsService = {
     });
   },
 };
-

@@ -7,8 +7,11 @@ import { Users, CalendarCheck, AlertTriangle, ShieldOff } from "lucide-react";
 interface SubscriptionsStats {
   active: number;
   trial: number;
-  expiringSoon: number;
+  pastDue: number;
+  readOnly: number;
   suspended: number;
+  cancelled: number;
+  total: number;
 }
 
 interface KpiSectionProps {
@@ -61,7 +64,15 @@ function StatCard({
 }
 
 export function SubscriptionsKpiSection({ stats, isLoading, activeFilter, onFilterChange }: KpiSectionProps) {
-  const defaultStats = { active: 0, trial: 0, expiringSoon: 0, suspended: 0 };
+  const defaultStats = {
+    active: 0,
+    trial: 0,
+    pastDue: 0,
+    readOnly: 0,
+    suspended: 0,
+    cancelled: 0,
+    total: 0,
+  };
   const displayStats = stats ?? defaultStats;
 
   return (
@@ -85,12 +96,12 @@ export function SubscriptionsKpiSection({ stats, isLoading, activeFilter, onFilt
       />
 
       <StatCard
-        label="Por Vencer"
-        value={displayStats.expiringSoon}
+        label="Vencidas"
+        value={displayStats.pastDue + displayStats.readOnly}
         icon={<AlertTriangle className="w-4 h-4 text-orange-400" />}
-        isActive={activeFilter === 'expiring'}
+        isActive={activeFilter === 'past_due'}
         isLoading={isLoading}
-        onClick={() => onFilterChange(activeFilter === 'expiring' ? null : 'expiring')}
+        onClick={() => onFilterChange(activeFilter === 'past_due' ? null : 'past_due')}
       />
 
       <StatCard

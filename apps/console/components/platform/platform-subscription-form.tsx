@@ -10,8 +10,10 @@ import {
   type IPlatformOrganization,
   type IPlatformPlan,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetail
+  type IPaymentMethodDetail,
+  type PaymentStatus,
 } from "@workspace/shared/types";
+import { PAYMENT_STATUSES } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
@@ -24,12 +26,13 @@ import { PaymentSection } from "./payment-section";
 import { PlatformPlanSelector } from "./platform-plan-selector";
 
 interface PaymentData {
-  amountPaid: number;
+  amountPaidCents: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
+  baseAmountCents?: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
-  status?: string;
+  status: PaymentStatus;
   paymentDate?: string;
 }
 
@@ -37,9 +40,8 @@ interface PlatformSubscriptionSubmitData {
   organizationId: string;
   planId: number;
   startDate: string;
-  endDate: string;
   isTrial: boolean;
-  priceOverride?: string;
+  priceOverrideCents?: number;
   payment: PaymentData;
 }
 
@@ -47,6 +49,29 @@ interface PlatformSubscriptionFormProps {
   readonly onSubmit: (data: PlatformSubscriptionSubmitData) => Promise<void>;
   readonly isLoading?: boolean;
   readonly initialOrganization?: IPlatformOrganization | null;
+}
+
+function calculateEndDate(
+  startDate: string,
+  durationValue: number,
+  durationUnit: "day" | "week" | "month" | "year"
+): string {
+  const d = new Date(startDate);
+  switch (durationUnit) {
+    case "day":
+      d.setDate(d.getDate() + durationValue);
+      break;
+    case "week":
+      d.setDate(d.getDate() + durationValue * 7);
+      break;
+    case "month":
+      d.setMonth(d.getMonth() + durationValue);
+      break;
+    case "year":
+      d.setFullYear(d.getFullYear() + durationValue);
+      break;
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function PlatformSubscriptionForm({
@@ -79,11 +104,7 @@ export function PlatformSubscriptionForm({
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   const [startDate, setStartDate] = React.useState(todayStr);
-  const [endDate, setEndDate] = React.useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  });
+  const [isTrial, setIsTrial] = React.useState(false);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
 
   const [paymentCurrency, setPaymentCurrency] = React.useState("USD");
@@ -102,7 +123,24 @@ export function PlatformSubscriptionForm({
   const currencyFormat = (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
   const selectedPlan = React.useMemo(() => plans.find((p) => p.id === planId) ?? null, [plans, planId]);
-  const isTrial = selectedPlan ? Number(selectedPlan.price) === 0 : false;
+
+  // Plan free (precio 0) o trial explícito
+  const isFreePlan = selectedPlan ? Number(selectedPlan.price) === 0 : false;
+  const hasTrialDays = selectedPlan ? (selectedPlan.trialDays ?? 0) > 0 : false;
+  const showPayment = selectedPlan && !isTrial && !isFreePlan;
+
+  // Preview de la fecha de fin (solo visual)
+  const previewEndDate = React.useMemo(() => {
+    if (!selectedPlan) return "";
+    if (isTrial && hasTrialDays) {
+      return calculateEndDate(startDate, selectedPlan.trialDays!, "day");
+    }
+    return calculateEndDate(
+      startDate,
+      selectedPlan.durationValue,
+      selectedPlan.durationUnit
+    );
+  }, [selectedPlan, startDate, isTrial, hasTrialDays]);
 
   const planCurrency = selectedPlan?.currency || "USD";
   const { data: planRates } = useExchangeRates(planCurrency);
@@ -167,6 +205,7 @@ export function PlatformSubscriptionForm({
       rate = planRates[paymentCurrency] ?? 1;
     }
     setExchangeRate(rate);
+    // price ya está en centavos → dividir por 100 para mostrar
     setFinalAmount((Number(selectedPlan.price) * rate) / 100);
   }, [selectedPlan, paymentCurrency, planRates]);
 
@@ -210,18 +249,18 @@ export function PlatformSubscriptionForm({
 
     setIsProcessingUploads(true);
     try {
-      if (isTrial) {
+      // Trial o plan free: pago automático validated con 0
+      if (isTrial || isFreePlan) {
         await onSubmit({
           organizationId,
           planId,
           startDate,
-          endDate,
-          isTrial: true,
+          isTrial: isTrial,
           payment: {
-            amountPaid: 0,
+            amountPaidCents: 0,
             currencyPaid: planCurrency,
-            paymentMethod: "trial",
-            status: "validated",
+            paymentMethod: isTrial ? "trial" : "free",
+            status: PAYMENT_STATUSES.VALIDATED,
             paymentDate: todayStr,
           },
         });
@@ -247,15 +286,14 @@ export function PlatformSubscriptionForm({
         organizationId,
         planId,
         startDate,
-        endDate,
         isTrial: false,
         payment: {
-          amountPaid: Math.round(finalAmount * 100),
+          amountPaidCents: Math.round(finalAmount * 100),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
           paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
           paymentMethodDetails: finalPaymentMethodDetails,
-          status: paymentValidated ? "validated" : "processing",
+          status: paymentValidated ? PAYMENT_STATUSES.VALIDATED : PAYMENT_STATUSES.PROCESSING,
           paymentDate: paymentDate,
         },
       });
@@ -286,6 +324,34 @@ export function PlatformSubscriptionForm({
         disabled={!organizationId}
       />
 
+      {/* Trial toggle si el plan lo permite */}
+      {selectedPlan && hasTrialDays && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+          <input
+            id="is-trial"
+            type="checkbox"
+            checked={isTrial}
+            onChange={(e) => setIsTrial(e.target.checked)}
+            className="h-4 w-4 rounded border-white/20"
+          />
+          <label htmlFor="is-trial" className="text-sm font-medium cursor-pointer flex-1">
+            Iniciar como prueba
+            <span className="block text-xs text-muted-foreground font-normal">
+              {selectedPlan.trialDays} días gratis antes del primer cobro
+            </span>
+          </label>
+        </div>
+      )}
+
+      {selectedPlan && isFreePlan && !isTrial && (
+        <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <p className="text-sm font-medium text-emerald-400">Plan gratuito</p>
+          <p className="text-xs text-muted-foreground">
+            No se requiere pago. La suscripción se activará inmediatamente.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           id="start-date"
@@ -297,13 +363,14 @@ export function PlatformSubscriptionForm({
         <Input
           id="end-date"
           type="date"
-          label="Fecha Final"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
+          label="Fecha de Vencimiento (calculada)"
+          value={previewEndDate}
+          disabled
+          title="Calculada según la duración del plan"
         />
       </div>
 
-      {selectedPlan && !isTrial && (
+      {showPayment && (
         <PaymentSection
           selectedPlan={selectedPlan}
           paymentCurrency={paymentCurrency}
@@ -320,7 +387,7 @@ export function PlatformSubscriptionForm({
           amountFocus={amountFocus}
           onRateFocus={setRateFocus}
           onAmountFocus={setAmountFocus}
-          onRateChange={(val) => { setExchangeRate(val); setFinalAmount((Number(selectedPlan.price) * val) / 100); }}
+          onRateChange={(val) => { setExchangeRate(val); setFinalAmount((Number(selectedPlan!.price) * val) / 100); }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}

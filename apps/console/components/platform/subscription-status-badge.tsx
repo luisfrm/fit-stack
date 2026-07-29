@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Badge } from "@workspace/ui/components";
 import { PlatformSubscriptionStatus } from "@workspace/shared/types";
-import { CheckCircle2, Clock, AlertTriangle, ShieldOff, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, AlertTriangle, ShieldOff, XCircle, Sparkles } from "lucide-react";
 
 interface SubscriptionStatusBadgeProps {
   status: PlatformSubscriptionStatus;
@@ -14,6 +14,12 @@ const STATUS_CONFIG: Record<PlatformSubscriptionStatus, { variant: "success" | "
     variant: "success",
     label: "Activa",
     icon: <CheckCircle2 size={12} />,
+  },
+  trial: {
+    variant: "default",
+    label: "Trial",
+    icon: <Sparkles size={12} />,
+    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   },
   past_due: {
     variant: "warning",

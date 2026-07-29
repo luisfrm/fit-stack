@@ -11,15 +11,22 @@ import {
   Badge,
   Modal,
   Input,
+  toast,
 } from "@workspace/ui/components";
-import { platformSubscriptionsService, type SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
+import {
+  platformSubscriptionsService,
+  type SubscriptionWithDetails,
+} from "@/lib/services/platform-subscriptions-service";
 import { SubscriptionStatusBadge } from "./subscription-status-badge";
+import { PlatformPaymentHistoryModal } from "./platform-payment-history-modal";
 import {
   Trash2,
   Calendar,
   XCircle,
   ExternalLink,
   CalendarPlus,
+  CreditCard,
+  History,
 } from "lucide-react";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 
@@ -34,15 +41,14 @@ interface SubscriptionsTableProps {
     onPageChange: (page: number) => void;
   };
   currencyFormat?: CurrencyFormat;
-  onStatusChange?: (id: number, status: string) => void;
-  onDelete?: (id: number) => void;
+  onChange?: () => void;
 }
 
 function formatDate(date: string | Date) {
-  return new Date(date).toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  return new Date(date).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -55,11 +61,13 @@ export function SubscriptionsTable({
   loading = false,
   pagination,
   currencyFormat = "latam",
+  onChange,
 }: SubscriptionsTableProps) {
   const router = useRouter();
   const [detailModal, setDetailModal] = React.useState<SubscriptionWithDetails | null>(null);
   const [cancelModal, setCancelModal] = React.useState<SubscriptionWithDetails | null>(null);
   const [extendModal, setExtendModal] = React.useState<SubscriptionWithDetails | null>(null);
+  const [historyModal, setHistoryModal] = React.useState<SubscriptionWithDetails | null>(null);
   const [cancelReason, setCancelReason] = React.useState("");
   const [extendDate, setExtendDate] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState(false);
@@ -68,8 +76,10 @@ export function SubscriptionsTable({
     if (!confirm("¿Estás seguro de eliminar esta suscripción?")) return;
     try {
       await platformSubscriptionsService.delete(id);
-    } catch (error) {
-      console.error(error);
+      toast.success("Suscripción eliminada");
+      onChange?.();
+    } catch (error: any) {
+      toast.error(error?.message || "Error al eliminar");
     }
   };
 
@@ -78,10 +88,12 @@ export function SubscriptionsTable({
     setActionLoading(true);
     try {
       await platformSubscriptionsService.cancel(cancelModal.id, cancelReason || undefined);
+      toast.success("Suscripción cancelada");
       setCancelModal(null);
       setCancelReason("");
-    } catch (error) {
-      console.error(error);
+      onChange?.();
+    } catch (error: any) {
+      toast.error(error?.message || "Error al cancelar");
     } finally {
       setActionLoading(false);
     }
@@ -92,10 +104,12 @@ export function SubscriptionsTable({
     setActionLoading(true);
     try {
       await platformSubscriptionsService.extend(extendModal.id, extendDate);
+      toast.success("Periodo extendido");
       setExtendModal(null);
       setExtendDate("");
-    } catch (error) {
-      console.error(error);
+      onChange?.();
+    } catch (error: any) {
+      toast.error(error?.message || "Error al extender");
     } finally {
       setActionLoading(false);
     }
@@ -112,11 +126,11 @@ export function SubscriptionsTable({
           className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
         >
           <Text weight="bold" className="text-foreground hover:text-primary transition-colors leading-tight">
-            {sub.organizationName}
+            {sub.organizationName || sub.organizationId}
           </Text>
-          {sub.organizationSlug && (
+          {sub.organizationId && (
             <Text size="xs" variant="muted" className="opacity-50 font-mono">
-              /{sub.organizationSlug}
+              {sub.organizationId}
             </Text>
           )}
         </button>
@@ -128,7 +142,7 @@ export function SubscriptionsTable({
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <Text as="span" size="sm" className="uppercase font-bold tracking-widest text-primary leading-tight">
-              {sub.planName}
+              {sub.planName ?? "—"}
             </Text>
             {sub.isTrial && (
               <Badge variant="default" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20 uppercase font-bold tracking-widest px-1.5 h-4">
@@ -136,9 +150,11 @@ export function SubscriptionsTable({
               </Badge>
             )}
           </div>
-          <Text size="xs" variant="muted" className="opacity-60">
-            {formatCurrency(Number(sub.planPrice), sub.planCurrency, currencyFormat)}
-          </Text>
+          {sub.planPrice !== undefined && sub.planCurrency && (
+            <Text size="xs" variant="muted" className="opacity-60">
+              {formatCurrency(sub.planPrice, sub.planCurrency, currencyFormat)}
+            </Text>
+          )}
         </div>
       ),
     },
@@ -160,32 +176,50 @@ export function SubscriptionsTable({
     },
     {
       header: "Status",
-      cell: (sub) => <SubscriptionStatusBadge status={sub.computedStatus} />,
+      cell: (sub) => <SubscriptionStatusBadge status={sub.status} />,
     },
     {
       header: "Precio",
-      cell: (sub) => (
-        <div className="flex flex-col gap-0.5">
-          {sub.isTrial ? (
-            <Text weight="bold" size="sm" className="text-blue-400">Gratuito</Text>
-          ) : sub.priceOverride ? (
+      cell: (sub) => {
+        if (sub.isTrial) {
+          return <Text weight="bold" size="sm" className="text-blue-400">Gratuito</Text>;
+        }
+        if (sub.priceOverride !== null && sub.priceOverride !== undefined) {
+          return (
             <div className="flex flex-col gap-0.5">
               <Text weight="bold" size="sm" className="text-primary">
-                {formatCurrency(Number(sub.priceOverride), sub.planCurrency, currencyFormat)}
+                {formatCurrency(
+                  sub.priceOverride / 100,
+                  sub.planCurrency ?? "USD",
+                  currencyFormat
+                )}
               </Text>
-              {Number(sub.priceOverride) !== Number(sub.planPrice) && (
-                <Text size="xs" variant="muted" className="opacity-50 italic" title={`Precio base: ${formatCurrency(Number(sub.planPrice), sub.planCurrency, currencyFormat)}`}>
-                  Base: {formatCurrency(Number(sub.planPrice), sub.planCurrency, currencyFormat)}
-                </Text>
-              )}
+              {sub.planPrice !== undefined &&
+                sub.priceOverride !== sub.planPrice && (
+                  <Text
+                    size="xs"
+                    variant="muted"
+                    className="opacity-50 italic"
+                    title={`Precio base: ${formatCurrency(
+                      sub.planPrice / 100,
+                      sub.planCurrency ?? "USD",
+                      currencyFormat
+                    )}`}
+                  >
+                    Base: {formatCurrency(sub.planPrice / 100, sub.planCurrency ?? "USD", currencyFormat)}
+                  </Text>
+                )}
             </div>
-          ) : (
-            <Text weight="bold" size="sm">
-              {formatCurrency(Number(sub.planPrice), sub.planCurrency, currencyFormat)}
-            </Text>
-          )}
-        </div>
-      ),
+          );
+        }
+        return (
+          <Text weight="bold" size="sm">
+            {sub.planPrice !== undefined
+              ? formatCurrency(sub.planPrice / 100, sub.planCurrency ?? "USD", currencyFormat)
+              : "—"}
+          </Text>
+        );
+      },
     },
     {
       header: "Acciones",
@@ -198,6 +232,7 @@ export function SubscriptionsTable({
             size="icon"
             onClick={() => setDetailModal(sub)}
             className="h-8 w-8"
+            title="Ver detalle"
           >
             <ExternalLink size={14} className="text-foreground/50" />
           </Button>
@@ -208,13 +243,25 @@ export function SubscriptionsTable({
                 label: "Gestión de Suscripción",
                 items: [
                   {
+                    label: "Ver Pagos",
+                    icon: <History size={14} />,
+                    variant: "default",
+                    onClick: () => setHistoryModal(sub),
+                  },
+                  {
+                    label: "Registrar Pago",
+                    icon: <CreditCard size={14} />,
+                    variant: "default",
+                    onClick: () => router.push(`/dashboard/organizations/${sub.organizationId}/subscriptions?addPayment=${sub.id}`),
+                  },
+                  {
                     label: "Extender Periodo",
                     icon: <CalendarPlus size={14} />,
                     variant: "default",
                     onClick: () => {
                       const newDate = new Date(sub.currentPeriodEnd);
                       newDate.setMonth(newDate.getMonth() + 1);
-                      setExtendDate(newDate.toISOString().split('T')[0] ?? '');
+                      setExtendDate(newDate.toISOString().split("T")[0] ?? "");
                       setExtendModal(sub);
                     },
                   },
@@ -260,18 +307,18 @@ export function SubscriptionsTable({
           open={!!detailModal}
           onOpenChange={() => setDetailModal(null)}
           trigger={null}
-          title={`Suscripción: ${detailModal.organizationName}`}
+          title={`Suscripción: ${detailModal.organizationName || detailModal.organizationId}`}
           className="max-w-lg"
         >
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Plan</Text>
-                <Text weight="bold">{detailModal.planName}</Text>
+                <Text weight="bold">{detailModal.planName ?? "—"}</Text>
               </div>
               <div className="space-y-1">
                 <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Status</Text>
-                <SubscriptionStatusBadge status={detailModal.computedStatus} />
+                <SubscriptionStatusBadge status={detailModal.status} />
               </div>
               <div className="space-y-1">
                 <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Inicio</Text>
@@ -287,8 +334,8 @@ export function SubscriptionsTable({
                   {detailModal.isTrial
                     ? "Gratuito"
                     : formatCurrency(
-                        Number(detailModal.priceOverride || detailModal.planPrice),
-                        detailModal.planCurrency,
+                        (detailModal.priceOverride ?? detailModal.planPrice ?? 0) / 100,
+                        detailModal.planCurrency ?? "USD",
                         currencyFormat
                       )}
                 </Text>
@@ -298,24 +345,14 @@ export function SubscriptionsTable({
                 <Text>{detailModal.isTrial ? "Sí" : "No"}</Text>
               </div>
               {detailModal.cancellationReason && (
-                <div className="col-span-2 space-y-1 p-3 bg-red-500/5 rounded-xl border border-red-500/10">
-                  <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold text-red-400">Razón de Cancelación</Text>
+                <div className="space-y-1 col-span-2">
+                  <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Motivo cancelación</Text>
                   <Text>{detailModal.cancellationReason}</Text>
                 </div>
               )}
             </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <Button variant="ghost" onClick={() => setDetailModal(null)}>Cerrar</Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  setDetailModal(null);
-                  setCancelModal(detailModal);
-                }}
-              >
-                Cancelar Suscripción
-              </Button>
+            <div className="flex justify-end">
+              <Button variant="outlined" onClick={() => setDetailModal(null)}>Cerrar</Button>
             </div>
           </div>
         </Modal>
@@ -328,30 +365,21 @@ export function SubscriptionsTable({
           onOpenChange={() => setCancelModal(null)}
           trigger={null}
           title="Cancelar Suscripción"
-          className="max-w-md"
+          description="Esta acción no se puede deshacer."
         >
-          <div className="space-y-6">
-            <Text variant="muted">
-              ¿Estás seguro de cancelar la suscripción de <strong>{cancelModal.organizationName}</strong> al plan <strong>{cancelModal.planName}</strong>?
-            </Text>
-
-            <div className="space-y-2">
-              <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Razón (opcional)</Text>
-              <Input
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Ej: Cliente solicitó cancelación..."
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <Button variant="ghost" onClick={() => setCancelModal(null)}>Cerrar</Button>
-              <Button
-                variant="danger"
-                onClick={handleCancel}
-                loading={actionLoading}
-              >
-                Confirmar Cancelación
+          <div className="space-y-4">
+            <Input
+              label="Motivo (opcional)"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Ej: Cliente solicitó baja"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outlined" onClick={() => setCancelModal(null)} disabled={actionLoading}>
+                Volver
+              </Button>
+              <Button variant="danger" onClick={handleCancel} disabled={actionLoading}>
+                {actionLoading ? "Cancelando..." : "Confirmar Cancelación"}
               </Button>
             </div>
           </div>
@@ -365,35 +393,36 @@ export function SubscriptionsTable({
           onOpenChange={() => setExtendModal(null)}
           trigger={null}
           title="Extender Periodo"
-          className="max-w-md"
+          description={`Vence actualmente: ${formatDate(extendModal.currentPeriodEnd)}`}
         >
-          <div className="space-y-6">
-            <Text variant="muted">
-              Extender la suscripción de <strong>{extendModal.organizationName}</strong> hasta:
-            </Text>
-
-            <div className="space-y-2">
-              <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Nueva Fecha de Fin</Text>
-              <Input
-                type="date"
-                value={extendDate}
-                onChange={(e) => setExtendDate(e.target.value)}
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t border-border">
-              <Button variant="ghost" onClick={() => setExtendModal(null)}>Cerrar</Button>
-              <Button
-                variant="primary"
-                onClick={handleExtend}
-                loading={actionLoading}
-                disabled={!extendDate}
-              >
-                Extender Suscripción
+          <div className="space-y-4">
+            <Input
+              type="date"
+              label="Nueva fecha de vencimiento"
+              value={extendDate}
+              onChange={(e) => setExtendDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outlined" onClick={() => setExtendModal(null)} disabled={actionLoading}>
+                Volver
+              </Button>
+              <Button onClick={handleExtend} disabled={actionLoading || !extendDate}>
+                {actionLoading ? "Extendiendo..." : "Confirmar Extensión"}
               </Button>
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Payment History Modal */}
+      {historyModal && (
+        <PlatformPaymentHistoryModal
+          open={!!historyModal}
+          onOpenChange={() => setHistoryModal(null)}
+          subscriptionId={historyModal.id}
+          subscriptionLabel={`${historyModal.organizationName || historyModal.organizationId} - ${historyModal.planName ?? ""}`}
+          onChange={onChange}
+        />
       )}
     </>
   );

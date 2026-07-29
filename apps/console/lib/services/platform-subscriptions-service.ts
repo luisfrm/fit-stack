@@ -1,27 +1,16 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import type { PlatformSubscriptionStatus, IPaginatedResult } from "@workspace/shared/types";
+import type {
+  PlatformSubscriptionStatus,
+  IPaginatedResult,
+  IPlatformSubscription,
+  IPlatformSubscriptionPayment,
+  PaymentStatus,
+} from "@workspace/shared/types";
 
-export interface SubscriptionWithDetails {
-  id: number;
-  organizationId: string;
-  planId: number;
-  status: string;
-  computedStatus: PlatformSubscriptionStatus;
-  startDate: string | Date;
-  currentPeriodEnd: string | Date;
-  isTrial: boolean;
-  priceOverride: string | null;
-  cancelledAt: string | Date | null;
-  cancellationReason: string | null;
-  createdAt: string | Date;
-  organizationName: string;
-  organizationSlug: string | null;
-  planName: string;
-  planPrice: string;
-  planCurrency: string;
-}
-
-export type PaginatedSubscriptions = IPaginatedResult<SubscriptionWithDetails>;
+export type SubscriptionWithDetails = IPlatformSubscription;
+export type PaginatedSubscriptions = IPaginatedResult<IPlatformSubscription>;
+export type PlatformPayment = IPlatformSubscriptionPayment;
+export type PaginatedPayments = IPaginatedResult<IPlatformSubscriptionPayment>;
 
 export interface SubscriptionFilters {
   status?: PlatformSubscriptionStatus | "all";
@@ -36,13 +25,43 @@ export interface SubscriptionFilters {
 export interface SubscriptionStats {
   active: number;
   trial: number;
-  expiringSoon: number;
+  pastDue: number;
+  readOnly: number;
   suspended: number;
+  cancelled: number;
+  total: number;
+}
+
+export interface PlatformPaymentPayload {
+  amountPaidCents: number;
+  currencyPaid: string;
+  exchangeRateApplied?: string;
+  baseAmountCents?: number;
+  paymentMethod: string;
+  paymentMethodDetails?: Record<string, any>;
+  status: PaymentStatus;
+  paymentDate?: string;
+}
+
+export interface CreatePlatformSubscriptionPayload {
+  organizationId: string;
+  planId: number;
+  startDate?: string;
+  isTrial?: boolean;
+  priceOverrideCents?: number;
+  payment: PlatformPaymentPayload;
+}
+
+export interface ChangePlanPayload {
+  newPlanId: number;
+  isTrial?: boolean;
+  priceOverrideCents?: number;
+  payment: PlatformPaymentPayload;
 }
 
 const SUBSCRIPTIONS_PATH = "/platform/subscriptions";
 
-function buildSubscriptionQuery(filters: SubscriptionFilters) {
+function buildQuery(filters: SubscriptionFilters) {
   const q: Record<string, string | number | boolean> = {};
   if (filters.page) q.page = filters.page;
   if (filters.limit) q.limit = filters.limit;
@@ -55,7 +74,7 @@ function buildSubscriptionQuery(filters: SubscriptionFilters) {
 }
 
 /**
- * Service to manage platform subscriptions and billing stats for organizations.
+ * Service to manage platform subscriptions, payments and billing stats.
  */
 export const platformSubscriptionsService = {
   /**
@@ -66,7 +85,7 @@ export const platformSubscriptionsService = {
     options?: ApiFetchOptions,
   ): Promise<PaginatedSubscriptions> {
     return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
-      query: buildSubscriptionQuery(filters),
+      query: buildQuery(filters),
       ...options,
     });
   },
@@ -77,43 +96,95 @@ export const platformSubscriptionsService = {
   async getById(
     id: number,
     options?: ApiFetchOptions,
-  ): Promise<SubscriptionWithDetails> {
-    return await api<SubscriptionWithDetails>(
+  ): Promise<IPlatformSubscription> {
+    return await api<IPlatformSubscription>(
       `${SUBSCRIPTIONS_PATH}/${id}`,
       options,
     );
   },
 
   /**
-   * Retrieves all subscriptions associated with a specific organization ID.
+   * Retrieves all subscriptions for a specific organization.
    */
   async getByOrganization(
     organizationId: string,
     options?: ApiFetchOptions,
-  ): Promise<SubscriptionWithDetails[]> {
-    return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
+  ): Promise<IPlatformSubscription[]> {
+    return await api<IPlatformSubscription[]>(SUBSCRIPTIONS_PATH, {
       query: { organizationId },
       ...options,
-    }).then((res) => res.data);
+    });
+  },
+
+  /**
+   * Retrieves the latest active subscription for a specific organization.
+   */
+  async getActiveByOrganization(
+    organizationId: string,
+    options?: ApiFetchOptions,
+  ): Promise<IPlatformSubscription | null> {
+    return await api<IPlatformSubscription | null>(
+      `${SUBSCRIPTIONS_PATH}/by-organization/${organizationId}/active`,
+      options,
+    );
+  },
+
+  /**
+   * Creates a new platform subscription with its first payment (atomic).
+   * Supports trial and free plans automatically.
+   */
+  async create(
+    data: CreatePlatformSubscriptionPayload,
+  ): Promise<IPlatformSubscription> {
+    return await api<IPlatformSubscription>(SUBSCRIPTIONS_PATH, {
+      method: "POST",
+      body: data,
+    });
+  },
+
+  /**
+   * Renews an existing subscription under the same plan (cumulative extension).
+   */
+  async renew(
+    id: number,
+    payment: PlatformPaymentPayload,
+  ): Promise<{ success: boolean; newPeriodEnd: string }> {
+    return await api<{ success: boolean; newPeriodEnd: string }>(
+      `${SUBSCRIPTIONS_PATH}/${id}/renew`,
+      { method: "POST", body: { payment } },
+    );
+  },
+
+  /**
+   * Changes the plan for an organization (cancels current, creates new).
+   */
+  async changePlan(
+    organizationId: string,
+    data: ChangePlanPayload,
+  ): Promise<IPlatformSubscription> {
+    return await api<IPlatformSubscription>(
+      `${SUBSCRIPTIONS_PATH}/change-plan`,
+      { method: "POST", body: { organizationId, ...data } },
+    );
   },
 
   /**
    * Cancels an active platform subscription.
    */
   async cancel(id: number, reason?: string): Promise<void> {
-    await api(`${SUBSCRIPTIONS_PATH}/${id}`, {
-      method: "PATCH",
-      body: { action: "cancel", reason },
+    await api(`${SUBSCRIPTIONS_PATH}/${id}/cancel`, {
+      method: "POST",
+      body: { reason },
     });
   },
 
   /**
-   * Extends the end date of an existing platform subscription.
+   * Extends the period end of a subscription (admin override).
    */
   async extend(id: number, newEndDate: string): Promise<void> {
-    await api(`${SUBSCRIPTIONS_PATH}/${id}`, {
-      method: "PATCH",
-      body: { action: "extend", newEndDate },
+    await api(`${SUBSCRIPTIONS_PATH}/${id}/extend`, {
+      method: "POST",
+      body: { newEndDate },
     });
   },
 
@@ -125,7 +196,7 @@ export const platformSubscriptionsService = {
   },
 
   /**
-   * Retrieves platform subscription KPI statistics.
+   * Retrieves KPI statistics.
    */
   async getStats(options?: ApiFetchOptions): Promise<SubscriptionStats> {
     return await api<SubscriptionStats>(
@@ -133,5 +204,45 @@ export const platformSubscriptionsService = {
       options,
     );
   },
-};
 
+  /* ── Payments ── */
+
+  /**
+   * Retrieves the payment history for a subscription.
+   */
+  async getPayments(
+    subscriptionId: number,
+    options?: ApiFetchOptions,
+  ): Promise<IPlatformSubscriptionPayment[]> {
+    return await api<IPlatformSubscriptionPayment[]>(
+      `${SUBSCRIPTIONS_PATH}/${subscriptionId}/payments`,
+      options,
+    );
+  },
+
+  /**
+   * Registers a new payment for an existing subscription.
+   */
+  async addPayment(
+    subscriptionId: number,
+    payment: PlatformPaymentPayload,
+  ): Promise<{ success: boolean; paymentId: number }> {
+    return await api<{ success: boolean; paymentId: number }>(
+      `${SUBSCRIPTIONS_PATH}/${subscriptionId}/payments`,
+      { method: "POST", body: payment },
+    );
+  },
+
+  /**
+   * Updates the status of an existing payment.
+   */
+  async updatePaymentStatus(
+    paymentId: number,
+    status: PaymentStatus,
+  ): Promise<void> {
+    await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`, {
+      method: "PATCH",
+      body: { status },
+    });
+  },
+};
