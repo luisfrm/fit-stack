@@ -1,9 +1,20 @@
-import { eq, sql, desc, count, getTableColumns, type Db } from '@workspace/database/factory';
-import { fitstackPlan, storeSubscription, platformPayment } from '@workspace/database/schema';
+import {
+  eq,
+  sql,
+  desc,
+  count,
+  getTableColumns,
+  type Db,
+} from '@workspace/database/factory';
+import {
+  platformPlan,
+  platformSubscription,
+  platformSubscriptionPayment,
+} from '@workspace/database/schema';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
-export type DbPlatformPlan = typeof fitstackPlan.$inferSelect;
-export type NewDbPlatformPlan = typeof fitstackPlan.$inferInsert;
+export type DbPlatformPlan = typeof platformPlan.$inferSelect;
+export type NewDbPlatformPlan = typeof platformPlan.$inferInsert;
 
 export interface PlatformPlanWithStats extends DbPlatformPlan {
   organizationCount: number;
@@ -21,67 +32,77 @@ export interface PlatformPlansSummary {
 export function createPlatformPlansRepository(db: Db) {
   return {
     async findAll() {
-      return db.select().from(fitstackPlan).where(eq(fitstackPlan.isActive, true));
+      return db.select().from(platformPlan).where(eq(platformPlan.isActive, true));
     },
 
     async findAllWithStats(): Promise<PlatformPlanWithStats[]> {
       const plans = await db
         .select({
-          ...getTableColumns(fitstackPlan),
-          organizationCount: sql<number>`count(${storeSubscription.organizationId})`.mapWith(Number),
+          ...getTableColumns(platformPlan),
+          organizationCount: sql<number>`count(DISTINCT ${platformSubscription.organizationId})::int`,
         })
-        .from(fitstackPlan)
-        .leftJoin(storeSubscription, eq(fitstackPlan.id, storeSubscription.planId))
-        .where(eq(fitstackPlan.isActive, true))
-        .groupBy(fitstackPlan.id)
-        .orderBy(desc(fitstackPlan.createdAt));
+        .from(platformPlan)
+        .leftJoin(platformSubscription, eq(platformPlan.id, platformSubscription.planId))
+        .where(eq(platformPlan.isActive, true))
+        .groupBy(platformPlan.id)
+        .orderBy(desc(platformPlan.createdAt));
 
       return plans as unknown as PlatformPlanWithStats[];
     },
 
     async findById(id: number): Promise<DbPlatformPlan | undefined> {
-      const [result] = await db.select().from(fitstackPlan).where(eq(fitstackPlan.id, id)).limit(1);
+      const [result] = await db
+        .select()
+        .from(platformPlan)
+        .where(eq(platformPlan.id, id))
+        .limit(1);
       return result;
     },
 
     async create(data: NewDbPlatformPlan) {
-      const [newPlan] = await db.insert(fitstackPlan).values(data).returning();
+      const [newPlan] = await db.insert(platformPlan).values(data).returning();
       return newPlan;
     },
 
     async update(id: number, data: Partial<NewDbPlatformPlan>) {
       const [updatedPlan] = await db
-        .update(fitstackPlan)
+        .update(platformPlan)
         .set(data)
-        .where(eq(fitstackPlan.id, id))
+        .where(eq(platformPlan.id, id))
         .returning();
       return updatedPlan;
     },
 
     async delete(id: number) {
-      await db.update(fitstackPlan).set({ isActive: false }).where(eq(fitstackPlan.id, id));
+      await db.update(platformPlan).set({ isActive: false }).where(eq(platformPlan.id, id));
     },
 
     async getSummary(): Promise<PlatformPlansSummary> {
-      const plansResult = await db.select({ count: count() }).from(fitstackPlan);
-
-      const activePlansResult = await db.select({ count: count() }).from(fitstackPlan).where(eq(fitstackPlan.isActive, true));
-
-      const subscriptionsResult = await db.select({ count: count() }).from(storeSubscription);
-
-      const activeSubscriptionsResult = await db
+      const [plansResult] = await db.select({ count: count() }).from(platformPlan);
+      const [activePlansResult] = await db
         .select({ count: count() })
-        .from(storeSubscription)
-        .where(eq(storeSubscription.status, 'active'));
+        .from(platformPlan)
+        .where(eq(platformPlan.isActive, true));
+      const [subscriptionsResult] = await db
+        .select({ count: count() })
+        .from(platformSubscription);
+
+      // Active: currentPeriodEnd >= now AND cancelledAt IS NULL
+      const [activeSubscriptionsResult] = await db
+        .select({ count: count() })
+        .from(platformSubscription)
+        .where(
+          sql`${platformSubscription.cancelledAt} IS NULL AND ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP`
+        );
 
       const revenueResult = await db
         .select({
-          currency: platformPayment.currency,
-          total: sql<number>`sum(${platformPayment.amount})`.mapWith(Number),
+          currency: platformSubscriptionPayment.currencyPaid,
+          total: sql<number>`sum(${platformSubscriptionPayment.amountPaid})::int`.mapWith(Number),
         })
-        .from(platformPayment)
-        .where(eq(platformPayment.status, PAYMENT_STATUSES.VALIDATED))
-        .groupBy(platformPayment.currency);
+        .from(platformSubscriptionPayment)
+        .where(eq(platformSubscriptionPayment.status, PAYMENT_STATUSES.VALIDATED))
+        .groupBy(platformSubscriptionPayment.currencyPaid);
 
       const monthlyRevenue: Record<string, number> = {};
       revenueResult.forEach((row) => {
@@ -90,19 +111,18 @@ export function createPlatformPlansRepository(db: Db) {
         }
       });
 
-      const hasTrialPlan = await db
-        .select()
-        .from(fitstackPlan)
-        .where(sql`${fitstackPlan.price}::numeric = 0`)
-        .limit(1);
+      const trialPlansResult = await db
+        .select({ count: count() })
+        .from(platformPlan)
+        .where(sql`${platformPlan.trialDays} > 0`);
 
       return {
-        totalPlans: plansResult[0]?.count ?? 0,
-        activePlans: activePlansResult[0]?.count ?? 0,
-        totalSubscriptions: subscriptionsResult[0]?.count ?? 0,
-        activeSubscriptions: activeSubscriptionsResult[0]?.count ?? 0,
+        totalPlans: Number(plansResult?.count ?? 0),
+        activePlans: Number(activePlansResult?.count ?? 0),
+        totalSubscriptions: Number(subscriptionsResult?.count ?? 0),
+        activeSubscriptions: Number(activeSubscriptionsResult?.count ?? 0),
         monthlyRevenue,
-        trialPlans: hasTrialPlan.length > 0 ? 1 : 0,
+        trialPlans: Number(trialPlansResult[0]?.count ?? 0),
       };
     },
   };

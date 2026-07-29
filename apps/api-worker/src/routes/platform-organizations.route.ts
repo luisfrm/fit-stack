@@ -6,8 +6,10 @@ import { createOrganizationsRepository } from '../repositories/organizations.rep
 import { createOrganizationsService } from '../services/organizations.service';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
+import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createCache } from '../lib/cache';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
 const createOrgSchema = z.object({
@@ -118,11 +120,64 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   .get('/:id/subscriptions', requirePlatformAuth(), async (c) => {
     const id = c.req.param('id');
     const repo = createPlatformSubscriptionsRepository(c.get('db'));
-    const service = createPlatformSubscriptionsService(repo);
+    const plansRepo = createPlatformPlansRepository(c.get('db'));
+    const service = createPlatformSubscriptionsService(repo, plansRepo);
 
     const subscriptions = await service.getSubscriptionsByOrganization(id);
     return c.json(subscriptions);
   })
+
+  // POST /api/platform/organizations/:id/subscriptions
+  .post(
+    '/:id/subscriptions',
+    requirePlatformAuth(),
+    zValidator(
+      'json',
+      z.object({
+        planId: z.number().int().positive(),
+        startDate: z.string().optional(),
+        isTrial: z.boolean().default(false),
+        priceOverrideCents: z.number().int().nonnegative().optional(),
+        payment: z.object({
+          amountPaidCents: z.number().int().nonnegative(),
+          currencyPaid: z.string().min(1),
+          exchangeRateApplied: z.string().optional(),
+          baseAmountCents: z.number().int().nonnegative().optional(),
+          paymentMethod: z.string().min(1),
+          paymentMethodDetails: z.record(z.string(), z.any()).optional(),
+          status: z.enum([
+            PAYMENT_STATUSES.PENDING,
+            PAYMENT_STATUSES.PROCESSING,
+            PAYMENT_STATUSES.VALIDATED,
+            PAYMENT_STATUSES.INVALID,
+            PAYMENT_STATUSES.VOIDED,
+            PAYMENT_STATUSES.REFUNDED,
+          ]),
+          paymentDate: z.string().optional(),
+        }),
+      })
+    ),
+    async (c) => {
+      const id = c.req.param('id');
+      const data = c.req.valid('json');
+      const cache = createCache(c.env);
+
+      const repo = createPlatformSubscriptionsRepository(c.get('db'));
+      const plansRepo = createPlatformPlansRepository(c.get('db'));
+      const service = createPlatformSubscriptionsService(repo, plansRepo);
+
+      const result = await service.createSubscriptionWithPayment({
+        organizationId: id,
+        ...data,
+      });
+
+      await cache.invalidate('platform:subscriptions*');
+      await cache.invalidateExact(`org:${id}:subscription-status`);
+
+      const created = await service.getSubscriptionById(result.subscriptionId);
+      return c.json(created, 201);
+    }
+  )
 
   // GET /api/platform/organizations/:id/staff
   .get('/:id/staff', requirePlatformAuth(), async (c) => {
