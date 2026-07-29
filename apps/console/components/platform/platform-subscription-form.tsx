@@ -56,7 +56,16 @@ function calculateEndDate(
   durationValue: number,
   durationUnit: "day" | "week" | "month" | "year"
 ): string {
-  const d = new Date(startDate);
+  const parts = startDate.split("-").map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (year === undefined || month === undefined || day === undefined || Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return "";
+  }
+
+  // Construct local date without UTC offset drift
+  const d = new Date(year, month - 1, day);
   switch (durationUnit) {
     case "day":
       d.setDate(d.getDate() + durationValue);
@@ -363,7 +372,7 @@ export function PlatformSubscriptionForm({
         <Input
           id="end-date"
           type="date"
-          label="Fecha de Vencimiento (calculada)"
+          label="Fecha de Vencimiento"
           value={previewEndDate}
           disabled
           title="Calculada según la duración del plan"

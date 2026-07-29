@@ -51,6 +51,17 @@ export interface UpdatePlatformPaymentStatusPayload {
   status: PaymentStatus;
 }
 
+/**
+ * Safely parses a start date input string into a Date object (UTC midnight for YYYY-MM-DD strings).
+ */
+function parseStartDate(input?: string): Date {
+  if (!input) return new Date();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    return new Date(`${input}T00:00:00.000Z`);
+  }
+  return new Date(input);
+}
+
 export function createPlatformSubscriptionsService(
   platformSubsRepo: PlatformSubscriptionsRepository,
   plansRepo: ReturnType<typeof createPlatformPlansRepository>
@@ -100,7 +111,7 @@ export function createPlatformSubscriptionsService(
       const plan = await plansRepo.findById(data.planId);
       if (!plan) throw new Error('Plan no encontrado');
 
-      const startDate = data.startDate ? new Date(data.startDate) : new Date();
+      const startDate = parseStartDate(data.startDate);
       const isTrial = data.isTrial ?? false;
 
       // Free plan: validar precio 0

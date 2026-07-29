@@ -2,6 +2,7 @@ import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { api } from "@/lib/api/client";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { updateTag } from "next/cache";
 import { PlansClient } from "./plans-client";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,11 @@ export default async function PlatformPlansPage() {
     (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") ||
     "latam";
 
+  const refreshPlans = async () => {
+    "use server";
+    updateTag("console:plans");
+  };
+
   return (
     <PlansClient
       initialPlans={plans}
@@ -33,6 +39,8 @@ export default async function PlatformPlansPage() {
       primaryCurrency={primaryCurrency}
       currencyFormat={currencyFormat}
       rates={rates}
+      onSuccess={refreshPlans}
     />
   );
 }
+

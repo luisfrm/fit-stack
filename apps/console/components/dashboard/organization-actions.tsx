@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  ArrowUpRight,
   Settings,
   Edit2,
   Power,
@@ -13,12 +12,10 @@ import {
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type IPlatformOrganization } from "@workspace/shared/types";
-import { useOrganizationActivation } from "@/lib/hooks/use-organization-activation";
 
 interface OrganizationActionsProps {
   readonly organization: IPlatformOrganization;
   readonly status: 'active' | 'inactive' | 'pending';
-  readonly onActivate?: () => void;
   readonly onEdit?: () => void;
   readonly onSettings?: () => void;
   readonly onAddSubscription?: () => void;
@@ -34,7 +31,6 @@ interface OrganizationActionsProps {
 export function OrganizationActions({
   organization,
   status,
-  onActivate,
   onEdit,
   onSettings,
   onAddSubscription,
@@ -42,16 +38,6 @@ export function OrganizationActions({
   onSuccess,
   EditModal
 }: OrganizationActionsProps) {
-  const { activate, isActivating } = useOrganizationActivation();
-
-  const handleActivate = async () => {
-    if (onActivate) {
-      onActivate();
-      return;
-    }
-    await activate(organization.id);
-  };
-
   const dropdownSections = React.useMemo(() => [
     {
       label: "Gestión de Sede",
@@ -93,16 +79,6 @@ export function OrganizationActions({
       <Button
         variant="ghost"
         size="icon"
-        title="Activar Contexto"
-        className="text-primary hover:bg-primary/10"
-        onClick={handleActivate}
-        loading={isActivating}
-      >
-        <ArrowUpRight size={18} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
         title="Configuración Técnica"
         onClick={onSettings}
       >
@@ -116,4 +92,4 @@ export function OrganizationActions({
       />
     </div>
   );
-}
+}

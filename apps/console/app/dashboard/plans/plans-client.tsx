@@ -15,6 +15,7 @@ interface PlansClientProps {
   readonly primaryCurrency: string;
   readonly currencyFormat: "latam" | "usa";
   readonly rates: Record<string, number> | null;
+  readonly onSuccess?: () => Promise<void> | void;
 }
 
 export function PlansClient({
@@ -23,6 +24,7 @@ export function PlansClient({
   primaryCurrency,
   currencyFormat,
   rates,
+  onSuccess,
 }: PlansClientProps) {
   const router = useRouter();
   const plans = initialPlans;
@@ -60,7 +62,12 @@ export function PlansClient({
     return { totalInPrimary, breakdown };
   };
 
-  const refresh = () => router.refresh();
+  const refresh = async () => {
+    if (onSuccess) {
+      await onSuccess();
+    }
+    router.refresh();
+  };
 
   const renderRevenueCard = (revenue: Record<string, number>) => {
     const { totalInPrimary, breakdown } = computeRevenueBreakdown(revenue);
