@@ -6,7 +6,7 @@ import { cn } from "@workspace/ui/lib/utils";
    TITLE VARIANTS
    ───────────────────────────────────────────── */
 const titleVariants = cva(
-  ["font-black italic uppercase tracking-tighter leading-tight"],
+  ["font-display font-black italic uppercase tracking-tighter leading-tight"],
   {
     variants: {
       /**

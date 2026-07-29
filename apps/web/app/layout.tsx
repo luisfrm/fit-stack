@@ -1,16 +1,16 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import { DM_Sans, Space_Grotesk } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
 
-const fontSans = Geist({
+const fontSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
 })
 
-const fontMono = Geist_Mono({
+const fontDisplay = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-display",
 })
 
 export const metadata = {
@@ -33,7 +33,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}
+        className={`${fontSans.variable} ${fontDisplay.variable} font-sans antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

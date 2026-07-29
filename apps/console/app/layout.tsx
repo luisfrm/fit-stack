@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Space_Grotesk } from "next/font/google";
 import { Toaster } from "@workspace/ui/components";
 import { Providers } from "@/components/providers";
 import type { Metadata } from "next";
@@ -12,14 +12,14 @@ export const metadata: Metadata = {
   },
 };
 
-const fontSans = Geist({
+const fontSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
 });
 
-const fontMono = Geist_Mono({
+const fontDisplay = Space_Grotesk({
   subsets: ["latin"],
-  variable: "--font-mono",
+  variable: "--font-display",
 });
 
 export default function RootLayout({
@@ -31,7 +31,7 @@ export default function RootLayout({
     <html lang="es" className="dark" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased bg-background text-foreground`}
+        className={`${fontSans.variable} ${fontDisplay.variable} font-sans antialiased bg-background text-foreground`}
       >
         <Providers>
           {children}
