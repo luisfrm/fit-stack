@@ -1,6 +1,16 @@
 import { eq, ilike, and, or, count, desc, type Db } from '@workspace/database/factory';
-import { organization, storeSubscription, fitstackPlan, authMember, gymMember } from '@workspace/database/schema';
-import type { IPlatformOrganization } from '@workspace/shared/types';
+import {
+  organization,
+  platformSubscription,
+  platformPlan,
+  authMember,
+  gymMember,
+} from '@workspace/database/schema';
+import type { IPlatformOrganization, IPlatformSubscription } from '@workspace/shared/types';
+import {
+  computePlatformSubscriptionStatus,
+  PLATFORM_SUBSCRIPTION_STATUSES,
+} from '@workspace/shared/constants';
 
 export type DbOrganization = typeof organization.$inferSelect;
 export type NewDbOrganization = typeof organization.$inferInsert;
@@ -58,22 +68,35 @@ export function createOrganizationsRepository(db: Db) {
         orgs.map(async (org) => {
           const [latestSub] = await db
             .select({
-              id: storeSubscription.id,
-              organizationId: storeSubscription.organizationId,
-              planId: storeSubscription.planId,
-              status: storeSubscription.status,
-              startDate: storeSubscription.startDate,
-              endDate: storeSubscription.currentPeriodEnd,
-              isTrial: storeSubscription.isTrial,
-              priceOverride: storeSubscription.priceOverride,
-              createdAt: storeSubscription.createdAt,
-              planName: fitstackPlan.name,
+              id: platformSubscription.id,
+              organizationId: platformSubscription.organizationId,
+              planId: platformSubscription.planId,
+              startDate: platformSubscription.startDate,
+              currentPeriodEnd: platformSubscription.currentPeriodEnd,
+              isTrial: platformSubscription.isTrial,
+              priceOverride: platformSubscription.priceOverride,
+              cancelledAt: platformSubscription.cancelledAt,
+              createdAt: platformSubscription.createdAt,
+              planName: platformPlan.name,
+              planPrice: platformPlan.price,
+              planCurrency: platformPlan.currency,
+              planDurationValue: platformPlan.durationValue,
+              planDurationUnit: platformPlan.durationUnit,
             })
-            .from(storeSubscription)
-            .leftJoin(fitstackPlan, eq(storeSubscription.planId, fitstackPlan.id))
-            .where(eq(storeSubscription.organizationId, org.id))
-            .orderBy(desc(storeSubscription.createdAt))
+            .from(platformSubscription)
+            .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id))
+            .where(eq(platformSubscription.organizationId, org.id))
+            .orderBy(desc(platformSubscription.createdAt))
             .limit(1);
+
+          // Computar status (no se guarda en DB)
+          const computedStatus = latestSub
+            ? computePlatformSubscriptionStatus({
+                currentPeriodEnd: latestSub.currentPeriodEnd,
+                cancelledAt: latestSub.cancelledAt,
+                isTrial: latestSub.isTrial,
+              })
+            : PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
 
           let memberCountNum: number | undefined = undefined;
           let userCountNum: number | undefined = undefined;
@@ -92,6 +115,27 @@ export function createOrganizationsRepository(db: Db) {
             userCountNum = Number(uCount?.total || 0);
           }
 
+          let subscriptionDto: (IPlatformSubscription & { planName?: string }) | null = null;
+          if (latestSub) {
+            subscriptionDto = {
+              id: latestSub.id,
+              organizationId: latestSub.organizationId,
+              planId: latestSub.planId,
+              startDate: latestSub.startDate.toISOString(),
+              currentPeriodEnd: latestSub.currentPeriodEnd.toISOString(),
+              isTrial: latestSub.isTrial,
+              priceOverride: latestSub.priceOverride ?? null,
+              cancelledAt: latestSub.cancelledAt?.toISOString() ?? null,
+              createdAt: latestSub.createdAt.toISOString(),
+              status: computedStatus,
+              planName: latestSub.planName ?? undefined,
+              planPrice: latestSub.planPrice ?? undefined,
+              planCurrency: latestSub.planCurrency ?? undefined,
+              planDurationValue: latestSub.planDurationValue ?? undefined,
+              planDurationUnit: (latestSub.planDurationUnit ?? undefined) as "day" | "week" | "month" | "year" | undefined,
+            };
+          }
+
           return {
             id: org.id,
             name: org.name,
@@ -107,17 +151,7 @@ export function createOrganizationsRepository(db: Db) {
             metadata: org.metadata as Record<string, any> | null,
             memberCount: memberCountNum,
             userCount: userCountNum,
-            latestSubscription: latestSub
-              ? {
-                  ...latestSub,
-                  startDate: latestSub.startDate.toISOString(),
-                  endDate: latestSub.endDate.toISOString(),
-                  createdAt: latestSub.createdAt.toISOString(),
-                  status: latestSub.status as any,
-                  priceOverride: latestSub.priceOverride ? Number(latestSub.priceOverride) : null,
-                  planName: latestSub.planName || undefined,
-                }
-              : null,
+            latestSubscription: subscriptionDto,
           };
         })
       );
@@ -132,12 +166,20 @@ export function createOrganizationsRepository(db: Db) {
     },
 
     async findById(id: string): Promise<DbOrganization | undefined> {
-      const [result] = await db.select().from(organization).where(eq(organization.id, id)).limit(1);
+      const [result] = await db
+        .select()
+        .from(organization)
+        .where(eq(organization.id, id))
+        .limit(1);
       return result;
     },
 
     async findBySlug(slug: string): Promise<DbOrganization | undefined> {
-      const [result] = await db.select().from(organization).where(eq(organization.slug, slug)).limit(1);
+      const [result] = await db
+        .select()
+        .from(organization)
+        .where(eq(organization.slug, slug))
+        .limit(1);
       return result;
     },
 

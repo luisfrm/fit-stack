@@ -177,7 +177,7 @@ function SelectedOrganizationCard({
               {isActive ? "Suscripción Vigente" : "Suscripción Inactiva"}
             </Text>
             <Text size="sm" weight="semibold">
-              {hasSub.planName} • {isActive ? "Vence el" : "Venció el"} {new Date(hasSub.endDate).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+              {hasSub.planName} • {isActive ? "Vence el" : "Venció el"} {new Date(hasSub.currentPeriodEnd).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
             </Text>
           </div>
           {isActive && (

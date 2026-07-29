@@ -112,8 +112,8 @@ export function createMembersRepository(db: Db) {
         return {
           data: rows.map((r) => ({
             ...r.member,
-            role: r.member.role,
-            authRole: r.authRole,
+            role: r.member.role as OrgRole,
+            authRole: r.authRole as OrgRole | null,
             user: r.user,
             latestSubscription: null,
           })),
@@ -133,8 +133,8 @@ export function createMembersRepository(db: Db) {
 
           return {
             ...r.member,
-            role: r.member.role,
-            authRole: r.authRole,
+            role: r.member.role as OrgRole,
+            authRole: r.authRole as OrgRole | null,
             user: r.user,
             latestSubscription: latestSub
               ? {
@@ -181,7 +181,7 @@ export function createMembersRepository(db: Db) {
         .limit(1);
 
       if (result.length === 0 || !result[0]) return undefined;
-      return { ...result[0].member, role: result[0].member.role, authRole: result[0].authRole, user: result[0].user };
+      return { ...result[0].member, role: result[0].member.role as OrgRole, authRole: result[0].authRole as OrgRole | null, user: result[0].user };
     },
 
     async findByEmail(organizationId: string, email: string) {

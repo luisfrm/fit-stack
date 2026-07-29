@@ -8,8 +8,8 @@ export default function DashboardError({
   error,
   reset,
 }: {
-  error: Error & { digest?: string };
-  reset: () => void;
+  readonly error: Error & { digest?: string };
+  readonly reset: () => void;
 }) {
   React.useEffect(() => {
     console.error("[Console Dashboard Error]", error);
@@ -25,13 +25,8 @@ export default function DashboardError({
           Algo salió mal
         </Text>
         <Text size="sm" variant="muted">
-          {error.message || "Ha ocurrido un error inesperado al cargar esta vista."}
+          No pudimos procesar tu solicitud en este momento. Por favor, intenta nuevamente o regresa al inicio.
         </Text>
-        {error.digest && (
-          <Text size="xs" variant="muted" className="font-mono opacity-50">
-            ref: {error.digest}
-          </Text>
-        )}
       </div>
       <div className="flex items-center gap-3">
         <Button variant="primary" size="sm" onClick={reset} leftIcon={<RefreshCcw size={16} />}>

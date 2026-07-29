@@ -113,7 +113,7 @@ export function createMembersService(
       if (sanitizedData.role) {
         const currentMember = await this.getMemberById(organizationId, id);
         if (currentMember.userId) {
-          await membersRepo.updateAuthRole(currentMember.userId, organizationId, sanitizedData.role);
+          await membersRepo.updateAuthRole(currentMember.userId, organizationId, sanitizedData.role as any);
         }
       }
 

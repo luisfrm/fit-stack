@@ -1,5 +1,5 @@
 import { sql, and, eq, or, gte, count, sum, isNull, lte, type Db } from '@workspace/database/factory';
-import { subscription, payment, cmsClass } from '@workspace/database/schema';
+import { subscription, payment, gymClass } from '@workspace/database/schema';
 import { OrganizationDateManager } from '../lib/date-manager';
 
 export interface DashboardStats {
@@ -83,19 +83,19 @@ export function createDashboardRepository(db: Db) {
 
       const classesTodayResult = await db
         .select({ count: count() })
-        .from(cmsClass)
+        .from(gymClass)
         .where(
           and(
-            eq(cmsClass.organizationId, organizationId),
-            eq(cmsClass.isVisible, true),
+            eq(gymClass.organizationId, organizationId),
+            eq(gymClass.isVisible, true),
             or(
               and(
-                eq(cmsClass.frequencyType, 'once'),
-                eq(cmsClass.scheduledDate, today)
+                eq(gymClass.frequencyType, 'once'),
+                eq(gymClass.scheduledDate, today)
               ),
               and(
-                eq(cmsClass.frequencyType, 'weekly'),
-                sql`${dayOfWeek} = ANY(${cmsClass.daysOfWeek})`
+                eq(gymClass.frequencyType, 'weekly'),
+                sql`${dayOfWeek} = ANY(${gymClass.daysOfWeek})`
               )
             )
           )

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireAuth } from '../lib/route-handler';
 import { GLOBAL_ROLES } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
+import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
@@ -31,7 +32,8 @@ export const organizationRoutes = new Hono<AppEnv>()
     }
 
     const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
-    const platformSubsService = createPlatformSubscriptionsService(platformSubsRepo);
+    const platformPlansRepo = createPlatformPlansRepository(c.get('db'));
+    const platformSubsService = createPlatformSubscriptionsService(platformSubsRepo, platformPlansRepo);
 
     const status = await platformSubsService.getOrganizationStatus(activeOrganizationId);
     const data = { status };

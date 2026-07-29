@@ -167,9 +167,10 @@ const getColumns = (
           );
         }
 
-        const isExpired = new Date(sub.endDate) < new Date();
+        const isExpired = new Date(sub.currentPeriodEnd) < new Date();
         const statusVariants: Record<string, "success" | "warning" | "destructive" | "info" | "default"> = {
           active: 'success',
+          trial: 'info',
           past_due: 'warning',
           read_only: 'default',
           suspended: 'destructive',
@@ -187,7 +188,7 @@ const getColumns = (
             <Text size="xs" className="text-slate-500 font-medium">
               {isExpired ? 'Expiró: ' : 'Expira: '}
               <span className={isExpired ? "text-rose-500 font-bold" : "text-slate-300 font-bold"}>
-                {format(new Date(sub.endDate), "dd MMM yyyy", { locale: es })}
+                {format(new Date(sub.currentPeriodEnd), "dd MMM yyyy", { locale: es })}
               </span>
             </Text>
           </div>
