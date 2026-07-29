@@ -58,6 +58,12 @@
       "sourceType": "autoskills-registry",
       "computedHash": "c184da724d1c61ad077f27418ea8e7e88fd54bcdf98165e18be7e4681cbd5e20"
     },
+    "terraform-stacks": {
+      "source": "hashicorp/agent-skills",
+      "sourceType": "github",
+      "skillPath": "terraform/module-generation/skills/terraform-stacks/SKILL.md",
+      "computedHash": "0a10a627b2c8ef7200de9303ec84b48529c6130b12836a1f43975e50a744bfd4"
+    },
     "typescript-advanced-types": {
       "source": "wshobson/agents",
       "sourceType": "github",
