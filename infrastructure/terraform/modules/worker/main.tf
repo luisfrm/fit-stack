@@ -1,7 +1,7 @@
 resource "cloudflare_workers_script" "this" {
   account_id  = var.account_id
   script_name = var.name
-  content     = "export default { async fetch() { return new Response('placeholder - deployed via wrangler') } }"
+  content     = "addEventListener('fetch', event => { event.respondWith(new Response('placeholder - deployed via wrangler')); });"
 
   compatibility_date  = var.compatibility_date
   compatibility_flags = var.compatibility_flags
@@ -20,9 +20,9 @@ resource "cloudflare_workers_script" "this" {
       bucket_name = b.bucket_name
     }],
     [for b in var.queue_producer_bindings : {
-      name  = b.name
-      type  = "queue"
-      queue = b.queue
+      name       = b.name
+      type       = "queue"
+      queue_name = b.queue
     }],
     [for k, v in var.plain_text_bindings : {
       name = k
