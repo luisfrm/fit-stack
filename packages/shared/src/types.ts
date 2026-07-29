@@ -131,6 +131,7 @@ export interface IMember {
   birthday?: string;
   imageUrl?: string | null;
   role?: string;
+  userId?: string | null;
   user?: {
     id: string;
     email: string;

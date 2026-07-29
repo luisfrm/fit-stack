@@ -450,6 +450,9 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       suspended: number;
       cancelled: number;
       total: number;
+      monthlyRevenueCents: number;
+      previousMonthRevenueCents: number;
+      mrrCents: number;
     }> {
       const computedStatus = this.getSubscriptionStatusSql();
 
@@ -465,6 +468,22 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         })
         .from(platformSubscription);
 
+      // Compute monthly B2B revenue and previous month revenue for growth calculation
+      const [revenueResult] = await db
+        .select({
+          monthlyRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP) THEN COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid}) ELSE 0 END), 0)::int`,
+          previousMonthRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP - INTERVAL '1 month') THEN COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid}) ELSE 0 END), 0)::int`,
+        })
+        .from(platformSubscriptionPayment);
+
+      // Compute Monthly Recurring Revenue (MRR) from active subscriptions
+      const [mrrResult] = await db
+        .select({
+          mrrCents: sql<number>`COALESCE(SUM(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN COALESCE(${platformSubscription.priceOverride}, ${platformPlan.price}) ELSE 0 END), 0)::int`,
+        })
+        .from(platformSubscription)
+        .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id));
+
       return {
         active: Number(result?.active ?? 0),
         trial: Number(result?.trial ?? 0),
@@ -473,6 +492,9 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         suspended: Number(result?.suspended ?? 0),
         cancelled: Number(result?.cancelled ?? 0),
         total: Number(result?.total ?? 0),
+        monthlyRevenueCents: Number(revenueResult?.monthlyRevenueCents ?? 0),
+        previousMonthRevenueCents: Number(revenueResult?.previousMonthRevenueCents ?? 0),
+        mrrCents: Number(mrrResult?.mrrCents ?? 0),
       };
     },
 

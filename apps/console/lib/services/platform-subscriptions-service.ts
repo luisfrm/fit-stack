@@ -30,6 +30,9 @@ export interface SubscriptionStats {
   suspended: number;
   cancelled: number;
   total: number;
+  monthlyRevenueCents: number;
+  previousMonthRevenueCents: number;
+  mrrCents: number;
 }
 
 export interface PlatformPaymentPayload {
