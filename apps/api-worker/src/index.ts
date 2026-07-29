@@ -29,11 +29,20 @@ import { platformSettingsRoutes } from './routes/platform-settings.route';
 
 const app = new Hono<AppEnv>();
 
+// Public Healthcheck and Static Endpoints (no auth or DB required)
+app.get('/healthz', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/favicon.ico', (c) => c.text('', 204));
+
 // Apply CORS middleware for all /api routes
 app.use('/api/*', corsMiddleware);
 
 // Per-request Context Setup (Auth, Db, Session)
 app.use('*', async (c, next) => {
+  // Defensive check for missing DATABASE_URL
+  if (!c.env.DATABASE_URL) {
+    return c.json({ error: 'Database connection string is missing or not configured' }, 500);
+  }
+
   const auth = createAuth(c.env);
   const db = createDb(c.env.DATABASE_URL);
   c.set('auth', auth);
@@ -50,9 +59,6 @@ app.use('*', async (c, next) => {
 
 // Global Error Handler
 app.onError(onError);
-
-// Healthcheck
-app.get('/healthz', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // Better Auth Engine Handler
 app.on(['POST', 'GET'], '/api/auth/*', (c) => c.get('auth').handler(c.req.raw));

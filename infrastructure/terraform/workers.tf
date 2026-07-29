@@ -1,7 +1,7 @@
 module "api_worker" {
   source              = "./modules/worker"
   account_id          = var.cloudflare_account_id
-  name                = var.api_worker_name
+  name                = local.api_worker_name
   compatibility_date  = var.compatibility_date
   compatibility_flags = var.compatibility_flags
 
@@ -41,7 +41,7 @@ module "api_worker" {
 module "jobs_worker" {
   source              = "./modules/worker"
   account_id          = var.cloudflare_account_id
-  name                = var.jobs_worker_name
+  name                = local.jobs_worker_name
   compatibility_date  = var.compatibility_date
   compatibility_flags = var.compatibility_flags
 

@@ -67,7 +67,7 @@
       ]
     },
     "production": {
-      "name": "fit-stack-jobs-production",
+      "name": "fit-stack-jobs-prod",
       "queues": {
         "consumers": [
           {

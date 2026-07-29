@@ -15,23 +15,28 @@ variable "environment" {
 }
 
 variable "api_worker_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "jobs_worker_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "files_bucket_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "queue_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "dlq_queue_name" {
-  type = string
+  type    = string
+  default = ""
 }
 
 variable "better_auth_url" {

@@ -62,7 +62,7 @@
       }
     },
     "production": {
-      "name": "fit-stack-api-production",
+      "name": "fit-stack-api-prod",
       "r2_buckets": [
         {
           "binding": "FILES_BUCKET",
