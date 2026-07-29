@@ -19,6 +19,9 @@ on:
           - staging
           - dev
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: deploy-api-worker-${{ github.event.inputs.environment || github.ref }}
   cancel-in-progress: false

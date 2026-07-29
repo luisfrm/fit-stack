@@ -17,6 +17,9 @@ on:
           - staging
           - dev
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: db-migrations-${{ github.event.inputs.environment || github.ref }}
   cancel-in-progress: false
