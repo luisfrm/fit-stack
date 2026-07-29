@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { OrganizationSettingsForm } from "@/components/dashboard/organization-settings-form";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { toast } from "@workspace/ui/components";
-import { type IPlatformOrganization } from "@workspace/shared/types";
+import type { IPlatformOrganization } from "@workspace/shared/types";
 
-export default function OrganizationAdminSettingsPage() {
+export default function OrganizationGeneralSettingsPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -38,11 +38,9 @@ export default function OrganizationAdminSettingsPage() {
   const handleSave = async (data: Record<string, string>) => {
     setIsUpdating(true);
     try {
-      // Send settings inside the 'settings' property as expected by the new API route
       await organizationsService.update(id, {
-        // @ts-ignore - The service expects IPlatformOrganization but we are sending a custom structure
-        // that the PATCH handler in the API knows how to process (extracting 'settings')
-        settings: data
+        // @ts-ignore - Custom payload for updating settings
+        settings: data,
       });
       toast.success("Ajustes de la organización actualizados");
     } catch (error) {
@@ -54,14 +52,16 @@ export default function OrganizationAdminSettingsPage() {
   };
 
   return (
-    <OrganizationSettingsForm
-      initialData={(org as { settings?: Record<string, string> })?.settings ?? {}}
-      onSave={handleSave}
-      isLoading={isLoading}
-      isUpdating={isUpdating}
-      title={`Ajustes: ${org?.name || 'Cargando...'}`}
-      description={`Configuración técnica y de marca para la sede ${org?.slug || ''}.`}
-      backUrl="/dashboard/organizations"
-    />
+    <div className="max-w-4xl space-y-8">
+      <OrganizationSettingsForm
+        initialData={(org as { settings?: Record<string, string> })?.settings ?? {}}
+        onSave={handleSave}
+        isLoading={isLoading}
+        isUpdating={isUpdating}
+        title={`General: ${org?.name || 'Cargando...'}`}
+        description={`Configuración técnica y de marca para la sede ${org?.slug || ''}.`}
+        backUrl="/dashboard/organizations"
+      />
+    </div>
   );
 }
