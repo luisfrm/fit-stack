@@ -665,3 +665,119 @@ Use skill tool for specialized tasks:
 - `packages/auth/src/` — Shared auth client, service, hooks, permissions
 - `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
 - `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI
+
+---
+
+## Infrastructure & Deployment (Terraform + GitHub Actions)
+
+Toda la infraestructura de Cloudflare (Workers, R2, Queues, Secrets) se gestiona con Terraform y los despliegues se automatizan con GitHub Actions. **Nunca se usa wrangler manualmente.**
+
+### Modelo de ambientes
+
+Un solo set de archivos Terraform. Los workflows son **uno solo** y seleccionan el ambiente vía `inputs.environment` o vía la rama de Git.
+
+Los secretos y variables son **nombres simples** (sin prefijo). GitHub ya los aísla por environment, así que `CLOUDFLARE_API_TOKEN` en `production` es distinto de `CLOUDFLARE_API_TOKEN` en `staging`.
+
+Por ahora solo está configurado **`production`**. Para agregar un ambiente nuevo, ver "Cómo escalar" más abajo.
+
+### Estructura
+
+```
+infrastructure/terraform/
+├── backend.tf            # Backend S3 en R2 (sin account_id hardcodeado)
+├── providers.tf          # Cloudflare provider
+├── variables.tf          # Variables
+├── main.tf               # Locals
+├── workers.tf            # Workers
+├── queues.tf             # Colas + DLQ
+├── storage.tf            # R2 bucket
+├── secrets.tf            # Secrets por worker
+├── outputs.tf            # Outputs
+└── modules/              # Módulos reutilizables
+    ├── worker/
+    ├── r2_bucket/
+    └── queue/
+```
+
+### Workflows de GitHub Actions
+
+| Workflow | Trigger | Ambiente seleccionado |
+|----------|---------|----------------------|
+| `terraform.yml` | `workflow_dispatch` con `environment` | cualquier ambiente |
+| `deploy-api-worker.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
+| `deploy-jobs-worker.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
+| `database-migrations.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
+
+### Environment de GitHub
+
+- **`production`**: con aprobador. Por ahora es el único.
+
+> Cuando agregues `staging` o `dev`, crea el environment correspondiente y define si requiere aprobación.
+
+### Variables y Secrets
+
+Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel de repositorio). GitHub los aísla automáticamente por ambiente, por eso no usamos prefijos.
+
+**Secrets por environment (nombres simples, sin prefijo):**
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `DATABASE_URL`
+- `BETTER_AUTH_URL`
+- `R2_PUBLIC_URL`
+- `BETTER_AUTH_SECRET`
+- `JWT_SECRET`
+- `COOKIE_DOMAIN`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+
+**Variables por environment (nombres de recursos, no sensibles):**
+- `API_WORKER_NAME` (ej: `fit-stack-api`)
+- `JOBS_WORKER_NAME` (ej: `fit-stack-jobs`)
+- `FILES_BUCKET_NAME` (ej: `fit-stack-files`)
+- `QUEUE_NAME` (ej: `fit-task-events`)
+- `DLQ_QUEUE_NAME` (ej: `fit-task-events-dlq`)
+
+**Repository secrets (compartidos por todos los environments):**
+- `TFSTATE_R2_ACCOUNT_ID`
+- `TFSTATE_R2_ACCESS_KEY_ID`
+- `TFSTATE_R2_SECRET_ACCESS_KEY`
+
+> Los secrets del bucket de estado son **repository secrets** (no por environment) porque solo hay un bucket de estado para todos los ambientes.
+
+### Estado remoto (R2)
+
+- Bucket: `fit-stack-terraform-state`
+- Path: `s3://fit-stack-terraform-state/<environment>/terraform.tfstate`
+
+### Cómo escalar a más ambientes
+
+**Para crear un nuevo ambiente (ej. `staging`):**
+
+1. GitHub: `Settings > Environments > New environment > staging`.
+2. Decide si requiere aprobador.
+3. En la sección "Environment secrets", agrega los mismos secrets que tiene `production` (con los valores de staging).
+4. En la sección "Environment variables", agrega los nombres de los recursos de staging (ej: `API_WORKER_NAME=fit-stack-api-staging`).
+5. Ejecuta `terraform.yml` con `environment: staging`.
+6. Listo. Los workflows de deploy también lo soportan automáticamente.
+
+**Para desplegar en otra cuenta de Cloudflare:**
+
+1. Crea la cuenta en Cloudflare.
+2. Crea un nuevo API Token en esa cuenta.
+3. Crea un nuevo GitHub Environment (ej: `fitstack`).
+4. En ese environment, configura `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` con los valores de la nueva cuenta.
+5. Configura el resto de secrets con valores apuntando a esa cuenta.
+6. Configura las variables de nombres de recursos.
+7. Ejecuta `terraform.yml` con `environment: fitstack`.
+
+**Cero cambios en código** para agregar ambientes o cuentas. Todo se hace en la UI de GitHub.
+
+### Reglas
+
+1. **Nunca** ejecutar `wrangler` a mano para deploys. Usar los workflows.
+2. **Nunca** commitear valores reales. Usar GitHub Secrets.
+3. **Nunca** modificar manualmente recursos en Cloudflare. Todo pasa por Terraform.
+4. **Cambios en `infrastructure/terraform/**` requieren PR**.
+5. **Migraciones de base de datos requieren aprobación manual** (environment `production`).
