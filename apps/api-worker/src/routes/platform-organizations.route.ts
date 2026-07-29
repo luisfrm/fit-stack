@@ -5,6 +5,9 @@ import { requirePlatformAuth } from '../lib/route-handler';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createMembersRepository } from '../repositories/members.repository';
+import { createUsersRepository } from '../repositories/users.repository';
+import { createTokenService } from '../services/token.service';
+import { createMembersService } from '../services/members.service';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
@@ -22,6 +25,17 @@ const createOrgSchema = z.object({
   address: z.string().nullable().optional(),
   fiscalConfig: z.record(z.string(), z.any()).nullable().optional(),
   metadata: z.record(z.string(), z.any()).nullable().optional(),
+});
+
+const provisionOwnerSchema = z.object({
+  firstName: z.string().min(1, 'El nombre es requerido'),
+  lastName: z.string().min(1, 'El apellido es requerido'),
+  email: z.string().email('Email inválido'),
+  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional().default('owner'),
+  isActive: z.boolean().optional().default(true),
+  sendInvite: z.boolean().optional().default(false),
+  phoneNumber: z.string().nullable().optional(),
+  documentId: z.string().nullable().optional(),
 });
 
 export const platformOrganizationRoutes = new Hono<AppEnv>()
@@ -190,4 +204,85 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     });
 
     return c.json(staffMembers.data);
+  })
+
+  // POST /api/platform/organizations/:id/staff
+  .post(
+    '/:id/staff',
+    requirePlatformAuth(),
+    zValidator('json', provisionOwnerSchema),
+    async (c) => {
+      const id = c.req.param('id');
+      const { sendInvite, ...memberData } = c.req.valid('json');
+
+      const membersRepo = createMembersRepository(c.get('db'));
+      const usersRepo = createUsersRepository(c.get('db'));
+      const tokenService = createTokenService(c.env.JWT_SECRET);
+      const membersService = createMembersService(membersRepo, usersRepo, tokenService, c.env.TASK_QUEUE);
+
+      const auth = c.get('auth');
+      const cache = createCache(c.env);
+
+      // Provision or update gym_member entry
+      const newMember = await membersService.createMember(id, memberData as any, sendInvite, {
+        auth,
+        headers: c.req.raw.headers,
+      });
+
+      // If existing user is in the database, link them to auth_member with owner role
+      const existingUser = await usersRepo.findByEmail(memberData.email);
+      if (existingUser) {
+        const isAlreadyAuthMember = await membersRepo.findAuthMember(existingUser.id, id);
+        if (!isAlreadyAuthMember) {
+          await membersRepo.addToOrganization(existingUser.id, id, (memberData.role as any) || 'owner');
+        }
+      }
+
+      await cache.invalidate(`org:${id}:members:*`);
+      return c.json(newMember, 201);
+    }
+  )
+
+  // POST /api/platform/organizations/:id/join
+  .post('/:id/join', requirePlatformAuth(), async (c) => {
+    const id = c.req.param('id');
+    const user = c.get('user');
+
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const membersRepo = createMembersRepository(c.get('db'));
+    const newMember = await membersRepo.addToOrganization(user.id, id, 'owner');
+
+    const cache = createCache(c.env);
+    await cache.invalidate(`org:${id}:members:*`);
+
+    return c.json({
+      success: true,
+      message: 'Te has unido exitosamente a la organización',
+      data: newMember,
+    });
+  })
+
+  // POST /api/platform/organizations/:id/staff/:memberId/resend-invite
+  .post('/:id/staff/:memberId/resend-invite', requirePlatformAuth(), async (c) => {
+    const id = c.req.param('id');
+    const memberId = Number(c.req.param('memberId'));
+
+    const membersRepo = createMembersRepository(c.get('db'));
+    const usersRepo = createUsersRepository(c.get('db'));
+    const tokenService = createTokenService(c.env.JWT_SECRET);
+    const membersService = createMembersService(membersRepo, usersRepo, tokenService, c.env.TASK_QUEUE);
+
+    const auth = c.get('auth');
+    const result = await membersService.resendInvite(id, memberId, {
+      auth,
+      headers: c.req.raw.headers,
+    });
+
+    return c.json({
+      message: 'Invitación reenviada exitosamente',
+      ...result,
+    });
   });

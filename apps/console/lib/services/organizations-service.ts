@@ -6,6 +6,7 @@ import type {
   IProvisionOwnerDTO,
   IPaginatedResult,
   PaymentStatus,
+  IMember,
 } from "@workspace/shared/types";
 
 const ORGANIZATIONS_PATH = "/platform/organizations";
@@ -122,5 +123,22 @@ export const organizationsService = {
       method: "POST",
       body: { ...data, sendInvite },
     });
+  },
+
+  /**
+   * Fetches the staff members of an organization.
+   */
+  async getStaff(id: string): Promise<IMember[]> {
+    return await api<IMember[]>(`${ORGANIZATIONS_PATH}/${id}/staff`);
+  },
+
+  /**
+   * Resends an invitation to a staff member of an organization.
+   */
+  async resendStaffInvite(id: string, memberId: number): Promise<{ success: boolean; message?: string }> {
+    return await api<{ success: boolean; message?: string }>(
+      `${ORGANIZATIONS_PATH}/${id}/staff/${memberId}/resend-invite`,
+      { method: "POST" }
+    );
   },
 };

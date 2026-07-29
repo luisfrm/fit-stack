@@ -146,27 +146,16 @@ export function createMembersService(
           await membersRepo.update(organizationId, member.id, { userId: existingUser.id });
           return { success: true, linked: true };
         }
+      }
 
-        if (ctx) {
-          await (ctx.auth.api as any).createInvitation({
-            headers: ctx.headers,
-            body: {
-              email: member.email,
-              role: (member.authRole as any) || 'member',
-              organizationId,
-              resend: true,
-            },
-          });
-        }
-      } else {
-        const token = await tokenService.signInviteToken(organizationId, member.id, member.email);
-        if (taskQueue) {
-          await taskQueue.send({
-            type: 'email.registration_invite',
-            email: member.email,
-            token,
-          });
-        }
+      // Re-issue JWT invite token and dispatch email registration invite event
+      const token = await tokenService.signInviteToken(organizationId, member.id, member.email);
+      if (taskQueue) {
+        await taskQueue.send({
+          type: 'email.registration_invite',
+          email: member.email,
+          token,
+        });
       }
 
       return { success: true };

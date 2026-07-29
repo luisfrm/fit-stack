@@ -90,9 +90,67 @@ export const memberRoutes = new Hono<AppEnv>()
     const tokenService = createTokenService(c.env.JWT_SECRET);
     try {
       const payload = await tokenService.verifyInviteToken(token);
-      return c.json({ valid: true, payload });
+      const membersRepo = createMembersRepository(c.get('db'));
+      const member = await membersRepo.findById(payload.organizationId, payload.memberId);
+
+      if (!member) {
+        return c.json({ valid: false, error: 'Miembro no encontrado' }, 404);
+      }
+
+      if (member.userId) {
+        return c.json({ valid: false, error: 'Esta invitación ya fue utilizada' }, 400);
+      }
+
+      return c.json({
+        valid: true,
+        email: member.email,
+        firstName: member.firstName,
+        lastName: member.lastName,
+      });
     } catch {
       return c.json({ valid: false, error: 'Token inválido o expirado' }, 400);
+    }
+  })
+  // POST /api/members/link-user
+  .post('/link-user', requireAuth(), async (c) => {
+    const { token } = await c.req.json<{ token?: string }>();
+    if (!token) {
+      return c.json({ error: 'Token es requerido' }, 400);
+    }
+
+    const tokenService = createTokenService(c.env.JWT_SECRET);
+    const user = c.get('user')!;
+
+    try {
+      const payload = await tokenService.verifyInviteToken(token);
+      const organizationId = payload.organizationId;
+      const membersRepo = createMembersRepository(c.get('db'));
+
+      const member = await membersRepo.findById(organizationId, payload.memberId);
+      if (!member) {
+        return c.json({ error: 'Miembro no encontrado' }, 404);
+      }
+
+      if (member.userId && member.userId !== user.id) {
+        return c.json({ error: 'Este miembro ya está vinculado a otra cuenta' }, 400);
+      }
+
+      // 1. Link user ID to gymMember record
+      await membersRepo.update(organizationId, member.id, { userId: user.id });
+
+      // 2. Add user to organization membership
+      await membersRepo.addToOrganization(user.id, organizationId, member.role);
+
+      // 3. Set active organization for current session
+      const auth = c.get('auth');
+      await auth.api.setActiveOrganization({
+        headers: c.req.raw.headers,
+        body: { organizationId },
+      });
+
+      return c.json({ success: true });
+    } catch (error: any) {
+      return c.json({ error: error.message || 'Token inválido o expirado' }, 400);
     }
   })
 
