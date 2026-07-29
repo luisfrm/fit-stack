@@ -22,6 +22,9 @@ export const user = pgTable('user', {
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
   role: text('role').default('user'), // Global role ('admin' | 'user')
+  banned: boolean('banned').notNull().default(false), // Better Auth admin plugin: ban status
+  banReason: text('ban_reason'), // Better Auth admin plugin: reason for ban
+  banExpires: timestamp('ban_expires', { withTimezone: true }), // Better Auth admin plugin: ban expiration
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
