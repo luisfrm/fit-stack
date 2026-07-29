@@ -11,7 +11,6 @@ import { toast, Checkbox, Label, SplashScreen } from "@workspace/ui/components";
 import { useSession } from "@workspace/auth/client";
 import { sessionService } from "@workspace/auth/service";
 import { useRouter } from "next/navigation";
-import { uploadService } from "@/lib/services/upload-service";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = React.useState(false);
@@ -190,7 +189,7 @@ export default function LoginPage() {
       <section className="hidden lg:block w-1/2 relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url('${uploadService.getMediaUrl("cms/public/gym_bg.png")}')` }}
+          style={{ backgroundImage: "url('/gym-login-bg.png')" }}
           role="img"
           aria-label="Panel de administración"
         />
