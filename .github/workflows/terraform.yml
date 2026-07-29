@@ -53,6 +53,7 @@ jobs:
       TF_VAR_upstash_redis_rest_token: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
       TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
       TF_VAR_resend_from_email: ${{ secrets.RESEND_FROM_EMAIL }}
+      TF_VAR_email_provider: ${{ vars.EMAIL_PROVIDER || 'resend' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: us-east-1
