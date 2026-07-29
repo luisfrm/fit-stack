@@ -36,19 +36,3 @@ resource "cloudflare_workers_script" "this" {
     }]
   )
 }
-
-resource "cloudflare_queue_consumer" "this" {
-  for_each = { for q in var.queue_consumer_bindings : q.name => q }
-
-  account_id  = var.account_id
-  queue_id    = each.value.queue_id
-  script_name = cloudflare_workers_script.this.script_name
-  type        = "worker"
-
-  dead_letter_queue = each.value.dead_letter_queue
-
-  settings = {
-    batch_size  = each.value.max_batch_size
-    max_retries = each.value.max_retries
-  }
-}

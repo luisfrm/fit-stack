@@ -52,16 +52,6 @@ module "jobs_worker" {
     }
   ]
 
-  queue_consumer_bindings = [
-    {
-      name              = "TASK_QUEUE"
-      queue_id          = module.task_queue.id
-      max_batch_size    = 10
-      max_retries       = 3
-      dead_letter_queue = module.dlq_queue.name
-    }
-  ]
-
   secret_text_bindings = concat(
     [
       { name = "DATABASE_URL", text = var.database_url }
