@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Suspense } from "react";
-import { Eye, EyeOff, Mail, Lock, AlertCircle, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, AlertCircle, ShieldCheck, Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -82,9 +82,9 @@ function RegisterForm() {
     membersService.validateToken(token)
       .then((res) => {
         setMemberData({
-          firstName: res.firstName,
-          lastName: res.lastName,
-          email: res.email
+          firstName: res.firstName || "",
+          lastName: res.lastName || "",
+          email: res.email || ""
         });
       })
       .catch((err) => {
@@ -145,18 +145,19 @@ function RegisterForm() {
   };
 
   return (
-    <main className="flex flex-col md:flex-row min-h-svh w-full font-sans text-white bg-black overflow-hidden relative">
+    <main
+      className="flex flex-col md:flex-row min-h-svh w-full text-foreground overflow-hidden relative"
+      style={{ backgroundColor: "var(--background)", fontFamily: "var(--font-sans, sans-serif)" }}
+    >
       <section
-        className="w-full md:w-1/2 flex flex-col justify-between p-8 md:p-16 bg-black overflow-y-auto h-svh"
+        className="w-full md:w-1/2 flex flex-col justify-between gap-3 overflow-y-auto h-svh"
         style={{ paddingBlock: "clamp(2rem, 6vw, 3rem)", paddingInline: "clamp(2rem, 6vw, 6rem)" }}
       >
-        <div className="mb-12">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rotate-45 flex items-center justify-center">
-              <div className="w-4 h-4 bg-black -rotate-45" />
-            </div>
-            <Text as="span" size="lg" weight="bold" uppercase className="tracking-tighter">
-              PREMIUM GYM
+        <div className="mb-8">
+          <div className="flex items-center gap-3">
+            <Dumbbell size={28} className="text-primary" />
+            <Text as="span" size="lg" weight="bold" uppercase className="tracking-tight italic">
+              Fit<span className="text-primary">Stack</span>
             </Text>
           </div>
         </div>
@@ -164,13 +165,13 @@ function RegisterForm() {
         <div className="max-w-md">
           <header className="mb-8">
             <Title as="h1" size="section" className="mb-2 text-foreground">
-              CREA TU CUENTA
+              CREA TU <span className="text-primary">CUENTA</span>
             </Title>
             <Text variant="muted" size="md">Completa tu registro para acceder a la plataforma</Text>
           </header>
 
           {isValidating && (
-            <div className="flex flex-col items-center justify-center py-10 gap-4 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-10 gap-4 text-foreground-muted">
               <div className="w-8 h-8 rounded-full border-t-2 border-r-2 border-primary animate-spin" />
               <p>Validando invitación...</p>
             </div>
@@ -258,7 +259,9 @@ function RegisterForm() {
               <div className="pt-4">
                 <Button
                   type="submit"
+                  variant="primary"
                   size="xl"
+                  rounded="lg"
                   fullWidth
                   loading={isLoading}
                   disabled={isLoading}
@@ -281,8 +284,8 @@ function RegisterForm() {
         </div>
 
         <footer className="mt-8">
-          <Text as="p" size="xs" variant="muted" className="text-center md:text-left opacity-60 flex flex-col md:flex-row gap-2">
-            <span>&copy; {new Date().getFullYear()} Premium Gym. &nbsp;Todos los derechos reservados.</span>
+          <Text variant="subtle" size="xs">
+            © {new Date().getFullYear()} Fit Stack. Todos los derechos reservados.
           </Text>
         </footer>
       </section>
@@ -300,21 +303,12 @@ function RegisterForm() {
               </svg>
             ))}
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold font-sans text-white mb-6 uppercase tracking-tight leading-[1.1]">
-            El Mejor Software<br />de Entrenamiento
-          </h2>
-          <p className="text-lg text-slate-300 max-w-lg mb-8">
-            "Desde que implementamos esta plataforma, la administración de nuestras sedes es impecable y la satisfacción de los miembros subió al máximo."
-          </p>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/30">
-              <img src="https://i.pravatar.cc/150?u=a042581f4e29026704z" alt="Avatar Director" className="w-full h-full object-cover" />
-            </div>
-            <div>
-              <p className="font-bold text-white text-md">Alejandro Marín</p>
-              <p className="text-slate-400 text-sm">Director en Premium Gym</p>
-            </div>
-          </div>
+          <Title as="h2" size="section" className="mb-4 uppercase tracking-tight leading-[1.1] text-white">
+            El Mejor Software<br />de Gestión Fitness
+          </Title>
+          <Text variant="subtle" className="text-slate-300 text-lg max-w-lg mb-8 font-light leading-relaxed">
+            "Optimiza el rendimiento de tu centro deportivo y administra tus sedes con tecnología de vanguardia."
+          </Text>
         </div>
       </section>
     </main>

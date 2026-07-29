@@ -50,8 +50,17 @@ export function NavTabs({
     <nav className={cn("w-full", className)}>
       <div className={cn(navTabsListVariants({ variant }), listClassName)}>
         {items.map((item) => {
-          const Icon = item.icon
-          const isActive = pathname === item.href || (item.href !== "/dashboard/settings" && pathname.startsWith(item.href))
+          const Icon = item.icon;
+          // Check if there is a more specific child item in the list matching the current pathname
+          const hasMoreSpecificMatch = items.some(
+            (other) =>
+              other.href !== item.href &&
+              other.href.length > item.href.length &&
+              (pathname === other.href || pathname.startsWith(other.href + '/'))
+          );
+          const isActive = hasMoreSpecificMatch
+            ? false
+            : pathname === item.href || pathname.startsWith(item.href + '/');
           
           return (
             <Link
