@@ -34,7 +34,7 @@ variable "queue_producer_bindings" {
 variable "queue_consumer_bindings" {
   type = list(object({
     name              = string
-    queue             = string
+    queue_id          = string
     max_batch_size    = optional(number)
     max_retries       = optional(number)
     dead_letter_queue = optional(string)
@@ -45,4 +45,12 @@ variable "queue_consumer_bindings" {
 variable "plain_text_bindings" {
   type    = map(string)
   default = {}
+}
+
+variable "secret_text_bindings" {
+  type = list(object({
+    name = string
+    text = string
+  }))
+  default = []
 }

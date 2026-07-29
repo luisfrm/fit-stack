@@ -35,6 +35,7 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
 
     env:
+      TF_VAR_environment: ${{ github.event.inputs.environment }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TF_VAR_api_worker_name: ${{ vars.API_WORKER_NAME }}
@@ -61,12 +62,13 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.0
+          terraform_version: 1.9.8
 
       - name: Terraform init
         working-directory: infrastructure/terraform
         run: |
           terraform init \
+            -upgrade \
             -backend-config="bucket=fit-stack-terraform-state" \
             -backend-config="key=${{ github.event.inputs.environment }}/terraform.tfstate" \
             -backend-config="endpoint=https://${{ secrets.TFSTATE_R2_ACCOUNT_ID }}.r2.cloudflarestorage.com" \

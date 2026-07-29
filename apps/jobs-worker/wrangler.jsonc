@@ -8,10 +8,10 @@
   "queues": {
     "consumers": [
       {
-        "queue": "fit-task-events",
+        "queue": "fit-task-events-dev",
         "max_batch_size": 10,
         "max_retries": 3,
-        "dead_letter_queue": "fit-task-events-dlq"
+        "dead_letter_queue": "fit-task-events-dlq-dev"
       }
     ]
   },
@@ -19,11 +19,71 @@
   "r2_buckets": [
     {
       "binding": "FILES_BUCKET",
-      "bucket_name": "fit-stack-files"
+      "bucket_name": "fit-stack-files-dev"
     }
   ],
 
   "observability": {
     "enabled": true
+  },
+
+  "env": {
+    "dev": {
+      "name": "fit-stack-jobs-dev",
+      "queues": {
+        "consumers": [
+          {
+            "queue": "fit-task-events-dev",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-dlq-dev"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-dev"
+        }
+      ]
+    },
+    "staging": {
+      "name": "fit-stack-jobs-staging",
+      "queues": {
+        "consumers": [
+          {
+            "queue": "fit-task-events-staging",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-dlq-staging"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "fit-stack-jobs-production",
+      "queues": {
+        "consumers": [
+          {
+            "queue": "fit-task-events-prod",
+            "max_batch_size": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-dlq-prod"
+          }
+        ]
+      },
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-prod"
+        }
+      ]
+    }
   }
 }

@@ -1,7 +1,7 @@
 resource "cloudflare_workers_script" "this" {
-  account_id = var.account_id
-  name       = var.name
-  content    = "export default { async fetch() { return new Response('placeholder - deployed via wrangler') } }"
+  account_id  = var.account_id
+  script_name = var.name
+  content     = "export default { async fetch() { return new Response('placeholder - deployed via wrangler') } }"
 
   compatibility_date  = var.compatibility_date
   compatibility_flags = var.compatibility_flags
@@ -12,39 +12,32 @@ resource "cloudflare_workers_script" "this" {
     ignore_changes = [content]
   }
 
-  dynamic "r2_bucket_binding" {
-    for_each = var.r2_bucket_bindings
-    content {
-      name        = r2_bucket_binding.value.name
-      bucket_name = r2_bucket_binding.value.bucket_name
-    }
-  }
+  r2_bucket_binding = var.r2_bucket_bindings
 
-  dynamic "queue_binding" {
-    for_each = var.queue_producer_bindings
-    content {
-      binding = queue_binding.value.name
-      queue   = queue_binding.value.queue
-    }
-  }
+  queue_binding = var.queue_producer_bindings
 
-  dynamic "plain_text_binding" {
-    for_each = var.plain_text_bindings
-    content {
-      name = plain_text_binding.key
-      text = plain_text_binding.value
+  plain_text_binding = [
+    for k, v in var.plain_text_bindings : {
+      name = k
+      text = v
     }
-  }
+  ]
+
+  secret_text_binding = var.secret_text_bindings
 }
 
-resource "cloudflare_workers_queue_consumer" "this" {
+resource "cloudflare_queue_consumer" "this" {
   for_each = { for q in var.queue_consumer_bindings : q.name => q }
 
   account_id  = var.account_id
-  queue_id    = each.value.queue
-  script_name = cloudflare_workers_script.this.name
+  queue_id    = each.value.queue_id
+  script_name = cloudflare_workers_script.this.script_name
+  type        = "worker"
 
-  max_batch_size       = each.value.max_batch_size
-  max_retries          = each.value.max_retries
-  dead_letter_queue    = each.value.dead_letter_queue
+  dead_letter_queue = each.value.dead_letter_queue
+
+  settings = {
+    batch_size  = each.value.max_batch_size
+    max_retries = each.value.max_retries
+  }
 }

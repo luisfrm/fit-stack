@@ -12,18 +12,71 @@
   "r2_buckets": [
     {
       "binding": "FILES_BUCKET",
-      "bucket_name": "fit-stack-files"
+      "bucket_name": "fit-stack-files-dev"
     }
   ],
   "queues": {
     "producers": [
       {
-        "queue": "fit-task-events",
+        "queue": "fit-task-events-dev",
         "binding": "TASK_QUEUE"
       }
     ]
   },
   "observability": {
     "enabled": true
+  },
+  "env": {
+    "dev": {
+      "name": "fit-stack-api-dev",
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-dev"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "queue": "fit-task-events-dev",
+            "binding": "TASK_QUEUE"
+          }
+        ]
+      }
+    },
+    "staging": {
+      "name": "fit-stack-api-staging",
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-staging"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "queue": "fit-task-events-staging",
+            "binding": "TASK_QUEUE"
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "fit-stack-api-production",
+      "r2_buckets": [
+        {
+          "binding": "FILES_BUCKET",
+          "bucket_name": "fit-stack-files-prod"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "queue": "fit-task-events-prod",
+            "binding": "TASK_QUEUE"
+          }
+        ]
+      }
+    }
   }
 }
