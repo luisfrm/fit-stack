@@ -69,7 +69,7 @@ export function createAuth(env: Env) {
           },
         },
         async sendInvitationEmail(data) {
-          const panelBaseUrl = isLocal ? 'http://localhost:3001' : 'https://panel.luisrivas.site';
+          const panelBaseUrl = env.PANEL_URL || 'http://localhost:3001';
           const inviteLink = `${panelBaseUrl}/accept-invitation/${data.id}`;
 
           if (env.TASK_QUEUE) {

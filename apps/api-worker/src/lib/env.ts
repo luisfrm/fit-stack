@@ -22,6 +22,8 @@ export type Env = {
 
   // Cloudflare Worker Environment Variables
   BETTER_AUTH_URL: string;
+  PANEL_URL?: string;
+  CONSOLE_URL?: string;
 
   // Cloudflare Bindings
   FILES_BUCKET: R2Bucket;

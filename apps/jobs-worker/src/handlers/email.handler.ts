@@ -7,13 +7,15 @@ export interface EmailHandlerEnv {
   RESEND_FROM_EMAIL?: string;
   SMTP_USER?: string;
   SMTP_PASS?: string;
+  PANEL_URL?: string;
+  CONSOLE_URL?: string;
 }
 
 export async function handleRegistrationInvite(
   env: EmailHandlerEnv,
   payload: { email: string; token: string }
 ) {
-  const panelUrl = process.env.PANEL_URL || 'http://localhost:3001';
+  const panelUrl = env.PANEL_URL || 'http://localhost:3001';
   const inviteLink = `${panelUrl}/register?token=${payload.token}`;
   const provider = env.EMAIL_PROVIDER || 'gmail';
 

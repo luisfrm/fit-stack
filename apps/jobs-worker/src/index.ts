@@ -13,6 +13,8 @@ export interface Env {
   RESEND_FROM_EMAIL?: string;
   SMTP_USER?: string;
   SMTP_PASS?: string;
+  PANEL_URL?: string;
+  CONSOLE_URL?: string;
 }
 
 export default {
