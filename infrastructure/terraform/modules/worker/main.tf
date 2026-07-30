@@ -1,7 +1,8 @@
 resource "cloudflare_workers_script" "this" {
   account_id  = var.account_id
   script_name = var.name
-  content     = "addEventListener('fetch', event => { event.respondWith(new Response('placeholder - deployed via wrangler')); });"
+  main_module = "index.js"
+  content     = "export default { async fetch(request, env, ctx) { return new Response('placeholder - deployed via wrangler'); } };"
 
   compatibility_date  = var.compatibility_date
   compatibility_flags = var.compatibility_flags
