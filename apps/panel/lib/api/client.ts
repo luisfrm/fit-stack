@@ -1,5 +1,6 @@
 import { ofetch } from "ofetch";
 import { env } from "@/lib/config/envs";
+import { formatApiErrorMessage } from "@/lib/utils/error";
 import type { ApiFetchOptions } from "./types";
 
 const isServer = typeof window === "undefined";
@@ -21,9 +22,17 @@ export const api = ofetch.create({
 
   onResponseError({ response }) {
     if (isServer) return;
-    const body = response?._data as { code?: string } | undefined;
+    const body = response?._data as Record<string, any> | undefined;
     if (body?.code === "ORGANIZATION_NOT_FOUND") {
       window.location.href = "/reset-org-context";
+    }
+
+    // Format Zod / API validation errors into a human-readable string to prevent React rendering crashes
+    if (body && typeof body === "object" && body.error && typeof body.error === "object") {
+      const formatted = formatApiErrorMessage(body);
+      if (formatted) {
+        body.error = formatted;
+      }
     }
   },
 });

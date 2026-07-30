@@ -10,12 +10,12 @@ import type { AppEnv } from '../lib/env';
 
 const classSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  trainerName: z.string().min(1, 'El nombre del entrenador es requerido'),
+  trainerName: z.string().nullable().optional(),
   trainerPhoto: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
-  capacity: z.number().int().positive('La capacidad debe ser mayor a 0'),
-  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato de hora inválido (HH:mm)'),
-  durationMinutes: z.number().int().positive('La duración debe ser mayor a 0'),
+  capacity: z.number().int().positive('La capacidad debe ser mayor a 0').nullable().optional(),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato de hora de inicio inválido (HH:mm)'),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Formato de hora de fin inválido (HH:mm)').nullable().optional(),
   frequencyType: z.enum(['once', 'weekly']),
   scheduledDate: z.string().nullable().optional(),
   daysOfWeek: z.array(z.number().min(0).max(6)).nullable().optional(),
