@@ -45,7 +45,7 @@ export const classRoutes = new Hono<AppEnv>()
 
     if (date) {
       const classes = await classesService.getByDate(orgId, date);
-      return c.json({ data: classes });
+      return c.json(classes);
     }
 
     const cache = createCache(c.env);
