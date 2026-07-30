@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSessionCookie } from 'better-auth/cookies';
-import { env } from '@/lib/config/envs';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const sessionCookie = getSessionCookie(request, {
-    cookiePrefix: env.isLocal ? "better-auth" : "__Secure-better-auth",
-  });
+  const sessionCookie = getSessionCookie(request);
 
   if (pathname.startsWith('/dashboard')) {
     if (!sessionCookie) {

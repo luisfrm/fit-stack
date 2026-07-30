@@ -37,9 +37,7 @@ export async function proxy(request: NextRequest) {
   const isGetSettings = pathname.startsWith("/api/settings") && request.method === "GET";
   if (isGetSettings) return response;
 
-  const sessionCookie = getSessionCookie(request, {
-    cookiePrefix: env.isLocal ? "better-auth" : "__Secure-better-auth",
-  });
+  const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
     const errorResponse = NextResponse.json({ error: "No autorizado" }, { status: 401 });

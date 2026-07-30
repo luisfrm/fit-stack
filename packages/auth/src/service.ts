@@ -6,8 +6,17 @@ export const sessionService = {
     if (globalThis.window === undefined) {
       try {
         const { headers: nextHeaders } = await import("next/headers");
-        const headers = customHeaders || await nextHeaders();
-        const result = await authClient.getSession({ fetchOptions: { headers } });
+        const reqHeaders = customHeaders || await nextHeaders();
+
+        // Pass only essential auth headers (cookie & authorization)
+        // to prevent forwarding frontend Host header to backend API server
+        const cleanHeaders = new Headers();
+        const cookie = reqHeaders.get("cookie");
+        if (cookie) cleanHeaders.set("cookie", cookie);
+        const authorization = reqHeaders.get("authorization");
+        if (authorization) cleanHeaders.set("authorization", authorization);
+
+        const result = await authClient.getSession({ fetchOptions: { headers: cleanHeaders } });
         return { data: result?.data as Session | null, error: (result?.error as IAuthError) || null };
       } catch (error: any) {
         console.error("Error fetching session on server:", error);
@@ -23,8 +32,14 @@ export const sessionService = {
     const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
 
     try {
+      const cleanHeaders = new Headers();
+      const cookie = headers.get("cookie");
+      if (cookie) cleanHeaders.set("cookie", cookie);
+      const authorization = headers.get("authorization");
+      if (authorization) cleanHeaders.set("authorization", authorization);
+
       const response = await fetch(`${apiBase}/api/auth/get-session`, {
-        headers,
+        headers: cleanHeaders,
         cache: 'no-store',
       });
 
