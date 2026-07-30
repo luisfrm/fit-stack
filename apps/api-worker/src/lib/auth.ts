@@ -26,8 +26,6 @@ export function createAuth(env: Env) {
   const membersRepo = createMembersRepository(db);
   const isLocal = env.BETTER_AUTH_URL.includes('localhost');
 
-  const cookieDomain = env.COOKIE_DOMAIN && env.COOKIE_DOMAIN.trim() !== '' ? env.COOKIE_DOMAIN : undefined;
-
   return betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
@@ -149,13 +147,13 @@ export function createAuth(env: Env) {
 
     advanced: {
       crossSubDomainCookies: {
-        enabled: !isLocal && Boolean(cookieDomain),
-        domain: isLocal ? undefined : cookieDomain,
+        enabled: !isLocal,
+        domain: isLocal ? undefined : env.COOKIE_DOMAIN,
       },
       defaultCookieAttributes: {
         sameSite: isLocal ? 'lax' : 'none',
         secure: !isLocal,
-        domain: isLocal ? undefined : cookieDomain,
+        domain: isLocal ? undefined : env.COOKIE_DOMAIN,
       },
     },
   });
