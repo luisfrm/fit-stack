@@ -118,3 +118,16 @@ variable "r2_public_url" {
   sensitive = true
   default   = ""
 }
+
+variable "panel_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "console_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+

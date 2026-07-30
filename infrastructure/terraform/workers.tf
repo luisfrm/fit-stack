@@ -30,6 +30,8 @@ module "api_worker" {
     ],
     var.r2_public_url != "" ? [{ name = "R2_PUBLIC_URL", text = var.r2_public_url }] : [],
     var.cookie_domain != "" ? [{ name = "COOKIE_DOMAIN", text = var.cookie_domain }] : [],
+    var.panel_url != "" ? [{ name = "PANEL_URL", text = var.panel_url }] : [],
+    var.console_url != "" ? [{ name = "CONSOLE_URL", text = var.console_url }] : [],
     var.upstash_redis_rest_url != "" ? [{ name = "UPSTASH_REDIS_REST_URL", text = var.upstash_redis_rest_url }] : [],
     var.upstash_redis_rest_token != "" ? [{ name = "UPSTASH_REDIS_REST_TOKEN", text = var.upstash_redis_rest_token }] : [],
     var.resend_api_key != "" ? [{ name = "RESEND_API_KEY", text = var.resend_api_key }] : [],
@@ -55,6 +57,8 @@ module "jobs_worker" {
     [
       { name = "DATABASE_URL", text = var.database_url }
     ],
+    var.panel_url != "" ? [{ name = "PANEL_URL", text = var.panel_url }] : [],
+    var.console_url != "" ? [{ name = "CONSOLE_URL", text = var.console_url }] : [],
     var.email_provider != "" ? [{ name = "EMAIL_PROVIDER", text = var.email_provider }] : [],
     var.resend_api_key != "" ? [{ name = "RESEND_API_KEY", text = var.resend_api_key }] : [],
     var.resend_from_email != "" ? [{ name = "RESEND_FROM_EMAIL", text = var.resend_from_email }] : [],

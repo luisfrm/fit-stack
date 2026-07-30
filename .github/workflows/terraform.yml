@@ -54,6 +54,9 @@ jobs:
       TF_VAR_resend_api_key: ${{ secrets.RESEND_API_KEY }}
       TF_VAR_resend_from_email: ${{ secrets.RESEND_FROM_EMAIL }}
       TF_VAR_email_provider: ${{ secrets.EMAIL_PROVIDER }}
+      TF_VAR_panel_url: ${{ secrets.PANEL_URL }}
+      TF_VAR_console_url: ${{ secrets.CONSOLE_URL }}
+
       AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: us-east-1
