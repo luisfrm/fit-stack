@@ -39,10 +39,6 @@ variable "dlq_queue_name" {
   default = ""
 }
 
-variable "better_auth_url" {
-  type = string
-}
-
 variable "compatibility_date" {
   type    = string
   default = "2026-07-01"
@@ -60,6 +56,11 @@ variable "database_url" {
 }
 
 variable "better_auth_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "better_auth_url" {
   type      = string
   sensitive = true
 }
@@ -113,6 +114,7 @@ variable "smtp_pass" {
 }
 
 variable "r2_public_url" {
-  type    = string
-  default = ""
+  type      = string
+  sensitive = true
+  default   = ""
 }

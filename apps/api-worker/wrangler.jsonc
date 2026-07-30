@@ -6,9 +6,6 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "vars": {
-    "BETTER_AUTH_URL": "http://localhost:8788"
-  },
   "r2_buckets": [
     {
       "binding": "FILES_BUCKET",
