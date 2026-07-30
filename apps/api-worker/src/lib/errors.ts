@@ -36,6 +36,11 @@ export const onError: ErrorHandler<AppEnv> = (err, c) => {
     return c.json({ error: err.message }, err.status);
   }
 
-  console.error('Unhandled server error:', err);
-  return c.json({ error: 'Error interno del servidor' }, 500);
+  console.error('Unhandled server error details:', {
+    message: err.message,
+    name: err.name,
+    stack: err.stack,
+    cause: err.cause,
+  });
+  return c.json({ error: `Error interno del servidor: ${err.message}` }, 500);
 };
