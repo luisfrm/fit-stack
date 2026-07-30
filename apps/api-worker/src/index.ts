@@ -31,7 +31,7 @@ const app = new Hono<AppEnv>();
 
 // Public Healthcheck and Static Endpoints (no auth or DB required)
 app.get('/healthz', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
-app.get('/favicon.ico', (c) => c.text('', 204));
+app.get('/favicon.ico', (c) => c.body(null, 204));
 
 // Apply CORS middleware for all /api routes
 app.use('/api/*', corsMiddleware);

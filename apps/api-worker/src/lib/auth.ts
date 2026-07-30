@@ -11,7 +11,7 @@ import {
   organizationAc,
   organizationRoles,
 } from '@workspace/shared';
-import { ALLOWED_ORIGINS } from './cors';
+import { ALLOWED_ORIGINS, isAllowedOrigin } from './cors';
 import { createCache } from './cache';
 import { createMembersRepository } from '../repositories/members.repository';
 import type { Env } from './env';
@@ -37,7 +37,13 @@ export function createAuth(env: Env) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
 
-    trustedOrigins: [...ALLOWED_ORIGINS],
+    trustedOrigins: (request) => {
+      const origin = request?.headers.get('origin');
+      if (origin && isAllowedOrigin(origin)) {
+        return [origin];
+      }
+      return [...ALLOWED_ORIGINS];
+    },
     user: {
       additionalFields: {
         role: {
