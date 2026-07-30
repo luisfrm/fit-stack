@@ -67,21 +67,21 @@
       ]
     },
     "production": {
-      "name": "fit-stack-jobs-prod",
+      "name": "fit-stack-jobs",
       "queues": {
         "consumers": [
           {
-            "queue": "fit-task-events-prod",
+            "queue": "fit-task-events",
             "max_batch_size": 10,
             "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-dlq-prod"
+            "dead_letter_queue": "fit-task-events-dlq"
           }
         ]
       },
       "r2_buckets": [
         {
           "binding": "FILES_BUCKET",
-          "bucket_name": "fit-stack-files-prod"
+          "bucket_name": "fit-stack-files"
         }
       ]
     }

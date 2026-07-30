@@ -62,17 +62,17 @@
       }
     },
     "production": {
-      "name": "fit-stack-api-prod",
+      "name": "fit-stack-api",
       "r2_buckets": [
         {
           "binding": "FILES_BUCKET",
-          "bucket_name": "fit-stack-files-prod"
+          "bucket_name": "fit-stack-files"
         }
       ],
       "queues": {
         "producers": [
           {
-            "queue": "fit-task-events-prod",
+            "queue": "fit-task-events",
             "binding": "TASK_QUEUE"
           }
         ]
