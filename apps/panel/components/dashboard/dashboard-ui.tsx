@@ -87,30 +87,12 @@ function useFilteredNavItems(): SidebarNavItem[] {
 
 export function SwitchOrganizationAction() {
   const router = useRouter();
-  const [organizations, setOrganizations] = React.useState<IOrganization[]>([]);
   const [open, setOpen] = React.useState(false);
-  const loadedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (loadedRef.current) return;
-    let cancelled = false;
-    async function load() {
-      const { data } = await authClient.organization.list();
-      if (cancelled) return;
-      if (data) setOrganizations(data as IOrganization[]);
-      loadedRef.current = true;
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
 
   const handleSelect = React.useCallback(() => {
     setOpen(false);
     router.refresh();
   }, [router]);
-
-  // Solo mostrar si pertenece a más de una organización
-  if (organizations.length <= 1) return null;
 
   return (
     <Modal
@@ -130,21 +112,24 @@ export function SwitchOrganizationAction() {
       }
     >
       <div className="py-4">
-        <OrganizationPicker
-          isModal
-          onSelect={handleSelect}
-        />
+        {open && (
+          <OrganizationPicker
+            isModal
+            onSelect={handleSelect}
+          />
+        )}
       </div>
     </Modal>
   );
 }
 
-export function AppSidebar({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
-  const { isPending: sessionLoading, activeOrganization } = useAuth();
+export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ user: SidebarUser, activeOrganization?: IOrganization | null }>) {
+  const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
 
-  const isBrandingLoading = sessionLoading || settingsLoading;
+  const activeOrganization = initialOrg ?? clientOrg;
+  const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
   const navigation = useFilteredNavItems();
 
   const brandingAction = React.useMemo(() => {
@@ -169,12 +154,13 @@ export function AppSidebar({ user }: Readonly<{ user: SidebarUser, activeOrganiz
   );
 }
 
-export function MobileNav({ user }: Readonly<{ user: SidebarUser, activeOrganizationId?: string }>) {
-  const { isPending: sessionLoading, activeOrganization } = useAuth();
+export function MobileNav({ user, activeOrganization: initialOrg }: Readonly<{ user: SidebarUser, activeOrganization?: IOrganization | null }>) {
+  const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
 
-  const isBrandingLoading = sessionLoading || settingsLoading;
+  const activeOrganization = initialOrg ?? clientOrg;
+  const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
   const navigation = useFilteredNavItems();
 
   const brandingAction = React.useMemo(() => {
