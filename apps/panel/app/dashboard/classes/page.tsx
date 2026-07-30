@@ -1,5 +1,6 @@
 import { classesService } from "@/lib/services/classes-service";
 import { ClassesClient } from "./classes-client";
+import { sessionService } from "@/lib/services/session-service";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,11 @@ export default async function ClassesPage({
         ? "hidden"
         : "all";
 
+  // Fetch session to determine active org ID for isolated cache tagging
+  const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const tag = `org:${activeOrgId}:classes`;
+
   const filters: {
     name?: string;
     isVisible?: boolean;
@@ -40,14 +46,14 @@ export default async function ClassesPage({
   if (initialVisibility === "hidden") filters.isVisible = false;
 
   const result = await classesService.getClasses(filters, {
-    next: { revalidate: 60, tags: ["panel:classes"] },
+    next: { revalidate: 60, tags: [tag] },
   });
 
+  // Server Action to purge organization-specific classes cache tag
   const refreshClasses = async () => {
     "use server";
-    updateTag("panel:classes");
+    updateTag(tag);
   };
-  void refreshClasses;
 
   return (
     <ClassesClient
@@ -55,6 +61,7 @@ export default async function ClassesPage({
       initialQuery={query}
       initialVisibility={initialVisibility}
       limit={PAGE_LIMIT}
+      onSuccess={refreshClasses}
     />
   );
 }

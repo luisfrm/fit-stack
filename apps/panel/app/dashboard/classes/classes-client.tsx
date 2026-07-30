@@ -21,6 +21,7 @@ interface ClassesClientProps {
   readonly initialQuery: string;
   readonly initialVisibility: "all" | "visible" | "hidden";
   readonly limit: number;
+  readonly onSuccess?: () => Promise<void> | void;
 }
 
 type VisibilityFilter = "all" | "visible" | "hidden";
@@ -30,6 +31,7 @@ export function ClassesClient({
   initialQuery,
   initialVisibility,
   limit,
+  onSuccess,
 }: ClassesClientProps) {
   const router = useRouter();
   const [searchInput, setSearchInput] = React.useState(initialQuery);
@@ -72,12 +74,9 @@ export function ClassesClient({
     try {
       await classesService.deleteClass(id);
       toast.success("Clase eliminada correctamente");
-      router.refresh();
+      await onSuccess?.();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al eliminar la clase";
-      toast.error(message);
+      toast.error("Error al eliminar la clase. Intente más tarde.");
     } finally {
       setDeletingId(null);
     }
@@ -91,6 +90,7 @@ export function ClassesClient({
         iconName="CalendarDays"
       >
         <ClassModal
+          onSuccess={onSuccess}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus className="w-4 h-4" />}>
               Nueva Clase

@@ -1,13 +1,12 @@
 "use client";
 
-import { useSession, useActiveOrganization } from "./client";
+import { useSession } from "./client";
 import { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared';
 import type { User, Session } from "./client";
 import type { IOrganization } from '@workspace/shared/types';
 
 export function useAuth() {
   const { data: sessionData, isPending, error, refetch } = useSession();
-  const { data: activeOrganization, isPending: orgPending } = useActiveOrganization();
 
   const session = sessionData as Session;
   const user = session?.user as User;
@@ -22,13 +21,16 @@ export function useAuth() {
   const isCoach = orgRole === ORG_ROLES.COACH;
   const isMember = orgRole === ORG_ROLES.MEMBER;
 
+  // Read active organization directly from session object returned by useSession
+  const activeOrganization = (session?.activeOrganization as unknown as IOrganization) ?? null;
+
   return {
     session,
     user,
-    activeOrganization: (activeOrganization as unknown as IOrganization) ?? null,
+    activeOrganization,
 
     isAuthenticated: !!session,
-    isPending: isPending || orgPending,
+    isPending,
     error,
 
     roleName,

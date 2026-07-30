@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Modal, toast } from "@workspace/ui/components";
 import { ClassForm } from "./class-form";
 import { type IGymClass } from "@workspace/shared/types";
@@ -10,10 +9,10 @@ import { classesService } from "@/lib/services/classes-service";
 interface ClassModalProps {
   readonly classData?: IGymClass;
   readonly trigger: React.ReactNode;
+  readonly onSuccess?: () => Promise<void> | void;
 }
 
-export function ClassModal({ classData, trigger }: ClassModalProps) {
-  const router = useRouter();
+export function ClassModal({ classData, trigger, onSuccess }: ClassModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -29,14 +28,13 @@ export function ClassModal({ classData, trigger }: ClassModalProps) {
         await classesService.createClass(formData);
         toast.success("Clase creada correctamente");
       }
+      await onSuccess?.();
       setIsOpen(false);
-      router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Algo salió mal";
-      toast.error(message);
+      const fallbackMsg = isEdit
+        ? "Error al actualizar la clase. Intente más tarde."
+        : "Error al crear la clase. Intente más tarde.";
+      toast.error(fallbackMsg);
     } finally {
       setIsLoading(false);
     }
