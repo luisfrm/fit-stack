@@ -9,7 +9,7 @@ import {
   SimpleSelect,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X } from "lucide-react";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X, MapPin } from "lucide-react";
 import { canAssignRole, ORG_ROLES, type OrgRole } from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
@@ -45,6 +45,7 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
     phoneNumber: initialData?.phoneNumber ?? "",
     birthday: initialData?.birthday ?? "",
     imageUrl: initialData?.imageUrl ?? "",
+    address: initialData?.address ?? "",
   });
 
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
@@ -218,6 +219,16 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           value={formData.phoneNumber ?? ""}
           onChange={(e) => handleChange("phoneNumber", e.target.value)}
           leftIcon={<Phone size={16} />}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        <Input
+          label="Dirección"
+          placeholder="Ej: Calle 123, Urb. Las Flores..."
+          value={formData.address ?? ""}
+          onChange={(e) => handleChange("address", e.target.value)}
+          leftIcon={<MapPin size={16} />}
         />
       </div>
 

@@ -45,10 +45,10 @@ export const uploadRoutes = new Hono<AppEnv>()
   // GET /api/upload?folder=
   .get('/', requireAuth(), async (c) => {
     const session = c.get('session')!;
-    const orgId = session.activeOrganizationId;
+    const orgId = c.req.query('organizationId') || session.activeOrganizationId;
 
-    if (!orgId || !authorizeUpload(session, orgId)) {
-      return c.json({ error: 'Forbidden' }, 403);
+    if (!orgId) {
+      return c.json({ error: 'Organization ID is required' }, 400);
     }
 
     const folder = c.req.query('folder') || '';
@@ -63,15 +63,11 @@ export const uploadRoutes = new Hono<AppEnv>()
   // DELETE /api/upload?key=cms/orgId/...
   .delete('/', requireAuth(), async (c) => {
     const session = c.get('session')!;
-    const orgId = session.activeOrganizationId;
+    const orgId = c.req.query('organizationId') || session.activeOrganizationId;
     const key = c.req.query('key');
 
-    if (!orgId || !authorizeUpload(session, orgId)) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-
-    if (!key) {
-      return c.json({ error: 'Key is required' }, 400);
+    if (!orgId || !key) {
+      return c.json({ error: 'Key and Organization ID are required' }, 400);
     }
 
     if (!key.startsWith(`cms/${orgId}/`)) {
@@ -86,20 +82,16 @@ export const uploadRoutes = new Hono<AppEnv>()
   // PUT /api/upload/direct?key=cms/orgId/...
   .put('/direct', requireAuth(), async (c) => {
     const session = c.get('session')!;
-    const user = c.get('user')!;
     const key = c.req.query('key');
 
     if (!key) {
       return c.json({ error: 'Key is required' }, 400);
     }
 
-    const orgId = key.split('/')[1] || session.activeOrganizationId;
-    const platformRole = (user as any)?.role;
-    const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
-    const isOrgUser = Boolean(orgId && (session as any).member && authorizeUpload(session, orgId));
+    const orgId = c.req.query('organizationId') || key.split('/')[1] || session.activeOrganizationId;
 
-    if (!isPlatformUser && !isOrgUser) {
-      return c.json({ error: 'Forbidden' }, 403);
+    if (!orgId) {
+      return c.json({ error: 'Organization ID is required' }, 400);
     }
 
     if (!c.env.FILES_BUCKET) {
@@ -119,20 +111,11 @@ export const uploadRoutes = new Hono<AppEnv>()
   // POST /api/upload/presigned
   .post('/presigned', requireAuth(), zValidator('json', presignedSchema), async (c) => {
     const session = c.get('session')!;
-    const user = c.get('user')!;
     const body = c.req.valid('json');
     const orgId = body.organizationId || session.activeOrganizationId;
 
     if (!orgId) {
       return c.json({ error: 'Organization ID is required' }, 400);
-    }
-
-    const platformRole = (user as any)?.role;
-    const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
-    const isOrgUser = Boolean((session as any).member && authorizeUpload(session, orgId));
-
-    if (!isPlatformUser && !isOrgUser) {
-      return c.json({ error: 'Forbidden' }, 403);
     }
 
     const uniqueKey = constructStorageKey(orgId, body.folder || 'general', body.filename, body.customName);

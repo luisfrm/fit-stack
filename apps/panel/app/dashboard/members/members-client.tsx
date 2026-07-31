@@ -19,6 +19,7 @@ interface MembersClientProps {
   readonly initialTotalPages: number;
   readonly initialQuery: string;
   readonly limit: number;
+  readonly onRefreshServer?: () => Promise<void>;
 }
 
 export function MembersClient({
@@ -27,6 +28,7 @@ export function MembersClient({
   initialTotalPages,
   initialQuery,
   limit,
+  onRefreshServer,
 }: MembersClientProps) {
   const router = useRouter();
   const [members, setMembers] = React.useState<IMember[]>(initialMembers);
@@ -36,9 +38,12 @@ export function MembersClient({
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
 
-  const refresh = React.useCallback(() => {
+  const refresh = React.useCallback(async () => {
+    if (onRefreshServer) {
+      await onRefreshServer();
+    }
     router.refresh();
-  }, [router]);
+  }, [router, onRefreshServer]);
 
   React.useEffect(() => {
     if (debouncedSearch === initialQuery) return;

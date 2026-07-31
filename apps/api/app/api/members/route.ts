@@ -86,7 +86,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: cannot assign this role' }, { status: 403 })
     }
 
-    const newMember = await membersService.createMember(organizationId, memberData, sendInvite === true)
+    const inviterName = session?.user?.name || undefined;
+    const newMember = await membersService.createMember(
+      organizationId,
+      memberData,
+      sendInvite === true,
+      inviterName
+    );
 
     await cache.invalidate(`org:${organizationId}:members:*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)

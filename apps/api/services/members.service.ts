@@ -5,6 +5,11 @@ import { emailService } from './email.service';
 import { usersRepository } from '../repositories/users.repository';
 import { auth } from '@/config/auth';
 import { headers } from 'next/headers';
+import { db, eq } from '@workspace/database/client';
+import { organization } from '@workspace/database/schema';
+import { urls } from '@/config/urls';
+
+import { OrgRole } from '@workspace/shared';
 
 const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
   const sanitized = { ...data };
@@ -34,7 +39,12 @@ export const membersService = {
     return membersRepository.findByUserId(organizationId, userId);
   },
 
-  async createMember(organizationId: string, data: Omit<NewDbMember, "organizationId">, sendInvite: boolean = false) {
+  async createMember(
+    organizationId: string,
+    data: Omit<NewDbMember, "organizationId">,
+    sendInvite: boolean = false,
+    inviterName?: string
+  ) {
     const sanitizedData = sanitizeMemberData(data);
     const existing = await membersRepository.findByEmail(organizationId, sanitizedData.email);
     if (existing) {
@@ -65,9 +75,10 @@ export const membersService = {
           // We update the record we just created to include the userId
           await membersRepository.update(organizationId, newMember.id, { userId: existingUser.id });
         } else {
-          // FLOW: Existing User -> Better Auth Organization Invitation
+          // FLOW: Existing User -> Better Auth Organization Invitation + Organization Invite Email
+          let invitationId: string | null = null;
           try {
-            await auth.api.createInvitation({
+            const inviteResult = await auth.api.createInvitation({
               headers: await headers(),
               body: {
                 email: sanitizedData.email,
@@ -76,9 +87,25 @@ export const membersService = {
                 resend: true,
               }
             });
+            invitationId = inviteResult?.id ?? null;
           } catch (inviteError: any) {
             console.error("Failed to create Better Auth invitation:", inviteError);
           }
+
+          // Fetch organization name to render personalized invite email
+          const org = await db.query.organization.findFirst({ where: eq(organization.id, organizationId) });
+          const orgName = org?.name || "la organización";
+          const senderName = inviterName || orgName;
+          const inviteLink = invitationId 
+            ? `${urls.cms}/accept-invitation/${invitationId}`
+            : `${urls.cms}/dashboard`;
+
+          await emailService.sendOrganizationInvite(
+            sanitizedData.email,
+            orgName,
+            senderName,
+            inviteLink
+          );
         }
       } else {
         // FLOW: New User -> JWT Token + Registration Email
@@ -111,7 +138,7 @@ export const membersService = {
     if (sanitizedData.role) {
       const currentMember = await this.getMemberById(organizationId, id);
       if (currentMember.userId) {
-        await membersRepository.updateAuthRole(currentMember.userId, organizationId, sanitizedData.role);
+        await membersRepository.updateAuthRole(currentMember.userId, organizationId, sanitizedData.role as OrgRole);
       }
     }
 

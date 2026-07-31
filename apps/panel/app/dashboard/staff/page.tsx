@@ -36,8 +36,6 @@ export default async function StaffPage({
     updateTag(tag);
   };
 
-  void refreshStaff;
-
   return (
     <StaffClient
       initialStaff={result.data}
@@ -45,6 +43,7 @@ export default async function StaffPage({
       initialTotalPages={result.totalPages}
       initialQuery={query}
       limit={PAGE_LIMIT}
+      onRefreshServer={refreshStaff}
     />
   );
 }

@@ -37,8 +37,6 @@ export default async function MembersPage({
     updateTag(tag);
   };
 
-  void refreshMembers;
-
   return (
     <MembersClient
       initialMembers={result.data}
@@ -46,6 +44,7 @@ export default async function MembersPage({
       initialTotalPages={result.totalPages}
       initialQuery={query}
       limit={PAGE_LIMIT}
+      onRefreshServer={refreshMembers}
     />
   );
 }
