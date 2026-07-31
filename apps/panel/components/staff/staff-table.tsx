@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip, NextImage } from "@workspace/ui/components";
+import { formatRole } from "@workspace/shared";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User } from "lucide-react";
 import { membersService } from "@/lib/services/members-service";
@@ -95,7 +96,7 @@ const getColumns = (
     header: "Rol",
     cell: (m: IMember) => (
       <Badge variant="secondary">
-        {m.role || "Sin rol"}
+        {formatRole(m.role)}
       </Badge>
     ),
   },

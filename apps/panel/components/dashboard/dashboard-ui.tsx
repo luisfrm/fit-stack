@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { IOrganization } from "@workspace/shared";
+import { IOrganization, formatRole } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -88,11 +88,16 @@ function useFilteredNavItems(): SidebarNavItem[] {
 export function SwitchOrganizationAction() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const { data: orgs } = authClient.useListOrganizations();
 
   const handleSelect = React.useCallback(() => {
     setOpen(false);
     router.refresh();
   }, [router]);
+
+  if (!orgs || orgs.length <= 1) {
+    return null;
+  }
 
   return (
     <Modal
@@ -132,13 +137,18 @@ export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ 
   const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
   const navigation = useFilteredNavItems();
 
+  const formattedUser = React.useMemo(() => ({
+    ...user,
+    role: formatRole(user.role),
+  }), [user]);
+
   const brandingAction = React.useMemo(() => {
     return <SwitchOrganizationAction />;
   }, []);
 
   return (
     <UISidebar
-      user={user}
+      user={formattedUser}
       navigation={navigation}
       branding={{
         logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
@@ -163,13 +173,18 @@ export function MobileNav({ user, activeOrganization: initialOrg }: Readonly<{ u
   const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
   const navigation = useFilteredNavItems();
 
+  const formattedUser = React.useMemo(() => ({
+    ...user,
+    role: formatRole(user.role),
+  }), [user]);
+
   const brandingAction = React.useMemo(() => {
     return <SwitchOrganizationAction />;
   }, []);
 
   return (
     <UIMobileNav
-      user={user}
+      user={formattedUser}
       navigation={navigation}
       branding={{
         logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,

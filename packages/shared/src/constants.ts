@@ -24,6 +24,27 @@ export const ORG_ROLES = {
 export type OrgRole = typeof ORG_ROLES[keyof typeof ORG_ROLES];
 
 /**
+ * Human-readable Spanish labels for roles.
+ */
+export const ROLE_LABELS: Record<string, string> = {
+  owner: "Propietario",
+  manager: "Gerente",
+  cashier: "Cajero",
+  coach: "Entrenador",
+  member: "Miembro",
+  admin: "Administrador",
+};
+
+/**
+ * Formats a raw role string into a human-readable label in Spanish.
+ */
+export function formatRole(role?: string | null): string {
+  if (!role) return "Sin rol";
+  const normalized = role.toLowerCase();
+  return ROLE_LABELS[normalized] ?? (role.charAt(0).toUpperCase() + role.slice(1));
+}
+
+/**
  * Combined Role type for general utility.
  */
 export type Role = GlobalRole | OrgRole;
