@@ -197,7 +197,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             onChange={handleChange}
             min={type === "number" && !allowNegative ? 0 : props.min}
             className={cn(
-              "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-sm text-foreground placeholder:text-foreground-dim min-w-0",
+              "flex-1 bg-transparent outline-none border-none shadow-none px-4 h-full text-base md:text-sm text-foreground placeholder:text-foreground-dim min-w-0",
               "autofill:bg-transparent autofill:transition-colors autofill:duration-[5000s] autofill:[-webkit-text-fill-color:var(--color-foreground)]",
               "appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
               leftIcon && "pl-2",

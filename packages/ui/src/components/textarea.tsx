@@ -36,7 +36,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <textarea
             id={textareaId}
             className={cn(
-              "flex-1 w-full bg-transparent outline-none border-none shadow-none px-4 py-3 text-sm text-foreground placeholder-foreground-dim/50 min-w-0 resize-y",
+              "flex-1 w-full bg-transparent outline-none border-none shadow-none px-4 py-3 text-base md:text-sm text-foreground placeholder-foreground-dim/50 min-w-0 resize-y",
               disabled && "cursor-not-allowed opacity-40"
             )}
             disabled={disabled}
