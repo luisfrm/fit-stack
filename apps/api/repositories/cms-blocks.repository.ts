@@ -1,5 +1,5 @@
 import { db, eq, and, asc } from '@workspace/database/client'
-import { cmsPageBlock } from '@workspace/database/schema'
+import { contentBlock } from '@workspace/database/schema'
 
 export type CmsBlockType = 'hero' | 'services' | 'classes_info' | 'testimonials' | 'gallery' | 'contact' | 'team_info';
 
@@ -8,7 +8,7 @@ export interface ICmsBlock {
   organizationId: string
   pageId: number
   blockType: CmsBlockType
-  data: any // Validado por Zod en la capa de Servicio
+  data: any // Validated by Zod at service layer
   isVisible: boolean
   displayOrder: number
   createdAt?: Date
@@ -19,9 +19,9 @@ export const cmsBlocksRepository = {
   async findByPageId(organizationId: string, pageId: number): Promise<ICmsBlock[]> {
     const records = await db
       .select()
-      .from(cmsPageBlock)
-      .where(and(eq(cmsPageBlock.pageId, pageId), eq(cmsPageBlock.organizationId, organizationId)))
-      .orderBy(asc(cmsPageBlock.displayOrder))
+      .from(contentBlock)
+      .where(and(eq(contentBlock.pageId, pageId), eq(contentBlock.organizationId, organizationId)))
+      .orderBy(asc(contentBlock.displayOrder))
     
     return records as unknown as ICmsBlock[]
   },
@@ -29,14 +29,14 @@ export const cmsBlocksRepository = {
   async findById(organizationId: string, id: number): Promise<ICmsBlock | undefined> {
     const records = await db
       .select()
-      .from(cmsPageBlock)
-      .where(and(eq(cmsPageBlock.id, id), eq(cmsPageBlock.organizationId, organizationId)))
+      .from(contentBlock)
+      .where(and(eq(contentBlock.id, id), eq(contentBlock.organizationId, organizationId)))
     
     return records[0] as unknown as ICmsBlock | undefined
   },
 
   async create(organizationId: string, data: Omit<ICmsBlock, 'id' | 'createdAt' | 'updatedAt' | 'organizationId'>): Promise<ICmsBlock> {
-    const inserted = await db.insert(cmsPageBlock).values({
+    const inserted = await db.insert(contentBlock).values({
       organizationId,
       pageId: data.pageId,
       blockType: data.blockType,
@@ -50,40 +50,38 @@ export const cmsBlocksRepository = {
 
   async update(organizationId: string, id: number, data: Partial<ICmsBlock>): Promise<ICmsBlock> {
     const updated = await db
-      .update(cmsPageBlock)
+      .update(contentBlock)
       .set({
         ...data,
         updatedAt: new Date(),
       })
-      .where(and(eq(cmsPageBlock.id, id), eq(cmsPageBlock.organizationId, organizationId)))
+      .where(and(eq(contentBlock.id, id), eq(contentBlock.organizationId, organizationId)))
       .returning()
     
     return updated[0] as unknown as ICmsBlock
   },
 
   async delete(organizationId: string, id: number): Promise<void> {
-    await db.delete(cmsPageBlock).where(and(eq(cmsPageBlock.id, id), eq(cmsPageBlock.organizationId, organizationId)))
+    await db.delete(contentBlock).where(and(eq(contentBlock.id, id), eq(contentBlock.organizationId, organizationId)))
   },
 
   /**
-   * Actualiza el orden de múltiples bloques dentro de una misma página de manera atómica.
-   * Se espera un array de { id: number, displayOrder: number }.
+   * Updates display order of multiple blocks within the same page sequentially.
+   * Expects an array of { id: number, displayOrder: number }.
    */
   async updateBulkOrder(organizationId: string, pageId: number, orders: { id: number, displayOrder: number }[]): Promise<void> {
-    await db.transaction(async (tx) => {
-      for (const item of orders) {
-        await tx
-          .update(cmsPageBlock)
-          .set({ 
-            displayOrder: item.displayOrder,
-            updatedAt: new Date()
-          })
-          .where(and(
-            eq(cmsPageBlock.id, item.id),
-            eq(cmsPageBlock.pageId, pageId),
-            eq(cmsPageBlock.organizationId, organizationId)
-          ))
-      }
-    })
+    for (const item of orders) {
+      await db
+        .update(contentBlock)
+        .set({ 
+          displayOrder: item.displayOrder,
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(contentBlock.id, item.id),
+          eq(contentBlock.pageId, pageId),
+          eq(contentBlock.organizationId, organizationId)
+        ))
+    }
   }
 }

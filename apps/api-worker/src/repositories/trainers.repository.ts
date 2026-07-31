@@ -119,25 +119,25 @@ export function createTrainersRepository(db: Db) {
     },
 
     async create(organizationId: string, data: ICreateTrainerDTO) {
-      return db.transaction(async (tx) => {
-        const [member] = await tx
-          .insert(gymMember)
-          .values({
-            organizationId,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            email: data.email,
-            documentId: data.documentId,
-            phoneNumber: data.phoneNumber,
-            birthday: data.birthday,
-            imageUrl: data.imageUrl,
-            isActive: true,
-          })
-          .returning();
+      const [member] = await db
+        .insert(gymMember)
+        .values({
+          organizationId,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          documentId: data.documentId,
+          phoneNumber: data.phoneNumber,
+          birthday: data.birthday,
+          imageUrl: data.imageUrl,
+          isActive: true,
+        })
+        .returning();
 
-        if (!member) throw new Error('Fallo al crear el miembro entrenador');
+      if (!member) throw new Error('Fallo al crear el miembro entrenador');
 
-        const [profile] = await tx
+      try {
+        const [profile] = await db
           .insert(coachProfile)
           .values({
             organizationId,
@@ -152,60 +152,61 @@ export function createTrainersRepository(db: Db) {
         if (!profile) throw new Error('Fallo al crear el perfil de entrenador');
 
         return { ...member, ...profile };
-      });
+      } catch (err) {
+        await db.delete(gymMember).where(eq(gymMember.id, member.id));
+        throw err;
+      }
     },
 
     async update(organizationId: string, id: number, data: IUpdateTrainerDTO) {
-      return db.transaction(async (tx) => {
-        const memberFields = {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          documentId: data.documentId,
-          phoneNumber: data.phoneNumber,
-          birthday: data.birthday,
-          imageUrl: data.imageUrl,
-          isActive: data.isActive,
-        };
+      const memberFields = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        documentId: data.documentId,
+        phoneNumber: data.phoneNumber,
+        birthday: data.birthday,
+        imageUrl: data.imageUrl,
+        isActive: data.isActive,
+      };
 
-        const filteredMemberFields = Object.fromEntries(
-          Object.entries(memberFields).filter(([, v]) => v !== undefined)
-        );
+      const filteredMemberFields = Object.fromEntries(
+        Object.entries(memberFields).filter(([, v]) => v !== undefined)
+      );
 
-        if (Object.keys(filteredMemberFields).length > 0) {
-          await tx
-            .update(gymMember)
-            .set(filteredMemberFields)
-            .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
-        }
+      if (Object.keys(filteredMemberFields).length > 0) {
+        await db
+          .update(gymMember)
+          .set(filteredMemberFields)
+          .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
+      }
 
-        const profileFields = {
-          specialities: data.specialities,
-          bio: data.bio,
-          isVisible: data.isVisible,
-          displayOrder: data.displayOrder,
-        };
+      const profileFields = {
+        specialities: data.specialities,
+        bio: data.bio,
+        isVisible: data.isVisible,
+        displayOrder: data.displayOrder,
+      };
 
-        const filteredProfileFields = Object.fromEntries(
-          Object.entries(profileFields).filter(([, v]) => v !== undefined)
-        );
+      const filteredProfileFields = Object.fromEntries(
+        Object.entries(profileFields).filter(([, v]) => v !== undefined)
+      );
 
-        if (Object.keys(filteredProfileFields).length > 0) {
-          await tx
-            .insert(coachProfile)
-            .values({
-              organizationId,
-              memberId: id,
-              ...filteredProfileFields,
-            })
-            .onConflictDoUpdate({
-              target: [coachProfile.memberId],
-              set: filteredProfileFields,
-            });
-        }
+      if (Object.keys(filteredProfileFields).length > 0) {
+        await db
+          .insert(coachProfile)
+          .values({
+            organizationId,
+            memberId: id,
+            ...filteredProfileFields,
+          })
+          .onConflictDoUpdate({
+            target: [coachProfile.memberId],
+            set: filteredProfileFields,
+          });
+      }
 
-        return this.findById(organizationId, id);
-      });
+      return this.findById(organizationId, id);
     },
 
     async delete(organizationId: string, id: number) {

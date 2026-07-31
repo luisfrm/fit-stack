@@ -77,23 +77,21 @@ export function createContentBlocksRepository(db: Db) {
     },
 
     async updateBulkOrder(organizationId: string, pageId: number, orders: { id: number; displayOrder: number }[]): Promise<void> {
-      await db.transaction(async (tx) => {
-        for (const item of orders) {
-          await tx
-            .update(contentBlock)
-            .set({
-              displayOrder: item.displayOrder,
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(contentBlock.id, item.id),
-                eq(contentBlock.pageId, pageId),
-                eq(contentBlock.organizationId, organizationId)
-              )
-            );
-        }
-      });
+      for (const item of orders) {
+        await db
+          .update(contentBlock)
+          .set({
+            displayOrder: item.displayOrder,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(contentBlock.id, item.id),
+              eq(contentBlock.pageId, pageId),
+              eq(contentBlock.organizationId, organizationId)
+            )
+          );
+      }
     },
   };
 }
