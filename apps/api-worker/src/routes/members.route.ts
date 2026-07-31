@@ -18,6 +18,7 @@ const memberSchema = z.object({
   phoneNumber: z.string().nullable().optional(),
   birthday: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
   role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).default('member'),
   isActive: z.boolean().default(true),
   sendInvite: z.boolean().default(false),
