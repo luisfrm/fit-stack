@@ -5,9 +5,6 @@ import {
   type OrganizationStatement,
   type PlatformStatement,
   can,
-  GLOBAL_ROLES,
-  PERMISSION_MODULES,
-  PERMISSION_ACTIONS,
 } from '@workspace/shared';
 import type { AppEnv } from './env';
 
@@ -117,7 +114,7 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
 export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
 
 /**
- * Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
+ * GLOBAL_ROLES,Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
  */
 export function authorizeUpload(session: any, organizationId: string): boolean {
   return Boolean(session && organizationId);
