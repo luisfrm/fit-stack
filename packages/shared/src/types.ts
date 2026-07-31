@@ -330,6 +330,7 @@ export interface CreateTrainerDTO {
   phoneNumber?: string | null;
   birthday?: string | null;
   imageUrl?: string | null;
+  address?: string | null;
   specialities?: string[] | null;
   bio?: string | null;
   isVisible?: boolean;

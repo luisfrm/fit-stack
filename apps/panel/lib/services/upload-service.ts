@@ -1,4 +1,3 @@
-import { ofetch } from "ofetch";
 import { api, type ApiFetchOptions } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
@@ -36,8 +35,9 @@ export const uploadService = {
       },
     );
 
-    await ofetch(data.presignedUrl, {
+    await api("/upload/direct", {
       method: "PUT",
+      query: { key: data.key },
       body: file,
       headers: { "Content-Type": file.type },
     });

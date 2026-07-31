@@ -3,8 +3,6 @@
 import * as React from "react";
 import { Upload, X, Loader2 } from "lucide-react";
 import { Text, Button, toast } from "@workspace/ui/components";
-import { ofetch } from "ofetch";
-import { contentService } from "@/lib/services/content-service";
 import { uploadService } from "@/lib/services/upload-service";
 
 interface ImageUploaderProps {
@@ -26,7 +24,7 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validación básica
+    // Basic validation
     if (!file.type.startsWith("image/")) {
       toast.error("Solo se permiten archivos de imagen");
       return;
@@ -35,17 +33,10 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
     try {
       setIsUploading(true);
       
-      // 1. Obtener Presigned URL desde nuestra API (carpeta 'cms' por defecto)
-      const { presignedUrl, key } = await contentService.getPresignedUrl(file.name, file.type, 'cms');
-      
-      // 2. Subir directamente a R2 usando la URL firmada
-      await ofetch(presignedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
+      // Upload using standardized uploadService (uses api client)
+      const key = await uploadService.uploadFile(file, undefined, undefined, 'cms');
 
-      // 3. Notificar éxito y actualizar el padre con la KEY del objeto
+      // Notify success and update parent with the object key
       onChange(key);
       toast.success("Imagen subida con éxito");
     } catch (error: any) {

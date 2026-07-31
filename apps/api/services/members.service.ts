@@ -11,11 +11,28 @@ import { urls } from '@/config/urls';
 
 import { OrgRole } from '@workspace/shared';
 
-const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
-  const sanitized = { ...data };
-  for (const key in sanitized) {
-    if (sanitized[key] === "") {
-      sanitized[key] = null as any;
+const ALLOWED_MEMBER_FIELDS = [
+  "firstName",
+  "lastName",
+  "email",
+  "documentId",
+  "phoneNumber",
+  "birthday",
+  "imageUrl",
+  "address",
+  "isActive",
+  "role",
+  "biometricId",
+  "isBiometricEnrolled",
+  "userId",
+] as const;
+
+const sanitizeMemberData = <T extends Record<string, any>>(data: T): Record<string, any> => {
+  const sanitized: Record<string, any> = {};
+  for (const key of ALLOWED_MEMBER_FIELDS) {
+    if (key in data) {
+      const val = data[key];
+      sanitized[key] = val === "" ? null : val;
     }
   }
   return sanitized;

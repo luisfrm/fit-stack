@@ -42,6 +42,7 @@ export const trainersRepository = {
         phoneNumber: gymMember.phoneNumber,
         birthday: gymMember.birthday,
         imageUrl: gymMember.imageUrl,
+        address: gymMember.address,
         isActive: gymMember.isActive,
         documentId: gymMember.documentId,
         specialities: coachProfile.specialities,
@@ -100,6 +101,7 @@ export const trainersRepository = {
         phoneNumber: gymMember.phoneNumber,
         birthday: gymMember.birthday,
         imageUrl: gymMember.imageUrl,
+        address: gymMember.address,
         isActive: gymMember.isActive,
         documentId: gymMember.documentId,
         specialities: coachProfile.specialities,
@@ -136,6 +138,7 @@ export const trainersRepository = {
         phoneNumber: data.phoneNumber,
         birthday: data.birthday,
         imageUrl: data.imageUrl,
+        address: data.address,
         isActive: true,
       })
       .returning();
@@ -176,6 +179,7 @@ export const trainersRepository = {
       phoneNumber: data.phoneNumber,
       birthday: data.birthday,
       imageUrl: data.imageUrl,
+      address: data.address,
       isActive: data.isActive,
     };
 

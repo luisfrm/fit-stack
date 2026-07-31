@@ -1,4 +1,3 @@
-import { ofetch } from "ofetch";
 import { api } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
@@ -36,12 +35,10 @@ export const uploadService = {
       },
     );
 
-    // Direct binary PUT to external R2 presigned URL.
-    // Uses standalone ofetch to bypass internal api client's baseURL and session cookie headers.
-    await ofetch(data.presignedUrl, {
+    await api("/upload/direct", {
       method: "PUT",
+      query: { key: data.key, organizationId: organizationId || undefined },
       body: file,
-      credentials: "include",
       headers: { "Content-Type": file.type },
     });
 
