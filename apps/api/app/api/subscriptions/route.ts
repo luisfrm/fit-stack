@@ -43,9 +43,10 @@ export const POST = withAuth(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTION
 
     const newSubscription = await subscriptionsService.create(organizationId, body, timezone)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:subscriptions*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
     await cache.invalidate(`org:${organizationId}:members:*`)
+    await cache.invalidate(`org:${organizationId}:plans:*`)
 
     return NextResponse.json(newSubscription, { status: 201 })
   }

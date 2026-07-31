@@ -60,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     await cache.invalidate(`org:${organizationId}:cms:pages:${pageId}:blocks*`)
+    await cache.invalidate(`org:${organizationId}:public:page:*`)
 
     return NextResponse.json(newBlock, { status: 201 })
   } catch (error: any) {
@@ -91,6 +92,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     await cmsBlocksService.reorderBlocks(organizationId, pageId, body)
 
     await cache.invalidate(`org:${organizationId}:cms:pages:${pageId}:blocks*`)
+    await cache.invalidate(`org:${organizationId}:public:page:*`)
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

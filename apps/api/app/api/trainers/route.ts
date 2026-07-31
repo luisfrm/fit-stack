@@ -64,6 +64,7 @@ export const POST = withAuth(PERMISSION_MODULES.STAFF, PERMISSION_ACTIONS.CREATE
     const newTrainer = await trainersService.createTrainer(organizationId, trainerData)
 
     await cache.invalidate(`org:${organizationId}:trainers:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(newTrainer, { status: 201 })
   }

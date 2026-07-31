@@ -17,6 +17,7 @@ export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.STAFF, PERMISSION_AC
     const updatedTrainer = await trainersService.updateTrainer(organizationId, id, body)
 
     await cache.invalidate(`org:${organizationId}:trainers:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json(updatedTrainer)
   }
@@ -30,6 +31,7 @@ export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.STAFF, PERMISSION
     await trainersService.deleteTrainer(organizationId, id)
 
     await cache.invalidate(`org:${organizationId}:trainers:*`)
+    await cache.invalidate(`org:${organizationId}:members:*`)
 
     return NextResponse.json({ success: true })
   }

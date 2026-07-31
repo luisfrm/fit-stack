@@ -24,9 +24,10 @@ export const PUT = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PERMI
 
     const updated = await subscriptionsService.cancel(organizationId, subId)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:subscriptions*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
     await cache.invalidate(`org:${organizationId}:members:*`)
+    await cache.invalidate(`org:${organizationId}:plans:*`)
 
     return NextResponse.json(updated)
   }
@@ -39,9 +40,10 @@ export const DELETE = withAuth<RouteParams>(PERMISSION_MODULES.SUBSCRIPTIONS, PE
 
     await subscriptionsService.delete(organizationId, id)
 
-    await cache.invalidate(`org:${organizationId}:subscriptions`)
+    await cache.invalidate(`org:${organizationId}:subscriptions*`)
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`)
     await cache.invalidate(`org:${organizationId}:members:*`)
+    await cache.invalidate(`org:${organizationId}:plans:*`)
 
     return NextResponse.json({ success: true })
   }

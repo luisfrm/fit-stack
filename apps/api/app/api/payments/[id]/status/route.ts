@@ -33,6 +33,7 @@ const organizationId = sessionOrg.activeOrganizationId;
     await cache.invalidate(`org:${organizationId}:subscriptions*`);
     await cache.invalidate(`org:${organizationId}:dashboard:stats:*`);
     await cache.invalidate(`org:${organizationId}:members:*`);
+    await cache.invalidate(`org:${organizationId}:plans:*`);
 
     return NextResponse.json(updated)
   } catch (error) {
