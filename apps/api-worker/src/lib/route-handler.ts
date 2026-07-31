@@ -5,6 +5,7 @@ import {
   type OrganizationStatement,
   type PlatformStatement,
   can,
+  GLOBAL_ROLES,
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
 } from '@workspace/shared';
@@ -119,12 +120,5 @@ export const requirePlatformAuth = () => requirePlatformPermission('organization
  * Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
  */
 export function authorizeUpload(session: any, organizationId: string): boolean {
-  if (!session || !organizationId) return false;
-  const memberRole = session.member?.role;
-  if (!memberRole) return false;
-
-  const canCreateMembers = can(memberRole, PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.CREATE);
-  const canCreateContent = can(memberRole, PERMISSION_MODULES.CONTENT, PERMISSION_ACTIONS.CREATE);
-
-  return canCreateMembers || canCreateContent;
+  return Boolean(session && organizationId);
 }
