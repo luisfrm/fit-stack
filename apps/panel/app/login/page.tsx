@@ -69,12 +69,12 @@ export default function LoginPage() {
       localStorage.removeItem("remember_password");
     }
 
-    setIsLoading(false);
-    router.push('/dashboard');
+    // Keep loading state active during redirect transition
+    router.replace('/dashboard');
   };
 
-  if (isPending) {
-    return <SplashScreen message="Verificando sesión..." />;
+  if (isPending || session) {
+    return <SplashScreen message={session ? "Redirigiendo al panel..." : "Verificando sesión..."} />;
   }
 
   return (

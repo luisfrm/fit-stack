@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@workspace/ui/components/button";
 import { Text } from "@workspace/ui/components/text";
@@ -30,6 +31,7 @@ function OrgItemSkeleton() {
 }
 
 export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProps) {
+  const router = useRouter();
   const [organizations, setOrganizations] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [activatingId, setActivatingId] = React.useState<string | null>(null);
@@ -55,7 +57,7 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
       return false;
     }
 
-    toast.success("Contexto activado correctamente");
+    toast.success("Centro deportivo seleccionado correctamente");
     return true;
   };
 
@@ -70,14 +72,19 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
 
         if (!isModal && data.length === 1 && data[0]) {
           setActivatingId(data[0].id);
-          await activateOrg(data[0].id);
+          const success = await activateOrg(data[0].id);
+          if (success) {
+            onSelect?.(data[0].id);
+            router.refresh();
+            return;
+          }
           setActivatingId(null);
         }
       }
       setIsLoading(false);
     }
     loadOrgs();
-  }, [isModal]);
+  }, [isModal, router, onSelect]);
 
   const handleLogout = async () => {
     await authClient.signOut();
@@ -89,15 +96,20 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
     setActivatingId(orgId);
     try {
       const success = await activateOrg(orgId);
-      if (success) onSelect?.(orgId);
-    } finally {
+      if (success) {
+        onSelect?.(orgId);
+        router.refresh();
+      } else {
+        setActivatingId(null);
+      }
+    } catch {
       setActivatingId(null);
     }
   };
 
   if (isLoading) {
-    return (
-      <div className={cn("w-full max-w-md", !isModal && "px-4")}>
+    const loadingContent = (
+      <div className={cn("w-full max-w-md animate-in fade-in zoom-in duration-300", !isModal && "px-4")}>
         {!isModal && (
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold tracking-tight mb-2 uppercase italic text-foreground">
@@ -106,10 +118,18 @@ export function OrganizationPicker({ onSelect, isModal }: OrganizationPickerProp
             <Text variant="muted" size="lg">¿Con qué sede deseas trabajar hoy?</Text>
           </div>
         )}
-        <div className="flex flex-col">
+        <div className="flex flex-col divide-y divide-white/5">
           <OrgItemSkeleton />
           <OrgItemSkeleton />
         </div>
+      </div>
+    );
+
+    if (isModal) return loadingContent;
+
+    return (
+      <div className="flex h-svh w-full items-center justify-center bg-background/80 backdrop-blur-sm p-4 z-[100]">
+        {loadingContent}
       </div>
     );
   }

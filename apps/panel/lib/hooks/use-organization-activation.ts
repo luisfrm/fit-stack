@@ -37,7 +37,7 @@ export function useOrganizationActivation() {
         return false;
       }
 
-      toast.success("Contexto activado correctamente");
+      toast.success("Centro deportivo seleccionado correctamente");
       router.refresh();
       return true;
     } catch (err: any) {
