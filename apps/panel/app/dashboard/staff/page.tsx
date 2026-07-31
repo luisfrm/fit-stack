@@ -1,5 +1,6 @@
 import { membersService } from "@/lib/services/members-service";
 import { StaffClient } from "./staff-client";
+import { sessionService } from "@/lib/services/session-service";
 import { updateTag } from "next/cache";
 import { ORG_ROLES } from "@workspace/shared";
 
@@ -16,6 +17,10 @@ export default async function StaffPage({
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
 
+  const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const tag = `org:${activeOrgId}:staff`;
+
   const result = await membersService.getMembers(
     {
       query: query || undefined,
@@ -23,12 +28,12 @@ export default async function StaffPage({
       limit: PAGE_LIMIT,
       excludeRole: ORG_ROLES.MEMBER,
     } as Parameters<typeof membersService.getMembers>[0],
-    { next: { revalidate: 60, tags: ["panel:staff"] } },
+    { next: { revalidate: 3600, tags: [tag] } },
   );
 
   const refreshStaff = async () => {
     "use server";
-    updateTag("panel:staff");
+    updateTag(tag);
   };
 
   void refreshStaff;

@@ -1,6 +1,7 @@
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
 import { settingsService } from "@/lib/services/settings-service";
+import { sessionService } from "@/lib/services/session-service";
 import { PaymentsClient } from "./payments-client";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { updateTag } from "next/cache";
@@ -31,8 +32,13 @@ export default async function PaymentsPage({
   const statusFilter = params.status || null;
   const page = Math.max(1, Number(params.page) || 1);
 
+  const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const settingsTag = `org:${activeOrgId}:settings`;
+  const subsTag = `org:${activeOrgId}:subscriptions`;
+
   const settings = await settingsService
-    .getAll({ next: { revalidate: 600, tags: ["panel:settings"] } })
+    .getAll({ next: { revalidate: 600, tags: [settingsTag] } })
     .catch(() => ({}) as Record<string, string>);
 
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
@@ -47,7 +53,7 @@ export default async function PaymentsPage({
         query: search || undefined,
         status: statusFilter || undefined,
       },
-      { next: { revalidate: 60, tags: ["panel:subscriptions"] } },
+      { next: { revalidate: 60, tags: [subsTag] } },
     ),
     financeService
       .getRevenueReport(primaryCurrency)
@@ -56,7 +62,7 @@ export default async function PaymentsPage({
 
   const refreshPayments = async () => {
     "use server";
-    updateTag("panel:subscriptions");
+    updateTag(subsTag);
   };
   void refreshPayments;
 

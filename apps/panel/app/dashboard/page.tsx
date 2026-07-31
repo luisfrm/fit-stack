@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
   const orgTimezone = session?.session?.activeOrganizationId
     ? DEFAULT_TIMEZONE
     : DEFAULT_TIMEZONE;
@@ -23,18 +24,18 @@ export default async function DashboardPage() {
   const [stats, todayClassesRaw, recentRegistrations, settings] =
     await Promise.all([
       dashboardService.getStats(today, {
-        next: { revalidate: 60, tags: ["panel:dashboard:stats"] },
+        next: { revalidate: 60, tags: [`org:${activeOrgId}:dashboard:stats`] },
       }),
       classesService
         .getClassesByDate(today, {
-          next: { revalidate: 60, tags: ["panel:classes"] },
+          next: { revalidate: 60, tags: [`org:${activeOrgId}:classes`] },
         })
         .catch(() => []),
       subscriptionsService
-        .getRecent(5, { next: { revalidate: 60, tags: ["panel:subscriptions"] } })
+        .getRecent(5, { next: { revalidate: 60, tags: [`org:${activeOrgId}:subscriptions`] } })
         .catch(() => []),
       settingsService
-        .getAll({ next: { revalidate: 600, tags: ["panel:settings"] } })
+        .getAll({ next: { revalidate: 600, tags: [`org:${activeOrgId}:settings`] } })
         .catch(() => ({})),
     ]);
 

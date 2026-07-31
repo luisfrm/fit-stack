@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
 
 export default async function MembershipsPage() {
   const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const plansTag = `org:${activeOrgId}:plans`;
+  const settingsTag = `org:${activeOrgId}:settings`;
+
   const timezone =
     session?.session?.activeOrganizationId
       ? (await settingsService.getByKey("org_timezone")) || DEFAULT_TIMEZONE
@@ -18,19 +22,19 @@ export default async function MembershipsPage() {
 
   const [plans, summary, settings] = await Promise.all([
     plansService.getAll({ includeStats: true }, {
-      next: { revalidate: 60, tags: ["panel:plans"] },
+      next: { revalidate: 60, tags: [plansTag] },
     }),
     plansService.getSummary({
-      next: { revalidate: 60, tags: ["panel:plans"] },
+      next: { revalidate: 60, tags: [plansTag] },
     }),
     settingsService.getAll({
-      next: { revalidate: 600, tags: ["panel:settings"] },
+      next: { revalidate: 600, tags: [settingsTag] },
     }),
   ]);
 
   const refreshPlans = async () => {
     "use server";
-    updateTag("panel:plans");
+    updateTag(plansTag);
   };
   void refreshPlans;
 

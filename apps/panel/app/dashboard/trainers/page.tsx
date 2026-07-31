@@ -1,5 +1,6 @@
 import { trainersService } from "@/lib/services/trainers-service";
 import { TrainersClient } from "./trainers-client";
+import { sessionService } from "@/lib/services/session-service";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,10 @@ export default async function TrainersPage({
         ? "hidden"
         : "all";
 
+  const { data: session } = await sessionService.getSession();
+  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const tag = `org:${activeOrgId}:trainers`;
+
   const filters: {
     page: number;
     limit: number;
@@ -40,12 +45,12 @@ export default async function TrainersPage({
   if (initialVisibility === "hidden") filters.isVisible = false;
 
   const result = await trainersService.getTrainers(filters, {
-    next: { revalidate: 60, tags: ["panel:trainers"] },
+    next: { revalidate: 3600, tags: [tag] },
   });
 
   const refreshTrainers = async () => {
     "use server";
-    updateTag("panel:trainers");
+    updateTag(tag);
   };
 
   void refreshTrainers;
