@@ -190,16 +190,11 @@ Las tres aplicaciones frontend Next.js 16 se despliegan **manualmente en Vercel*
 
 ### Variables de Entorno Requeridas en Vercel
 
-#### Para `apps/panel` y `apps/console`:
+#### Para `apps/panel`, `apps/console` y `apps/web`:
 ```env
-NEXT_PUBLIC_API_URL=https://api.luisrivas.site
-NEXT_PUBLIC_BETTER_AUTH_URL=https://api.luisrivas.site
-BETTER_AUTH_SECRET=your_secret_key
-```
-
-#### Para `apps/web`:
-```env
-NEXT_PUBLIC_API_URL=https://api.luisrivas.site
+NEXT_PUBLIC_API_BASE_URL=https://api.luisrivas.site
+NEXT_PUBLIC_R2_URL=https://api.luisrivas.site/api/public/files
+NEXT_PUBLIC_EXCHANGE_URL=https://open.er-api.com/v6/latest   # opcional (default en código)
 ```
 
 ---

@@ -101,6 +101,20 @@ Páginas dinámicas con bloques arrastrables: hero, services, classes, testimoni
 
 ## Deploy
 
-- Configurar `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` con las URLs de producción
-- Asegurar que el dominio del panel esté en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)
-- Se requiere Next.js standalone output (`next.config.mjs` ya configurado)
+Despliegue **manual en Vercel** (guía completa en [`INFRASTRUCTURE.md` §4](../../INFRASTRUCTURE.md)):
+
+```bash
+cd apps/panel
+vercel --prod   # o Vercel Dashboard → Git Integration (root: `apps/panel`, preset: Next.js)
+```
+
+**Env vars en producción (Vercel):**
+
+| Variable | Valor |
+|----------|-------|
+| `NEXT_PUBLIC_API_BASE_URL` | URL del api-worker (dev: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | URL pública de archivos R2 (dev: `http://localhost:8788/api/public/files`) |
+
+**Requisitos:**
+- El dominio del panel debe estar en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)
+- Next.js standalone output ya configurado (`next.config.mjs`)

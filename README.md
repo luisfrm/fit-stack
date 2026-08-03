@@ -112,6 +112,36 @@ pnpm format
 
 ---
 
+## Deploy
+
+### Deployment Model
+
+| Component | Hosting | Strategy |
+|-----------|---------|----------|
+| `api-worker`, `jobs-worker` | Cloudflare Workers | Automated via GitHub Actions (`deploy-api-worker.yml` / `deploy-jobs-worker.yml`) + Terraform provisioning |
+| `panel`, `web`, `console` | Vercel | Manual (`vercel --prod` or Vercel Dashboard) |
+| Database (Neon) | Neon Postgres | Migrations via `database-migrations.yml` (Drizzle) |
+| Cloudflare infra (R2, Queues, Secrets) | Cloudflare | Terraform (`terraform.yml` — plan/apply per environment) |
+
+### GitHub Actions Workflows (`.github/workflows/`)
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull requests to `master`/`develop` | Lint + typecheck of affected apps (Turbo) |
+| `deploy-api-worker.yml` | Push to `master`/`develop` or `workflow_dispatch` | Deploys the API worker (production / dev) |
+| `deploy-jobs-worker.yml` | Push to `master`/`develop` or `workflow_dispatch` | Deploys the jobs worker |
+| `database-migrations.yml` | Schema changes or `workflow_dispatch` | Applies Neon migrations (`pnpm db:migrate`) |
+| `terraform.yml` | `workflow_dispatch` (`plan` / `apply`) | Provisions Cloudflare resources per environment |
+
+### Local vs Production
+
+- **Local development**: `pnpm dev` (see Quick Start above). Each app reads its `.env` (templates in `.env.example`); the `api-worker` reads `.dev.vars` via Wrangler.
+- **Production**: workers and DB are deployed through the workflows above; the Next.js apps are deployed manually to Vercel with `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` configured per app. Secrets live in GitHub Environments (workers) and Vercel (frontend).
+
+For the full deployment guide see [INFRASTRUCTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/INFRASTRUCTURE.md) and [infrastructure/terraform/README.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/infrastructure/terraform/README.md).
+
+---
+
 ## Documentation
 
 - [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md) — Detailed architecture design & system decisions

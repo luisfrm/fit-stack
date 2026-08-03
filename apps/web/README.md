@@ -43,5 +43,20 @@ Las páginas CMS creadas en `apps/panel` (módulo Contenido) se renderizan aquí
 
 ## Deploy
 
+Despliegue **manual en Vercel** (guía completa en [`INFRASTRUCTURE.md` §4](../../INFRASTRUCTURE.md)):
+
+```bash
+cd apps/web
+vercel --prod   # o Vercel Dashboard → Git Integration (root: `apps/web`, preset: Next.js)
+```
+
+**Env vars en producción (Vercel):**
+
+| Variable | Valor |
+|----------|-------|
+| `NEXT_PUBLIC_API_BASE_URL` | URL del api-worker (dev: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | URL pública de archivos R2 (dev: `http://localhost:8788/api/public/files`) |
+
+**Notas:**
 - Hospedaje público (Vercel recomendado)
 - Para páginas CMS: configurar edge caching para `/api/public/pages/[slug]`

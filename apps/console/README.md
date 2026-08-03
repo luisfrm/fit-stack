@@ -86,7 +86,20 @@ Todas las llamadas van al `api-worker` via `/api/platform/*` (requiere rol globa
 
 ## Deploy
 
-- Configurar `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` con las URLs de producción
-- No debe ser accesible públicamente (solo staff Fit-Stack)
-- Dominio separado del panel de tenants
-- Asegurar que el dominio del console esté en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)
+Despliegue **manual en Vercel** (guía completa en [`INFRASTRUCTURE.md` §4](../../INFRASTRUCTURE.md)):
+
+```bash
+cd apps/console
+vercel --prod   # o Vercel Dashboard → Git Integration (root: `apps/console`, preset: Next.js)
+```
+
+**Env vars en producción (Vercel):**
+
+| Variable | Valor |
+|----------|-------|
+| `NEXT_PUBLIC_API_BASE_URL` | URL del api-worker (dev: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | URL pública de archivos R2 (dev: `http://localhost:8788/api/public/files`) |
+
+**Requisitos:**
+- No debe ser accesible públicamente (solo staff Fit-Stack); dominio separado del panel de tenants
+- El dominio del console debe estar en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)
