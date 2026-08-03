@@ -24,24 +24,44 @@ export const ORG_ROLES = {
 export type OrgRole = typeof ORG_ROLES[keyof typeof ORG_ROLES];
 
 /**
- * Human-readable Spanish labels for roles.
+ * Human-readable Spanish labels for ORGANIZATION roles (Panel / gym tenant).
  */
-export const ROLE_LABELS: Record<string, string> = {
+export const ORG_ROLE_LABELS: Record<string, string> = {
   owner: "Propietario",
   manager: "Gerente",
   cashier: "Cajero",
   coach: "Entrenador",
   member: "Miembro",
-  admin: "Administrador",
 };
 
 /**
- * Formats a raw role string into a human-readable label in Spanish.
+ * Human-readable Spanish labels for PLATFORM roles (Console / SaaS admin).
+ * NOTE: `owner` also exists in ORG_ROLE_LABELS but is a DIFFERENT concept:
+ * platform owner (Fit-Stack staff) vs organization owner (gym tenant).
  */
-export function formatRole(role?: string | null): string {
+export const PLATFORM_ROLE_LABELS: Record<string, string> = {
+  owner: "Propietario",
+  admin: "Administrador",
+  support: "Soporte",
+  user: "Usuario",
+};
+
+/**
+ * Formats a raw ORGANIZATION (panel) role string into a Spanish label.
+ */
+export function formatOrgRole(role?: string | null): string {
   if (!role) return "Sin rol";
   const normalized = role.toLowerCase();
-  return ROLE_LABELS[normalized] ?? (role.charAt(0).toUpperCase() + role.slice(1));
+  return ORG_ROLE_LABELS[normalized] ?? (role.charAt(0).toUpperCase() + role.slice(1));
+}
+
+/**
+ * Formats a raw PLATFORM (console) role string into a Spanish label.
+ */
+export function formatPlatformRole(role?: string | null): string {
+  if (!role) return "Sin rol";
+  const normalized = role.toLowerCase();
+  return PLATFORM_ROLE_LABELS[normalized] ?? (role.charAt(0).toUpperCase() + role.slice(1));
 }
 
 /**

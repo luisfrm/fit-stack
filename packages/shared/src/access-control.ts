@@ -38,6 +38,19 @@ export const platformRoles = {
 
 export type PlatformRole = keyof typeof platformRoles | 'user';
 
+/**
+ * Whether a user with the given global (platform) role can access the FitStack Console.
+ * Derived from the permission matrix: the role must be able to create organizations
+ * (`requirePlatformAuth` checks exactly this), so `admin` and `owner` pass but
+ * `support` (read-only, no `organization.create`) does not.
+ */
+export function canAccessConsole(role?: string | null): boolean {
+  if (!role || !(role in platformRoles)) return false;
+  return platformRoles[role as keyof typeof platformRoles]
+    .authorize({ organization: ['create'] })
+    .success;
+}
+
 // --- ORGANIZATION ACCESS CONTROL (Tenant Gym) ---
 const organizationStatement = {
   panel: ["access"],
