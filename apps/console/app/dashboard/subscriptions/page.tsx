@@ -72,6 +72,7 @@ export default async function PlatformSubscriptionsPage({
       >
         <PlatformSubscriptionModal
           onSuccess={refreshSubs}
+          settings={settings}
           trigger={
             <Button size="sm" rightIcon={<Plus size={18} />}>
               NUEVA SUSCRIPCIÓN

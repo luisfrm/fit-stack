@@ -39,6 +39,7 @@ export default async function PlatformPlansPage() {
       primaryCurrency={primaryCurrency}
       currencyFormat={currencyFormat}
       rates={rates}
+      settings={settings}
       onSuccess={refreshPlans}
     />
   );

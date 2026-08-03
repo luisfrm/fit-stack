@@ -18,7 +18,7 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
-import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { SETTINGS_KEYS } from "@/lib/config/settings";
 import Link from "next/link";
 
 const DEFAULT_BRANDING = {

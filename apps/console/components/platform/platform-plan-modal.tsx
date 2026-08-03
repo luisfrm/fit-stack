@@ -10,9 +10,10 @@ interface PlatformPlanModalProps {
   readonly planData?: IPlatformPlan;
   readonly trigger: React.ReactNode;
   readonly onSuccess?: () => void;
+  readonly settings?: Record<string, string>;
 }
 
-export function PlatformPlanModal({ planData, trigger, onSuccess }: PlatformPlanModalProps) {
+export function PlatformPlanModal({ planData, trigger, onSuccess, settings }: PlatformPlanModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -46,10 +47,11 @@ export function PlatformPlanModal({ planData, trigger, onSuccess }: PlatformPlan
       description="Define los límites técnicos y accesos globales para este nivel de suscripción."
       isScrollable={true}
     >
-      <PlatformPlanForm 
-        initialData={planData} 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading} 
+      <PlatformPlanForm
+        initialData={planData}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
+        settings={settings}
       />
     </Modal>
   );

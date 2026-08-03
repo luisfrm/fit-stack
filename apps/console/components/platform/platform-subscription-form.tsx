@@ -18,7 +18,7 @@ import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
+import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
 import { type CurrencyFormat } from "@/lib/utils/value-converters";
 import { OrganizationSelector } from "./organization-selector";
@@ -49,6 +49,7 @@ interface PlatformSubscriptionFormProps {
   readonly onSubmit: (data: PlatformSubscriptionSubmitData) => Promise<void>;
   readonly isLoading?: boolean;
   readonly initialOrganization?: IPlatformOrganization | null;
+  readonly settings?: Record<string, string>;
 }
 
 function calculateEndDate(
@@ -86,9 +87,10 @@ function calculateEndDate(
 export function PlatformSubscriptionForm({
   onSubmit,
   isLoading,
-  initialOrganization
+  initialOrganization,
+  settings
 }: PlatformSubscriptionFormProps) {
-  const { settings } = usePlatformSettings();
+  const platformSettings = React.useMemo(() => settings ?? {}, [settings]);
   const [plans, setPlans] = React.useState<IPlatformPlan[]>([]);
 
   const [selectedOrganization, setSelectedOrganization] = React.useState<IPlatformOrganization | null>(
@@ -129,7 +131,7 @@ export function PlatformSubscriptionForm({
   const [amountFocus, setAmountFocus] = React.useState(false);
   const [rateFocus, setRateFocus] = React.useState(false);
 
-  const currencyFormat = (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const currencyFormat = (platformSettings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
 
   const selectedPlan = React.useMemo(() => plans.find((p) => p.id === planId) ?? null, [plans, planId]);
 
@@ -168,8 +170,8 @@ export function PlatformSubscriptionForm({
   React.useEffect(() => { loadPlans(); }, [loadPlans]);
 
   React.useEffect(() => {
-    setAllowPriceOverride(settings["allow_price_override"] === "true");
-  }, []);
+    setAllowPriceOverride(platformSettings["allow_price_override"] === "true");
+  }, [platformSettings]);
 
   React.useEffect(() => {
     if (!debouncedOrgSearch) { setOrgResults([]); return; }
@@ -187,16 +189,16 @@ export function PlatformSubscriptionForm({
   }, [debouncedOrgSearch]);
 
   const activeCurrencies = React.useMemo(() => {
-    const val = settings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    const val = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
     if (!val) return ["USD", "VES"];
     try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
-  }, [settings]);
+  }, [platformSettings]);
 
   const activePaymentMethods = React.useMemo(() => {
-    const val = settings[PLATFORM_SETTINGS_KEYS.ACTIVE_PAYMENT_METHODS];
+    const val = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_PAYMENT_METHODS];
     if (!val) return [];
     try { return JSON.parse(val) as IPaymentMethodConfig[]; } catch { return []; }
-  }, [settings]);
+  }, [platformSettings]);
 
   const selectedPaymentConfig = React.useMemo(
     () => activePaymentMethods.find((m) => m.id === paymentMethodId),

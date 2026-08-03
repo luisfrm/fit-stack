@@ -12,6 +12,7 @@ interface PlatformSubscriptionModalProps {
   readonly initialOrganization?: IPlatformOrganization | null;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  readonly settings?: Record<string, string>;
 }
 
 export function PlatformSubscriptionModal({
@@ -20,6 +21,7 @@ export function PlatformSubscriptionModal({
   initialOrganization,
   open,
   onOpenChange,
+  settings,
 }: PlatformSubscriptionModalProps) {
   const [isControlled, setIsControlled] = React.useState(open);
   const isOpen = open ?? isControlled;
@@ -85,6 +87,7 @@ export function PlatformSubscriptionModal({
         <PlatformSubscriptionForm
           onSubmit={handleSubmit}
           initialOrganization={initialOrganization}
+          settings={settings}
         />
       </div>
     </Modal>

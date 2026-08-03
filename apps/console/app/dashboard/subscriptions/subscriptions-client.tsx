@@ -2,9 +2,8 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, Plus } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Button, Text } from "@workspace/ui/components";
-import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@workspace/ui/lib/utils";

@@ -13,31 +13,32 @@ import {
 import { type IPlatformPlan } from "@workspace/shared/types";
 import { Users, Globe } from "lucide-react";
 import { cleanNumericInput } from "@/lib/utils/helper";
-import { usePlatformSettings, PLATFORM_SETTINGS_KEYS } from "@/lib/hooks/use-platform-settings";
+import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 
 interface PlatformPlanFormProps {
   readonly initialData?: Partial<IPlatformPlan>;
   readonly onSubmit: (data: any) => Promise<void>;
   readonly isLoading: boolean;
+  readonly settings?: Record<string, string>;
 }
 
-export function PlatformPlanForm({ initialData, onSubmit, isLoading }: PlatformPlanFormProps) {
-  const { settings } = usePlatformSettings();
+export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }: PlatformPlanFormProps) {
+  const platformSettings = React.useMemo(() => settings ?? {}, [settings]);
 
   const activeCurrencies: string[] = React.useMemo(() => {
-    const active = settings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
+    const active = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
     if (!active) return ["USD"];
     try {
       return JSON.parse(active);
     } catch {
       return ["USD"];
     }
-  }, [settings]);
+  }, [platformSettings]);
 
   const defaultCurrency = React.useMemo(() => {
-    const primary = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
+    const primary = platformSettings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
     return primary && activeCurrencies.includes(primary) ? primary : (activeCurrencies[0] || "USD");
-  }, [settings, activeCurrencies]);
+  }, [platformSettings, activeCurrencies]);
 
   const [formData, setFormData] = React.useState({
     name: initialData?.name || "",

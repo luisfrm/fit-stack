@@ -15,6 +15,7 @@ interface PlansClientProps {
   readonly primaryCurrency: string;
   readonly currencyFormat: "latam" | "usa";
   readonly rates: Record<string, number> | null;
+  readonly settings?: Record<string, string>;
   readonly onSuccess?: () => Promise<void> | void;
 }
 
@@ -24,6 +25,7 @@ export function PlansClient({
   primaryCurrency,
   currencyFormat,
   rates,
+  settings,
   onSuccess,
 }: PlansClientProps) {
   const router = useRouter();
@@ -126,6 +128,7 @@ export function PlansClient({
           </div>
           <PlatformPlanModal
             onSuccess={refresh}
+            settings={settings}
             trigger={
               <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
                 CREAR PRIMER PLAN
@@ -144,6 +147,7 @@ export function PlansClient({
             plan={plan}
             onUpdate={refresh}
             organizationCount={plan.organizationCount}
+            settings={settings}
           />
         ))}
       </div>
@@ -162,6 +166,7 @@ export function PlansClient({
       >
         <PlatformPlanModal
           onSuccess={refresh}
+          settings={settings}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               NUEVO PLAN

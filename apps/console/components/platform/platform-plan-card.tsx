@@ -114,9 +114,10 @@ interface PlatformPlanCardProps {
   readonly plan: IPlatformPlan;
   readonly onUpdate: () => void;
   readonly organizationCount?: number;
+  readonly settings?: Record<string, string>;
 }
 
-export function PlatformPlanCard({ plan, onUpdate, organizationCount }: PlatformPlanCardProps) {
+export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }: PlatformPlanCardProps) {
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Style Variants
@@ -200,6 +201,7 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount }: Platform
         <PlatformPlanModal
           planData={plan}
           onSuccess={onUpdate}
+          settings={settings}
           trigger={
             <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", styles.editButton)}>
               Editar Plan
