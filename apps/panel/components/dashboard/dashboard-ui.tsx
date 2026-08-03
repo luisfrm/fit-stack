@@ -130,11 +130,12 @@ export function SwitchOrganizationAction() {
 
 function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null) {
   const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
-  const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
 
   const activeOrganization = initialOrg ?? clientOrg;
-  const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
+  // Sidebar branding depends solely on organization identity (session), independent of regional settings query state
+  // to prevent SSR/hydration mismatch error.
+  const isBrandingLoading = sessionLoading && !activeOrganization;
   const navigation = useFilteredNavItems();
 
   const formattedUser = React.useMemo(() => ({
