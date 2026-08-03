@@ -1,7 +1,7 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
-import { GLOBAL_ROLES } from "@workspace/shared";
+import { canAccessConsole } from "@workspace/shared";
 import { AppSidebar } from "@/components/dashboard/dashboard-ui";
 
 export default async function DashboardLayout({
@@ -20,9 +20,8 @@ export default async function DashboardLayout({
   }
 
   const userRole = await sessionService.getUserRole();
-  const isAdmin = userRole === GLOBAL_ROLES.ADMIN;
 
-  if (!isAdmin) {
+  if (!canAccessConsole(userRole)) {
     redirect("/unauthorized");
   }
 
