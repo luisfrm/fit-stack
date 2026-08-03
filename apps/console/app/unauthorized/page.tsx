@@ -1,8 +1,27 @@
-import Link from "next/link";
-import { ShieldAlert, ArrowLeft, LogIn } from "lucide-react";
-import { Button } from "@workspace/ui/components";
+import { redirect } from "next/navigation";
+import { ShieldAlert } from "lucide-react";
+import { sessionService } from "@workspace/auth/service";
+import { canAccessConsole } from "@workspace/shared";
+import SignOutButton from "./sign-out-button";
 
-export default function UnauthorizedPage() {
+export const dynamic = "force-dynamic";
+
+export default async function UnauthorizedPage() {
+  const { data: session, error: sessionError } = await sessionService.getSession();
+
+  if (sessionError?.code === "ORGANIZATION_NOT_FOUND") {
+    redirect("/reset-org-context");
+  }
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  const userRole = await sessionService.getUserRole();
+  if (canAccessConsole(userRole)) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden font-display">
       {/* Background radial gradients for premium feel */}
@@ -28,21 +47,7 @@ export default function UnauthorizedPage() {
             global de administrador.
           </p>
           
-          <div className="flex flex-col gap-3">
-            <Button asChild variant="white" fullWidth>
-              <Link href="/login" className="flex items-center justify-center gap-2">
-                <LogIn className="w-4 h-4" />
-                Volver al Login
-              </Link>
-            </Button>
-            
-            <Button asChild variant="glass" fullWidth>
-              <Link href="/" className="flex items-center justify-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Ir al Inicio
-              </Link>
-            </Button>
-          </div>
+          <SignOutButton />
         </div>
         
         <p className="mt-8 text-xs text-slate-600 uppercase tracking-[0.2em]">

@@ -18,14 +18,22 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("");
   const [rememberMe, setRememberMe] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [returnTo, setReturnTo] = React.useState<string | null>(null);
   const router = useRouter();
   const { data: session, isPending } = useSession();
 
+  // Read ?returnTo= (internal path only) — used by /register to return after login
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("returnTo");
+    setReturnTo(target && target.startsWith("/") && !target.startsWith("//") ? target : null);
+  }, []);
+
   React.useEffect(() => {
     if (!isPending && session) {
-      router.replace('/dashboard');
+      router.replace(returnTo ?? '/dashboard');
     }
-  }, [session, isPending, router]);
+  }, [session, isPending, router, returnTo]);
 
   React.useEffect(() => {
     const savedEmail = localStorage.getItem("remember_email");
@@ -64,7 +72,7 @@ export default function LoginPage() {
     }
 
     setIsLoading(false);
-    router.push('/dashboard');
+    router.replace(returnTo ?? '/dashboard');
   };
 
   if (isPending) {
