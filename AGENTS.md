@@ -20,12 +20,12 @@ pnpm db:studio    # Open Drizzle Studio
 pnpm db:seed      # Seed demo data (tsx src/seed.ts)
 
 # Individual apps
-cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active)
-cd apps/jobs-worker # Cloudflare Queues Worker
+cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active) — port 8788
+cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
 cd apps/console     && pnpm dev  # Port 3003 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API
+cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (read-only reference)
 
 # Bridge (Python/Flet — managed separately with uv)
 cd apps/bridge
@@ -35,8 +35,8 @@ uv run python main.py
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - Active), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop), `api` (Next.js 16, DEPRECATED).
-- **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/permissions), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop), `api` (Next.js 16, **DEPRECATED** — kept only as reference, excluded from pnpm workspace).
+- **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
@@ -65,7 +65,7 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 | **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
 | **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. |
 | **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
-| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. |
+| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⚠ Endpoints pending migration to api-worker.** |
 | **Reports** | Revenue analytics with multi-currency normalization. |
 | **Settings** | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection). |
 
@@ -79,13 +79,13 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 
 **Staff (`/dashboard/staff`):**
 - Table view for gym_members with roles: Owner, Manager, Cashier, Coach
-- Components: `StaffTable`, `StaffModal`, `StaffForm` (`apps/cms/components/staff/`)
+- Components: `StaffTable`, `StaffModal`, `StaffForm` (`apps/panel/components/staff/`)
 - Columns: Avatar+Name, Email, Role, Status, Actions
 - Service: `membersService` (shared with Members module)
 
 **Trainers (`/dashboard/trainers`):**
 - Table view for gym_members with role `COACH` that have a `coach_profile`
-- Components: `TrainersTable`, `TrainerModal`, `TrainerForm` (`apps/cms/components/trainers/`)
+- Components: `TrainersTable`, `TrainerModal`, `TrainerForm` (`apps/panel/components/trainers/`)
 - Fields: name, photo, specialities, bio, visibility toggle, display order
 - Service: `trainersService` (joins gym_member + coach_profile)
 - API routes: `/api/trainers`
@@ -96,12 +96,20 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 
 A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
 
-**API contract** (authenticated via `x-api-key`):
+**API contract** (authenticated via `x-api-key` header → `ACCESS_CONTROL_API_KEY`):
 - `POST /api/access-control/verify` — validate `documentId` + `organizationId`, returns access decision, creates audit log
 - `GET /api/access-control/sync-tasks` — poll pending biometric enroll/delete tasks
 - `POST /api/access-control/mark-synced` — confirm task completion
 
 **Tables**: `access_control_log` (audit trail of every access attempt), `biometric_sync_task` (queue of sync tasks for devices)
+
+**⚠ Migration status (PENDING)**: These 3 endpoints currently exist **only in `apps/api` (deprecated)**. The active `apps/api-worker` does **NOT** mount `/api/access-control` yet. When migrating, port:
+
+1. `apps/api/repositories/access-control.repository.ts` → `apps/api-worker/src/repositories/access-control.repository.ts` as `createAccessControlRepository(db: Db)` factory with: `verifyAccess`, `createLog`, `getPendingSyncTasks`, `updateTaskStatus`, `createSyncTask`. Use `@workspace/database/factory` imports (not `@workspace/database/client`).
+2. Routes → `apps/api-worker/src/routes/access-control.route.ts` (Hono). Machine-to-machine: **no session required** — add a `requireApiKey` middleware comparing `x-api-key` against `c.env.ACCESS_CONTROL_API_KEY` (use timing-safe comparison). Mount `app.route('/api/access-control', accessControlRoutes)` in `apps/api-worker/src/index.ts`.
+3. Add `ACCESS_CONTROL_API_KEY: string` to `apps/api-worker/src/lib/env.ts` and to the Worker `secret_text_bindings` in `infrastructure/terraform/workers.tf` + GitHub environment secret.
+4. Hook biometric sync tasks into member lifecycle: `apps/api-worker/src/services/members.service.ts` must create sync tasks (create → `enroll`, delete → `delete`) like the legacy `apps/api/services/members.service.ts` does.
+5. Update `apps/bridge/main.py` `CLOUD_API_URL` (currently defaults to `http://localhost:3000` — the deprecated API) and the bridge README.
 
 ### 5. Business Rules Summary
 
@@ -125,6 +133,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
   - Repository: Drizzle ORM, filter by `organizationId` for multi-tenancy.
   - Service: Business logic layer.
   - Route Handler: HTTP concerns only.
+- **Worker DB Pattern**: In `api-worker` the DB client is created **per request** via `createDb(c.env.DATABASE_URL)` (`@workspace/database/factory`) — `process.env` does not exist in Workers. Repositories and services are **factory functions** that receive dependencies by parameter (`createXRepository(db)`, `createXService(repo)`).
 
 ### 2. UI Design System & Hierarchy
 
@@ -144,6 +153,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 - **Workflow**: `generate` → `review` → `migrate`. NO `push`, `generate`, `migrate`, or `seed` without explicit user approval.
 - **Push Restriction**: `db:push` is EXCLUSIVELY for local prototyping. Strictly prohibited on shared branches or production.
 - **Naming**: Table names are **singular** (`user`, `organization`). Repositories and Services are **plural** (`users.service.ts`).
+- **No `pgEnum`**: Use `text('col').$type<UnionType>()` instead of Postgres enums — pgEnum breaks Drizzle migrations.
 - **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
 
 ### 4. Next.js Patterns & Best Practices
@@ -160,71 +170,53 @@ Fit-Stack uses **Better Auth** for authentication.
 
 **Package layers:**
 - **`@workspace/auth`** — canonical auth package. Entry points:
-  - `@workspace/auth/client` — raw `authClient`, `useSession`, `useActiveOrganization`, `organization`
+  - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
   - `@workspace/auth/service` — `sessionService.getSession()` for server components
-  - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)`
-- **`apps/cms/lib/auth-client.ts`** and `apps/console/lib/auth-client.ts` — re-export `@workspace/auth/client`
-- **`apps/cms/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
+  - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)` and `canAccessCms()`
+- **`apps/panel/lib/auth-client.ts`** and **`apps/console/lib/auth-client.ts`** — re-export `@workspace/auth/client`
+- **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
 
 **Conventions:**
-- Client MUST use `useAuth()`. NEVER use `useSession()` directly or read `session.activeOrganization` directly — use `useActiveOrganization()`.
+- Client MUST use `useAuth()`. It exposes `activeOrganization` (the org object, resolved by the api-worker custom session) alongside `member`. NEVER use `useSession()` directly in components.
 - For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
 
 #### CORS & Allowed Origins
 
-The CORS allowlist is defined **in code only** — no env vars. Single source of truth in `apps/api/config/allowed-origins.ts`, consumed by both:
-- `apps/api/config/auth.ts` → `trustedOrigins` of Better Auth
-- `apps/api/proxy.ts` → preflight and CORS headers
+The CORS allowlist is defined **in code only** — no env vars. Single source of truth in `apps/api-worker/src/lib/cors.ts`, consumed by:
+- `apps/api-worker/src/lib/auth.ts` → `trustedOrigins` of Better Auth
+- `apps/api-worker/src/index.ts` → `corsMiddleware` (Hono CORS)
 
 | Ambiente | Origins permitidos |
 |---|---|
-| `development` | `http://localhost:3001` (cms), `http://localhost:3002` (web), `http://localhost:3003` (console) |
-| `production` | Exact: `panel.luisrivas.site`, `console.luisrivas.site`, `api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
+| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api) |
+| `production` | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
 
-**Multi-tenant web domains** live in `apps/api/config/urls.ts` → `WEB_BASE_DOMAINS`. Any subdomain of a listed base domain is automatically trusted (Better Auth wildcards + custom matcher in the proxy). To support a custom domain for a specific gym (e.g. `powerfit.com`), add it to that array — no redeploy of auth logic needed.
+**Public routes skip auth**: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`. The global middleware tries to resolve a session but never blocks unauthenticated requests — machine-to-machine routes (e.g. access-control with `x-api-key`) work without a session.
 
-**Proxy rules** (`apps/api/proxy.ts`):
-- `OPTIONS` preflight → 200 with CORS headers if origin is allowed
-- CORS headers always attached to responses (success or error) when origin is allowed
-- Public routes skip auth: `/api/auth`, `/api/health`, `/api/members/validate-token`, `/api/init`, `GET /api/settings`
+### 6. Route Handler Pattern (`apps/api-worker/src/lib/route-handler.ts`)
 
-### 6. Route Handler Pattern (`route-handler.ts`)
+The Hono API uses centralized middleware — never write auth/error boilerplate manually.
 
-API route handlers use centralized wrappers from `apps/api/lib/route-handler.ts` — never write auth/error boilerplate manually.
-
-| Wrapper | When to use | Auth check |
+| Middleware | When to use | Auth check |
 |---------|-------------|------------|
-| `withAuth(module, action)` | Org-scoped CRUD routes | Session + orgId + permission check |
-| `withSession()` | Org-scoped routes without permission check | Session + orgId only |
-| `withPlatformAuth()` | SaaS admin routes (`/api/platform/*`) | Session + global admin role |
+| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback) |
+| `requireAuth()` | Org-scoped routes without permission check | Session + user only |
+| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`) | Session + platform permission via `auth.api.userHasPermission` |
 
 ```ts
-// Before (old pattern — 15+ lines of boilerplate per handler)
-export async function GET(req: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session?.session?.activeOrganizationId) return ...
-    if (!authorize(session, orgId, MODULE, ACTION)) return ...
-    // ... handler logic ...
-  } catch (error) { return handleError(error) }
-}
-
-// After (new pattern — clean handler only)
-export const GET = withAuth(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.READ)(
-  async (req, { organizationId }) => {
-    // ... handler logic ...
-  }
-)
+// Typical org-scoped route (Hono)
+.get('/', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
+  const orgId = c.get('session')!.activeOrganizationId!;
+  const repo = createMembersRepository(c.get('db'));
+  const service = createMembersService(repo, /* ...deps */);
+  return c.json(await service.getAllMembers({ organizationId: orgId }));
+})
 ```
 
-Params are auto-resolved from Promises — no manual `await params` needed.
-
-For platform/super-admin endpoints that don't use the wrapper pattern, use:
-```ts
-import { requireGlobalAdmin } from '@/config/auth-utils';
-if (!requireGlobalAdmin(session)) return Response.json({ error: 'Forbidden' }, { status: 403 });
-```
+- Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
+- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope.
+- The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
 
 ### 7. Error Handling & Mutations
 
@@ -239,11 +231,10 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 
 ### Setup
 
-- **Client**: `apps/api/lib/redis.ts` — Configures `Redis` with REST URL + token
-- **Wrapper**: `apps/api/lib/cache.ts` — Centralized cache abstraction with error handling
-- **Env vars**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (both optional, cache degrades gracefully)
+- **Wrapper**: `apps/api-worker/src/lib/cache.ts` — `createCache(env)` with error handling; Redis being down never blocks requests (graceful degradation).
+- **Env vars**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (both optional)
 
-### Cache Methods (`apps/api/lib/cache.ts`)
+### Cache Methods
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
@@ -257,6 +248,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | Pattern | TTL | Used For |
 |---------|-----|----------|
 | `org:${orgId}:settings` | 10 min | Organization settings |
+| `org:${orgId}:profile` | 5 min | Active org profile in custom session (branding/theme/timezone) |
 | `org:${orgId}:plans:*` | 5 min | Membership plans |
 | `org:${orgId}:classes:*` | 5 min | Classes |
 | `org:${orgId}:members:*` | 5 min | Gym members |
@@ -305,7 +297,7 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 - Days overdue ≤ 14 → `read_only`
 - Days overdue > 14 → `suspended`
 
-**Validation flow** (`dashboard/layout.tsx`):
+**Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
 - `ACTIVE` → normal render
@@ -329,6 +321,8 @@ GLOBAL_ROLES = {
 }
 ```
 
+Platform roles for Better Auth admin plugin (`platformRoles`): `owner`, `admin`, `support`.
+
 ### Organization Roles
 
 ```ts
@@ -343,39 +337,31 @@ ORG_ROLES = {
 
 ### Permission Matrix
 
-Defined in `packages/shared/src/permissions/matrix.ts` using presets (`NONE`, `READ`, `READ_UPDATE`, `READ_CREATE_UPDATE`, `CRUD`):
+**Source of truth**: `packages/shared/src/access-control.ts` — `organizationStatement` + `organizationAc.newRole(...)` (Better Auth Access Control). Helpers in `packages/shared/src/permissions/` expose the matrix through `can(role, module, action)`.
 
 | Module | Owner | Manager | Cashier | Coach | Member |
 |--------|:-----:|:-------:|:-------:|:-----:|:------:|
+| **Panel** | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Dashboard** | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Reports** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Members** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Staff** | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Subscriptions** | ✅ | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
-| **Plans** | ✅ | ✅ | ✅ (read) | ❌ | ❌ |
-| **Classes** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Content** | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Settings** | ✅ (r+w) | ✅ (r+w) | ✅ (read) | ❌ | ❌ |
-| **Organization** | ✅ (r+w) | ✅ (r+w) | ❌ | ❌ | ❌ |
+| **Members** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
+| **Staff** | ✅ CRUD | ✅ (no delete) | ❌ | ❌ | ❌ |
+| **Subscriptions** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
+| **Plans** | ✅ CRUD | ✅ (no delete) | ✅ read | ✅ read | ✅ read |
+| **Classes** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
+| **Content** | ✅ CRUD | ✅ (no delete) | ❌ | ✅ read | ✅ read |
+| **Settings** | ✅ r+w | ✅ r+w | ✅ read | ❌ | ❌ |
+| **Organization** | ✅ r+w | ✅ r+w | ❌ | ❌ | ❌ |
 
 ### How to Verify Permissions
 
-**In API routes (server-side)**: Use `authorize()` from `apps/api/config/auth-utils.ts`
+**In API routes (api-worker)**: Use `requireOrgPermission` / `requirePlatformPermission` middleware from `apps/api-worker/src/lib/route-handler.ts`
 ```ts
-import { authorize } from '@/config/auth-utils'
+import { requireOrgPermission } from '../lib/route-handler'
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
 
-if (!await authorize(session, organizationId, PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ)) {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-}
+.get('/', requireOrgPermission(PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ), async (c) => { ... })
 ```
-
-**Available helpers** (`apps/api/config/auth-utils.ts`):
-- `getActiveOrgId(session)` — Returns `activeOrganizationId` or null
-- `getOrgContext(session, organizationId)` — Returns `{ memberRole }` or null
-- `authorize(session, orgId, module, action)` — Returns boolean
-- `requireGlobalAdmin(session)` — Returns boolean (for SaaS platform routes)
-- `authorizeUpload(session, orgId)` — Composite check for upload routes (MEMBERS.CREATE or CONTENT.CREATE)
 
 **In UI (client-side)**: Use `useAuth()` and `usePermissions()` from `@workspace/auth/hooks`
 ```tsx
@@ -387,17 +373,18 @@ const canEditClasses = can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE
 
 ### Anti-escalation
 
-Use `canAssignRole(actor, target)` from `@workspace/shared` to prevent role escalation:
+Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/src/permissions/role-assignment.ts`) to prevent role escalation:
 - `OWNER` → can assign any role
 - `MANAGER` → cannot assign `OWNER`
 - `CASHIER` → can only assign `MEMBER`
 
-### CMS Access Control
+### Panel Access Control
 
-Only `OWNER`, `MANAGER`, `CASHIER` can use the CMS app (`apps/cms`):
+Only `OWNER`, `MANAGER`, `CASHIER` can use the panel app (`apps/panel`). Implemented via the `panel: ["access"]` permission (`PANEL` module, `ACCESS` action):
 ```ts
-import { canAccessCms } from '@workspace/shared'
-if (orgRole && !canAccessCms(orgRole)) redirect('/unauthorized')
+import { usePermissions } from '@workspace/auth/hooks'
+const { canAccessCms } = usePermissions()  // equivalent to can(PANEL, ACCESS)
+if (orgRole && !canAccessCms()) redirect('/unauthorized')
 ```
 
 ### Security Rules
@@ -406,7 +393,7 @@ if (orgRole && !canAccessCms(orgRole)) redirect('/unauthorized')
 2. **Session-based authorization** — Use `session.member.role` from Better Auth
 3. **Organization scoping** — All queries MUST filter by `organizationId`
 4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
-5. **Platform user upload bypass** — Users with global roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + `authorizeUpload(session, orgId)`.
+5. **Platform user upload bypass** — Users with global roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + upload permission (`MEMBERS.CREATE` or `CONTENT.CREATE`).
 
 ---
 
@@ -426,17 +413,19 @@ IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
 PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization
 
 // access-control.ts
-statement, ac, owner/manager/cashier/coach/member (Better Auth org roles), orgRoleDefinitions
+platformStatement/platformAc/platformRoles (owner, admin, support),
+organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
+orgRoleDefinitions, PlatformStatement, OrganizationStatement, OrgRole types.
+Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
-ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone, status)
+ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone)
 
 // permissions/
-  modules.ts:    PERMISSION_MODULES (10 modules)
-  actions.ts:    PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE)
-  matrix.ts:     ORG_ROLE_PERMISSIONS (owner/manager/cashier/coach/member matrices)
-  can.ts:         can(role, module, action), canAny()
-  cms-access.ts: CMS_ALLOWED_ORG_ROLES, canAccessCms()
+  modules.ts:         PERMISSION_MODULES (11 modules: dashboard, reports, members, staff,
+                      subscriptions, plans, classes, content, settings, organization, panel)
+  actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
+  can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
   role-assignment.ts: canAssignRole(actor, target)
 ```
 
@@ -448,7 +437,7 @@ ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, 
 // Entry: @workspace/auth (re-exports client, service, hooks, permissions + shared constants)
 
 // client.ts — createAuthClient with customSession + organization plugin
-authClient, useSession, useActiveOrganization, organization
+authClient, useSession, organization
 Types: User, Session, SignInParams, SignUpParams
 
 // service.ts — sessionService (works client & server)
@@ -461,6 +450,8 @@ sessionService.signUp({ email, password, name }) → { data, error }
 useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, error, roleName,
               orgRole, isAdmin, isOwner, isManager, isCashier, isCoach, isMember, refetch }
 usePermissions() → { orgRole, can(module, action), canAccessCms() }
+
+// permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
 ```
 
 ---
@@ -475,8 +466,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`fitstack_plan` (plan catalog with features as PlanFeatures), `store_subscription` (org subscriptions),
-`platform_payment` (platform invoices)
+`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
@@ -492,7 +482,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
-`cms_class`, `cms_page`, `cms_page_block`, `cms_class`
+`gym_class` (class schedule), `content_page`, `content_block` (blocks by type with display order)
 
 ### Settings
 `platform_setting`, `gym_setting`
@@ -620,7 +610,7 @@ Definida en `apps/console/lib/config/platform-settings.ts`. Replica de la que es
 
 ### When to update AGENTS.md
 
-- New API endpoints or route restructuring (e.g., `/api/platform/settings`)
+- New API endpoints or route restructuring (e.g., `/api/access-control` migration to api-worker)
 - Changes to RBAC (new roles, permission matrix changes, new modules)
 - New business rules or module changes
 - New apps or packages added to the monorepo (e.g., `console`, `auth`)
@@ -641,15 +631,18 @@ Use skill tool for specialized tasks:
 | Skill | When to use |
 |-------|-------------|
 | `brainstorming` | Any creative work or feature creation |
-| `python-best-practices` | Python code (Bridge app) |
+| `database-designer` | Database schema design (Drizzle) |
 | `neon-postgres` | Neon database questions |
 | `interface-design` | Admin panels, dashboards |
 | `copywriting` | Marketing copy changes |
 | `vercel-react-best-practices` | React/Next.js performance |
 | `next-best-practices` | Next.js route handlers, data fetching, bundling, image optimization |
-| `drizzle-orm` | Type-safe SQL ORM operations |
-| `better-auth-best-practices` | Better Auth configuration and plugins |
-| `organization-best-practices` | Better Auth organizations, members, RBAC |
+| `drizzle` | Type-safe SQL ORM operations |
+| `best-practices` | Better Auth best practices |
+| `organization` | Better Auth organizations, members, RBAC |
+| `frontend-design` | Distinctive frontend interfaces / UI polish |
+| `neon-drizzle` | Drizzle + Neon setup, migrations |
+| `terraform-stacks` | Terraform Stacks configuration |
 
 ---
 
@@ -658,10 +651,13 @@ Use skill tool for specialized tasks:
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
 - `packages/database/src/schema.ts` — Full DB schema (28 tables)
-- `packages/shared/src/permissions/matrix.ts` — RBAC permission matrix
-- `apps/api/config/auth.ts` — Better Auth server config
-- `apps/api/lib/route-handler.ts` — Route handler wrappers
-- `apps/api/proxy.ts` — CORS + session validation middleware
+- `packages/shared/src/access-control.ts` — RBAC statements + roles (single source of truth)
+- `apps/api-worker/src/index.ts` — Hono app: middleware, mounts, healthcheck
+- `apps/api-worker/src/lib/auth.ts` — Better Auth server config (per-request factory)
+- `apps/api-worker/src/lib/route-handler.ts` — Auth/permission middleware
+- `apps/api-worker/src/lib/cache.ts` — Upstash Redis wrapper
+- `apps/api-worker/src/lib/cors.ts` — CORS allowlist
+- `apps/api-worker/src/lib/env.ts` — Worker env/bindings types
 - `packages/auth/src/` — Shared auth client, service, hooks, permissions
 - `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
 - `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI
@@ -688,10 +684,10 @@ infrastructure/terraform/
 ├── providers.tf          # Cloudflare provider
 ├── variables.tf          # Variables
 ├── main.tf               # Locals
-├── workers.tf            # Workers
+├── workers.tf            # Workers (+ secret_text_bindings inline)
 ├── queues.tf             # Colas + DLQ
 ├── storage.tf            # R2 bucket
-├── secrets.tf            # Secrets por worker
+├── secrets.tf            # Nota: secrets van inline en workers.tf
 ├── outputs.tf            # Outputs
 └── modules/              # Módulos reutilizables
     ├── worker/
@@ -731,6 +727,9 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `UPSTASH_REDIS_REST_TOKEN`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
+- `PANEL_URL`
+- `CONSOLE_URL`
+- `ACCESS_CONTROL_API_KEY` *(pendiente: agregar al migrar access-control al api-worker)*
 
 **Variables por environment (nombres de recursos, no sensibles):**
 - `API_WORKER_NAME` (ej: `fit-stack-api`)

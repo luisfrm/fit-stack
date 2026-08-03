@@ -16,7 +16,7 @@ Protect user data and ensure secure access across all organizations with our Bet
 
 - **Client Side**: Always use the custom `useAuth()` hook from `@/lib/hooks/use-auth`. It wraps Better Auth and adds critical role-based flags (e.g., `isOwner`, `isManager`, `isCashier`, `isCoach`, `isMember`).
 - **Never Direct**: Do not use `useSession()` from the native library directly — you'll miss out on the Fit-Stack specific enhancements.
-- **Active Context**: Use `useActiveOrganization()` to ensure the UI is always correctly scoped.
+- **Active Context**: Use `useAuth()` → `activeOrganization` (resolved by the api-worker custom session) to ensure the UI is always correctly scoped.
 
 ## 3. Server-Side Validation
 

@@ -9,7 +9,7 @@ Capa compartida de autenticación cliente (Better Auth). Contiene el cliente, ho
 | Import path | Contents |
 |-------------|----------|
 | `@workspace/auth` | Re-exporta todo: client, service, hooks, permissions y constantes de `@workspace/shared` |
-| `@workspace/auth/client` | `authClient`, `useSession`, `useActiveOrganization`, `organization` |
+| `@workspace/auth/client` | `authClient`, `useSession`, `organization` |
 | `@workspace/auth/service` | `sessionService` (getSession, signIn, signUp) |
 | `@workspace/auth/hooks` | `useAuth()` — hook con role flags (`isOwner`, `isManager`, etc.) |
 | `@workspace/auth/permissions` | `usePermissions()` — `can(module, action)`, `canAccessCms()` |
@@ -50,20 +50,21 @@ export default async function Page() {
 ### Cliente raw
 
 ```tsx
-import { authClient, useActiveOrganization } from '@workspace/auth/client'
+import { authClient } from '@workspace/auth/client'
+import { useAuth } from '@workspace/auth/hooks'
+
+// Leer org activa (objeto completo, resuelto por el customSession del api-worker)
+const { activeOrganization } = useAuth()
 
 // Cambiar organización activa
 await authClient.organization.setActive({ organizationId: 'org_123' })
-
-// Leer org activa
-const { data: org } = useActiveOrganization()
 ```
 
 ---
 
 ## Convenciones
 
-- **Siempre** usar `useAuth()` en UI. **Nunca** `useSession()` o `useActiveOrganization()` directamente.
+- **Siempre** usar `useAuth()` en UI — expone `activeOrganization` y los role flags. **Nunca** `useSession()` directamente.
 - Para server components: `sessionService.getSession()` con headers de la request.
 - Los archivos `apps/*/lib/auth-client.ts` re-exportan este paquete para centralización.
 
