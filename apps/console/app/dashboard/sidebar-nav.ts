@@ -1,11 +1,16 @@
 import * as Icons from "lucide-react";
 import { SidebarNavItem } from "@workspace/ui/components";
 
-export const ConsoleSidebarNav: SidebarNavItem[] = [
+export const SidebarNav: SidebarNavItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
     icon: Icons.LayoutGrid,
+  },
+  {
+    label: "Staff",
+    href: "/dashboard/staff",
+    icon: Icons.Users,
   },
   {
     label: "Organizaciones",
