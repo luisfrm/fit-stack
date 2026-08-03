@@ -1,5 +1,6 @@
-import { eq, type Db } from '@workspace/database/factory';
+import { desc, eq, inArray, type Db } from '@workspace/database/factory';
 import { user } from '@workspace/database/schema';
+import { platformRoles } from '@workspace/shared';
 
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
@@ -8,6 +9,24 @@ export function createUsersRepository(db: Db) {
   return {
     async findAll() {
       return db.select().from(user);
+    },
+
+    /**
+     * Users with a platform role (support, admin, owner) — the SaaS staff.
+     * Role values come from `platformRoles` keys to avoid magic strings.
+     */
+    async findPlatformStaff() {
+      const roles = Object.keys(platformRoles);
+      return db
+        .select()
+        .from(user)
+        .where(inArray(user.role, roles))
+        .orderBy(desc(user.createdAt));
+    },
+
+    async countByRole(role: string) {
+      const rows = await db.select({ id: user.id }).from(user).where(eq(user.role, role));
+      return rows.length;
     },
 
     async findById(id: string) {

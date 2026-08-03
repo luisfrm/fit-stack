@@ -13,11 +13,21 @@ export interface EmailHandlerEnv {
 
 export async function handleRegistrationInvite(
   env: EmailHandlerEnv,
-  payload: { email: string; token: string }
+  payload: { email: string; token: string; target?: 'panel' | 'console'; role?: string }
 ) {
-  const panelUrl = env.PANEL_URL || 'http://localhost:3001';
-  const inviteLink = `${panelUrl}/register?token=${payload.token}`;
-  const provider = env.EMAIL_PROVIDER || 'gmail';
+  const target = payload.target === 'console' ? 'console' : 'panel';
+  const baseUrl =
+    target === 'console'
+      ? env.CONSOLE_URL || 'http://localhost:3003'
+      : env.PANEL_URL || 'http://localhost:3001';
+  const inviteLink = `${baseUrl}/register?token=${payload.token}`;
+
+  const appName = target === 'console' ? 'FitStack Console' : 'FitStack Panel';
+  const title = target === 'console' ? 'Invitación de Administración' : 'Invitación al Equipo';
+  const description =
+    target === 'console'
+      ? 'Has sido invitado a unirte al equipo de administración de la plataforma SaaS Fit-Stack. Haz clic en el botón de abajo para activar tu cuenta y configurar tu contraseña.'
+      : 'Has sido invitado a unirte al panel de gestión de tu gimnasio. Haz clic en el botón de abajo para activar tu cuenta y configurar tu contraseña.';
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -37,9 +47,9 @@ export async function handleRegistrationInvite(
     <body>
         <div class="container">
             <div class="logo">FIT-STACK</div>
-            <h1 class="title">Invitación al Equipo</h1>
-            <p class="text">Has sido invitado a unirte a la plataforma de gestión. Haz clic en el botón de abajo para activar tu cuenta y configurar tu contraseña.</p>
-            <a href="${inviteLink}" class="button">Activar mi cuenta</a>
+            <h1 class="title">${title}</h1>
+            <p class="text">${description}</p>
+            <a href="${inviteLink}" class="button">Activar mi cuenta en ${appName}</a>
             <p class="text" style="margin-top: 32px; font-size: 13px;">Este enlace es válido por 48 horas.</p>
         </div>
         <div class="footer">
@@ -51,7 +61,7 @@ export async function handleRegistrationInvite(
 
   return sendEmail(env, {
     to: payload.email,
-    subject: 'Invitación para registrarse en Gym CMS',
+    subject: `Invitación para registrarse en ${appName}`,
     html: htmlContent,
   });
 }

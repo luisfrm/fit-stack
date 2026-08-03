@@ -2,7 +2,15 @@ import { handleRegistrationInvite, handleOrgInvite } from './handlers/email.hand
 import { handlePaymentReceipt } from './handlers/pdf.handler';
 
 export type FitTaskEvent =
-  | { type: 'email.registration_invite'; email: string; token: string }
+  | {
+      type: 'email.registration_invite';
+      email: string;
+      token: string;
+      /** Which app the registration link must point to. Defaults to 'panel'. */
+      target?: 'panel' | 'console';
+      /** Platform role to assign on sign-up (console invites only). */
+      role?: string;
+    }
   | { type: 'email.org_invite'; email: string; orgName: string; inviterName: string; inviteLink: string }
   | { type: 'email.payment_receipt'; paymentId: number; organizationId: string };
 

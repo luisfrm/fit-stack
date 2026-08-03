@@ -90,6 +90,7 @@ export function createMembersService(
               type: 'email.registration_invite',
               email: newMember.email,
               token,
+              target: 'panel',
             });
           }
         }
@@ -155,6 +156,7 @@ export function createMembersService(
           type: 'email.registration_invite',
           email: member.email,
           token,
+          target: 'panel',
         });
       }
 

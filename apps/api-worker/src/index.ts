@@ -26,6 +26,7 @@ import { platformPlanRoutes } from './routes/platform-plans.route';
 import { platformSubscriptionRoutes } from './routes/platform-subscriptions.route';
 import { platformOrganizationRoutes } from './routes/platform-organizations.route';
 import { platformSettingsRoutes } from './routes/platform-settings.route';
+import { platformStaffRoutes } from './routes/platform-staff.route';
 
 const app = new Hono<AppEnv>();
 
@@ -84,5 +85,6 @@ app.route('/api/platform/plans', platformPlanRoutes);
 app.route('/api/platform/subscriptions', platformSubscriptionRoutes);
 app.route('/api/platform/organizations', platformOrganizationRoutes);
 app.route('/api/platform/settings', platformSettingsRoutes);
+app.route('/api/platform/staff', platformStaffRoutes);
 
 export default app;
