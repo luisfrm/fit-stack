@@ -30,7 +30,7 @@ export default async function DashboardLayout({
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
       <AppSidebar
         user={{
-          name: session.user?.name || "Admin",
+          name: session.user?.name,
           role: userRole,
           avatarUrl: session.user?.image || undefined,
         }}

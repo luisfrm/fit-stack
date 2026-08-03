@@ -128,7 +128,7 @@ export function SwitchOrganizationAction() {
   );
 }
 
-export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ user: SidebarUser, activeOrganization?: IOrganization | null }>) {
+function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null) {
   const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
   const { isLoading: settingsLoading } = useSettings();
   const { isDark, toggleTheme } = useTheme();
@@ -145,6 +145,28 @@ export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ 
   const brandingAction = React.useMemo(() => {
     return <SwitchOrganizationAction />;
   }, []);
+
+  return {
+    activeOrganization,
+    isBrandingLoading,
+    navigation,
+    formattedUser,
+    brandingAction,
+    isDark,
+    toggleTheme,
+  };
+}
+
+export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ user: SidebarUser, activeOrganization?: IOrganization | null }>) {
+  const {
+    activeOrganization,
+    isBrandingLoading,
+    navigation,
+    formattedUser,
+    brandingAction,
+    isDark,
+    toggleTheme,
+  } = useSidebarBranding(user, initialOrg);
 
   return (
     <UISidebar
@@ -165,22 +187,15 @@ export function AppSidebar({ user, activeOrganization: initialOrg }: Readonly<{ 
 }
 
 export function MobileNav({ user, activeOrganization: initialOrg }: Readonly<{ user: SidebarUser, activeOrganization?: IOrganization | null }>) {
-  const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
-  const { isLoading: settingsLoading } = useSettings();
-  const { isDark, toggleTheme } = useTheme();
-
-  const activeOrganization = initialOrg ?? clientOrg;
-  const isBrandingLoading = (sessionLoading && !activeOrganization) || settingsLoading;
-  const navigation = useFilteredNavItems();
-
-  const formattedUser = React.useMemo(() => ({
-    ...user,
-    role: formatRole(user.role),
-  }), [user]);
-
-  const brandingAction = React.useMemo(() => {
-    return <SwitchOrganizationAction />;
-  }, []);
+  const {
+    activeOrganization,
+    isBrandingLoading,
+    navigation,
+    formattedUser,
+    brandingAction,
+    isDark,
+    toggleTheme,
+  } = useSidebarBranding(user, initialOrg);
 
   return (
     <UIMobileNav
@@ -188,7 +203,7 @@ export function MobileNav({ user, activeOrganization: initialOrg }: Readonly<{ u
       navigation={navigation}
       branding={{
         logo: activeOrganization?.logo ? uploadService.getMediaUrl(activeOrganization.logo) : undefined,
-        title: activeOrganization?.name || "Elite Fitness",
+        title: activeOrganization?.name || "Gym unnamed",
         subtitle: activeOrganization?.slogan || "",
         isLoading: isBrandingLoading,
         fallbackIcon: Dumbbell,
