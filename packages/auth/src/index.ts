@@ -1,4 +1,4 @@
-export { authClient, useSession, useActiveOrganization, organization } from './client';
+export { authClient, useSession, organization } from './client';
 export type { User, Session, SignInParams, SignUpParams } from './client';
 
 export { sessionService } from './service';

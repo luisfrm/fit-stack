@@ -35,7 +35,6 @@ export interface SignUpParams {
 
 export const {
   useSession,
-  useActiveOrganization,
   organization,
 } = authClient;
 
