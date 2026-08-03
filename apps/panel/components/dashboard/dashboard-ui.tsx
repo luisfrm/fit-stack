@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { IOrganization, formatRole } from "@workspace/shared";
+import { IOrganization, formatOrgRole } from "@workspace/shared";
 
 import {
   type IClassToday,
@@ -139,7 +139,7 @@ function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null
 
   const formattedUser = React.useMemo(() => ({
     ...user,
-    role: formatRole(user.role),
+    role: formatOrgRole(user.role),
   }), [user]);
 
   const brandingAction = React.useMemo(() => {

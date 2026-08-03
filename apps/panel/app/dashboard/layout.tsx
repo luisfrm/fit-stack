@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";
 import { PLATFORM_SUBSCRIPTION_STATUSES, hasAccess, PERMISSION_MODULES, PERMISSION_ACTIONS, type OrgRole } from "@workspace/shared";
 import { SubscriptionWarningBanner } from "@/components/dashboard/subscription/subscription-warning-banner";
+import { getOrgSubscriptionStatus } from "@/lib/services/subscription-status";
 
 export default async function DashboardLayout({
   children,
@@ -34,26 +35,7 @@ export default async function DashboardLayout({
   }
 
   // Check organization subscription status
-  let subscriptionStatus: string = PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE;
-  if (activeOrgId) {
-    try {
-      const { headers: nextHeaders } = await import("next/headers");
-      const cookieHeader = (await nextHeaders()).get("cookie") || "";
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
-
-      const subRes = await fetch(`${apiBase}/api/organizations/subscription-status`, {
-        headers: { cookie: cookieHeader },
-        cache: "no-store",
-      });
-
-      if (subRes.ok) {
-        const subData = await subRes.json();
-        subscriptionStatus = subData.status;
-      }
-    } catch (err) {
-      console.error("Error fetching subscription status:", err);
-    }
-  }
+  const subscriptionStatus = await getOrgSubscriptionStatus(activeOrgId);
 
   // If suspended or cancelled, redirect to no-subscription page
   if (subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED ||
