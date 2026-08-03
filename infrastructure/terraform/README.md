@@ -50,6 +50,12 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 | `UPSTASH_REDIS_REST_TOKEN` | Token de Upstash Redis |
 | `RESEND_API_KEY` | API Key de Resend |
 | `RESEND_FROM_EMAIL` | Email de envío |
+| `PANEL_URL` | URL del panel de tenants (ej: `https://fitstack-panel.luisrivas.site`) |
+| `CONSOLE_URL` | URL del console SaaS (ej: `https://fitstack-console.luisrivas.site`) |
+| `EMAIL_PROVIDER` | `smtp` o `resend` (jobs-worker) |
+| `SMTP_USER` | Usuario SMTP (si EMAIL_PROVIDER=smtp) |
+| `SMTP_PASS` | Contraseña SMTP (si EMAIL_PROVIDER=smtp) |
+| `ACCESS_CONTROL_API_KEY` | API key del Bridge (pausado — se agrega al migrar access-control al api-worker) |
 
 ### 3. Configurar Environment variables (en `production`)
 
@@ -148,10 +154,10 @@ infrastructure/terraform/
 ├── providers.tf          # Cloudflare provider
 ├── variables.tf          # Variables
 ├── main.tf               # Locals
-├── workers.tf            # Workers
+├── workers.tf            # Workers (+ secret_text_bindings inline)
 ├── queues.tf             # Colas + DLQ
 ├── storage.tf            # R2 bucket
-├── secrets.tf            # Secrets por worker
+├── secrets.tf            # Nota: secrets van inline en workers.tf
 ├── outputs.tf            # Outputs
 ├── .gitignore
 └── modules/

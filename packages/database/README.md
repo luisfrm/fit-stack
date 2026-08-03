@@ -8,10 +8,13 @@ Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 2
 
 | Import path | Contents |
 |-------------|----------|
-| `@workspace/database/client` | `db` (Neon serverless), `eq`, `and`, `or`, `sql`, `desc`, `count`, `isNull` |
+| `@workspace/database/client` | `db` (Neon serverless) — contexto Next.js / Node |
+| `@workspace/database/factory` | `createDb(url)` → instancia Drizzle **por request** (Neon HTTP driver, ideal Cloudflare Workers) + re-export de `drizzle-orm` (`eq`, `and`, `sql`, `desc`, etc.) |
 | `@workspace/database/schema` | Todas las tablas + relaciones |
 | `@workspace/database/seed` | Script de seed (`tsx src/seed.ts`) |
 | `@workspace/database/constants` | `rbac-defaults` (valores por defecto) |
+
+> **Workers**: en `api-worker` se usa siempre `@workspace/database/factory` — el cliente se crea por request con `createDb(c.env.DATABASE_URL)` (no existe `process.env` en Workers).
 
 ---
 
@@ -24,7 +27,7 @@ Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 2
 `organization` (incluye: slogan, countryCode, timezone, taxId, legalName, address, fiscalConfig), `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`fitstack_plan` (catalog with features as PlanFeatures), `store_subscription` (org subscriptions), `platform_payment` (platform invoices)
+`platform_plan` (catalog with features as PlanFeatures), `platform_subscription` (org subscriptions, status computado en SQL), `platform_subscription_payment` (invoices with commercial snapshots)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension), `coach_assignment` (coach ↔ client)
@@ -39,7 +42,7 @@ Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 2
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
-`cms_class`, `cms_page`, `cms_page_block`
+`gym_class` (class schedule), `content_page`, `content_block` (blocks by type with display order)
 
 ### Settings
 `platform_setting`, `gym_setting`

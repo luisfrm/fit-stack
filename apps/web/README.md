@@ -12,7 +12,8 @@ Sitio público de Fit-Stack + renderizado de páginas CMS dinámicas por organiz
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:3000`) |
+| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | ✅ | URL pública de archivos R2 (default: `http://localhost:8788/api/public/files`) |
 
 ```bash
 cp .env.example .env
@@ -36,7 +37,7 @@ pnpm lint         # ESLint
 Hero + servicios + funcionalidades + cómo funciona + testimonios. Muestra el producto Fit-Stack.
 
 ### Páginas CMS dinámicas (futuro)
-Las páginas CMS creadas en `apps/cms` se renderizan aquí mediante `GET /api/public/pages/[slug]`, pasando el header `x-organization-id`.
+Las páginas CMS creadas en `apps/panel` (módulo Contenido) se renderizan aquí mediante `GET /api/public/pages/[slug]`, pasando el header `x-organization-id`.
 
 ---
 

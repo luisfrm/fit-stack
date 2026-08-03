@@ -12,13 +12,14 @@ Panel de administración para gimnasios (Owner/Manager/Cashier). Next.js 16 con 
 ### Prerequisites
 
 - Node.js >= 20, pnpm 10+
-- `apps/api` corriendo en :3000
+- `apps/api-worker` corriendo en :8788 (la API activa)
 
 ### Environment variables
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:3000`) |
+| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | ✅ | URL pública de archivos R2 (default: `http://localhost:8788/api/public/files`) |
 
 ```bash
 cp .env.example .env
@@ -39,7 +40,7 @@ pnpm lint         # ESLint
 ## Estructura
 
 ```
-apps/cms/
+apps/panel/
 ├── app/
 │   ├── login/                     # Login page
 │   ├── register/                  # Registration page
@@ -100,6 +101,6 @@ Páginas dinámicas con bloques arrastrables: hero, services, classes, testimoni
 
 ## Deploy
 
-- Configurar `NEXT_PUBLIC_API_BASE_URL` con la URL del API en producción
-- Asegurar que el dominio CMS esté en `TRUSTED_ORIGINS` del API
+- Configurar `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` con las URLs de producción
+- Asegurar que el dominio del panel esté en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)
 - Se requiere Next.js standalone output (`next.config.mjs` ya configurado)

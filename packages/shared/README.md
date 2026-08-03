@@ -18,9 +18,11 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ### `src/constants.ts`
 - `GLOBAL_ROLES` — `ADMIN` (`admin`), `USER` (`user`)
 - `ORG_ROLES` — `OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`
-- `PAYMENT_STATUSES` — `processing`, `validated`, `invalid`, `voided`
+- `ROLE_LABELS` + `formatRole(role)` — etiquetas legibles en español para roles
+- `PAYMENT_STATUSES` — `pending`, `processing`, `validated`, `invalid`, `voided`, `refunded`
 - `SUBSCRIPTION_STATUSES` — `active`, `cancelled`, `expired`, `expiring`
-- `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `past_due`, `read_only`, `suspended`, `cancelled`
+- `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `trial`, `past_due`, `read_only`, `suspended`, `cancelled`
+- `PLATFORM_GRACE_PERIODS` + `computePlatformSubscriptionStatus()` + `isPlatformSubscriptionActive()/Expired()` — helpers puros para el status de la suscripción SaaS
 - `COUNTRIES` — 8 países preconfigurados: VE, CO, MX, AR, CL, PE, ES, US + interfaz `ICountryConfig`
 
 ### `types.ts`
@@ -31,9 +33,9 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 
 ### `access-control.ts`
 
-- `statement`, `ac` (Better Auth `createAccessControl`)
-- Roles: `owner`, `manager`, `cashier`, `coach`, `member`
-- `orgRoleDefinitions` — mapa Better Auth de rol → permisos nativos
+- `platformStatement`/`platformAc`/`platformRoles` — AC de plataforma SaaS (roles: `owner`, `admin`, `support`)
+- `organizationStatement`/`organizationAc`/`organizationRoles` — AC de tenant (roles: `owner`, `manager`, `cashier`, `coach`, `member`)
+- `orgRoleDefinitions` — alias de `organizationRoles` (mapa Better Auth de rol → permisos nativos)
 
 ### `auth-config.ts`
 
@@ -43,13 +45,13 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 
 | File | Contents |
 |------|----------|
-| `modules.ts` | `PERMISSION_MODULES` (10 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization) |
-| `actions.ts` | `PERMISSION_ACTIONS` (READ, CREATE, UPDATE, DELETE) |
-| `matrix-helpers.ts` | `PERMISSION_PRESETS` (NONE, READ, READ_UPDATE, READ_CREATE_UPDATE, CRUD), tipos `OrgPermissions`, `ModulePermissions` |
-| `matrix.ts` | `ORG_ROLE_PERMISSIONS` — matriz owner/manager/cashier/coach/member |
-| `can.ts` | `can(role, module, action)`, `canAny(role, checks)` |
-| `cms-access.ts` | `CMS_ALLOWED_ORG_ROLES`, `canAccessCms(role)` |
+| `modules.ts` | `PERMISSION_MODULES` (11 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization, panel) + `PERMISSION_MODULE_VALUES` |
+| `actions.ts` | `PERMISSION_ACTIONS` (READ, CREATE, UPDATE, DELETE, ACCESS) |
+| `can.ts` | `can(role, module, action)`, `canAny(role, checks)`, `hasAccess` (alias de `can`) |
 | `role-assignment.ts` | `canAssignRole(actor, target)` — anti-escalation |
+| `index.ts` | Re-export del módulo `permissions` |
+
+> La matriz de permisos vive en `access-control.ts` (`organizationRoles` con `organizationAc.newRole(...)`), no en un archivo de matriz separado. `can()` evalúa contra `organizationRoles`.
 
 ---
 

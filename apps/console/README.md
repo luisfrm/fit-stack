@@ -12,13 +12,14 @@ Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de pla
 ### Prerequisites
 
 - Node.js >= 20, pnpm 10+
-- `apps/api` corriendo en :3000
+- `apps/api-worker` corriendo en :8788 (la API activa)
 
 ### Environment variables
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:3000`) |
+| `NEXT_PUBLIC_API_BASE_URL` | ✅ | API URL (default: `http://localhost:8788`) |
+| `NEXT_PUBLIC_R2_URL` | ✅ | URL pública de archivos R2 (default: `http://localhost:8788/api/public/files`) |
 
 ```bash
 cp .env.example .env
@@ -77,7 +78,7 @@ apps/console/
 
 ## API consumida
 
-Todas las llamadas van a `apps/api` via `/api/platform/*` (requiere `GLOBAL_ROLES.ADMIN`):
+Todas las llamadas van al `api-worker` via `/api/platform/*` (requiere rol global `admin`):
 - `/api/platform/organizations`
 - `/api/platform/plans/*`
 - `/api/platform/settings`
@@ -85,6 +86,7 @@ Todas las llamadas van a `apps/api` via `/api/platform/*` (requiere `GLOBAL_ROLE
 
 ## Deploy
 
-- Configurar `NEXT_PUBLIC_API_BASE_URL` con la URL del API en producción
+- Configurar `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` con las URLs de producción
 - No debe ser accesible públicamente (solo staff Fit-Stack)
-- Dominio separado del CMS de tenants
+- Dominio separado del panel de tenants
+- Asegurar que el dominio del console esté en la allowlist CORS del API (`apps/api-worker/src/lib/cors.ts`)

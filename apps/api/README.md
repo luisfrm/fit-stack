@@ -1,8 +1,12 @@
 # Fit-Stack API
 
-The central HTTP API for the Fit-Stack platform — **Next.js 16** (App Router + Route Handlers), **Better Auth** (session management), **Drizzle ORM** (PostgreSQL via Neon), **Upstash Redis** (caching), **Cloudflare R2** (file uploads), **Nodemailer/Resend** (emails).
+> ## ⏸ DEPRECATED — PAUSADO
+>
+> Este app está **pausado y deprecado**. La API activa es **`apps/api-worker`** (Hono / Cloudflare Workers, puerto 8788). Este README se conserva solo como referencia histórica del API legacy (Next.js 16 + Route Handlers).
 
-Runs on **port 3000** by default.
+El API HTTP central del ecosistema Fit-Stack (versión legacy) — **Next.js 16** (App Router + Route Handlers), **Better Auth**, **Drizzle ORM** (PostgreSQL via Neon), **Upstash Redis** (caching), **Cloudflare R2** (file uploads), **Nodemailer/Resend** (emails).
+
+Corría en el **puerto 3000** por defecto.
 
 ---
 

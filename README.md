@@ -14,13 +14,13 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 
 | App | Stack | Port / Platform | Purpose |
 |-----|-------|:----:|---------|
-| `api-worker` | Hono + Cloudflare Workers | Edge API | Primary REST API (Better Auth + Drizzle ORM + Hono) |
-| `jobs-worker` | Cloudflare Queues | Worker | Background jobs processor (Emails via Resend, PDFs, Notifications) |
+| `api-worker` | Hono + Cloudflare Workers | 8788 | Primary REST API (Better Auth + Drizzle ORM + Hono) |
+| `jobs-worker` | Cloudflare Queues | 8787 | Background jobs processor (Emails via Resend, PDFs, Notifications) |
 | `panel` | Next.js 16 (App) | 3001 | Gym admin panel (Owner/Manager/Cashier) |
 | `web` | Next.js 16 (App) | 3002 | Public marketing + CMS pages & Member portal |
 | `console` | Next.js 16 (App) | 3003 | SaaS super-admin (organizations, plans, subscriptions) |
-| `bridge` | Python/Flet | Desktop Kiosk | Desktop app for biometric & QR access control |
-| `api` | Next.js 16 | 3000 | *(DEPRECATED)* Legacy Next.js API Routes |
+| `bridge` | Python/Flet | Desktop Kiosk | Desktop app for biometric & QR access control — ⏸ **pausado** |
+| `api` | Next.js 16 | 3000 | *(DEPRECATED)* Legacy Next.js API Routes — ⏸ **pausado, solo referencia** |
 
 ### Packages
 
@@ -103,11 +103,12 @@ pnpm format
 - **Two-tier roles** — `GLOBAL_ROLES` (platform admin) + `ORG_ROLES` (tenant-scoped).
 - **Unified RBAC** — Defined in `packages/shared/src/access-control.ts`. Includes `panel: ["access"]` and `hasAccess()` evaluation.
 - **Drizzle Schema Rule** — No PostgreSQL `pgEnum` types. Uses `text().$type<...>()` to avoid breaking database migrations.
-- **Caching** — Upstash Redis with graceful degradation.
+- **Caching** — Upstash Redis with graceful degradation (cache keys in AGENTS.md).
+- **Active org profile** — Resolved by the `api-worker` custom session (`activeOrganization`) with a 5-min Redis cache (`org:{id}:profile`).
 - **Atomic Invoicing** — Subscriptions + Payments created in a single unit.
 - **Cumulative Expiration** — Renewing extends from `periodEnd`, not today.
 - **Multi-currency** — Base currency (USD) + local currencies via real-time exchange rates.
-- **Bridge** — Local Flet app polls `/api/access-control/sync-tasks` for biometric device enrollment.
+- **Bridge (pausado)** — Local Flet app polls `/api/access-control/sync-tasks` for biometric device enrollment (endpoints aún no migrados al api-worker).
 
 ---
 

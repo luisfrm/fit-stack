@@ -25,17 +25,17 @@ cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
 cd apps/console     && pnpm dev  # Port 3003 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (read-only reference)
+cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado, read-only reference)
 
-# Bridge (Python/Flet — managed separately with uv)
-cd apps/bridge
-uv sync
-uv run python main.py
+# Bridge (Python/Flet — managed separately with uv) ⏸ PAUSADO
+# cd apps/bridge
+# uv sync
+# uv run python main.py
 ```
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop), `api` (Next.js 16, **DEPRECATED** — kept only as reference, excluded from pnpm workspace).
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
 
@@ -65,7 +65,7 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 | **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
 | **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. |
 | **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
-| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⚠ Endpoints pending migration to api-worker.** |
+| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Pausado** — endpoints viven solo en `apps/api` legacy, no migrados al api-worker. |
 | **Reports** | Revenue analytics with multi-currency normalization. |
 | **Settings** | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection). |
 
@@ -103,13 +103,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 
 **Tables**: `access_control_log` (audit trail of every access attempt), `biometric_sync_task` (queue of sync tasks for devices)
 
-**⚠ Migration status (PENDING)**: These 3 endpoints currently exist **only in `apps/api` (deprecated)**. The active `apps/api-worker` does **NOT** mount `/api/access-control` yet. When migrating, port:
-
-1. `apps/api/repositories/access-control.repository.ts` → `apps/api-worker/src/repositories/access-control.repository.ts` as `createAccessControlRepository(db: Db)` factory with: `verifyAccess`, `createLog`, `getPendingSyncTasks`, `updateTaskStatus`, `createSyncTask`. Use `@workspace/database/factory` imports (not `@workspace/database/client`).
-2. Routes → `apps/api-worker/src/routes/access-control.route.ts` (Hono). Machine-to-machine: **no session required** — add a `requireApiKey` middleware comparing `x-api-key` against `c.env.ACCESS_CONTROL_API_KEY` (use timing-safe comparison). Mount `app.route('/api/access-control', accessControlRoutes)` in `apps/api-worker/src/index.ts`.
-3. Add `ACCESS_CONTROL_API_KEY: string` to `apps/api-worker/src/lib/env.ts` and to the Worker `secret_text_bindings` in `infrastructure/terraform/workers.tf` + GitHub environment secret.
-4. Hook biometric sync tasks into member lifecycle: `apps/api-worker/src/services/members.service.ts` must create sync tasks (create → `enroll`, delete → `delete`) like the legacy `apps/api/services/members.service.ts` does.
-5. Update `apps/bridge/main.py` `CLOUD_API_URL` (currently defaults to `http://localhost:3000` — the deprecated API) and the bridge README.
+> **⏸ Estado: PAUSADO.** El Bridge y `apps/api` están pausados. Los 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) y el repositorio `access-control.repository.ts` existen **solo en `apps/api` (legacy)** — el `apps/api-worker` activo **no** monta `/api/access-control` todavía. No hay migración en curso. Cuando se reactive, portar a un `createAccessControlRepository(db)` factory + router Hono con `requireApiKey` middleware, y agregar `ACCESS_CONTROL_API_KEY` a `apps/api-worker/src/lib/env.ts` + `secret_text_bindings` de Terraform.
 
 ### 5. Business Rules Summary
 
@@ -610,7 +604,7 @@ Definida en `apps/console/lib/config/platform-settings.ts`. Replica de la que es
 
 ### When to update AGENTS.md
 
-- New API endpoints or route restructuring (e.g., `/api/access-control` migration to api-worker)
+- New API endpoints or route restructuring (e.g., migrating `/api/access-control` to api-worker when Bridge reactivates)
 - Changes to RBAC (new roles, permission matrix changes, new modules)
 - New business rules or module changes
 - New apps or packages added to the monorepo (e.g., `console`, `auth`)
@@ -729,7 +723,7 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `RESEND_FROM_EMAIL`
 - `PANEL_URL`
 - `CONSOLE_URL`
-- `ACCESS_CONTROL_API_KEY` *(pendiente: agregar al migrar access-control al api-worker)*
+- `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
 
 **Variables por environment (nombres de recursos, no sensibles):**
 - `API_WORKER_NAME` (ej: `fit-stack-api`)

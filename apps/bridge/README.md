@@ -1,5 +1,9 @@
 # Fit-Stack Bridge
 
+> ## ⏸ PAUSADO
+>
+> Este proyecto está **pausado**. Los endpoints de access-control que consume (`/api/access-control/*`) existen solo en el API legacy (`apps/api`) — **no** están migrados al `api-worker` activo. Este README se conserva como referencia para cuando se reactive.
+
 App de escritorio para control de acceso biométrico/QR. Corre localmente en el kiosk del gimnasio. Construida con **Python 3.12+** y **Flet** (UI). Gestionada con `uv` — no forma parte del monorepo Turbo.
 
 ---
@@ -24,7 +28,7 @@ App de escritorio para control de acceso biométrico/QR. Corre localmente en el 
 
 | Variable | Required | Description |
 |----------|:--------:|-------------|
-| `CLOUD_API_URL` | ✅ | API base URL (default: `http://localhost:3000/api/access-control`) |
+| `CLOUD_API_URL` | ✅ | API base URL (default: `http://localhost:3000/api/access-control` — apunta al API legacy pausado; al reactivar, apuntar al `api-worker` en :8788) |
 | `CLOUD_API_KEY` | ✅ | Debe coincidir con `ACCESS_CONTROL_API_KEY` del API |
 | `ORGANIZATION_ID` | ✅ | ID de la organización (gimnasio) |
 
