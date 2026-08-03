@@ -101,21 +101,7 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
       {/* Photo Upload */}
       <div className="flex flex-col items-center gap-4 py-4">
-        <button
-          type="button"
-          aria-label={previewUrl ? "Cambiar foto de perfil" : "Subir foto de perfil"}
-          className={cn(
-            "relative group cursor-pointer transition-all duration-300 outline-none rounded-full block",
-            !previewUrl && "hover:border-primary/50"
-          )}
-          onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-        >
+        <div className="relative group cursor-pointer">
           <div className={cn(
             "rounded-full p-1 border-2 border-dashed border-white/10 group-hover:border-primary/40 transition-colors",
             previewUrl && "border-solid border-primary/20"
@@ -130,36 +116,41 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
             </Avatar>
           </div>
 
-          {/* Hover Overlay */}
-          <div className="absolute inset-1 rounded-full bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center gap-1.5 z-10 overflow-hidden">
-            {isUploading ? (
-              <Loader2 className="size-6 text-white animate-spin" />
-            ) : (
-              <>
-                <Camera className="size-6 text-white" />
-                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                  {previewUrl ? "Cambiar" : "Subir foto"}
-                </span>
-              </>
-            )}
-          </div>
+          {/* Upload Trigger (covers whole avatar area, always clickable even when invisible) */}
+          <button
+            type="button"
+            aria-label={previewUrl ? "Cambiar foto de perfil" : "Subir foto de perfil"}
+            className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-all duration-300 z-10 overflow-hidden cursor-pointer border-none outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--color-primary]"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <span className="absolute inset-1 rounded-full bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1.5">
+              {isUploading ? (
+                <Loader2 className="size-6 text-white animate-spin" />
+              ) : (
+                <>
+                  <Camera className="size-6 text-white" />
+                  <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                    {previewUrl ? "Cambiar" : "Subir foto"}
+                  </span>
+                </>
+              )}
+            </span>
+          </button>
 
+          {/* Remove Photo (sibling button) */}
           {previewUrl && (
             <Button
               type="button"
               variant="danger"
               size="icon"
               rounded="full"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeImage();
-              }}
+              onClick={removeImage}
               className="absolute -top-1 -right-1 h-6 w-6 shadow-xl hover:scale-110 transition-transform z-20"
             >
               <X className="size-3.5" />
             </Button>
           )}
-        </button>
+        </div>
         <div className="flex flex-col items-center gap-1">
           <span className="text-xs font-semibold text-gray-300">Foto de perfil</span>
           <span className="text-[10px] text-gray-400">JPG, PNG o WEBP (Máx. 2MB)</span>
