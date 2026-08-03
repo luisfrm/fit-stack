@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   const isAdmin = userRole === GLOBAL_ROLES.ADMIN;
 
   if (!isAdmin) {
-    redirect("/login?status=unauthorized");
+    redirect("/unauthorized");
   }
 
   return (
