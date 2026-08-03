@@ -1,9 +1,9 @@
 # Fit-Stack Console
 
-Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de plataforma, suscripciones y configuraciones globales (currencies, payment methods). Requiere `GLOBAL_ROLES.ADMIN`.
+Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de plataforma, suscripciones, configuraciones globales (currencies, payment methods) y el equipo de administración (Staff).
 
 **Puerto:** 3003  
-**Acceso:** Solo usuarios con rol global `admin`
+**Acceso:** Usuarios con rol global de plataforma que pasen `canAccessConsole(role)` (admin/owner — los que tienen `organization.create` en `platformRoles`); `support` es read-only y no entra al layout
 
 ---
 
@@ -42,7 +42,8 @@ pnpm lint         # ESLint
 ```
 apps/console/
 ├── app/
-│   ├── login/                     # Super-admin login
+│   ├── login/                     # Super-admin login (soporta ?returnTo=)
+│   ├── register/                  # Registro de invitados del módulo Staff (token → signUp → accept)
 │   ├── init/                      # First admin setup
 │   └── dashboard/
 │       ├── page.tsx               # SaaS admin dashboard (KPIs + recent orgs)
@@ -51,15 +52,17 @@ apps/console/
 │       ├── settings/              # Global platform settings
 │       │   ├── currencies/        # Supported currencies
 │       │   └── payment-methods/   # Active payment methods
-│       └── subscriptions/         # All platform subscriptions list
+│       ├── subscriptions/         # All platform subscriptions list
+│       └── staff/                 # Staff de plataforma (list + add/revoke admins)
 ├── components/
 │   ├── dashboard/                 # saas-admin-dashboard, organizations-table, org-form/modal
-│   └── platform/                  # platform-plan-card/form/modal, subscription-form/modal,
+│   ├── platform/                  # platform-plan-card/form/modal, subscription-form/modal,
 │                                  # subscriptions-table + kpi-section, payment-section
+│   └── staff/                     # staff-table, staff-modal, staff-form
 └── lib/
     ├── auth-client.ts             # Re-export de @workspace/auth/client
-    ├── hooks/                     # use-auth, platform-settings, platform-subscriptions
-    ├── services/                  # organizations, platform-plans, platform-subscriptions
+    ├── hooks/                     # Vanilla (sin TanStack Query): use-auth, use-debounce, use-exchange-rates
+    ├── services/                  # organizations, platform-plans, platform-subscriptions, staff
     └── config/                    # envs, constants, display config
 ```
 
@@ -73,6 +76,7 @@ apps/console/
 | `/dashboard/organizations/[id]/subscriptions` | Suscripciones de la org + crear manual |
 | `/dashboard/plans` | Catálogo de planes Fit-Stack |
 | `/dashboard/subscriptions` | Lista global de suscripciones |
+| `/dashboard/staff` | Equipo de administración de la plataforma (support/admin/owner) — alta con invitación por correo o acceso directo, y revocación |
 | `/dashboard/settings/currencies` | Monedas disponibles |
 | `/dashboard/settings/payment-methods` | Métodos de pago |
 
@@ -82,6 +86,7 @@ Todas las llamadas van al `api-worker` via `/api/platform/*` (requiere rol globa
 - `/api/platform/organizations`
 - `/api/platform/plans/*`
 - `/api/platform/settings`
+- `/api/platform/staff` (list/create/revoke + validate-token/accept para el register)
 - `/api/platform/subscriptions/*`
 
 ## Deploy

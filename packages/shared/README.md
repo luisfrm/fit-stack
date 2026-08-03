@@ -18,7 +18,8 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ### `src/constants.ts`
 - `GLOBAL_ROLES` — `ADMIN` (`admin`), `USER` (`user`)
 - `ORG_ROLES` — `OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`
-- `ROLE_LABELS` + `formatRole(role)` — etiquetas legibles en español para roles
+- `ORG_ROLE_LABELS` + `formatOrgRole(role)` — etiquetas en español para roles de **organización (Panel)**
+- `PLATFORM_ROLE_LABELS` + `formatPlatformRole(role)` — etiquetas en español para roles de **plataforma (Console)**: `owner`, `admin`, `support`, `user`
 - `PAYMENT_STATUSES` — `pending`, `processing`, `validated`, `invalid`, `voided`, `refunded`
 - `SUBSCRIPTION_STATUSES` — `active`, `cancelled`, `expired`, `expiring`
 - `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `trial`, `past_due`, `read_only`, `suspended`, `cancelled`
@@ -34,6 +35,7 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ### `access-control.ts`
 
 - `platformStatement`/`platformAc`/`platformRoles` — AC de plataforma SaaS (roles: `owner`, `admin`, `support`)
+- `canAccessConsole(role)` — gate de acceso al Console (true para cualquier rol de `platformRoles`)
 - `organizationStatement`/`organizationAc`/`organizationRoles` — AC de tenant (roles: `owner`, `manager`, `cashier`, `coach`, `member`)
 - `orgRoleDefinitions` — alias de `organizationRoles` (mapa Better Auth de rol → permisos nativos)
 
@@ -48,7 +50,7 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 | `modules.ts` | `PERMISSION_MODULES` (11 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization, panel) + `PERMISSION_MODULE_VALUES` |
 | `actions.ts` | `PERMISSION_ACTIONS` (READ, CREATE, UPDATE, DELETE, ACCESS) |
 | `can.ts` | `can(role, module, action)`, `canAny(role, checks)`, `hasAccess` (alias de `can`) |
-| `role-assignment.ts` | `canAssignRole(actor, target)` — anti-escalation |
+| `role-assignment.ts` | `canAssignRole(actor, target)` (org) y `canAssignPlatformRole(actor, target)` (plataforma) — anti-escalation |
 | `index.ts` | Re-export del módulo `permissions` |
 
 > La matriz de permisos vive en `access-control.ts` (`organizationRoles` con `organizationAc.newRole(...)`), no en un archivo de matriz separado. `can()` evalúa contra `organizationRoles`.

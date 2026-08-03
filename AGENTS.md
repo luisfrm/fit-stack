@@ -217,6 +217,18 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
 - **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
 
+### 8. HTTP Client (ofetch — NO `fetch` nativo)
+
+**ESTÁ PROHIBIDO usar `fetch` nativo.** Todas las peticiones HTTP se hacen con **ofetch**:
+
+- **API de Fit-Stack (api-worker)** → SIEMPRE a través del cliente context-aware de cada app:
+  - Console: `apps/console/lib/api/client.ts` (export `api`)
+  - Panel: `apps/panel/lib/api/client.ts` (exports `api` y `apiBlob`)
+  - El cliente añade `baseURL` (`${apiBaseUrl}/api`), **forwardea cookies en server** (RSC), `credentials: "include"` en client, `retry`/`timeout`, e intercepta `ORGANIZATION_NOT_FOUND`.
+  - Server actions que invalidan cache (`updateTag`) + `router.refresh()` NO hacen peticiones HTTP — se combinan con `api()` para las llamadas.
+- **APIs externas** (ej. exchange rates de open.er-api.com) → `ofetch` directo, SIN pasar por el cliente interno (que no debe enviar sesión ni baseURL del API). Ver `apps/{console,panel}/lib/api/exchange-rates.ts` con `next: { revalidate }` para cache de Next.
+- `next/headers` (`cookies()`, `headers()`) se usa solo para leer contexto de la request — nunca para hacer la petición HTTP.
+
 ---
 
 ## Redis Caching (Upstash)
@@ -259,6 +271,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `platform:plans*` | 10 min | Platform plan catalog |
 | `platform:subscriptions*` | 5 min | SaaS subscriptions |
 | `platform:subscriptions:stats` | 5 min | Subscription KPI stats |
+| `platform:staff*` | 5 min | Platform staff (SaaS admins: support/admin/owner) |
 
 ### Cache Invalidation Strategy
 
@@ -296,7 +309,9 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
 - `ACTIVE` → normal render
 
-**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session)
+**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch envuelto en `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), usado por el layout y por la gate page.
+
+**Gate pages dinámicas** (`/no-subscription`, `/unauthorized` en panel y console) — Server Components con `force-dynamic` que chequean la sesión en cada request: sin sesión → `redirect('/login')`; con acceso válido (suscripción activa o rol permitido) → `redirect('/dashboard')`; solo sin acceso se renderizan. Evita quedarse pegado tras cerrar sesión o refrescar.
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
 
 ---
@@ -315,7 +330,9 @@ GLOBAL_ROLES = {
 }
 ```
 
-Platform roles for Better Auth admin plugin (`platformRoles`): `owner`, `admin`, `support`.
+Platform roles for Better Auth admin plugin (`platformRoles`): `owner`, `admin`, `support` (defined in `packages/shared/src/access-control.ts`).
+
+**Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` solo para roles con `organization.create` (admin/owner); `support` es read-only y no entra al layout de console.
 
 ### Organization Roles
 
@@ -372,6 +389,13 @@ Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/sr
 - `MANAGER` → cannot assign `OWNER`
 - `CASHIER` → can only assign `MEMBER`
 
+**Platform anti-escalation** (`canAssignPlatformRole(actor, target)`):
+- `owner` → puede asignar cualquier rol de plataforma (support/admin/owner)
+- `admin` → solo `support` o `admin` (NUNCA `owner`)
+- `support` → no puede asignar
+
+> La anti-escalación se valida **server-side** en `/api/platform/staff` (POST y DELETE) — la UI solo filtra opciones.
+
 ### Panel Access Control
 
 Only `OWNER`, `MANAGER`, `CASHIER` can use the panel app (`apps/panel`). Implemented via the `panel: ["access"]` permission (`PANEL` module, `ACCESS` action):
@@ -400,7 +424,9 @@ if (orgRole && !canAccessCms()) redirect('/unauthorized')
 // constants.ts
 GLOBAL_ROLES, ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
 PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
-DEFAULT_COUNTRY, COUNTRY_LIST, ICountryConfig
+DEFAULT_COUNTRY, COUNTRY_LIST, ICountryConfig,
+ORG_ROLE_LABELS + formatOrgRole (roles de organización/Panel),
+PLATFORM_ROLE_LABELS + formatPlatformRole (roles de plataforma/Console: owner, admin, support, user)
 
 // types.ts
 IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
@@ -409,8 +435,8 @@ PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlat
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
-orgRoleDefinitions, PlatformStatement, OrganizationStatement, OrgRole types.
-Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
+orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationStatement,
+OrgRole/PlatformRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
 ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone)
@@ -420,7 +446,7 @@ ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, 
                       subscriptions, plans, classes, content, settings, organization, panel)
   actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
   can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
-  role-assignment.ts: canAssignRole(actor, target)
+  role-assignment.ts: canAssignRole(actor, target) (org) y canAssignPlatformRole(actor, target) (plataforma)
 ```
 
 ---
@@ -485,7 +511,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ## Console API Layer (ofetch)
 
-`apps/console` usa **ofetch** como wrapper unificado de `fetch` nativo. Reemplaza axios con una API más liviana (~6kb) y soporte nativo para `next: { revalidate, tags }`.
+`apps/console` usa **ofetch** como wrapper unificado de `fetch` nativo (regla global: **no raw `fetch`** — ver sección 8 de Technical Standards). Reemplaza axios con una API más liviana (~6kb) y soporte nativo para `next: { revalidate, tags }`.
 
 ### Estructura
 
@@ -499,11 +525,13 @@ lib/
 │   ├── organizations-service.ts
 │   ├── platform-plans-service.ts
 │   ├── platform-subscriptions-service.ts
+│   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
 │   ├── currency-service.ts (legacy, usar lib/api/exchange-rates en RSC)
 │   ├── init-service.ts
 │   ├── upload-service.ts
 │   └── session-service.ts (usa authClient, sin cambios)
-└── hooks/                 ← useTanStackQuery sobre los services
+└── hooks/                 ← hooks vanilla (sin TanStack Query): use-auth, use-debounce,
+                             use-exchange-rates, use-organization-activation, use-theme
 ```
 
 ### Comportamiento context-aware (`lib/api/client.ts`)
@@ -568,6 +596,7 @@ const handleSuccess = async () => {
 | `console:plans` | `/api/platform/plans*` (with-stats, summary) |
 | `console:subs` | `/api/platform/subscriptions*` (incluye /stats) |
 | `console:settings` | `/api/platform/settings` |
+| `console:staff` | `/api/platform/staff` |
 
 ### RSC Pattern en `apps/console`
 
@@ -585,12 +614,15 @@ const handleSuccess = async () => {
   }
   ```
 - **Hojas cliente** (search inputs, pagination buttons, modales) usan `useRouter` + `searchParams` de `next/navigation` para modificar la URL → re-render server.
-- **Type C pages** (full-client forms: currencies, payment-methods, `[id]/settings`) siguen con `"use client"`. Follow-up: envolverlas en server parent que pase `initialData` para eliminar loading flash.
-- **`QueryClient` (TanStack Query)**: solo sirve mutaciones y Type C pages. No se usa para reads iniciales en RSC.
+- **Type C pages** (currencies, payment-methods) ya son **RSC parent + client child con `initialData`**: el server fetchea settings (`console:settings`) y el client arranca con el dato (sin loading flash) y guarda vía `api POST` + server action `updateTag`. La página `organizations/[id]/settings` sigue siendo client (fetch con `useState`/`useEffect`, sin TanStack Query).
+- **TanStack Query está ELIMINADO del proyecto** (console y panel). Estándar único: **RSC + ofetch + cache de Next para todos los reads**; las mutaciones en páginas RSC usan `service → toast → updateTag → refresh`. Solo se reintroduciría una librería de fetching client-side si una feature de datos en vivo (polling, UI optimista, infinite scroll) lo justifique.
 
-### Constante de settings (`PLATFORM_SETTINGS_KEYS`)
+### Constantes de settings
 
-Definida en `apps/console/lib/config/platform-settings.ts`. Replica de la que está en `lib/hooks/use-platform-settings.ts` para uso en server components (los hooks no son accesibles desde server).
+- `PLATFORM_SETTINGS_KEYS` → `apps/console/lib/config/platform-settings.ts` (settings de plataforma)
+- `SETTINGS_KEYS` → `apps/console/lib/config/settings.ts` (settings de organización)
+
+Ambas se importan desde server y client (no dependen de hooks).
 
 ---
 

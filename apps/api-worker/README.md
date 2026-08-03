@@ -100,7 +100,8 @@ apps/api-worker/
 | GET/POST | `/api/auth/*` | Motor Better Auth (sign-in, sign-up, get-session, organization, invitations, admin) |
 | GET | `/api/init` | Verifica si el sistema requiere bootstrap (`needsInit`) |
 | POST | `/api/init` | Crea el primer admin global (solo cuando `needsInit`) |
-| GET | `/api/members/validate-token?token=...` | Valida token de invitación (sin auth) |
+| GET | `/api/members/validate-token?token=...` | Valida token de invitación de panel (sin auth) |
+| GET | `/api/platform/staff/validate-token?token=...` | Valida token de invitación de console (sin auth) — prefill del register |
 | GET | `/api/public/pages/:slug?organizationId=...` | Página CMS pública (cache 15 min) |
 | GET | `/api/public/files/*` | Archivos estáticos desde R2 |
 
@@ -159,7 +160,7 @@ apps/api-worker/
 | PUT | `/api/upload/direct?key=...` | `requireAuth` | Upload directo del body al bucket |
 | POST | `/api/upload/presigned` | `requireAuth` | Genera presigned URL (`{ presignedUrl, key }`) |
 
-### Rutas plataforma (SaaS admin — `requirePlatformAuth`, solo rol global `admin`)
+### Rutas plataforma (SaaS admin — `requirePlatformAuth`, roles globales `admin`/`owner`)
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -194,6 +195,10 @@ apps/api-worker/
 | POST | `/api/platform/organizations/:id/staff/:memberId/resend-invite` | Reenvía invitación de staff |
 | GET | `/api/platform/settings` | Settings globales de plataforma |
 | POST | `/api/platform/settings` | Actualiza settings globales |
+| GET | `/api/platform/staff` | Staff de plataforma (users con rol support/admin/owner, cache 5 min) |
+| POST | `/api/platform/staff` | Otorga acceso (user existe → update role) o envía invitación a console (user no existe) |
+| POST | `/api/platform/staff/accept` | `requireAuth` — activa el rol de plataforma tras registrarse |
+| DELETE | `/api/platform/staff/:id` | Revoca acceso (role → `user`). Guards: no a sí mismo, no al último owner, anti-escalación |
 
 ---
 
@@ -219,7 +224,7 @@ apps/api-worker/
 | `RESEND_API_KEY` | ❌ | Declarado en `Env` pero **no consumido por este worker** — los emails se encolan en `TASK_QUEUE` y los envía el `jobs-worker` |
 | `RESEND_FROM_EMAIL` | ❌ | Ídem |
 | `PANEL_URL` | ❌ | Base URL del panel para links de invitación (default `http://localhost:3001`) |
-| `CONSOLE_URL` | ❌ | Base URL del console (reservado) |
+| `CONSOLE_URL` | ❌ | Base URL del console para links de invitación de staff (default `http://localhost:3003`) |
 
 ### Bindings (Cloudflare)
 
@@ -228,7 +233,7 @@ apps/api-worker/
 | `FILES_BUCKET` | R2 | Bucket de archivos (per-env: `fit-stack-files[-dev|-staging]`) |
 | `TASK_QUEUE` | Queue | Cola de tareas (emails, etc.). Per-env: `fit-task-events[-dev|-staging]` |
 
-> ⚠️ **Tip**: el template `.env.example` usa `BETTER_AUTH_URL=http://localhost:8787` — ese es el puerto del `jobs-worker`. Para la API local debe ser `http://localhost:8788`.
+> ⚠️ **Tip**: `BETTER_AUTH_URL` en dev debe apuntar a `http://localhost:8788` (el puerto de este worker; `8787` es del `jobs-worker`).
 
 ---
 
@@ -247,7 +252,7 @@ Patrones principales (referencia completa en [AGENTS.md](../../AGENTS.md#cache-k
 | `org:{id}:settings` | 10 min | Settings de org |
 | `org:{id}:public:page:*` | 15 min | Páginas públicas (web) |
 | `org:{id}:subscription-status` | 1 min | Estado de facturación |
-| `platform:organizations*` / `platform:plans*` / `platform:subscriptions*` | 5-10 min | Datos SaaS admin |
+| `platform:organizations*` / `platform:plans*` / `platform:subscriptions*` / `platform:staff*` | 5-10 min | Datos SaaS admin |
 | `member:role:{userId}:{orgId}` | 1 min | Rol cached del miembro (invalidado en `afterUpdateMemberRole`) |
 
 Las escrituras (POST/PUT/DELETE) invalidan los patrones relacionados inmediatamente.
