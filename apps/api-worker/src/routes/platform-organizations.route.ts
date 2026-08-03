@@ -100,6 +100,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
+    await cache.invalidateExact(`org:${id}:profile`);
     return c.json(updatedOrg);
   })
 
@@ -114,6 +115,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
+    await cache.invalidateExact(`org:${id}:profile`);
     return c.json(updatedOrg);
   })
 
@@ -127,6 +129,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     await service.deleteOrganization(id);
     await cache.invalidate('platform:organizations*');
+    await cache.invalidateExact(`org:${id}:profile`);
     return c.json({ success: true });
   })
 

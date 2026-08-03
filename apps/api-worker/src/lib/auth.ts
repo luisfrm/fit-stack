@@ -102,6 +102,24 @@ export function createAuth(env: Env) {
           return { user, session };
         }
 
+        // Resolve active organization profile (cached 5 min) — used for sidebar branding, theme, timezone
+        const orgCacheKey = `org:${activeOrgId}:profile`;
+        let activeOrganization: (typeof schema.organization.$inferSelect) | null = null;
+        const orgCached = await cache.get<typeof schema.organization.$inferSelect>(orgCacheKey);
+        if (orgCached) {
+          activeOrganization = orgCached;
+        } else {
+          const [org] = await db
+            .select()
+            .from(schema.organization)
+            .where(eq(schema.organization.id, activeOrgId))
+            .limit(1);
+          if (org) {
+            await cache.set(orgCacheKey, org, 300);
+            activeOrganization = org;
+          }
+        }
+
         const cacheKey = `member:role:${user.id}:${activeOrgId}`;
         const cached = await cache.get<{ id: string; role: string }>(cacheKey);
         if (cached) {
@@ -115,6 +133,7 @@ export function createAuth(env: Env) {
               role: cached.role,
               createdAt: new Date(),
             },
+            activeOrganization,
           };
         }
 
@@ -143,6 +162,7 @@ export function createAuth(env: Env) {
           user,
           session,
           member: member || null,
+          activeOrganization,
         };
       }),
     ],
