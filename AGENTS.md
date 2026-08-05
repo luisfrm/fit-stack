@@ -35,8 +35,9 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
+- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE-05-20-2026.md` y specs de diseño en `docs/superpowers/specs/` (ej. Hybrid FAB).
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
@@ -197,6 +198,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 | `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback) |
 | `requireAuth()` | Org-scoped routes without permission check | Session + user only |
 | `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`) | Session + platform permission via `auth.api.userHasPermission` |
+| `requirePlatformAuth()` | Alias de `requirePlatformPermission('organization', 'create')` — middleware estándar de las rutas `/api/platform/*` | Session + permiso `organization.create` |
 
 ```ts
 // Typical org-scoped route (Hono)
@@ -211,6 +213,35 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 - Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
 - Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope.
 - The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
+
+#### API Route Map (api-worker)
+
+Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/healthz` y `/favicon.ico`):
+
+| Router | Endpoints notables |
+|--------|--------------------|
+| `/api/auth/*` | Better Auth engine (sesiones, orgs, invitations) |
+| `/api/members` | CRUD gym members + invites (`members.service` encola `email.org_invite`) |
+| `/api/plans` | Membership plans (catalog gym) |
+| `/api/subscriptions` | CRUD subscriptions (registro de pago encola `email.payment_receipt`) |
+| `/api/payments` | `PATCH /:id/status`, `POST /:id/send-email` (reenvío de recibo) |
+| `/api/classes` | Class schedule CRUD |
+| `/api/trainers` | Trainers (gym_member + coach_profile) |
+| `/api/cms` | Content pages/blocks |
+| `/api/dashboard` | KPI stats (cache `org:*:dashboard:stats:*`) |
+| `/api/settings` | Gym settings (currencies, payment methods, theme) |
+| `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
+| `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
+| `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
+| `/api/init` | Bootstrap de org (sin auth) |
+| `/api/public` | `GET /pages/:slug` (CMS público, cache 15 min), `GET /files/*` (R2) — sin auth |
+| `/api/platform/plans` | Catálogo de planes SaaS (console) |
+| `/api/platform/subscriptions` | Suscripciones SaaS + invoices + `GET /stats` |
+| `/api/platform/organizations` | CRUD orgs plataforma (console) |
+| `/api/platform/settings` | Settings globales de plataforma |
+| `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
+
+> `/api/access-control/*` **NO está montado** en api-worker (Bridge pausado — ver sección 4).
 
 ### 7. Error Handling & Mutations
 
@@ -228,6 +259,8 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
   - Server actions que invalidan cache (`updateTag`) + `router.refresh()` NO hacen peticiones HTTP — se combinan con `api()` para las llamadas.
 - **APIs externas** (ej. exchange rates de open.er-api.com) → `ofetch` directo, SIN pasar por el cliente interno (que no debe enviar sesión ni baseURL del API). Ver `apps/{console,panel}/lib/api/exchange-rates.ts` con `next: { revalidate }` para cache de Next.
 - `next/headers` (`cookies()`, `headers()`) se usa solo para leer contexto de la request — nunca para hacer la petición HTTP.
+
+**Env vars frontend** (`apps/{panel,console}/lib/config/envs.ts`, validadas con Zod): `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` (obligatorias); `NEXT_PUBLIC_EXCHANGE_URL` (opcional, leída en `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
 
 ---
 
@@ -278,6 +311,28 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 - **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`
 - **Role invalidation**: `afterUpdateMemberRole` hook in Better Auth invalidates `member:role:${userId}:${orgId}` so role changes take effect instantly
 - **Graceful degradation**: All cache methods wrap errors with `console.error` and return `null`/void — Redis being down never blocks requests
+
+---
+
+## Background Jobs (Cloudflare Queues)
+
+Los emails y la generación de PDF se procesan **asíncronamente** vía Cloudflare Queues: el `api-worker` produce eventos en el binding `TASK_QUEUE` (`fit-task-events`, DLQ `fit-task-events-dlq`) y `apps/jobs-worker` los consume.
+
+**Contrato de eventos** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
+
+| Type | Payload | Producer |
+|------|---------|----------|
+| `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invitar miembro sin cuenta → panel) + `/api/platform/staff` (invitaciones console) |
+| `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | Hook `sendInvitationEmail` de Better Auth en `lib/auth.ts` (invitación a miembro con cuenta) |
+| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` (al registrar un pago) |
+
+**Handlers** (`apps/jobs-worker/src/handlers/`):
+- `email.handler.ts` — envía emails con **Resend** (`EMAIL_PROVIDER=resend`) o **Gmail SMTP** (`EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`).
+- `pdf.handler.ts` — genera el recibo de pago en PDF con `@react-pdf/renderer` y lo envía por email.
+
+**Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
+
+> **Regla**: nunca acoplar el api-worker a envíos síncronos de email/PDF — siempre encolar en `TASK_QUEUE` y dejar que el jobs-worker procese.
 
 ---
 
@@ -647,6 +702,7 @@ Ambas se importan desde server y client (no dependen de hooks).
 - New Bridge endpoints or device management
 - New cache key patterns
 - New RSC patterns or RSC migrations in any app
+- New queue event types or email/PDF flows in jobs-worker
 
 ---
 
@@ -656,7 +712,6 @@ Use skill tool for specialized tasks:
 
 | Skill | When to use |
 |-------|-------------|
-| `brainstorming` | Any creative work or feature creation |
 | `database-designer` | Database schema design (Drizzle) |
 | `neon-postgres` | Neon database questions |
 | `interface-design` | Admin panels, dashboards |
@@ -669,6 +724,8 @@ Use skill tool for specialized tasks:
 | `frontend-design` | Distinctive frontend interfaces / UI polish |
 | `neon-drizzle` | Drizzle + Neon setup, migrations |
 | `terraform-stacks` | Terraform Stacks configuration |
+
+> Skills instaladas localmente en `.agents/skills/` (vía `npx skills add`). Para descubrir más: `npx skills find <query>` y confirmar con el usuario antes de instalar.
 
 ---
 
@@ -684,6 +741,7 @@ Use skill tool for specialized tasks:
 - `apps/api-worker/src/lib/cache.ts` — Upstash Redis wrapper
 - `apps/api-worker/src/lib/cors.ts` — CORS allowlist
 - `apps/api-worker/src/lib/env.ts` — Worker env/bindings types
+- `apps/jobs-worker/src/index.ts` — Queue event contract (`FitTaskEvent`) + handlers
 - `packages/auth/src/` — Shared auth client, service, hooks, permissions
 - `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
 - `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI
@@ -753,6 +811,9 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `UPSTASH_REDIS_REST_TOKEN`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
+- `EMAIL_PROVIDER` (`resend` o `gmail` — jobs-worker)
+- `SMTP_USER`
+- `SMTP_PASS`
 - `PANEL_URL`
 - `CONSOLE_URL`
 - `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
