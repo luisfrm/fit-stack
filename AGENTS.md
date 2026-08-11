@@ -141,6 +141,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
     - Inputs, Buttons, CheckboxCards → `rounded-md`
     - Cards, Containers → `rounded-xl`
     - Modals, Dialogs → `rounded-2xl`
+- **Responsive Modal** (`packages/ui/src/components/modal.tsx`): renders a **bottom sheet** (drag handle + drag-to-close, `rounded-t-2xl`) on mobile (<768px vía `useIsMobile`) and a **centered modal** on desktop. Exports the legacy `Modal` (misma API: `trigger`/`title`/`description`/`footer`/`size`/`isScrollable`/`open`/`onOpenChange`) y la API compuesta `ResponsiveModal` / `ResponsiveModalTrigger` / `ResponsiveModalClose` / `ResponsiveModalContent` (icon, subtitle, `desktopMaxWidth`). Built on `radix-ui` Dialog; las animaciones open/close son **keyframes custom** en `packages/ui/src/styles/globals.css` (`animate-sheet-in/out`, `animate-modal-in/out`) que animan `translate`/`scale` para no chocar con el centrado de Tailwind v4; el overlay usa `tw-animate-css` (`data-open:`/`data-closed:`). Hook `useIsMobile` en `packages/ui/src/hooks/use-is-mobile.ts`.
 
 ### 3. Database Integrity & ORM
 
