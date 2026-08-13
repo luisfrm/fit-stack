@@ -15,6 +15,13 @@
       "when": 1785320031253,
       "tag": "0001_closed_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786665503489,
+      "tag": "0002_silent_celestials",
+      "breakpoints": true
     }
   ]
 }
