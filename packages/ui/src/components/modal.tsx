@@ -125,11 +125,17 @@ function ResponsiveModalContent({
     setDragDelta(delta);
   }
 
-  function onPointerUp() {
+  function onPointerUp(e: React.PointerEvent) {
     if (!isDragging) return;
     setIsDragging(false);
-    if (dragDelta >= CLOSE_THRESHOLD) {
-      onOpenChange(false);
+    // Compute the delta from the stored start position instead of the
+    // `dragDelta` state, which may be stale if the release happens before
+    // the last pointer-move re-render commits (fast flicks past the threshold).
+    if (dragStartY.current !== null) {
+      const delta = Math.max(0, e.clientY - dragStartY.current);
+      if (delta >= CLOSE_THRESHOLD) {
+        onOpenChange(false);
+      }
     }
     setDragDelta(0);
     dragStartY.current = null;
@@ -143,8 +149,8 @@ function ResponsiveModalContent({
         <DialogPrimitive.Overlay
           className={cn(
             "fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px]",
-            // tw-animate-css data-state animations
-            "data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+            // tw-animate-css data-state animations (Radix sets data-state="open"/"closed")
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
             "duration-300"
           )}
         />
@@ -170,7 +176,7 @@ function ResponsiveModalContent({
             // Max height
             "max-h-[90dvh]",
             // Radix data-state animations (custom keyframes en globals.css)
-            "data-open:animate-sheet-in data-closed:animate-sheet-out",
+            "data-[state=open]:animate-sheet-in data-[state=closed]:animate-sheet-out",
             className
           )}
         >
@@ -217,7 +223,7 @@ function ResponsiveModalContent({
       <DialogPrimitive.Overlay
         className={cn(
           "fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]",
-          "data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
           "duration-200"
         )}
       />
@@ -237,7 +243,7 @@ function ResponsiveModalContent({
           "flex flex-col max-h-[90dvh]",
           // Animations — keyframes custom que animan `translate`/`scale`
           // (sin chocar con el centrado `-translate-x-1/2 -translate-y-1/2`)
-          "data-open:animate-modal-in data-closed:animate-modal-out",
+          "data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out",
           className
         )}
       >
