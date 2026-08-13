@@ -239,6 +239,20 @@ export function createSubscriptionsRepository(db: Db) {
       return inserted[0];
     },
 
+    async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled') {
+      const [updated] = await db
+        .update(subscription)
+        .set({
+          cancelledAt: status === 'cancelled' ? new Date() : null,
+        })
+        .where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
+        .returning();
+      if (!updated) {
+        throw new Error('Suscripción no encontrada');
+      }
+      return updated;
+    },
+
     async cancel(organizationId: string, id: number) {
       const updated = await db
         .update(subscription)

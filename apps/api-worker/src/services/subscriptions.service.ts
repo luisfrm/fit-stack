@@ -152,6 +152,11 @@ export function createSubscriptionsService(
       return updated;
     },
 
+    async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled') {
+      const updated = await subsRepo.updateStatus(organizationId, id, status);
+      return updated;
+    },
+
     async cancel(organizationId: string, id: number) {
       const updated = await subsRepo.cancel(organizationId, id);
       if (!updated) {

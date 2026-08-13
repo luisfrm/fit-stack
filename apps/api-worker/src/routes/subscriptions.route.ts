@@ -26,6 +26,10 @@ const createSubSchema = z.object({
   }),
 });
 
+const updateSubStatusSchema = z.object({
+  status: z.enum(['active', 'cancelled']),
+});
+
 export const subscriptionRoutes = new Hono<AppEnv>()
   // GET /api/subscriptions
   .get('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
@@ -83,6 +87,25 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate(`org:${orgId}:subscriptions*`);
     await cache.invalidateExact(`org:${orgId}:subscription-status`);
     return c.json(newSub, 201);
+  })
+
+  // PUT /api/subscriptions/:id
+  .put('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), zValidator('json', updateSubStatusSchema), async (c) => {
+    const orgId = c.get('session')!.activeOrganizationId!;
+    const id = Number(c.req.param('id'));
+    const { status } = c.req.valid('json');
+    const cache = createCache(c.env);
+
+    const db = c.get('db');
+    const subsRepo = createSubscriptionsRepository(db);
+    const paymentsRepo = createPaymentsRepository(db);
+    const plansRepo = createPlansRepository(db);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+
+    const updated = await subsService.updateStatus(orgId, id, status);
+    await cache.invalidate(`org:${orgId}:subscriptions*`);
+    await cache.invalidateExact(`org:${orgId}:subscription-status`);
+    return c.json(updated);
   })
 
   // DELETE /api/subscriptions/:id
