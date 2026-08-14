@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, count, type Db } from '@workspace/database/factory';
+import { eq, desc, and, or, ilike, isNull, gte, lte, sql, count, type Db } from '@workspace/database/factory';
 import {
   platformSubscription,
   platformPlan,
@@ -158,6 +158,29 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       if (filters.isTrial !== undefined) {
         conditions.push(eq(platformSubscription.isTrial, filters.isTrial));
       }
+      if (filters.search) {
+        conditions.push(
+          or(
+            ilike(organization.name, `%${filters.search}%`),
+            ilike(platformPlan.name, `%${filters.search}%`)
+          )!
+        );
+      }
+      if (filters.status === ('expiring' as any)) {
+        conditions.push(
+          and(
+            isNull(platformSubscription.cancelledAt),
+            gte(platformSubscription.currentPeriodEnd, sql`NOW()`),
+            lte(platformSubscription.currentPeriodEnd, sql`NOW() + INTERVAL '7 days'`)
+          )!
+        );
+      } else if (filters.status && filters.status !== 'all') {
+        conditions.push(sql`(${this.getSubscriptionStatusSql()}) = ${filters.status}`);
+      }
+
+      const whereClause = conditions.length > 0
+        ? and(...conditions)
+        : undefined;
 
       const baseQuery = db
         .select({
@@ -186,26 +209,20 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         .leftJoin(organization, eq(platformSubscription.organizationId, organization.id))
         .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id));
 
-      const filteredQuery = conditions.length > 0
-        ? baseQuery.where(and(...conditions))
-        : baseQuery;
-
       const [totalResult] = await db
         .select({ total: count() })
         .from(platformSubscription)
-        .where(conditions.length > 0 ? and(...conditions) : undefined);
+        .leftJoin(organization, eq(platformSubscription.organizationId, organization.id))
+        .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id))
+        .where(whereClause);
 
       const total = Number(totalResult?.total ?? 0);
 
-      const allRecords = (await filteredQuery
+      const records = (await baseQuery
+        .where(whereClause)
         .orderBy(desc(platformSubscription.createdAt))
         .limit(limit)
         .offset(offset)) as SubscriptionWithDetails[];
-
-      // Filtro por status se aplica post-query (el status es computado)
-      const records = filters.status && filters.status !== 'all'
-        ? allRecords.filter((r) => r.computedStatus === filters.status)
-        : allRecords;
 
       return {
         data: records,

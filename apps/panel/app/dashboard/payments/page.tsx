@@ -45,7 +45,7 @@ export default async function PaymentsPage({
   const currencyFormat =
     (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") || "latam";
 
-  const [subsResult, monthlyReport] = await Promise.all([
+  const [subsResult, monthlyReport, analytics] = await Promise.all([
     subscriptionsService.getAll(
       {
         page,
@@ -58,6 +58,9 @@ export default async function PaymentsPage({
     financeService
       .getRevenueReport(primaryCurrency)
       .catch(() => [] as MonthlyReportRow[]),
+    financeService
+      .getAnalytics(primaryCurrency)
+      .catch(() => null),
   ]);
 
   const refreshPayments = async () => {
@@ -74,7 +77,7 @@ export default async function PaymentsPage({
       initialTotal={subsResult.total}
       initialQuery={search}
       initialStatus={statusFilter}
-      initialAnalytics={null}
+      initialAnalytics={analytics}
       initialMonthlyReport={monthlyReport}
       initialCurrencyFormat={currencyFormat}
       initialPrimaryCurrency={primaryCurrency}

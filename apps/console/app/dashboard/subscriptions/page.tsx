@@ -15,11 +15,13 @@ export const dynamic = "force-dynamic";
 
 const PAGE_LIMIT = 15;
 
-const FILTER_TO_STATUS: Record<string, PlatformSubscriptionStatus> = {
+const FILTER_TO_STATUS: Record<string, string | undefined> = {
   active: "active",
-  trial: "active",
-  expiring: "active",
+  expiring: "expiring",
+  past_due: "past_due",
+  read_only: "read_only",
   suspended: "suspended",
+  cancelled: "cancelled",
 };
 
 export default async function PlatformSubscriptionsPage({
@@ -40,8 +42,8 @@ export default async function PlatformSubscriptionsPage({
         search: search || undefined,
         isTrial: statusFilter === "trial" ? true : undefined,
         status:
-          statusFilter && statusFilter !== "trial" && statusFilter !== "expiring"
-            ? FILTER_TO_STATUS[statusFilter] ?? undefined
+          statusFilter && statusFilter !== "trial"
+            ? (FILTER_TO_STATUS[statusFilter] as any)
             : undefined,
       },
       { next: { revalidate: 60, tags: ["console:subs"] } },

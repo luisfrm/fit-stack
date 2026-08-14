@@ -7,6 +7,7 @@ import {
   jsonb,
   date,
   uniqueIndex,
+  index,
   bigint,
   numeric,
 } from 'drizzle-orm/pg-core';
@@ -142,69 +143,85 @@ export const platformPlan = pgTable('platform_plan', {
  * El estado NO se guarda; se computa en SQL según currentPeriodEnd y el último pago.
  * Mantenemos `status` como columna legacy (a remover en migración futura).
  */
-export const platformSubscription = pgTable('platform_subscription', {
-  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  organizationId: text('organization_id')
-    .references(() => organization.id, { onDelete: 'cascade' })
-    .notNull(),
-  planId: bigint('plan_id', { mode: 'number' })
-    .references(() => platformPlan.id)
-    .notNull(),
-  // legacy column — a dropear una vez validada la migración a status computado
-  status: text('status').notNull().default('active'),
-  startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
-  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
-  isTrial: boolean('is_trial').default(false).notNull(),
-  priceOverride: bigint('price_override', { mode: 'number' }), // centavos — excepción comercial
-  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
-  cancellationReason: text('cancellation_reason'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const platformSubscription = pgTable(
+  'platform_subscription',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: text('organization_id')
+      .references(() => organization.id, { onDelete: 'cascade' })
+      .notNull(),
+    planId: bigint('plan_id', { mode: 'number' })
+      .references(() => platformPlan.id)
+      .notNull(),
+    // legacy column — a dropear una vez validada la migración a status computado
+    status: text('status').notNull().default('active'),
+    startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+    isTrial: boolean('is_trial').default(false).notNull(),
+    priceOverride: bigint('price_override', { mode: 'number' }), // centavos — excepción comercial
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancellationReason: text('cancellation_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_ps_organization_id').on(table.organizationId),
+    index('idx_ps_plan_id').on(table.planId),
+    index('idx_ps_current_period_end').on(table.currentPeriodEnd),
+  ]
+);
 
 /**
  * platform_subscription_payment: pagos asociados a una platform_subscription.
  * Guarda snapshot comercial completo para preservar la integridad histórica
  * aunque cambien los datos del plan.
  */
-export const platformSubscriptionPayment = pgTable('platform_subscription_payment', {
-  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+export const platformSubscriptionPayment = pgTable(
+  'platform_subscription_payment',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
 
-  // Relaciones
-  subscriptionId: bigint('subscription_id', { mode: 'number' })
-    .references(() => platformSubscription.id, { onDelete: 'cascade' }),
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-  planId: bigint('plan_id', { mode: 'number' })
-    .references(() => platformPlan.id)
-    .notNull(),
+    // Relaciones
+    subscriptionId: bigint('subscription_id', { mode: 'number' })
+      .references(() => platformSubscription.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    planId: bigint('plan_id', { mode: 'number' })
+      .references(() => platformPlan.id)
+      .notNull(),
 
-  // Snapshot comercial
-  planSnapshotName: text('plan_snapshot_name').notNull(),
-  planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
-  planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
-  planSnapshotDurationValue: integer('plan_snapshot_duration_value').notNull(),
-  planSnapshotDurationUnit: text('plan_snapshot_duration_unit').notNull(),
+    // Snapshot comercial
+    planSnapshotName: text('plan_snapshot_name').notNull(),
+    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
+    planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
+    planSnapshotDurationValue: integer('plan_snapshot_duration_value').notNull(),
+    planSnapshotDurationUnit: text('plan_snapshot_duration_unit').notNull(),
 
-  // Datos del pago
-  amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
-  currencyPaid: text('currency_paid').notNull(),
-  exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
-  baseAmount: bigint('base_amount', { mode: 'number' }), // centavos en moneda base
+    // Datos del pago
+    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
+    currencyPaid: text('currency_paid').notNull(),
+    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
+    baseAmount: bigint('base_amount', { mode: 'number' }), // centavos en moneda base
 
-  // Método y metadata
-  paymentMethod: text('payment_method').notNull(), // incluye 'trial' | 'free' | 'manual' | etc
-  paymentMethodDetails: jsonb('payment_method_details'),
-  paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
+    // Método y metadata
+    paymentMethod: text('payment_method').notNull(), // incluye 'trial' | 'free' | 'manual' | etc
+    paymentMethodDetails: jsonb('payment_method_details'),
+    paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
 
-  // Estados
-  status: text('status').notNull().default('pending'),
-  dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
-  paidAt: timestamp('paid_at', { withTimezone: true }),
-  refundedAt: timestamp('refunded_at', { withTimezone: true }),
+    // Estados
+    status: text('status').notNull().default('pending'),
+    dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_psp_subscription_id').on(table.subscriptionId),
+    index('idx_psp_payment_date').on(table.paymentDate),
+    index('idx_psp_subscription_status').on(table.subscriptionId, table.status),
+  ]
+);
 
 // ── GYM DOMAIN: LOCAL MEMBERS & STAFF ──
 
@@ -283,51 +300,65 @@ export const membershipPlan = pgTable('membership_plan', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const subscription = pgTable('subscription', {
-  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-  memberId: bigint('member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
-  planId: bigint('plan_id', { mode: 'number' })
-    .references(() => membershipPlan.id).notNull(),
-  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
-  endDate: timestamp('end_date', { withTimezone: true }).notNull(),
-  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const subscription = pgTable(
+  'subscription',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    memberId: bigint('member_id', { mode: 'number' })
+      .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+    planId: bigint('plan_id', { mode: 'number' })
+      .references(() => membershipPlan.id).notNull(),
+    startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+    endDate: timestamp('end_date', { withTimezone: true }).notNull(),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_subscription_org_member').on(table.organizationId, table.memberId),
+  ]
+);
 
-export const payment = pgTable('payment', {
-  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-  memberId: bigint('member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
-  subscriptionId: bigint('subscription_id', { mode: 'number' })
-    .references(() => subscription.id),
+export const payment = pgTable(
+  'payment',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    memberId: bigint('member_id', { mode: 'number' })
+      .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+    subscriptionId: bigint('subscription_id', { mode: 'number' })
+      .references(() => subscription.id),
 
-  planSnapshotName: text('plan_snapshot_name').notNull(),
-  planSnapshotPrice: numeric('plan_snapshot_price', { precision: 10, scale: 2 }).notNull(),
-  planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
+    planSnapshotName: text('plan_snapshot_name').notNull(),
+    planSnapshotPrice: numeric('plan_snapshot_price', { precision: 10, scale: 2 }).notNull(),
+    planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
 
-  amountPaid: numeric('amount_paid', { precision: 10, scale: 2 }).notNull(),
-  currencyPaid: text('currency_paid').notNull(),
-  exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
+    amountPaid: numeric('amount_paid', { precision: 10, scale: 2 }).notNull(),
+    currencyPaid: text('currency_paid').notNull(),
+    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
-  status: text('status').default('validated').notNull(),
-  paymentMethod: text('payment_method').notNull(),
-  paymentMethodDetails: jsonb('payment_method_details'),
+    status: text('status').default('validated').notNull(),
+    paymentMethod: text('payment_method').notNull(),
+    paymentMethodDetails: jsonb('payment_method_details'),
 
-  // Invoice Breakdown (Optional)
-  subtotal: numeric('subtotal', { precision: 15, scale: 2 }),
-  taxTotal: numeric('tax_total', { precision: 15, scale: 2 }),
-  taxDetails: jsonb('tax_details'),
+    // Invoice Breakdown (Optional)
+    subtotal: numeric('subtotal', { precision: 15, scale: 2 }),
+    taxTotal: numeric('tax_total', { precision: 15, scale: 2 }),
+    taxDetails: jsonb('tax_details'),
 
-  paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+    paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_payment_subscription_id').on(table.subscriptionId),
+    index('idx_payment_payment_date').on(table.paymentDate),
+    index('idx_payment_org_status').on(table.organizationId, table.status),
+  ]
+);
 
 // ── ACCESS CONTROL: BIOMETRIC LOGS & SYNC ──
 

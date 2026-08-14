@@ -75,6 +75,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const status = c.req.query('status') as any;
     const planId = c.req.query('planId') ? Number(c.req.query('planId')) : undefined;
     const organizationId = c.req.query('organizationId');
+    const search = c.req.query('search');
+    const isTrial = c.req.query('isTrial') !== undefined ? c.req.query('isTrial') === 'true' : undefined;
     const page = Number(c.req.query('page') || '1');
     const limit = Number(c.req.query('limit') || '20');
 
@@ -89,6 +91,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       status,
       planId,
       organizationId,
+      isTrial,
+      search,
       page,
       limit,
     });
@@ -186,6 +190,25 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
 
     return c.json({ success: true, ...result });
+  })
+
+  // PATCH /api/platform/subscriptions/payments/:paymentId/status
+  .patch('/payments/:paymentId/status', requirePlatformAuth(), zValidator('json', updatePaymentStatusSchema), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+    const data = c.req.valid('json');
+    const cache = createCache(c.env);
+
+    const { service } = buildService(c);
+    const payment = await service.getPaymentById(paymentId);
+    if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
+
+    await service.updatePaymentStatus(paymentId, data);
+    await cache.invalidate('platform:subscriptions*');
+    if (payment.organizationId) {
+      await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
+    }
+
+    return c.json({ success: true, paymentId, status: data.status });
   })
 
   // GET /api/platform/subscriptions/:id/payments

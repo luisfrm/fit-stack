@@ -26,7 +26,14 @@ export { Text } from "@workspace/ui/components/text";
 export { Toaster } from "@workspace/ui/components/sonner";
 export { toast } from "sonner";
 export { Spinner } from "@workspace/ui/components/spinner";
-export { Modal } from "@workspace/ui/components/modal";
+export {
+  Modal,
+  ResponsiveModal,
+  ResponsiveModalTrigger,
+  ResponsiveModalClose,
+  ResponsiveModalContent,
+} from "@workspace/ui/components/modal";
+export type { ModalSize } from "@workspace/ui/components/modal";
 export { TooltipProvider, SimpleTooltip } from "./tooltip";
 export { Checkbox } from "@workspace/ui/components/checkbox";
 export { CheckboxCard } from "@workspace/ui/components/checkbox-card";
