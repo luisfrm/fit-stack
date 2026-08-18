@@ -64,6 +64,7 @@ const organizationStatement = {
   content: ["read", "create", "update", "delete"],
   settings: ["read", "update"],
   organization: ["read", "update"],
+  ai: ["read"],
 } as const;
 
 export type OrganizationStatement = typeof organizationStatement;
@@ -82,6 +83,7 @@ export const organizationRoles = {
     content: ["read"],
     settings: [],
     organization: [],
+    ai: [],
   }),
   coach: organizationAc.newRole({
     panel: [],
@@ -95,6 +97,7 @@ export const organizationRoles = {
     content: ["read"],
     settings: [],
     organization: [],
+    ai: [],
   }),
   cashier: organizationAc.newRole({
     panel: ["access"],
@@ -108,6 +111,7 @@ export const organizationRoles = {
     content: [],
     settings: ["read"],
     organization: [],
+    ai: ["read"],
   }),
   manager: organizationAc.newRole({
     panel: ["access"],
@@ -121,6 +125,7 @@ export const organizationRoles = {
     content: ["read", "create", "update"],
     settings: ["read", "update"],
     organization: ["read", "update"],
+    ai: ["read"],
   }),
   owner: organizationAc.newRole({
     panel: ["access"],
@@ -134,6 +139,7 @@ export const organizationRoles = {
     content: ["read", "create", "update", "delete"],
     settings: ["read", "update"],
     organization: ["read", "update"],
+    ai: ["read"],
   }),
 };
 

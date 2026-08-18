@@ -13,6 +13,7 @@ export const PERMISSION_MODULES = {
   CONTENT: "content",
   SETTINGS: "settings",
   ORGANIZATION: "organization",
+  AI: "ai",
   PANEL: "panel",
 } as const;
 
