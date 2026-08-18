@@ -21,6 +21,7 @@ import {
   ArrowLeftRight,
   User,
   CalendarClock,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -75,6 +76,7 @@ const GYM_NAV_ITEMS: GymNavItem[] = [
   { label: "Membresías", href: "/dashboard/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
   { label: "Clases", href: "/dashboard/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
   { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
+  { label: "Chat IA", href: "/dashboard/chat", icon: MessageSquare, module: PERMISSION_MODULES.AI },
   { label: "Configuración", href: "/dashboard/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
 ];
 
