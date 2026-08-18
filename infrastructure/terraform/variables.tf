@@ -119,6 +119,24 @@ variable "r2_public_url" {
   default   = ""
 }
 
+variable "cloudflare_ai_api_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "openrouter_api_key" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "ai_gateway_url" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
 variable "panel_url" {
   type      = string
   sensitive = true

@@ -26,7 +26,9 @@ module "api_worker" {
       { name = "DATABASE_URL", text = var.database_url },
       { name = "BETTER_AUTH_SECRET", text = var.better_auth_secret },
       { name = "BETTER_AUTH_URL", text = var.better_auth_url },
-      { name = "JWT_SECRET", text = var.jwt_secret }
+      { name = "JWT_SECRET", text = var.jwt_secret },
+      { name = "CLOUDFLARE_ACCOUNT_ID", text = var.cloudflare_account_id },
+      { name = "CLOUDFLARE_API_TOKEN", text = var.cloudflare_ai_api_token }
     ],
     var.r2_public_url != "" ? [{ name = "R2_PUBLIC_URL", text = var.r2_public_url }] : [],
     var.cookie_domain != "" ? [{ name = "COOKIE_DOMAIN", text = var.cookie_domain }] : [],
@@ -35,7 +37,9 @@ module "api_worker" {
     var.upstash_redis_rest_url != "" ? [{ name = "UPSTASH_REDIS_REST_URL", text = var.upstash_redis_rest_url }] : [],
     var.upstash_redis_rest_token != "" ? [{ name = "UPSTASH_REDIS_REST_TOKEN", text = var.upstash_redis_rest_token }] : [],
     var.resend_api_key != "" ? [{ name = "RESEND_API_KEY", text = var.resend_api_key }] : [],
-    var.resend_from_email != "" ? [{ name = "RESEND_FROM_EMAIL", text = var.resend_from_email }] : []
+    var.resend_from_email != "" ? [{ name = "RESEND_FROM_EMAIL", text = var.resend_from_email }] : [],
+    var.ai_gateway_url != "" ? [{ name = "AI_GATEWAY_URL", text = var.ai_gateway_url }] : [],
+    var.openrouter_api_key != "" ? [{ name = "OPENROUTER_API_KEY", text = var.openrouter_api_key }] : []
   )
 }
 
