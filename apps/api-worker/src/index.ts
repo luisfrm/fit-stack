@@ -20,6 +20,7 @@ import { organizationRoutes } from './routes/organizations.route';
 import { uploadRoutes } from './routes/upload.route';
 import { initRoutes } from './routes/init.route';
 import { publicRoutes } from './routes/public.route';
+import { aiRoutes } from './routes/ai.route';
 
 // Platform Sub-routers
 import { platformPlanRoutes } from './routes/platform-plans.route';
@@ -79,6 +80,7 @@ app.route('/api/organizations', organizationRoutes);
 app.route('/api/upload', uploadRoutes);
 app.route('/api/init', initRoutes);
 app.route('/api/public', publicRoutes);
+app.route('/api/ai', aiRoutes);
 
 // Mount SaaS Platform Routes (Admin)
 app.route('/api/platform/plans', platformPlanRoutes);

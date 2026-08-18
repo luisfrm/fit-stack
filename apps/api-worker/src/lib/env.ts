@@ -25,6 +25,14 @@ export type Env = {
   PANEL_URL?: string;
   CONSOLE_URL?: string;
 
+  // Cloudflare Workers AI (OpenAI SDK)
+  CLOUDFLARE_ACCOUNT_ID: string;
+  CLOUDFLARE_API_TOKEN: string;
+  AI_GATEWAY_URL?: string;
+
+  // OpenRouter (free models via `openrouter/free`)
+  OPENROUTER_API_KEY?: string;
+
   // Cloudflare Bindings
   FILES_BUCKET: R2Bucket;
   TASK_QUEUE: Queue;
