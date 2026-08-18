@@ -234,6 +234,9 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
 | `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
+| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → Workers AI o `openrouter/free`), `GET /models` (allowlist) |
+
+> **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). `openrouter/free` usa el enrutador automático gratuito de OpenRouter (el fallback entre modelos gratuitos lo maneja OpenRouter). El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. |
 | `/api/init` | Bootstrap de org (sin auth) |
 | `/api/public` | `GET /pages/:slug` (CMS público, cache 15 min), `GET /files/*` (R2) — sin auth |
 | `/api/platform/plans` | Catálogo de planes SaaS (console) |
@@ -419,6 +422,7 @@ ORG_ROLES = {
 | **Content** | ✅ CRUD | ✅ (no delete) | ❌ | ✅ read | ✅ read |
 | **Settings** | ✅ r+w | ✅ r+w | ✅ read | ❌ | ❌ |
 | **Organization** | ✅ r+w | ✅ r+w | ❌ | ❌ | ❌ |
+| **AI (Chat)** | ✅ read | ✅ read | ✅ read | ❌ | ❌ |
 
 ### How to Verify Permissions
 
@@ -498,11 +502,17 @@ OrgRole/PlatformRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS
 ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone)
 
 // permissions/
-  modules.ts:         PERMISSION_MODULES (11 modules: dashboard, reports, members, staff,
-                      subscriptions, plans, classes, content, settings, organization, panel)
+  modules.ts:         PERMISSION_MODULES (12 modules: dashboard, reports, members, staff,
+                      subscriptions, plans, classes, content, settings, organization, ai, panel)
   actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
   can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
   role-assignment.ts: canAssignRole(actor, target) (org) y canAssignPlatformRole(actor, target) (plataforma)
+
+// ai.ts
+AI_MODEL_IDS, OPENROUTER_FREE_MODEL_IDS, ALL_CHAT_MODEL_IDS (allowlist — single source
+of truth consumida por api-worker para validar/rutear proveedor y por panel para el
+selector vía RSC), AiProvider ("workers-ai" | "openrouter"), getAiProvider(modelId),
+AI_MODELS, IAiChatMessage, IAiChatRequest, IAiSseEvent (contrato SSE del chat)
 ```
 
 ---
@@ -817,6 +827,9 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `SMTP_PASS`
 - `PANEL_URL`
 - `CONSOLE_URL`
+- `CLOUDFLARE_AI_API_TOKEN` (token Workers AI: Run para `/api/ai` — api-worker)
+- `AI_GATEWAY_URL` *(opcional — si se setea, `createWorkersAIClient` apunta al AI Gateway en vez de Workers AI directo)*
+- `OPENROUTER_API_KEY` *(opcional — necesario para el modelo `openrouter/free`)*
 - `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
 
 **Variables por environment (nombres de recursos, no sensibles):**
