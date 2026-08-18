@@ -810,7 +810,7 @@ infrastructure/terraform/
 Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel de repositorio). GitHub los aísla automáticamente por ambiente, por eso no usamos prefijos.
 
 **Secrets por environment (nombres simples, sin prefijo):**
-- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_API_TOKEN` (token de **deploy/provider** — permisos Workers/R2/Queues; auth de wrangler y del provider Terraform. **NO** es el token de Workers AI)
 - `CLOUDFLARE_ACCOUNT_ID`
 - `DATABASE_URL`
 - `BETTER_AUTH_URL`
@@ -827,7 +827,7 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `SMTP_PASS`
 - `PANEL_URL`
 - `CONSOLE_URL`
-- `CLOUDFLARE_AI_API_TOKEN` (token Workers AI: Run para `/api/ai` — api-worker)
+- `CLOUDFLARE_AI_API_TOKEN` (token **Workers AI**: Run para `/api/ai` — api-worker. Binding del worker con el mismo nombre; en local va en `.dev.vars` como `CLOUDFLARE_AI_API_TOKEN`)
 - `AI_GATEWAY_URL` *(opcional — si se setea, `createWorkersAIClient` apunta al AI Gateway en vez de Workers AI directo)*
 - `OPENROUTER_API_KEY` *(opcional — necesario para el modelo `openrouter/free`)*
 - `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*

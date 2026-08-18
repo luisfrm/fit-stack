@@ -85,7 +85,7 @@ export const aiRoutes = new Hono<AppEnv>()
       }
       if (
         provider === 'workers-ai' &&
-        (!c.env.CLOUDFLARE_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)
+        (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)
       ) {
         return c.json({ error: 'IA no configurada: faltan variables de entorno de Workers AI' }, 503);
       }

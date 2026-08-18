@@ -47,7 +47,7 @@ function createAIClient({
  */
 export function createWorkersAIClient(env: Env): OpenAI {
   return createAIClient({
-    apiKey: env.CLOUDFLARE_API_TOKEN,
+    apiKey: env.CLOUDFLARE_AI_API_TOKEN,
     baseURL: env.AI_GATEWAY_URL ?? workersAiBaseUrl(env.CLOUDFLARE_ACCOUNT_ID),
   });
 }

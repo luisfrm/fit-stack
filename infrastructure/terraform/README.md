@@ -38,7 +38,11 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 
 | Secret | Descripción |
 |--------|-------------|
-| `CLOUDFLARE_API_TOKEN` | API Token de Cloudflare |
+| `CLOUDFLARE_API_TOKEN` | API Token de Cloudflare (deploy/provider — permisos Workers, R2, Queues) |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID de Cloudflare |
+| `CLOUDFLARE_AI_API_TOKEN` | Token Workers AI: Run para `/api/ai` (binding del worker: `CLOUDFLARE_AI_API_TOKEN`) |
+| `OPENROUTER_API_KEY` | API key de OpenRouter (opcional — modelo `openrouter/free`) |
+| `AI_GATEWAY_URL` | URL del AI Gateway de Cloudflare (opcional) |
 | `CLOUDFLARE_ACCOUNT_ID` | Account ID de Cloudflare |
 | `DATABASE_URL` | URL de Neon Postgres |
 | `BETTER_AUTH_URL` | URL pública del API (ej: `https://api.fit-stack.com`) |

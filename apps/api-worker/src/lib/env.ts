@@ -27,7 +27,7 @@ export type Env = {
 
   // Cloudflare Workers AI (OpenAI SDK)
   CLOUDFLARE_ACCOUNT_ID: string;
-  CLOUDFLARE_API_TOKEN: string;
+  CLOUDFLARE_AI_API_TOKEN: string;
   AI_GATEWAY_URL?: string;
 
   // OpenRouter (free models via `openrouter/free`)

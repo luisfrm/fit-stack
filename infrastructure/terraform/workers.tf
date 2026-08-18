@@ -28,7 +28,7 @@ module "api_worker" {
       { name = "BETTER_AUTH_URL", text = var.better_auth_url },
       { name = "JWT_SECRET", text = var.jwt_secret },
       { name = "CLOUDFLARE_ACCOUNT_ID", text = var.cloudflare_account_id },
-      { name = "CLOUDFLARE_API_TOKEN", text = var.cloudflare_ai_api_token }
+      { name = "CLOUDFLARE_AI_API_TOKEN", text = var.cloudflare_ai_api_token }
     ],
     var.r2_public_url != "" ? [{ name = "R2_PUBLIC_URL", text = var.r2_public_url }] : [],
     var.cookie_domain != "" ? [{ name = "COOKIE_DOMAIN", text = var.cookie_domain }] : [],
