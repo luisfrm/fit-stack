@@ -40,6 +40,7 @@ interface PaymentsClientProps {
   readonly initialCurrencyFormat: CurrencyFormat;
   readonly initialPrimaryCurrency: string;
   readonly limit: number;
+  readonly onSuccess?: () => Promise<void> | void;
 }
 
 export function PaymentsClient({
@@ -54,6 +55,7 @@ export function PaymentsClient({
   initialCurrencyFormat,
   initialPrimaryCurrency,
   limit,
+  onSuccess,
 }: PaymentsClientProps) {
   const router = useRouter();
   const { settings } = useSettings();
@@ -97,6 +99,7 @@ export function PaymentsClient({
   };
 
   const refreshAll = React.useCallback(async () => {
+    await onSuccess?.();
     router.refresh();
     if (primaryCurrency) {
       setAnalyticsLoading(true);
@@ -109,7 +112,7 @@ export function PaymentsClient({
         setAnalyticsLoading(false);
       }
     }
-  }, [router, primaryCurrency]);
+  }, [router, primaryCurrency, onSuccess]);
 
   const handleStatusChange = async (id: number, status: string) => {
     try {

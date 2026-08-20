@@ -67,10 +67,10 @@ export default async function PaymentsPage({
     "use server";
     updateTag(subsTag);
   };
-  void refreshPayments;
 
   return (
     <PaymentsClient
+      onSuccess={refreshPayments}
       initialSubscriptions={subsResult}
       initialPage={subsResult.page}
       initialTotalPages={subsResult.totalPages}
