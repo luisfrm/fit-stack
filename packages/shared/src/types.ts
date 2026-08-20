@@ -1,4 +1,5 @@
-import { Role, SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
+import { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
+import type { PlatformRole } from './access-control';
 
 export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
@@ -25,7 +26,7 @@ export interface IUser {
   image?: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
-  role?: Role; // Defined below as 'admin' | 'manager' etc.
+  role?: PlatformRole; // Platform role (Better Auth admin plugin): owner | admin | support | user
 }
 
 /**
@@ -89,7 +90,7 @@ export interface IRecentRegistration {
 export type TrendDirection = "up" | "down" | "neutral";
 
 
-// Role types are now managed in ./constants.ts to separate Global and Org roles
+// Role types live in ./constants.ts (OrgRole) and ./access-control.ts (PlatformRole, OrganizationRole)
 
 export type FrequencyType = 'once' | 'weekly';
 

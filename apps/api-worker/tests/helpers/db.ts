@@ -152,8 +152,8 @@ export async function readGymSetting(
   return rows[0]?.value;
 }
 
-/** Convenience: promote a user to a platform-level global role. */
-export async function setUserGlobalRole(userId: string, role: string): Promise<void> {
+/** Convenience: promote a user to a platform role. */
+export async function setUserPlatformRole(userId: string, role: string): Promise<void> {
   await query(`UPDATE "user" SET role = $1 WHERE id = $2`, [role, userId]);
 }
 

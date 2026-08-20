@@ -1,6 +1,6 @@
 import { count, eq, type Db } from '@workspace/database/factory';
 import { user as userTable } from '@workspace/database/schema';
-import type { GlobalRole } from '@workspace/shared';
+import type { PlatformRole } from '@workspace/shared';
 
 export function createInitRepository(db: Db) {
   return {
@@ -9,7 +9,7 @@ export function createInitRepository(db: Db) {
       return Number(result?.value || 0);
     },
 
-    async updateUserRole(userId: string, role: GlobalRole) {
+    async updateUserRole(userId: string, role: PlatformRole) {
       const [updatedUser] = await db
         .update(userTable)
         .set({ role })

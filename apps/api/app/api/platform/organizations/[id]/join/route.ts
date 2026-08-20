@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/config/get-session";
 import { membersRepository } from "@/repositories/members.repository";
-import { ORG_ROLES, GLOBAL_ROLES } from "@workspace/shared";
+import { ORG_ROLES } from "@workspace/shared";
 
 export async function POST(
   _req: NextRequest,
@@ -19,7 +19,7 @@ export async function POST(
 
   // 2. Security Check: Only Global Admins can use this endpoint
   const userRole = (session.user as { role?: string }).role;
-  if (userRole !== GLOBAL_ROLES.ADMIN) {
+  if (userRole !== 'admin') {
     return NextResponse.json({
       error: "Solo los administradores globales pueden unirse automáticamente a organizaciones"
     }, { status: 403 });

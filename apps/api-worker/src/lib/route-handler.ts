@@ -114,7 +114,7 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
 export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
 
 /**
- * GLOBAL_ROLES,Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
+ * Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
  */
 export function authorizeUpload(session: any, organizationId: string): boolean {
   return Boolean(session && organizationId);

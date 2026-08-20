@@ -4,7 +4,6 @@ import { customSession, organization, admin as adminPlugin } from 'better-auth/p
 import { createDb } from '@workspace/database/factory';
 import * as schema from '@workspace/database/schema';
 import {
-  GLOBAL_ROLES,
   ORGANIZATION_ADDITIONAL_FIELDS,
   platformAc,
   platformRoles,
@@ -49,7 +48,7 @@ export function createAuth(env: Env) {
         role: {
           type: 'string',
           required: false,
-          defaultValue: GLOBAL_ROLES.USER,
+          defaultValue: 'user',
           input: false,
         },
       },

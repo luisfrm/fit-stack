@@ -22,7 +22,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull().default(false),
   image: text('image'),
-  role: text('role').default('user'), // Global role ('admin' | 'user')
+  role: text('role').default('user'), // Platform role ('owner' | 'admin' | 'support' | 'user')
   banned: boolean('banned').notNull().default(false), // Better Auth admin plugin: ban status
   banReason: text('ban_reason'), // Better Auth admin plugin: reason for ban
   banExpires: timestamp('ban_expires', { withTimezone: true }), // Better Auth admin plugin: ban expiration

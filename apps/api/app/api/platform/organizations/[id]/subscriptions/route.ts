@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
 import { getSession } from '@/config/get-session';
-import { GLOBAL_ROLES } from "@workspace/shared";
 import { cache } from '@/lib/cache';
 
 export async function POST(
@@ -12,7 +11,7 @@ export async function POST(
     const session = await getSession();
 
     // Admin only
-    if ((session?.user as { role?: string }).role !== GLOBAL_ROLES.ADMIN) {
+    if ((session?.user as { role?: string }).role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

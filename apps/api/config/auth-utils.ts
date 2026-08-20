@@ -1,12 +1,10 @@
 import {
   can,
-  GLOBAL_ROLES,
   PERMISSION_ACTIONS,
   PERMISSION_MODULES,
   type OrgRole,
   type PermissionAction,
-  type PermissionModule,
-} from "@workspace/shared";
+  type PermissionModule } from "@workspace/shared";
 import { db, eq, and } from "@workspace/database/client";
 import { authMember } from "@workspace/database/schema";
 import type { Session } from "./auth";
@@ -60,7 +58,7 @@ export async function authorize(
 }
 
 export function requireGlobalAdmin(session: Session | null): boolean {
-  return (session?.user as { role?: string })?.role === GLOBAL_ROLES.ADMIN;
+  return (session?.user as { role?: string })?.role === 'admin';
 }
 
 /** Media uploads authorization: Allows upload if session is authenticated and scoped to the organization. */

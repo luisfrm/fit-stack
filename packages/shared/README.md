@@ -7,7 +7,7 @@ Tipos, DTOs, constantes y sistema de permisos compartidos entre backend y fronte
 ## Entry Point
 
 ```ts
-import { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared'
+import { ORG_ROLES, platformRoles } from '@workspace/shared'
 import type { IUser, IOrganization } from '@workspace/shared/types'
 ```
 
@@ -16,7 +16,6 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ## Estructura
 
 ### `src/constants.ts`
-- `GLOBAL_ROLES` — `ADMIN` (`admin`), `USER` (`user`)
 - `ORG_ROLES` — `OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`
 - `ORG_ROLE_LABELS` + `formatOrgRole(role)` — etiquetas en español para roles de **organización (Panel)**
 - `PLATFORM_ROLE_LABELS` + `formatPlatformRole(role)` — etiquetas en español para roles de **plataforma (Console)**: `owner`, `admin`, `support`, `user`

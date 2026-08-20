@@ -152,7 +152,7 @@ Validado en `POST/PUT /api/members` y en `staff-form` (UI).
 
 ## Plataforma vs tenant
 
-- **`GLOBAL_ROLES.ADMIN`**: rutas `/api/platform/*`, settings globales sin org activa.
+- **Rol de plataforma `admin`**: rutas `/api/platform/*`, settings globales sin org activa.
 - **Sin bypass**: un admin global en el CMS sigue limitado por `ORG_ROLE_PERMISSIONS` de su `member.role` en la org activa.
 
 ---

@@ -7,7 +7,6 @@ export type { IAuthError } from '@workspace/shared';
 export { useAuth } from './hooks';
 export { usePermissions } from './permissions';
 export {
-  GLOBAL_ROLES,
   ORG_ROLES,
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,

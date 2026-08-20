@@ -100,7 +100,7 @@ pnpm format
 
 - **Multi-tenancy** — Every gym is an `Organization`. All queries filter by `organizationId`.
 - **Cloudflare Workers API** — `apps/api-worker` (Hono + Neon HTTP driver) using `Route → Service → Repository → Database` layering.
-- **Two-tier roles** — `GLOBAL_ROLES` (platform admin) + `ORG_ROLES` (tenant-scoped).
+- **Two-tier roles** — Platform roles (`owner`/`admin`/`support`, SaaS console) + `ORG_ROLES` (tenant-scoped panel).
 - **Unified RBAC** — Defined in `packages/shared/src/access-control.ts`. Includes `panel: ["access"]` and `hasAccess()` evaluation.
 - **Drizzle Schema Rule** — No PostgreSQL `pgEnum` types and no `.$type<...>()` annotations. Uses plain `text()` columns; allowed values are validated by Zod (backend) and the frontend, never by the DB layer.
 - **Caching** — Upstash Redis with graceful degradation (cache keys in AGENTS.md).

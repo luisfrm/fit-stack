@@ -223,7 +223,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | Router | Endpoints notables |
 |--------|--------------------|
 | `/api/auth/*` | Better Auth engine (sesiones, orgs, invitations) |
-| `/api/members` | CRUD gym members + invites (`members.service` encola `email.org_invite`) |
+| `/api/members` | CRUD gym members + invites (`members.service` encola `email.registration_invite`) |
 | `/api/plans` | Membership plans (catalog gym) |
 | `/api/subscriptions` | CRUD subscriptions (registro de pago encola `email.payment_receipt`) |
 | `/api/payments` | `PATCH /:id/status`, `POST /:id/send-email` (reenvío de recibo) |
@@ -300,7 +300,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:subscriptions` | 5 min | Member subscriptions |
 | `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
 | `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
-| `org:${orgId}:cms:pages*` | 5 min | CMS content pages |
+| `org:${orgId}:cms:*` | 5 min | Invalidation de CMS (los reads no se cachean) |
 | `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
 | `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
@@ -349,26 +349,31 @@ Subscription status is **computed dynamically** via SQL CASE — NOT stored in D
 **Constants** (`@workspace/shared/constants`):
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active",      // currentPeriodEnd >= now
+  ACTIVE: "active",      // periodEnd >= now y pago válido
+  TRIAL: "trial",        // isTrial = true
   PAST_DUE: "past_due",  // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
   SUSPENDED: "suspended", // 15+ days overdue
-  CANCELLED: "cancelled", // manually cancelled or invoice void
+  CANCELLED: "cancelled", // cancelledAt != null
 }
 ```
 
-**Computation** (`platform-subscriptions.repository.ts`):
+**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, el orden importa):
 - `cancelledAt IS NOT NULL` → `cancelled`
-- Latest invoice `status = VOIDED` → `cancelled`
-- `currentPeriodEnd >= CURRENT_TIMESTAMP` → `active`
-- Days overdue ≤ 7 → `past_due`
-- Days overdue ≤ 14 → `read_only`
-- Days overdue > 14 → `suspended`
+- `isTrial = true` y period activo → `trial`
+- Último pago `VALIDATED`/`REFUNDED` y period activo → `active`
+- Último pago `PENDING` y period activo → `past_due`
+- Period activo (sin pago validado) → `active`
+- Días vencidos ≤ 7 → `past_due`
+- Días vencidos ≤ 14 → `read_only`
+- Días vencidos > 14 → `suspended`
+
+> Ojo: la regla "último pago `VOIDED` → `cancelled`" aplica a la tabla gym `subscription` (`subscriptions.repository.ts`, junto a `INVALID`), **no** a `platform_subscription`.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
-- `ACTIVE` → normal render
+- `ACTIVE` / `TRIAL` → normal render
 
 **Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch envuelto en `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), usado por el layout y por la gate page.
 
@@ -379,19 +384,11 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 
 ## Role-Based Access Control (RBAC)
 
-Fit-Stack uses **two levels of roles**: Global (platform) and Organization (tenant).
+Fit-Stack uses **two levels of roles**: Platform (SaaS) and Organization (tenant).
 
-### Global Roles
+### Platform Roles
 
-```ts
-// packages/shared/src/constants.ts
-GLOBAL_ROLES = {
-  ADMIN: "admin",  // Global super-admin — full access to /api/platform/* + apps/console
-  USER: "user",    // Default platform user
-}
-```
-
-Platform roles for Better Auth admin plugin (`platformRoles`): `owner`, `admin`, `support` (defined in `packages/shared/src/access-control.ts`).
+Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared/src/access-control.ts`): `owner`, `admin`, `support` (+ `user` como default de Better Auth, sin rol en `platformRoles`). El campo `user.role` guarda este rol de plataforma.
 
 **Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` solo para roles con `organization.create` (admin/owner); `support` es read-only y no entra al layout de console.
 
@@ -472,8 +469,8 @@ if (orgRole && !canAccessCms()) redirect('/unauthorized')
 1. **Never trust client-side role checks** — Always re-verify in API
 2. **Session-based authorization** — Use `session.member.role` from Better Auth
 3. **Organization scoping** — All queries MUST filter by `organizationId`
-4. **No global admin bypass in CMS** — Global roles are for SaaS platform management only
-5. **Platform user upload bypass** — Users with global roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + upload permission (`MEMBERS.CREATE` or `CONTENT.CREATE`).
+4. **No platform admin bypass in CMS** — Platform roles are for SaaS platform management only
+5. **Platform user upload bypass** — Users with platform roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + upload permission (`MEMBERS.CREATE` or `CONTENT.CREATE`).
 
 ---
 
@@ -484,7 +481,7 @@ if (orgRole && !canAccessCms()) redirect('/unauthorized')
 // Re-exports: constants, types, access-control, auth-config, permissions
 
 // constants.ts
-GLOBAL_ROLES, ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
+ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
 PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
 DEFAULT_COUNTRY, COUNTRY_LIST, ICountryConfig,
 ORG_ROLE_LABELS + formatOrgRole (roles de organización/Panel),
@@ -498,7 +495,7 @@ PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlat
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
 orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationStatement,
-OrgRole/PlatformRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
+OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
 ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone)

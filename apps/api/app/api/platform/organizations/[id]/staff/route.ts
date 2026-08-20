@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { membersService } from '@/services/members.service';
 import { getSession } from '@/config/get-session';
-import { GLOBAL_ROLES } from "@workspace/shared";
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -12,7 +10,7 @@ export async function POST(
     
     // Security: Only SaaS Admin can provision owners directly via this route
     const userRole = (session?.user as { role?: string })?.role;
-    if (userRole !== GLOBAL_ROLES.ADMIN) {
+    if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -1,5 +1,5 @@
 import { authClient, type Session, type User, type SignInParams, type SignUpParams } from "./client";
-import { GLOBAL_ROLES, GlobalRole, type IAuthError } from '@workspace/shared';
+import { type PlatformRole, type IAuthError } from '@workspace/shared';
 
 export const sessionService = {
   async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: IAuthError | null }> {
@@ -99,7 +99,7 @@ export const sessionService = {
   },
 
   isSuperAdmin(session: Session | null): boolean {
-    return session?.user?.role === GLOBAL_ROLES.ADMIN;
+    return session?.user?.role === 'admin';
   },
 
   async getProfileData(): Promise<User | null> {
@@ -108,13 +108,13 @@ export const sessionService = {
     return session.user;
   },
 
-  async getUserRole(): Promise<GlobalRole> {
+  async getUserRole(): Promise<PlatformRole> {
     const { data: session } = await this.getSession();
-    return (session?.user?.role as GlobalRole) || GLOBAL_ROLES.USER;
+    return (session?.user?.role as PlatformRole) || 'user';
   },
 
   async isAdmin(): Promise<boolean> {
     const { data: session } = await this.getSession();
-    return session?.user.role === GLOBAL_ROLES.ADMIN;
+    return session?.user.role === 'admin';
   }
 };

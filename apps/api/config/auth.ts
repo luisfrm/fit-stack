@@ -7,13 +7,11 @@ import { env } from "./envs";
 import { urls } from "./urls";
 import { ALLOWED_ORIGINS } from "./allowed-origins";
 import {
-  GLOBAL_ROLES,
   ORGANIZATION_ADDITIONAL_FIELDS,
   platformAc,
   platformRoles,
   organizationAc,
-  organizationRoles,
-} from "@workspace/shared";
+  organizationRoles } from "@workspace/shared";
 import { emailService } from "@/services/email.service";
 import { membersRepository } from "@/repositories/members.repository";
 import { cache } from "@/lib/cache";
@@ -34,7 +32,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: false,
-        defaultValue: GLOBAL_ROLES.USER,
+        defaultValue: 'user',
         input: false,
       },
     },

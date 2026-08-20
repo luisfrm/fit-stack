@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../lib/route-handler';
-import { GLOBAL_ROLES } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
@@ -17,7 +16,7 @@ export const organizationRoutes = new Hono<AppEnv>()
     const activeOrganizationId = session.activeOrganizationId;
 
     if (!activeOrganizationId) {
-      if (userRole === GLOBAL_ROLES.ADMIN) {
+      if (userRole === 'admin') {
         return c.json({ status: 'active' });
       }
       return c.json({ error: 'No active organization' }, 400);

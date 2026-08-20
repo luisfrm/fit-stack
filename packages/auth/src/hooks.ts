@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "./client";
-import { GLOBAL_ROLES, ORG_ROLES } from '@workspace/shared';
+import { ORG_ROLES } from '@workspace/shared';
 import type { User, Session } from "./client";
 import type { IOrganization } from '@workspace/shared/types';
 
@@ -11,8 +11,8 @@ export function useAuth() {
   const session = sessionData as Session;
   const user = session?.user as User;
 
-  const roleName = user?.role || GLOBAL_ROLES.USER;
-  const isAdmin = user?.role === GLOBAL_ROLES.ADMIN;
+  const roleName = user?.role || 'user';
+  const isAdmin = user?.role === 'admin';
 
   const orgRole = session?.member?.role;
   const isOwner = orgRole === ORG_ROLES.OWNER;

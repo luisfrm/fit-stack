@@ -83,7 +83,7 @@ apps/api/
 │   ├── organizations/          # Org subscription status
 │   ├── payments/               # Payments CRUD + analytics + status + send-email
 │   ├── plans/                  # Membership plans CRUD
-│   ├── platform/               # SaaS admin (GLOBAL_ROLES.ADMIN only)
+│   ├── platform/               # SaaS admin ('admin' (platform role) only)
 │   │   ├── organizations/      #   List, get, create, join, staff, subscriptions
 │   │   ├── plans/              #   CRUD + summary + with-stats
 │   │   ├── settings/           #   Global platform settings
@@ -140,7 +140,7 @@ export const POST = withSession()(
   async (req, { organizationId }) => { /* logic */ }
 );
 
-// SaaS admin (GLOBAL_ROLES.ADMIN only)
+// SaaS admin ('admin' (platform role) only)
 export const GET = withPlatformAuth()(async (req) => { /* logic */ });
 ```
 
@@ -336,7 +336,7 @@ Get a presigned upload URL for Cloudflare R2.
 ### Platform `GET|PATCH|DELETE /api/platform/subscriptions/[id]`
 ### Platform `GET /api/platform/subscriptions/stats`
 
-**Auth**: All platform endpoints require `GLOBAL_ROLES.ADMIN`.
+**Auth**: All platform endpoints require `'admin' (platform role)`.
 
 ---
 

@@ -1,15 +1,4 @@
 /**
- * Global Platform Roles for Fit-Stack (SaaS Level).
- * Defines what a user can do across the entire platform.
- */
-export const GLOBAL_ROLES = {
-  ADMIN: "admin", // Global platform super-admin (e.g. Fit-Stack Owner)
-  USER: "user", // Regular platform user (default)
-} as const;
-
-export type GlobalRole = typeof GLOBAL_ROLES[keyof typeof GLOBAL_ROLES];
-
-/**
  * Organization-specific Roles (Tenant Level).
  * Defines what a user can do within a specific gym/organization.
  */
@@ -63,11 +52,6 @@ export function formatPlatformRole(role?: string | null): string {
   const normalized = role.toLowerCase();
   return PLATFORM_ROLE_LABELS[normalized] ?? (role.charAt(0).toUpperCase() + role.slice(1));
 }
-
-/**
- * Combined Role type for general utility.
- */
-export type Role = GlobalRole | OrgRole;
 
 /**
  * Payment statuses for audit and box flow.

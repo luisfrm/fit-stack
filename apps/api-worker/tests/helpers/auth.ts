@@ -3,12 +3,12 @@
  *
  * Everything goes through real HTTP endpoints wherever an endpoint exists.
  * Direct SQL is used only for things the API deliberately has no route for
- * (promoting a user to a platform-level global role), mirroring the pytest
+ * (promoting a user to a platform role), mirroring the pytest
  * approach of flipping `is_superuser` in the DB.
  */
 import { randomUUID } from 'node:crypto';
 import { createClient, type TestClient } from './client';
-import { setUserGlobalRole, testQuery } from './db';
+import { setUserPlatformRole, testQuery } from './db';
 import { ORG_ROLES } from '@workspace/shared';
 
 /** Short unique suffix so records never collide across runs. */
@@ -70,7 +70,7 @@ export async function signIn(
 }
 
 /**
- * Registers a user and promotes them to a platform global role
+ * Registers a user and promotes them to a platform role
  * (`admin` / `owner` / `support`). Role changes are applied straight to the DB
  * because there is intentionally no public endpoint for self-promotion.
  */
@@ -78,8 +78,8 @@ export async function registerPlatformUser(
   role: 'admin' | 'owner' | 'support' = 'admin',
 ): Promise<AuthedUser> {
   const user = await registerUser({ email: uniqueEmail(`platform-${role}`) });
-  await setUserGlobalRole(user.userId, role);
-  // Re-issue the session so the custom session picks up the new global role.
+  await setUserPlatformRole(user.userId, role);
+  // Re-issue the session so the custom session picks up the new platform role.
   await signIn(user.client, user.email);
   return user;
 }

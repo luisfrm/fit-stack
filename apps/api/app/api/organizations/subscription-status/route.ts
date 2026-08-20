@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/config/auth';
-import { GLOBAL_ROLES } from '@workspace/shared';
 import { platformSubscriptionsService } from '@/services/platform-subscriptions.service';
 import { cache } from '@/lib/cache';
 
@@ -15,7 +14,7 @@ export async function GET(req: NextRequest) {
   const activeOrganizationId = session.session?.activeOrganizationId;
 
   if (!activeOrganizationId) {
-    if (userRole === GLOBAL_ROLES.ADMIN) {
+    if (userRole === 'admin') {
       return Response.json({ status: 'active' });
     }
     return Response.json({ error: 'No active organization' }, { status: 400 });
