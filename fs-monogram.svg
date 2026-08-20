@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 464 562" width="100%" height="100%">
+  <rect width="464" height="562" fill="#0d1117" />
+  <g fill="#fcd303" stroke="#fcd303" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Remate superior de la S -->
+    <path d="M 356 200 L 352 201 L 320 242 L 321 244 L 334 249 L 351 260 L 382 218 L 382 216 L 375 211 Z" />
+    
+    <!-- Estructura superior de la F -->
+    <path d="M 362 120 L 99 120 L 99 405 L 157 331 L 157 282 L 158 281 L 196 281 L 212 260 L 245 230 L 245 229 L 158 229 L 157 228 L 157 185 L 136 156 L 137 155 L 163 172 L 306 172 Z" />
+    
+    <!-- Trazo diagonal / rayo y cuerpo inferior de la S -->
+    <path d="M 401 111 L 237 261 L 221 277 L 75 463 L 82 458 L 222 329 L 254 339 L 258 339 L 266 342 L 270 342 L 293 348 L 310 354 L 321 361 L 327 370 L 327 383 L 324 389 L 319 394 L 308 400 L 294 403 L 267 403 L 266 402 L 259 402 L 249 400 L 230 394 L 217 388 L 198 375 L 158 411 L 162 416 L 180 429 L 209 443 L 233 450 L 243 452 L 250 452 L 251 453 L 258 453 L 259 454 L 297 454 L 298 453 L 316 451 L 328 448 L 341 443 L 358 433 L 369 423 L 379 409 L 385 394 L 386 384 L 387 383 L 387 365 L 382 345 L 376 334 L 368 325 L 358 317 L 339 307 L 326 302 L 287 292 L 283 290 L 280 290 L 251 305 L 249 304 Z" />
+  </g>
+</svg>
