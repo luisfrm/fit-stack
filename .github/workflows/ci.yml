@@ -47,9 +47,38 @@ jobs:
             BASE_SHA="${{ github.event.before }}"
           fi
           
-          # Si por alguna razón BASE_SHA es nulo o vacío (ej: primer commit), comparamos con master
+          # Si por alguna raz��n BASE_SHA es nulo o vac��o (ej: primer commit), comparamos con master
           BASE_SHA=${BASE_SHA:-master}
 
           echo "Comparing against: $BASE_SHA"
           
           pnpm turbo lint typecheck --filter="...[$BASE_SHA]"
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Tests
+        env:
+          # Opcional: si no existe, la suite de integración de api-worker se
+          # salta con un mensaje claro (nunca contra la base de producción).
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: pnpm test

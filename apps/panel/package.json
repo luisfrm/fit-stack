@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -29,14 +31,21 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@testing-library/dom": "^10",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@testing-library/user-event": "^14",
     "@types/node": "^25.1.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "better-auth": "^1.5.5",
     "eslint": "^9.39.2",
     "jose": "^6.2.1",
-    "typescript": "^5.9.3"
+    "jsdom": "^26",
+    "typescript": "^5.9.3",
+    "vitest": "^3"
   }
 }
