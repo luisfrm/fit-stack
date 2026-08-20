@@ -7,17 +7,28 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
 import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
-import { registerPlatformUser, uid } from '../helpers/auth';
+import {
+  registerPlatformUser,
+  registerUser,
+  uid,
+  type AuthedUser,
+} from '../helpers/auth';
 
 describe.skipIf(skipReason !== null)('Platform API', () => {
+  let admin: AuthedUser;
+  let normalUser: AuthedUser;
+
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
+    // Shared fixtures: platform tests are read-only or create their own
+    // resources, so one admin + one plain user serve the whole file.
+    admin = await registerPlatformUser('admin');
+    normalUser = await registerUser();
   });
 
   describe('GET /api/platform/settings', () => {
     it('returns platform settings for an admin user', async () => {
-      const admin = await registerPlatformUser('admin');
       const res = await admin.client.get('/api/platform/settings');
 
       expect(res.status, res.text).toBe(200);
@@ -32,9 +43,7 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
     });
 
     it('rejects requests from org-level users without platform role', async () => {
-      // Register a normal user (global role = "user") — no platform access
-      const { registerUser } = await import('../helpers/auth');
-      const normalUser = await registerUser();
+      // normalUser has global role = "user" — no platform access
       const res = await normalUser.client.get('/api/platform/settings');
 
       expect(res.status, res.text).toBe(403);
@@ -43,8 +52,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
 
   describe('POST /api/platform/settings', () => {
     it('creates platform settings as admin', async () => {
-      const admin = await registerPlatformUser('admin');
-
       const res = await admin.client.post('/api/platform/settings', {
         platform_name: 'Fit-Stack',
       });
@@ -53,8 +60,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
     });
 
     it('rejects non-admin users', async () => {
-      const { registerUser } = await import('../helpers/auth');
-      const normalUser = await registerUser();
       const res = await normalUser.client.post('/api/platform/settings', {
         platform_name: 'Hack',
       });
@@ -65,7 +70,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
 
   describe('GET /api/platform/organizations', () => {
     it('returns paginated organizations for admin', async () => {
-      const admin = await registerPlatformUser('admin');
       const res = await admin.client.get('/api/platform/organizations');
 
       expect(res.status, res.text).toBe(200);
@@ -83,8 +87,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
 
   describe('POST /api/platform/organizations', () => {
     it('creates an organization via platform admin', async () => {
-      const admin = await registerPlatformUser('admin');
-
       const res = await admin.client.post('/api/platform/organizations', {
         name: `Gym ${uid()}`,
         slug: `gym-${uid()}`,
@@ -97,8 +99,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
     });
 
     it('rejects creation by non-admin', async () => {
-      const { registerUser } = await import('../helpers/auth');
-      const normalUser = await registerUser();
       const res = await normalUser.client.post('/api/platform/organizations', {
         name: `Gym ${uid()}`,
       });
@@ -109,8 +109,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
 
   describe('Organization provisioning flow', () => {
     it('admin can create org, fetch it, and update it', async () => {
-      const admin = await registerPlatformUser('admin');
-
       // Create
       const createRes = await admin.client.post('/api/platform/organizations', {
         name: `Provision Gym ${uid()}`,
@@ -133,8 +131,6 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
     });
 
     it('admin can delete an organization', async () => {
-      const admin = await registerPlatformUser('admin');
-
       const createRes = await admin.client.post('/api/platform/organizations', {
         name: `Delete Me ${uid()}`,
         slug: `del-${uid()}`,

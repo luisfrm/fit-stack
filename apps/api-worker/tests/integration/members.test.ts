@@ -13,6 +13,7 @@ import {
   createGymMember,
   uniqueEmail,
   uid,
+  type GymTenant,
 } from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
 
@@ -23,9 +24,16 @@ describe.skipIf(skipReason !== null)('Members API', () => {
   });
 
   describe('POST /api/members', () => {
+    let tenant: GymTenant;
+
+    beforeAll(async () => {
+      // Shared tenant: these tests create members with unique emails or fail
+      // validation before any mutation, so one org serves them all.
+      tenant = await createGymTenant('members-post');
+    });
+
     it('creates a gym member with required fields', async () => {
-      const { owner } = await createGymTenant();
-      const member = await createGymMember(owner.client);
+      const member = await createGymMember(tenant.owner.client);
 
       expect(member).toHaveProperty('id');
       expect(member.id).toBeGreaterThan(0);
@@ -34,8 +42,7 @@ describe.skipIf(skipReason !== null)('Members API', () => {
     });
 
     it('creates a member with explicit role', async () => {
-      const { owner } = await createGymTenant();
-      const member = await createGymMember(owner.client, {
+      const member = await createGymMember(tenant.owner.client, {
         firstName: 'Coach',
         lastName: 'Test',
         role: ORG_ROLES.COACH,
@@ -45,8 +52,7 @@ describe.skipIf(skipReason !== null)('Members API', () => {
     });
 
     it('rejects creation with missing firstName', async () => {
-      const { owner } = await createGymTenant();
-      const res = await owner.client.post('/api/members', {
+      const res = await tenant.owner.client.post('/api/members', {
         lastName: 'Perez',
         email: uniqueEmail(),
         role: 'member',
@@ -56,8 +62,7 @@ describe.skipIf(skipReason !== null)('Members API', () => {
     });
 
     it('rejects creation with invalid email', async () => {
-      const { owner } = await createGymTenant();
-      const res = await owner.client.post('/api/members', {
+      const res = await tenant.owner.client.post('/api/members', {
         firstName: 'Test',
         lastName: 'User',
         email: 'not-an-email',

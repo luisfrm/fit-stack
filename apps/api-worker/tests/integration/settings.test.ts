@@ -8,7 +8,11 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
 import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
-import { createGymTenant, addUserToOrganization } from '../helpers/auth';
+import {
+  createGymTenant,
+  addUserToOrganization,
+  type GymTenant,
+} from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
 
 describe.skipIf(skipReason !== null)('Settings API', () => {
@@ -18,9 +22,15 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
   });
 
   describe('GET /api/settings', () => {
+    let tenant: GymTenant;
+
+    beforeAll(async () => {
+      // Shared tenant: the GET tests are read-only, so one org serves them all.
+      tenant = await createGymTenant('settings-get');
+    });
+
     it('returns empty object for a new organization', async () => {
-      const { owner } = await createGymTenant();
-      const res = await owner.client.get('/api/settings');
+      const res = await tenant.owner.client.get('/api/settings');
 
       expect(res.status, res.text).toBe(200);
       expect(res.body).toEqual({});
@@ -34,8 +44,7 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
     });
 
     it('rejects requests from a member without SETTINGS.READ permission', async () => {
-      const { organization } = await createGymTenant();
-      const member = await addUserToOrganization(organization.id, ORG_ROLES.MEMBER, 'settings-member');
+      const member = await addUserToOrganization(tenant.organization.id, ORG_ROLES.MEMBER, 'settings-member');
       const res = await member.client.get('/api/settings');
 
       expect(res.status, res.text).toBe(403);
