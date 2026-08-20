@@ -150,7 +150,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 - **Workflow**: `generate` → `review` → `migrate`. NO `push`, `generate`, `migrate`, or `seed` without explicit user approval.
 - **Push Restriction**: `db:push` is EXCLUSIVELY for local prototyping. Strictly prohibited on shared branches or production.
 - **Naming**: Table names are **singular** (`user`, `organization`). Repositories and Services are **plural** (`users.service.ts`).
-- **No `pgEnum`**: Use `text('col').$type<UnionType>()` instead of Postgres enums — pgEnum breaks Drizzle migrations.
+- **No `pgEnum`**: Use plain `text('col')` — no `.$type<...>()` annotation. The DB treats these columns as plain strings. Allowed values are validated exclusively by Zod schemas on the backend and by the frontend; they never live in the DB layer. pgEnum is strictly forbidden (breaks Drizzle migrations).
 - **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
 
 ### 4. Next.js Patterns & Best Practices
@@ -245,6 +245,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/platform/organizations` | CRUD orgs plataforma (console) |
 | `/api/platform/settings` | Settings globales de plataforma |
 | `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
+| `/api/platform/upload` | Assets de plataforma sin org (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, scope fijo `platform/` |
 
 > `/api/access-control/*` **NO está montado** en api-worker (Bridge pausado — ver sección 4).
 

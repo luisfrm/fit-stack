@@ -127,17 +127,23 @@ app.get('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
 ## 4. Base de Datos y Drizzle ORM
 
 ### 4.1. Regla de Oro: Cero `pgEnum` en el Esquema
-* **Regla**: **Está prohibido utilizar `pgEnum` de PostgreSQL en `packages/database/src/schema.ts`**.
-* **Motivo**: Los tipos enum de PostgreSQL (`CREATE TYPE ... AS ENUM`) impiden modificar o eliminar valores dentro de transacciones de migración estándar en Postgres, lo que rompe de forma recurrente las migraciones automáticas de Drizzle (`pnpm db:generate` / `pnpm db:migrate`).
-* **Estándar Aprobado**: Usar columnas de tipo `text('columna').$type<UnionType>()`:
+
+* **Regla**: **Está prohibido utilizar `pgEnum` de PostgreSQL en `packages/database/src/schema.ts`**. Tampoco se usa `.$type<...>()` en las columnas de texto.
+* **Motivo**: Los tipos enum de PostgreSQL (`CREATE TYPE ... AS ENUM`) impiden modificar o eliminar valores dentro de transacciones de migración estándar en Postgres, lo que rompe las migraciones de Drizzle. El modificador `.$type<...>()` es innecesario porque la validación de valores permitidos no le corresponde a la capa de base de datos.
+* **Responsabilidad de la validación**:
+  * **Base de datos** → columna `text` plana, sin restricción de valores.
+  * **Backend** → Zod schema en el route handler valida los valores permitidos.
+  * **Frontend** → los componentes/formularios también validan antes de enviar.
+* **Estándar Aprobado**: `text('columna')` plano, sin genérico:
   ```ts
-  // Correcto: Cero fallos en migraciones + 100% Tipado Estricto en TypeScript
+  // Correcto: texto plano — la validación vive en Zod, no en la DB
   export const memberPayment = pgTable('payment', {
-    status: text('status')
-      .$type<'processing' | 'validated' | 'invalid' | 'voided'>()
-      .default('validated')
-      .notNull(),
+    status: text('status').default('validated').notNull(),
   });
+  ```
+  ```ts
+  // Incorrecto — no usar:
+  status: text('status').$type<'processing' | 'validated'>()  // ❌
   ```
 
 ### 4.2. Modelo Unificado de Usuarios (Diagrama ER)

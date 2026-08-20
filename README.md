@@ -102,7 +102,7 @@ pnpm format
 - **Cloudflare Workers API** — `apps/api-worker` (Hono + Neon HTTP driver) using `Route → Service → Repository → Database` layering.
 - **Two-tier roles** — `GLOBAL_ROLES` (platform admin) + `ORG_ROLES` (tenant-scoped).
 - **Unified RBAC** — Defined in `packages/shared/src/access-control.ts`. Includes `panel: ["access"]` and `hasAccess()` evaluation.
-- **Drizzle Schema Rule** — No PostgreSQL `pgEnum` types. Uses `text().$type<...>()` to avoid breaking database migrations.
+- **Drizzle Schema Rule** — No PostgreSQL `pgEnum` types and no `.$type<...>()` annotations. Uses plain `text()` columns; allowed values are validated by Zod (backend) and the frontend, never by the DB layer.
 - **Caching** — Upstash Redis with graceful degradation (cache keys in AGENTS.md).
 - **Active org profile** — Resolved by the `api-worker` custom session (`activeOrganization`) with a 5-min Redis cache (`org:{id}:profile`).
 - **Atomic Invoicing** — Subscriptions + Payments created in a single unit.
