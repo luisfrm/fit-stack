@@ -183,6 +183,19 @@
     }
   }
 
+  /* Puntos de "escribiendo..." del chat IA (3 puntos que brincan escalonados) */
+  --animate-typing-bounce: typing-bounce 1.2s ease-in-out infinite;
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      translate: 0 0;
+    }
+    30% {
+      translate: 0 -5px;
+    }
+  }
+
   /* ── Modal / bottom-sheet open & close ──
      Animan las propiedades individuales `translate`/`scale` (no `transform`)
      para no chocar con las utilidades de centrado de Tailwind v4

@@ -75,6 +75,12 @@ export function ChatView({ initialModels }: ChatViewProps) {
   const modelOptions = React.useMemo(() => MODEL_OPTIONS(initialModels), [initialModels]);
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
 
+  // Mientras el LLM no ha emitido el primer token, la última message es del usuario:
+  // mostramos la nubecita "escribiendo..." con los 3 puntos animados.
+  const isAwaitingResponse =
+    isStreaming &&
+    activeChat?.messages[activeChat.messages.length - 1]?.role === "user";
+
   // Activate the first chat on mount
   React.useEffect(() => {
     setActiveChatId((current) => current ?? chats[0]?.id ?? null);
@@ -83,7 +89,7 @@ export function ChatView({ initialModels }: ChatViewProps) {
   // Auto-scroll to the latest message
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [activeChat?.messages]);
+  }, [activeChat?.messages, isStreaming]);
 
   const createChat = () => {
     const empty = chats.find((chat) => chat.messages.length === 0);
@@ -295,6 +301,22 @@ export function ChatView({ initialModels }: ChatViewProps) {
                     </div>
                   </div>
                 ))}
+                {isAwaitingResponse && (
+                  <div className="flex justify-start">
+                    <div
+                      className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-surface px-4 py-3"
+                      aria-label="El asistente está escribiendo"
+                    >
+                      {[0, 1, 2].map((dot) => (
+                        <span
+                          key={dot}
+                          className="size-1.5 rounded-full bg-foreground-dim animate-typing-bounce"
+                          style={{ animationDelay: `${dot * 0.15}s` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {usedModelLabel && (
                   <div className="flex justify-start">
                     <Badge variant="outline" size="sm">
