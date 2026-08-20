@@ -7,7 +7,7 @@ import {
   type PaginatedMembers,
   type IMember,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetail
+  type IPaymentMethodDetails
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
@@ -40,7 +40,7 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     currencyPaid: string;
     exchangeRateApplied?: string;
     paymentMethod: string;
-    paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
+    paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
     paymentDate?: Date | string;
   }
@@ -301,7 +301,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     try {
       const finalDetails = await handleUploads();
 
-      let finalPaymentMethodDetails: IPaymentMethodDetail[] | Record<string, any> | undefined = undefined;
+      let finalPaymentMethodDetails: IPaymentMethodDetails | undefined = undefined;
 
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
         // Map field IDs to human-readable labels for self-descriptive data

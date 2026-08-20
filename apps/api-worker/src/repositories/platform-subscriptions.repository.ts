@@ -12,6 +12,7 @@ import {
   PLATFORM_GRACE_PERIODS,
 } from '@workspace/shared/constants';
 import type { PaymentStatus } from '@workspace/shared/constants';
+import type { IPaymentMethodDetails } from '@workspace/shared';
 
 export interface SubscriptionFilters {
   status?: PlatformSubscriptionStatus | 'all';
@@ -84,7 +85,7 @@ export interface NewPlatformPaymentData {
   exchangeRateApplied?: string | null;
   baseAmount?: number | null;
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any> | null;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
   paymentDate?: Date;
   dueDate?: Date;
@@ -410,7 +411,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         .orderBy(desc(platformSubscriptionPayment.paymentDate));
       return records.map((r) => ({
         ...r,
-        paymentMethodDetails: r.paymentMethodDetails as Record<string, any> | null,
+        paymentMethodDetails: r.paymentMethodDetails as IPaymentMethodDetails | Record<string, any> | null,
       }));
     },
 

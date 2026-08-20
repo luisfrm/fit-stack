@@ -14,6 +14,7 @@ import {
   type PlatformSubscriptionStatus,
   type PaymentStatus,
 } from '@workspace/shared/constants';
+import type { IPaymentMethodDetails } from '@workspace/shared';
 import { addDuration } from '../lib/billing-utils';
 
 export interface CreatePlatformSubscriptionPayload {
@@ -31,7 +32,7 @@ export interface PlatformPaymentPayload {
   exchangeRateApplied?: string;
   baseAmountCents?: number;
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
   paymentDate?: string;
 }

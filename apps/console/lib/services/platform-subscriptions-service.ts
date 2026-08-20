@@ -4,6 +4,7 @@ import type {
   IPaginatedResult,
   IPlatformSubscription,
   IPlatformSubscriptionPayment,
+  IPaymentMethodDetails,
   PaymentStatus,
 } from "@workspace/shared/types";
 
@@ -41,7 +42,7 @@ export interface PlatformPaymentPayload {
   exchangeRateApplied?: string;
   baseAmountCents?: number;
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;
   paymentDate?: string;
 }

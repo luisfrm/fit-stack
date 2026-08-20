@@ -1,5 +1,6 @@
 import { eq, and, sql, gte, type Db } from '@workspace/database/factory';
 import { payment } from '@workspace/database/schema';
+import type { IPaymentMethodDetails } from '@workspace/shared';
 import { OrganizationDateManager } from '../lib/date-manager';
 
 export interface IPayment {
@@ -18,7 +19,7 @@ export interface IPayment {
 
   status?: 'processing' | 'validated' | 'invalid' | 'voided';
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any> | null;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
   paymentDate?: Date;
   createdAt?: string | Date;

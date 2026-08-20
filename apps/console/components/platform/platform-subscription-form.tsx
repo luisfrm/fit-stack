@@ -10,7 +10,7 @@ import {
   type IPlatformOrganization,
   type IPlatformPlan,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetail,
+  type IPaymentMethodDetails,
   type PaymentStatus,
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
@@ -31,7 +31,7 @@ interface PaymentData {
   exchangeRateApplied?: string;
   baseAmountCents?: number;
   paymentMethod: string;
-  paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;
   paymentDate?: string;
 }
@@ -280,7 +280,7 @@ export function PlatformSubscriptionForm({
 
       const finalDetails = await handleUploads();
 
-      let finalPaymentMethodDetails: IPaymentMethodDetail[] | Record<string, any> | undefined;
+      let finalPaymentMethodDetails: IPaymentMethodDetails | undefined;
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
         finalPaymentMethodDetails = selectedPaymentConfig.fields
           .filter((field) => finalDetails[field.id] !== undefined)

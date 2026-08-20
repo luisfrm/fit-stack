@@ -2,7 +2,7 @@ import { api, type ApiFetchOptions } from "@/lib/api/client";
 import type {
   IPlatformOrganization,
   IPlatformSubscription,
-  IPaymentMethodDetail,
+  IPaymentMethodDetails,
   IProvisionOwnerDTO,
   IPaginatedResult,
   PaymentStatus,
@@ -24,7 +24,7 @@ export interface AddSubscriptionPayload {
     exchangeRateApplied?: string;
     baseAmountCents?: number;
     paymentMethod: string;
-    paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, unknown>;
+    paymentMethodDetails?: IPaymentMethodDetails;
     status: PaymentStatus;
     paymentDate?: string;
   };

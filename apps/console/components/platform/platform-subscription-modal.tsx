@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
-import { type IPlatformOrganization, type PaymentStatus, type IPaymentMethodDetail } from "@workspace/shared/types";
+import { type IPlatformOrganization, type PaymentStatus, type IPaymentMethodDetails } from "@workspace/shared/types";
 import { PlatformSubscriptionForm } from "./platform-subscription-form";
 import { organizationsService } from "@/lib/services/organizations-service";
 
@@ -48,7 +48,7 @@ export function PlatformSubscriptionModal({
       exchangeRateApplied?: string;
       baseAmountCents?: number;
       paymentMethod: string;
-      paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, unknown>;
+      paymentMethodDetails?: IPaymentMethodDetails;
       status: PaymentStatus;
       paymentDate?: string;
     };

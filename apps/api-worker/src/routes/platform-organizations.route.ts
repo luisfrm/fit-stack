@@ -12,6 +12,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createCache } from '../lib/cache';
+import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
@@ -72,7 +73,8 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo);
 
-    const org = await service.getOrganizationById(id);
+    const org = await service.findOrganizationById(id);
+    if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
     return c.json(org);
   })
 
@@ -161,7 +163,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
           exchangeRateApplied: z.string().optional(),
           baseAmountCents: z.number().int().nonnegative().optional(),
           paymentMethod: z.string().min(1),
-          paymentMethodDetails: z.record(z.string(), z.any()).optional(),
+          paymentMethodDetails: paymentMethodDetailsSchema,
           status: z.enum([
             PAYMENT_STATUSES.PENDING,
             PAYMENT_STATUSES.PROCESSING,

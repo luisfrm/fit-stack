@@ -6,6 +6,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createCache } from '../lib/cache';
+import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
@@ -24,7 +25,7 @@ const paymentSchema = z.object({
   exchangeRateApplied: z.string().optional(),
   baseAmountCents: z.number().int().nonnegative().optional(),
   paymentMethod: z.string().min(1),
-  paymentMethodDetails: z.record(z.string(), z.any()).optional(),
+  paymentMethodDetails: paymentMethodDetailsSchema,
   status: paymentStatusEnum,
   paymentDate: z.string().optional(),
 });
