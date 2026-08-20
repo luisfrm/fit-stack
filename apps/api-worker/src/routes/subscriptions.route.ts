@@ -6,8 +6,10 @@ import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/s
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
+import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createCache } from '../lib/cache';
+import { paymentMethodDetailsSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 const createSubSchema = z.object({
@@ -20,7 +22,7 @@ const createSubSchema = z.object({
     currencyPaid: z.string(),
     exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: z.string(),
-    paymentMethodDetails: z.record(z.string(), z.any()).nullable().optional(),
+    paymentMethodDetails: paymentMethodDetailsSchema,
     status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
     paymentDate: z.string().optional(),
   }),
@@ -48,7 +50,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const result = await subsService.getAllPaginated(orgId, { query, status, page, limit });
     await cache.set(cacheKey, result, 300);
@@ -64,7 +66,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const recent = await subsService.getRecent(orgId, limit);
     return c.json(recent);
@@ -81,7 +83,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const newSub = await subsService.create(orgId, payload as any, timezone);
     await cache.invalidate(`org:${orgId}:subscriptions*`);
@@ -100,7 +102,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const updated = await subsService.updateStatus(orgId, id, status);
     await cache.invalidate(`org:${orgId}:subscriptions*`);
@@ -118,7 +120,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     await subsService.delete(orgId, id);
     await cache.invalidate(`org:${orgId}:subscriptions*`);

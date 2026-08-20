@@ -1,8 +1,10 @@
 import type { SubscriptionsRepository, ISubscriptionDTO, SubscriptionsFilter } from '../repositories/subscriptions.repository';
 import type { PaymentsRepository } from '../repositories/payments.repository';
 import type { PlansRepository } from '../repositories/plans.repository';
+import type { MembersRepository } from '../repositories/members.repository';
+import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
-import { PAYMENT_STATUSES } from '@workspace/shared';
+import { PAYMENT_STATUSES, type IPaymentMethodDetails } from '@workspace/shared';
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
@@ -12,7 +14,7 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
     currencyPaid: string;
     exchangeRateApplied?: string | null;
     paymentMethod: string;
-    paymentMethodDetails?: Record<string, any> | null;
+    paymentMethodDetails?: IPaymentMethodDetails | null;
     status?: string;
     paymentDate?: string | Date;
   };
@@ -22,6 +24,7 @@ export function createSubscriptionsService(
   subsRepo: SubscriptionsRepository,
   paymentsRepo: PaymentsRepository,
   plansRepo: PlansRepository,
+  membersRepo: MembersRepository,
   taskQueue?: Queue
 ) {
   return {
@@ -75,14 +78,19 @@ export function createSubscriptionsService(
     },
 
     async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone?: string) {
+      const member = await membersRepo.findById(organizationId, payload.memberId);
+      if (!member) {
+        throw new HTTPException(400, { message: 'El miembro seleccionado no existe' });
+      }
+
       const plan = await plansRepo.findById(organizationId, payload.planId);
       if (!plan) {
-        throw new Error('El plan seleccionado no existe');
+        throw new HTTPException(400, { message: 'El plan seleccionado no existe' });
       }
 
       const latest = await subsRepo.findLatestForMember(organizationId, payload.memberId);
       if (latest?.paymentStatus === 'processing') {
-        throw new Error('No es posible registrar un nuevo pago mientras el anterior esté pendiente de validación');
+        throw new HTTPException(400, { message: 'No es posible registrar un nuevo pago mientras el anterior esté pendiente de validación' });
       }
 
       const dateManager = new OrganizationDateManager(timezone || 'America/Caracas');

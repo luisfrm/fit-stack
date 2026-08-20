@@ -248,7 +248,7 @@ export interface ISubscription {
   amountPaid?: number;
   currencyPaid?: string;
   paymentMethod?: string;
-  paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any>;
   exchangeRateApplied?: string;
   paymentStatus?: PaymentStatus;
   paymentDate?: string;
@@ -256,9 +256,17 @@ export interface ISubscription {
 
 export interface IPaymentMethodDetail {
   label: string;
-  value: any;
+  value: string;
   type?: 'text' | 'file' | 'number';
 }
+
+/**
+ * Contracto canónico de `paymentMethodDetails` (panel + console + API).
+ * Los forms envían un array de items auto-descriptivos; el API lo valida
+ * con `paymentMethodDetailsSchema` (api-worker/src/lib/schemas.ts).
+ * El lado de lectura mantiene tolerancia a filas legacy con forma de objeto.
+ */
+export type IPaymentMethodDetails = IPaymentMethodDetail[];
 
 export interface IPaymentMethodField {
   id: string;
@@ -300,7 +308,7 @@ export interface IPayment {
   exchangeRateApplied?: string;
 
   paymentMethod: string;
-  paymentMethodDetails?: IPaymentMethodDetail[] | Record<string, any>;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any>;
 
   // Invoice Details (Optional/Internal)
   subtotal?: number;
@@ -414,7 +422,7 @@ export interface IPlatformSubscriptionPayment {
 
   // Método
   paymentMethod: string;
-  paymentMethodDetails?: Record<string, any> | null;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
   // Fechas
   paymentDate: string | Date;

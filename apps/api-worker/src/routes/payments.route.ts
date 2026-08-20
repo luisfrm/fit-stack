@@ -6,6 +6,7 @@ import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/s
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
+import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createFinanceService } from '../services/finance.service';
 import { createCache } from '../lib/cache';
@@ -53,7 +54,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const updated = await subsService.updatePaymentStatus(orgId, id, status);
     await cache.invalidate(`org:${orgId}:subscriptions*`);
@@ -70,7 +71,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const result = await subsService.sendReceiptEmail(orgId, id);
     return c.json(result);
