@@ -17,7 +17,7 @@ import { membersService } from "@/lib/services/members-service";
 import { trainersService } from "@/lib/services/trainers-service";
 import { type ITrainer } from "@workspace/shared/types";
 import { uploadService } from "@/lib/services/upload-service";
-import { NoData } from "@/components/dashboard/dashboard-ui";
+import { NoData } from "@/components/dashboard/no-data";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";

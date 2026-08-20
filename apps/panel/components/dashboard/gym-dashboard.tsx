@@ -6,11 +6,9 @@ import { Download, Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
-import {
-  TodayClassesTable,
-  RecentRegistrationsList,
-  AlertItem,
-} from "@/components/dashboard/dashboard-ui";
+import { TodayClassesTable } from "@/components/dashboard/today-classes-table";
+import { RecentRegistrationsList } from "@/components/dashboard/recent-registrations";
+import { AlertItem } from "@/components/dashboard/alert-item";
 import { DashboardStatsView } from "@/components/dashboard/dashboard-stats";
 import { MemberModal } from "@/components/members/member-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";

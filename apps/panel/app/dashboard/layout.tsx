@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AppSidebar, MobileNav } from "@/components/dashboard/dashboard-ui";
+import { AppSidebar, MobileNav } from "@/components/dashboard/sidebar";
 import { sessionService } from "@/lib/services/session-service";
 import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";

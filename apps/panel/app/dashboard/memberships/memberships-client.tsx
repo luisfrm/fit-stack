@@ -9,7 +9,7 @@ import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { StatCard } from "@workspace/ui/components";
-import { NoData } from "@/components/dashboard/dashboard-ui";
+import { NoData } from "@/components/dashboard/no-data";
 
 interface MembershipsClientProps {
   readonly initialPlans: IMembershipPlan[];

@@ -255,7 +255,7 @@ interface SubscriptionsTableProps {
   readonly pagination?: any;
 }
 
-import { NoData } from "../dashboard/dashboard-ui";
+import { NoData } from "../dashboard/no-data";
 
 export function SubscriptionsTable({
   subscriptions,

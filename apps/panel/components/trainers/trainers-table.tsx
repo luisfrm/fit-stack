@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { type ITrainer } from "@/types/dashboard";
-import { NoData } from "../dashboard/dashboard-ui";
+import { NoData } from "../dashboard/no-data";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";

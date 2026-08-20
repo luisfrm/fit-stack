@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { KpiCard } from "./dashboard-ui";
+import { KpiCard } from "./kpi-card";
 
 interface KpiItem {
   label: string;
