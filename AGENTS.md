@@ -8,6 +8,7 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
+pnpm test         # Full test suite (shared → api-worker → panel → console, Vitest)
 pnpm format       # Format code (Prettier)
 
 # Database (Drizzle ORM — all run via @workspace/database)
@@ -692,10 +693,28 @@ Ambas se importan desde server y client (no dependen de hooks).
 
 ---
 
+## Testing (Vitest)
+
+Suite completa con `pnpm test` (shared → api-worker → panel → console). Config en cada `vitest.config.ts`; helpers en `apps/api-worker/tests/`.
+
+**api-worker — tests de integración** (`tests/integration/`, `pnpm --filter api-worker test:integration`):
+- **HTTP real, sin mocks**: `app.fetch(request, env, ctx)` — el mismo entry point de producción — contra una **branch de Neon** (`TEST_DATABASE_URL` en `apps/api-worker/.dev.vars`; leer `tests/setup.ts`).
+- **Guardas duras**: se niega a correr si `TEST_DATABASE_URL` apunta al mismo host+db que `DATABASE_URL`; sin `TEST_DATABASE_URL` toda la suite se salta con `describe.skipIf` (CI incluido).
+- **Determinismo**: `fileParallelism: false` (una branch compartida), `TRUNCATE ... RESTART IDENTITY CASCADE` entre archivos (`tests/helpers/db.ts`), Redis ausente a propósito (cache no-op).
+- **Spies grabadores** para R2 y Queues (`tests/helpers/env.ts`) — se puede assertear eventos encolados (ej. `email.payment_receipt`).
+- **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs por HTTP real (Better Auth), inserción SQL directa solo para lo que no tiene endpoint (roles globales).
+- **Sincronizar schema**: `pnpm --filter api-worker test:db:push` (drizzle-kit push contra la branch de test, nunca producción).
+
+**panel/console — tests unit** (`tests/unit/`, jsdom + Testing Library): helpers de UI y utilidades puras.
+
+> Cuando agregues o cambies comportamiento del API, los tests de integración son la primera línea de defensa: corre `pnpm test` antes de pedir review.
+
+---
+
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
-- **No test suite** — `pnpm test` does not exist
+- **Tests**: `pnpm test` runs the full suite (shared → api-worker → panel → console, Vitest). Los tests de integración de api-worker hablan HTTP real al Hono app contra una branch de Neon (`TEST_DATABASE_URL` en `apps/api-worker/.dev.vars`); sin esa variable se saltan con mensaje claro, y jamás corren contra la base de producción (guardas duras). CI los ejecuta en PRs (`ci.yml` job `test`).
 - **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
 - **Keep AGENTS.md updated** — After any structural change, update AGENTS.md to reflect it. When in doubt, update it.
@@ -830,6 +849,7 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `CLOUDFLARE_AI_API_TOKEN` (token **Workers AI**: Run para `/api/ai` — api-worker. Binding del worker con el mismo nombre; en local va en `.dev.vars` como `CLOUDFLARE_AI_API_TOKEN`)
 - `AI_GATEWAY_URL` *(opcional — si se setea, `createWorkersAIClient` apunta al AI Gateway en vez de Workers AI directo)*
 - `OPENROUTER_API_KEY` *(opcional — necesario para el modelo `openrouter/free`)*
+- `TEST_DATABASE_URL` *(opcional — branch de Neon para la suite de integración de api-worker; sin él, los tests de integración se saltan en CI)*
 - `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
 
 **Variables por environment (nombres de recursos, no sensibles):**
