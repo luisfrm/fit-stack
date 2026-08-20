@@ -702,7 +702,8 @@ Suite completa con `pnpm test` (shared → api-worker → panel → console). Co
 - **Guardas duras**: se niega a correr si `TEST_DATABASE_URL` apunta al mismo host+db que `DATABASE_URL`; sin `TEST_DATABASE_URL` toda la suite se salta con `describe.skipIf` (CI incluido).
 - **Determinismo**: `fileParallelism: false` (una branch compartida), `TRUNCATE ... RESTART IDENTITY CASCADE` entre archivos (`tests/helpers/db.ts`), Redis ausente a propósito (cache no-op).
 - **Spies grabadores** para R2 y Queues (`tests/helpers/env.ts`) — se puede assertear eventos encolados (ej. `email.payment_receipt`).
-- **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs por HTTP real (Better Auth), inserción SQL directa solo para lo que no tiene endpoint (roles globales).
+- **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs por HTTP real (Better Auth), inserción SQL directa solo para lo que no tiene endpoint (roles globales). **Se comparten por `describe`** (`beforeAll`) cuando los asserts no dependen de estado mutado (emails/keys únicos) — cada sign-up de Better Auth cuesta ~3s (bcrypt + Neon), así que un tenant por test solo donde la isolation lo exige.
+- **Guards de autorización** (`tests/integration/guards.test.ts`): cubren los 3 middlewares de `route-handler.ts` — `requireAuth` (401 sin sesión; deja pasar sesión válida sin org, 200 con `admin`), `requireOrgPermission` (401, **400 sin org activa**, matriz de roles: positivos owner/manager/cashier settings, member/coach plans/classes read; negativos coach settings, cashier staff, coach classes.create aun con update, member subscriptions) y `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** en settings/orgs/staff, user 403, 401).
 - **Sincronizar schema**: `pnpm --filter api-worker test:db:push` (drizzle-kit push contra la branch de test, nunca producción).
 
 **panel/console — tests unit** (`tests/unit/`, jsdom + Testing Library): helpers de UI y utilidades puras.
