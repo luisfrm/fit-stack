@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
 import { canAccessConsole } from "@workspace/shared";
 import { AppSidebar } from "@/components/dashboard/dashboard-ui";
+import { api } from "@/lib/api/client";
+import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { uploadService } from "@/lib/services/upload-service";
 
 export default async function DashboardLayout({
   children,
@@ -25,6 +28,14 @@ export default async function DashboardLayout({
     redirect("/unauthorized");
   }
 
+  const [settings] = await Promise.all([
+    api<Record<string, string>>("/platform/settings", {
+      next: { revalidate: 600, tags: ["console:settings"] },
+    }).catch(() => ({} as Record<string, string>)),
+  ]);
+
+  const platformLogo = settings[PLATFORM_SETTINGS_KEYS.PLATFORM_LOGO];
+
   return (
     <div className="flex flex-col lg:flex-row h-svh overflow-hidden bg-background text-slate-100 font-display">
       <AppSidebar
@@ -32,6 +43,9 @@ export default async function DashboardLayout({
           name: session.user?.name,
           role: userRole,
           avatarUrl: session.user?.image || undefined,
+        }}
+        branding={{
+          logo: platformLogo ? uploadService.getMediaUrl(platformLogo) : undefined,
         }}
       />
       <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">

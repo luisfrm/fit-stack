@@ -1,49 +1,41 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireAuth } from '../lib/route-handler';
+import { requirePlatformAuth } from '../lib/route-handler';
 import { createR2Service } from '../lib/r2';
 import { constructStorageKey } from '../lib/storage-keys';
 import type { AppEnv } from '../lib/env';
+
+const PLATFORM_SCOPE = 'platform';
 
 const presignedSchema = z.object({
   filename: z.string().min(1),
   contentType: z.string().min(1),
   folder: z.string().optional(),
   customName: z.string().optional(),
-  organizationId: z.string().optional(),
 });
 
-export const uploadRoutes = new Hono<AppEnv>()
-  // GET /api/upload?folder=
-  .get('/', requireAuth(), async (c) => {
-    const session = c.get('session')!;
-    const orgId = c.req.query('organizationId') || session.activeOrganizationId;
-
-    if (!orgId) {
-      return c.json({ error: 'Organization ID is required' }, 400);
-    }
-
+export const platformUploadRoutes = new Hono<AppEnv>()
+  // GET /api/platform/upload?folder=
+  .get('/', requirePlatformAuth(), async (c) => {
     const folder = c.req.query('folder') || '';
     const folderPath = folder && folder !== 'general' ? `${folder}/` : '';
-    const prefix = `cms/${orgId}/${folderPath}`;
+    const prefix = `${PLATFORM_SCOPE}/${folderPath}`;
 
     const r2Service = createR2Service(c.env);
     const files = await r2Service.listFiles(prefix);
     return c.json(files);
   })
 
-  // DELETE /api/upload?key=cms/orgId/...
-  .delete('/', requireAuth(), async (c) => {
-    const session = c.get('session')!;
-    const orgId = c.req.query('organizationId') || session.activeOrganizationId;
+  // DELETE /api/platform/upload?key=platform/...
+  .delete('/', requirePlatformAuth(), async (c) => {
     const key = c.req.query('key');
 
-    if (!orgId || !key) {
-      return c.json({ error: 'Key and Organization ID are required' }, 400);
+    if (!key) {
+      return c.json({ error: 'Key is required' }, 400);
     }
 
-    if (!key.startsWith(`cms/${orgId}/`)) {
+    if (!key.startsWith(`${PLATFORM_SCOPE}/`)) {
       return c.json({ error: 'Forbidden: No tienes permiso para borrar este archivo.' }, 403);
     }
 
@@ -52,19 +44,16 @@ export const uploadRoutes = new Hono<AppEnv>()
     return c.json({ success: true });
   })
 
-  // PUT /api/upload/direct?key=cms/orgId/...
-  .put('/direct', requireAuth(), async (c) => {
-    const session = c.get('session')!;
+  // PUT /api/platform/upload/direct?key=platform/...
+  .put('/direct', requirePlatformAuth(), async (c) => {
     const key = c.req.query('key');
 
     if (!key) {
       return c.json({ error: 'Key is required' }, 400);
     }
 
-    const orgId = c.req.query('organizationId') || key.split('/')[1] || session.activeOrganizationId;
-
-    if (!orgId) {
-      return c.json({ error: 'Organization ID is required' }, 400);
+    if (!key.startsWith(`${PLATFORM_SCOPE}/`)) {
+      return c.json({ error: 'Forbidden: No tienes permiso para subir este archivo.' }, 403);
     }
 
     if (!c.env.FILES_BUCKET) {
@@ -81,17 +70,11 @@ export const uploadRoutes = new Hono<AppEnv>()
     return c.json({ success: true, key });
   })
 
-  // POST /api/upload/presigned
-  .post('/presigned', requireAuth(), zValidator('json', presignedSchema), async (c) => {
-    const session = c.get('session')!;
+  // POST /api/platform/upload/presigned
+  .post('/presigned', requirePlatformAuth(), zValidator('json', presignedSchema), async (c) => {
     const body = c.req.valid('json');
-    const orgId = body.organizationId || session.activeOrganizationId;
 
-    if (!orgId) {
-      return c.json({ error: 'Organization ID is required' }, 400);
-    }
-
-    const uniqueKey = constructStorageKey(`cms/${orgId}`, body.folder || 'general', body.filename, body.customName);
+    const uniqueKey = constructStorageKey(PLATFORM_SCOPE, body.folder || 'general', body.filename, body.customName);
     const r2Service = createR2Service(c.env);
     const requestUrl = new URL(c.req.url);
     const apiBaseUrl = `${requestUrl.protocol}//${requestUrl.host}/api`;

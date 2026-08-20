@@ -3,11 +3,12 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Coins, Wallet, ChevronLeft } from "lucide-react";
+import { Sparkles, Coins, Wallet, ChevronLeft } from "lucide-react";
 import { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 import { Button } from "@workspace/ui/components/button";
 
 const PLATFORM_SETTINGS_NAV_ITEMS = [
+  { label: "General", href: "/dashboard/settings/general", icon: Sparkles, disabled: false },
   { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
   { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
 ];

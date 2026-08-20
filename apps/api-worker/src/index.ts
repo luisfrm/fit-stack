@@ -28,6 +28,7 @@ import { platformSubscriptionRoutes } from './routes/platform-subscriptions.rout
 import { platformOrganizationRoutes } from './routes/platform-organizations.route';
 import { platformSettingsRoutes } from './routes/platform-settings.route';
 import { platformStaffRoutes } from './routes/platform-staff.route';
+import { platformUploadRoutes } from './routes/platform-upload.route';
 
 const app = new Hono<AppEnv>();
 
@@ -88,5 +89,6 @@ app.route('/api/platform/subscriptions', platformSubscriptionRoutes);
 app.route('/api/platform/organizations', platformOrganizationRoutes);
 app.route('/api/platform/settings', platformSettingsRoutes);
 app.route('/api/platform/staff', platformStaffRoutes);
+app.route('/api/platform/upload', platformUploadRoutes);
 
 export default app;

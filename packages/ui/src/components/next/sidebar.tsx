@@ -27,6 +27,8 @@ export interface SidebarBranding {
   logo?: string;
   title?: string;
   subtitle?: string;
+  /** When provided, replaces the title/subtitle lockup (e.g. a logotype). */
+  logotipo?: React.ReactNode;
   isLoading?: boolean;
   fallbackIcon?: LucideIcon;
   action?: React.ReactNode;
@@ -69,31 +71,32 @@ export function MobileNav({ user, branding, navigation, footer, themeToggle }: R
 
   const FallbackIcon = branding.fallbackIcon;
 
-  const LogoContent = branding.logo ? (
-    <NextImage src={branding.logo} alt="Logo" width={32} height={32} />
-  ) : (
-    <div className="text-primary w-4 h-4">
-      {FallbackIcon ? <FallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
-    </div>
-  );
-
   return (
     <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between font-display">
       <div className="flex items-center gap-2">
-        <div className={cn(
-          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden transition-colors duration-300",
-          branding.isLoading ? "bg-white/5 border-white/5" : "bg-primary/10 border-primary/20"
-        )}>
-          {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : LogoContent}
-        </div>
+        {branding.isLoading ? (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5">
+            <Skeleton className="w-full h-full rounded-none" />
+          </div>
+        ) : branding.logo ? (
+          <NextImage src={branding.logo} alt="Logo" width={32} height={32} className="object-contain" />
+        ) : (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-primary/10 border-primary/20">
+            <div className="text-primary w-4 h-4">
+              {FallbackIcon ? <FallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
+            </div>
+          </div>
+        )}
         <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <Link href="/dashboard" className="transition-opacity hover:opacity-80">
+          <Link href="/dashboard" className="transition-opacity hover:opacity-80 truncate">
             {branding.isLoading ? (
               <Skeleton className="h-5 w-24 rounded-md" />
             ) : (
-              <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
-                {branding.title || "Panel"}
-              </Text>
+              branding.logotipo || (
+                <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
+                  {branding.title || "Panel"}
+                </Text>
+              )
             )}
           </Link>
           {!branding.isLoading && branding.action && <div>{branding.action}</div>}
@@ -138,32 +141,35 @@ export function SidebarContent({ user, branding, navigation, footer, themeToggle
 
   const DesktopFallbackIcon = branding.fallbackIcon;
 
-  const DesktopLogoContent = branding.logo ? (
-    <NextImage src={branding.logo} alt="Logo" width={40} height={40} />
-  ) : (
-    <div className="text-primary w-5 h-5">
-      {DesktopFallbackIcon ? <DesktopFallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
-    </div>
-  );
-
   return (
     <>
       <div className="px-6 flex-1 flex flex-col gap-8 min-h-0">
         {/* Branding Branding */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg transition-colors duration-300",
-              branding.isLoading ? "bg-white/5 border-white/5 shadow-none" : "bg-primary/10 border-primary/20 shadow-primary/5"
-            )}>
-              {branding.isLoading ? <Skeleton className="w-full h-full rounded-none" /> : DesktopLogoContent}
-            </div>
+            {branding.isLoading ? (
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5 shadow-none">
+                <Skeleton className="w-full h-full rounded-none" />
+              </div>
+            ) : branding.logo ? (
+              <NextImage src={branding.logo} alt="Logo" width={40} height={40} className="object-contain" />
+            ) : (
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg bg-primary/10 border-primary/20 shadow-primary/5">
+                <div className="text-primary w-5 h-5">
+                  {DesktopFallbackIcon ? <DesktopFallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
+                </div>
+              </div>
+            )}
             <div className="flex flex-col min-w-0">
               {branding.isLoading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-5 w-32 rounded-md" />
                   <Skeleton className="h-3 w-20 rounded-md" />
                 </div>
+              ) : branding.logotipo ? (
+                <Link href="/dashboard" className="transition-opacity hover:opacity-80 truncate">
+                  {branding.logotipo}
+                </Link>
               ) : (
                 <>
                   <Link href="/dashboard" className="transition-opacity hover:opacity-80">

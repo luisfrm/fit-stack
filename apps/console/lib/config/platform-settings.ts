@@ -1,4 +1,6 @@
 export const PLATFORM_SETTINGS_KEYS = {
+  PLATFORM_NAME: "platform_name",
+  PLATFORM_LOGO: "platform_logo",
   ACTIVE_CURRENCIES: "active_currencies",
   PRIMARY_CURRENCY: "primary_currency",
   CURRENCY_FORMAT: "currency_format",

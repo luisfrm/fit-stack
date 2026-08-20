@@ -76,4 +76,52 @@ export const uploadService = {
 
     return `${cleanBaseUrl}/${cleanKey}`;
   },
+
+  /**
+   * Uploads a platform-level asset (no organization context, e.g. branding).
+   * Path format: platform/[folder]/[filename]_[shortId].[ext]
+   */
+  async uploadPlatformFile(
+    file: File,
+    customName?: string,
+    folder?: string,
+  ): Promise<string> {
+    const data = await api<{ presignedUrl: string; key: string }>(
+      "/platform/upload/presigned",
+      {
+        method: "POST",
+        body: {
+          filename: file.name,
+          customName: customName || undefined,
+          folder: folder || undefined,
+          contentType: file.type,
+        },
+      },
+    );
+
+    await api("/platform/upload/direct", {
+      method: "PUT",
+      query: { key: data.key },
+      body: file,
+      headers: { "Content-Type": file.type },
+    });
+
+    return data.key;
+  },
+
+  /**
+   * Lists platform-level assets in a specific folder.
+   * @param folder Subfolder to list (e.g., 'branding')
+   */
+  async listPlatformFiles(folder: string = ""): Promise<FileItem[]> {
+    return await api<FileItem[]>("/platform/upload", { query: { folder } });
+  },
+
+  /**
+   * Deletes a platform-level asset by its full key.
+   * @param key The full key of the file (e.g., 'platform/branding/logo.png')
+   */
+  async deletePlatformFile(key: string): Promise<void> {
+    await api("/platform/upload", { method: "DELETE", query: { key } });
+  },
 };

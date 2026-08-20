@@ -21,6 +21,7 @@ export type { PaginationProps } from "@workspace/ui/components/pagination";
 export { SimpleAvatar as Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 export { Badge } from "@workspace/ui/components/badge";
 export { Text } from "@workspace/ui/components/text";
+export { Logotipo } from "@workspace/ui/components/logotipo";
 
 // Feedback
 export { Toaster } from "@workspace/ui/components/sonner";
@@ -64,7 +65,7 @@ export type { FabItem, FabConfig } from "@workspace/ui/components/floating-actio
 
 // Next.js specific components
 export { AppSidebar, MobileNav, SettingsSidebar } from "@workspace/ui/components/next/sidebar";
-export type { SidebarUser, SidebarNavItem } from "@workspace/ui/components/next/sidebar";
+export type { SidebarUser, SidebarNavItem, SidebarBranding } from "@workspace/ui/components/next/sidebar";
 export { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 export { NextImage } from "@workspace/ui/components/next/image";
 

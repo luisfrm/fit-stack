@@ -1,18 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { AppSidebar as UISidebar } from "@workspace/ui/components";
+import { AppSidebar as UISidebar, Logotipo } from "@workspace/ui/components";
 import { formatPlatformRole } from "@workspace/shared";
 import { useTheme } from "@/lib/hooks/use-theme";
 import { SidebarNav } from "@/app/dashboard/sidebar-nav";
 import SignOutButton from "@/components/sign-out-button";
-import type { SidebarUser } from "@workspace/ui/components";
+import type { SidebarUser, SidebarBranding } from "@workspace/ui/components";
 
 interface AppSidebarProps {
   user: SidebarUser;
+  branding?: Partial<SidebarBranding>;
 }
 
-export function AppSidebar({ user }: AppSidebarProps) {
+export function AppSidebar({ user, branding }: AppSidebarProps) {
   const { isDark, toggleTheme } = useTheme();
 
   const formattedUser = React.useMemo(
@@ -24,9 +25,9 @@ export function AppSidebar({ user }: AppSidebarProps) {
     <UISidebar
       user={formattedUser}
       branding={{
-        title: "Fit Stack Console",
-        subtitle: "Administración SaaS",
+        logotipo: <Logotipo />,
         fallbackIcon: undefined,
+        ...branding,
       }}
       navigation={SidebarNav}
       footer={<SignOutButton />}
