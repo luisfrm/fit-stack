@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { type LucideIcon, Menu, Building2, Moon, Sun } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Text } from "@workspace/ui/components/text";
+import { Title } from "@workspace/ui/components/title";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@workspace/ui/components/sheet";
 import { NextImage } from "@workspace/ui/components/next/image";
@@ -26,7 +27,6 @@ export interface SidebarUser {
 export interface SidebarBranding {
   logo?: string;
   title?: string;
-  subtitle?: string;
   /** When provided, replaces the title/subtitle lockup (e.g. a logotype). */
   logotipo?: React.ReactNode;
   isLoading?: boolean;
@@ -75,14 +75,14 @@ export function MobileNav({ user, branding, navigation, footer, themeToggle }: R
     <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between font-display">
       <div className="flex items-center gap-2">
         {branding.isLoading ? (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5">
+          <div id="mobile-nav-logo-skeleton" className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5">
             <Skeleton className="w-full h-full rounded-none" />
           </div>
         ) : branding.logo ? (
-          <NextImage src={branding.logo} alt="Logo" width={32} height={32} className="object-contain" />
+          <NextImage id="mobile-nav-logo" src={branding.logo} alt="Logo" width={40} height={40} className="object-contain" />
         ) : (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-primary/10 border-primary/20">
-            <div className="text-primary w-4 h-4">
+          <div id="mobile-nav-logo-fallback" className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-primary/10 border-primary/20">
+            <div className="text-primary w-5 h-5">
               {FallbackIcon ? <FallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
             </div>
           </div>
@@ -93,7 +93,7 @@ export function MobileNav({ user, branding, navigation, footer, themeToggle }: R
               <Skeleton className="h-5 w-24 rounded-md" />
             ) : (
               branding.logotipo || (
-                <Text as="p" size="sm" weight="bold" className="leading-none uppercase italic tracking-tighter">
+                <Text id="mobile-nav-title" as="p" size="md" weight="bold" className="leading-none uppercase tracking-tighter">
                   {branding.title || "Panel"}
                 </Text>
               )
@@ -144,27 +144,26 @@ export function SidebarContent({ user, branding, navigation, footer, themeToggle
   return (
     <>
       <div className="px-6 flex-1 flex flex-col gap-8 min-h-0">
-        {/* Branding Branding */}
+        {/* Branding */}
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             {branding.isLoading ? (
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5 shadow-none">
+              <div id="sidebar-logo-skeleton" className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5 shadow-none">
                 <Skeleton className="w-full h-full rounded-none" />
               </div>
             ) : branding.logo ? (
-              <NextImage src={branding.logo} alt="Logo" width={40} height={40} className="object-contain" />
+              <NextImage id="sidebar-logo" src={branding.logo} alt="Logo" width={60} height={60} className="object-contain" />
             ) : (
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg bg-primary/10 border-primary/20 shadow-primary/5">
-                <div className="text-primary w-5 h-5">
+              <div id="sidebar-logo-fallback" className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 border overflow-hidden shadow-lg bg-primary/10 border-primary/20 shadow-primary/5">
+                <div className="text-primary w-7 h-7">
                   {DesktopFallbackIcon ? <DesktopFallbackIcon className="w-full h-full" /> : <Building2 className="w-full h-full" />}
                 </div>
               </div>
             )}
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col flex-1 min-w-0">
               {branding.isLoading ? (
                 <div className="space-y-2">
-                  <Skeleton className="h-5 w-32 rounded-md" />
-                  <Skeleton className="h-3 w-20 rounded-md" />
+                  <Skeleton className="h-6 w-32 rounded-md" />
                 </div>
               ) : branding.logotipo ? (
                 <Link href="/dashboard" className="transition-opacity hover:opacity-80 truncate">
@@ -173,13 +172,10 @@ export function SidebarContent({ user, branding, navigation, footer, themeToggle
               ) : (
                 <>
                   <Link href="/dashboard" className="transition-opacity hover:opacity-80">
-                    <Text as="p" size="md" weight="bold" className="leading-tight truncate uppercase italic tracking-tighter">
+                    <Title id="sidebar-title" as="h2" size="card" className="truncate not-italic">
                       {branding.title || "Panel"}
-                    </Text>
+                    </Title>
                   </Link>
-                  <Text as="span" size="xs" variant="subtle" className="truncate opacity-60">
-                    {branding.subtitle || "Admin"}
-                  </Text>
                 </>
               )}
             </div>

@@ -2,7 +2,7 @@ import * as React from "react";
 import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
 import { canAccessConsole } from "@workspace/shared";
-import { AppSidebar } from "@/components/dashboard/dashboard-ui";
+import { AppSidebar } from "@/components/dashboard/sidebar";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { uploadService } from "@/lib/services/upload-service";
