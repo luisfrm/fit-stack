@@ -33,6 +33,10 @@ export function createMembersService(
       return member;
     },
 
+    async findMemberById(organizationId: string, id: number) {
+      return membersRepo.findById(organizationId, id);
+    },
+
     async getMemberByUserId(organizationId: string, userId: string) {
       return membersRepo.findByUserId(organizationId, userId);
     },

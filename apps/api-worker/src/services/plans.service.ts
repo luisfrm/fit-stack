@@ -23,6 +23,10 @@ export function createPlansService(plansRepo: PlansRepository) {
       return plan;
     },
 
+    async findById(organizationId: string, id: number): Promise<IMembershipPlan | undefined> {
+      return plansRepo.findById(organizationId, id);
+    },
+
     async create(organizationId: string, data: Omit<IMembershipPlan, 'id' | 'organizationId'>): Promise<IMembershipPlan> {
       const newPlan = await plansRepo.create(organizationId, data);
       if (!newPlan) {

@@ -59,7 +59,10 @@ export const planRoutes = new Hono<AppEnv>()
     const plansRepo = createPlansRepository(c.get('db'));
     const plansService = createPlansService(plansRepo);
 
-    const plan = await plansService.getById(orgId, id);
+    const plan = await plansService.findById(orgId, id);
+    if (!plan) {
+      return c.json({ error: 'Plan no encontrado' }, 404);
+    }
     return c.json(plan);
   })
 
@@ -87,6 +90,11 @@ export const planRoutes = new Hono<AppEnv>()
     const plansRepo = createPlansRepository(c.get('db'));
     const plansService = createPlansService(plansRepo);
 
+    const plan = await plansService.findById(orgId, id);
+    if (!plan) {
+      return c.json({ error: 'Plan no encontrado' }, 404);
+    }
+
     const updatedPlan = await plansService.update(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:plans:*`);
     return c.json(updatedPlan);
@@ -100,6 +108,11 @@ export const planRoutes = new Hono<AppEnv>()
 
     const plansRepo = createPlansRepository(c.get('db'));
     const plansService = createPlansService(plansRepo);
+
+    const plan = await plansService.findById(orgId, id);
+    if (!plan) {
+      return c.json({ error: 'Plan no encontrado' }, 404);
+    }
 
     await plansService.delete(orgId, id);
     await cache.invalidate(`org:${orgId}:plans:*`);

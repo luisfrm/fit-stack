@@ -55,5 +55,10 @@ export const settingsRoutes = new Hono<AppEnv>()
 
     await settingsService.updateAll(orgId, body);
     await cache.invalidateExact(`org:${orgId}:settings`);
-    return c.json({ success: true });
+
+    // Return the full settings so the client can update its local state
+    // with the complete set (not just the partial patch).
+    const allSettings = await settingsService.getAll(orgId);
+    await cache.set(`org:${orgId}:settings`, allSettings, 600);
+    return c.json(allSettings);
   });

@@ -46,13 +46,19 @@ export function OrganizationSettingsForm({
   backUrl = "/dashboard"
 }: OrganizationSettingsFormProps) {
   const [formData, setFormData] = React.useState<Record<string, string>>({});
-  const hasInitialized = React.useRef(false);
+  const prevInitialDataRef = React.useRef<string>('');
 
-  // Sync state with initial data - only once
+  // Sync state with initial data when it changes (e.g. after a save updates the
+  // hook's settings state). JSON comparison avoids unnecessary re-syncs when
+  // the parent re-renders with the same data.
   React.useEffect(() => {
-    if (!hasInitialized.current && Object.keys(initialData).length > 0) {
+    const serialized = JSON.stringify(initialData);
+    if (
+      Object.keys(initialData).length > 0 &&
+      serialized !== prevInitialDataRef.current
+    ) {
       setFormData(initialData);
-      hasInitialized.current = true;
+      prevInitialDataRef.current = serialized;
     }
   }, [initialData]);
 

@@ -14,6 +14,11 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository) {
       return org;
     },
 
+    /** Like `getOrganizationById` but returns `null` instead of throwing. */
+    async findOrganizationById(id: string) {
+      return orgsRepo.findById(id);
+    },
+
     async createOrganization(data: Omit<NewDbOrganization, 'id'>) {
       if (!data.name) throw new Error('El nombre de la organización es requerido');
 

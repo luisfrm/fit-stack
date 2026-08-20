@@ -165,7 +165,10 @@ export const memberRoutes = new Hono<AppEnv>()
     const tokenService = createTokenService(c.env.JWT_SECRET);
     const membersService = createMembersService(membersRepo, usersRepo, tokenService, c.env.TASK_QUEUE);
 
-    const member = await membersService.getMemberById(orgId, id);
+    const member = await membersService.findMemberById(orgId, id);
+    if (!member) {
+      return c.json({ error: 'Miembro no encontrado' }, 404);
+    }
     return c.json(member);
   })
 
@@ -201,6 +204,11 @@ export const memberRoutes = new Hono<AppEnv>()
     const usersRepo = createUsersRepository(c.get('db'));
     const tokenService = createTokenService(c.env.JWT_SECRET);
     const membersService = createMembersService(membersRepo, usersRepo, tokenService, c.env.TASK_QUEUE);
+
+    const existing = await membersService.findMemberById(orgId, id);
+    if (!existing) {
+      return c.json({ error: 'Miembro no encontrado' }, 404);
+    }
 
     const updatedMember = await membersService.updateMember(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:members:*`);

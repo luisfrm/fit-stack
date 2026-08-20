@@ -132,9 +132,11 @@ export function useSettings() {
     async (next: Record<string, string>) => {
       try {
         setIsUpdating(true);
-        await settingsService.update(next);
-        setSettings(next);
-        writeCache(next);
+        const updated = await settingsService.update(next);
+        // The API returns the full settings object, not just the patch.
+        // Use it so the local state and cache always reflect reality.
+        setSettings(updated);
+        writeCache(updated);
         toast.success("Ajustes actualizados correctamente");
         router.refresh();
       } catch (error) {
