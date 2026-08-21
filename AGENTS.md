@@ -235,7 +235,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
 | `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
-| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → Workers AI o `openrouter/free`), `GET /models` (allowlist) |
+| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → Workers AI o `openrouter/free`, rate-limit `ai_chat` + headers `X-Ai-Quota-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA) |
 
 > **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). `openrouter/free` usa el enrutador automático gratuito de OpenRouter (el fallback entre modelos gratuitos lo maneja OpenRouter). El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. |
 | `/api/init` | Bootstrap de org (sin auth) |
@@ -246,6 +246,9 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/platform/settings` | Settings globales de plataforma |
 | `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
 | `/api/platform/upload` | Assets de plataforma sin org (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, scope fijo `platform/` |
+| `/api/platform/features` | Catálogo de features (`GET /`, cache `platform:features`) |
+| `/api/organizations/features` | Features resueltas de la org activa + `isFreeTier` (gate del panel, cache `org:*:features`) |
+| `/api/organizations/seats` | Cupos del portal de la org activa (`{ used, limit, pending }`) |
 
 > `/api/access-control/*` **NO está montado** en api-worker (Bridge pausado — ver sección 4).
 
@@ -303,9 +306,11 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:cms:*` | 5 min | Invalidation de CMS (los reads no se cachean) |
 | `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
+| `org:${orgId}:features` | 5 min | Features resueltas + isFreeTier de la org |
 | `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
 | `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
 | `platform:settings` | 10 min | SaaS-level global settings |
+| `platform:features` | 10 min | Feature catalog (console) |
 | `platform:organizations*` | 5 min | Organization list (SaaS admin) |
 | `platform:plans*` | 10 min | Platform plan catalog |
 | `platform:subscriptions*` | 5 min | SaaS subscriptions |
@@ -379,6 +384,59 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 
 **Gate pages dinámicas** (`/no-subscription`, `/unauthorized` en panel y console) — Server Components con `force-dynamic` que chequean la sesión en cada request: sin sesión → `redirect('/login')`; con acceso válido (suscripción activa o rol permitido) → `redirect('/dashboard')`; solo sin acceso se renderizan. Evita quedarse pegado tras cerrar sesión o refrescar.
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
+
+---
+
+## Features & Free Tier (SaaS Plan Feature-Flags)
+
+Los planes SaaS de la plataforma se describen con **features (feature-flags)** en vez de booleanos sueltos. Single source of truth en código: `packages/shared/src/features/catalog.ts` (re-exportado por `@workspace/shared`).
+
+### Catálogo (`FEATURE_CATALOG`, version `FEATURE_CATALOG_VERSION`)
+
+| Feature | kind | Limits | Notes |
+|---------|------|--------|-------|
+| `panel` | boolean | — | `alwaysOn` (no puede desactivarse) |
+| `cms` | boolean | — | Contenido/páginas |
+| `blog` | boolean | — | Blog |
+| `members_portal` | boolean | `member_seats` | Portal de Miembros (cupos) |
+| `ai_chat` | boolean | `ai_messages_daily`, `ai_messages_weekly`, `ai_messages_monthly` | Chat IA (cuotas; 0 = ilimitado) |
+
+Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva); `normalizeFeatures` ignora IDs desconocidos y sanitiza tipos (límites numéricos, 0 = ilimitado); `resolveFeatures(null)` → defaults del catálogo.
+
+### Free Tier (piso gratuito)
+
+- **Explicito, NO es un plan**: se configura en `platform_setting` key `feature_flags_free_tier` (JSON de `PlanFeaturesV2`), editado desde console → Settings → **Plan Gratuito** (`apps/console/app/dashboard/settings/free-tier/`). No existe `is_free`; planes con `price = 0` son trials normales.
+- **Defaults de código** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 cupos) + `ai_chat` (5 msgs/día, semanal/mensual 0 = ilimitado). Se pueden overridear desde console.
+- **Regla de resolución** (`features.service.ts → getOrgFeatures`):
+  - Sub `ACTIVE`/`TRIAL` → features del plan (con `planId`/`planName`).
+  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **o sin sub** + free tier seteado → piso gratuito (`isFreeTier: true`).
+  - Sin free tier seteado → comportamiento legado (banner `past_due`/`read_only`, bloqueo `suspended`/`cancelled`).
+
+### Enforcement (downgrade = hide)
+
+- **Middleware** `requireFeature(featureId)` en `apps/api-worker/src/lib/route-handler.ts` → 403 `{ code: 'FEATURE_NOT_AVAILABLE' }` si la feature no está habilitada. Se aplica tras `requireOrgPermission`.
+- **Rutas gateadas**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (además de rate-limit, ver abajo).
+- **Cupos del portal** (`members_portal.member_seats`): `GET /api/organizations/seats` → `{ used, limit, pending }` (used = gym_members activos con `userId`; pending = invitaciones Better Auth `pending`). Guard en `members.route.ts` (POST `/api/members` con `sendInvite` y role `member`, y en `link-user`) → 403 `FEATURE_LIMIT_REACHED` si `limit > 0` y `used + pending >= limit`. `limit 0` = ilimitado.
+- **Frontend**: `OrgFeaturesProvider` + `filterNavItemsByFeatures` ocultan items del sidebar; guards en `/dashboard/content` y `/dashboard/chat`; `ai-quota-banner` y `portal-seats-banner`.
+
+### Rate-limit IA (`ai_chat`)
+
+- **Fuente de verdad**: tabla `ai_usage` (Postgres) — fila por `(organization_id, period_type, period_start)` con `count`, upsert atómico `ON CONFLICT DO UPDATE` (índice único `idx_ai_usage_org_period`). Períodos en UTC: día, semana ISO (lunes), mes.
+- **Evaluación**: `consumeAiMessage` lee y escribe **siempre contra Postgres** (decisión de diseño: DB = fuente de verdad, sin dependencia de Redis para el enforcement). Existe `cache.increment` en `lib/cache.ts` para un futuro layer de caché, pero **no** se invoca en el flujo actual.
+- `GET /api/ai/usage` → `{ daily, weekly, monthly: { used, limit } }`. `POST /api/ai/chat` consume 1 mensaje y devuelve headers `X-Ai-Quota-Daily/Weekly/Monthly: used/limit`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado; feature deshabilitada → límites 0.
+
+### Snapshot de features en pagos
+
+Cada pago de plataforma (`platform_subscription_payment`) guarda `features_snapshot` (JSON de `PlanFeaturesV2`) en crear suscripción, renovar, cambiar plan y registrar pago — para comparar "features al momento de pagar" vs "plan hoy" (`summarizeFeatures` en console). Invalidación de cache: `org:${orgId}:features` en writes de suscripciones, planes y settings de plataforma.
+
+### Endpoints
+
+| Endpoint | Auth | Uso |
+|----------|------|-----|
+| `GET /api/platform/features` | `requirePlatformAuth` | Catálogo (console) |
+| `GET /api/organizations/features` | `requireAuth` | Features resueltas + `isFreeTier` + status (gate del panel) |
+| `GET /api/organizations/seats` | `requireAuth` | Cupos del portal |
+| `GET /api/ai/usage` | `requireAuth` | Cuotas IA |
 
 ---
 
