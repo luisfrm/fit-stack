@@ -1,5 +1,6 @@
 import { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
 import type { PlatformRole } from './access-control';
+import type { PlanFeaturesV2 } from './features/catalog';
 
 export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
@@ -350,18 +351,6 @@ export type UpdateTrainerDTO = Partial<CreateTrainerDTO> & { isActive?: boolean 
 
 /* ── SAAS PLATFORM TYPES ── */
 
-export interface PlanFeatures {
-  limits?: {
-    members?: number;
-    trainers?: number;
-  };
-  access?: {
-    pwa?: boolean;
-    blog?: boolean;
-    web_commercial?: boolean;
-  };
-}
-
 export interface IPlatformPlan {
   id: number;
   name: string;
@@ -369,7 +358,7 @@ export interface IPlatformPlan {
   currency: string;
   durationValue: number;
   durationUnit: 'day' | 'week' | 'month' | 'year';
-  features: PlanFeatures | null;
+  features: PlanFeaturesV2 | null;
   isActive: boolean;
   trialDays: number; // 0 = sin trial
   createdAt?: string | Date;
@@ -414,6 +403,8 @@ export interface IPlatformSubscriptionPayment {
   planSnapshotCurrency: string;
   planSnapshotDurationValue: number;
   planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
+  /** Snapshot de las features del plan al momento del pago (para comparar vs el plan hoy) */
+  featuresSnapshot?: PlanFeaturesV2 | null;
 
   // Datos del pago
   amountPaid: number; // centavos
