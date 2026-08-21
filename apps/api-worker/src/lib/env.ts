@@ -53,6 +53,15 @@ export type AppVariables = {
   db: Db;
   session?: Session;
   user?: SessionUser;
+  /** Features resueltas de la org activa (set por `requireFeature`) */
+  orgFeatures?: {
+    features: Record<string, { enabled: boolean; limits?: Record<string, number> }>;
+    limits: Record<string, number>;
+    subscriptionStatus: string;
+    isFreeTier: boolean;
+    planId?: string;
+    planName?: string;
+  };
 };
 
 export type AppEnv = {

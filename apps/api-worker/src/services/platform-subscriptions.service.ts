@@ -14,7 +14,8 @@ import {
   type PlatformSubscriptionStatus,
   type PaymentStatus,
 } from '@workspace/shared/constants';
-import type { IPaymentMethodDetails } from '@workspace/shared';
+import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
+import { normalizeFeatures } from '@workspace/shared';
 import { addDuration } from '../lib/billing-utils';
 
 export interface CreatePlatformSubscriptionPayload {
@@ -61,6 +62,14 @@ function parseStartDate(input?: string): Date {
     return new Date(`${input}T00:00:00.000Z`);
   }
   return new Date(input);
+}
+
+/**
+ * Features del plan normalizadas para el snapshot del pago (nunca null:
+ * un pago sin features queda con los defaults del catálogo).
+ */
+function snapshotFeatures(features: PlanFeaturesV2 | null | undefined): PlanFeaturesV2 {
+  return normalizeFeatures(features ?? {});
 }
 
 export function createPlatformSubscriptionsService(
@@ -161,6 +170,7 @@ export function createPlatformSubscriptionsService(
         planSnapshotCurrency: plan.currency,
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
+        featuresSnapshot: snapshotFeatures(plan.features),
         amountPaid: amountPaidCents,
         currencyPaid: data.payment.currencyPaid || plan.currency,
         exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
@@ -218,6 +228,7 @@ export function createPlatformSubscriptionsService(
         planSnapshotCurrency: plan.currency,
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
+        featuresSnapshot: snapshotFeatures(plan.features),
         amountPaid: amountPaidCents,
         currencyPaid: data.payment.currencyPaid || plan.currency,
         exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
@@ -289,6 +300,7 @@ export function createPlatformSubscriptionsService(
         planSnapshotCurrency: sub.planCurrency,
         planSnapshotDurationValue: sub.planDurationValue,
         planSnapshotDurationUnit: sub.planDurationUnit,
+        featuresSnapshot: snapshotFeatures(sub.planFeatures),
         amountPaid: data.amountPaidCents,
         currencyPaid: data.currencyPaid,
         exchangeRateApplied: data.exchangeRateApplied ?? null,

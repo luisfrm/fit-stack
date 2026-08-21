@@ -1,4 +1,5 @@
 import type { PlatformPlansRepository, NewDbPlatformPlan, PlatformPlansSummary, PlatformPlanWithStats } from '../repositories/platform-plans.repository';
+import { normalizeFeatures, type PlanFeaturesV2 } from '@workspace/shared';
 
 export function createPlatformPlansService(platformPlansRepo: PlatformPlansRepository) {
   return {
@@ -28,21 +29,26 @@ export function createPlatformPlansService(platformPlansRepo: PlatformPlansRepos
         throw new Error('El precio es requerido');
       }
 
-      if (data.features) {
-        this.validateFeatures(data.features as any);
-      }
+      const normalized = {
+        ...data,
+        features: this.normalizeFeatures(data.features as PlanFeaturesV2 | null | undefined),
+      };
 
-      return platformPlansRepo.create(data);
+      return platformPlansRepo.create(normalized);
     },
 
     async updatePlan(id: number, data: Partial<NewDbPlatformPlan>) {
       await this.getPlanById(id);
 
-      if (data.features) {
-        this.validateFeatures(data.features as any);
-      }
+      const normalized = {
+        ...data,
+        features:
+          data.features !== undefined
+            ? this.normalizeFeatures(data.features as PlanFeaturesV2 | null | undefined)
+            : undefined,
+      };
 
-      return platformPlansRepo.update(id, data);
+      return platformPlansRepo.update(id, normalized);
     },
 
     async deletePlan(id: number) {
@@ -50,13 +56,12 @@ export function createPlatformPlansService(platformPlansRepo: PlatformPlansRepos
       return platformPlansRepo.delete(id);
     },
 
-    validateFeatures(features: any) {
-      if (features.limits && typeof features.limits !== 'object') {
-        throw new Error('Límites inválidos');
-      }
-      if (features.access && typeof features.access !== 'object') {
-        throw new Error('Accesos inválidos');
-      }
+    /**
+     * Normaliza features contra el catálogo: descarta IDs desconocidos,
+     * aplica defaults y garantiza `panel` siempre habilitado.
+     */
+    normalizeFeatures(features: PlanFeaturesV2 | null | undefined) {
+      return normalizeFeatures(features ?? {});
     },
   };
 }

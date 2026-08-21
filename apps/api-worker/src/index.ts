@@ -29,6 +29,10 @@ import { platformOrganizationRoutes } from './routes/platform-organizations.rout
 import { platformSettingsRoutes } from './routes/platform-settings.route';
 import { platformStaffRoutes } from './routes/platform-staff.route';
 import { platformUploadRoutes } from './routes/platform-upload.route';
+import { platformFeaturesRoutes } from './routes/features.route';
+import { organizationFeaturesRoutes } from './routes/organization-features.route';
+import { organizationSeatsRoutes } from './routes/organization-seats.route';
+import { aiUsageRoutes } from './routes/ai-usage.route';
 
 const app = new Hono<AppEnv>();
 
@@ -90,5 +94,13 @@ app.route('/api/platform/organizations', platformOrganizationRoutes);
 app.route('/api/platform/settings', platformSettingsRoutes);
 app.route('/api/platform/staff', platformStaffRoutes);
 app.route('/api/platform/upload', platformUploadRoutes);
+app.route('/api/platform/features', platformFeaturesRoutes);
+
+// Features de la org activa: resolución + cupos del portal (panel)
+app.route('/api/organizations/features', organizationFeaturesRoutes);
+app.route('/api/organizations/seats', organizationSeatsRoutes);
+
+// Cuotas IA de la org activa (dentro del prefijo /api/ai)
+app.route('/api/ai/usage', aiUsageRoutes);
 
 export default app;

@@ -55,6 +55,24 @@ export function createCache(env: Partial<Env>) {
         console.error(`[CACHE INVALIDATE EXACT ERROR] key: ${key}`, error);
       }
     },
+
+    /**
+     * INCR atómico con TTL (solo si la clave es nueva). Usado por el
+     * rate-limit de IA: la DB (ai_usage) es la fuente de verdad; Redis es caché.
+     */
+    async increment(key: string, ttlSeconds?: number): Promise<number | null> {
+      if (!redis) return null;
+      try {
+        const value = await redis.incr(key);
+        if (value === 1 && ttlSeconds) {
+          await redis.expire(key, ttlSeconds);
+        }
+        return value;
+      } catch (error) {
+        console.error(`[CACHE INCREMENT ERROR] key: ${key}`, error);
+        return null;
+      }
+    },
   };
 }
 

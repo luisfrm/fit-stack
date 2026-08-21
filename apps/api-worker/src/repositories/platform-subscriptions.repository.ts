@@ -12,7 +12,7 @@ import {
   PLATFORM_GRACE_PERIODS,
 } from '@workspace/shared/constants';
 import type { PaymentStatus } from '@workspace/shared/constants';
-import type { IPaymentMethodDetails } from '@workspace/shared';
+import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 
 export interface SubscriptionFilters {
   status?: PlatformSubscriptionStatus | 'all';
@@ -50,6 +50,8 @@ export interface SubscriptionWithDetails {
   planCurrency: string;
   planDurationValue: number;
   planDurationUnit: 'day' | 'week' | 'month' | 'year';
+  /** Features del plan al momento de la consulta (para snapshots de pago) */
+  planFeatures: PlanFeaturesV2 | null;
   paymentsCount: number;
 }
 
@@ -80,6 +82,8 @@ export interface NewPlatformPaymentData {
   planSnapshotCurrency: string;
   planSnapshotDurationValue: number;
   planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
+  /** Snapshot de features del plan al momento del pago (comparar vs el plan hoy) */
+  featuresSnapshot?: PlanFeaturesV2 | null;
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
@@ -202,6 +206,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planCurrency: platformPlan.currency,
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
+          planFeatures: platformPlan.features,
           computedStatus: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
@@ -254,6 +259,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planCurrency: platformPlan.currency,
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
+          planFeatures: platformPlan.features,
           computedStatus: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
@@ -287,6 +293,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planCurrency: platformPlan.currency,
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
+          planFeatures: platformPlan.features,
           computedStatus: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
@@ -320,6 +327,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planCurrency: platformPlan.currency,
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
+          planFeatures: platformPlan.features,
           computedStatus: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
@@ -385,6 +393,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planSnapshotCurrency: data.planSnapshotCurrency,
           planSnapshotDurationValue: data.planSnapshotDurationValue,
           planSnapshotDurationUnit: data.planSnapshotDurationUnit,
+          featuresSnapshot: (data.featuresSnapshot ?? null) as any,
           amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied ?? null,

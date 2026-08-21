@@ -1,12 +1,20 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
+import type { Context } from 'hono';
 import { APIError } from 'better-auth/api';
 import {
   type OrganizationStatement,
   type PlatformStatement,
+  type FeatureId,
   can,
 } from '@workspace/shared';
 import type { AppEnv } from './env';
+import { createCache } from './cache';
+import { createFeaturesRepository } from '../repositories/features.repository';
+import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
+import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
+import { createFeaturesService } from '../services/features.service';
 
 /**
  * Ensures the user has an active session.
@@ -112,6 +120,53 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
 
 /** Alias for platform auth */
 export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
+
+/**
+ * Construye el service de features para el contexto de la request.
+ */
+function buildFeaturesService(c: Context<AppEnv>) {
+  const db = c.get('db');
+  const cache = createCache(c.env);
+  const subsRepo = createPlatformSubscriptionsRepository(db);
+  const plansRepo = createPlatformPlansRepository(db);
+  const settingsRepo = createPlatformSettingsRepository(db);
+  const featuresRepo = createFeaturesRepository(db);
+  return createFeaturesService(subsRepo, plansRepo, settingsRepo, featuresRepo, cache);
+}
+
+/**
+ * Feature-guard: verifica que el plan activo de la org incluya la feature.
+ * Se compone DESPUÉS de `requireOrgPermission` (RBAC = rol; features = contratado).
+ * Sin la feature → 403 { error, code: 'FEATURE_NOT_AVAILABLE', feature }.
+ */
+export const requireFeature = (featureId: FeatureId) =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    const session = c.get('session');
+    const organizationId = c.req.param('orgId') ?? session?.activeOrganizationId;
+    if (!organizationId) {
+      throw new HTTPException(400, { message: 'No active organization selected' });
+    }
+
+    const service = buildFeaturesService(c);
+    const orgFeatures = await service.getOrgFeatures(organizationId);
+
+    if (!orgFeatures.features[featureId]?.enabled) {
+      throw new HTTPException(403, {
+        message: 'Feature no disponible en tu plan',
+        res: c.json(
+          {
+            error: 'Feature no disponible en tu plan',
+            code: 'FEATURE_NOT_AVAILABLE',
+            feature: featureId,
+          },
+          403
+        ),
+      });
+    }
+
+    c.set('orgFeatures', orgFeatures);
+    await next();
+  });
 
 /**
  * Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
