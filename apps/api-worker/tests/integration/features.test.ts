@@ -22,10 +22,14 @@ import {
 import { ORG_ROLES } from '@workspace/shared';
 
 const FREE_TIER_KEY = 'feature_flags_free_tier';
+const FREE_TIER_ENABLED_KEY = 'feature_flags_free_tier_enabled';
 
 /** Borra el setting del free tier para aislamiento determinístico entre tests. */
 async function clearFreeTierSetting(): Promise<void> {
-  await testQuery(`DELETE FROM platform_setting WHERE key = $1`, [FREE_TIER_KEY]);
+  await testQuery(`DELETE FROM platform_setting WHERE key IN ($1, $2)`, [
+    FREE_TIER_KEY,
+    FREE_TIER_ENABLED_KEY,
+  ]);
 }
 
 const FREE_TIER_SETTING = JSON.stringify({
@@ -33,6 +37,14 @@ const FREE_TIER_SETTING = JSON.stringify({
   members_portal: { enabled: true, limits: { member_seats: 10 } },
   ai_chat: { enabled: true, limits: { ai_messages_daily: 5, ai_messages_weekly: 0, ai_messages_monthly: 0 } },
 });
+
+/** Habilita el free tier: flag enabled + features. */
+async function enableFreeTier(admin: AuthedUser): Promise<void> {
+  await admin.client.post('/api/platform/settings', {
+    [FREE_TIER_ENABLED_KEY]: 'true',
+    [FREE_TIER_KEY]: FREE_TIER_SETTING,
+  });
+}
 
 async function createPlatformPlan(
   admin: AuthedUser,
@@ -157,9 +169,9 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       expect(res.body.isFreeTier).toBe(false);
     });
 
-    it('no subscription + free tier set → free tier features', async () => {
+    it('no subscription + free tier enabled → free tier features', async () => {
       const { owner, organization } = await createGymTenant();
-      await admin.client.post('/api/platform/settings', { [FREE_TIER_KEY]: FREE_TIER_SETTING });
+      await enableFreeTier(admin);
 
       const res = await owner.client.get('/api/organizations/features');
       expect(res.status, res.text).toBe(200);
@@ -168,6 +180,17 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       expect(res.body.features.members_portal.limits.member_seats).toBe(10);
       expect(res.body.features.ai_chat.limits.ai_messages_daily).toBe(5);
       expect(res.body.limits.member_seats).toBe(10);
+    });
+
+    it('free tier setting without enabled flag → legacy gate (not free)', async () => {
+      await clearFreeTierSetting();
+      const { owner, organization } = await createGymTenant();
+      await admin.client.post('/api/platform/settings', { [FREE_TIER_KEY]: FREE_TIER_SETTING });
+
+      const res = await owner.client.get('/api/organizations/features');
+      expect(res.status, res.text).toBe(200);
+      expect(res.body.isFreeTier).toBe(false);
+      expect(res.body.subscriptionStatus).toBe('suspended');
     });
 
     it('active subscription → plan features (not free tier)', async () => {
@@ -184,12 +207,12 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       expect(res.body.planName).toBe(plan.name);
     });
 
-    it('overdue subscription + free tier set → free tier floor', async () => {
+    it('overdue subscription + free tier enabled → free tier floor', async () => {
       const { owner, organization } = await createGymTenant();
       const plan = await createPlatformPlan(admin);
       const sub = await createPlatformSubscription(admin, organization.id, plan.id);
       await testQuery(`UPDATE platform_subscription SET current_period_end = NOW() - INTERVAL '20 days' WHERE id = $1`, [sub.id]);
-      await admin.client.post('/api/platform/settings', { [FREE_TIER_KEY]: FREE_TIER_SETTING });
+      await enableFreeTier(admin);
 
       const res = await owner.client.get('/api/organizations/features');
       expect(res.status, res.text).toBe(200);
