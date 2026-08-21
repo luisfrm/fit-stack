@@ -57,9 +57,9 @@ export const FEATURE_CATALOG_VERSION = 1;
 
 const FEATURE_LIMIT_LABELS: Record<string, string> = {
   member_seats: 'Cupos de miembros',
-  ai_messages_daily: 'Mensajes IA / día',
-  ai_messages_weekly: 'Mensajes IA / semana',
-  ai_messages_monthly: 'Mensajes IA / mes',
+  ai_messages_daily: 'Mensajes / día',
+  ai_messages_weekly: 'Mensajes / semana',
+  ai_messages_monthly: 'Mensajes / mes',
 };
 
 function defaultLimits(def: FeatureDefinition): Record<string, number> {
@@ -135,7 +135,7 @@ export function getFeatureLimitLabel(limitId: string): string {
 }
 
 /**
- * Texto legible de los límites de una feature, ej. "5 Mensajes IA / día · 0 Cupos".
+ * Texto legible de los límites de una feature, ej. "5 Mensajes / día · 0 Cupos".
  * `null` si la feature no tiene límites definidos.
  */
 export function formatFeatureLimits(value: FeatureValue | undefined): string | null {

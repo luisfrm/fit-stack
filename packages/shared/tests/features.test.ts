@@ -117,7 +117,7 @@ describe('helpers', () => {
   it('formatFeatureLimits renders readable text (0 = ilimitado)', () => {
     expect(
       formatFeatureLimits({ enabled: true, limits: { ai_messages_daily: 5, ai_messages_weekly: 0 } }),
-    ).toBe('Mensajes IA / día: 5 · Mensajes IA / semana: Ilimitado');
+    ).toBe('Mensajes / día: 5 · Mensajes / semana: Ilimitado');
     expect(formatFeatureLimits({ enabled: true })).toBeNull();
     expect(formatFeatureLimits(undefined)).toBeNull();
   });

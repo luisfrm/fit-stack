@@ -91,8 +91,8 @@ describe('formatFeatureLimits', () => {
       enabled: true,
       limits: { ai_messages_daily: 5, ai_messages_weekly: 0 },
     });
-    expect(text).toContain('Mensajes IA / día: 5');
-    expect(text).toContain('Mensajes IA / semana: Ilimitado');
+    expect(text).toContain('Mensajes / día: 5');
+    expect(text).toContain('Mensajes / semana: Ilimitado');
   });
 });
 
