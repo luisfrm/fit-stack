@@ -4,7 +4,7 @@ import * as React from "react";
 import { Gift, Info, AlertCircle } from "lucide-react";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
-import { Badge } from "@workspace/ui/components/badge";
+import { Switch } from "@workspace/ui/components/switch";
 import { Title, toast } from "@workspace/ui";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { api } from "@/lib/api/client";
@@ -26,7 +26,8 @@ interface FreeTierSettingsProps {
 export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTierSettingsProps) {
   const router = useRouter();
   const raw = initialSettings[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER];
-  const isConfigured = !!raw;
+  const isEnabled =
+    initialSettings[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER_ENABLED] === "true";
 
   const [features, setFeatures] = React.useState<PlanFeaturesV2>(() => {
     if (!raw) return resolveFeatures(FREE_TIER_FEATURES);
@@ -36,43 +37,56 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
       return resolveFeatures(FREE_TIER_FEATURES);
     }
   });
+  const [enabled, setEnabled] = React.useState(isEnabled);
   const [isUpdating, setIsUpdating] = React.useState(false);
+
+  const saveSettings = async (body: Record<string, string>) => {
+    await api("/platform/settings", {
+      method: "POST",
+      body,
+    });
+  };
+
+  const handleToggleEnabled = async (next: boolean) => {
+    setIsUpdating(true);
+    try {
+      const body: Record<string, string> = {
+        [PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER_ENABLED]: next ? "true" : "false",
+      };
+      // Al habilitar, persistimos las features (si aún no había config, defaults de código)
+      if (next) {
+        body[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER] = JSON.stringify(features);
+      }
+      await saveSettings(body);
+      setEnabled(next);
+      toast.success(next ? "Plan Gratuito habilitado" : "Plan Gratuito deshabilitado");
+      await onSaved?.();
+      router.refresh();
+    } catch (error) {
+      console.error("Error toggling free tier:", error);
+      toast.error("Error al cambiar el estado del Plan Gratuito");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsUpdating(true);
     try {
-      await api("/platform/settings", {
-        method: "POST",
-        body: {
-          [PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER]: JSON.stringify(features),
-        },
-      });
+      const body: Record<string, string> = {
+        [PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER]: JSON.stringify(features),
+      };
+      if (!enabled) {
+        body[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER_ENABLED] = "true";
+      }
+      await saveSettings(body);
+      setEnabled(true);
       toast.success("Plan Gratuito actualizado correctamente");
       await onSaved?.();
       router.refresh();
     } catch (error) {
       console.error("Error saving free tier features:", error);
       toast.error("Error al guardar el Plan Gratuito");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleDisable = async () => {
-    setIsUpdating(true);
-    try {
-      await api("/platform/settings", {
-        method: "POST",
-        body: {
-          [PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER]: "",
-        },
-      });
-      toast.success("Plan Gratuito desactivado");
-      await onSaved?.();
-      router.refresh();
-    } catch (error) {
-      console.error("Error disabling free tier:", error);
-      toast.error("Error al desactivar el Plan Gratuito");
     } finally {
       setIsUpdating(false);
     }
@@ -88,39 +102,58 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
               Plan Gratuito
             </Title>
             <Text variant="muted" className="text-[13px] leading-relaxed">
-              Piso que reciben las orgs sin suscripción pagada. Es un setting de plataforma, no un plan del catálogo. Downgrade = hide.
+              Piso que reciben las orgs sin suscripción pagada. Es un setting de plataforma, no un
+              plan del catálogo. Downgrade = hide.
             </Text>
           </div>
-          {isConfigured ? (
-            <Badge variant="success" size="md" className="uppercase tracking-widest shrink-0">
-              Configurado
-            </Badge>
-          ) : (
-            <Badge variant="warning" size="md" className="uppercase tracking-widest shrink-0">
-              No configurado
-            </Badge>
-          )}
+
+          <label
+            htmlFor="free-tier-enabled"
+            className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 cursor-pointer select-none"
+          >
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold leading-tight">Free tier habilitado</span>
+              <span className="text-xs text-foreground-muted leading-tight">
+                {enabled ? "Las orgs sin suscripción entran al panel" : "Las orgs sin suscripción quedan bloqueadas"}
+              </span>
+            </span>
+            <Switch
+              id="free-tier-enabled"
+              checked={enabled}
+              disabled={isUpdating}
+              onCheckedChange={(val) => handleToggleEnabled(val === true)}
+            />
+          </label>
         </div>
+
         <p className="flex gap-2 text-xs leading-relaxed text-foreground-muted">
           <AlertCircle className="size-3.5 text-foreground-dim shrink-0 mt-0.5" />
           <span>
-            {isConfigured
-              ? "Las orgs sin suscripción entran al panel con estas features. Módulos sin feature se ocultan, los datos no se tocan."
-              : "Sin configurar, las orgs sin suscripción quedan bloqueadas (legado)."}
+            {enabled
+              ? "Las orgs sin suscripción entran con estas features. Módulos sin feature se ocultan, los datos no se tocan."
+              : "Deshabilitado: las orgs sin suscripción quedan bloqueadas (comportamiento legado)."}
           </span>
         </p>
       </div>
 
       {/* Editor — sección plana con header + lista, sin card-en-card */}
-      <section className="mt-8 overflow-hidden rounded-xl border border-border bg-surface">
+      <section
+        className={`mt-8 overflow-hidden rounded-xl border transition-opacity ${
+          enabled ? "border-border bg-surface" : "border-border-muted bg-surface/60"
+        }`}
+      >
         <div className="flex items-center gap-3 border-b border-border-muted bg-surface-2/40 px-4 py-3">
           <span className="inline-flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
             <Gift className="size-3.5 text-primary" />
           </span>
           <span className="text-sm font-bold">Módulos del piso gratuito</span>
-          <span className="ml-auto hidden sm:inline text-xs text-foreground-muted">0 = ilimitado</span>
+          {!enabled && (
+            <span className="ml-auto hidden sm:inline text-xs text-foreground-muted">
+              Habilitá el free tier para editarlos
+            </span>
+          )}
         </div>
-        <div className="p-4">
+        <div className={`p-4 ${!enabled ? "pointer-events-none opacity-60" : ""}`}>
           <FeaturesEditor catalog={catalog} features={features} onChange={setFeatures} />
         </div>
       </section>
@@ -131,16 +164,13 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
           <Info className="size-3.5 text-foreground-dim shrink-0 mt-0.5" />
           <span>Se aplica al instante a todas las orgs sin suscripción pagada. No genera suscripciones ni aparece en el catálogo.</span>
         </div>
-        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:items-center shrink-0">
-          {isConfigured && (
-            <Button variant="outlined" onClick={handleDisable} disabled={isUpdating} className="w-full sm:w-auto">
-              Desactivar
-            </Button>
-          )}
-          <Button onClick={handleSave} loading={isUpdating} className="w-full sm:w-auto px-8 h-11 text-sm font-bold uppercase tracking-[0.08em]">
-            Guardar Plan Gratuito
-          </Button>
-        </div>
+        <Button
+          onClick={handleSave}
+          loading={isUpdating}
+          className="w-full sm:w-auto px-8 h-11 text-sm font-bold uppercase tracking-[0.08em]"
+        >
+          Guardar Plan Gratuito
+        </Button>
       </div>
     </div>
   );

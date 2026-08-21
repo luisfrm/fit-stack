@@ -5,9 +5,9 @@ import {
   Button,
   Input,
   Text,
+  Checkbox,
   SimpleSelect,
   CurrencySelector,
-  CheckboxCard
 } from "@workspace/ui/components";
 import { type IPlatformPlan } from "@workspace/shared/types";
 import { cleanNumericInput } from "@/lib/utils/helper";
@@ -177,22 +177,47 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
         </div>
       )}
 
-      {/* Status — estructura plana sin card anidada */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <CheckboxCard
-          id="isActive"
-          label="Plan activo"
-          description="Visible para nuevas suscripciones."
-          checked={formData.isActive}
-          onCheckedChange={(val) => setFormData(p => ({ ...p, isActive: val }))}
-        />
-        <CheckboxCard
-          id="isTrial"
-          label="Plan de prueba — isTrial"
-          description={formData.isTrial ? `Trial de ${formData.trialDays} días sin cobro inicial.` : "Si se marca, la suscripción inicia como trial."}
-          checked={formData.isTrial}
-          onCheckedChange={(val) => setFormData(p => ({ ...p, isTrial: val }))}
-        />
+      {/* Status — filas planas con checkbox + label clicable (sin card-wrapping) */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="isActive"
+            checked={formData.isActive}
+            onCheckedChange={(val) => setFormData(p => ({ ...p, isActive: val === true }))}
+            className="mt-0.5"
+          />
+          <button
+            type="button"
+            onClick={() => setFormData(p => ({ ...p, isActive: !p.isActive }))}
+            className="min-w-0 flex-1 cursor-pointer select-none rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+          >
+            <span className="block text-[13px] font-semibold text-foreground">Plan activo</span>
+            <span className="block text-xs text-foreground-muted">Visible para nuevas suscripciones.</span>
+          </button>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="isTrial"
+            checked={formData.isTrial}
+            onCheckedChange={(val) => setFormData(p => ({ ...p, isTrial: val === true }))}
+            className="mt-0.5"
+          />
+          <button
+            type="button"
+            onClick={() => setFormData(p => ({ ...p, isTrial: !p.isTrial }))}
+            className="min-w-0 flex-1 cursor-pointer select-none rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+          >
+            <span className="block text-[13px] font-semibold text-foreground">
+              Período de prueba (trial)
+            </span>
+            <span className="block text-xs text-foreground-muted">
+              {formData.isTrial
+                ? `Inicia con ${formData.trialDays} días de trial sin cobro (trialDays).`
+                : "Los primeros días no se cobran al inicio de la suscripción."}
+            </span>
+          </button>
+        </div>
       </div>
 
       {formData.isTrial && (
@@ -212,7 +237,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
             />
           </div>
           <Text size="xs" variant="muted" className="pb-2.5">
-            0 = sin trial · recomendado 7–14 días
+            Propiedad trialDays · 0 = sin trial · recomendado 7–14
           </Text>
         </div>
       )}
