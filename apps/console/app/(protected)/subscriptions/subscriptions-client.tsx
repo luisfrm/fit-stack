@@ -57,7 +57,7 @@ export function SubscriptionsClient({
     }
 
     if (changed) {
-      router.push(`/dashboard/subscriptions?${params.toString()}`);
+      router.push(`/subscriptions?${params.toString()}`);
     }
   }, [debouncedSearch, router, searchParams]);
 
@@ -67,13 +67,13 @@ export function SubscriptionsClient({
     if (newStatus) params.set("status", newStatus);
     else params.delete("status");
     params.set("page", "1");
-    router.push(`/dashboard/subscriptions?${params.toString()}`);
+    router.push(`/subscriptions?${params.toString()}`);
   };
 
   const setPage = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", newPage.toString());
-    router.push(`/dashboard/subscriptions?${params.toString()}`);
+    router.push(`/subscriptions?${params.toString()}`);
   };
 
   const refresh = () => router.refresh();

@@ -17,7 +17,7 @@ export function OrganizationsPagination({ page, totalPages }: OrganizationsPagin
   const navigate = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", newPage.toString());
-    router.push(`/dashboard/organizations?${params.toString()}`);
+    router.push(`/organizations?${params.toString()}`);
   };
 
   if (totalPages <= 1) return null;

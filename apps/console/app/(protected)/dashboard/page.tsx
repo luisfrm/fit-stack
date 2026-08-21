@@ -122,7 +122,7 @@ export default async function DashboardPage() {
             <Text size="sm" variant="muted">Monitoreo y gestión de inquilinos de la plataforma.</Text>
           </div>
           <Button asChild variant="ghost" size="sm" className="text-primary font-bold hover:bg-primary/5">
-            <Link href="/dashboard/organizations">
+            <Link href="/organizations">
               Ver todas las organizaciones
             </Link>
           </Button>

@@ -24,7 +24,7 @@ export default function OrganizationGeneralSettingsPage() {
       } catch (error) {
         console.error("Error fetching organization:", error);
         toast.error("No se pudo cargar la información de la organización");
-        router.push("/dashboard/organizations");
+        router.push("/organizations");
       } finally {
         setIsLoading(false);
       }
@@ -60,7 +60,7 @@ export default function OrganizationGeneralSettingsPage() {
         isUpdating={isUpdating}
         title={`General: ${org?.name || 'Cargando...'}`}
         description={`Configuración técnica y de marca para la sede ${org?.slug || ''}.`}
-        backUrl="/dashboard/organizations"
+        backUrl="/organizations"
       />
     </div>
   );

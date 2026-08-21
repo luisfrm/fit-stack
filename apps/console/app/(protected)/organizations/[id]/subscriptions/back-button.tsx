@@ -10,7 +10,7 @@ export function BackButton() {
     <Button
       variant="ghost"
       size="sm"
-      onClick={() => router.push("/dashboard/subscriptions")}
+      onClick={() => router.push("/subscriptions")}
       className="gap-2 text-foreground/60 hover:text-foreground font-bold uppercase tracking-wider"
     >
       <ChevronLeft className="size-4" />

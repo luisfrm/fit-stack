@@ -92,7 +92,7 @@ export default async function PlatformSubscriptionsPage({
           const params = new URLSearchParams();
           if (newFilter) params.set("status", newFilter);
           params.set("page", "1");
-          redirect(`/dashboard/subscriptions?${params.toString()}`);
+          redirect(`/subscriptions?${params.toString()}`);
         }}
       />
 

@@ -30,7 +30,7 @@ export function OrganizationsSearch({
       params.delete(paramName);
     }
     params.set("page", "1");
-    router.push(`/dashboard/organizations?${params.toString()}`);
+    router.push(`/organizations?${params.toString()}`);
   }, [debouncedValue, paramName, router, searchParams]);
 
   return (

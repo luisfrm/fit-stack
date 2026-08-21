@@ -12,12 +12,12 @@ export function OrgSettingsNav({ organizationId }: OrgSettingsNavProps) {
   const navItems = React.useMemo(() => [
     {
       label: "General",
-      href: `/dashboard/organizations/${organizationId}/settings`,
+      href: `/organizations/${organizationId}/settings`,
       icon: Building2,
     },
     {
       label: "Personal / Propietario",
-      href: `/dashboard/organizations/${organizationId}/settings/staff`,
+      href: `/organizations/${organizationId}/settings/staff`,
       icon: Users,
     },
   ], [organizationId]);

@@ -9,27 +9,27 @@ export const SidebarNav: SidebarNavItem[] = [
   },
   {
     label: "Staff",
-    href: "/dashboard/staff",
+    href: "/staff",
     icon: Icons.Users,
   },
   {
     label: "Organizaciones",
-    href: "/dashboard/organizations",
+    href: "/organizations",
     icon: Icons.Building2,
   },
   {
     label: "Suscripciones",
-    href: "/dashboard/subscriptions",
+    href: "/subscriptions",
     icon: Icons.CreditCard,
   },
   {
     label: "Planes",
-    href: "/dashboard/plans",
+    href: "/plans",
     icon: Icons.Package,
   },
   {
     label: "Configuración",
-    href: "/dashboard/settings",
+    href: "/settings",
     icon: Icons.Settings,
   },
 ];

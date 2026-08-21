@@ -8,15 +8,15 @@ import { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 import { Button } from "@workspace/ui/components/button";
 
 const PLATFORM_SETTINGS_NAV_ITEMS = [
-  { label: "General", href: "/dashboard/settings/general", icon: Sparkles, disabled: false },
-  { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
-  { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
-  { label: "Plan Gratuito", href: "/dashboard/settings/free-tier", icon: Gift, disabled: false },
+  { label: "General", href: "/settings/general", icon: Sparkles, disabled: false },
+  { label: "Monedas", href: "/settings/currencies", icon: Coins, disabled: false },
+  { label: "Métodos de Pago", href: "/settings/payment-methods", icon: Wallet, disabled: false },
+  { label: "Plan Gratuito", href: "/settings/free-tier", icon: Gift, disabled: false },
 ];
 
 export function SettingsNav() {
   const pathname = usePathname();
-  const isRoot = pathname === "/dashboard/settings";
+  const isRoot = pathname === "/settings";
 
   return (
     <>
@@ -36,7 +36,7 @@ export function SettingsNav() {
             asChild
             className="gap-2 -ml-2 text-foreground/60 hover:text-foreground font-bold uppercase tracking-wider"
           >
-            <Link href="/dashboard/settings">
+            <Link href="/settings">
               <ChevronLeft className="size-4" />
               Volver a Configuración
             </Link>
