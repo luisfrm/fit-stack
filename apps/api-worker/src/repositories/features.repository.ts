@@ -1,4 +1,4 @@
-import { eq, and, sql, type Db } from '@workspace/database/factory';
+import { eq, and, or, sql, type Db } from '@workspace/database/factory';
 import { gymMember, invitation, aiUsage } from '@workspace/database/schema';
 
 export interface AiPeriodStarts {
@@ -46,13 +46,16 @@ export function createFeaturesRepository(db: Db) {
         .select({
           periodType: aiUsage.periodType,
           count: aiUsage.count,
-          periodStart: aiUsage.periodStart,
         })
         .from(aiUsage)
         .where(
           and(
             eq(aiUsage.organizationId, orgId),
-            sql`(${aiUsage.periodType} = 'daily' AND ${aiUsage.periodStart} = ${starts.daily}) OR (${aiUsage.periodType} = 'weekly' AND ${aiUsage.periodStart} = ${starts.weekly}) OR (${aiUsage.periodType} = 'monthly' AND ${aiUsage.periodStart} = ${starts.monthly})`
+            or(
+              and(eq(aiUsage.periodType, 'daily'), eq(aiUsage.periodStart, starts.daily)),
+              and(eq(aiUsage.periodType, 'weekly'), eq(aiUsage.periodStart, starts.weekly)),
+              and(eq(aiUsage.periodType, 'monthly'), eq(aiUsage.periodStart, starts.monthly))
+            )
           )
         );
 
