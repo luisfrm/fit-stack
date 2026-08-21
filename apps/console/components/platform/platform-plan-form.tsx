@@ -5,25 +5,32 @@ import {
   Button,
   Input,
   Text,
-  Separator,
   SimpleSelect,
   CurrencySelector,
   CheckboxCard
 } from "@workspace/ui/components";
 import { type IPlatformPlan } from "@workspace/shared/types";
-import { Users, Globe } from "lucide-react";
 import { cleanNumericInput } from "@/lib/utils/helper";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { FeaturesEditor } from "./features-editor";
+import {
+  FEATURE_CATALOG,
+  resolveFeatures,
+  type FeatureCatalog,
+  type PlanFeaturesV2,
+} from "@workspace/shared";
 
 interface PlatformPlanFormProps {
   readonly initialData?: Partial<IPlatformPlan>;
   readonly onSubmit: (data: any) => Promise<void>;
   readonly isLoading: boolean;
   readonly settings?: Record<string, string>;
+  readonly catalog?: FeatureCatalog;
 }
 
-export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }: PlatformPlanFormProps) {
+export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, catalog }: PlatformPlanFormProps) {
   const platformSettings = React.useMemo(() => settings ?? {}, [settings]);
+  const activeCatalog = catalog ?? FEATURE_CATALOG;
 
   const activeCurrencies: string[] = React.useMemo(() => {
     const active = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
@@ -47,17 +54,9 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }:
     durationValue: initialData?.durationValue?.toString() || "1",
     durationUnit: initialData?.durationUnit || "month",
     isActive: initialData?.isActive ?? true,
-    features: {
-      limits: {
-        members: initialData?.features?.limits?.members?.toString() || "0",
-        trainers: initialData?.features?.limits?.trainers?.toString() || "0"
-      },
-      access: initialData?.features?.access || {
-        pwa: false,
-        blog: false,
-        web_commercial: false
-      }
-    }
+    isTrial: (initialData as { trialDays?: number })?.trialDays ? (initialData as { trialDays?: number }).trialDays! > 0 : false,
+    trialDays: ((initialData as { trialDays?: number })?.trialDays ?? 14).toString(),
+    features: resolveFeatures(initialData?.features as PlanFeaturesV2 | null | undefined),
   });
 
   // Frequency auto-complete logic
@@ -80,34 +79,6 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }:
     else if (val === "annual") setFormData(prev => ({ ...prev, durationValue: "1", durationUnit: "year" }));
   };
 
-  const updateLimit = (key: keyof typeof formData.features.limits, val: string) => {
-    const processed = cleanNumericInput(formData.features.limits[key], val);
-
-    setFormData(prev => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        limits: {
-          ...prev.features.limits,
-          [key]: processed
-        }
-      }
-    }));
-  };
-
-  const updateFeatureAccess = (key: keyof typeof formData.features.access, val: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        access: {
-          ...prev.features.access,
-          [key]: val
-        }
-      }
-    }));
-  };
-
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
@@ -121,13 +92,8 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }:
       durationValue: Number.parseInt(formData.durationValue, 10) || 1,
       durationUnit: formData.durationUnit,
       isActive: formData.isActive,
-      features: {
-        ...formData.features,
-        limits: {
-          members: Number.parseInt(formData.features.limits.members, 10) || 0,
-          trainers: Number.parseInt(formData.features.limits.trainers, 10) || 0,
-        }
-      }
+      trialDays: formData.isTrial ? Math.max(1, Number.parseInt(formData.trialDays, 10) || 14) : 0,
+      features: formData.features,
     };
 
     await onSubmit(submissionData);
@@ -211,76 +177,54 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings }:
         </div>
       )}
 
-      {/* Status */}
-      <div className="col-span-full">
+      {/* Status — estructura plana sin card anidada */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <CheckboxCard
           id="isActive"
-          label="Plan Activo"
-          description="Habilitar para nuevas suscripciones."
+          label="Plan activo"
+          description="Visible para nuevas suscripciones."
           checked={formData.isActive}
           onCheckedChange={(val) => setFormData(p => ({ ...p, isActive: val }))}
         />
+        <CheckboxCard
+          id="isTrial"
+          label="Plan de prueba — isTrial"
+          description={formData.isTrial ? `Trial de ${formData.trialDays} días sin cobro inicial.` : "Si se marca, la suscripción inicia como trial."}
+          checked={formData.isTrial}
+          onCheckedChange={(val) => setFormData(p => ({ ...p, isTrial: val }))}
+        />
       </div>
 
-      <Separator className="bg-white/10 my-2" />
-
-      {/* Limits */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Users size={18} className="text-primary" />
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-widest">Límites de Uso (0 = Ilimitado)</Text>
+      {formData.isTrial && (
+        <div className="flex items-end gap-3 pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="w-32">
+            <Input
+              label="Días de trial"
+              type="number"
+              min="1"
+              max="90"
+              value={formData.trialDays}
+              onChange={(e) => {
+                const processed = cleanNumericInput(formData.trialDays, e.target.value);
+                setFormData(p => ({ ...p, trialDays: processed }));
+              }}
+              placeholder="14"
+            />
+          </div>
+          <Text size="xs" variant="muted" className="pb-2.5">
+            0 = sin trial · recomendado 7–14 días
+          </Text>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Máx. Miembros"
-            type="number"
-            min="0"
-            value={formData.features.limits?.members}
-            onChange={(e) => updateLimit('members', e.target.value)}
-          />
-          <Input
-            label="Máx. Entrenadores"
-            type="number"
-            min="0"
-            value={formData.features.limits?.trainers}
-            onChange={(e) => updateLimit('trainers', e.target.value)}
-          />
-        </div>
-      </div>
+      )}
 
-      <Separator className="bg-white/10" />
+      <div className="h-px bg-border-muted my-1" />
 
-      {/* Access Control */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Globe size={18} className="text-primary" />
-          <Text size="sm" weight="bold" className="text-white uppercase tracking-widest">Accesos y Módulos</Text>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <CheckboxCard
-            id="pwa"
-            checked={formData.features.access?.pwa}
-            onCheckedChange={(val) => updateFeatureAccess('pwa', val)}
-            label="Acceso a PWA"
-            description="Permitir uso de la aplicación móvil."
-          />
-          <CheckboxCard
-            id="blog"
-            checked={formData.features.access?.blog}
-            onCheckedChange={(val) => updateFeatureAccess('blog', val)}
-            label="Módulo de Blog"
-            description="Habilitar creación de contenido informativo."
-          />
-          <CheckboxCard
-            id="web_commercial"
-            checked={formData.features.access?.web_commercial}
-            onCheckedChange={(val) => updateFeatureAccess('web_commercial', val)}
-            label="Web Comercial"
-            description="Habilitar sitio corporativo personalizable."
-          />
-        </div>
-      </div>
+      {/* Features (dynamic from catalog) — lista plana */}
+      <FeaturesEditor
+        catalog={activeCatalog}
+        features={formData.features}
+        onChange={(features) => setFormData(p => ({ ...p, features }))}
+      />
 
       <div className="pt-4">
         <Button

@@ -7,6 +7,7 @@ import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { PlatformPlanCard } from "@/components/platform/platform-plan-card";
 import { PlatformPlanModal } from "@/components/platform/platform-plan-modal";
 import type { PlatformPlanWithStats, PlatformPlansSummary } from "@/lib/services/platform-plans-service";
+import type { FeatureCatalog } from "@workspace/shared";
 import { useRouter } from "next/navigation";
 
 interface PlansClientProps {
@@ -16,6 +17,7 @@ interface PlansClientProps {
   readonly currencyFormat: "latam" | "usa";
   readonly rates: Record<string, number> | null;
   readonly settings?: Record<string, string>;
+  readonly catalog?: FeatureCatalog;
   readonly onSuccess?: () => Promise<void> | void;
 }
 
@@ -26,6 +28,7 @@ export function PlansClient({
   currencyFormat,
   rates,
   settings,
+  catalog,
   onSuccess,
 }: PlansClientProps) {
   const router = useRouter();
@@ -129,6 +132,7 @@ export function PlansClient({
           <PlatformPlanModal
             onSuccess={refresh}
             settings={settings}
+            catalog={catalog}
             trigger={
               <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
                 CREAR PRIMER PLAN
@@ -148,6 +152,7 @@ export function PlansClient({
             onUpdate={refresh}
             organizationCount={plan.organizationCount}
             settings={settings}
+            catalog={catalog}
           />
         ))}
       </div>
@@ -167,6 +172,7 @@ export function PlansClient({
         <PlatformPlanModal
           onSuccess={refresh}
           settings={settings}
+          catalog={catalog}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               NUEVO PLAN

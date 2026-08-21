@@ -6,21 +6,26 @@ import {
   Button,
   toast,
   Text,
-  Separator
+  Separator,
+  Badge,
 } from "@workspace/ui/components";
 import {
   Trash2,
-  Users,
-  ShieldCheck,
-  Smartphone,
-  Globe,
-  BookOpen,
   Clock,
-  Building2
+  Building2,
+  Check,
+  X,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { PlatformPlanModal } from "./platform-plan-modal";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
+import {
+  FEATURE_CATALOG,
+  formatFeatureLimits,
+  resolveFeatures,
+  type FeatureCatalog,
+  type PlanFeaturesV2,
+} from "@workspace/shared";
 
 /* ─────────────────────────────────────────────
    CONSTANTS & HELPERS
@@ -47,16 +52,19 @@ const getDurationText = (value: number, unit: string, isShort = false) => {
    ───────────────────────────────────────────── */
 
 interface FeatureItemProps {
-  readonly icon: any;
   readonly label: string;
   readonly active?: boolean;
   readonly detail?: string;
 }
 
-function FeatureItem({ icon: Icon, label, active = true, detail }: FeatureItemProps) {
+function FeatureItem({ label, active = true, detail }: FeatureItemProps) {
   return (
     <div className={cn("flex items-center gap-3 py-1", !active && "opacity-40 grayscale")}>
-      <Icon size={16} className={active ? "text-primary" : "text-slate-500"} />
+      {active ? (
+        <Check size={16} className="text-primary shrink-0" />
+      ) : (
+        <X size={16} className="text-slate-500 shrink-0" />
+      )}
       <div className="flex flex-col">
         <Text size="xs" weight="bold" className={cn("uppercase tracking-widest", active ? "text-white" : "text-slate-500")}>
           {label}
@@ -67,40 +75,25 @@ function FeatureItem({ icon: Icon, label, active = true, detail }: FeatureItemPr
   );
 }
 
-function PlanFeatures({ features }: { readonly features: any }) {
+function PlanFeatures({ features, catalog }: { readonly features: PlanFeaturesV2; readonly catalog: FeatureCatalog }) {
+  const resolved = resolveFeatures(features);
+
   return (
     <div className="space-y-4 mb-8">
       <div className="space-y-2">
-        <FeatureItem
-          icon={Users}
-          label="Miembros"
-          detail={features.limits?.members ? `${features.limits.members} Miembros máx.` : "Ilimitados"}
-        />
-        <FeatureItem
-          icon={ShieldCheck}
-          label="Coaches"
-          detail={features.limits?.trainers ? `${features.limits.trainers} Entrenadores máx.` : "Ilimitados"}
-        />
-      </div>
-
-      <Separator className="bg-white/5 h-px mb-4" />
-
-      <div className="space-y-3">
-        <FeatureItem
-          icon={Smartphone}
-          label="Aplicación (PWA)"
-          active={features.access?.pwa}
-        />
-        <FeatureItem
-          icon={BookOpen}
-          label="Módulo de Blog"
-          active={features.access?.blog}
-        />
-        <FeatureItem
-          icon={Globe}
-          label="Web Comercial"
-          active={features.access?.web_commercial}
-        />
+        {Object.entries(catalog).map(([id, def]) => {
+          const value = resolved[id as keyof PlanFeaturesV2];
+          const enabled = value?.enabled ?? false;
+          const limits = formatFeatureLimits(value);
+          return (
+            <FeatureItem
+              key={id}
+              label={def.label}
+              active={enabled}
+              detail={enabled && limits ? limits : undefined}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -115,10 +108,12 @@ interface PlatformPlanCardProps {
   readonly onUpdate: () => void;
   readonly organizationCount?: number;
   readonly settings?: Record<string, string>;
+  readonly catalog?: FeatureCatalog;
 }
 
-export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }: PlatformPlanCardProps) {
+export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, catalog }: PlatformPlanCardProps) {
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const activeCatalog = catalog ?? FEATURE_CATALOG;
 
   // Style Variants
   const styles = React.useMemo(() => ({
@@ -143,10 +138,8 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }
     }
   };
 
-  const features = plan.features || {
-    limits: { members: 0, coaches: 0 },
-    access: { pwa: false, blog: false, web_commercial: false }
-  };
+  const features = resolveFeatures(plan.features as PlanFeaturesV2 | null | undefined);
+  const isZeroPrice = Number(plan.price) === 0;
 
   return (
     <div className="bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-primary/20 transition-all group">
@@ -167,11 +160,18 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }
             </div>
           </div>
         </div>
-        <div className={cn(
-          "px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border",
-          styles.statusWrapper
-        )}>
-          {plan.isActive ? "Activo" : "Inactivo"}
+        <div className="flex flex-col items-end gap-1.5">
+          {isZeroPrice && (
+            <Badge variant="info" size="sm" className="uppercase tracking-widest">
+              Precio 0 / Trial
+            </Badge>
+          )}
+          <div className={cn(
+            "px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border",
+            styles.statusWrapper
+          )}>
+            {plan.isActive ? "Activo" : "Inactivo"}
+          </div>
         </div>
       </div>
 
@@ -194,7 +194,7 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }
       <Separator className="bg-white/10 mb-6" />
 
       {/* Feature List */}
-      <PlanFeatures features={features} />
+      <PlanFeatures features={features} catalog={activeCatalog} />
 
       {/* Actions */}
       <div className="flex items-center gap-2">
@@ -202,6 +202,7 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings }
           planData={plan}
           onSuccess={onUpdate}
           settings={settings}
+          catalog={activeCatalog}
           trigger={
             <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", styles.editButton)}>
               Editar Plan

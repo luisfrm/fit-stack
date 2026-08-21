@@ -12,10 +12,15 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { platformSubscriptionsService, type PlatformPayment } from "@/lib/services/platform-subscriptions-service";
+import { platformPlansService } from "@/lib/services/platform-plans-service";
 import type { PaymentStatus, IPlatformSubscriptionPayment } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { Trash2, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { SimpleTooltip, TooltipProvider } from "@workspace/ui/components";
+import { summarizeFeatures, type PlanFeaturesV2 } from "@workspace/shared";
+
+type PlatformPaymentWithSnapshot = PlatformPayment & { features_snapshot?: PlanFeaturesV2 | null };
 
 interface PlatformPaymentHistoryModalProps {
   open: boolean;
@@ -55,15 +60,26 @@ export function PlatformPaymentHistoryModal({
   currencyFormat = "latam",
   onChange,
 }: PlatformPaymentHistoryModalProps) {
-  const [payments, setPayments] = React.useState<IPlatformSubscriptionPayment[]>([]);
+  const [payments, setPayments] = React.useState<PlatformPaymentWithSnapshot[]>([]);
+  const [planFeatures, setPlanFeatures] = React.useState<PlanFeaturesV2 | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState(false);
 
   const loadPayments = React.useCallback(async () => {
     setLoading(true);
     try {
-      const data = await platformSubscriptionsService.getPayments(subscriptionId);
-      setPayments(data);
+      const [data, subscription] = await Promise.all([
+        platformSubscriptionsService.getPayments(subscriptionId),
+        platformSubscriptionsService.getById(subscriptionId).catch(() => null),
+      ]);
+      setPayments(data as PlatformPaymentWithSnapshot[]);
+
+      if (subscription?.planId) {
+        const plan = await platformPlansService.getById(subscription.planId).catch(() => null);
+        setPlanFeatures((plan?.features as PlanFeaturesV2 | null | undefined) ?? null);
+      } else {
+        setPlanFeatures(null);
+      }
     } catch (error: any) {
       toast.error(error?.message || "Error al cargar pagos");
     } finally {
@@ -144,6 +160,49 @@ export function PlatformPaymentHistoryModal({
           >
             {config.label}
           </Badge>
+        );
+      },
+    },
+    {
+      header: "Features",
+      cell: (p) => {
+        const snapshot = (p as PlatformPaymentWithSnapshot).features_snapshot;
+        if (!snapshot) {
+          return <Text size="xs" variant="muted" className="opacity-50">—</Text>;
+        }
+
+        const snapshotSummary = summarizeFeatures(snapshot);
+        const planSummary = planFeatures ? summarizeFeatures(planFeatures) : null;
+        const differs = planSummary !== null && planSummary !== snapshotSummary;
+
+        return (
+          <TooltipProvider>
+            <SimpleTooltip
+              side="bottom"
+              delayDuration={200}
+              content={
+                <div className="flex flex-col gap-1.5 py-1 min-w-[220px]">
+                  <Text size="xs" weight="bold" className="text-background/80 uppercase tracking-widest">
+                    Features al pagar
+                  </Text>
+                  <Text size="xs" className="text-background/70 leading-relaxed">{snapshotSummary}</Text>
+                  {differs && (
+                    <>
+                      <div className="h-px bg-background/10 my-1" />
+                      <Text size="xs" weight="bold" className="text-background/80 uppercase tracking-widest">
+                        Features del plan hoy
+                      </Text>
+                      <Text size="xs" className="text-background/70 leading-relaxed">{planSummary}</Text>
+                    </>
+                  )}
+                </div>
+              }
+            >
+              <Badge variant="info" size="sm" className="uppercase tracking-widest cursor-help">
+                Al pagar
+              </Badge>
+            </SimpleTooltip>
+          </TooltipProvider>
         );
       },
     },

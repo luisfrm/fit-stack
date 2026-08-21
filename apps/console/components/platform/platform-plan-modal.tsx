@@ -5,15 +5,17 @@ import { Modal, toast } from "@workspace/ui/components";
 import { PlatformPlanForm } from "./platform-plan-form";
 import { type IPlatformPlan } from "@workspace/shared/types";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
+import type { FeatureCatalog } from "@workspace/shared";
 
 interface PlatformPlanModalProps {
   readonly planData?: IPlatformPlan;
   readonly trigger: React.ReactNode;
   readonly onSuccess?: () => void;
   readonly settings?: Record<string, string>;
+  readonly catalog?: FeatureCatalog;
 }
 
-export function PlatformPlanModal({ planData, trigger, onSuccess, settings }: PlatformPlanModalProps) {
+export function PlatformPlanModal({ planData, trigger, onSuccess, settings, catalog }: PlatformPlanModalProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -52,6 +54,7 @@ export function PlatformPlanModal({ planData, trigger, onSuccess, settings }: Pl
         onSubmit={handleSubmit}
         isLoading={isLoading}
         settings={settings}
+        catalog={catalog}
       />
     </Modal>
   );

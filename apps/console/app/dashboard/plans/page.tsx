@@ -2,13 +2,15 @@ import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { api } from "@/lib/api/client";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { featuresService } from "@/lib/services/features-service";
+import { FEATURE_CATALOG } from "@workspace/shared";
 import { updateTag } from "next/cache";
 import { PlansClient } from "./plans-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlatformPlansPage() {
-  const [plans, summary, settings, rates] = await Promise.all([
+  const [plans, summary, settings, rates, catalogData] = await Promise.all([
     platformPlansService.getAllWithStats({
       next: { revalidate: 60, tags: ["console:plans"] },
     }),
@@ -19,6 +21,9 @@ export default async function PlatformPlansPage() {
       next: { revalidate: 600, tags: ["console:settings"] },
     }),
     getExchangeRates("USD").catch(() => null),
+    featuresService.getCatalog({
+      next: { revalidate: 3600, tags: ["console:plans"] },
+    }),
   ]);
 
   const primaryCurrency =
@@ -40,6 +45,7 @@ export default async function PlatformPlansPage() {
       currencyFormat={currencyFormat}
       rates={rates}
       settings={settings}
+      catalog={catalogData?.catalog ?? FEATURE_CATALOG}
       onSuccess={refreshPlans}
     />
   );

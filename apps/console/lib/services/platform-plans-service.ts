@@ -82,7 +82,7 @@ export const platformPlansService = {
     data: Partial<IPlatformPlan>,
   ): Promise<IPlatformPlan> {
     return await api<IPlatformPlan>(`${PLATFORM_PLANS_PATH}/${id}`, {
-      method: "PATCH",
+      method: "PUT",
       body: data,
     });
   },
