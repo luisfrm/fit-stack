@@ -12,6 +12,7 @@ import { getAiPeriodStarts } from '../repositories/features.repository';
 import type { Cache } from '../lib/cache';
 
 export const FREE_TIER_SETTING_KEY = 'feature_flags_free_tier';
+export const FREE_TIER_ENABLED_KEY = 'feature_flags_free_tier_enabled';
 
 export interface OrgFeaturesResult {
   features: PlanFeaturesV2;
@@ -67,8 +68,10 @@ export function createFeaturesService(
    * (comportamiento legado: SUSPENDED/CANCELLED → /no-subscription).
    */
   async function getConfiguredFreeTier(): Promise<PlanFeaturesV2 | null> {
+    const enabled = await platformSettingsRepo.findByKey(FREE_TIER_ENABLED_KEY);
+    if (enabled !== 'true') return null;
     const raw = await platformSettingsRepo.findByKey(FREE_TIER_SETTING_KEY);
-    if (!raw) return null;
+    if (!raw) return resolveFeatures(null);
     try {
       return resolveFeatures(JSON.parse(raw) as PlanFeaturesV2);
     } catch {

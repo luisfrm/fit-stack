@@ -405,12 +405,12 @@ Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva);
 
 ### Free Tier (piso gratuito)
 
-- **Explicito, NO es un plan**: se configura en `platform_setting` key `feature_flags_free_tier` (JSON de `PlanFeaturesV2`), editado desde console → Settings → **Plan Gratuito** (`apps/console/app/dashboard/settings/free-tier/`). No existe `is_free`; planes con `price = 0` son trials normales.
+- **Explicito, NO es un plan**: se configura en `platform_setting` con 2 keys — `feature_flags_free_tier` (JSON de `PlanFeaturesV2`) y `feature_flags_free_tier_enabled` (`"true"`/`"false"`, flag de activación) — editadas desde console → Settings → **Plan Gratuito** (`apps/console/app/dashboard/settings/free-tier/`). No existe `is_free`; planes con `price = 0` son trials normales. El resolver ignora el setting si `feature_flags_free_tier_enabled !== 'true'`.
 - **Defaults de código** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 cupos) + `ai_chat` (5 msgs/día, semanal/mensual 0 = ilimitado). Se pueden overridear desde console.
 - **Regla de resolución** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → features del plan (con `planId`/`planName`).
-  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **o sin sub** + free tier seteado → piso gratuito (`isFreeTier: true`).
-  - Sin free tier seteado → comportamiento legado (banner `past_due`/`read_only`, bloqueo `suspended`/`cancelled`).
+  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **o sin sub** + free tier **habilitado** (`enabled === 'true'`) → piso gratuito (`isFreeTier: true`).
+  - Sin free tier habilitado → comportamiento legado (banner `past_due`/`read_only`, bloqueo `suspended`/`cancelled`).
 
 ### Enforcement (downgrade = hide)
 
