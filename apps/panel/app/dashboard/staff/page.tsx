@@ -1,6 +1,8 @@
 import { membersService } from "@/lib/services/members-service";
 import { StaffClient } from "./staff-client";
 import { sessionService } from "@/lib/services/session-service";
+import { getOrgFeatures, getOrgSeats } from "@/lib/services/org-features";
+import { PortalSeatsBanner } from "@/components/dashboard/portal-seats-banner";
 import { updateTag } from "next/cache";
 import { ORG_ROLES } from "@workspace/shared";
 
@@ -21,15 +23,21 @@ export default async function StaffPage({
   const activeOrgId = session?.session?.activeOrganizationId || "global";
   const tag = `org:${activeOrgId}:staff`;
 
-  const result = await membersService.getMembers(
-    {
-      query: query || undefined,
-      page,
-      limit: PAGE_LIMIT,
-      excludeRole: ORG_ROLES.MEMBER,
-    } as Parameters<typeof membersService.getMembers>[0],
-    { next: { revalidate: 3600, tags: [tag] } },
-  );
+  const [result, featuresData, seats] = await Promise.all([
+    membersService.getMembers(
+      {
+        query: query || undefined,
+        page,
+        limit: PAGE_LIMIT,
+        excludeRole: ORG_ROLES.MEMBER,
+      } as Parameters<typeof membersService.getMembers>[0],
+      { next: { revalidate: 3600, tags: [tag] } },
+    ),
+    getOrgFeatures(activeOrgId),
+    getOrgSeats({ next: { revalidate: 60, tags: [tag] } }),
+  ]);
+
+  const portalEnabled = featuresData?.features.members_portal?.enabled === true;
 
   const refreshStaff = async () => {
     "use server";
@@ -37,13 +45,18 @@ export default async function StaffPage({
   };
 
   return (
-    <StaffClient
-      initialStaff={result.data}
-      initialPage={result.page}
-      initialTotalPages={result.totalPages}
-      initialQuery={query}
-      limit={PAGE_LIMIT}
-      onRefreshServer={refreshStaff}
-    />
+    <div className="flex flex-col gap-4">
+      {portalEnabled && seats && (
+        <PortalSeatsBanner used={seats.used} limit={seats.limit} pending={seats.pending} />
+      )}
+      <StaffClient
+        initialStaff={result.data}
+        initialPage={result.page}
+        initialTotalPages={result.totalPages}
+        initialQuery={query}
+        limit={PAGE_LIMIT}
+        onRefreshServer={refreshStaff}
+      />
+    </div>
   );
 }

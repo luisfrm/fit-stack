@@ -28,22 +28,22 @@ export default function NotFound() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center">
-          <Button 
-            asChild 
-            variant="primary" 
-            size="lg" 
+          <Button
+            asChild
+            variant="primary"
+            size="lg"
             rounded="lg"
-            className="group shadow-xl shadow-primary/10" 
+            className="group shadow-xl shadow-primary/10"
             leftIcon={<ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />}
           >
             <Link href="/dashboard">
               Volver al Panel
             </Link>
           </Button>
-          <Button 
-            asChild 
-            variant="glass" 
-            size="lg" 
+          <Button
+            asChild
+            variant="glass"
+            size="lg"
             rounded="lg"
             leftIcon={<Home className="w-4 h-4 text-slate-400" />}
           >
@@ -55,7 +55,7 @@ export default function NotFound() {
       </main>
 
       <footer className="absolute bottom-8 text-slate-500 text-[10px] font-bold tracking-[0.3em] uppercase opacity-30 select-none">
-        FitStack CMS &copy; 2026
+        FitStack Panel &copy; 2026
       </footer>
     </div>
   );

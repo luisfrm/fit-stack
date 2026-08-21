@@ -16,6 +16,9 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import type { AiModelInfo, ChatModelId, IAiChatMessage } from "@workspace/shared";
 import { chatService } from "@/lib/services/chat-service";
+import { AiQuotaBanner } from "./ai-quota-banner";
+import type { AiUsage } from "@/lib/features/quota";
+import { isQuotaExhausted } from "@/lib/features/quota";
 
 interface UiChat {
   id: string;
@@ -60,9 +63,11 @@ function buildTitle(content: string): string {
 interface ChatViewProps {
   /** Model allowlist fetched by the RSC page (falls back to shared constant). */
   readonly initialModels: readonly AiModelInfo[];
+  /** AI usage quotas fetched by the RSC page (daily/weekly/monthly). */
+  readonly initialUsage?: AiUsage | null;
 }
 
-export function ChatView({ initialModels }: ChatViewProps) {
+export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
   const [chats, setChats] = React.useState<UiChat[]>(() => [
     createEmptyChat(resolveDefaultModel(initialModels)),
   ]);
@@ -74,6 +79,7 @@ export function ChatView({ initialModels }: ChatViewProps) {
 
   const modelOptions = React.useMemo(() => MODEL_OPTIONS(initialModels), [initialModels]);
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
+  const dailyExhausted = isQuotaExhausted(initialUsage?.daily);
 
   // Mientras el LLM no ha emitido el primer token, la última message es del usuario:
   // mostramos la nubecita "escribiendo..." con los 3 puntos animados.
@@ -138,7 +144,7 @@ export function ChatView({ initialModels }: ChatViewProps) {
 
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || isStreaming || !activeChat) return;
+    if (!content || isStreaming || !activeChat || dailyExhausted) return;
 
     const userMessage: IAiChatMessage = { role: "user", content };
     const messages = [...activeChat.messages, userMessage];
@@ -248,6 +254,8 @@ export function ChatView({ initialModels }: ChatViewProps) {
 
   return (
     <div className="flex h-full min-h-[60svh] flex-col gap-4">
+      <AiQuotaBanner usage={initialUsage} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <Text as="p" size="lg" weight="bold" uppercase italic>
@@ -351,8 +359,8 @@ export function ChatView({ initialModels }: ChatViewProps) {
                     <Button
                       size="icon"
                       onClick={() => void sendMessage()}
-                      disabled={!draft.trim()}
-                      title="Enviar"
+                      disabled={!draft.trim() || dailyExhausted}
+                      title={dailyExhausted ? "Cuota diaria agotada" : "Enviar"}
                       aria-label="Enviar mensaje"
                     >
                       <Send className="size-4" />

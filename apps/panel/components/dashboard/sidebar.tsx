@@ -29,6 +29,7 @@ import {
   type SidebarNavItem,
   Button,
   Modal,
+  Badge,
 } from "@workspace/ui/components";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -37,30 +38,42 @@ import { useTheme } from "@/lib/hooks/use-theme";
 import SignOutButton from "../SignOutButton";
 import { authClient } from "@/lib/auth-client";
 import { OrganizationPicker } from "./organization-picker";
+import { useOrgFeatures } from "./org-features-provider";
+import { filterNavItemsByFeatures } from "@/lib/features/nav-filter";
+import type { FeatureId } from "@workspace/shared";
 
 /* ─────────────────────────────────────────────
    SIDEBAR NAV SCHEMAS
    ───────────────────────────────────────────── */
 
-type GymNavItem = SidebarNavItem & { module: PermissionModule };
+type GymNavItem = SidebarNavItem & { module: PermissionModule; feature?: FeatureId };
 
 const GYM_NAV_ITEMS: GymNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: PERMISSION_MODULES.DASHBOARD },
   { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
   { label: "Pagos", href: "/dashboard/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
   { label: "Clientes", href: "/dashboard/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT },
+  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT, feature: "cms" },
   { label: "Membresías", href: "/dashboard/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
   { label: "Clases", href: "/dashboard/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
   { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
-  { label: "Chat IA", href: "/dashboard/chat", icon: MessageSquare, module: PERMISSION_MODULES.AI },
+  { label: "Chat IA", href: "/dashboard/chat", icon: MessageSquare, module: PERMISSION_MODULES.AI, feature: "ai_chat" },
   { label: "Configuración", href: "/dashboard/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
 ];
 
 function useFilteredNavItems(): SidebarNavItem[] {
   const { can } = usePermissions();
-  return GYM_NAV_ITEMS.filter((item) =>
+  const { features } = useOrgFeatures();
+  return filterNavItemsByFeatures(GYM_NAV_ITEMS, features).filter((item) =>
     can(item.module, PERMISSION_ACTIONS.READ),
+  );
+}
+
+function FreeTierBadge() {
+  return (
+    <Badge variant="info" size="sm" className="uppercase tracking-widest">
+      Plan Gratuito
+    </Badge>
   );
 }
 
@@ -110,6 +123,7 @@ export function SwitchOrganizationAction() {
 function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null) {
   const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { isFreeTier } = useOrgFeatures();
 
   const activeOrganization = initialOrg ?? clientOrg;
   // Sidebar branding depends solely on organization identity (session), independent of regional settings query state
@@ -123,8 +137,13 @@ function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null
   }), [user]);
 
   const brandingAction = React.useMemo(() => {
-    return <SwitchOrganizationAction />;
-  }, []);
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        {isFreeTier && <FreeTierBadge />}
+        <SwitchOrganizationAction />
+      </div>
+    );
+  }, [isFreeTier]);
 
   return {
     activeOrganization,

@@ -28,8 +28,8 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { label: "Organización", href: "/dashboard/settings/organization", icon: Building2, disabled: false },
   { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
   { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
+  { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: false },
   { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog, disabled: true },
-  { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: true },
 ];
 
 export function SettingsNavTabs() {

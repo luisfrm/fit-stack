@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import "@workspace/ui/globals.css";
 
 export const metadata: Metadata = {
-  title: "FitStack CMS",
+  title: "FitStack Panel",
   description: "Sistema de administración de contenido",
   icons: {
     icon: "/favicon.ico",

@@ -8,6 +8,7 @@ import {
   type OrgRole,
 } from "@workspace/shared";
 import { getOrgSubscriptionStatus } from "@/lib/services/subscription-status";
+import { getOrgFeatures } from "@/lib/services/org-features";
 import { NoSubscriptionClient } from "./no-subscription-client";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,13 @@ export default async function NoSubscriptionPage() {
   }
 
   const activeOrgId = session.session?.activeOrganizationId;
+
+  // Free tier: la org entra al dashboard aunque no tenga suscripción pagada.
+  const featuresData = await getOrgFeatures(activeOrgId);
+  if (featuresData?.isFreeTier) {
+    redirect("/dashboard");
+  }
+
   const subscriptionStatus = await getOrgSubscriptionStatus(activeOrgId);
 
   // This page only makes sense when the org is suspended/cancelled.
