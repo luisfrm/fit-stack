@@ -12,7 +12,7 @@ import {
   numeric,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-import { type PlanFeatures } from '@workspace/shared';
+import { type PlanFeaturesV2 } from '@workspace/shared';
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
@@ -132,7 +132,7 @@ export const platformPlan = pgTable('platform_plan', {
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
   durationUnit: text('duration_unit').default('month').notNull(),
-  features: jsonb('features').$type<PlanFeatures | null>(), // PlanFeatures interface from shared/types.ts
+  features: jsonb('features').$type<PlanFeaturesV2 | null>(), // PlanFeaturesV2 from shared/features
   isActive: boolean('is_active').default(true).notNull(),
   trialDays: integer('trial_days').default(0).notNull(), // 0 = sin trial
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -196,6 +196,8 @@ export const platformSubscriptionPayment = pgTable(
     planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
     planSnapshotDurationValue: integer('plan_snapshot_duration_value').notNull(),
     planSnapshotDurationUnit: text('plan_snapshot_duration_unit').notNull(),
+    // Snapshot de features del plan al momento del pago (comparar vs el plan a día de hoy)
+    featuresSnapshot: jsonb('features_snapshot').$type<PlanFeaturesV2 | null>(),
 
     // Datos del pago
     amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
@@ -220,6 +222,30 @@ export const platformSubscriptionPayment = pgTable(
     index('idx_psp_subscription_id').on(table.subscriptionId),
     index('idx_psp_payment_date').on(table.paymentDate),
     index('idx_psp_subscription_status').on(table.subscriptionId, table.status),
+  ]
+);
+
+// ── AI USAGE (rate-limit de chat IA por período) ──
+// Fuente de verdad de las cuotas diaria/semanal/mensual; Redis es solo caché.
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    periodType: text('period_type').notNull(), // 'daily' | 'weekly' | 'monthly'
+    periodStart: date('period_start', { mode: 'date' }).notNull(),
+    count: integer('count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_ai_usage_org_period').on(
+      table.organizationId,
+      table.periodType,
+      table.periodStart
+    ),
   ]
 );
 
