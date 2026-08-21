@@ -77,7 +77,7 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
       className: "text-right pr-6",
       cell: (page) => (
         <div className="flex justify-end gap-2">
-          <Link href={`/dashboard/content/${page.id}`}>
+          <Link href={`/content/${page.id}`}>
             <Button variant="ghost" size="sm" leftIcon={<Edit2 size={16} />}>
               Editar
             </Button>
@@ -195,7 +195,7 @@ function PageCreationModal({
       toast.success("Página creada con éxito");
       setIsOpen(false);
       onSuccess();
-      router.push(`/dashboard/content/${newPage.id}`);
+      router.push(`/content/${newPage.id}`);
     } catch (error) {
       const message =
         (error as { data?: { error?: string }; message?: string }).data?.error ??

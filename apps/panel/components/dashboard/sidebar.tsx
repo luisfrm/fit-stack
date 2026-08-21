@@ -50,15 +50,15 @@ type GymNavItem = SidebarNavItem & { module: PermissionModule; feature?: Feature
 
 const GYM_NAV_ITEMS: GymNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: PERMISSION_MODULES.DASHBOARD },
-  { label: "Staff", href: "/dashboard/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
-  { label: "Pagos", href: "/dashboard/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
-  { label: "Clientes", href: "/dashboard/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
-  { label: "Contenido", href: "/dashboard/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT, feature: "cms" },
-  { label: "Membresías", href: "/dashboard/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
-  { label: "Clases", href: "/dashboard/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
-  { label: "Entrenadores", href: "/dashboard/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
-  { label: "Chat IA", href: "/dashboard/chat", icon: MessageSquare, module: PERMISSION_MODULES.AI, feature: "ai_chat" },
-  { label: "Configuración", href: "/dashboard/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
+  { label: "Staff", href: "/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
+  { label: "Pagos", href: "/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
+  { label: "Clientes", href: "/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
+  { label: "Contenido", href: "/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT, feature: "cms" },
+  { label: "Membresías", href: "/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },
+  { label: "Clases", href: "/classes", icon: CalendarDays, module: PERMISSION_MODULES.CLASSES },
+  { label: "Entrenadores", href: "/trainers", icon: Dumbbell, module: PERMISSION_MODULES.STAFF },
+  { label: "Chat IA", href: "/chat", icon: MessageSquare, module: PERMISSION_MODULES.AI, feature: "ai_chat" },
+  { label: "Configuración", href: "/settings", icon: Settings, module: PERMISSION_MODULES.SETTINGS },
 ];
 
 function useFilteredNavItems(): SidebarNavItem[] {

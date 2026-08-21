@@ -5,16 +5,15 @@ import { Button, toast } from "@workspace/ui/components";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type IMember } from "@workspace/shared/types";
-import { MembersTable } from "@/components/members/members-table";
-import { MemberModal } from "@/components/members/member-modal";
-import { SubscriptionModal } from "@/components/payments/subscription-modal";
+import { StaffTable } from "@/components/staff/staff-table";
+import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 
-interface MembersClientProps {
-  readonly initialMembers: IMember[];
+interface StaffClientProps {
+  readonly initialStaff: IMember[];
   readonly initialPage: number;
   readonly initialTotalPages: number;
   readonly initialQuery: string;
@@ -22,16 +21,16 @@ interface MembersClientProps {
   readonly onRefreshServer?: () => Promise<void>;
 }
 
-export function MembersClient({
-  initialMembers,
+export function StaffClient({
+  initialStaff,
   initialPage,
   initialTotalPages,
   initialQuery,
   limit,
   onRefreshServer,
-}: MembersClientProps) {
+}: StaffClientProps) {
   const router = useRouter();
-  const [members, setMembers] = React.useState<IMember[]>(initialMembers);
+  const [staff, setStaff] = React.useState<IMember[]>(initialStaff);
   const [page, setPage] = React.useState(initialPage);
   const [totalPages, setTotalPages] = React.useState(initialTotalPages);
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
@@ -50,25 +49,25 @@ export function MembersClient({
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("query", debouncedSearch);
     params.set("page", "1");
-    router.push(`/dashboard/members?${params.toString()}`);
+    router.push(`/staff?${params.toString()}`);
   }, [debouncedSearch, initialQuery, router]);
 
   React.useEffect(() => {
-    setMembers(initialMembers);
+    setStaff(initialStaff);
     setPage(initialPage);
     setTotalPages(initialTotalPages);
-  }, [initialMembers, initialPage, initialTotalPages]);
+  }, [initialStaff, initialPage, initialTotalPages]);
 
   const handleDelete = async (id: number) => {
     setDeletingId(id);
     try {
       await membersService.deleteMember(id);
-      toast.success("Cliente eliminado.");
-      if (members.length === 1 && page > 1) {
+      toast.success("Usuario de staff eliminado.");
+      if (staff.length === 1 && page > 1) {
         const params = new URLSearchParams();
         if (initialQuery) params.set("query", initialQuery);
         params.set("page", String(page - 1));
-        router.push(`/dashboard/members?${params.toString()}`);
+        router.push(`/staff?${params.toString()}`);
       } else {
         refresh();
       }
@@ -76,7 +75,7 @@ export function MembersClient({
       const message =
         (error as { data?: { error?: string }; message?: string }).data?.error ??
         (error as Error).message ??
-        "Fallo al eliminar cliente";
+        "Fallo al eliminar staff";
       toast.error(message);
     } finally {
       setDeletingId(null);
@@ -87,20 +86,20 @@ export function MembersClient({
     const params = new URLSearchParams();
     if (initialQuery) params.set("query", initialQuery);
     params.set("page", String(newPage));
-    router.push(`/dashboard/members?${params.toString()}`);
+    router.push(`/staff?${params.toString()}`);
   };
 
   return (
     <div className="flex flex-col gap-6">
       <DashboardHeader
-        title="Clientes"
-        description="Administra los usuarios registrados en tu plataforma como miembros activos."
-        iconName="Users"
+        title="Gestión de Staff"
+        description="Administra los roles operativos del gimnasio (Admins, Managers y Trainers)."
+        iconName="ShieldCheck"
       >
-        <MemberModal
+        <StaffModal
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              NUEVO CLIENTE
+              AÑADIR STAFF
             </Button>
           }
           onSuccess={refresh}
@@ -115,14 +114,13 @@ export function MembersClient({
 
       <section>
         <div className="space-y-6">
-          <MembersTable
-            members={members}
+          <StaffTable
+            staff={staff}
             onDelete={handleDelete}
             onSuccess={refresh}
-            SubscriptionModal={SubscriptionModal}
-            hideRoleColumn={true}
             loading={false}
-            emptyDescription="Aún no se han registrado clientes en esta organización."
+            EditModal={StaffModal}
+            emptyDescription="Aún no se han registrado miembros del staff."
           />
 
           {totalPages > 1 && (
@@ -154,8 +152,10 @@ export function MembersClient({
       </section>
 
       {deletingId !== null && (
-        <span className="sr-only">Eliminando cliente {deletingId}</span>
+        <span className="sr-only">Eliminando staff {deletingId}</span>
       )}
+
+      <span className="sr-only">Límite {limit}</span>
     </div>
   );
 }

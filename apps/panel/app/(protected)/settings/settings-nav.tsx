@@ -24,12 +24,12 @@ interface NavItem {
 }
 
 const SETTINGS_NAV_ITEMS: NavItem[] = [
-  { label: "General", href: "/dashboard/settings/general", icon: Building2, disabled: false },
-  { label: "Organización", href: "/dashboard/settings/organization", icon: Building2, disabled: false },
-  { label: "Monedas", href: "/dashboard/settings/currencies", icon: Coins, disabled: false },
-  { label: "Métodos de Pago", href: "/dashboard/settings/payment-methods", icon: Wallet, disabled: false },
-  { label: "Facturación", href: "/dashboard/settings/billing", icon: CreditCard, disabled: false },
-  { label: "Equipo", href: "/dashboard/settings/team", icon: UserCog, disabled: true },
+  { label: "General", href: "/settings/general", icon: Building2, disabled: false },
+  { label: "Organización", href: "/settings/organization", icon: Building2, disabled: false },
+  { label: "Monedas", href: "/settings/currencies", icon: Coins, disabled: false },
+  { label: "Métodos de Pago", href: "/settings/payment-methods", icon: Wallet, disabled: false },
+  { label: "Facturación", href: "/settings/billing", icon: CreditCard, disabled: false },
+  { label: "Equipo", href: "/settings/team", icon: UserCog, disabled: true },
 ];
 
 export function SettingsNavTabs() {
@@ -46,7 +46,7 @@ export function SettingsNavTabs() {
 
 export function SettingsMobileBack() {
   const pathname = usePathname();
-  const isRoot = pathname === "/dashboard/settings";
+  const isRoot = pathname === "/settings";
 
   if (isRoot) return null;
 
@@ -58,7 +58,7 @@ export function SettingsMobileBack() {
         asChild
         className="gap-2 -ml-2 text-foreground/60 hover:text-foreground font-bold uppercase tracking-wider"
       >
-        <Link href="/dashboard/settings">
+        <Link href="/settings">
           <ChevronLeft className="size-4" />
           Volver al menú
         </Link>

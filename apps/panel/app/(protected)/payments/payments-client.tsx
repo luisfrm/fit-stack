@@ -78,7 +78,7 @@ export function PaymentsClient({
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (activeFilter) params.set("status", activeFilter);
     params.set("page", "1");
-    router.push(`/dashboard/payments?${params.toString()}`);
+    router.push(`/payments?${params.toString()}`);
   }, [debouncedSearch, initialQuery, router, activeFilter]);
 
   const setFilterAndNavigate = (filter: string | null) => {
@@ -87,7 +87,7 @@ export function PaymentsClient({
     if (initialQuery) params.set("search", initialQuery);
     if (filter) params.set("status", filter);
     params.set("page", "1");
-    router.push(`/dashboard/payments?${params.toString()}`);
+    router.push(`/payments?${params.toString()}`);
   };
 
   const navigatePage = (newPage: number) => {
@@ -95,7 +95,7 @@ export function PaymentsClient({
     if (initialQuery) params.set("search", initialQuery);
     if (activeFilter) params.set("status", activeFilter);
     params.set("page", String(newPage));
-    router.push(`/dashboard/payments?${params.toString()}`);
+    router.push(`/payments?${params.toString()}`);
   };
 
   const refreshAll = React.useCallback(async () => {

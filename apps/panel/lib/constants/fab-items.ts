@@ -23,7 +23,7 @@ export const GLOBAL_FAB_ITEMS: FabItem[] = [
     icon: Settings,
     label: "Configuración",
     onClick: () => {
-      window.location.href = "/dashboard/settings";
+      window.location.href = "/settings";
     },
   },
 ];

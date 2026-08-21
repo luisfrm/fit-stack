@@ -65,7 +65,7 @@ export function TrainersClient({
     params.set("page", "1");
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
-    router.push(`/dashboard/trainers?${params.toString()}`);
+    router.push(`/trainers?${params.toString()}`);
   }, [debouncedSearch, initialQuery, router, visibility]);
 
   const navigatePage = (newPage: number) => {
@@ -74,7 +74,7 @@ export function TrainersClient({
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
     params.set("page", String(newPage));
-    router.push(`/dashboard/trainers?${params.toString()}`);
+    router.push(`/trainers?${params.toString()}`);
   };
 
   const toggleVisibility = (isVisible: "all" | "visible" | "hidden") => {
@@ -85,7 +85,7 @@ export function TrainersClient({
     if (next === "visible") params.set("isVisible", "true");
     if (next === "hidden") params.set("isVisible", "false");
     params.set("page", "1");
-    router.push(`/dashboard/trainers?${params.toString()}`);
+    router.push(`/trainers?${params.toString()}`);
   };
 
   const handleToggleVisibility = async (trainer: ITrainer, isVisible: boolean) => {

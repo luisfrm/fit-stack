@@ -46,7 +46,7 @@ export function ClassesClient({
     params.set("page", "1");
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
-    router.push(`/dashboard/classes?${params.toString()}`);
+    router.push(`/classes?${params.toString()}`);
   }, [debouncedSearch, initialQuery, router, visibility]);
 
   const setVisibilityAndNavigate = (next: VisibilityFilter) => {
@@ -56,7 +56,7 @@ export function ClassesClient({
     params.set("page", "1");
     if (next === "visible") params.set("isVisible", "true");
     if (next === "hidden") params.set("isVisible", "false");
-    router.push(`/dashboard/classes?${params.toString()}`);
+    router.push(`/classes?${params.toString()}`);
   };
 
   const navigatePage = (newPage: number) => {
@@ -65,7 +65,7 @@ export function ClassesClient({
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
     params.set("page", String(newPage));
-    router.push(`/dashboard/classes?${params.toString()}`);
+    router.push(`/classes?${params.toString()}`);
   };
 
   const handleDelete = async (id: number) => {

@@ -62,7 +62,7 @@ export function GymDashboard({
         <Card className="lg:col-span-2 overflow-hidden pb-0">
           <div className="p-6 border-b border-border flex justify-between items-center">
             <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
-            <Link href="/dashboard/classes" className="text-primary text-sm font-medium hover:underline">
+            <Link href="/classes" className="text-primary text-sm font-medium hover:underline">
               Ver todas
             </Link>
           </div>

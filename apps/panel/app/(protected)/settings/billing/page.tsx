@@ -76,7 +76,7 @@ export default async function BillingSettingsPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {statusBadge()}
-            <Link href="/dashboard/members">
+            <Link href="/members">
               <Button variant="outlined" size="sm">Ver uso</Button>
             </Link>
           </div>

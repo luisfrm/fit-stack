@@ -72,7 +72,7 @@ export default function CMSPageEditor() {
     } catch (error: any) {
       toast.error("Error al cargar los datos del editor");
       console.error("Error al cargar los datos del editor",error);
-      router.push("/dashboard/content");
+      router.push("/content");
     } finally {
       setIsLoading(false);
     }
@@ -185,7 +185,7 @@ export default function CMSPageEditor() {
       {/* ── Top Bar ── */}
       <header className="flex justify-between items-center bg-background/80 backdrop-blur-md sticky top-0 z-20 py-4 -mx-4 px-4 sm:px-8 border-b border-border-dark lg:border-none lg:bg-transparent">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard/content">
+          <Link href="/content">
             <Button variant="ghost" size="sm" className="hidden sm:flex">
                 <ArrowLeft size={18} className="mr-2" /> Atrás
             </Button>

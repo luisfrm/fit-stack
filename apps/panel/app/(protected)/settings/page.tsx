@@ -12,7 +12,7 @@ export default function SettingsRootPage() {
 
   useEffect(() => {
     if (width !== undefined && isDesktop) {
-      router.replace("/dashboard/settings/general");
+      router.replace("/settings/general");
     }
   }, [isDesktop, router, width]);
 

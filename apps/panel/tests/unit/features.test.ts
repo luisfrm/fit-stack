@@ -6,8 +6,8 @@ import { resolveFeatures, type PlanFeaturesV2 } from '@workspace/shared';
 describe('filterNavItemsByFeatures', () => {
   const items = [
     { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Contenido', href: '/dashboard/content', feature: 'cms' },
-    { label: 'Chat IA', href: '/dashboard/chat', feature: 'ai_chat' },
+    { label: 'Contenido', href: '/content', feature: 'cms' },
+    { label: 'Chat IA', href: '/chat', feature: 'ai_chat' },
   ] as const;
 
   it('keeps items without feature and hides disabled/missing features', () => {
