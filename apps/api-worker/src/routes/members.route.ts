@@ -7,6 +7,11 @@ import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
 import { createMembersService } from '../services/members.service';
+import { createFeaturesService } from '../services/features.service';
+import { createFeaturesRepository } from '../repositories/features.repository';
+import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
+import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
@@ -136,6 +141,28 @@ export const memberRoutes = new Hono<AppEnv>()
         return c.json({ error: 'Este miembro ya está vinculado a otra cuenta' }, 400);
       }
 
+      // Guard de cupos del portal al vincular cuenta (solo clientes 'member')
+      if (member.role === 'member') {
+        const cache = createCache(c.env);
+        const featuresService = createFeaturesService(
+          createPlatformSubscriptionsRepository(c.get('db')),
+          createPlatformPlansRepository(c.get('db')),
+          createPlatformSettingsRepository(c.get('db')),
+          createFeaturesRepository(c.get('db')),
+          cache
+        );
+        const seats = await featuresService.getSeatsUsage(organizationId);
+        if (seats.limit > 0 && seats.used + seats.pending >= seats.limit) {
+          return c.json(
+            {
+              error: 'Límite de cupos del portal de miembros alcanzado',
+              code: 'FEATURE_LIMIT_REACHED',
+            },
+            403
+          );
+        }
+      }
+
       // 1. Link user ID to gymMember record
       await membersRepo.update(organizationId, member.id, { userId: user.id });
 
@@ -178,6 +205,27 @@ export const memberRoutes = new Hono<AppEnv>()
     const { sendInvite, ...data } = c.req.valid('json');
     const auth = c.get('auth');
     const cache = createCache(c.env);
+
+    // Guard de cupos del portal: solo invitaciones de clientes (role member)
+    if (sendInvite && data.role === 'member') {
+      const featuresService = createFeaturesService(
+        createPlatformSubscriptionsRepository(c.get('db')),
+        createPlatformPlansRepository(c.get('db')),
+        createPlatformSettingsRepository(c.get('db')),
+        createFeaturesRepository(c.get('db')),
+        cache
+      );
+      const seats = await featuresService.getSeatsUsage(orgId);
+      if (seats.limit > 0 && seats.used + seats.pending >= seats.limit) {
+        return c.json(
+          {
+            error: 'Límite de cupos del portal de miembros alcanzado',
+            code: 'FEATURE_LIMIT_REACHED',
+          },
+          403
+        );
+      }
+    }
 
     const membersRepo = createMembersRepository(c.get('db'));
     const usersRepo = createUsersRepository(c.get('db'));

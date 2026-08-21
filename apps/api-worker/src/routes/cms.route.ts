@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireFeature } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createContentPagesRepository } from '../repositories/content-pages.repository';
 import { createContentBlocksRepository } from '../repositories/content-blocks.repository';
@@ -27,7 +27,7 @@ const blockSchema = z.object({
 
 export const cmsRoutes = new Hono<AppEnv>()
   // GET /api/cms/pages
-  .get('/pages', requireOrgPermission(PM.CONTENT, PA.READ), async (c) => {
+  .get('/pages', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const pagesRepo = createContentPagesRepository(c.get('db'));
     const pagesService = createContentPagesService(pagesRepo);
@@ -37,7 +37,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/cms/pages/:id
-  .get('/pages/:id', requireOrgPermission(PM.CONTENT, PA.READ), async (c) => {
+  .get('/pages/:id', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
 
@@ -49,7 +49,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/cms/pages
-  .post('/pages', requireOrgPermission(PM.CONTENT, PA.CREATE), zValidator('json', pageSchema), async (c) => {
+  .post('/pages', requireOrgPermission(PM.CONTENT, PA.CREATE), requireFeature('cms'), zValidator('json', pageSchema), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -64,7 +64,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/cms/pages/:id
-  .put('/pages/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), zValidator('json', pageSchema.partial()), async (c) => {
+  .put('/pages/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', pageSchema.partial()), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
@@ -80,7 +80,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/cms/pages/:id
-  .delete('/pages/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), async (c) => {
+  .delete('/pages/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), requireFeature('cms'), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
@@ -95,7 +95,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/cms/pages/:id/blocks
-  .get('/pages/:id/blocks', requireOrgPermission(PM.CONTENT, PA.READ), async (c) => {
+  .get('/pages/:id/blocks', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const pageId = Number(c.req.param('id'));
 
@@ -108,7 +108,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/cms/blocks
-  .post('/blocks', requireOrgPermission(PM.CONTENT, PA.CREATE), zValidator('json', blockSchema), async (c) => {
+  .post('/blocks', requireOrgPermission(PM.CONTENT, PA.CREATE), requireFeature('cms'), zValidator('json', blockSchema), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -124,7 +124,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/cms/blocks/:id
-  .put('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), zValidator('json', blockSchema.partial()), async (c) => {
+  .put('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', blockSchema.partial()), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
@@ -141,7 +141,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/cms/blocks/:id
-  .delete('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), async (c) => {
+  .delete('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), requireFeature('cms'), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
@@ -157,7 +157,7 @@ export const cmsRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/cms/pages/:id/blocks/reorder
-  .put('/pages/:id/blocks/reorder', requireOrgPermission(PM.CONTENT, PA.UPDATE), zValidator('json', z.object({ orders: z.array(z.object({ id: z.number(), displayOrder: z.number() })) })), async (c) => {
+  .put('/pages/:id/blocks/reorder', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', z.object({ orders: z.array(z.object({ id: z.number(), displayOrder: z.number() })) })), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const pageId = Number(c.req.param('id'));
     const { orders } = c.req.valid('json');

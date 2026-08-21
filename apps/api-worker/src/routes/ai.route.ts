@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireFeature } from '../lib/route-handler';
 import {
   PERMISSION_MODULES as PM,
   PERMISSION_ACTIONS as PA,
@@ -11,6 +11,12 @@ import {
   type IAiSseEvent,
 } from '@workspace/shared';
 import { createAIService, type AiChatDelta } from '../services/ai.service';
+import { createFeaturesService } from '../services/features.service';
+import { createFeaturesRepository } from '../repositories/features.repository';
+import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
+import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
+import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 const chatMessageSchema = z.object({
@@ -72,11 +78,13 @@ export const aiRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/ai/chat — streaming chat completion (SSE)
+  // Enforcement: feature `ai_chat` + rate-limit diario/semanal/mensual (fuente de verdad: Postgres ai_usage; Redis solo caché)
   .post(
     '/chat',
     requireOrgPermission(PM.AI, PA.READ),
+    requireFeature('ai_chat'),
     zValidator('json', chatSchema),
-    (c) => {
+    async (c) => {
       const { model, messages, temperature, maxTokens } = c.req.valid('json');
       const provider = getAiProvider(model);
 
@@ -88,6 +96,36 @@ export const aiRoutes = new Hono<AppEnv>()
         (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)
       ) {
         return c.json({ error: 'IA no configurada: faltan variables de entorno de Workers AI' }, 503);
+      }
+
+      // Rate-limit: consume 1 mensaje (cuotas del plan; 0 = ilimitado)
+      const orgId = c.get('session')!.activeOrganizationId!;
+      const cache = createCache(c.env);
+      const featuresService = createFeaturesService(
+        createPlatformSubscriptionsRepository(c.get('db')),
+        createPlatformPlansRepository(c.get('db')),
+        createPlatformSettingsRepository(c.get('db')),
+        createFeaturesRepository(c.get('db')),
+        cache
+      );
+      const { allowed, quota } = await featuresService.consumeAiMessage(orgId);
+
+      const quotaHeaders = {
+        'X-Ai-Quota-Daily': `${quota.daily.used}/${quota.daily.limit === 0 ? '0' : quota.daily.limit}`,
+        'X-Ai-Quota-Weekly': `${quota.weekly.used}/${quota.weekly.limit === 0 ? '0' : quota.weekly.limit}`,
+        'X-Ai-Quota-Monthly': `${quota.monthly.used}/${quota.monthly.limit === 0 ? '0' : quota.monthly.limit}`,
+      };
+
+      if (!allowed) {
+        return c.json(
+          {
+            error: 'Cuota de mensajes IA agotada para este período',
+            code: 'AI_QUOTA_EXCEEDED',
+            limits: quota,
+          },
+          429,
+          quotaHeaders
+        );
       }
 
       const aiService = createAIService(c.env);
@@ -106,6 +144,7 @@ export const aiRoutes = new Hono<AppEnv>()
           'Cache-Control': 'no-cache, no-transform',
           Connection: 'keep-alive',
           'X-Accel-Buffering': 'no',
+          ...quotaHeaders,
         },
       });
     },

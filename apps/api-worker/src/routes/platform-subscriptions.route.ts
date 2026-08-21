@@ -137,6 +137,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${data.organizationId}:features`);
 
     const created = await service.getSubscriptionById(result.subscriptionId);
     return c.json(created, 201);
@@ -155,6 +156,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await service.cancelSubscription(id, reason);
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, id });
   })
@@ -172,6 +174,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await service.extendSubscriptionPeriod(id, newEndDate);
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, newEndDate });
   })
@@ -189,6 +192,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const result = await service.renewSubscription(id, data);
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, ...result });
   })
@@ -207,6 +211,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate('platform:subscriptions*');
     if (payment.organizationId) {
       await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${payment.organizationId}:features`);
     }
 
     return c.json({ success: true, paymentId, status: data.status });
@@ -237,6 +242,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const result = await service.registerPayment(id, data);
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, ...result }, 201);
   })
@@ -253,6 +259,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await service.deleteSubscription(id);
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true });
   });

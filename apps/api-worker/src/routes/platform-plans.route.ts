@@ -5,16 +5,36 @@ import { requirePlatformAuth } from '../lib/route-handler';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformPlansService } from '../services/platform-plans.service';
 import { createCache } from '../lib/cache';
+import { FEATURE_CATALOG } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
+
+const featureLimitsSchema = z.record(z.string(), z.number().int().min(0));
+
+const featureValueSchema = z.object({
+  enabled: z.boolean(),
+  limits: featureLimitsSchema.optional(),
+});
+
+/**
+ * Features validadas contra el catálogo: IDs desconocidos → 400.
+ * (El catálogo es la fuente de verdad en código; la DB solo persiste valores.)
+ */
+const featuresSchema = z
+  .record(z.string(), featureValueSchema)
+  .refine(
+    (features) => Object.keys(features).every((id) => id in FEATURE_CATALOG),
+    { message: 'Features desconocidas no permitidas' }
+  );
 
 const platformPlanSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  description: z.string().nullable().optional(),
   price: z.union([z.string(), z.number()]),
   currency: z.string().default('USD'),
-  billingPeriod: z.enum(['monthly', 'yearly']).default('monthly'),
+  durationValue: z.number().int().min(1).optional(),
+  durationUnit: z.enum(['day', 'week', 'month', 'year']).optional(),
   isActive: z.boolean().default(true),
-  features: z.record(z.string(), z.any()).nullable().optional(),
+  trialDays: z.number().int().min(0).optional(),
+  features: featuresSchema.nullable().optional(),
 });
 
 export const platformPlanRoutes = new Hono<AppEnv>()
@@ -87,6 +107,22 @@ export const platformPlanRoutes = new Hono<AppEnv>()
 
     const updatedPlan = await service.updatePlan(id, data as any);
     await cache.invalidate('platform:plans*');
+    await cache.invalidate('org:*:features');
+    return c.json(updatedPlan);
+  })
+
+  // PATCH /api/platform/plans/:id (alias de PUT, por compatibilidad de clientes)
+  .patch('/:id', requirePlatformAuth(), zValidator('json', platformPlanSchema.partial()), async (c) => {
+    const id = Number(c.req.param('id'));
+    const data = c.req.valid('json');
+    const cache = createCache(c.env);
+
+    const repo = createPlatformPlansRepository(c.get('db'));
+    const service = createPlatformPlansService(repo);
+
+    const updatedPlan = await service.updatePlan(id, data as any);
+    await cache.invalidate('platform:plans*');
+    await cache.invalidate('org:*:features');
     return c.json(updatedPlan);
   })
 
@@ -100,5 +136,6 @@ export const platformPlanRoutes = new Hono<AppEnv>()
 
     await service.deletePlan(id);
     await cache.invalidate('platform:plans*');
+    await cache.invalidate('org:*:features');
     return c.json({ success: true });
   });
