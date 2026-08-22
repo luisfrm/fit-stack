@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
-import { OrganizationForm, type OwnerData } from "./organization-form";
+import { OrganizationForm } from "./organization-form";
+import type { OwnerData } from "./organization-form-types";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { type IPlatformOrganization, ORG_ROLES } from "@workspace/shared";
@@ -87,8 +88,8 @@ export function OrganizationModal({
       }
       handleSuccess();
     } catch (error: any) {
-      const message = error?.data?.error ?? error.message ?? "Algo salió mal";
-      toast.error(message);
+      console.error("Error saving organization:", error);
+      toast.error("Algo salió mal");
     }
   };
 

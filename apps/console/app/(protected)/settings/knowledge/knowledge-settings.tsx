@@ -7,42 +7,24 @@ import {
   Badge,
   Button,
   Card,
-  Input,
-  Modal,
-  SimpleSelect,
   Switch,
-  Textarea,
   Text,
   Title,
   ConfirmationModal,
   toast,
 } from "@workspace/ui/components";
-import type { KnowledgeDoc, KnowledgeSource } from "@/lib/services/knowledge-service";
+import type { KnowledgeDoc } from "@/lib/services/knowledge-service";
 import {
   KNOWLEDGE_SOURCE_LABELS,
   knowledgeService,
 } from "@/lib/services/knowledge-service";
+import { KnowledgeDocModal } from "@/components/knowledge/knowledge-doc-modal";
 
-const SOURCE_OPTIONS: { label: string; value: KnowledgeSource }[] = [
-  { label: "FAQ", value: "faq" },
-  { label: "Política", value: "policy" },
-  { label: "Configuración", value: "settings" },
-];
-
-const SOURCE_BADGE_VARIANT: Record<KnowledgeSource, "default" | "info" | "warning"> = {
+const SOURCE_BADGE_VARIANT: Record<KnowledgeDoc["source"], "default" | "info" | "warning"> = {
   faq: "info",
   policy: "warning",
   settings: "default",
 };
-
-interface DocumentFormState {
-  id?: string;
-  title: string;
-  source: KnowledgeSource;
-  content: string;
-}
-
-const EMPTY_FORM: DocumentFormState = { title: "", source: "faq", content: "" };
 
 interface KnowledgeSettingsProps {
   readonly initialDocs: KnowledgeDoc[];
@@ -52,61 +34,44 @@ interface KnowledgeSettingsProps {
 export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsProps) {
   const router = useRouter();
   const [docs, setDocs] = React.useState<KnowledgeDoc[]>(initialDocs);
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [form, setForm] = React.useState<DocumentFormState>(EMPTY_FORM);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [mode, setMode] = React.useState<"closed" | "create" | { edit: KnowledgeDoc }>("closed");
   const [deleteTarget, setDeleteTarget] = React.useState<KnowledgeDoc | null>(null);
+
+  React.useEffect(() => {
+    setDocs(initialDocs);
+  }, [initialDocs]);
 
   const refresh = async () => {
     await onSaved?.();
     router.refresh();
   };
 
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setFormOpen(true);
-  };
+  const openCreate = () => setMode("create");
+  const openEdit = (doc: KnowledgeDoc) => setMode({ edit: doc });
+  const closeModal = () => setMode("closed");
 
-  const openEdit = (doc: KnowledgeDoc) => {
-    setForm({ id: doc.id, title: doc.title, source: doc.source, content: "" });
-    setFormOpen(true);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("El título es obligatorio");
-      return;
-    }
-    if (!form.id && !form.content.trim()) {
-      toast.error("El contenido es obligatorio");
-      return;
-    }
-    setIsSaving(true);
+  const handleSave = async (values: {
+    title: string;
+    source: KnowledgeDoc["source"];
+    content: string;
+  }) => {
     try {
-      if (form.id) {
-        const payload: Partial<{ title: string; source: KnowledgeSource; content: string }> = {
-          title: form.title,
-          source: form.source,
-        };
-        if (form.content.trim()) payload.content = form.content;
-        await knowledgeService.update(form.id, payload);
-        toast.success("Documento actualizado correctamente");
-      } else {
-        await knowledgeService.create({
-          title: form.title,
-          source: form.source,
-          content: form.content,
-        });
+      if (mode === "create") {
+        await knowledgeService.create(values);
         toast.success("Documento creado y procesado correctamente");
+      } else if (mode !== "closed") {
+        const payload: Partial<{ title: string; source: KnowledgeDoc["source"]; content: string }> = {
+          title: values.title,
+          source: values.source,
+        };
+        if (values.content.trim()) payload.content = values.content;
+        await knowledgeService.update(mode.edit.id, payload);
+        toast.success("Documento actualizado correctamente");
       }
-      setFormOpen(false);
       await refresh();
     } catch (error) {
       console.error("Error saving knowledge document:", error);
       toast.error("Error al guardar el documento");
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -130,13 +95,28 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
       setDeleteTarget(null);
       await refresh();
     } catch (error) {
-      console.error("Error deleting document:", error);
+      console.error("Error deleting knowledge document:", error);
       toast.error("Error al eliminar el documento");
     }
   };
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+
+  const modalState = (() => {
+    if (mode === "create") {
+      return { open: true, initialTitle: undefined, initialSource: undefined as never, initialContent: "" };
+    }
+    if (mode !== "closed") {
+      return {
+        open: true,
+        initialTitle: mode.edit.title,
+        initialSource: mode.edit.source,
+        initialContent: "",
+      };
+    }
+    return null;
+  })();
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -240,67 +220,16 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
         </Card>
       </div>
 
-      <Modal
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        title={form.id ? "Editar documento" : "Nuevo documento"}
-        description={
-          form.id
-            ? "Deja el contenido vacío para conservar el actual (sin reprocesar embeddings)."
-            : "Se fragmenta automáticamente para búsqueda semántica del asistente."
-        }
-      >
-        <form onSubmit={handleSave} className="space-y-5 py-2">
-          <div className="space-y-1.5">
-            <label htmlFor="kb-title" className="text-xs font-bold uppercase tracking-widest text-foreground-muted">
-              Título
-            </label>
-            <Input
-              id="kb-title"
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="¿Cómo funcionan los créditos IA?"
-              maxLength={200}
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-widest text-foreground-muted">Tipo</label>
-            <SimpleSelect
-              options={SOURCE_OPTIONS}
-              value={form.source}
-              onChange={(value) => setForm((f) => ({ ...f, source: value as KnowledgeSource }))}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="kb-content" className="text-xs font-bold uppercase tracking-widest text-foreground-muted">
-              Contenido
-            </label>
-            <Textarea
-              id="kb-content"
-              value={form.content}
-              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-              placeholder={form.id ? "(vacío = sin cambios)" : "Escribe aquí la información que debe conocer el asistente..."}
-              className="min-h-[180px]"
-              maxLength={20000}
-            />
-            <Text variant="muted" size="xs" className="text-right">
-              {form.content.length.toLocaleString()} / 20.000 caracteres
-            </Text>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outlined" onClick={() => setFormOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? "Guardando..." : form.id ? "Guardar cambios" : "Crear documento"}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      <KnowledgeDocModal
+        open={modalState?.open ?? false}
+        onOpenChange={(open) => {
+          if (!open) closeModal();
+        }}
+        initialTitle={modalState?.initialTitle}
+        initialSource={modalState?.initialSource}
+        initialContent={modalState?.initialContent ?? ""}
+        onSubmit={handleSave}
+      />
 
       <ConfirmationModal
         open={!!deleteTarget}

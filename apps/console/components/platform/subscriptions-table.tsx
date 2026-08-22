@@ -10,7 +10,6 @@ import {
   ActionsDropdown,
   Badge,
   Modal,
-  Input,
   toast,
 } from "@workspace/ui/components";
 import {
@@ -19,12 +18,15 @@ import {
 } from "@/lib/services/platform-subscriptions-service";
 import { SubscriptionStatusBadge } from "./subscription-status-badge";
 import { PlatformPaymentHistoryModal } from "./platform-payment-history-modal";
+import { CancelSubscriptionModal } from "./cancel-subscription-modal";
+import { ExtendSubscriptionModal } from "./extend-subscription-modal";
+import { PriceCell } from "./price-cell";
 import {
   Trash2,
   Calendar,
-  XCircle,
   ExternalLink,
   CalendarPlus,
+  XCircle,
   CreditCard,
   History,
 } from "lucide-react";
@@ -68,8 +70,6 @@ export function SubscriptionsTable({
   const [cancelModal, setCancelModal] = React.useState<SubscriptionWithDetails | null>(null);
   const [extendModal, setExtendModal] = React.useState<SubscriptionWithDetails | null>(null);
   const [historyModal, setHistoryModal] = React.useState<SubscriptionWithDetails | null>(null);
-  const [cancelReason, setCancelReason] = React.useState("");
-  const [extendDate, setExtendDate] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState(false);
 
   const handleDelete = async (id: number) => {
@@ -79,37 +79,38 @@ export function SubscriptionsTable({
       toast.success("Suscripción eliminada");
       onChange?.();
     } catch (error: any) {
-      toast.error(error?.message || "Error al eliminar");
+      console.error("Error deleting subscription:", error);
+      toast.error("Error al eliminar");
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = async (reason: string | undefined) => {
     if (!cancelModal) return;
     setActionLoading(true);
     try {
-      await platformSubscriptionsService.cancel(cancelModal.id, cancelReason || undefined);
+      await platformSubscriptionsService.cancel(cancelModal.id, reason);
       toast.success("Suscripción cancelada");
       setCancelModal(null);
-      setCancelReason("");
       onChange?.();
     } catch (error: any) {
-      toast.error(error?.message || "Error al cancelar");
+      console.error("Error cancelling subscription:", error);
+      toast.error("Error al cancelar");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleExtend = async () => {
-    if (!extendModal || !extendDate) return;
+  const handleExtend = async (newDate: string) => {
+    if (!extendModal) return;
     setActionLoading(true);
     try {
-      await platformSubscriptionsService.extend(extendModal.id, extendDate);
+      await platformSubscriptionsService.extend(extendModal.id, newDate);
       toast.success("Periodo extendido");
       setExtendModal(null);
-      setExtendDate("");
       onChange?.();
     } catch (error: any) {
-      toast.error(error?.message || "Error al extender");
+      console.error("Error extending subscription:", error);
+      toast.error("Error al extender");
     } finally {
       setActionLoading(false);
     }
@@ -180,46 +181,15 @@ export function SubscriptionsTable({
     },
     {
       header: "Precio",
-      cell: (sub) => {
-        if (sub.isTrial) {
-          return <Text weight="bold" size="sm" className="text-blue-400">Gratuito</Text>;
-        }
-        if (sub.priceOverride !== null && sub.priceOverride !== undefined) {
-          return (
-            <div className="flex flex-col gap-0.5">
-              <Text weight="bold" size="sm" className="text-primary">
-                {formatCurrency(
-                  sub.priceOverride / 100,
-                  sub.planCurrency ?? "USD",
-                  currencyFormat
-                )}
-              </Text>
-              {sub.planPrice !== undefined &&
-                sub.priceOverride !== sub.planPrice && (
-                  <Text
-                    size="xs"
-                    variant="muted"
-                    className="opacity-50 italic"
-                    title={`Precio base: ${formatCurrency(
-                      sub.planPrice / 100,
-                      sub.planCurrency ?? "USD",
-                      currencyFormat
-                    )}`}
-                  >
-                    Base: {formatCurrency(sub.planPrice / 100, sub.planCurrency ?? "USD", currencyFormat)}
-                  </Text>
-                )}
-            </div>
-          );
-        }
-        return (
-          <Text weight="bold" size="sm">
-            {sub.planPrice !== undefined
-              ? formatCurrency(sub.planPrice / 100, sub.planCurrency ?? "USD", currencyFormat)
-              : "—"}
-          </Text>
-        );
-      },
+      cell: (sub) => (
+        <PriceCell
+          isTrial={sub.isTrial}
+          priceOverride={sub.priceOverride}
+          planPrice={sub.planPrice}
+          planCurrency={sub.planCurrency}
+          currencyFormat={currencyFormat}
+        />
+      ),
     },
     {
       header: "Acciones",
@@ -258,12 +228,7 @@ export function SubscriptionsTable({
                     label: "Extender Periodo",
                     icon: <CalendarPlus size={14} />,
                     variant: "default",
-                    onClick: () => {
-                      const newDate = new Date(sub.currentPeriodEnd);
-                      newDate.setMonth(newDate.getMonth() + 1);
-                      setExtendDate(newDate.toISOString().split("T")[0] ?? "");
-                      setExtendModal(sub);
-                    },
+                    onClick: () => setExtendModal(sub),
                   },
                   {
                     label: "Cancelar Suscripción",
@@ -301,7 +266,6 @@ export function SubscriptionsTable({
         pagination={pagination}
       />
 
-      {/* Detail Modal */}
       {detailModal && (
         <Modal
           open={!!detailModal}
@@ -358,63 +322,21 @@ export function SubscriptionsTable({
         </Modal>
       )}
 
-      {/* Cancel Modal */}
-      {cancelModal && (
-        <Modal
-          open={!!cancelModal}
-          onOpenChange={() => setCancelModal(null)}
-          trigger={null}
-          title="Cancelar Suscripción"
-          description="Esta acción no se puede deshacer."
-        >
-          <div className="space-y-4">
-            <Input
-              label="Motivo (opcional)"
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Ej: Cliente solicitó baja"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outlined" onClick={() => setCancelModal(null)} disabled={actionLoading}>
-                Volver
-              </Button>
-              <Button variant="danger" onClick={handleCancel} disabled={actionLoading}>
-                {actionLoading ? "Cancelando..." : "Confirmar Cancelación"}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <CancelSubscriptionModal
+        open={!!cancelModal}
+        onOpenChange={(open) => !open && setCancelModal(null)}
+        onConfirm={handleCancel}
+        isLoading={actionLoading}
+      />
 
-      {/* Extend Modal */}
-      {extendModal && (
-        <Modal
-          open={!!extendModal}
-          onOpenChange={() => setExtendModal(null)}
-          trigger={null}
-          title="Extender Periodo"
-          description={`Vence actualmente: ${formatDate(extendModal.currentPeriodEnd)}`}
-        >
-          <div className="space-y-4">
-            <Input
-              type="date"
-              label="Nueva fecha de vencimiento"
-              value={extendDate}
-              onChange={(e) => setExtendDate(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outlined" onClick={() => setExtendModal(null)} disabled={actionLoading}>
-                Volver
-              </Button>
-              <Button onClick={handleExtend} disabled={actionLoading || !extendDate}>
-                {actionLoading ? "Extendiendo..." : "Confirmar Extensión"}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+      <ExtendSubscriptionModal
+        open={!!extendModal}
+        onOpenChange={(open) => !open && setExtendModal(null)}
+        currentPeriodEnd={extendModal?.currentPeriodEnd ?? new Date()}
+        onConfirm={handleExtend}
+        isLoading={actionLoading}
+      />
 
-      {/* Payment History Modal */}
       {historyModal && (
         <PlatformPaymentHistoryModal
           open={!!historyModal}

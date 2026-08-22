@@ -75,7 +75,7 @@ export function OrganizationSettingsForm({
       await onSave(dataToSave);
     } catch (error: any) {
       console.error("Error saving settings:", error);
-      toast.error(error.message || "Error general al guardar");
+      toast.error("Error general al guardar");
     }
   };
 

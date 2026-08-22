@@ -10,14 +10,13 @@ import {
   Skeleton
 } from "@workspace/ui/components";
 import { OrganizationActions } from "./organization-actions";
+import { SubscriptionCell } from "./subscription-cell";
 import { Building2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { IPlatformOrganization } from "@workspace/shared/types";
 import { COUNTRIES } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 interface OrganizationsTableProps {
   readonly organizations: IPlatformOrganization[];
@@ -148,52 +147,12 @@ const getColumns = (
     {
       header: "Suscripción",
       className: "min-w-[200px]",
-      cell: (org) => {
-        if (isLoading) {
-          return (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-5 w-24 rounded-full" />
-              <Skeleton className="h-3 w-32" />
-            </div>
-          );
-        }
-        const sub = org.latestSubscription;
-        if (!sub) {
-          return (
-            <div className="flex flex-col gap-0.5">
-              <Text size="xs" weight="bold" className="text-amber-500/80 uppercase tracking-widest italic">Sin Suscripción</Text>
-              <Text size="xs" variant="muted" className="opacity-40">No hay planes vinculados.</Text>
-            </div>
-          );
-        }
-
-        const isExpired = new Date(sub.currentPeriodEnd) < new Date();
-        const statusVariants: Record<string, "success" | "warning" | "destructive" | "info" | "default"> = {
-          active: 'success',
-          trial: 'info',
-          past_due: 'warning',
-          read_only: 'default',
-          suspended: 'destructive',
-          cancelled: 'destructive'
-        };
-
-        return (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <Badge variant={statusVariants[sub.status] || 'default'} className="uppercase text-[9px] font-black tracking-tighter h-5 px-2">
-                {sub.planName || 'Plan Personalizado'}
-              </Badge>
-              {sub.isTrial && <Badge variant="info" className="uppercase text-[9px] font-black tracking-tighter h-5">Prueba</Badge>}
-            </div>
-            <Text size="xs" className="text-slate-500 font-medium">
-              {isExpired ? 'Expiró: ' : 'Expira: '}
-              <span className={isExpired ? "text-rose-500 font-bold" : "text-slate-300 font-bold"}>
-                {format(new Date(sub.currentPeriodEnd), "dd MMM yyyy", { locale: es })}
-              </span>
-            </Text>
-          </div>
-        );
-      }
+      cell: (org) => (
+        <SubscriptionCell
+          subscription={org.latestSubscription}
+          isLoading={isLoading}
+        />
+      ),
     },
     {
       header: "Acciones",
