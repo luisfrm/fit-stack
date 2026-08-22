@@ -2,16 +2,20 @@
 
 import * as React from "react";
 import { KpiGroup } from "./kpi-group";
-import { DEFAULT_TIMEZONE } from "@/lib/config/display";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { CompactMoney } from "./compact-money";
+import { Text } from "@workspace/ui/components";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
-import { ValueConverter } from "@/lib/utils/value-converters";
+
+interface TodayIncome {
+  /** Monto normalizado a la divisa primaria, en unidades mayores */
+  readonly amount: number | null;
+  readonly currency: string;
+}
 
 interface DashboardStatsViewProps {
   readonly stats: DashboardStats;
-  readonly primaryCurrency?: string;
-  readonly timezone?: string;
+  readonly todayIncome?: TodayIncome | null;
+  readonly pendingPayments?: number | null;
 }
 
 function getRelativeTime(dateStr: string): string {
@@ -20,7 +24,7 @@ function getRelativeTime(dateStr: string): string {
   const diffInMs = now.getTime() - past.getTime();
   const diffInMins = Math.floor(diffInMs / (1000 * 60));
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 24));
 
   if (diffInMins < 2) return "Ahora mismo";
   if (diffInMins < 60) return `Hace ${diffInMins} min`;
@@ -29,37 +33,7 @@ function getRelativeTime(dateStr: string): string {
   return past.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
-export function DashboardStatsView({ stats }: DashboardStatsViewProps) {
-  const { settings } = useSettings();
-  const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
-
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: DEFAULT_TIMEZONE,
-  }).format(new Date());
-  void today;
-
-  const formatIncome = (income: Record<string, number>): React.ReactNode => {
-    if (!income || Object.keys(income).length === 0) {
-      return ValueConverter.format(0, primaryCurrency, currencyFormat);
-    }
-
-    const keys = Object.keys(income);
-
-    return (
-      <div className="flex flex-col gap-1">
-        {keys.map((cur) => {
-          const amount = (income[cur] ?? 0) / 100;
-          return (
-            <div key={cur}>
-              {ValueConverter.format(amount, cur, currencyFormat)}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
+export function DashboardStatsView({ stats, todayIncome, pendingPayments }: DashboardStatsViewProps) {
   const items = React.useMemo(
     () => [
       {
@@ -75,10 +49,26 @@ export function DashboardStatsView({ stats }: DashboardStatsViewProps) {
         trend: { value: "Programadas", direction: "neutral" as const },
       },
       {
-        label: "Ingresos del Mes",
-        value: formatIncome(stats.monthlyIncome),
+        label: "Ingresos del Día",
+        value: (
+          <CompactMoney
+            amount={todayIncome?.amount ?? null}
+            currency={todayIncome?.currency}
+          />
+        ),
         icon: "wallet" as const,
-        trend: { value: "Este mes", direction: "up" as const },
+        trend: { value: "Hoy", direction: "up" as const },
+      },
+      {
+        label: "Pagos Pendientes",
+        value:
+          pendingPayments === null || pendingPayments === undefined ? (
+            <Text as="span" className="text-3xl">—</Text>
+          ) : (
+            String(pendingPayments)
+          ),
+        icon: "clock" as const,
+        trend: { value: "Por validar", direction: "neutral" as const },
       },
       {
         label: "Membresías por Vencer",
@@ -88,7 +78,7 @@ export function DashboardStatsView({ stats }: DashboardStatsViewProps) {
         accent: true,
       },
     ],
-    [stats],
+    [stats, todayIncome, pendingPayments],
   );
 
   return <KpiGroup items={items} />;

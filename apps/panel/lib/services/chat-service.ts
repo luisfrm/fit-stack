@@ -1,50 +1,38 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import type { AiModelInfo, IAiChatMessage, IAiSseEvent } from "@workspace/shared";
+import type { IAiChatMessage, IAiSseEvent } from "@workspace/shared";
 
 export interface ChatStreamCallbacks {
   onDelta: (content: string) => void;
-  /** Fired with the actual model that answered (relevant with `openrouter/free`). */
   onModel?: (model: string) => void;
   onDone?: () => void;
   onError?: (message: string) => void;
   signal?: AbortSignal;
+  onQuotaUpdate?: (used: number, limit: number) => void;
 }
 
-/**
- * Chat AI service — streams token deltas from the api-worker via SSE.
- * Uses ofetch (never native fetch). The response is not cached: it's a
- * streaming POST consumed only from client components.
- */
 export const chatService = {
-  /**
-   * Available models (allowlist). Used from RSC pages with Next.js cache
-   * options; the chat itself receives the list as props.
-   */
-  async getModels(options?: ApiFetchOptions): Promise<AiModelInfo[] | null> {
-    try {
-      const res = await api<{ data: AiModelInfo[] }>("/ai/models", options);
-      return res.data ?? null;
-    } catch {
-      return null;
-    }
+  async getUsage(options?: ApiFetchOptions) {
+    return await api<import("@/lib/features/quota").AiUsage>("/ai/usage", options);
   },
 
-  /**
-   * Streams a chat completion. `onDelta` fires with each text chunk;
-   * `onDone` after the stream closes; `onError` on failures or mid-stream
-   * errors. Pass an AbortController signal to stop generation.
-   */
   async streamChat(
-    model: string,
     messages: IAiChatMessage[],
-    { onDelta, onModel, onDone, onError, signal }: ChatStreamCallbacks,
+    { onDelta, onModel, onDone, onError, signal, onQuotaUpdate }: ChatStreamCallbacks,
   ): Promise<void> {
     const response = await api.raw("/ai/chat", {
       method: "POST",
-      body: { model, messages },
+      body: { messages },
       responseType: "stream",
       signal,
     });
+
+    if (onQuotaUpdate) {
+      const used = Number(response.headers.get("X-Ai-Credits-Used"));
+      const limit = Number(response.headers.get("X-Ai-Credits-Limit"));
+      if (!Number.isNaN(used) && !Number.isNaN(limit)) {
+        onQuotaUpdate(used, limit);
+      }
+    }
 
     if (!response.ok) {
       const errBody = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -93,7 +81,6 @@ export const chatService = {
       }
       onDone?.();
     } catch (err) {
-      // User aborted (stop button) — treat as graceful end
       if (signal?.aborted) {
         onDone?.();
         return;

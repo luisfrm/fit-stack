@@ -8,8 +8,8 @@ import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { TodayClassesTable } from "@/components/dashboard/today-classes-table";
 import { RecentRegistrationsList } from "@/components/dashboard/recent-registrations";
-import { AlertItem } from "@/components/dashboard/alert-item";
 import { DashboardStatsView } from "@/components/dashboard/dashboard-stats";
+import { DashboardChartsRow } from "@/components/dashboard/dashboard-charts-row";
 import { MemberModal } from "@/components/members/member-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { useRouter } from "next/navigation";
@@ -19,16 +19,37 @@ import type {
 } from "@workspace/shared/types";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
 
+type AnalyticsSlice = {
+  plansDistribution: Array<{ planName: string; count: number }>;
+  renewals: Array<{ day: string; count: number }>;
+  growth: {
+    altas: Array<{ day: string; count: number }>;
+    bajas: Array<{ day: string; count: number }>;
+  };
+};
+
+interface TodayIncome {
+  readonly amount: number | null;
+  readonly currency: string;
+}
+
 interface GymDashboardProps {
   readonly stats: DashboardStats;
   readonly todayClasses: IClassToday[];
   readonly recentRegistrations: IRecentRegistration[];
+  /** Monto del día normalizado a la divisa primaria (unidades mayores) */
+  readonly todayIncome?: TodayIncome | null;
+  readonly pendingPayments?: number | null;
+  readonly analytics?: AnalyticsSlice | null;
 }
 
 export function GymDashboard({
   stats,
   todayClasses,
   recentRegistrations,
+  todayIncome,
+  pendingPayments,
+  analytics,
 }: GymDashboardProps) {
   const router = useRouter();
 
@@ -56,7 +77,11 @@ export function GymDashboard({
         />
       </DashboardHeader>
 
-      <DashboardStatsView stats={stats} />
+      <DashboardStatsView
+        stats={stats}
+        todayIncome={todayIncome}
+        pendingPayments={pendingPayments}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
         <Card className="lg:col-span-2 overflow-hidden pb-0">
@@ -66,7 +91,7 @@ export function GymDashboard({
               Ver todas
             </Link>
           </div>
-          <TodayClassesTable classes={todayClasses} />
+          <TodayClassesTable classes={todayClasses.slice(0, 6)} />
         </Card>
 
         <Card className="overflow-hidden flex flex-col">
@@ -77,23 +102,7 @@ export function GymDashboard({
         </Card>
       </div>
 
-      <section>
-        <Text as="p" size="lg" weight="bold" className="mb-4">Alertas Recientes</Text>
-        <div className="flex flex-wrap gap-4">
-          <AlertItem
-            severity="warning"
-            title="5 membresías vencen esta semana"
-            description="Revisar lista de renovación para contactar miembros."
-            actionLabel="Revisar"
-          />
-          <AlertItem
-            severity="info"
-            title="Nueva clase disponible"
-            description="La clase de Pilates Avanzado ya está activa."
-            actionLabel="Ver clase"
-          />
-        </div>
-      </section>
+      <DashboardChartsRow analytics={analytics ?? null} />
     </>
   );
 }

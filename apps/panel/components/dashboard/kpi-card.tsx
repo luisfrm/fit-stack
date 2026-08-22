@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TrendingDown,
   Inbox,
+  Clock,
 } from "lucide-react";
 
 import { Card, Text } from "@workspace/ui/components";
@@ -22,9 +23,12 @@ const ICON_MAP = {
   trendingUp: TrendingUp,
   trendingDown: TrendingDown,
   inbox: Inbox,
+  clock: Clock,
 } as const;
 
 type IconName = keyof typeof ICON_MAP;
+
+export type { IconName };
 type TrendDirection = "up" | "down" | "neutral";
 
 interface KpiCardProps {

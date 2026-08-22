@@ -10,7 +10,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { KpiSection } from "@/components/payments/kpi-section";
 import { RevenueChart } from "@/components/payments/revenue-chart";
-import { AnalyticsCarousel } from "@/components/payments/analytics-carousel";
+import { PaymentMethodsChart } from "@/components/payments/payment-methods-chart";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus } from "@workspace/shared";
@@ -202,7 +202,7 @@ export function PaymentsClient({
               />
             </div>
             <div className="w-full xl:w-1/2">
-              <AnalyticsCarousel
+              <PaymentMethodsChart
                 data={analytics}
                 currencyFormat={currencyFormat}
               />

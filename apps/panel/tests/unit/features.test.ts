@@ -39,7 +39,7 @@ describe('resolveFeatures', () => {
     expect(resolved.cms?.enabled).toBe(true);
     expect(resolved.panel?.enabled).toBe(true);
     expect(resolved.ai_chat?.enabled).toBe(false);
-    expect(resolved.ai_chat?.limits?.ai_messages_daily).toBe(0);
+    expect(resolved.ai_chat?.limits?.ai_credits_monthly).toBe(0);
   });
 });
 
@@ -55,9 +55,9 @@ describe('isQuotaExhausted', () => {
 });
 
 describe('formatQuotaLabel', () => {
-  it('formats used/limit with infinity for unlimited', () => {
+  it('formats used/limit and shows Ilimitado when limit is 0', () => {
     expect(formatQuotaLabel({ used: 5, limit: 5 })).toBe('5/5');
-    expect(formatQuotaLabel({ used: 3, limit: 0 })).toBe('3/∞');
+    expect(formatQuotaLabel({ used: 3, limit: 0 })).toBe('Ilimitado');
     expect(formatQuotaLabel(null)).toBe('—');
   });
 });

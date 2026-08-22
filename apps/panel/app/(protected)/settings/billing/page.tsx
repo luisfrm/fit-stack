@@ -153,7 +153,7 @@ export default async function BillingSettingsPage() {
           ) : (
             <p className="text-sm text-foreground-muted">Chat IA no contratado en este plan.</p>
           )}
-          <p className="text-[11px] text-foreground-muted">0 = ilimitado · diaria / semanal / mensual</p>
+          <p className="text-[11px] text-foreground-muted">1 crédito = 1K tokens · 0 = ilimitado · ciclo de suscripción</p>
         </section>
       </div>
     </div>

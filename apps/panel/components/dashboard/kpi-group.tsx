@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { KpiCard } from "./kpi-card";
+import { KpiCard, type IconName } from "./kpi-card";
 
 interface KpiItem {
   label: string;
   value: React.ReactNode;
-  icon: "users" | "wallet" | "calendar" | "alert" | "trendingUp" | "trendingDown" | "inbox";
+  icon: IconName;
   trend?: { value: string; direction: "up" | "down" | "neutral" };
   accent?: boolean;
 }
@@ -18,7 +18,7 @@ interface KpiGroupProps {
 
 export function KpiGroup({ items, loading }: KpiGroupProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-10">
       {items.map((item) => (
         <KpiCard
           key={item.label}

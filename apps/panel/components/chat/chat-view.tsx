@@ -6,15 +6,13 @@ import {
   Badge,
   Button,
   Card,
-  SimpleSelect,
   Spinner,
   Text,
   Textarea,
   toast,
-  type SimpleSelectOption,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
-import type { AiModelInfo, ChatModelId, IAiChatMessage } from "@workspace/shared";
+import type { IAiChatMessage } from "@workspace/shared";
 import { chatService } from "@/lib/services/chat-service";
 import { AiQuotaBanner } from "./ai-quota-banner";
 import type { AiUsage } from "@/lib/features/quota";
@@ -23,34 +21,14 @@ import { isQuotaExhausted } from "@/lib/features/quota";
 interface UiChat {
   id: string;
   title: string;
-  model: ChatModelId;
   modelUsed?: string;
   messages: IAiChatMessage[];
 }
 
-const MODEL_OPTIONS = (models: readonly AiModelInfo[]): SimpleSelectOption[] =>
-  models.map((model) => ({
-    value: model.id,
-    label:
-      model.provider === "openrouter"
-        ? `OpenRouter · ${model.label}`
-        : `Workers AI · ${model.label}`,
-    description: model.description,
-  }));
-
-function resolveDefaultModel(models: readonly AiModelInfo[]): ChatModelId {
-  return (
-    (models.find((model) => model.id === "openrouter/free")?.id as ChatModelId | undefined) ??
-    (models[0]?.id as ChatModelId | undefined) ??
-    "openrouter/free"
-  );
-}
-
-function createEmptyChat(model: ChatModelId): UiChat {
+function createEmptyChat(): UiChat {
   return {
     id: crypto.randomUUID(),
     title: "Nueva conversación",
-    model,
     messages: [],
   };
 }
@@ -61,38 +39,29 @@ function buildTitle(content: string): string {
 }
 
 interface ChatViewProps {
-  /** Model allowlist fetched by the RSC page (falls back to shared constant). */
-  readonly initialModels: readonly AiModelInfo[];
-  /** AI usage quotas fetched by the RSC page (daily/weekly/monthly). */
   readonly initialUsage?: AiUsage | null;
 }
 
-export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
-  const [chats, setChats] = React.useState<UiChat[]>(() => [
-    createEmptyChat(resolveDefaultModel(initialModels)),
-  ]);
+export function ChatView({ initialUsage }: ChatViewProps) {
+  const [chats, setChats] = React.useState<UiChat[]>(() => [createEmptyChat()]);
   const [activeChatId, setActiveChatId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState("");
   const [isStreaming, setIsStreaming] = React.useState(false);
+  const [usage, setUsage] = React.useState<AiUsage | null | undefined>(initialUsage);
   const abortRef = React.useRef<AbortController | null>(null);
   const endRef = React.useRef<HTMLDivElement>(null);
 
-  const modelOptions = React.useMemo(() => MODEL_OPTIONS(initialModels), [initialModels]);
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
-  const dailyExhausted = isQuotaExhausted(initialUsage?.daily);
+  const dailyExhausted = isQuotaExhausted(usage?.monthly ?? (usage as unknown as { daily?: { used: number; limit: number } })?.daily);
 
-  // Mientras el LLM no ha emitido el primer token, la última message es del usuario:
-  // mostramos la nubecita "escribiendo..." con los 3 puntos animados.
   const isAwaitingResponse =
     isStreaming &&
     activeChat?.messages[activeChat.messages.length - 1]?.role === "user";
 
-  // Activate the first chat on mount
   React.useEffect(() => {
     setActiveChatId((current) => current ?? chats[0]?.id ?? null);
   }, [chats]);
 
-  // Auto-scroll to the latest message
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [activeChat?.messages, isStreaming]);
@@ -103,7 +72,7 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
       setActiveChatId(empty.id);
       return;
     }
-    const chat = createEmptyChat(resolveDefaultModel(initialModels));
+    const chat = createEmptyChat();
     setChats((prev) => [...prev, chat]);
     setActiveChatId(chat.id);
   };
@@ -112,15 +81,6 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
     event.stopPropagation();
     setChats((prev) => prev.filter((chat) => chat.id !== id));
     if (activeChatId === id) setActiveChatId(null);
-  };
-
-  const changeModel = (model: string) => {
-    if (!activeChatId) return;
-    setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === activeChatId ? { ...chat, model: model as ChatModelId } : chat,
-      ),
-    );
   };
 
   const appendAssistantDelta = (chatId: string, delta: string) => {
@@ -142,9 +102,22 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
     );
   };
 
+  const refreshUsage = React.useCallback(async () => {
+    try {
+      const fresh = await chatService.getUsage();
+      if (fresh) setUsage(fresh);
+    } catch {
+      // silencioso
+    }
+  }, []);
+
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || isStreaming || !activeChat || dailyExhausted) return;
+    if (!content || isStreaming || !activeChat) return;
+    if (dailyExhausted) {
+      toast.error("No tienes créditos disponibles en este ciclo");
+      return;
+    }
 
     const userMessage: IAiChatMessage = { role: "user", content };
     const messages = [...activeChat.messages, userMessage];
@@ -169,21 +142,27 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
     setIsStreaming(true);
 
     try {
-      await chatService.streamChat(
-        activeChat.model,
-        messages,
-        {
-          signal: controller.signal,
-          onDelta: (delta) => appendAssistantDelta(chatId, delta),
-          onModel: (model) => {
-            setChats((prev) =>
-              prev.map((chat) => (chat.id === chatId ? { ...chat, modelUsed: model } : chat)),
-            );
-          },
-          onDone: () => undefined,
-          onError: (message) => toast.error(message),
+      await chatService.streamChat(messages, {
+        signal: controller.signal,
+        onDelta: (delta) => appendAssistantDelta(chatId, delta),
+        onModel: (model) => {
+          setChats((prev) =>
+            prev.map((chat) => (chat.id === chatId ? { ...chat, modelUsed: model } : chat)),
+          );
         },
-      );
+        onDone: () => undefined,
+        onError: (message) => toast.error(message),
+        onQuotaUpdate: (used, limit) => {
+          setUsage((prev) => ({
+            monthly: { used, limit },
+            remaining: limit === 0 ? Number.POSITIVE_INFINITY : Math.max(0, limit - used),
+            disabled: false,
+            periodStart: prev?.periodStart ?? new Date().toISOString(),
+            ...(prev && (prev as unknown as { daily?: unknown }).daily ? { daily: { used, limit } } : {}),
+            ...(prev && (prev as unknown as { weekly?: unknown }).weekly ? { weekly: { used, limit } } : {}),
+          }));
+        },
+      });
     } catch (err) {
       if (!controller.signal.aborted) {
         toast.error(err instanceof Error ? err.message : "Error al enviar el mensaje");
@@ -191,6 +170,7 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
+      void refreshUsage();
     }
   };
 
@@ -204,12 +184,6 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
       void sendMessage();
     }
   };
-
-  const usedModelLabel =
-    activeChat?.modelUsed && activeChat.modelUsed !== activeChat.model
-      ? (modelOptions.find((option) => option.value === activeChat.modelUsed)?.label ??
-        activeChat.modelUsed)
-      : null;
 
   const chatList = (
     <>
@@ -254,28 +228,17 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
 
   return (
     <div className="flex h-full min-h-[60svh] flex-col gap-4">
-      <AiQuotaBanner usage={initialUsage} />
+      <AiQuotaBanner usage={usage} />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3">
         <div>
           <Text as="p" size="lg" weight="bold" uppercase italic>
             Chat IA
           </Text>
           <Text variant="muted" size="sm">
-            Asistente con Cloudflare Workers AI y OpenRouter (gratuito)
+            Asistente configurado desde Console (fallback automático entre providers)
           </Text>
         </div>
-        {activeChat && (
-          <div className="w-full sm:w-72">
-            <SimpleSelect
-              label="Proveedor / Modelo"
-              size="sm"
-              value={activeChat.model}
-              onChange={changeModel}
-              options={modelOptions}
-            />
-          </div>
-        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
@@ -325,10 +288,10 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
                     </div>
                   </div>
                 )}
-                {usedModelLabel && (
+                {activeChat.modelUsed && (
                   <div className="flex justify-start">
                     <Badge variant="outline" size="sm">
-                      Modelo: {usedModelLabel}
+                      Modelo: {activeChat.modelUsed}
                     </Badge>
                   </div>
                 )}
@@ -336,37 +299,48 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
               </div>
 
               <div className="border-t border-white/5 p-3">
-                <div className="flex items-end gap-2">
-                  <Textarea
-                    placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isStreaming}
-                    className="min-h-[56px] max-h-40"
-                  />
-                  {isStreaming ? (
-                    <Button
-                      variant="danger"
-                      size="icon"
-                      onClick={stopGeneration}
-                      title="Detener generación"
-                      aria-label="Detener generación"
-                    >
-                      <Square className="size-4" />
-                    </Button>
-                  ) : (
-                    <Button
-                      size="icon"
-                      onClick={() => void sendMessage()}
-                      disabled={!draft.trim() || dailyExhausted}
-                      title={dailyExhausted ? "Cuota diaria agotada" : "Enviar"}
-                      aria-label="Enviar mensaje"
-                    >
-                      <Send className="size-4" />
-                    </Button>
-                  )}
-                </div>
+                {dailyExhausted ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+                    <Badge variant="warning" size="sm" className="shrink-0 uppercase tracking-widest text-[10px]">
+                      Sin créditos
+                    </Badge>
+                    <Text size="xs" variant="muted" className="leading-relaxed">
+                      No tienes créditos disponibles en este ciclo. Se renuevan con el ciclo de suscripción (o el día 1).
+                    </Text>
+                  </div>
+                ) : (
+                  <div className="flex items-end gap-2">
+                    <Textarea
+                      placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isStreaming}
+                      className="min-h-[56px] max-h-40"
+                    />
+                    {isStreaming ? (
+                      <Button
+                        variant="danger"
+                        size="icon"
+                        onClick={stopGeneration}
+                        title="Detener generación"
+                        aria-label="Detener generación"
+                      >
+                        <Square className="size-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="icon"
+                        onClick={() => void sendMessage()}
+                        disabled={!draft.trim()}
+                        title="Enviar"
+                        aria-label="Enviar mensaje"
+                      >
+                        <Send className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -379,7 +353,7 @@ export function ChatView({ initialModels, initialUsage }: ChatViewProps) {
                   Asistente de IA
                 </Text>
                 <Text variant="muted" size="sm">
-                  Elige un proveedor/modelo y comienza una conversación
+                  Comienza una conversación
                 </Text>
               </div>
               <Button onClick={createChat} leftIcon={<Plus className="size-4" />}>

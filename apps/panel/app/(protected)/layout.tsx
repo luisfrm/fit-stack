@@ -91,7 +91,11 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-y-auto bg-background p-4 lg:p-8">
           {showWarningBanner && <SubscriptionWarningBanner />}
           {isFreeTier && featuresData?.features && (
-            <FreeTierBanner features={featuresData.features} isFreeTier={isFreeTier} className="mb-4" />
+            <FreeTierBanner
+              features={featuresData.features}
+              isFreeTier={isFreeTier}
+              organizationId={activeOrgId}
+            />
           )}
           {children}
         </main>

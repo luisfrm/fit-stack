@@ -9,26 +9,26 @@ import { NoData } from "./no-data";
 const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
   {
     header: "Hora",
-    className: "pl-6",
-    headerClassName: "pl-6",
+    className: "pl-4",
+    headerClassName: "pl-4",
     cell: (cls) => (
-      <Text as="span" size="base" variant="muted">
+      <Text as="span" size="sm" variant="muted">
         {formatTimeRange(cls.startTime, cls.endTime)}
       </Text>
     )
   },
   {
     header: "Clase",
-    cell: (cls) => <Text as="span" size="base" weight="medium">{cls.name}</Text>
+    cell: (cls) => <Text as="span" size="sm" weight="medium">{cls.name}</Text>
   },
   {
     header: "Entrenador",
-    cell: (cls) => <Text as="span" size="base" variant="muted">{cls.trainerName ?? 'Sin asignar'}</Text>
+    cell: (cls) => <Text as="span" size="sm" variant="muted">{cls.trainerName ?? 'Sin asignar'}</Text>
   },
   {
     header: "Cupos",
     cell: (cls) => (
-      <Text as="span" size="base" variant="muted">
+      <Text as="span" size="sm" variant="muted">
         {cls.capacity ? `${cls.capacity} cupos` : '—'}
       </Text>
     )
@@ -41,7 +41,7 @@ export function TodayClassesTable({ classes, loading }: Readonly<{ classes: ICla
       columns={TODAY_CLASSES_COLUMNS}
       data={classes}
       loading={loading}
-      emptyState={<NoData message="No hay clases programadas para hoy." className="py-20" />}
+      emptyState={<NoData message="No hay clases programadas para hoy." className="py-8" />}
       className="rounded-none"
     />
   );
