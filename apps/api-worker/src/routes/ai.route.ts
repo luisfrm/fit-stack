@@ -219,11 +219,11 @@ export const aiRoutes = new Hono<AppEnv>()
               const actual = u ? creditsFromUsage(u) : estimated;
               return featuresService.settleAiCredits(orgId, periodStart, actual);
             })
-            .catch(() => {});
+            .catch(() => { });
           c.executionCtx.waitUntil(p);
           if (!done) {
             c.executionCtx.waitUntil(
-              featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => {}),
+              featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => { }),
             );
           }
         }

@@ -119,21 +119,26 @@ export function createKnowledgeRepository(db: Db) {
       await db.delete(aiKnowledgeDocument).where(eq(aiKnowledgeDocument.id, id));
     },
 
+    /**
+     * Reemplaza los chunks de un documento. Sin transacción: neon-http (driver
+     * HTTP de Neon para Workers) no soporta transacciones interactivas. El
+     * orden delete→insert es aceptable: service.create borra el doc completo si
+     * el re-embed falla; en update lo peor es un doc sin chunks hasta el
+     * próximo guardado con contenido.
+     */
     async replaceChunks(documentId: string, chunks: KnowledgeChunkInput[]): Promise<void> {
-      await db.transaction(async (tx) => {
-        await tx.delete(aiKnowledgeChunk).where(eq(aiKnowledgeChunk.documentId, documentId));
-        if (chunks.length > 0) {
-          await tx.insert(aiKnowledgeChunk).values(
-            chunks.map((c) => ({
-              id: crypto.randomUUID(),
-              documentId,
-              content: c.content,
-              embedding: c.embedding,
-              model: c.model,
-            })),
-          );
-        }
-      });
+      await db.delete(aiKnowledgeChunk).where(eq(aiKnowledgeChunk.documentId, documentId));
+      if (chunks.length > 0) {
+        await db.insert(aiKnowledgeChunk).values(
+          chunks.map((c) => ({
+            id: crypto.randomUUID(),
+            documentId,
+            content: c.content,
+            embedding: c.embedding,
+            model: c.model,
+          })),
+        );
+      }
     },
 
     /**

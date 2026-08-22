@@ -10,13 +10,15 @@
  * validan como 503 — determinista y sin deps externas.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { testQuery, skipReason, truncateAll } from '../helpers/db';
+import { testQuery, skipReason, truncateAll, TEST_DATABASE_URL } from '../helpers/db';
 import {
   registerPlatformUser,
   createGymTenant,
   uid,
   type AuthedUser,
 } from '../helpers/auth';
+import { createDb } from '@workspace/database/factory';
+import { createKnowledgeRepository } from '../../src/repositories/knowledge.repository';
 
 async function insertDoc(opts: {
   organizationId?: string | null;
@@ -218,6 +220,35 @@ describe.skipIf(skipReason !== null)('Knowledge Base (RAG)', () => {
       );
       const contents = rows.map((r) => r.content).sort();
       expect(contents).toEqual(['doc propio', 'faq global']);
+    });
+  });
+
+  describe('Regresión neon-http (sin transacciones)', () => {
+    it('replaceChunks persiste y reemplaza vectores sin db.transaction', async () => {
+      const docId = await insertDoc({ title: 'Regresión' });
+      const db = createDb(TEST_DATABASE_URL);
+      const repo = createKnowledgeRepository(db);
+
+      const fakeEmbedding = (seed: number) => Array.from({ length: 1024 }, (_, i) => (i === seed ? 1 : 0));
+
+      await repo.replaceChunks(docId, [
+        { content: 'chunk 1', embedding: fakeEmbedding(0), model: 'test-model' },
+        { content: 'chunk 2', embedding: fakeEmbedding(1), model: 'test-model' },
+      ]);
+      const first = await testQuery<{ content: string }>(
+        `SELECT content FROM ai_knowledge_chunk WHERE document_id = $1 ORDER BY content`,
+        [docId],
+      );
+      expect(first.map((r) => r.content)).toEqual(['chunk 1', 'chunk 2']);
+
+      await repo.replaceChunks(docId, [
+        { content: 'chunk nuevo', embedding: fakeEmbedding(2), model: 'test-model' },
+      ]);
+      const second = await testQuery<{ content: string }>(
+        `SELECT content FROM ai_knowledge_chunk WHERE document_id = $1 ORDER BY content`,
+        [docId],
+      );
+      expect(second.map((r) => r.content)).toEqual(['chunk nuevo']);
     });
   });
 });

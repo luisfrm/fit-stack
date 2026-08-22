@@ -8,6 +8,15 @@ import type { Env } from './env';
 export const workersAiBaseUrl = (accountId: string): string =>
   `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
 
+/**
+ * Native Workers AI run endpoint root (`/ai/run/{model}`). Use this for
+ * features that aren't (or are inconsistently) exposed via the OpenAI-
+ * compatible `/ai/v1` root — e.g. embeddings for `@cf/baai/bge-m3`, which the
+ * OpenAI-compatible endpoint currently truncates to 256 dims.
+ */
+export const workersAiRunUrl = (accountId: string): string =>
+  `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run`;
+
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 /**
