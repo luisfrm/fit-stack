@@ -28,7 +28,7 @@ export const FEATURE_CATALOG = {
   ai_chat: {
     kind: 'boolean',
     defaultEnabled: false,
-    limits: ['ai_messages_daily', 'ai_messages_weekly', 'ai_messages_monthly'],
+    limits: ['ai_credits_monthly'],
     label: 'Chat IA',
   },
 } as const;
@@ -57,9 +57,7 @@ export const FEATURE_CATALOG_VERSION = 1;
 
 const FEATURE_LIMIT_LABELS: Record<string, string> = {
   member_seats: 'Cupos de miembros',
-  ai_messages_daily: 'Mensajes / día',
-  ai_messages_weekly: 'Mensajes / semana',
-  ai_messages_monthly: 'Mensajes / mes',
+  ai_credits_monthly: 'Créditos IA / mes',
 };
 
 function defaultLimits(def: FeatureDefinition): Record<string, number> {
@@ -120,10 +118,7 @@ export function resolveFeatures(features?: PlanFeaturesV2 | null): PlanFeaturesV
 export const FREE_TIER_FEATURES: PlanFeaturesV2 = {
   panel: { enabled: true },
   members_portal: { enabled: true, limits: { member_seats: 10 } },
-  ai_chat: {
-    enabled: true,
-    limits: { ai_messages_daily: 5, ai_messages_weekly: 0, ai_messages_monthly: 0 },
-  },
+  ai_chat: { enabled: true, limits: { ai_credits_monthly: 500 } },
 };
 
 export function getFeatureLimits(def: FeatureDefinition): Record<string, number> {
