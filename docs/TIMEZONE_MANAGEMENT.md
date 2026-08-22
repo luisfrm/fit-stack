@@ -51,3 +51,14 @@ sql`(${table.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone})::date`
 
 > [!TIP]
 > **Golden Rule:** Whenever you create a new service that handles reports or analytics, make sure to receive the `timezone` from the controller and pass it to the SQL aggregation functions.
+
+---
+
+## 🤖 Nota: Cuotas IA (créditos) — UTC, no timezone de la org
+
+Las cuotas del chat IA **no** usan la timezone de la organización. La tabla `ai_usage` guarda `period_start` como **`date` en UTC** y el reset es **perezoso por ciclo de suscripción** (ver `CHAT_PRICING.md` y `CHAT_INFRASTRUCTURE.md`):
+
+- Con sub `ACTIVE`/`TRIAL`: `periodStart = startOfSubscriptionPeriod(currentPeriodEnd, duration)` (ciclo del plan, UTC).
+- Sin sub o sub no activa: `startOfMonthUtc(now)` — día 1 00:00 **UTC**.
+
+Esto evita desfases por `America/Caracas`, `America/Bogota`, etc., y mantiene el ledger determinista. Los **reportes de consumo** (`GET /api/ai/usage` → `periodStart`) también se exponen en UTC; si se muestran en UI, convertir a la timezone de la org solo para display. No confundir con el modelo isomórfico de reportes financieros (que sí agrupa por `AT TIME ZONE`).

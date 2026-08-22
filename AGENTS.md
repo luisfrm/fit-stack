@@ -38,7 +38,7 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado
 
 - **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE-05-20-2026.md` y specs de diseño en `docs/superpowers/specs/` (ej. Hybrid FAB).
+- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (créditos IA, vigentes) y `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, histórico) + `how/` (fuente de la Base de Conocimiento IA, tono usuario final) + specs en `docs/superpowers/specs/`.
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
@@ -235,9 +235,9 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
 | `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
-| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → Workers AI o `openrouter/free`, rate-limit `ai_chat` + headers `X-Ai-Quota-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA) |
+| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → cadena fija OpenRouter o Workers AI GLM, RAG pre-generación + `PANEL_SYSTEM_PROMPT`, cuota `ai_chat` + headers `X-Ai-Credits-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA) |
 
-> **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). `openrouter/free` usa el enrutador automático gratuito de OpenRouter (el fallback entre modelos gratuitos lo maneja OpenRouter). El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. |
+> **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). Cadena OpenRouter de modelos fijos (`OPENROUTER_TEXT_MODEL_CHAIN`) con fallback a GLM en Workers AI. El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. 1 crédito = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), límites `AI_CHAT_LIMITS`, ciclo mensual por suscripción, RAG con embeddings `@cf/baai/bge-m3` (ver `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
 | `/api/init` | Bootstrap de org (sin auth) |
 | `/api/public` | `GET /pages/:slug` (CMS público, cache 15 min), `GET /files/*` (R2) — sin auth |
 | `/api/platform/plans` | Catálogo de planes SaaS (console) |
@@ -247,6 +247,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
 | `/api/platform/upload` | Assets de plataforma sin org (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, scope fijo `platform/` |
 | `/api/platform/features` | Catálogo de features (`GET /`, cache `platform:features`) |
+| `/api/platform/knowledge` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3, sin cache Redis) |
 | `/api/organizations/features` | Features resueltas de la org activa + `isFreeTier` (gate del panel, cache `org:*:features`) |
 | `/api/organizations/seats` | Cupos del portal de la org activa (`{ used, limit, pending }`) |
 
@@ -399,14 +400,14 @@ Los planes SaaS de la plataforma se describen con **features (feature-flags)** e
 | `cms` | boolean | — | Contenido/páginas |
 | `blog` | boolean | — | Blog |
 | `members_portal` | boolean | `member_seats` | Portal de Miembros (cupos) |
-| `ai_chat` | boolean | `ai_messages_daily`, `ai_messages_weekly`, `ai_messages_monthly` | Chat IA (cuotas; 0 = ilimitado) |
+| `ai_chat` | boolean | `ai_credits_monthly` | Chat IA (créditos/mes; 0 = ilimitado) |
 
 Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva); `normalizeFeatures` ignora IDs desconocidos y sanitiza tipos (límites numéricos, 0 = ilimitado); `resolveFeatures(null)` → defaults del catálogo.
 
 ### Free Tier (piso gratuito)
 
 - **Explicito, NO es un plan**: se configura en `platform_setting` con 2 keys — `feature_flags_free_tier` (JSON de `PlanFeaturesV2`) y `feature_flags_free_tier_enabled` (`"true"`/`"false"`, flag de activación) — editadas desde console → Settings → **Plan Gratuito** (`apps/console/app/dashboard/settings/free-tier/`). No existe `is_free`; planes con `price = 0` son trials normales. El resolver ignora el setting si `feature_flags_free_tier_enabled !== 'true'`.
-- **Defaults de código** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 cupos) + `ai_chat` (5 msgs/día, semanal/mensual 0 = ilimitado). Se pueden overridear desde console.
+- **Defaults de código** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 cupos) + `ai_chat` (500 créditos/mes). Se pueden overridear desde console.
 - **Regla de resolución** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → features del plan (con `planId`/`planName`).
   - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **o sin sub** + free tier **habilitado** (`enabled === 'true'`) → piso gratuito (`isFreeTier: true`).
@@ -415,15 +416,19 @@ Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva);
 ### Enforcement (downgrade = hide)
 
 - **Middleware** `requireFeature(featureId)` en `apps/api-worker/src/lib/route-handler.ts` → 403 `{ code: 'FEATURE_NOT_AVAILABLE' }` si la feature no está habilitada. Se aplica tras `requireOrgPermission`.
-- **Rutas gateadas**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (además de rate-limit, ver abajo).
+- **Rutas gateadas**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (además de cuota de créditos mensual, ver abajo).
 - **Cupos del portal** (`members_portal.member_seats`): `GET /api/organizations/seats` → `{ used, limit, pending }` (used = gym_members activos con `userId`; pending = invitaciones Better Auth `pending`). Guard en `members.route.ts` (POST `/api/members` con `sendInvite` y role `member`, y en `link-user`) → 403 `FEATURE_LIMIT_REACHED` si `limit > 0` y `used + pending >= limit`. `limit 0` = ilimitado.
 - **Frontend**: `OrgFeaturesProvider` + `filterNavItemsByFeatures` ocultan items del sidebar; guards en `/dashboard/content` y `/dashboard/chat`; `ai-quota-banner` y `portal-seats-banner`.
 
-### Rate-limit IA (`ai_chat`)
+### Créditos IA (`ai_chat`)
 
-- **Fuente de verdad**: tabla `ai_usage` (Postgres) — fila por `(organization_id, period_type, period_start)` con `count`, upsert atómico `ON CONFLICT DO UPDATE` (índice único `idx_ai_usage_org_period`). Períodos en UTC: día, semana ISO (lunes), mes.
-- **Evaluación**: `consumeAiMessage` lee y escribe **siempre contra Postgres** (decisión de diseño: DB = fuente de verdad, sin dependencia de Redis para el enforcement). Existe `cache.increment` en `lib/cache.ts` para un futuro layer de caché, pero **no** se invoca en el flujo actual.
-- `GET /api/ai/usage` → `{ daily, weekly, monthly: { used, limit } }`. `POST /api/ai/chat` consume 1 mensaje y devuelve headers `X-Ai-Quota-Daily/Weekly/Monthly: used/limit`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado; feature deshabilitada → límites 0.
+- **Unidad**: 1 crédito = 1K tokens (x1.0, ver `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Provider default en `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, fallback automático al otro). Docs: `docs/CHAT_PRICING.md`, `docs/CHAT_INFRASTRUCTURE.md`.
+- **Límites**: `ai_chat.limits.ai_credits_monthly` por plan (configurable en gestores, no hardcode) + free tier `FREE_TIER_FEATURES` (500/mes). Catálogo en `shared/features/catalog.ts`.
+- **Límites de balance**: `AI_CHAT_LIMITS` en `shared/ai.ts` (`maxUserMessageChars: 500`, `maxHistoryMessageChars: 2_000`, `maxInputChars: 8_000`, `maxOutputTokens: 800` normal / `maxToolOutputTokens: 2_048` para tool, `maxHistoryMessages: 10`). Zod y `ai.service` clampean `max_tokens`. El system prompt lo compone el servidor — el cliente nunca envía role `system`.
+- **Fuente de verdad**: tabla `ai_usage` — fila por `(organization_id, period_type='monthly', periodStart)` con `credits`, upsert atómico. `periodStart` = ciclo de suscripción si ACTIVE/TRIAL, si no día 1 calendario (reset perezoso, sin cron). Índice `idx_ai_usage_org_period`.
+- **Evaluación**: `consumeAiCredits(estimated)` (pre-flight) + `settleAiCredits(actual)` post-stream vía `ctx.waitUntil` (DB fuente de verdad). Compat `consumeAiMessage` (3 créditos) para tests. `cache.increment` existe pero no se usa.
+- **RAG (Base de Conocimiento)**: retrieval automático pre-generación en `/api/ai/chat`. Config en `RAG_CONFIG` (`shared/ai.ts`: topK 4, minSimilarity 0.35, chunkSizeChars 800, overlap 100, maxContextChars 2_000). Embeddings SIEMPRE Workers AI `@cf/baai/bge-m3` (1024 dims, multilingüe) vía `aiService.embed()` — independiente del provider de chat. System prompt = `PANEL_SYSTEM_PROMPT` (`shared/prompts.ts`) + bloque `[Contexto]`; fallo del RAG nunca rompe el chat. KB admin: Console → Settings → Base de Conocimiento (`/api/platform/knowledge`, tablas `ai_knowledge_document`/`ai_knowledge_chunk`, pgvector HNSW; `organization_id NULL` = plataforma, seteado = doc de org con aislamiento en el SQL). Fase 2: panel org-KB + function calling (datos vivos).
+- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estima créditos (+ chars del prompt compuesto), valida balance, hace fallback openrouter→glm y liquida `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado.
 
 ### Snapshot de features en pagos
 
@@ -434,6 +439,7 @@ Cada pago de plataforma (`platform_subscription_payment`) guarda `features_snaps
 | Endpoint | Auth | Uso |
 |----------|------|-----|
 | `GET /api/platform/features` | `requirePlatformAuth` | Catálogo (console) |
+| `/api/platform/knowledge` | `requirePlatformAuth` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3) |
 | `GET /api/organizations/features` | `requireAuth` | Features resueltas + `isFreeTier` + status (gate del panel) |
 | `GET /api/organizations/seats` | `requireAuth` | Cupos del portal |
 | `GET /api/ai/usage` | `requireAuth` | Cuotas IA |
@@ -599,7 +605,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ---
 
-## Database Schema (28 tables)
+## Database Schema (30 tables)
 
 ### Better Auth Core
 `user`, `session`, `account`, `verification`
@@ -609,7 +615,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots)
+`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (créditos IA: `credits` + `count` legacy, índice `idx_ai_usage_org_period`, periodo mensual por ciclo)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
@@ -620,6 +626,9 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ### Access Control
 `access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
+
+### AI / RAG
+`ai_usage` (créditos IA), `ai_knowledge_document` (KB docs; `organization_id NULL` = plataforma, seteado = org), `ai_knowledge_chunk` (fragmentos con embedding pgvector 1024 dims + HNSW cosine)
 
 ### Routines (Fitness)
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
@@ -720,6 +729,7 @@ const handleSuccess = async () => {
 | `console:subs` | `/api/platform/subscriptions*` (incluye /stats) |
 | `console:settings` | `/api/platform/settings` |
 | `console:staff` | `/api/platform/staff` |
+| `console:knowledge` | `/api/platform/knowledge*` |
 
 ### RSC Pattern en `apps/console`
 
@@ -820,7 +830,7 @@ Use skill tool for specialized tasks:
 
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
-- `packages/database/src/schema.ts` — Full DB schema (28 tables)
+- `packages/database/src/schema.ts` — Full DB schema (30 tables)
 - `packages/shared/src/access-control.ts` — RBAC statements + roles (single source of truth)
 - `apps/api-worker/src/index.ts` — Hono app: middleware, mounts, healthcheck
 - `apps/api-worker/src/lib/auth.ts` — Better Auth server config (per-request factory)
@@ -835,126 +845,6 @@ Use skill tool for specialized tasks:
 
 ---
 
-## Infrastructure & Deployment (Terraform + GitHub Actions)
+## Infrastructure & Deployment
 
-Toda la infraestructura de Cloudflare (Workers, R2, Queues, Secrets) se gestiona con Terraform y los despliegues se automatizan con GitHub Actions. **Nunca se usa wrangler manualmente.**
-
-### Modelo de ambientes
-
-Un solo set de archivos Terraform. Los workflows son **uno solo** y seleccionan el ambiente vía `inputs.environment` o vía la rama de Git.
-
-Los secretos y variables son **nombres simples** (sin prefijo). GitHub ya los aísla por environment, así que `CLOUDFLARE_API_TOKEN` en `production` es distinto de `CLOUDFLARE_API_TOKEN` en `staging`.
-
-Por ahora solo está configurado **`production`**. Para agregar un ambiente nuevo, ver "Cómo escalar" más abajo.
-
-### Estructura
-
-```
-infrastructure/terraform/
-├── backend.tf            # Backend S3 en R2 (sin account_id hardcodeado)
-├── providers.tf          # Cloudflare provider
-├── variables.tf          # Variables
-├── main.tf               # Locals
-├── workers.tf            # Workers (+ secret_text_bindings inline)
-├── queues.tf             # Colas + DLQ
-├── storage.tf            # R2 bucket
-├── secrets.tf            # Nota: secrets van inline en workers.tf
-├── outputs.tf            # Outputs
-└── modules/              # Módulos reutilizables
-    ├── worker/
-    ├── r2_bucket/
-    └── queue/
-```
-
-### Workflows de GitHub Actions
-
-| Workflow | Trigger | Ambiente seleccionado |
-|----------|---------|----------------------|
-| `terraform.yml` | `workflow_dispatch` con `environment` | cualquier ambiente |
-| `deploy-api-worker.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
-| `deploy-jobs-worker.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
-| `database-migrations.yml` | push a `master`/`develop` o `workflow_dispatch` | `production` (master) / `dev` (develop) |
-
-### Environment de GitHub
-
-- **`production`**: con aprobador. Por ahora es el único.
-
-> Cuando agregues `staging` o `dev`, crea el environment correspondiente y define si requiere aprobación.
-
-### Variables y Secrets
-
-Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel de repositorio). GitHub los aísla automáticamente por ambiente, por eso no usamos prefijos.
-
-**Secrets por environment (nombres simples, sin prefijo):**
-- `CLOUDFLARE_API_TOKEN` (token de **deploy/provider** — permisos Workers/R2/Queues; auth de wrangler y del provider Terraform. **NO** es el token de Workers AI)
-- `CLOUDFLARE_ACCOUNT_ID`
-- `DATABASE_URL`
-- `BETTER_AUTH_URL`
-- `R2_PUBLIC_URL`
-- `BETTER_AUTH_SECRET`
-- `JWT_SECRET`
-- `COOKIE_DOMAIN`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-- `EMAIL_PROVIDER` (`resend` o `gmail` — jobs-worker)
-- `SMTP_USER`
-- `SMTP_PASS`
-- `PANEL_URL`
-- `CONSOLE_URL`
-- `CLOUDFLARE_AI_API_TOKEN` (token **Workers AI**: Run para `/api/ai` — api-worker. Binding del worker con el mismo nombre; en local va en `.dev.vars` como `CLOUDFLARE_AI_API_TOKEN`)
-- `AI_GATEWAY_URL` *(opcional — si se setea, `createWorkersAIClient` apunta al AI Gateway en vez de Workers AI directo)*
-- `OPENROUTER_API_KEY` *(opcional — necesario para el modelo `openrouter/free`)*
-- `TEST_DATABASE_URL` *(opcional — branch de Neon para la suite de integración de api-worker; sin él, los tests de integración se saltan en CI)*
-- `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
-
-**Variables por environment (nombres de recursos, no sensibles):**
-- `API_WORKER_NAME` (ej: `fit-stack-api`)
-- `JOBS_WORKER_NAME` (ej: `fit-stack-jobs`)
-- `FILES_BUCKET_NAME` (ej: `fit-stack-files`)
-- `QUEUE_NAME` (ej: `fit-task-events`)
-- `DLQ_QUEUE_NAME` (ej: `fit-task-events-dlq`)
-
-**Repository secrets (compartidos por todos los environments):**
-- `TFSTATE_R2_ACCOUNT_ID`
-- `TFSTATE_R2_ACCESS_KEY_ID`
-- `TFSTATE_R2_SECRET_ACCESS_KEY`
-
-> Los secrets del bucket de estado son **repository secrets** (no por environment) porque solo hay un bucket de estado para todos los ambientes.
-
-### Estado remoto (R2)
-
-- Bucket: `fit-stack-terraform-state`
-- Path: `s3://fit-stack-terraform-state/<environment>/terraform.tfstate`
-
-### Cómo escalar a más ambientes
-
-**Para crear un nuevo ambiente (ej. `staging`):**
-
-1. GitHub: `Settings > Environments > New environment > staging`.
-2. Decide si requiere aprobador.
-3. En la sección "Environment secrets", agrega los mismos secrets que tiene `production` (con los valores de staging).
-4. En la sección "Environment variables", agrega los nombres de los recursos de staging (ej: `API_WORKER_NAME=fit-stack-api-staging`).
-5. Ejecuta `terraform.yml` con `environment: staging`.
-6. Listo. Los workflows de deploy también lo soportan automáticamente.
-
-**Para desplegar en otra cuenta de Cloudflare:**
-
-1. Crea la cuenta en Cloudflare.
-2. Crea un nuevo API Token en esa cuenta.
-3. Crea un nuevo GitHub Environment (ej: `fitstack`).
-4. En ese environment, configura `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` con los valores de la nueva cuenta.
-5. Configura el resto de secrets con valores apuntando a esa cuenta.
-6. Configura las variables de nombres de recursos.
-7. Ejecuta `terraform.yml` con `environment: fitstack`.
-
-**Cero cambios en código** para agregar ambientes o cuentas. Todo se hace en la UI de GitHub.
-
-### Reglas
-
-1. **Nunca** ejecutar `wrangler` a mano para deploys. Usar los workflows.
-2. **Nunca** commitear valores reales. Usar GitHub Secrets.
-3. **Nunca** modificar manualmente recursos en Cloudflare. Todo pasa por Terraform.
-4. **Cambios en `infrastructure/terraform/**` requieren PR**.
-5. **Migraciones de base de datos requieren aprobación manual** (environment `production`).
+> Fuente vigente en `docs/ARCHITECTURE.md` §8. Infra en `infrastructure/terraform/` (Workers, R2, Queues) gestionada con Terraform + GitHub Actions. **Nunca usar `wrangler` manual.**
