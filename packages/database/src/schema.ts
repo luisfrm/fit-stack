@@ -10,6 +10,7 @@ import {
   index,
   bigint,
   numeric,
+  vector,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { type PlanFeaturesV2 } from '@workspace/shared';
@@ -226,7 +227,7 @@ export const platformSubscriptionPayment = pgTable(
 );
 
 // ── AI USAGE (rate-limit de chat IA por período) ──
-// Fuente de verdad de las cuotas diaria/semanal/mensual; Redis es solo caché.
+// Fuente de verdad de créditos (1 crédito = 1K tokens). Reset mensual por ciclo de suscripción (o calendario si no hay sub).
 export const aiUsage = pgTable(
   'ai_usage',
   {
@@ -234,9 +235,10 @@ export const aiUsage = pgTable(
     organizationId: text('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    periodType: text('period_type').notNull(), // 'daily' | 'weekly' | 'monthly'
+    periodType: text('period_type').notNull(), // 'monthly' (legado: daily/weekly siguen válidos)
     periodStart: date('period_start', { mode: 'date' }).notNull(),
-    count: integer('count').notNull().default(0),
+    credits: integer('credits').notNull().default(0),
+    count: integer('count').notNull().default(0), // @deprecated legacy mensajes (mantener para compat)
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -245,6 +247,47 @@ export const aiUsage = pgTable(
       table.organizationId,
       table.periodType,
       table.periodStart
+    ),
+  ]
+);
+
+// ── AI KNOWLEDGE BASE (RAG: documentos + chunks embebidos) ──
+// organizationId NULL = documento de plataforma FitStack (visible para todas las gyms).
+// organizationId seteado = documento del gym (solo visible para esa org).
+export const aiKnowledgeDocument = pgTable(
+  'ai_knowledge_document',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id'),
+    title: text('title').notNull(),
+    source: text('source').notNull().default('faq'), // 'faq' | 'policy' | 'settings'
+    content: text('content').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_ai_knowledge_doc_org').on(table.organizationId),
+  ]
+);
+
+export const aiKnowledgeChunk = pgTable(
+  'ai_knowledge_chunk',
+  {
+    id: text('id').primaryKey(),
+    documentId: text('document_id')
+      .notNull()
+      .references(() => aiKnowledgeDocument.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    embedding: vector('embedding', { dimensions: 1024 }).notNull(),
+    model: text('model').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_ai_chunk_document').on(table.documentId),
+    index('idx_ai_chunk_embedding').using(
+      'hnsw',
+      table.embedding.op('vector_cosine_ops')
     ),
   ]
 );
