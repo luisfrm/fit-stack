@@ -123,7 +123,8 @@ function RegisterForm() {
       } else if (error.message?.includes("Password too short")) {
         toast.error("La contraseña es muy corta");
       } else {
-        toast.error(error.message || "Ocurrió un error inesperado al conectar con el servidor.");
+        console.error('signUp error:', error);
+        toast.error("Ocurrió un error inesperado al conectar con el servidor.");
       }
       setIsLoading(false);
       return;
@@ -138,7 +139,8 @@ function RegisterForm() {
       toast.success("Cuenta configurada correctamente.");
       router.push("/dashboard");
     } catch (acceptError: any) {
-      toast.error(acceptError?.data?.error ?? "Error al activar tu acceso de administrador.");
+      console.error('acceptStaff error:', acceptError);
+      toast.error("Error al activar tu acceso de administrador.");
     } finally {
       setIsLoading(false);
     }

@@ -73,11 +73,8 @@ export function MembersClient({
         refresh();
       }
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Fallo al eliminar cliente";
-      toast.error(message);
+      console.error("Error deleting member:", error);
+      toast.error("Fallo al eliminar cliente");
     } finally {
       setDeletingId(null);
     }

@@ -99,7 +99,7 @@ export default function OrganizationSettingsPage() {
 
     } catch (error: any) {
       console.error("Save error:", error);
-      toast.error(error.message || "No se pudo guardar la información");
+      toast.error("No se pudo guardar la información");
     } finally {
       setIsUpdating(false);
     }

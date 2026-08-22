@@ -132,7 +132,8 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, 
       toast.success("Plan de plataforma desactivado.");
       onUpdate();
     } catch (error: any) {
-      toast.error(error.message || "Error al eliminar");
+      console.error("Error deleting plan:", error);
+      toast.error("Error al eliminar");
     } finally {
       setIsDeleting(false);
     }

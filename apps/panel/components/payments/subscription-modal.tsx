@@ -65,7 +65,8 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onO
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      toast.error(error.message || "Fallo al registrar la suscripción");
+      console.error("Error creating subscription:", error);
+      toast.error("Fallo al registrar la suscripción");
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +80,8 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onO
       setNewMember(created);
       setView('payment'); // Go back to payment with the new member selected
     } catch (error: any) {
-      toast.error(error.message || "Error al crear el cliente");
+      console.error("Error creating member:", error);
+      toast.error("Error al crear el cliente");
     } finally {
       setIsLoading(false);
     }

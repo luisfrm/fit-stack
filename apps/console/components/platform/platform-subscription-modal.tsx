@@ -65,7 +65,8 @@ export function PlatformSubscriptionModal({
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      toast.error(error.message || "Error al registrar la suscripción");
+      console.error("Error registering subscription:", error);
+      toast.error("Error al registrar la suscripción");
     }
   };
 

@@ -122,11 +122,8 @@ export function PaymentsClient({
       );
       refreshAll();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Fallo al cambiar estado";
-      toast.error(message);
+      console.error("Error updating subscription status:", error);
+      toast.error("Fallo al cambiar estado");
     }
   };
 
@@ -136,11 +133,8 @@ export function PaymentsClient({
       toast.success("Registro eliminado.");
       refreshAll();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Fallo al eliminar";
-      toast.error(message);
+      console.error("Error deleting subscription:", error);
+      toast.error("Fallo al eliminar");
     }
   };
 
@@ -150,11 +144,8 @@ export function PaymentsClient({
       toast.success("Estado de pago actualizado correctamente");
       refreshAll();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Error al actualizar pago";
-      toast.error(message);
+      console.error("Error updating payment status:", error);
+      toast.error("Error al actualizar pago");
     }
   };
 

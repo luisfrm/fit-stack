@@ -91,7 +91,8 @@ export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps
 
       await onSubmit(payload, sendInvite);
     } catch (error: any) {
-      toast.error(error.message || "Error al procesar el formulario");
+      console.error("Member form error:", error);
+      toast.error("Error al procesar el formulario");
     } finally {
       setIsUploading(false);
     }

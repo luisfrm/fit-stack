@@ -123,7 +123,8 @@ function RegisterForm() {
       } else if (error.message?.includes("Password too short")) {
         toast.error("La contraseña es muy corta");
       } else {
-        toast.error(error.message || "Ocurrió un error inesperado al conectar con el servidor.");
+        console.error('signUp error:', error);
+        toast.error("Ocurrió un error inesperado al conectar con el servidor.");
       }
       setIsLoading(false);
       return;
@@ -138,7 +139,8 @@ function RegisterForm() {
       toast.success("Cuenta configurada correctamente.");
       router.push('/dashboard');
     } catch (linkError: any) {
-      toast.error(linkError.response?.data?.error || "Error al vincular el usuario al miembro.");
+      console.error('linkUser error:', linkError);
+      toast.error("Error al vincular el usuario al miembro.");
     } finally {
       setIsLoading(false);
     }

@@ -51,7 +51,8 @@ export default function InitPage() {
       toast.success("¡Sistema inicializado correctamente!");
       router.push("/login");
     } catch (err: any) {
-      toast.error(typeof err === 'string' ? err : "Ocurrió un error inesperado.");
+      console.error('init error:', err);
+      toast.error("Ocurrió un error inesperado.");
     } finally {
       setIsLoading(false);
     }

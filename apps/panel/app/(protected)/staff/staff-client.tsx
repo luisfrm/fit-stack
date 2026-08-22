@@ -72,11 +72,8 @@ export function StaffClient({
         refresh();
       }
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Fallo al eliminar staff";
-      toast.error(message);
+      console.error("Error deleting staff:", error);
+      toast.error("Fallo al eliminar staff");
     } finally {
       setDeletingId(null);
     }

@@ -44,11 +44,8 @@ export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
       );
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Error al cambiar visibilidad";
-      toast.error(message);
+      console.error("Error toggling plan visibility:", error);
+      toast.error("Error al cambiar visibilidad");
     } finally {
       setIsToggling(false);
     }
@@ -62,11 +59,8 @@ export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
       toast.success("Plan eliminado correctamente");
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Error al eliminar el plan";
-      toast.error(message);
+      console.error("Error deleting plan:", error);
+      toast.error("Error al eliminar el plan");
     } finally {
       setIsDeleting(false);
     }

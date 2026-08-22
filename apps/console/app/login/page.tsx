@@ -57,7 +57,8 @@ export default function LoginPage() {
       if (error.code === 'INVALID_EMAIL_OR_PASSWORD' || error.message?.includes('Invalid email or password')) {
         toast.error('Email o contraseña incorrectos.');
       } else {
-        toast.error(error.message || 'Ocurrió un error al iniciar sesión.');
+        console.error('signIn error:', error);
+        toast.error('Ocurrió un error al iniciar sesión.');
       }
       setIsLoading(false);
       return;

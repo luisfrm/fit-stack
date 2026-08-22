@@ -100,8 +100,8 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
 
       onSubmit(payload);
     } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error(error.message || "Error al procesar el formulario. Por favor, revisa los datos.");
+      console.error("Trainer form error:", error);
+      toast.error("Error al procesar el formulario. Por favor, revisa los datos.");
     } finally {
       setIsUploading(false);
     }

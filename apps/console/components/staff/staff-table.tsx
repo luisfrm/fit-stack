@@ -45,7 +45,8 @@ export function StaffTable({ staff, onSuccess }: StaffTableProps) {
       setRevokeTarget(null);
       onSuccess?.();
     } catch (error: any) {
-      toast.error(error?.data?.error ?? error?.message ?? "No se pudo revocar el acceso");
+      console.error("Error revoking access:", error);
+      toast.error("No se pudo revocar el acceso");
     } finally {
       setIsRevoking(false);
     }

@@ -36,11 +36,8 @@ export function PlanModal({ planData, trigger, onSuccess }: PlanModalProps) {
       setIsOpen(false);
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Algo salió mal guardando el plan";
-      toast.error(message);
+      console.error("Error saving plan:", error);
+      toast.error("Algo salió mal guardando el plan");
     } finally {
       setIsLoading(false);
     }

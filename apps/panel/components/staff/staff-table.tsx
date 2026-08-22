@@ -31,8 +31,8 @@ function ResendInviteButton({ memberId }: { readonly memberId: number }) {
       await membersService.resendInvite(memberId);
       toast.success("Invitación enviada correctamente.");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Error interno del servidor";
-      toast.error(message || "Error al enviar invitación.");
+      console.error("Error resending staff invite:", error);
+      toast.error("Error al enviar invitación.");
     } finally {
       setLoading(false);
     }

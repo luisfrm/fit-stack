@@ -36,8 +36,8 @@ export function MemberModal({ initialData, trigger, onSuccess }: MemberModalProp
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      const message = error.response?.data?.error ?? error.message ?? "Algo salió mal";
-      toast.error(message);
+      console.error("Error saving member:", error);
+      toast.error("Algo salió mal");
     } finally {
       setIsLoading(false);
     }

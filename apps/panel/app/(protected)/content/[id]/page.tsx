@@ -109,7 +109,8 @@ export default function CMSPageEditor() {
       setPage(updated);
       toast.success("Metadatos guardados correctamente.");
     } catch (error: any) {
-      toast.error("Error al actualizar metadatos", { description: error.message });
+      console.error("Error updating metadata:", error);
+      toast.error("Error al actualizar metadatos");
     } finally {
       setIsUpdatingMeta(false);
     }

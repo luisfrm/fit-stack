@@ -81,7 +81,8 @@ export function PlatformPaymentHistoryModal({
         setPlanFeatures(null);
       }
     } catch (error: any) {
-      toast.error(error?.message || "Error al cargar pagos");
+      console.error("Error loading payments:", error);
+      toast.error("Error al cargar pagos");
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,8 @@ export function PlatformPaymentHistoryModal({
       await loadPayments();
       onChange?.();
     } catch (error: any) {
-      toast.error(error?.message || "Error al cambiar estado");
+      console.error("Error changing payment status:", error);
+      toast.error("Error al cambiar estado");
     } finally {
       setActionLoading(false);
     }

@@ -59,7 +59,8 @@ export function StaffForm({ onSubmit, isLoading }: StaffFormProps) {
         sendInvite: formData.sendInvite,
       });
     } catch (error: any) {
-      toast.error(error?.data?.error ?? error?.message ?? "Algo salió mal");
+      console.error("Error submitting staff form:", error);
+      toast.error("Algo salió mal");
     }
   };
 

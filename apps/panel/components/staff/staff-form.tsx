@@ -102,8 +102,8 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
 
       await onSubmit(payload, sendInvite);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Error interno del servidor'
-      toast.error(message || "Error al procesar el formulario");
+      console.error("Staff form error:", error);
+      toast.error("Error al procesar el formulario");
     } finally {
       setIsUploading(false);
     }

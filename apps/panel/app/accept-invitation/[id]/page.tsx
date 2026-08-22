@@ -56,7 +56,8 @@ export default function AcceptInvitationPage() {
     });
 
     if (error) {
-      toast.error(error.message || "Error al aceptar la invitación.");
+      console.error('acceptInvitation error:', error);
+      toast.error("Error al aceptar la invitación.");
       setIsProcessing(false);
       return;
     }
@@ -73,7 +74,8 @@ export default function AcceptInvitationPage() {
     });
 
     if (error) {
-      toast.error(error.message || "Error al rechazar la invitación.");
+      console.error('rejectInvitation error:', error);
+      toast.error("Error al rechazar la invitación.");
       setIsProcessing(false);
       return;
     }

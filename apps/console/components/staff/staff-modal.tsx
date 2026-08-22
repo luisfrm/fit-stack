@@ -39,7 +39,8 @@ export function StaffModal({ trigger, onSuccess }: StaffModalProps) {
       setInternalOpen(false);
       onSuccess?.();
     } catch (error: any) {
-      toast.error(error?.data?.error ?? error?.message ?? "Algo salió mal");
+      console.error("Error creating staff:", error);
+      toast.error("Algo salió mal");
     } finally {
       setIsSubmitting(false);
     }

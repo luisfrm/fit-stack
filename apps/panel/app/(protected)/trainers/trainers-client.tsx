@@ -96,10 +96,8 @@ export function TrainersClient({
       toast.success(`Entrenador ${isVisible ? "visible" : "oculto"}`);
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al actualizar visibilidad";
-      toast.error(message);
+      console.error("Error updating trainer visibility:", error);
+      toast.error("Error al actualizar visibilidad");
     } finally {
       setTogglingId(null);
     }
@@ -114,10 +112,8 @@ export function TrainersClient({
       setTrainerToDelete(undefined);
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al eliminar entrenador";
-      toast.error(message);
+      console.error("Error deleting trainer:", error);
+      toast.error("Error al eliminar entrenador");
     }
   };
 
@@ -128,10 +124,8 @@ export function TrainersClient({
       await membersService.resendInvite(trainer.id);
       toast.success(`Invitación reenviada a ${trainer.email}`);
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al reenviar invitación";
-      toast.error(message);
+      console.error("Error resending trainer invite:", error);
+      toast.error("Error al reenviar invitación");
     } finally {
       setResendingTrainerId(null);
     }

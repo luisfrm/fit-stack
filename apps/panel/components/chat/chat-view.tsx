@@ -165,7 +165,8 @@ export function ChatView({ initialUsage }: ChatViewProps) {
       });
     } catch (err) {
       if (!controller.signal.aborted) {
-        toast.error(err instanceof Error ? err.message : "Error al enviar el mensaje");
+        console.error("Chat send error:", err);
+        toast.error("Error al enviar el mensaje");
       }
     } finally {
       setIsStreaming(false);

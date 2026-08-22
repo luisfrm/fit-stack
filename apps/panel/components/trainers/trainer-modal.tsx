@@ -44,11 +44,8 @@ export function TrainerModal({
       onSuccess?.();
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        (error as Error).message ??
-        "Error al guardar entrenador";
-      toast.error(message);
+      console.error("Error saving trainer:", error);
+      toast.error("Error al guardar entrenador");
     } finally {
       setIsLoading(false);
     }

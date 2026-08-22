@@ -336,7 +336,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         }
       });
     } catch (err: any) {
-      toast.error(err.message || "Error al procesar el pago");
+      console.error("Error processing subscription payment:", err);
+      toast.error("Error al procesar el pago");
     } finally {
       setIsProcessingUploads(false);
     }
