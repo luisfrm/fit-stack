@@ -17,21 +17,18 @@ describe('normalizeFeatures', () => {
     expect(result.cms?.enabled).toBe(false);
     expect(result.ai_chat?.enabled).toBe(false);
     expect(result.ai_chat?.limits).toEqual({
-      ai_messages_daily: 0,
-      ai_messages_weekly: 0,
-      ai_messages_monthly: 0,
+      ai_credits_monthly: 0,
     });
   });
 
   it('keeps provided values and sanitizes invalid ones', () => {
     const result = normalizeFeatures({
       cms: { enabled: true },
-      ai_chat: { enabled: true, limits: { ai_messages_daily: 5, ai_messages_weekly: 'x' as unknown as number } },
+      ai_chat: { enabled: true, limits: { ai_credits_monthly: 1500, ai_messages_daily: 5 as unknown as number } },
     });
     expect(result.cms?.enabled).toBe(true);
     expect(result.ai_chat?.enabled).toBe(true);
-    expect(result.ai_chat?.limits?.ai_messages_daily).toBe(5);
-    expect(result.ai_chat?.limits?.ai_messages_weekly).toBe(0);
+    expect(result.ai_chat?.limits?.ai_credits_monthly).toBe(1500);
   });
 
   it('ignores non-object input', () => {
@@ -75,9 +72,7 @@ describe('FREE_TIER_FEATURES', () => {
 
   it('has the documented floor limits', () => {
     expect(FREE_TIER_FEATURES.members_portal?.limits?.member_seats).toBe(10);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_daily).toBe(5);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_weekly).toBe(0);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_monthly).toBe(0);
+    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_credits_monthly).toBe(500);
   });
 });
 
@@ -89,10 +84,14 @@ describe('formatFeatureLimits', () => {
   it('formats limits with labels and unlimited marker', () => {
     const text = formatFeatureLimits({
       enabled: true,
-      limits: { ai_messages_daily: 5, ai_messages_weekly: 0 },
+      limits: { ai_credits_monthly: 1500 },
     });
-    expect(text).toContain('Mensajes / día: 5');
-    expect(text).toContain('Mensajes / semana: Ilimitado');
+    expect(text).toContain('Créditos IA / mes: 1500');
+    const unlimited = formatFeatureLimits({
+      enabled: true,
+      limits: { ai_credits_monthly: 0 },
+    });
+    expect(unlimited).toContain('Créditos IA / mes: Ilimitado');
   });
 });
 
@@ -106,7 +105,7 @@ describe('getFeatureLimitLabel', () => {
 describe('summarizeFeatures', () => {
   it('produces a comparable summary including limits', () => {
     const a: PlanFeaturesV2 = { cms: { enabled: true } };
-    const b: PlanFeaturesV2 = { cms: { enabled: true }, ai_chat: { enabled: true, limits: { ai_messages_daily: 10 } } };
+    const b: PlanFeaturesV2 = { cms: { enabled: true }, ai_chat: { enabled: true, limits: { ai_credits_monthly: 1000 } } };
     expect(summarizeFeatures(a)).not.toBe(summarizeFeatures(b));
     expect(summarizeFeatures(a)).toContain('CMS (contenido/páginas): Sí');
   });

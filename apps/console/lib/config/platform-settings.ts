@@ -7,4 +7,5 @@ export const PLATFORM_SETTINGS_KEYS = {
   ACTIVE_PAYMENT_METHODS: "active_payment_methods",
   FEATURE_FLAGS_FREE_TIER: "feature_flags_free_tier",
   FEATURE_FLAGS_FREE_TIER_ENABLED: "feature_flags_free_tier_enabled",
+  AI_PROVIDER_DEFAULT: "ai_provider_default",
 } as const;

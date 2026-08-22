@@ -141,4 +141,17 @@ export const organizationsService = {
       { method: "POST" }
     );
   },
+
+  /**
+   * Grants AI credits to an organization (manual top-up / tests).
+   */
+  async grantAiCredits(
+    id: string,
+    credits: number,
+  ): Promise<{ success: boolean; granted: number; monthly: { used: number; limit: number } }> {
+    return await api<{ success: boolean; granted: number; monthly: { used: number; limit: number } }>(
+      `${ORGANIZATIONS_PATH}/${id}/ai-credits`,
+      { method: "POST", body: { credits } },
+    );
+  },
 };

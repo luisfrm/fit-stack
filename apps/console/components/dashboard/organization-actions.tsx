@@ -5,13 +5,15 @@ import {
   Settings,
   Edit2,
   Power,
-  CreditCard
+  CreditCard,
+  Zap
 } from "lucide-react";
 import {
   Button,
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type IPlatformOrganization } from "@workspace/shared/types";
+import { GrantAiCreditsModal } from "./grant-ai-credits-modal";
 
 interface OrganizationActionsProps {
   readonly organization: IPlatformOrganization;
@@ -58,6 +60,12 @@ export function OrganizationActions({
           label: "Gestionar Plan",
           icon: <CreditCard size={14} />,
           onClick: onAddSubscription,
+        },
+        {
+          label: "Dar AI Credits",
+          icon: <Zap size={14} />,
+          Modal: GrantAiCreditsModal,
+          show: true,
         },
       ],
     },
