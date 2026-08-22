@@ -8,11 +8,11 @@ import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { Table, type ColumnDef } from "@workspace/ui/components/table";
 import { Badge } from "@workspace/ui/components/badge";
-import { toast, Modal } from "@workspace/ui/components";
+import { toast } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
-import { Input } from "@workspace/ui/components/input";
 import { contentService } from "@/lib/services/content-service";
 import type { IContentPage } from "@/types/content";
+import { PageCreationModal } from "@/components/content/page-creation-modal";
 
 interface ContentListClientProps {
   readonly initialPages: IContentPage[];
@@ -35,10 +35,8 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
       toast.success("Página eliminada");
       router.refresh();
     } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al eliminar la página";
-      toast.error(message);
+      console.error("Error deleting page:", error);
+      toast.error("Error al eliminar la página");
     } finally {
       setDeletingId(null);
     }
@@ -129,117 +127,5 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
         )}
       </Card>
     </div>
-  );
-}
-
-function PageCreationModal({
-  trigger,
-  onSuccess,
-}: {
-  readonly trigger: React.ReactNode;
-  readonly onSuccess: () => void;
-}) {
-  const router = useRouter();
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [title, setTitle] = React.useState("");
-  const [slug, setSlug] = React.useState("");
-  const [description, setDescription] = React.useState("");
-
-  const generateSlug = (text: string) => {
-    const baseSlug = text
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, "-")
-      .replaceAll(/(^-+|-+)+/g, "");
-    return `/${baseSlug}`;
-  };
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTitle = e.target.value;
-    setTitle(newTitle);
-    if (!slug || slug === generateSlug(title)) {
-      setSlug(generateSlug(newTitle));
-    }
-  };
-
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newSlug = e.target.value.toLowerCase();
-
-    if (newSlug === "") {
-      setSlug("/");
-      return;
-    }
-
-    if (!newSlug.startsWith("/")) {
-      newSlug = "/" + newSlug;
-    }
-    newSlug = newSlug.replaceAll(/\s+/g, "-").replaceAll(/\/+/g, "/");
-    setSlug(newSlug);
-  };
-
-  const handleSubmit = async (e: React.SubmitEvent) => {
-    e.preventDefault();
-    if (!title || !slug) {
-      toast.error("El título y el slug son obligatorios");
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const newPage = await contentService.createPage({
-        title,
-        slug,
-        description,
-        isActive: false,
-      });
-      toast.success("Página creada con éxito");
-      setIsOpen(false);
-      onSuccess();
-      router.push(`/content/${newPage.id}`);
-    } catch (error) {
-      const message =
-        (error as { data?: { error?: string }; message?: string }).data?.error ??
-        "Error al crear la página";
-      toast.error(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      trigger={trigger}
-      title="Añadir Nueva Página"
-      description="Completa los datos para crear una nueva página en el sistema."
-    >
-      <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-        <Input
-          label="Título de la Página"
-          placeholder="ej. Nosotros"
-          value={title}
-          onChange={handleTitleChange}
-          required
-        />
-        <Input
-          label="Slug (URL)"
-          placeholder="/ (para la página de inicio)"
-          value={slug}
-          onChange={handleSlugChange}
-          required
-        />
-        <Input
-          label="Descripción (Opcional)"
-          placeholder="Breve resumen de la página..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <div className="flex justify-end gap-2 pt-4 border-t border-white/5">
-          <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancelar</Button>
-          <Button type="submit" variant="primary" loading={isSubmitting}>Crear Página</Button>
-        </div>
-      </form>
-    </Modal>
   );
 }

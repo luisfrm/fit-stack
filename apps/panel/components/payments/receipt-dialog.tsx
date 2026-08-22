@@ -16,7 +16,6 @@ import { type ISubscription } from "@/types/dashboard";
 import {
   Mail,
   Printer,
-  ExternalLink,
   ShieldCheck
 } from "lucide-react";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
@@ -26,6 +25,7 @@ import { emailsService } from "@/lib/services/emails-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { COUNTRIES } from "@workspace/shared/constants";
+import { normalizePaymentDetails, PaymentDetailRow } from "./payment-detail-row";
 
 interface ReceiptDialogProps {
   readonly initialData: ISubscription;
@@ -70,7 +70,8 @@ export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDia
       await emailsService.sendReceiptByEmail(subscription.paymentId);
       toast.success("Comprobante enviado al correo del miembro");
     } catch (error: any) {
-      toast.error(error.message || "Error al enviar el correo");
+      console.error("Error sending receipt email:", error);
+      toast.error("Error al enviar el correo");
     } finally {
       setIsSendingEmail(false);
     }
@@ -250,50 +251,9 @@ export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDia
             <div className="pt-5 space-y-3">
               <Eyebrow size="sm" accent="muted">Información de Operación</Eyebrow>
               <div className="space-y-1.5">
-                {Array.isArray(subscription.paymentMethodDetails) ? (
-                  // New Format: IPaymentMethodDetail[]
-                  subscription.paymentMethodDetails.map((detail, idx) => {
-                    const isImage = detail.type === 'file' ||
-                      (detail.type === undefined && typeof detail.value === 'string' && (detail.value.startsWith('http') || detail.value.startsWith('/')));
-
-                    return (
-                      <div key={`${detail.label}-${idx}`} className="flex justify-between items-center gap-4 py-0.5">
-                        <Text className="label-text">{detail.label}</Text>
-                        {isImage ? (
-                          <Button variant="link" size="xs" asChild className="h-auto p-0 text-primary">
-                            <a href={uploadService.getMediaUrl(String(detail.value))} target="_blank" rel="noopener noreferrer">
-                              VER CAPTURE <ExternalLink size={10} className="ml-1" />
-                            </a>
-                          </Button>
-                        ) : (
-                          <Text className="mono-text opacity-60">{detail.value}</Text>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  // Legacy Format: Record<string, any>
-                  Object.entries(subscription.paymentMethodDetails).map(([key, value]) => {
-                    if (!value || key === 'last4') return null;
-                    const label = key.replaceAll('_', ' ').toUpperCase();
-                    const isImage = typeof value === 'string' && (value.startsWith('http') || value.startsWith('/'));
-
-                    return (
-                      <div key={key} className="flex justify-between items-center gap-4 py-0.5">
-                        <Text className="label-text">{label}</Text>
-                        {isImage ? (
-                          <Button variant="link" size="xs" asChild className="h-auto p-0 text-primary">
-                            <a href={uploadService.getMediaUrl(String(value))} target="_blank" rel="noopener noreferrer">
-                              VER CAPTURE <ExternalLink size={10} className="ml-1" />
-                            </a>
-                          </Button>
-                        ) : (
-                          <Text className="mono-text opacity-60">{value}</Text>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+                {normalizePaymentDetails(subscription.paymentMethodDetails).map((detail) => (
+                  <PaymentDetailRow key={detail.key} detail={detail} />
+                ))}
               </div>
             </div>
           )}
