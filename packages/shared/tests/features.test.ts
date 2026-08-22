@@ -34,11 +34,7 @@ describe('FEATURE_CATALOG', () => {
 
   it('members_portal and ai_chat declare their limits', () => {
     expect(FEATURE_CATALOG.members_portal.limits).toEqual(['member_seats']);
-    expect(FEATURE_CATALOG.ai_chat.limits).toEqual([
-      'ai_messages_daily',
-      'ai_messages_weekly',
-      'ai_messages_monthly',
-    ]);
+    expect(FEATURE_CATALOG.ai_chat.limits).toEqual(['ai_credits_monthly']);
   });
 });
 
@@ -47,7 +43,7 @@ describe('normalizeFeatures', () => {
     const f = normalizeFeatures({});
     expect(f.panel.enabled).toBe(true);
     expect(f.cms.enabled).toBe(false);
-    expect(f.ai_chat?.limits?.ai_messages_daily).toBe(0);
+    expect(f.ai_chat?.limits?.ai_credits_monthly).toBe(0);
   });
 
   it('ignores unknown feature ids', () => {
@@ -57,20 +53,19 @@ describe('normalizeFeatures', () => {
 
   it('preserves explicit limits and enabled flags', () => {
     const f = normalizeFeatures({
-      ai_chat: { enabled: true, limits: { ai_messages_daily: 5 } },
+      ai_chat: { enabled: true, limits: { ai_credits_monthly: 1500 } },
       members_portal: { enabled: false, limits: { member_seats: 3 } },
     });
     expect(f.ai_chat?.enabled).toBe(true);
-    expect(f.ai_chat?.limits?.ai_messages_daily).toBe(5);
-    expect(f.ai_chat?.limits?.ai_messages_weekly).toBe(0);
+    expect(f.ai_chat?.limits?.ai_credits_monthly).toBe(1500);
     expect(f.members_portal?.enabled).toBe(false);
   });
 
   it('rejects non-numeric limits (defaults to 0)', () => {
     const f = normalizeFeatures({
-      ai_chat: { enabled: true, limits: { ai_messages_daily: 'cinco' as unknown as number } },
+      ai_chat: { enabled: true, limits: { ai_credits_monthly: 'cinco' as unknown as number } },
     });
-    expect(f.ai_chat?.limits?.ai_messages_daily).toBe(0);
+    expect(f.ai_chat?.limits?.ai_credits_monthly).toBe(0);
   });
 
   it('panel can never be disabled (alwaysOn safety)', () => {
@@ -93,14 +88,12 @@ describe('resolveFeatures', () => {
 });
 
 describe('FREE_TIER_FEATURES', () => {
-  it('is the documented floor: panel + portal (10 seats) + ai chat (5/day)', () => {
+  it('is the documented floor: panel + portal (10 seats) + ai chat (500 créditos)', () => {
     expect(FREE_TIER_FEATURES.panel?.enabled).toBe(true);
     expect(FREE_TIER_FEATURES.members_portal?.enabled).toBe(true);
     expect(FREE_TIER_FEATURES.members_portal?.limits?.member_seats).toBe(10);
     expect(FREE_TIER_FEATURES.ai_chat?.enabled).toBe(true);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_daily).toBe(5);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_weekly).toBe(0);
-    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_messages_monthly).toBe(0);
+    expect(FREE_TIER_FEATURES.ai_chat?.limits?.ai_credits_monthly).toBe(500);
   });
 });
 
@@ -116,8 +109,11 @@ describe('helpers', () => {
 
   it('formatFeatureLimits renders readable text (0 = ilimitado)', () => {
     expect(
-      formatFeatureLimits({ enabled: true, limits: { ai_messages_daily: 5, ai_messages_weekly: 0 } }),
-    ).toBe('Mensajes / día: 5 · Mensajes / semana: Ilimitado');
+      formatFeatureLimits({ enabled: true, limits: { ai_credits_monthly: 1500 } }),
+    ).toBe('Créditos IA / mes: 1500');
+    expect(
+      formatFeatureLimits({ enabled: true, limits: { ai_credits_monthly: 0 } }),
+    ).toBe('Créditos IA / mes: Ilimitado');
     expect(formatFeatureLimits({ enabled: true })).toBeNull();
     expect(formatFeatureLimits(undefined)).toBeNull();
   });
