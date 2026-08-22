@@ -92,6 +92,8 @@ const TABLES_TO_TRUNCATE = [
   'gym_member',
   // Platform billing
   'ai_usage',
+  'ai_knowledge_chunk',
+  'ai_knowledge_document',
   'platform_subscription_payment',
   'platform_subscription',
   'platform_plan',

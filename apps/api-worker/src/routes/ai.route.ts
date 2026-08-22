@@ -6,12 +6,17 @@ import {
   PERMISSION_MODULES as PM,
   PERMISSION_ACTIONS as PA,
   AI_MODELS,
-  ALL_CHAT_MODEL_IDS,
-  getAiProvider,
-  type IAiSseEvent,
+  AI_CHAT_LIMITS,
+  PANEL_SYSTEM_PROMPT,
+  creditsFromUsage,
+  estimateCreditsFromMessages,
+  getOrderedModelChain,
+  type AiProviderId,
 } from '@workspace/shared';
-import { createAIService, type AiChatDelta } from '../services/ai.service';
-import { createFeaturesService } from '../services/features.service';
+import { createAIService } from '../services/ai.service';
+import { createKnowledgeService } from '../services/knowledge.service';
+import { createKnowledgeRepository } from '../repositories/knowledge.repository';
+import { createFeaturesService, AI_PROVIDER_DEFAULT_KEY } from '../services/features.service';
 import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
@@ -20,37 +25,27 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 const chatMessageSchema = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
-  content: z.string().min(1).max(20_000),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(AI_CHAT_LIMITS.maxHistoryMessageChars),
 });
 
 const chatSchema = z.object({
-  model: z.enum(ALL_CHAT_MODEL_IDS),
-  messages: z.array(chatMessageSchema).min(1).max(50),
+  messages: z.array(chatMessageSchema).min(1).max(AI_CHAT_LIMITS.maxMessages),
   temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().min(1).max(8192).optional(),
+  maxTokens: z.number().int().min(1).max(AI_CHAT_LIMITS.maxToolOutputTokens).optional(),
 });
 
 const encoder = new TextEncoder();
 
-/**
- * Converts an async iterable of text deltas into a server-sent events stream.
- * Contract (one JSON per `data:` line):
- *   {"model":"..."}      → actual model that answered (first event)
- *   {"content":"..."}    → text delta
- *   {"done":true}        → end of stream
- *   {"error":"..."}      → mid-stream error (stream is closed afterwards)
- */
 function toSSEStream(
-  deltas: AsyncIterable<AiChatDelta>,
+  deltas: AsyncIterable<{ content: string }>,
   modelPromise: Promise<string>,
 ): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
-      const send = (event: IAiSseEvent) => {
+      const send = (event: import('@workspace/shared').IAiSseEvent) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
-
       try {
         let modelEmitted = false;
         for await (const delta of deltas) {
@@ -72,72 +67,177 @@ function toSSEStream(
 }
 
 export const aiRoutes = new Hono<AppEnv>()
-  // GET /api/ai/models — allowlist of available models (drives the panel selector via RSC)
   .get('/models', requireOrgPermission(PM.AI, PA.READ), (c) => {
     return c.json({ data: AI_MODELS });
   })
 
-  // POST /api/ai/chat — streaming chat completion (SSE)
-  // Enforcement: feature `ai_chat` + rate-limit diario/semanal/mensual (fuente de verdad: Postgres ai_usage; Redis solo caché)
   .post(
     '/chat',
     requireOrgPermission(PM.AI, PA.READ),
     requireFeature('ai_chat'),
     zValidator('json', chatSchema),
     async (c) => {
-      const { model, messages, temperature, maxTokens } = c.req.valid('json');
-      const provider = getAiProvider(model);
+      const body = c.req.valid('json');
+      const { messages, temperature, maxTokens } = body;
 
-      if (provider === 'openrouter' && !c.env.OPENROUTER_API_KEY) {
-        return c.json({ error: 'IA no configurada: falta OPENROUTER_API_KEY' }, 503);
+      // Límites de balance (constantes, no hardcode)
+      for (const m of messages) {
+        const cap =
+          m.role === 'user' ? AI_CHAT_LIMITS.maxUserMessageChars : AI_CHAT_LIMITS.maxHistoryMessageChars;
+        if (m.content.length > cap) {
+          return c.json({ error: `Mensaje excede ${cap} caracteres` }, 400);
+        }
       }
-      if (
-        provider === 'workers-ai' &&
-        (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)
-      ) {
-        return c.json({ error: 'IA no configurada: faltan variables de entorno de Workers AI' }, 503);
+      const totalInputChars = messages.reduce((a, m) => a + m.content.length, 0);
+      if (totalInputChars > AI_CHAT_LIMITS.maxInputChars) {
+        return c.json({ error: `Input excede ${AI_CHAT_LIMITS.maxInputChars} caracteres` }, 400);
       }
 
-      // Rate-limit: consume 1 mensaje (cuotas del plan; 0 = ilimitado)
-      const orgId = c.get('session')!.activeOrganizationId!;
+      // Provider default desde settings (cacheado en Redis + tag)
       const cache = createCache(c.env);
+      const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));
+      const cacheKey = 'ai:provider:default';
+      let configured = (await cache.get<string>(cacheKey)) as string | null;
+      if (configured === null || configured === undefined) {
+        configured = (await platformSettingsRepo.findByKey(AI_PROVIDER_DEFAULT_KEY)) ?? null;
+        if (configured) await cache.set(cacheKey, configured, 300);
+      }
+      const chain = getOrderedModelChain(configured);
+
+      // Validación: al menos un provider de la cadena debe estar configurado
+      const workersReady = !!c.env.CLOUDFLARE_AI_API_TOKEN && !!c.env.CLOUDFLARE_ACCOUNT_ID;
+      const openRouterReady = !!c.env.OPENROUTER_API_KEY;
+      const hasReadyModel = chain.some((mdl) =>
+        mdl.startsWith('@cf/') ? workersReady : openRouterReady,
+      );
+      if (!hasReadyModel) {
+        return c.json(
+          { error: 'IA no configurada: faltan credenciales de ambos providers' },
+          503,
+        );
+      }
+
+      const orgId = c.get('session')!.activeOrganizationId!;
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
         createPlatformPlansRepository(c.get('db')),
-        createPlatformSettingsRepository(c.get('db')),
+        platformSettingsRepo,
         createFeaturesRepository(c.get('db')),
-        cache
+        cache,
       );
-      const { allowed, quota } = await featuresService.consumeAiMessage(orgId);
+
+      const estimated = estimateCreditsFromMessages(
+        messages,
+        maxTokens ?? AI_CHAT_LIMITS.maxOutputTokens,
+        PANEL_SYSTEM_PROMPT.length + 12,
+      );
+      const { allowed, quota } = await featuresService.consumeAiCredits(orgId, estimated);
 
       const quotaHeaders = {
-        'X-Ai-Quota-Daily': `${quota.daily.used}/${quota.daily.limit === 0 ? '0' : quota.daily.limit}`,
-        'X-Ai-Quota-Weekly': `${quota.weekly.used}/${quota.weekly.limit === 0 ? '0' : quota.weekly.limit}`,
-        'X-Ai-Quota-Monthly': `${quota.monthly.used}/${quota.monthly.limit === 0 ? '0' : quota.monthly.limit}`,
+        'X-Ai-Credits-Used': String(quota.monthly.used),
+        'X-Ai-Credits-Limit': String(quota.monthly.limit),
+        'X-Ai-Credits-Remaining': quota.remaining === null ? '' : String(quota.remaining),
       };
 
       if (!allowed) {
         return c.json(
           {
-            error: 'Cuota de mensajes IA agotada para este período',
+            error: 'Créditos IA agotados para este ciclo',
             code: 'AI_QUOTA_EXCEEDED',
             limits: quota,
           },
           429,
-          quotaHeaders
+          quotaHeaders,
         );
       }
 
+      const periodStart = quota.periodStart;
       const aiService = createAIService(c.env);
-      const { stream, model: modelPromise } = aiService.streamChat({
-        model,
-        messages,
-        temperature,
-        maxTokens,
-        signal: c.req.raw.signal,
-      });
 
-      return new Response(toSSEStream(stream, modelPromise) as unknown as BodyInit, {
+      const knowledgeService = createKnowledgeService(
+        createKnowledgeRepository(c.get('db')),
+        aiService,
+      );
+      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+      const ragContext = lastUser
+        ? await knowledgeService.searchForChat(lastUser.content, orgId)
+        : '';
+      const systemPrompt = ragContext
+        ? `${PANEL_SYSTEM_PROMPT}\n\n[Contexto]\n${ragContext}`
+        : PANEL_SYSTEM_PROMPT;
+      const finalMessages = [
+        { role: 'system' as const, content: systemPrompt },
+        ...messages,
+      ];
+
+      // Filtra la cadena a modelos con credenciales disponibles
+      const readyChain = chain.filter((mdl) =>
+        mdl.startsWith('@cf/') ? workersReady : openRouterReady,
+      );
+
+      // Si solo queda un modelo, stream directo; si hay varios, fallback en el primer chunk
+      const makeStream = (mdl: string) => {
+        const s = aiService.streamChat({
+          model: mdl,
+          messages: finalMessages,
+          temperature,
+          maxTokens,
+          signal: c.req.raw.signal,
+        });
+        return { stream: s.stream, modelPromise: s.model, usage: s.usage, mdl };
+      };
+
+      const first = makeStream(readyChain[0]!);
+      let fallbackStreams: ReturnType<typeof makeStream>[] | null =
+        readyChain.length > 1 ? readyChain.slice(1).map(makeStream) : null;
+
+      let active = first;
+      const wrappedStream = (async function* () {
+        let done = false;
+        let attemptIdx = 0;
+        try {
+          let started = false;
+          while (true) {
+            try {
+              for await (const delta of active.stream) {
+                if (!started && delta.content) started = true;
+                yield delta;
+              }
+              done = true;
+              break;
+            } catch (err) {
+              if (!started && fallbackStreams && attemptIdx < fallbackStreams.length) {
+                active = fallbackStreams[attemptIdx++]!;
+                continue;
+              }
+              throw err;
+            }
+          }
+        } finally {
+          const p = active.usage
+            .then((u) => {
+              const actual = u ? creditsFromUsage(u) : estimated;
+              return featuresService.settleAiCredits(orgId, periodStart, actual);
+            })
+            .catch(() => {});
+          c.executionCtx.waitUntil(p);
+          if (!done) {
+            c.executionCtx.waitUntil(
+              featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => {}),
+            );
+          }
+        }
+      })();
+
+      const resolvedModelPromise = (async () => {
+        try {
+          return await active.modelPromise;
+        } catch {
+          return readyChain[0]!;
+        }
+      })();
+
+      return new Response(toSSEStream(wrappedStream, resolvedModelPromise) as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'text/event-stream; charset=utf-8',

@@ -8,11 +8,12 @@ import type { PlatformSubscriptionsRepository } from '../repositories/platform-s
 import type { PlatformPlansRepository } from '../repositories/platform-plans.repository';
 import type { PlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import type { FeaturesRepository } from '../repositories/features.repository';
-import { getAiPeriodStarts } from '../repositories/features.repository';
+import { startOfMonthUtc, startOfSubscriptionPeriod } from '../repositories/features.repository';
 import type { Cache } from '../lib/cache';
 
 export const FREE_TIER_SETTING_KEY = 'feature_flags_free_tier';
 export const FREE_TIER_ENABLED_KEY = 'feature_flags_free_tier_enabled';
+export const AI_PROVIDER_DEFAULT_KEY = 'ai_provider_default';
 
 export interface OrgFeaturesResult {
   features: PlanFeaturesV2;
@@ -29,11 +30,12 @@ export interface QuotaUsage {
 }
 
 export interface AiQuotaResult {
-  daily: QuotaUsage;
-  weekly: QuotaUsage;
   monthly: QuotaUsage;
+  /** null = ilimitado (limit 0). JSON-safe (Infinity → null). */
+  remaining: number | null;
   /** true si la feature ai_chat no está habilitada en el plan */
   disabled: boolean;
+  periodStart: Date;
 }
 
 export interface SeatsResult {
@@ -64,8 +66,7 @@ export function createFeaturesService(
 ) {
   /**
    * Features del free tier configurado en platform_setting (`feature_flags_free_tier`).
-   * null = free tier NO está seteado → las orgs sin suscripción pagada quedan bloqueadas
-   * (comportamiento legado: SUSPENDED/CANCELLED → /no-subscription).
+   * null = free tier NO habilitado → legacy gate.
    */
   async function getConfiguredFreeTier(): Promise<PlanFeaturesV2 | null> {
     const enabled = await platformSettingsRepo.findByKey(FREE_TIER_ENABLED_KEY);
@@ -78,6 +79,29 @@ export function createFeaturesService(
       console.error('[FEATURES] Free tier setting inválido, usando defaults de código');
       return resolveFeatures(null);
     }
+  }
+
+  /** Periodo mensual: ciclo de suscripción si hay sub activa, si no calendario. */
+  async function getCreditPeriodStart(orgId: string): Promise<Date> {
+    const sub = await subsRepo.findActiveByOrganization(orgId);
+    if (sub) {
+      const status = sub.computedStatus;
+      const isActiveBilling =
+        status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
+        status === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
+      if (isActiveBilling) {
+        const plan = await plansRepo.findById(sub.planId);
+        // Si el plan no existe, fallback a mes calendario
+        if (plan) {
+          return startOfSubscriptionPeriod(
+            sub.currentPeriodEnd as unknown as Date,
+            plan.durationValue,
+            plan.durationUnit,
+          );
+        }
+      }
+    }
+    return startOfMonthUtc(new Date());
   }
 
   async function getOrgFeatures(orgId: string): Promise<OrgFeaturesResult> {
@@ -107,13 +131,10 @@ export function createFeaturesService(
         planId = String(sub.planId);
         planName = plan?.name;
       } else if (freeTier) {
-        // Suscripción vencida/suspendida + free tier seteado → piso gratuito
         features = freeTier;
         isFreeTier = true;
       }
-      // sin free tier → sigue el gate legado (banner past_due/read_only, bloqueo suspended)
     } else {
-      // Sin suscripción
       if (freeTier) {
         features = freeTier;
         isFreeTier = true;
@@ -132,33 +153,22 @@ export function createFeaturesService(
     return data;
   }
 
-  async function getAiQuota(orgId: string, starts = getAiPeriodStarts()): Promise<AiQuotaResult> {
+  async function getAiQuota(orgId: string): Promise<AiQuotaResult> {
     const orgFeatures = await getOrgFeatures(orgId);
     const aiFeature = orgFeatures.features.ai_chat;
     const disabled = !aiFeature?.enabled;
 
-    const limits = {
-      daily: aiFeature?.limits?.ai_messages_daily ?? 0,
-      weekly: aiFeature?.limits?.ai_messages_weekly ?? 0,
-      monthly: aiFeature?.limits?.ai_messages_monthly ?? 0,
-    };
+    const limit = aiFeature?.limits?.ai_credits_monthly ?? 0;
 
     if (disabled) {
-      return {
-        daily: { used: 0, limit: 0 },
-        weekly: { used: 0, limit: 0 },
-        monthly: { used: 0, limit: 0 },
-        disabled,
-      };
+      const periodStart = await getCreditPeriodStart(orgId);
+      return { monthly: { used: 0, limit: 0 }, remaining: 0, disabled, periodStart };
     }
 
-    const counts = await featuresRepo.getAiUsageCounts(orgId, starts);
-    return {
-      daily: { used: counts.daily, limit: limits.daily },
-      weekly: { used: counts.weekly, limit: limits.weekly },
-      monthly: { used: counts.monthly, limit: limits.monthly },
-      disabled,
-    };
+    const periodStart = await getCreditPeriodStart(orgId);
+    const used = await featuresRepo.getMonthlyCredits(orgId, periodStart);
+    const remaining = limit === 0 ? null : Math.max(0, limit - used);
+    return { monthly: { used, limit }, remaining, disabled, periodStart };
   }
 
   async function getSeatsUsage(orgId: string): Promise<SeatsResult> {
@@ -174,35 +184,60 @@ export function createFeaturesService(
     getOrgFeatures,
     getAiQuota,
     getSeatsUsage,
+    getCreditPeriodStart,
 
-    /**
-     * Valida cuota y consume 1 mensaje de IA (upsert atómico en Postgres,
-     * fuente de verdad; Redis solo como caché). Devuelve la decisión + cuotas.
-     */
-    async consumeAiMessage(orgId: string): Promise<{ allowed: boolean; quota: AiQuotaResult }> {
-      const starts = getAiPeriodStarts();
-      const quota = await getAiQuota(orgId, starts);
+    /** Estima créditos por request (chars/4 + maxTokens). Mínimo 1. */
+    estimateCredits(messages: { content: string }[], maxTokens: number): number {
+      const chars = messages.reduce((acc, m) => acc + m.content.length, 0);
+      const tokens = Math.ceil(chars / 4) + maxTokens;
+      return Math.max(1, Math.ceil(tokens / 1_000));
+    },
+
+    async consumeAiCredits(
+      orgId: string,
+      estimatedCredits: number,
+    ): Promise<{ allowed: boolean; quota: AiQuotaResult }> {
+      const quota = await getAiQuota(orgId);
       if (quota.disabled) return { allowed: false, quota };
+      if (quota.monthly.limit > 0 && quota.monthly.used + estimatedCredits > quota.monthly.limit) {
+        return { allowed: false, quota };
+      }
+      // No consume todavía: se descuenta en settleAiCredits post-stream
+      return { allowed: true, quota };
+    },
 
-      const exhausted =
-        (quota.daily.limit > 0 && quota.daily.used >= quota.daily.limit) ||
-        (quota.weekly.limit > 0 && quota.weekly.used >= quota.weekly.limit) ||
-        (quota.monthly.limit > 0 && quota.monthly.used >= quota.monthly.limit);
+    async settleAiCredits(orgId: string, periodStart: Date, actualCredits: number): Promise<AiQuotaResult> {
+      const quota = await getAiQuota(orgId);
+      if (quota.disabled || actualCredits <= 0) return quota;
+      const limit = quota.monthly.limit;
+      await featuresRepo.incrementCredits(orgId, periodStart, actualCredits);
+      // Si excede (race), el próximo request quedará en 429; no hacemos rollback mid-stream
+      const used = quota.monthly.used + actualCredits;
+      return {
+        monthly: { used, limit },
+        remaining: limit === 0 ? null : Math.max(0, limit - used),
+        disabled: false,
+        periodStart,
+      };
+    },
 
-      if (exhausted) return { allowed: false, quota };
-      await Promise.all([
-        featuresRepo.incrementAiUsage(orgId, 'daily', starts.daily),
-        featuresRepo.incrementAiUsage(orgId, 'weekly', starts.weekly),
-        featuresRepo.incrementAiUsage(orgId, 'monthly', starts.monthly),
-      ]);
-
+    // Compat: mensajes → créditos (1 mensaje ≈ 3 créditos para tests viejos)
+    async consumeAiMessage(orgId: string): Promise<{ allowed: boolean; quota: AiQuotaResult }> {
+      const quota = await getAiQuota(orgId);
+      if (quota.disabled) return { allowed: false, quota };
+      if (quota.monthly.limit > 0 && quota.monthly.used + 3 > quota.monthly.limit) {
+        return { allowed: false, quota };
+      }
+      const periodStart = quota.periodStart;
+      await featuresRepo.incrementCredits(orgId, periodStart, 3);
+      const used = quota.monthly.used + 3;
       return {
         allowed: true,
         quota: {
-          ...quota,
-          daily: { used: quota.daily.used + 1, limit: quota.daily.limit },
-          weekly: { used: quota.weekly.used + 1, limit: quota.weekly.limit },
-          monthly: { used: quota.monthly.used + 1, limit: quota.monthly.limit },
+          monthly: { used, limit: quota.monthly.limit },
+          remaining: quota.monthly.limit === 0 ? null : Math.max(0, quota.monthly.limit - used),
+          disabled: false,
+          periodStart,
         },
       };
     },

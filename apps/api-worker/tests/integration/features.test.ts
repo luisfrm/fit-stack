@@ -35,7 +35,7 @@ async function clearFreeTierSetting(): Promise<void> {
 const FREE_TIER_SETTING = JSON.stringify({
   panel: { enabled: true },
   members_portal: { enabled: true, limits: { member_seats: 10 } },
-  ai_chat: { enabled: true, limits: { ai_messages_daily: 5, ai_messages_weekly: 0, ai_messages_monthly: 0 } },
+  ai_chat: { enabled: true, limits: { ai_credits_monthly: 500 } },
 });
 
 /** Habilita el free tier: flag enabled + features. */
@@ -61,7 +61,7 @@ async function createPlatformPlan(
     features: {
       panel: { enabled: true },
       members_portal: { enabled: true, limits: { member_seats: 5 } },
-      ai_chat: { enabled: true, limits: { ai_messages_daily: 2, ai_messages_weekly: 10, ai_messages_monthly: 40 } },
+      ai_chat: { enabled: true, limits: { ai_credits_monthly: 1500 } },
     },
     ...overrides,
   });
@@ -152,10 +152,10 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
     it('accepts PATCH as alias of PUT', async () => {
       const plan = await createPlatformPlan(admin);
       const res = await admin.client.patch(`/api/platform/plans/${plan.id}`, {
-        features: { ai_chat: { enabled: true, limits: { ai_messages_daily: 3 } } },
+        features: { ai_chat: { enabled: true, limits: { ai_credits_monthly: 3000 } } },
       });
       expect(res.status, res.text).toBe(200);
-      expect(res.body.features.ai_chat.limits.ai_messages_daily).toBe(3);
+      expect(res.body.features.ai_chat.limits.ai_credits_monthly).toBe(3000);
     });
   });
 
@@ -178,7 +178,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       expect(res.body.isFreeTier).toBe(true);
       expect(res.body.features.panel.enabled).toBe(true);
       expect(res.body.features.members_portal.limits.member_seats).toBe(10);
-      expect(res.body.features.ai_chat.limits.ai_messages_daily).toBe(5);
+      expect(res.body.features.ai_chat.limits.ai_credits_monthly).toBe(500);
       expect(res.body.limits.member_seats).toBe(10);
     });
 
@@ -202,7 +202,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       expect(res.status, res.text).toBe(200);
       expect(res.body.isFreeTier).toBe(false);
       expect(res.body.features.members_portal.limits.member_seats).toBe(5);
-      expect(res.body.features.ai_chat.limits.ai_messages_daily).toBe(2);
+      expect(res.body.features.ai_chat.limits.ai_credits_monthly).toBe(1500);
       expect(res.body.planId).toBe(String(plan.id));
       expect(res.body.planName).toBe(plan.name);
     });
@@ -341,7 +341,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
 
       const res = await owner.client.get('/api/ai/usage');
       expect(res.status, res.text).toBe(200);
-      expect(res.body.daily.limit).toBe(0);
+      expect((res.body.monthly ?? res.body.daily).limit).toBe(0);
     });
 
     it('refleja límites del plan y contadores de Postgres', async () => {
@@ -349,20 +349,22 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       const plan = await createPlatformPlan(admin);
       await createPlatformSubscription(admin, organization.id, plan.id);
 
-      // Uso directo en la tabla (fuente de verdad): 3 mensajes hoy
-      const today = new Date();
+      // Fetch periodStart del ciclo (subscription) para insertar en el período correcto
+      const quotaBefore = await owner.client.get('/api/ai/usage');
+      const periodStart = (quotaBefore.body as any).periodStart ?? new Date().toISOString().slice(0, 10);
+
       await testQuery(
-        `INSERT INTO ai_usage (organization_id, period_type, period_start, count)
-         VALUES ($1, 'daily', $2, 3)`,
-        [organization.id, today.toISOString().slice(0, 10) + 'T00:00:00.000Z'],
+        `INSERT INTO ai_usage (organization_id, period_type, period_start, credits, count)
+         VALUES ($1, 'monthly', $2::date, 500, 0)
+         ON CONFLICT (organization_id, period_type, period_start) DO UPDATE SET credits = 500`,
+        [organization.id, periodStart],
       );
 
       const res = await owner.client.get('/api/ai/usage');
       expect(res.status, res.text).toBe(200);
-      expect(res.body.daily.limit).toBe(2);
-      expect(res.body.daily.used).toBe(3);
-      expect(res.body.weekly.limit).toBe(10);
-      expect(res.body.monthly.limit).toBe(40);
+      const monthly = (res.body as any).monthly ?? res.body.daily;
+      expect(monthly.limit).toBe(1500);
+      expect(monthly.used).toBe(500);
     });
   });
 
@@ -373,7 +375,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
         features: {
           panel: { enabled: true },
           cms: { enabled: true },
-          ai_chat: { enabled: true, limits: { ai_messages_daily: 7 } },
+          ai_chat: { enabled: true, limits: { ai_credits_monthly: 1500 } },
         },
       });
       await createPlatformSubscription(admin, organization.id, plan.id);
@@ -384,7 +386,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
         [organization.id],
       );
       expect(rows.length).toBe(1);
-      expect(rows[0].features_snapshot.ai_chat.limits.ai_messages_daily).toBe(7);
+      expect(rows[0].features_snapshot.ai_chat.limits.ai_credits_monthly).toBe(1500);
       expect(rows[0].features_snapshot.cms.enabled).toBe(true);
     });
   });

@@ -39,6 +39,7 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
 
     await settingsService.updateAll(null, body);
     await cache.invalidateExact('platform:settings');
+    await cache.invalidateExact('ai:provider:default');
     // El free tier (feature_flags_free_tier) afecta el resolver de features de TODAS las orgs
     await cache.invalidate('org:*:features');
     return c.json({ success: true });

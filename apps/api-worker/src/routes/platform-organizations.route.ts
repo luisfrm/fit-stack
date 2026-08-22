@@ -11,6 +11,9 @@ import { createMembersService } from '../services/members.service';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
+import { createFeaturesService } from '../services/features.service';
+import { createFeaturesRepository } from '../repositories/features.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
@@ -134,6 +137,43 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     await cache.invalidateExact(`org:${id}:profile`);
     return c.json({ success: true });
   })
+
+  // POST /api/platform/organizations/:id/ai-credits — grant manual de créditos IA (tests / top-up)
+  .post(
+    '/:id/ai-credits',
+    requirePlatformAuth(),
+    zValidator('json', z.object({ credits: z.number().int().min(1).max(1_000_000) })),
+    async (c) => {
+      const orgId = c.req.param('id');
+      const { credits } = c.req.valid('json');
+      const cache = createCache(c.env);
+
+      const repo = createOrganizationsRepository(c.get('db'));
+      const service = createOrganizationsService(repo);
+      const org = await service.findOrganizationById(orgId);
+      if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
+
+      const featuresService = createFeaturesService(
+        createPlatformSubscriptionsRepository(c.get('db')),
+        createPlatformPlansRepository(c.get('db')),
+        createPlatformSettingsRepository(c.get('db')),
+        createFeaturesRepository(c.get('db')),
+        cache,
+      );
+      const periodStart = await featuresService.getCreditPeriodStart(orgId);
+      const quota = await featuresService.settleAiCredits(orgId, periodStart, credits);
+
+      // La cuota vive en cache por org → invalidar para que el panel la vea al refrescar
+      await cache.invalidateExact(`org:${orgId}:features`);
+
+      return c.json({
+        success: true,
+        granted: credits,
+        monthly: quota.monthly,
+        periodStart,
+      });
+    },
+  )
 
   // GET /api/platform/organizations/:id/subscriptions
   .get('/:id/subscriptions', requirePlatformAuth(), async (c) => {

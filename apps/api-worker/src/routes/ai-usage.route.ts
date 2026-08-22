@@ -9,8 +9,7 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 /**
- * GET /api/ai/usage — cuotas IA de la org activa (usado/limite por período).
- * Vive dentro de `/api/ai` (patrón de mounts por prefijo del repo).
+ * GET /api/ai/usage — créditos IA del ciclo (usado/límite mensual).
  */
 export const aiUsageRoutes = new Hono<AppEnv>()
   .get('/', requireAuth(), async (c) => {
@@ -32,8 +31,9 @@ export const aiUsageRoutes = new Hono<AppEnv>()
 
     const quota = await service.getAiQuota(orgId);
     return c.json({
-      daily: quota.daily,
-      weekly: quota.weekly,
       monthly: quota.monthly,
+      remaining: quota.remaining,
+      disabled: quota.disabled,
+      periodStart: quota.periodStart,
     });
   });
