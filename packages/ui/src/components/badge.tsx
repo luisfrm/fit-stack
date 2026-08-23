@@ -9,27 +9,28 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary-hover",
+        default:
+          "bg-primary text-primary-foreground border-primary/20 hover:bg-primary-hover shadow-xs",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-surface-2 text-foreground-muted border-border hover:bg-surface-2/80 hover:text-foreground",
         destructive:
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 [a]:hover:bg-destructive/20",
+          "bg-destructive/10 text-destructive border-destructive/20 focus-visible:ring-destructive/20 [a]:hover:bg-destructive/20",
         outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
+          "border-border text-foreground bg-transparent [a]:hover:bg-muted [a]:hover:text-foreground",
         ghost:
-          "hover:bg-muted hover:text-muted-foreground",
+          "hover:bg-muted hover:text-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         success:
-          "bg-success/10 text-success focus-visible:ring-success/20 [a]:hover:bg-success/20",
+          "bg-success/10 text-success border-success/20 focus-visible:ring-success/20 [a]:hover:bg-success/20",
         warning:
-          "bg-warning/10 text-warning focus-visible:ring-warning/20 [a]:hover:bg-warning/20",
+          "bg-warning/10 text-warning border-warning/25 focus-visible:ring-warning/20 [a]:hover:bg-warning/20",
         info:
-          "bg-info/10 text-info focus-visible:ring-info/20 [a]:hover:bg-info/20",
+          "bg-info/10 text-info border-info/20 focus-visible:ring-info/20 [a]:hover:bg-info/20",
       },
       size: {
-        sm: "h-4 px-1.5 text-[10px]",
-        md: "h-5 px-2 py-0.5 text-xs",
-        lg: "h-6 px-3 py-1 text-sm",
+        sm: "h-4 px-1.5 text-[10px] leading-none",
+        md: "h-5 px-2 py-0.5 text-xs leading-none",
+        lg: "h-6 px-3 py-1 text-sm leading-none",
       },
     },
     defaultVariants: {
