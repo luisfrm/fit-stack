@@ -43,7 +43,7 @@ const getPaymentStatusBadge = (status?: string) => {
       </Badge>
     );
     case PAYMENT_STATUSES.VOIDED: return (
-      <Badge className="bg-slate-500/10 text-slate-400 border-none flex items-center gap-1 px-2 py-0.5 pointer-events-none">
+      <Badge variant="secondary" className="flex items-center gap-1 px-2 py-0.5 pointer-events-none">
         <AlertCircle size={12} /> Anulado
       </Badge>
     );
@@ -59,7 +59,7 @@ const getSubscriptionStatusBadge = (status: string) => {
   switch (status) {
     case SUBSCRIPTION_STATUSES.ACTIVE: return <Badge variant="success" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">ACTIVA</Badge>;
     case SUBSCRIPTION_STATUSES.CANCELLED: return <Badge variant="destructive" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">CANCELADA</Badge>;
-    case SUBSCRIPTION_STATUSES.EXPIRED: return <Badge className="bg-slate-500/5 text-slate-400 border-slate-500/20 text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">EXPIRADA</Badge>;
+    case SUBSCRIPTION_STATUSES.EXPIRED: return <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">EXPIRADA</Badge>;
     default: return <Badge variant="outline" className="pointer-events-none">{status}</Badge>;
   }
 };
