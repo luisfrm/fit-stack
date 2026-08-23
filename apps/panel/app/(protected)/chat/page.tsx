@@ -1,6 +1,7 @@
 import { ChatView } from "@/components/chat/chat-view";
 import { sessionService } from "@/lib/services/session-service";
 import { getOrgFeatures, getAiUsage } from "@/lib/services/org-features";
+import { chatService } from "@/lib/services/chat-service";
 import { redirect } from "next/navigation";
 
 export default async function ChatPage() {
@@ -12,7 +13,10 @@ export default async function ChatPage() {
     redirect("/dashboard");
   }
 
-  const usage = await getAiUsage({ next: { revalidate: 60 } });
+  const [usage, conversations] = await Promise.all([
+    getAiUsage({ next: { revalidate: 60 } }),
+    chatService.getConversations({ next: { revalidate: 30, tags: ["chat:history"] } }).catch(() => []),
+  ]);
 
-  return <ChatView initialUsage={usage} />;
+  return <ChatView initialUsage={usage} initialConversations={conversations as never} />;
 }

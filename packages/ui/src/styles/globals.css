@@ -41,14 +41,16 @@
   --muted-foreground: var(--foreground-muted);
   --accent: var(--surface-2);
   --accent-foreground: var(--foreground);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--foreground);
   --destructive: oklch(0.52 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --success: oklch(0.65 0.18 145);
   --success-foreground: oklch(0 0 0);
-  --warning: oklch(0.8 0.15 85);
+  --warning: oklch(0.66 0.17 75);
   --warning-foreground: oklch(0 0 0);
-  --info: oklch(0.6 0.18 41.116);
-  --info-foreground: oklch(0 0 0);
+  --info: oklch(0.58 0.18 245);
+  --info-foreground: oklch(1 0 0);
   --input-bg: oklch(0.975 0.002 264);
   --input-hover: oklch(0.94 0.003 264);
   --input-border: var(--border);
@@ -94,14 +96,16 @@
   --primary-glow-hover: oklch(0.853 0.199 91.26 / 0.15);
   --table-header: oklch(0 0 0 / 0.4);
 
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--foreground);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
   --success: oklch(0.723 0.203 145);
   --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.85 0.15 85);
+  --warning: oklch(0.84 0.15 85);
   --warning-foreground: oklch(0 0 0);
-  --info: oklch(0.646 0.222 41.116);
-  --info-foreground: oklch(1 0 0);
+  --info: oklch(0.70 0.16 245);
+  --info-foreground: oklch(0 0 0);
   --input-bg: oklch(0.15 0 0);
   --input-hover: oklch(0.20 0 0);
 }
@@ -143,6 +147,8 @@
   --color-muted-foreground: var(--foreground-muted);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
@@ -252,9 +258,103 @@
       scale: 0.96;
     }
   }
+
 }
 
 @layer base {
+  /* ── Chat markdown (react-markdown) ── */
+  .chat-markdown {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  .chat-markdown pre {
+    overflow-x: auto;
+  }
+  .chat-markdown code {
+    overflow-wrap: break-word;
+  }
+  .chat-markdown p {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .chat-markdown ul,
+  .chat-markdown ol {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-left: 1.25rem;
+  }
+  .chat-markdown ul {
+    list-style-type: disc;
+  }
+  .chat-markdown ol {
+    list-style-type: decimal;
+  }
+  .chat-markdown li {
+    margin-top: 0.125rem;
+    margin-bottom: 0.125rem;
+  }
+  .chat-markdown a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .chat-markdown a:hover {
+    color: var(--primary-hover);
+  }
+  .chat-markdown blockquote {
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-left: 2px solid var(--border-primary);
+    padding-left: 0.75rem;
+    font-style: italic;
+    color: var(--foreground-muted);
+  }
+  .chat-markdown table {
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+  .chat-markdown th,
+  .chat-markdown td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+  .chat-markdown th {
+    background: var(--surface-2);
+    font-weight: 600;
+  }
+  .chat-markdown code:not(pre code) {
+    background: var(--surface-2);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.8125rem;
+    font-family: ui-monospace, monospace;
+  }
+  .chat-markdown pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  .chat-markdown pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .chat-markdown h1,
+  .chat-markdown h2,
+  .chat-markdown h3 {
+    font-weight: 700;
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+    line-height: 1.3;
+  }
   * {
     @apply border-border outline-ring/50;
     scrollbar-width: thin;

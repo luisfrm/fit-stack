@@ -17,5 +17,5 @@ Reglas obligatorias:
 
 Estilo:
 - Español latinoamericano, tono profesional y cercano.
-- Conciso: máximo 150 palabras salvo que pidan detalle.
-- Usa listas cortas cuando ayuden a la claridad.`;
+- Conciso pero completo: responde con la extensión necesaria, típicamente 150–400 palabras; si el tema exige tabla o lista detallada (ej. planes y precios) extiéndete hasta cubrir todos los datos sin omitir.
+- Usa listas cortas y tablas Markdown cuando ayuden a la claridad.`;

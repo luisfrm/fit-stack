@@ -22,6 +22,8 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
+import { createChatRepository } from '../repositories/chat.repository';
+import { CHAT_MAX_CONVERSATIONS, CHAT_MAX_STORED } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const chatMessageSchema = z.object({
@@ -33,6 +35,18 @@ const chatSchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(AI_CHAT_LIMITS.maxMessages),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(1).max(AI_CHAT_LIMITS.maxToolOutputTokens).optional(),
+});
+
+const chatConversationSchema = z.object({
+  id: z.string().min(1).max(100),
+  title: z.string().min(1).max(100),
+  modelUsed: z.string().optional(),
+  messages: z.array(chatMessageSchema).max(CHAT_MAX_STORED * 2), // margen, el repo recorta a CHAT_MAX_STORED
+  updatedAt: z.string().optional(),
+});
+
+const chatHistorySchema = z.object({
+  conversations: z.array(chatConversationSchema).max(CHAT_MAX_CONVERSATIONS),
 });
 
 const encoder = new TextEncoder();
@@ -69,6 +83,33 @@ function toSSEStream(
 export const aiRoutes = new Hono<AppEnv>()
   .get('/models', requireOrgPermission(PM.AI, PA.READ), (c) => {
     return c.json({ data: AI_MODELS });
+  })
+
+  // ── Historial de chat (Redis, sin DB) — cap CHAT_MAX_STORED por conversación
+  .get('/conversations', requireOrgPermission(PM.AI, PA.READ), async (c) => {
+    const orgId = c.get('session')!.activeOrganizationId!;
+    const userId = c.get('user')!.id;
+    const repo = createChatRepository(c.env);
+    const data = await repo.list(orgId, userId);
+    return c.json({ data });
+  })
+
+  .put('/conversations', requireOrgPermission(PM.AI, PA.READ), zValidator('json', chatHistorySchema), async (c) => {
+    const orgId = c.get('session')!.activeOrganizationId!;
+    const userId = c.get('user')!.id;
+    const { conversations } = c.req.valid('json');
+    const repo = createChatRepository(c.env);
+    await repo.save(orgId, userId, conversations as never);
+    return c.json({ success: true });
+  })
+
+  .delete('/conversations/:id', requireOrgPermission(PM.AI, PA.READ), async (c) => {
+    const orgId = c.get('session')!.activeOrganizationId!;
+    const userId = c.get('user')!.id;
+    const id = c.req.param('id');
+    const repo = createChatRepository(c.env);
+    await repo.delete(orgId, userId, id);
+    return c.json({ success: true });
   })
 
   .post(

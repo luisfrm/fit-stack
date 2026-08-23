@@ -12,9 +12,11 @@ import {
   toast,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { CHAT_HISTORY_LIMIT, CHAT_MAX_STORED } from "@workspace/shared";
 import type { IAiChatMessage } from "@workspace/shared";
 import { chatService } from "@/lib/services/chat-service";
 import { AiQuotaBanner } from "./ai-quota-banner";
+import { ChatMarkdown } from "./chat-markdown";
 import type { AiUsage } from "@/lib/features/quota";
 import { isQuotaExhausted } from "@/lib/features/quota";
 
@@ -40,10 +42,13 @@ function buildTitle(content: string): string {
 
 interface ChatViewProps {
   readonly initialUsage?: AiUsage | null;
+  readonly initialConversations?: UiChat[];
 }
 
-export function ChatView({ initialUsage }: ChatViewProps) {
-  const [chats, setChats] = React.useState<UiChat[]>(() => [createEmptyChat()]);
+export function ChatView({ initialUsage, initialConversations }: ChatViewProps) {
+  const [chats, setChats] = React.useState<UiChat[]>(() =>
+    initialConversations && initialConversations.length > 0 ? initialConversations : [createEmptyChat()],
+  );
   const [activeChatId, setActiveChatId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState("");
   const [isStreaming, setIsStreaming] = React.useState(false);
@@ -63,8 +68,36 @@ export function ChatView({ initialUsage }: ChatViewProps) {
   }, [chats]);
 
   React.useEffect(() => {
+    if (initialConversations && initialConversations.length > 0) {
+      setChats(initialConversations);
+    }
+  }, [initialConversations]);
+
+  React.useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [activeChat?.messages, isStreaming]);
+
+  // Persistencia en Redis: guarda solo los últimos CHAT_MAX_STORED mensajes por conversación
+  const persistChats = React.useCallback(async (nextChats: UiChat[]) => {
+    const trimmed = nextChats.map((c) => ({
+      ...c,
+      messages: c.messages.slice(-CHAT_MAX_STORED),
+    }));
+    try {
+      await chatService.saveHistory(trimmed.slice(-20));
+    } catch {
+      // silencioso: Redis es best-effort, el chat sigue funcionando
+    }
+  }, []);
+
+  const persistRef = React.useRef(persistChats);
+  persistRef.current = persistChats;
+  React.useEffect(() => {
+    // evita persistir el estado inicial vacío antes de hidratar
+    if (chats.length === 1 && chats[0]?.messages.length === 0 && !initialConversations?.length) return;
+    const t = setTimeout(() => void persistRef.current(chats), 400);
+    return () => clearTimeout(t);
+  }, [chats, initialConversations?.length]);
 
   const createChat = () => {
     const empty = chats.find((chat) => chat.messages.length === 0);
@@ -73,7 +106,7 @@ export function ChatView({ initialUsage }: ChatViewProps) {
       return;
     }
     const chat = createEmptyChat();
-    setChats((prev) => [...prev, chat]);
+    setChats((prev) => [...prev, chat].slice(-20));
     setActiveChatId(chat.id);
   };
 
@@ -81,6 +114,8 @@ export function ChatView({ initialUsage }: ChatViewProps) {
     event.stopPropagation();
     setChats((prev) => prev.filter((chat) => chat.id !== id));
     if (activeChatId === id) setActiveChatId(null);
+    // persistirá vía useEffect; además borra en Redis explícitamente
+    void chatService.deleteConversation(id).catch(() => {});
   };
 
   const appendAssistantDelta = (chatId: string, delta: string) => {
@@ -89,14 +124,15 @@ export function ChatView({ initialUsage }: ChatViewProps) {
         if (chat.id !== chatId) return chat;
         const last = chat.messages[chat.messages.length - 1];
         if (last && last.role === "assistant") {
+          const merged = { ...last, content: last.content + delta };
           return {
             ...chat,
-            messages: [...chat.messages.slice(0, -1), { ...last, content: last.content + delta }],
+            messages: [...chat.messages.slice(0, -1), merged].slice(-CHAT_MAX_STORED),
           };
         }
         return {
           ...chat,
-          messages: [...chat.messages, { role: "assistant", content: delta }],
+          messages: [...chat.messages, { role: "assistant" as const, content: delta }].slice(-CHAT_MAX_STORED),
         };
       }),
     );
@@ -120,7 +156,8 @@ export function ChatView({ initialUsage }: ChatViewProps) {
     }
 
     const userMessage: IAiChatMessage = { role: "user", content };
-    const messages = [...activeChat.messages, userMessage];
+    const messages = [...activeChat.messages, userMessage].slice(-CHAT_MAX_STORED);
+    const toSend = messages.slice(-CHAT_HISTORY_LIMIT);
     const chatId = activeChat.id;
 
     setChats((prev) =>
@@ -142,7 +179,7 @@ export function ChatView({ initialUsage }: ChatViewProps) {
     setIsStreaming(true);
 
     try {
-      await chatService.streamChat(messages, {
+      await chatService.streamChat(toSend, {
         signal: controller.signal,
         onDelta: (delta) => appendAssistantDelta(chatId, delta),
         onModel: (model) => {
@@ -256,14 +293,18 @@ export function ChatView({ initialUsage }: ChatViewProps) {
                   >
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-xl border px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+                        "max-w-[85%] rounded-xl border px-4 py-3 text-sm leading-relaxed",
                         message.role === "user"
-                          ? "border-primary/20 bg-primary/15 text-foreground"
+                          ? "border-primary/20 bg-primary/15 text-foreground whitespace-pre-wrap"
                           : "border-white/5 bg-surface text-foreground",
                       )}
                     >
                       {message.content ? (
-                        message.content
+                        message.role === "user" ? (
+                          <span className="whitespace-pre-wrap">{message.content}</span>
+                        ) : (
+                          <ChatMarkdown>{message.content}</ChatMarkdown>
+                        )
                       ) : (
                         <span className="inline-flex items-center gap-2 text-foreground-dim">
                           <Spinner className="size-3.5" />

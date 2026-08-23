@@ -97,6 +97,11 @@ export function getOrderedModelChain(provider?: string | null): readonly string[
   return [...getProviderModelChain(primary), ...getProviderModelChain(fallback)];
 }
 
+// ── Ventana de contexto del chat (SSOT para frontend y backend) ──
+export const CHAT_HISTORY_LIMIT = 6 as const; // últimos N mensajes enviados al LLM
+export const CHAT_MAX_STORED = 10 as const; // máximo persistido por conversación (sliding window)
+export const CHAT_MAX_CONVERSATIONS = 20 as const; // máximo conversaciones por usuario/org
+
 // ── Límites de balance del chat (no hardcodear en rutas) ──
 export const AI_CHAT_LIMITS = {
   /** Máx. caracteres del mensaje del usuario (una pregunta/rutina). */
@@ -104,11 +109,11 @@ export const AI_CHAT_LIMITS = {
   /** Máx. caracteres por mensaje del historial (user/assistant). */
   maxHistoryMessageChars: 2_000,
   /** Máx. tokens de salida en una respuesta normal. */
-  maxOutputTokens: 800,
+  maxOutputTokens: 1200,
   /** Máx. tokens de salida cuando hay tool (caso especial). */
   maxToolOutputTokens: 2_048,
   /** Máx. mensajes en el historial enviado al modelo (últimos N). */
-  maxHistoryMessages: 10,
+  maxHistoryMessages: CHAT_HISTORY_LIMIT,
   /** Máx. mensajes que valida el schema (límite duro). */
   maxMessages: 50,
   /** Máx. caracteres totales de los mensajes del cliente por request (input cap). */

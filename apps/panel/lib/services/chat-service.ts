@@ -10,9 +10,30 @@ export interface ChatStreamCallbacks {
   onQuotaUpdate?: (used: number, limit: number) => void;
 }
 
+export interface ChatConversationDto {
+  id: string;
+  title: string;
+  modelUsed?: string;
+  messages: IAiChatMessage[];
+  updatedAt?: string;
+}
+
 export const chatService = {
   async getUsage(options?: ApiFetchOptions) {
     return await api<import("@/lib/features/quota").AiUsage>("/ai/usage", options);
+  },
+
+  async getConversations(options?: ApiFetchOptions): Promise<ChatConversationDto[]> {
+    const res = await api<{ data: ChatConversationDto[] }>("/ai/conversations", options);
+    return res.data ?? [];
+  },
+
+  async saveHistory(conversations: ChatConversationDto[], options?: ApiFetchOptions): Promise<void> {
+    await api("/ai/conversations", { method: "PUT", body: { conversations }, ...(options as object) });
+  },
+
+  async deleteConversation(id: string, options?: ApiFetchOptions): Promise<void> {
+    await api(`/ai/conversations/${encodeURIComponent(id)}`, { method: "DELETE", ...(options as object) });
   },
 
   async streamChat(
