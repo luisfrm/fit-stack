@@ -9,17 +9,16 @@ interface SubscriptionStatusBadgeProps {
   status: PlatformSubscriptionStatus;
 }
 
-const STATUS_CONFIG: Record<PlatformSubscriptionStatus, { variant: "success" | "warning" | "destructive" | "default" | "outline"; label: string; icon: React.ReactNode; className?: string }> = {
+const STATUS_CONFIG: Record<PlatformSubscriptionStatus, { variant: "success" | "warning" | "destructive" | "default" | "outline" | "info" | "secondary"; label: string; icon: React.ReactNode; className?: string }> = {
   active: {
     variant: "success",
     label: "Activa",
     icon: <CheckCircle2 size={12} />,
   },
   trial: {
-    variant: "default",
+    variant: "info",
     label: "Trial",
     icon: <Sparkles size={12} />,
-    className: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   },
   past_due: {
     variant: "warning",
@@ -37,10 +36,9 @@ const STATUS_CONFIG: Record<PlatformSubscriptionStatus, { variant: "success" | "
     icon: <ShieldOff size={12} />,
   },
   cancelled: {
-    variant: "default",
+    variant: "secondary",
     label: "Cancelada",
     icon: <XCircle size={12} />,
-    className: "bg-slate-500/10 text-slate-400 border-slate-500/20",
   },
 };
 

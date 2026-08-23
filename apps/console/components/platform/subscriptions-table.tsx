@@ -146,7 +146,7 @@ export function SubscriptionsTable({
               {sub.planName ?? "—"}
             </Text>
             {sub.isTrial && (
-              <Badge variant="default" className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20 uppercase font-bold tracking-widest px-1.5 h-4">
+              <Badge variant="info" size="sm" className="uppercase font-bold tracking-widest">
                 Trial
               </Badge>
             )}
