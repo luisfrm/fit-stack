@@ -43,10 +43,6 @@ export function createKnowledgeRepository(db: Db) {
           source: aiKnowledgeDocument.source,
           isActive: aiKnowledgeDocument.isActive,
           contentLength: sql<number>`length(${aiKnowledgeDocument.content})`,
-          chunkCount: sql<number>`(
-            select count(*)::int from ${aiKnowledgeChunk}
-            where ${aiKnowledgeChunk.documentId} = ${aiKnowledgeDocument.id}
-          )`,
           createdAt: aiKnowledgeDocument.createdAt,
           updatedAt: aiKnowledgeDocument.updatedAt,
         })
@@ -57,7 +53,21 @@ export function createKnowledgeRepository(db: Db) {
             : isNull(aiKnowledgeDocument.organizationId),
         )
         .orderBy(desc(aiKnowledgeDocument.updatedAt));
-      return rows.map((r) => ({ ...r, contentLength: Number(r.contentLength), chunkCount: Number(r.chunkCount) }));
+      if (rows.length === 0) return [];
+      // Conteo separado: evita subquery correlacionada frágil con neon-http
+      const counts = await db
+        .select({
+          documentId: aiKnowledgeChunk.documentId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(aiKnowledgeChunk)
+        .groupBy(aiKnowledgeChunk.documentId);
+      const countMap = new Map(counts.map((c) => [c.documentId, Number(c.count)]));
+      return rows.map((r) => ({
+        ...r,
+        contentLength: Number(r.contentLength),
+        chunkCount: countMap.get(r.id) ?? 0,
+      }));
     },
 
     async getById(id: string): Promise<KnowledgeDocDetail | null> {

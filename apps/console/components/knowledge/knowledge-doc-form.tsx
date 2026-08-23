@@ -47,6 +47,10 @@ export function KnowledgeDocForm({
   const [content, setContent] = React.useState(initialContent);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  React.useEffect(() => setTitle(initialTitle), [initialTitle]);
+  React.useEffect(() => setSource(initialSource), [initialSource]);
+  React.useEffect(() => setContent(initialContent), [initialContent]);
+
   const isEdit = Boolean(initialTitle);
   const computedSubmitLabel = submitLabel ?? (isEdit ? "Guardar cambios" : "Crear documento");
 

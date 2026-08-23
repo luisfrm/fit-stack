@@ -1,3 +1,4 @@
+import { HTTPException } from 'hono/http-exception';
 import {
   RAG_CONFIG,
   WORKERS_AI_EMBEDDING_MODEL,
@@ -25,7 +26,7 @@ export function createKnowledgeService(repo: KnowledgeRepository, aiService: AIS
 
     async getById(id: string) {
       const doc = await repo.getById(id);
-      if (!doc) throw new Error('Documento no encontrado');
+      if (!doc) throw new HTTPException(404, { message: 'Documento no encontrado' });
       return { data: doc };
     },
 
@@ -50,11 +51,16 @@ export function createKnowledgeService(repo: KnowledgeRepository, aiService: AIS
       partial: Partial<{ title: string; source: string; content: string; isActive: boolean }>,
     ) {
       const current = await repo.getContentById(id);
-      if (!current) throw new Error('Documento no encontrado');
+      if (!current) throw new HTTPException(404, { message: 'Documento no encontrado' });
+      const needsReembed = partial.content !== undefined && partial.content !== current.content;
+      let newChunks: Awaited<ReturnType<typeof embedChunks>> | null = null;
+      if (needsReembed) {
+        // Embeber primero: si falla, no se persiste ningún cambio de metadatos
+        newChunks = await embedChunks(splitIntoChunks(partial.content!));
+      }
       await repo.update(id, partial);
-      if (partial.content !== undefined && partial.content !== current.content) {
-        const chunks = await embedChunks(splitIntoChunks(partial.content));
-        await repo.replaceChunks(id, chunks);
+      if (newChunks) {
+        await repo.replaceChunks(id, newChunks);
       }
       return this.getById(id);
     },

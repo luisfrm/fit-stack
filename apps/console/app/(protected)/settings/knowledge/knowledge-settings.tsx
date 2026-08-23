@@ -33,13 +33,8 @@ interface KnowledgeSettingsProps {
 
 export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsProps) {
   const router = useRouter();
-  const [docs, setDocs] = React.useState<KnowledgeDoc[]>(initialDocs);
-  const [mode, setMode] = React.useState<"closed" | "create" | { edit: KnowledgeDoc }>("closed");
+  const [mode, setMode] = React.useState<"closed" | "create" | { edit: KnowledgeDoc; content: string }>("closed");
   const [deleteTarget, setDeleteTarget] = React.useState<KnowledgeDoc | null>(null);
-
-  React.useEffect(() => {
-    setDocs(initialDocs);
-  }, [initialDocs]);
 
   const refresh = async () => {
     await onSaved?.();
@@ -47,7 +42,18 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
   };
 
   const openCreate = () => setMode("create");
-  const openEdit = (doc: KnowledgeDoc) => setMode({ edit: doc });
+  const openEdit = async (doc: KnowledgeDoc) => {
+    // Abre modal de inmediato con contenido vacío y luego carga el texto real
+    setMode({ edit: doc, content: "" });
+    try {
+      const { data } = await knowledgeService.getById(doc.id);
+      setMode({ edit: doc, content: data.content });
+    } catch (error) {
+      console.error("Error loading document for edit:", error);
+      toast.error("Error al cargar el documento");
+      setMode("closed");
+    }
+  };
   const closeModal = () => setMode("closed");
 
   const handleSave = async (values: {
@@ -60,11 +66,15 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
         await knowledgeService.create(values);
         toast.success("Documento creado y procesado correctamente");
       } else if (mode !== "closed") {
+        const original = mode.content;
         const payload: Partial<{ title: string; source: KnowledgeDoc["source"]; content: string }> = {
           title: values.title,
           source: values.source,
         };
-        if (values.content.trim()) payload.content = values.content;
+        // Solo re-embebe si el contenido cambió realmente
+        if (values.content.trim() && values.content.trim() !== original.trim()) {
+          payload.content = values.content;
+        }
         await knowledgeService.update(mode.edit.id, payload);
         toast.success("Documento actualizado correctamente");
       }
@@ -72,13 +82,13 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
     } catch (error) {
       console.error("Error saving knowledge document:", error);
       toast.error("Error al guardar el documento");
+      throw error;
     }
   };
 
   const toggleActive = async (doc: KnowledgeDoc, isActive: boolean) => {
     try {
       await knowledgeService.update(doc.id, { isActive });
-      setDocs((prev) => prev.map((d) => (d.id === doc.id ? { ...d, isActive } : d)));
       toast.success(isActive ? "Documento activado" : "Documento desactivado");
       await refresh();
     } catch (error) {
@@ -112,7 +122,7 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
         open: true,
         initialTitle: mode.edit.title,
         initialSource: mode.edit.source,
-        initialContent: "",
+        initialContent: mode.content,
       };
     }
     return null;
@@ -142,7 +152,7 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
               <Library className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <Text className="font-bold">{docs.length} documentos activos en la plataforma</Text>
+              <Text className="font-bold">{initialDocs.length} documentos activos en la plataforma</Text>
               <Text className="text-[10px] text-foreground-dim uppercase tracking-wider font-bold">
                 Se fragmentan automáticamente para búsqueda semántica
               </Text>
@@ -150,8 +160,8 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
           </div>
         </Card>
 
-        <Card variant="settings" className="p-0 overflow-hidden">
-          {docs.length === 0 ? (
+        <Card id="knowledge-docs-list" variant="settings" className="p-0 sm:p-0 overflow-hidden">
+          {initialDocs.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center px-6">
               <div className="flex size-14 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
                 <BookOpen className="size-6 text-primary" />
@@ -168,7 +178,7 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
             </div>
           ) : (
             <ul className="divide-y divide-white/5">
-              {docs.map((doc) => (
+              {initialDocs.map((doc) => (
                 <li key={doc.id} className="flex items-center gap-4 px-5 py-4">
                   <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2/40">
                     <FileText className="size-4 text-foreground-dim" />

@@ -46,8 +46,12 @@ export function KnowledgeDocModal({
   const handleCancel = React.useCallback(() => handleOpenChange(false), [handleOpenChange]);
   const handleSubmit = React.useCallback(
     async (values: KnowledgeDocFormValues) => {
-      await onSubmit(values);
-      handleOpenChange(false);
+      try {
+        await onSubmit(values);
+        handleOpenChange(false);
+      } catch {
+        // onSubmit ya mostró toast; mantener modal abierto para no perder datos
+      }
     },
     [onSubmit, handleOpenChange],
   );
@@ -64,7 +68,7 @@ export function KnowledgeDocModal({
       title={isEdit ? "Editar documento" : "Nuevo documento"}
       description={
         isEdit
-          ? "Deja el contenido vacío para conservar el actual (sin reprocesar embeddings)."
+          ? "Edita el contenido; si lo cambias se regeneran los embeddings."
           : "Se fragmenta automáticamente para búsqueda semántica del asistente."
       }
     >
