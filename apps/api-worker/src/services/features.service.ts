@@ -186,13 +186,6 @@ export function createFeaturesService(
     getSeatsUsage,
     getCreditPeriodStart,
 
-    /** Estima créditos por request (chars/4 + maxTokens). Mínimo 1. */
-    estimateCredits(messages: { content: string }[], maxTokens: number): number {
-      const chars = messages.reduce((acc, m) => acc + m.content.length, 0);
-      const tokens = Math.ceil(chars / 4) + maxTokens;
-      return Math.max(1, Math.ceil(tokens / 1_000));
-    },
-
     async consumeAiCredits(
       orgId: string,
       estimatedCredits: number,
@@ -221,26 +214,6 @@ export function createFeaturesService(
       };
     },
 
-    // Compat: mensajes → créditos (1 mensaje ≈ 3 créditos para tests viejos)
-    async consumeAiMessage(orgId: string): Promise<{ allowed: boolean; quota: AiQuotaResult }> {
-      const quota = await getAiQuota(orgId);
-      if (quota.disabled) return { allowed: false, quota };
-      if (quota.monthly.limit > 0 && quota.monthly.used + 3 > quota.monthly.limit) {
-        return { allowed: false, quota };
-      }
-      const periodStart = quota.periodStart;
-      await featuresRepo.incrementCredits(orgId, periodStart, 3);
-      const used = quota.monthly.used + 3;
-      return {
-        allowed: true,
-        quota: {
-          monthly: { used, limit: quota.monthly.limit },
-          remaining: quota.monthly.limit === 0 ? null : Math.max(0, quota.monthly.limit - used),
-          disabled: false,
-          periodStart,
-        },
-      };
-    },
   };
 }
 

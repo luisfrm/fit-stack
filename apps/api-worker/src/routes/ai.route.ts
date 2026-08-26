@@ -7,24 +7,31 @@ import {
   PERMISSION_ACTIONS as PA,
   AI_MODELS,
   AI_CHAT_LIMITS,
-  PANEL_SYSTEM_PROMPT,
-  creditsFromUsage,
   estimateCreditsFromMessages,
-  getOrderedModelChain,
-  type AiProviderId,
+  creditsFromUsage,
+  CHAT_MAX_CONVERSATIONS,
+  CHAT_MAX_STORED,
 } from '@workspace/shared';
 import { createAIService } from '../services/ai.service';
 import { createKnowledgeService } from '../services/knowledge.service';
 import { createKnowledgeRepository } from '../repositories/knowledge.repository';
-import { createFeaturesService, AI_PROVIDER_DEFAULT_KEY } from '../services/features.service';
+import { createFeaturesService } from '../services/features.service';
 import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
 import { createChatRepository } from '../repositories/chat.repository';
-import { CHAT_MAX_CONVERSATIONS, CHAT_MAX_STORED } from '@workspace/shared';
+import {
+  resolveProviderChain,
+  assembleRagPrompt,
+  settleUsage,
+  toSSEStream,
+  type AiStreamDelta,
+} from '../lib/ai-helpers';
 import type { AppEnv } from '../lib/env';
+
+// ── Zod schemas ──
 
 const chatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -41,7 +48,7 @@ const chatConversationSchema = z.object({
   id: z.string().min(1).max(100),
   title: z.string().min(1).max(100),
   modelUsed: z.string().optional(),
-  messages: z.array(chatMessageSchema).max(CHAT_MAX_STORED * 2), // margen, el repo recorta a CHAT_MAX_STORED
+  messages: z.array(chatMessageSchema).max(CHAT_MAX_STORED * 2),
   updatedAt: z.string().optional(),
 });
 
@@ -49,43 +56,14 @@ const chatHistorySchema = z.object({
   conversations: z.array(chatConversationSchema).max(CHAT_MAX_CONVERSATIONS),
 });
 
-const encoder = new TextEncoder();
-
-function toSSEStream(
-  deltas: AsyncIterable<{ content: string }>,
-  modelPromise: Promise<string>,
-): ReadableStream<Uint8Array> {
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const send = (event: import('@workspace/shared').IAiSseEvent) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      };
-      try {
-        let modelEmitted = false;
-        for await (const delta of deltas) {
-          if (!modelEmitted) {
-            modelEmitted = true;
-            send({ model: await modelPromise });
-          }
-          send({ content: delta.content });
-        }
-        send({ done: true });
-        controller.close();
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Error en la generación de la respuesta';
-        send({ error: message });
-        controller.close();
-      }
-    },
-  });
-}
+// ── Routes ──
 
 export const aiRoutes = new Hono<AppEnv>()
   .get('/models', requireOrgPermission(PM.AI, PA.READ), (c) => {
     return c.json({ data: AI_MODELS });
   })
 
-  // ── Historial de chat (Redis, sin DB) — cap CHAT_MAX_STORED por conversación
+  // ── Historial de chat (Redis, sin DB) — cap CHAT_MAX_STORED por conversación ──
   .get('/conversations', requireOrgPermission(PM.AI, PA.READ), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const userId = c.get('user')!.id;
@@ -112,6 +90,7 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ success: true });
   })
 
+  // ── Chat streaming (SSE) ──
   .post(
     '/chat',
     requireOrgPermission(PM.AI, PA.READ),
@@ -121,7 +100,7 @@ export const aiRoutes = new Hono<AppEnv>()
       const body = c.req.valid('json');
       const { messages, temperature, maxTokens } = body;
 
-      // Límites de balance (constantes, no hardcode)
+      // 1. Validación de límites de input
       for (const m of messages) {
         const cap =
           m.role === 'user' ? AI_CHAT_LIMITS.maxUserMessageChars : AI_CHAT_LIMITS.maxHistoryMessageChars;
@@ -134,20 +113,15 @@ export const aiRoutes = new Hono<AppEnv>()
         return c.json({ error: `Input excede ${AI_CHAT_LIMITS.maxInputChars} caracteres` }, 400);
       }
 
-      // Provider default desde settings (cacheado en Redis + tag)
+      // 2. Provider chain (Redis cache + settings)
       const cache = createCache(c.env);
       const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));
-      const cacheKey = 'ai:provider:default';
-      let configured = (await cache.get<string>(cacheKey)) as string | null;
-      if (configured === null || configured === undefined) {
-        configured = (await platformSettingsRepo.findByKey(AI_PROVIDER_DEFAULT_KEY)) ?? null;
-        if (configured) await cache.set(cacheKey, configured, 300);
-      }
-      const chain = getOrderedModelChain(configured);
+      const { chain, workersReady, openRouterReady } = await resolveProviderChain(
+        c.env,
+        cache,
+        platformSettingsRepo,
+      );
 
-      // Validación: al menos un provider de la cadena debe estar configurado
-      const workersReady = !!c.env.CLOUDFLARE_AI_API_TOKEN && !!c.env.CLOUDFLARE_ACCOUNT_ID;
-      const openRouterReady = !!c.env.OPENROUTER_API_KEY;
       const hasReadyModel = chain.some((mdl) =>
         mdl.startsWith('@cf/') ? workersReady : openRouterReady,
       );
@@ -158,6 +132,7 @@ export const aiRoutes = new Hono<AppEnv>()
         );
       }
 
+      // 3. Features + crédito pre-flight
       const orgId = c.get('session')!.activeOrganizationId!;
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
@@ -166,11 +141,23 @@ export const aiRoutes = new Hono<AppEnv>()
         createFeaturesRepository(c.get('db')),
         cache,
       );
+      const aiService = createAIService(c.env);
+
+      // 4. RAG prompt assembly
+      const knowledgeService = createKnowledgeService(
+        createKnowledgeRepository(c.get('db')),
+        aiService,
+      );
+      const { finalMessages, ragExtraChars, systemPromptLength } = await assembleRagPrompt(
+        knowledgeService,
+        messages,
+        orgId,
+      );
 
       const estimated = estimateCreditsFromMessages(
         messages,
         maxTokens ?? AI_CHAT_LIMITS.maxOutputTokens,
-        PANEL_SYSTEM_PROMPT.length + 12,
+        systemPromptLength + ragExtraChars,
       );
       const { allowed, quota } = await featuresService.consumeAiCredits(orgId, estimated);
 
@@ -182,41 +169,18 @@ export const aiRoutes = new Hono<AppEnv>()
 
       if (!allowed) {
         return c.json(
-          {
-            error: 'Créditos IA agotados para este ciclo',
-            code: 'AI_QUOTA_EXCEEDED',
-            limits: quota,
-          },
+          { error: 'Créditos IA agotados para este ciclo', code: 'AI_QUOTA_EXCEEDED', limits: quota },
           429,
           quotaHeaders,
         );
       }
 
-      const periodStart = quota.periodStart;
-      const aiService = createAIService(c.env);
-
-      const knowledgeService = createKnowledgeService(
-        createKnowledgeRepository(c.get('db')),
-        aiService,
-      );
-      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
-      const ragContext = lastUser
-        ? await knowledgeService.searchForChat(lastUser.content, orgId)
-        : '';
-      const systemPrompt = ragContext
-        ? `${PANEL_SYSTEM_PROMPT}\n\n[Contexto]\n${ragContext}`
-        : PANEL_SYSTEM_PROMPT;
-      const finalMessages = [
-        { role: 'system' as const, content: systemPrompt },
-        ...messages,
-      ];
-
-      // Filtra la cadena a modelos con credenciales disponibles
+      // 5. Stream creation with fallback chain
       const readyChain = chain.filter((mdl) =>
         mdl.startsWith('@cf/') ? workersReady : openRouterReady,
       );
+      const periodStart = quota.periodStart;
 
-      // Si solo queda un modelo, stream directo; si hay varios, fallback en el primer chunk
       const makeStream = (mdl: string) => {
         const s = aiService.streamChat({
           model: mdl,
@@ -229,22 +193,23 @@ export const aiRoutes = new Hono<AppEnv>()
       };
 
       const first = makeStream(readyChain[0]!);
-      let fallbackStreams: ReturnType<typeof makeStream>[] | null =
+      const fallbackStreams =
         readyChain.length > 1 ? readyChain.slice(1).map(makeStream) : null;
 
       let active = first;
-      const wrappedStream = (async function* () {
-        let done = false;
+      let usageEmitted = false;
+
+      const wrappedStream: AsyncGenerator<AiStreamDelta, void, void> = (async function* () {
         let attemptIdx = 0;
         try {
+          // Fallback chain: stream from active model, catch → next model
           let started = false;
           while (true) {
             try {
               for await (const delta of active.stream) {
                 if (!started && delta.content) started = true;
-                yield delta;
+                yield delta as AiStreamDelta;
               }
-              done = true;
               break;
             } catch (err) {
               if (!started && fallbackStreams && attemptIdx < fallbackStreams.length) {
@@ -254,22 +219,35 @@ export const aiRoutes = new Hono<AppEnv>()
               throw err;
             }
           }
+
+          // Success: settle credits synchronously and emit usage via SSE
+          const usagePayload = await settleUsage(
+            featuresService,
+            active,
+            orgId,
+            periodStart,
+            estimated,
+          );
+          if (usagePayload) {
+            yield usagePayload;
+            usageEmitted = true;
+          }
         } finally {
-          const p = active.usage
-            .then((u) => {
-              const actual = u ? creditsFromUsage(u) : estimated;
-              return featuresService.settleAiCredits(orgId, periodStart, actual);
-            })
-            .catch(() => { });
-          c.executionCtx.waitUntil(p);
-          if (!done) {
-            c.executionCtx.waitUntil(
-              featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => { }),
-            );
+          if (!usageEmitted) {
+            // Fallback: settle async via waitUntil if SSE emission failed
+            const p = active.usage
+              .then((u) => {
+                const actual = u ? creditsFromUsage(u) : estimated;
+                return featuresService.settleAiCredits(orgId, periodStart, actual);
+              })
+              .catch(() => featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => {}))
+              .catch(() => {});
+            c.executionCtx.waitUntil(p as Promise<unknown>);
           }
         }
       })();
 
+      // 6. Resolve model name (may come from fallback)
       const resolvedModelPromise = (async () => {
         try {
           return await active.modelPromise;
