@@ -222,4 +222,12 @@ export interface IAiSseError {
   error: string;
 }
 
-export type IAiSseEvent = IAiSseDelta | IAiSseModel | IAiSseDone | IAiSseError;
+export interface IAiSseUsage {
+  usage: {
+    monthly: { used: number; limit: number };
+    remaining: number | null;
+    periodStart: string;
+  };
+}
+
+export type IAiSseEvent = IAiSseDelta | IAiSseModel | IAiSseDone | IAiSseError | IAiSseUsage;

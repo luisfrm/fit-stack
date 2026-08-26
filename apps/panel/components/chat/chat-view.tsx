@@ -138,15 +138,6 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     );
   };
 
-  const refreshUsage = React.useCallback(async () => {
-    try {
-      const fresh = await chatService.getUsage();
-      if (fresh) setUsage(fresh);
-    } catch {
-      // silencioso
-    }
-  }, []);
-
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || isStreaming || !activeChat) return;
@@ -189,16 +180,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
         },
         onDone: () => undefined,
         onError: (message) => toast.error(message),
-        onQuotaUpdate: (used, limit) => {
-          setUsage((prev) => ({
-            monthly: { used, limit },
-            remaining: limit === 0 ? Number.POSITIVE_INFINITY : Math.max(0, limit - used),
-            disabled: false,
-            periodStart: prev?.periodStart ?? new Date().toISOString(),
-            ...(prev && (prev as unknown as { daily?: unknown }).daily ? { daily: { used, limit } } : {}),
-            ...(prev && (prev as unknown as { weekly?: unknown }).weekly ? { weekly: { used, limit } } : {}),
-          }));
-        },
+        onUsage: (fresh) => setUsage(fresh),
       });
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -208,7 +190,6 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     } finally {
       setIsStreaming(false);
       abortRef.current = null;
-      void refreshUsage();
     }
   };
 

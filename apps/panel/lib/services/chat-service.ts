@@ -7,7 +7,7 @@ export interface ChatStreamCallbacks {
   onDone?: () => void;
   onError?: (message: string) => void;
   signal?: AbortSignal;
-  onQuotaUpdate?: (used: number, limit: number) => void;
+  onUsage?: (usage: import("@/lib/features/quota").AiUsage) => void;
 }
 
 export interface ChatConversationDto {
@@ -38,7 +38,7 @@ export const chatService = {
 
   async streamChat(
     messages: IAiChatMessage[],
-    { onDelta, onModel, onDone, onError, signal, onQuotaUpdate }: ChatStreamCallbacks,
+    { onDelta, onModel, onDone, onError, signal, onUsage }: ChatStreamCallbacks,
   ): Promise<void> {
     const response = await api.raw("/ai/chat", {
       method: "POST",
@@ -46,14 +46,6 @@ export const chatService = {
       responseType: "stream",
       signal,
     });
-
-    if (onQuotaUpdate) {
-      const used = Number(response.headers.get("X-Ai-Credits-Used"));
-      const limit = Number(response.headers.get("X-Ai-Credits-Limit"));
-      if (!Number.isNaN(used) && !Number.isNaN(limit)) {
-        onQuotaUpdate(used, limit);
-      }
-    }
 
     if (!response.ok) {
       const errBody = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -91,6 +83,18 @@ export const chatService = {
             onDelta(event.content);
           } else if ("model" in event) {
             onModel?.(event.model);
+          } else if ("usage" in event && (event as { usage?: unknown }).usage) {
+            const u = (event as Extract<IAiSseEvent, { usage: unknown }>).usage as {
+              monthly: { used: number; limit: number };
+              remaining: number | null;
+              periodStart: string;
+            };
+            onUsage?.({
+              monthly: u.monthly,
+              remaining: u.remaining,
+              disabled: false,
+              periodStart: u.periodStart,
+            });
           } else if ("error" in event) {
             onError?.(event.error);
             return;
