@@ -5,6 +5,12 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "start": "turbo dev",
+    "start:api": "pnpm --filter api-worker dev",
+    "start:jobs": "pnpm --filter jobs-worker dev",
+    "start:panel": "pnpm --filter panel dev",
+    "start:console": "pnpm --filter console dev",
+    "start:web": "pnpm --filter web dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:generate": "pnpm --filter @workspace/database db:generate",
