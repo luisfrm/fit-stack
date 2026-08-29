@@ -28,8 +28,12 @@ export const chatService = {
     return res.data ?? [];
   },
 
-  async saveHistory(conversations: ChatConversationDto[], options?: ApiFetchOptions): Promise<void> {
-    await api("/ai/conversations", { method: "PUT", body: { conversations }, ...(options as object) });
+  async saveConversation(conversation: ChatConversationDto, options?: ApiFetchOptions): Promise<void> {
+    await api(`/ai/conversations/${encodeURIComponent(conversation.id)}`, {
+      method: "PUT",
+      body: conversation,
+      ...(options as object),
+    });
   },
 
   async deleteConversation(id: string, options?: ApiFetchOptions): Promise<void> {

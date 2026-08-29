@@ -55,6 +55,31 @@ export function createChatRepository(env: Partial<Env>) {
       }
     },
 
+    async saveOne(orgId: string, userId: string, conversation: ChatConversation): Promise<void> {
+      if (!redis) return;
+      try {
+        const trimmedConv: ChatConversation = {
+          ...conversation,
+          messages: conversation.messages.slice(-CHAT_MAX_STORED),
+          updatedAt: new Date().toISOString(),
+        };
+        const raw = await redis.get<ChatConversation[]>(chatKey(orgId, userId));
+        const existing: ChatConversation[] = (() => {
+          if (!raw) return [];
+          const parsed = typeof raw === 'string' ? (JSON.parse(raw as unknown as string) as ChatConversation[]) : raw;
+          return Array.isArray(parsed) ? parsed : [];
+        })();
+        const idx = existing.findIndex((c) => c.id === trimmedConv.id);
+        const next =
+          idx >= 0
+            ? existing.map((c, i) => (i === idx ? trimmedConv : c))
+            : [...existing, trimmedConv].slice(-CHAT_MAX_CONVERSATIONS);
+        await redis.set(chatKey(orgId, userId), next as unknown as string);
+      } catch (e) {
+        console.error('[chat redis] saveOne error', e);
+      }
+    },
+
     async delete(orgId: string, userId: string, conversationId: string): Promise<void> {
       if (!redis) return;
       try {

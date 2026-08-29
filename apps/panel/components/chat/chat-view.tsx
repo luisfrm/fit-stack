@@ -57,7 +57,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
   const endRef = React.useRef<HTMLDivElement>(null);
 
   const activeChat = chats.find((chat) => chat.id === activeChatId) ?? null;
-  const dailyExhausted = isQuotaExhausted(usage?.monthly ?? (usage as unknown as { daily?: { used: number; limit: number } })?.daily);
+  const quotaExhausted = isQuotaExhausted(usage?.monthly);
 
   const isAwaitingResponse =
     isStreaming &&
@@ -77,27 +77,29 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [activeChat?.messages, isStreaming]);
 
-  // Persistencia en Redis: guarda solo los últimos CHAT_MAX_STORED mensajes por conversación
-  const persistChats = React.useCallback(async (nextChats: UiChat[]) => {
-    const trimmed = nextChats.map((c) => ({
-      ...c,
-      messages: c.messages.slice(-CHAT_MAX_STORED),
-    }));
+  // Persistencia en Redis: guarda solo la conversación activa (no todo el historial)
+  const persistConversation = React.useCallback(async (chat: UiChat) => {
+    const trimmed = {
+      ...chat,
+      messages: chat.messages.slice(-CHAT_MAX_STORED),
+    };
     try {
-      await chatService.saveHistory(trimmed.slice(-20));
+      await chatService.saveConversation(trimmed);
     } catch {
       // silencioso: Redis es best-effort, el chat sigue funcionando
     }
   }, []);
 
-  const persistRef = React.useRef(persistChats);
-  persistRef.current = persistChats;
+  const persistRef = React.useRef(persistConversation);
+  persistRef.current = persistConversation;
   React.useEffect(() => {
+    if (!activeChat) return;
     // evita persistir el estado inicial vacío antes de hidratar
     if (chats.length === 1 && chats[0]?.messages.length === 0 && !initialConversations?.length) return;
-    const t = setTimeout(() => void persistRef.current(chats), 400);
+    const snapshot = activeChat;
+    const t = setTimeout(() => void persistRef.current(snapshot), 400);
     return () => clearTimeout(t);
-  }, [chats, initialConversations?.length]);
+  }, [activeChat, chats.length, initialConversations?.length]);
 
   const createChat = () => {
     const empty = chats.find((chat) => chat.messages.length === 0);
@@ -141,7 +143,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
   const sendMessage = async () => {
     const content = draft.trim();
     if (!content || isStreaming || !activeChat) return;
-    if (dailyExhausted) {
+    if (quotaExhausted) {
       toast.error("No tienes créditos disponibles en este ciclo");
       return;
     }
@@ -322,7 +324,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
               </div>
 
               <div className="border-t border-white/5 p-3">
-                {dailyExhausted ? (
+                {quotaExhausted ? (
                   <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
                     <Badge variant="warning" size="sm" className="shrink-0 uppercase tracking-widest text-[10px]">
                       Sin créditos

@@ -7,10 +7,11 @@ import {
   PERMISSION_ACTIONS as PA,
   AI_MODELS,
   AI_CHAT_LIMITS,
+  RAG_CONFIG,
   estimateCreditsFromMessages,
   creditsFromUsage,
-  CHAT_MAX_CONVERSATIONS,
   CHAT_MAX_STORED,
+  PANEL_SYSTEM_PROMPT,
 } from '@workspace/shared';
 import { createAIService } from '../services/ai.service';
 import { createKnowledgeService } from '../services/knowledge.service';
@@ -21,7 +22,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
-import { createChatRepository } from '../repositories/chat.repository';
+import { createChatRepository, type ChatConversation } from '../repositories/chat.repository';
 import {
   resolveProviderChain,
   assembleRagPrompt,
@@ -52,10 +53,6 @@ const chatConversationSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
-const chatHistorySchema = z.object({
-  conversations: z.array(chatConversationSchema).max(CHAT_MAX_CONVERSATIONS),
-});
-
 // ── Routes ──
 
 export const aiRoutes = new Hono<AppEnv>()
@@ -72,12 +69,23 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ data });
   })
 
-  .put('/conversations', requireOrgPermission(PM.AI, PA.READ), zValidator('json', chatHistorySchema), async (c) => {
+  .put('/conversations/:id', requireOrgPermission(PM.AI, PA.READ), zValidator('json', chatConversationSchema), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const userId = c.get('user')!.id;
-    const { conversations } = c.req.valid('json');
+    const body = c.req.valid('json');
     const repo = createChatRepository(c.env);
-    await repo.save(orgId, userId, conversations as never);
+    const conversation: ChatConversation = {
+      id: c.req.param('id'),
+      title: body.title,
+      modelUsed: body.modelUsed,
+      messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
+      updatedAt: body.updatedAt,
+    };
+    // Valida que el id de la ruta coincida con el del body si viene
+    if (body.id !== conversation.id) {
+      return c.json({ error: 'ID de conversación no coincide' }, 400);
+    }
+    await repo.saveOne(orgId, userId, conversation);
     return c.json({ success: true });
   })
 
@@ -132,7 +140,9 @@ export const aiRoutes = new Hono<AppEnv>()
         );
       }
 
-      // 3. Features + crédito pre-flight
+      // 3. Features + cuota pre-flight — ANTES del RAG: no gastar embeddings +
+      // pgvector si la cuota ya está agotada. consumeAiCredits no reserva nada;
+      // el estimate sin chars del RAG se corrige en el settle con el usage real.
       const orgId = c.get('session')!.activeOrganizationId!;
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
@@ -143,21 +153,11 @@ export const aiRoutes = new Hono<AppEnv>()
       );
       const aiService = createAIService(c.env);
 
-      // 4. RAG prompt assembly
-      const knowledgeService = createKnowledgeService(
-        createKnowledgeRepository(c.get('db')),
-        aiService,
-      );
-      const { finalMessages, ragExtraChars, systemPromptLength } = await assembleRagPrompt(
-        knowledgeService,
-        messages,
-        orgId,
-      );
-
+      // Incluye cota superior del RAG (maxContextChars) para que el pre-flight nunca subestime
       const estimated = estimateCreditsFromMessages(
-        messages,
+        messages.slice(-(AI_CHAT_LIMITS.maxHistoryMessages - 1)),
         maxTokens ?? AI_CHAT_LIMITS.maxOutputTokens,
-        systemPromptLength + ragExtraChars,
+        PANEL_SYSTEM_PROMPT.length + RAG_CONFIG.maxContextChars,
       );
       const { allowed, quota } = await featuresService.consumeAiCredits(orgId, estimated);
 
@@ -174,6 +174,17 @@ export const aiRoutes = new Hono<AppEnv>()
           quotaHeaders,
         );
       }
+
+      // 4. RAG prompt assembly (solo si hay cuota)
+      const knowledgeService = createKnowledgeService(
+        createKnowledgeRepository(c.get('db')),
+        aiService,
+      );
+      const { finalMessages } = await assembleRagPrompt(
+        knowledgeService,
+        messages,
+        orgId,
+      );
 
       // 5. Stream creation with fallback chain
       const readyChain = chain.filter((mdl) =>
@@ -199,26 +210,62 @@ export const aiRoutes = new Hono<AppEnv>()
       let active = first;
       let usageEmitted = false;
 
-      const wrappedStream: AsyncGenerator<AiStreamDelta, void, void> = (async function* () {
+      // Model name: se resuelve con el PRIMER evento del stream ganador (post
+      // fallback) y no al crear la response — evita reportar el modelo que
+      // falló pre-start.
+      let resolveModelName!: (model: string) => void;
+      const modelNamePromise = new Promise<string>((resolve) => {
+        resolveModelName = resolve;
+      });
+      // Idempotent: resolves the model-name promise only on the first call.
+      let modelNameEmitted = false;
+      const emitModelName = () => {
+        if (modelNameEmitted) return;
+        modelNameEmitted = true;
+        active.modelPromise.then(resolveModelName).catch(() => resolveModelName(readyChain[0]!));
+      };
+
+      // Streams from the active model; on error before first content, falls
+      // through to the next entry in the fallback chain.
+      async function* streamWithFallback(): AsyncGenerator<AiStreamDelta, void, void> {
         let attemptIdx = 0;
+        let started = false;
+        while (true) {
+          try {
+            for await (const delta of active.stream) {
+              emitModelName(); // no-op after first delta
+              if (delta.content) started = true;
+              yield delta as AiStreamDelta;
+            }
+            break;
+          } catch (err) {
+            if (!started && fallbackStreams && attemptIdx < fallbackStreams.length) {
+              active = fallbackStreams[attemptIdx++]!;
+              continue;
+            }
+            throw err;
+          }
+        }
+        // Covers zero-delta streams: no-op if already emitted
+        emitModelName();
+      }
+
+      // Schedules an async credit settlement via waitUntil when SSE emission failed.
+      function scheduleAsyncSettle(): void {
+        const p = active.usage
+          .then((u) => {
+            const actual = u ? creditsFromUsage(u) : estimated;
+            return featuresService.settleAiCredits(orgId, periodStart, actual);
+          })
+          .catch(() => featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => {}))
+          .catch(() => {});
+        c.executionCtx.waitUntil(p as Promise<unknown>);
+      }
+
+      const wrappedStream: AsyncGenerator<AiStreamDelta, void, void> = (async function* () {
         try {
           // Fallback chain: stream from active model, catch → next model
-          let started = false;
-          while (true) {
-            try {
-              for await (const delta of active.stream) {
-                if (!started && delta.content) started = true;
-                yield delta as AiStreamDelta;
-              }
-              break;
-            } catch (err) {
-              if (!started && fallbackStreams && attemptIdx < fallbackStreams.length) {
-                active = fallbackStreams[attemptIdx++]!;
-                continue;
-              }
-              throw err;
-            }
-          }
+          yield* streamWithFallback();
 
           // Success: settle credits synchronously and emit usage via SSE
           const usagePayload = await settleUsage(
@@ -233,30 +280,13 @@ export const aiRoutes = new Hono<AppEnv>()
             usageEmitted = true;
           }
         } finally {
-          if (!usageEmitted) {
-            // Fallback: settle async via waitUntil if SSE emission failed
-            const p = active.usage
-              .then((u) => {
-                const actual = u ? creditsFromUsage(u) : estimated;
-                return featuresService.settleAiCredits(orgId, periodStart, actual);
-              })
-              .catch(() => featuresService.settleAiCredits(orgId, periodStart, estimated).catch(() => {}))
-              .catch(() => {});
-            c.executionCtx.waitUntil(p as Promise<unknown>);
-          }
+          // Fallback: settle async via waitUntil if SSE emission failed
+          if (!usageEmitted) scheduleAsyncSettle();
         }
       })();
 
-      // 6. Resolve model name (may come from fallback)
-      const resolvedModelPromise = (async () => {
-        try {
-          return await active.modelPromise;
-        } catch {
-          return readyChain[0]!;
-        }
-      })();
-
-      return new Response(toSSEStream(wrappedStream, resolvedModelPromise) as unknown as BodyInit, {
+      // 6. Resolve model name (may come from fallback) — ya emitido por el stream ganador
+      return new Response(toSSEStream(wrappedStream, modelNamePromise) as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'text/event-stream; charset=utf-8',
