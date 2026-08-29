@@ -41,6 +41,10 @@ export const knowledgeService = {
     return await api<{ data: KnowledgeDocDetail }>(`${KNOWLEDGE_PATH}/${id}`, options);
   },
 
+  async getContent(id: string, options?: ApiFetchOptions): Promise<{ data: KnowledgeDoc & { content: string } }> {
+    return await api<{ data: KnowledgeDoc & { content: string } }>(`${KNOWLEDGE_PATH}/${id}/content`, options);
+  },
+
   async create(input: { title: string; source: KnowledgeSource; content: string }): Promise<{ data: KnowledgeDoc }> {
     return await api<{ data: KnowledgeDoc }>(KNOWLEDGE_PATH, { method: "POST", body: input });
   },
