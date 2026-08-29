@@ -12,7 +12,7 @@ import {
   toSSEStream,
   type AiStreamDelta,
 } from '../../src/lib/ai-helpers';
-import { PANEL_SYSTEM_PROMPT } from '@workspace/shared';
+import { PANEL_SYSTEM_PROMPT, AI_CHAT_LIMITS } from '@workspace/shared';
 
 // ── Helpers ──
 
@@ -161,9 +161,10 @@ describe('assembleRagPrompt', () => {
     );
 
     expect(ks.searchForChat).toHaveBeenCalledWith('¿Qué es FitStack?', 'org-1');
-    expect(result.finalMessages).toHaveLength(1);
-    expect(result.finalMessages[0].role).toBe('system');
-    expect(result.finalMessages[0].content).toBe(PANEL_SYSTEM_PROMPT);
+    expect(result.finalMessages).toHaveLength(2);
+    expect(result.finalMessages[0]!.role).toBe('system');
+    expect(result.finalMessages[0]!.content).toBe(PANEL_SYSTEM_PROMPT);
+    expect(result.finalMessages[1]).toEqual({ role: 'user', content: '¿Qué es FitStack?' });
     expect(result.ragExtraChars).toBe(0);
     expect(result.systemPromptLength).toBe(PANEL_SYSTEM_PROMPT.length);
   });
@@ -178,10 +179,27 @@ describe('assembleRagPrompt', () => {
       'org-1',
     );
 
-    expect(result.finalMessages[0].content).toContain('[Contexto]');
-    expect(result.finalMessages[0].content).toContain(ragContext);
+    expect(result.finalMessages[0]!.content).toContain('[Contexto]');
+    expect(result.finalMessages[0]!.content).toContain(ragContext);
+    expect(result.finalMessages).toHaveLength(2);
     expect(result.ragExtraChars).toBe(ragContext.length + 12);
-    expect(result.systemPromptLength).toBe(result.finalMessages[0].content.length);
+    expect(result.systemPromptLength).toBe(result.finalMessages[0]!.content.length);
+  });
+
+  it('caps history to maxHistoryMessages - 1 preserving the system prompt', async () => {
+    const ks = mockKnowledgeService('');
+    const history = Array.from({ length: 6 }, (_, i) => ({
+      role: i % 2 === 0 ? 'user' : 'assistant',
+      content: `msg-${i}`,
+    })) as { role: 'user' | 'assistant'; content: string }[];
+
+    const result = await assembleRagPrompt(ks, history, 'org-1');
+
+    expect(result.finalMessages).toHaveLength(AI_CHAT_LIMITS.maxHistoryMessages);
+    expect(result.finalMessages[0]!.role).toBe('system');
+    expect(result.finalMessages[1]!.content).toBe('msg-1');
+    expect(result.finalMessages!.at(-1)!.content).toBe('msg-5');
+    expect(result.finalMessages.map((m) => m.content)).not.toContain('msg-0');
   });
 
   it('uses last user message for RAG query', async () => {

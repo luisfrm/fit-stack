@@ -8,6 +8,8 @@ import {
   getOrderedModelChain,
   PANEL_SYSTEM_PROMPT,
   creditsFromUsage,
+  AI_CHAT_LIMITS,
+  type IAiChatMessage,
   type IAiSseEvent,
 } from '@workspace/shared';
 import { AI_PROVIDER_DEFAULT_KEY } from '../services/features.service';
@@ -29,7 +31,7 @@ export interface ProviderChain {
 }
 
 export interface RagPromptResult {
-  finalMessages: { role: 'system'; content: string }[];
+  finalMessages: IAiChatMessage[];
   ragExtraChars: number;
   systemPromptLength: number;
 }
@@ -67,7 +69,7 @@ export async function resolveProviderChain(
  */
 export async function assembleRagPrompt(
   knowledgeService: KnowledgeService,
-  messages: readonly { role: string; content: string }[],
+  messages: readonly IAiChatMessage[],
   orgId: string,
 ): Promise<RagPromptResult> {
   const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -79,8 +81,11 @@ export async function assembleRagPrompt(
     ? `${PANEL_SYSTEM_PROMPT}\n\n[Contexto]\n${ragContext}`
     : PANEL_SYSTEM_PROMPT;
 
-  const finalMessages = [
+  const finalMessages: IAiChatMessage[] = [
     { role: 'system' as const, content: systemPrompt },
+    // Historial acotado a maxHistoryMessages - 1 para que el system prompt
+    // nunca se pierda en el slice de buildChatBody (solo se envían estos).
+    ...messages.slice(-(AI_CHAT_LIMITS.maxHistoryMessages - 1)),
   ];
 
   const ragExtraChars = ragContext ? ragContext.length + 12 : 0;
