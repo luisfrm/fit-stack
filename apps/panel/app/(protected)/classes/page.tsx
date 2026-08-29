@@ -9,27 +9,29 @@ const PAGE_LIMIT = 10;
 
 export default async function ClassesPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{
     query?: string;
     page?: string;
     isVisible?: string;
   }>;
-}) {
+}>) {
   const params = await searchParams;
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
   const isVisibleParam = params.isVisible;
-  const initialVisibility: "all" | "visible" | "hidden" =
-    isVisibleParam === "true"
-      ? "visible"
-      : isVisibleParam === "false"
-        ? "hidden"
-        : "all";
+  let initialVisibility: "all" | "visible" | "hidden";
+  if (isVisibleParam === "true") {
+    initialVisibility = "visible";
+  } else if (isVisibleParam === "false") {
+    initialVisibility = "hidden";
+  } else {
+    initialVisibility = "all";
+  }
 
   // Fetch session to determine active org ID for isolated cache tagging
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const activeOrgId = session?.session?.activeOrganizationId;
   const tag = `org:${activeOrgId}:classes`;
 
   const filters: {

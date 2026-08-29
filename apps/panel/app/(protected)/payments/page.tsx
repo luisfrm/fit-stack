@@ -33,7 +33,7 @@ export default async function PaymentsPage({
   const page = Math.max(1, Number(params.page) || 1);
 
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const activeOrgId = session?.session?.activeOrganizationId;
   const settingsTag = `org:${activeOrgId}:settings`;
   const subsTag = `org:${activeOrgId}:subscriptions`;
 

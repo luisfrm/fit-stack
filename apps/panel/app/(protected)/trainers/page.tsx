@@ -28,7 +28,7 @@ export default async function TrainersPage({
         : "all";
 
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const activeOrgId = session?.session?.activeOrganizationId;
   const tag = `org:${activeOrgId}:trainers`;
 
   const filters: {

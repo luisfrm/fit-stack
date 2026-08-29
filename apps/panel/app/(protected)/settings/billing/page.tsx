@@ -33,12 +33,12 @@ function FeatureRow({ label, enabled, detail, alwaysOn }: { label: string; enabl
 
 export default async function BillingSettingsPage() {
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || null;
+  const activeOrgId = session?.session?.activeOrganizationId;
 
   const [featuresData, seats, usage, subscriptionStatus] = await Promise.all([
     getOrgFeatures(activeOrgId, { next: { revalidate: 60, tags: [`org:${activeOrgId}:features`] } }),
     getOrgSeats({ next: { revalidate: 60, tags: [`org:${activeOrgId}:members`] } }),
-    getAiUsage({ next: { revalidate: 60 } }),
+    getAiUsage(),
     getOrgSubscriptionStatus(activeOrgId),
   ]);
 

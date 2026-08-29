@@ -12,15 +12,15 @@ const PAGE_LIMIT = 10;
 
 export default async function MembersPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ query?: string; page?: string }>;
-}) {
+}>) {
   const params = await searchParams;
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
 
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || "global";
+  const activeOrgId = session?.session?.activeOrganizationId;
   const tag = `org:${activeOrgId}:members`;
 
   const [result, featuresData, seats] = await Promise.all([
