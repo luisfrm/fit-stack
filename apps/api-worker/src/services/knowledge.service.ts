@@ -30,6 +30,13 @@ export function createKnowledgeService(repo: KnowledgeRepository, aiService: AIS
       return { data: doc };
     },
 
+    async getContent(id: string) {
+      const doc = await repo.getById(id);
+      if (!doc) throw new HTTPException(404, { message: 'Documento no encontrado' });
+      const { chunks: _chunks, ...withoutChunks } = doc;
+      return { data: withoutChunks };
+    },
+
     async create(input: { title: string; source: string; content: string }) {
       const documentId = await repo.create({
         title: input.title,

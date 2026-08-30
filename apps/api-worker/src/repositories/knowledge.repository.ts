@@ -1,4 +1,4 @@
-import { eq, and, sql, isNull, or, desc, cosineDistance } from 'drizzle-orm';
+import { eq, and, sql, isNull, or, desc, cosineDistance, inArray } from 'drizzle-orm';
 import type { Db } from '@workspace/database/factory';
 import { aiKnowledgeChunk, aiKnowledgeDocument } from '@workspace/database/schema';
 
@@ -54,13 +54,15 @@ export function createKnowledgeRepository(db: Db) {
         )
         .orderBy(desc(aiKnowledgeDocument.updatedAt));
       if (rows.length === 0) return [];
-      // Conteo separado: evita subquery correlacionada frágil con neon-http
+      // Conteo acotado a los docs listados (evita escanear toda la tabla)
+      const docIds = rows.map((r) => r.id);
       const counts = await db
         .select({
           documentId: aiKnowledgeChunk.documentId,
           count: sql<number>`count(*)::int`,
         })
         .from(aiKnowledgeChunk)
+        .where(inArray(aiKnowledgeChunk.documentId, docIds))
         .groupBy(aiKnowledgeChunk.documentId);
       const countMap = new Map(counts.map((c) => [c.documentId, Number(c.count)]));
       return rows.map((r) => ({
@@ -162,12 +164,13 @@ export function createKnowledgeRepository(db: Db) {
       minSimilarity: number;
     }): Promise<SimilarChunk[]> {
       const distance = cosineDistance(aiKnowledgeChunk.embedding, params.queryEmbedding);
+      const similarity = sql<number>`1 - (${distance})`;
       const rows = await db
         .select({
           id: aiKnowledgeChunk.id,
           documentId: aiKnowledgeChunk.documentId,
           content: aiKnowledgeChunk.content,
-          similarity: sql<number>`1 - (${distance})`,
+          similarity,
         })
         .from(aiKnowledgeChunk)
         .innerJoin(aiKnowledgeDocument, eq(aiKnowledgeChunk.documentId, aiKnowledgeDocument.id))
@@ -177,13 +180,12 @@ export function createKnowledgeRepository(db: Db) {
             params.organizationId
               ? or(isNull(aiKnowledgeDocument.organizationId), eq(aiKnowledgeDocument.organizationId, params.organizationId))
               : isNull(aiKnowledgeDocument.organizationId),
+            sql`${similarity} >= ${params.minSimilarity}`,
           ),
         )
-        .orderBy(sql`1 - (${distance}) asc`)
+        .orderBy(sql`${similarity} desc`)
         .limit(params.topK);
-      return rows
-        .map((r) => ({ ...r, similarity: Number(r.similarity) }))
-        .filter((r) => r.similarity >= params.minSimilarity);
+      return rows.map((r) => ({ ...r, similarity: Number(r.similarity) }));
     },
   };
 }

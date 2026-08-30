@@ -51,10 +51,8 @@ async function normalizeTodayRevenue(
 
 export default async function DashboardPage() {
   const { data: session } = await sessionService.getSession();
-  const activeOrgId = session?.session?.activeOrganizationId || "global";
-  const orgTimezone = session?.session?.activeOrganizationId
-    ? DEFAULT_TIMEZONE
-    : DEFAULT_TIMEZONE;
+  const activeOrgId = session?.session?.activeOrganizationId;
+  const orgTimezone = DEFAULT_TIMEZONE;
 
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: orgTimezone,

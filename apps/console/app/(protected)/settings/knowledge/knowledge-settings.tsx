@@ -43,10 +43,10 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
 
   const openCreate = () => setMode("create");
   const openEdit = async (doc: KnowledgeDoc) => {
-    // Abre modal de inmediato con contenido vacío y luego carga el texto real
+    // Abre modal de inmediato con contenido vacío y luego carga solo el texto (sin chunks)
     setMode({ edit: doc, content: "" });
     try {
-      const { data } = await knowledgeService.getById(doc.id);
+      const { data } = await knowledgeService.getContent(doc.id);
       setMode({ edit: doc, content: data.content });
     } catch (error) {
       console.error("Error loading document for edit:", error);
@@ -152,7 +152,9 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
               <Library className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <Text className="font-bold">{initialDocs.length} documentos activos en la plataforma</Text>
+              <Text className="font-bold">
+                {initialDocs.filter((d) => d.isActive).length} documentos activos en la plataforma
+              </Text>
               <Text className="text-[10px] text-foreground-dim uppercase tracking-wider font-bold">
                 Se fragmentan automáticamente para búsqueda semántica
               </Text>

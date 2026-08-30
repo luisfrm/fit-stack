@@ -111,7 +111,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 
 1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both configurable dynamically in **Settings**.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
-3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session.
+3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel nunca usa fallback `|| "global"` — es siempre org-scoped vía `(protected)/layout.tsx` (renderiza `OrganizationPicker` si falta org); lo platform-scoped vive en servicios propios de console.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
 
@@ -235,7 +235,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
 | `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
-| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → cadena fija OpenRouter o Workers AI GLM, RAG pre-generación + `PANEL_SYSTEM_PROMPT`, cuota `ai_chat` + headers `X-Ai-Credits-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA) |
+| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → cadena fija OpenRouter o Workers AI GLM, RAG pre-generación + `PANEL_SYSTEM_PROMPT`, cuota `ai_chat` con cota RAG en pre-flight + headers `X-Ai-Credits-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
 > **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). Cadena OpenRouter de modelos fijos (`OPENROUTER_TEXT_MODEL_CHAIN`) con fallback a GLM en Workers AI. El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. 1 crédito = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), límites `AI_CHAT_LIMITS`, ciclo mensual por suscripción, RAG con embeddings `@cf/baai/bge-m3` (ver `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
 | `/api/init` | Bootstrap de org (sin auth) |
@@ -247,7 +247,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
 | `/api/platform/upload` | Assets de plataforma sin org (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, scope fijo `platform/` |
 | `/api/platform/features` | Catálogo de features (`GET /`, cache `platform:features`) |
-| `/api/platform/knowledge` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3, sin cache Redis) |
+| `/api/platform/knowledge` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3, sin cache Redis) — `GET /:id/content` (solo contenido, sin chunks, para edición sin transferir embeddings) |
 | `/api/organizations/features` | Features resueltas de la org activa + `isFreeTier` (gate del panel, cache `org:*:features`) |
 | `/api/organizations/seats` | Cupos del portal de la org activa (`{ used, limit, pending }`) |
 
@@ -428,7 +428,7 @@ Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva);
 - **Fuente de verdad**: tabla `ai_usage` — fila por `(organization_id, period_type='monthly', periodStart)` con `credits`, upsert atómico. `periodStart` = ciclo de suscripción si ACTIVE/TRIAL, si no día 1 calendario (reset perezoso, sin cron). Índice `idx_ai_usage_org_period`.
 - **Evaluación**: `consumeAiCredits(estimated)` (pre-flight) + `settleAiCredits(actual)` post-stream vía `ctx.waitUntil` (DB fuente de verdad). Compat `consumeAiMessage` (3 créditos) para tests. `cache.increment` existe pero no se usa.
 - **RAG (Base de Conocimiento)**: retrieval automático pre-generación en `/api/ai/chat`. Config en `RAG_CONFIG` (`shared/ai.ts`: topK 4, minSimilarity 0.35, chunkSizeChars 800, overlap 100, maxContextChars 2_000). Embeddings SIEMPRE Workers AI `@cf/baai/bge-m3` (1024 dims, multilingüe) vía `aiService.embed()` — independiente del provider de chat. System prompt = `PANEL_SYSTEM_PROMPT` (`shared/prompts.ts`) + bloque `[Contexto]`; fallo del RAG nunca rompe el chat. KB admin: Console → Settings → Base de Conocimiento (`/api/platform/knowledge`, tablas `ai_knowledge_document`/`ai_knowledge_chunk`, pgvector HNSW; `organization_id NULL` = plataforma, seteado = doc de org con aislamiento en el SQL). Fase 2: panel org-KB + function calling (datos vivos).
-- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estima créditos (+ chars del prompt compuesto), valida balance, hace fallback openrouter→glm y liquida `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado.
+- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estima créditos (+ chars del prompt compuesto + cota `RAG_CONFIG.maxContextChars`), valida balance, hace fallback openrouter→glm y liquida `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado.
 
 ### Snapshot de features en pagos
 
