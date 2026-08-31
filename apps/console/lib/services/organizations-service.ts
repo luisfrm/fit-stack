@@ -143,13 +143,14 @@ export const organizationsService = {
   },
 
   /**
-   * Grants AI credits to an organization (manual top-up / tests).
+   * Grants AI credits to an organization (manual top-up / bonus del ciclo vigente).
+   * El bonus aumenta el límite efectivo (base del plan + bonus) sin tocar el consumo.
    */
   async grantAiCredits(
     id: string,
     credits: number,
-  ): Promise<{ success: boolean; granted: number; monthly: { used: number; limit: number } }> {
-    return await api<{ success: boolean; granted: number; monthly: { used: number; limit: number } }>(
+  ): Promise<{ success: boolean; granted: number; monthly: { used: number; limit: number }; remaining: number | null; periodStart: string }> {
+    return await api<{ success: boolean; granted: number; monthly: { used: number; limit: number }; remaining: number | null; periodStart: string }>(
       `${ORGANIZATIONS_PATH}/${id}/ai-credits`,
       { method: "POST", body: { credits } },
     );
