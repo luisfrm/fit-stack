@@ -160,17 +160,17 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
         createFeaturesRepository(c.get('db')),
         cache,
       );
-      const periodStart = await featuresService.getCreditPeriodStart(orgId);
-      const quota = await featuresService.settleAiCredits(orgId, periodStart, credits);
+      const quota = await featuresService.grantAiBonus(orgId, credits);
 
-      // La cuota vive en cache por org → invalidar para que el panel la vea al refrescar
+      // Bonus no está en cache de features, pero invalidamos por si la UI lo deriva de ahí
       await cache.invalidateExact(`org:${orgId}:features`);
 
       return c.json({
         success: true,
         granted: credits,
         monthly: quota.monthly,
-        periodStart,
+        remaining: quota.remaining,
+        periodStart: quota.periodStart,
       });
     },
   )
