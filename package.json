@@ -21,6 +21,8 @@
     "db:studio": "pnpm --filter @workspace/database db:studio",
     "db:seed": "pnpm --filter @workspace/database db:seed",
     "typecheck": "pnpm turbo typecheck",
+    "repair-db": "pnpm --filter @workspace/database exec node scripts/repair-migrations.mjs",
+    "repair-db-test": "pnpm --filter @workspace/database exec node scripts/repair-test-migrations.mjs",
     "test": "pnpm --filter @workspace/shared test && pnpm --filter api-worker test && pnpm --filter panel test && pnpm --filter console test"
   },
   "devDependencies": {

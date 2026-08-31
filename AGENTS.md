@@ -615,7 +615,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (créditos IA: `credits` + `count` legacy, índice `idx_ai_usage_org_period`, periodo mensual por ciclo)
+`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (créditos IA: `credits` (consumo) + `bonus_credits` (bonus one-off por ciclo, vía **Dar AI Credits** en console) + `count` legacy, índice `idx_ai_usage_org_period`, periodo mensual por ciclo)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
