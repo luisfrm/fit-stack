@@ -58,6 +58,42 @@ export function createFeaturesRepository(db: Db) {
       return row?.credits ?? 0;
     },
 
+    async getPeriodUsage(orgId: string, periodStart: Date): Promise<{ credits: number; bonusCredits: number }> {
+      const [row] = await db
+        .select({ credits: aiUsage.credits, bonusCredits: aiUsage.bonusCredits })
+        .from(aiUsage)
+        .where(
+          and(
+            eq(aiUsage.organizationId, orgId),
+            eq(aiUsage.periodType, 'monthly'),
+            eq(aiUsage.periodStart, periodStart),
+          ),
+        );
+      return { credits: row?.credits ?? 0, bonusCredits: row?.bonusCredits ?? 0 };
+    },
+
+    async grantBonusCredits(orgId: string, periodStart: Date, delta: number): Promise<{ credits: number; bonusCredits: number }> {
+      const [row] = await db
+        .insert(aiUsage)
+        .values({
+          organizationId: orgId,
+          periodType: 'monthly',
+          periodStart,
+          credits: 0,
+          bonusCredits: delta,
+          count: 0,
+        })
+        .onConflictDoUpdate({
+          target: [aiUsage.organizationId, aiUsage.periodType, aiUsage.periodStart],
+          set: {
+            bonusCredits: sql`${aiUsage.bonusCredits} + ${delta}`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning({ credits: aiUsage.credits, bonusCredits: aiUsage.bonusCredits });
+      return { credits: row?.credits ?? 0, bonusCredits: row?.bonusCredits ?? delta };
+    },
+
     /**
      * Incremento atómico de créditos del ciclo (INSERT ... ON CONFLICT DO UPDATE).
      * Con cap: falla si credits + delta > limit (0 = ilimitado → sin cap).

@@ -158,7 +158,7 @@ export function createFeaturesService(
     const aiFeature = orgFeatures.features.ai_chat;
     const disabled = !aiFeature?.enabled;
 
-    const limit = aiFeature?.limits?.ai_credits_monthly ?? 0;
+    const baseLimit = aiFeature?.limits?.ai_credits_monthly ?? 0;
 
     if (disabled) {
       const periodStart = await getCreditPeriodStart(orgId);
@@ -166,9 +166,10 @@ export function createFeaturesService(
     }
 
     const periodStart = await getCreditPeriodStart(orgId);
-    const used = await featuresRepo.getMonthlyCredits(orgId, periodStart);
-    const remaining = limit === 0 ? null : Math.max(0, limit - used);
-    return { monthly: { used, limit }, remaining, disabled, periodStart };
+    const { credits: used, bonusCredits } = await featuresRepo.getPeriodUsage(orgId, periodStart);
+    const effectiveLimit = baseLimit === 0 ? 0 : baseLimit + bonusCredits;
+    const remaining = effectiveLimit === 0 ? null : Math.max(0, effectiveLimit - used);
+    return { monthly: { used, limit: effectiveLimit }, remaining, disabled, periodStart };
   }
 
   async function getSeatsUsage(orgId: string): Promise<SeatsResult> {
@@ -212,6 +213,14 @@ export function createFeaturesService(
         disabled: false,
         periodStart,
       };
+    },
+
+    async grantAiBonus(orgId: string, granted: number): Promise<AiQuotaResult> {
+      const quota = await getAiQuota(orgId);
+      if (quota.disabled || granted <= 0) return quota;
+      await featuresRepo.grantBonusCredits(orgId, quota.periodStart, granted);
+      // Re-leer para reflejar bonus en límite efectivo
+      return getAiQuota(orgId);
     },
 
   };
