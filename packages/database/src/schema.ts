@@ -228,6 +228,7 @@ export const platformSubscriptionPayment = pgTable(
 
 // ── AI USAGE (rate-limit de chat IA por período) ──
 // Fuente de verdad de créditos (1 crédito = 1K tokens). Reset mensual por ciclo de suscripción (o calendario si no hay sub).
+// bonusCredits: créditos extra otorgados manualmente (Dar AI Credits) — one-off por ciclo, no recurrente.
 export const aiUsage = pgTable(
   'ai_usage',
   {
@@ -238,6 +239,7 @@ export const aiUsage = pgTable(
     periodType: text('period_type').notNull(), // 'monthly' (legado: daily/weekly siguen válidos)
     periodStart: date('period_start', { mode: 'date' }).notNull(),
     credits: integer('credits').notNull().default(0),
+    bonusCredits: integer('bonus_credits').notNull().default(0),
     count: integer('count').notNull().default(0), // @deprecated legacy mensajes (mantener para compat)
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -1,0 +1,1 @@
+ALTER TABLE "ai_usage" ADD COLUMN "bonus_credits" integer NOT NULL DEFAULT 0;

@@ -1,0 +1,1 @@
+ALTER TABLE "ai_usage" ALTER COLUMN "bonus_credits" SET NOT NULL;
