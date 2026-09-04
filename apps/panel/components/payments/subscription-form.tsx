@@ -261,6 +261,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
     if (selectedPaymentConfig) {
       for (const field of selectedPaymentConfig.fields) {
+        if (field.type === 'visual') continue;
         const value = dynamicFieldValues[field.id];
         const isEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === "");
 
@@ -305,12 +306,13 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
         // Map field IDs to human-readable labels for self-descriptive data
+        // (visual fields are instructions, never persisted as payment details)
         finalPaymentMethodDetails = selectedPaymentConfig.fields
-          .filter(field => finalDetails[field.id] !== undefined)
+          .filter(field => field.type !== 'visual' && finalDetails[field.id] !== undefined)
           .map(field => ({
             label: field.label,
             value: finalDetails[field.id],
-            type: field.type
+            type: field.type === 'visual' ? 'text' : field.type
           }));
       } else if (paymentDetails) {
         finalPaymentMethodDetails = [{

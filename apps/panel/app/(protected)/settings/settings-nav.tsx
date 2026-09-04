@@ -28,7 +28,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { label: "Organización", href: "/settings/organization", icon: Building2, disabled: false },
   { label: "Monedas", href: "/settings/currencies", icon: Coins, disabled: false },
   { label: "Métodos de Pago", href: "/settings/payment-methods", icon: Wallet, disabled: false },
-  { label: "Facturación", href: "/settings/billing", icon: CreditCard, disabled: false },
+  { label: "Suscripción", href: "/settings/suscription", icon: CreditCard, disabled: false },
   { label: "Equipo", href: "/settings/team", icon: UserCog, disabled: true },
 ];
 

@@ -282,12 +282,13 @@ export function PlatformSubscriptionForm({
 
       let finalPaymentMethodDetails: IPaymentMethodDetails | undefined;
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
+        // visual fields are instructions, never persisted as payment details
         finalPaymentMethodDetails = selectedPaymentConfig.fields
-          .filter((field) => finalDetails[field.id] !== undefined)
+          .filter((field) => field.type !== "visual" && finalDetails[field.id] !== undefined)
           .map((field) => ({
             label: field.label,
             value: finalDetails[field.id],
-            type: field.type,
+            type: field.type === "visual" ? "text" : field.type,
           }));
       } else if (paymentDetails) {
         finalPaymentMethodDetails = [{ label: "Nota / Referencia", value: paymentDetails, type: "text" }];

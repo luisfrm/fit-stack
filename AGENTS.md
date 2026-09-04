@@ -553,7 +553,16 @@ PLATFORM_ROLE_LABELS + formatPlatformRole (roles de plataforma/Console: owner, a
 
 // types.ts
 IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
-PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization
+PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization,
+IPaymentMethodConfig, IPaymentMethodField (type: 'text' | 'file' | 'number' | 'visual' + value?)
+
+> **Campo `visual` en métodos de pago**: un field con `type: 'visual'` guarda instrucciones
+> en `value` (p. ej. "Método de pago: Binance\nEnviar a: ...") que el editor de payment-methods
+> escribe con un `Textarea`. En los forms de pago (`payment-section.tsx` de panel y console)
+> se renderiza como **card informativa** (`whitespace-pre-line`), nunca como input, nunca
+> `required`, y **no se persiste** en `paymentMethodDetails` (los forms lo filtran en el
+> build de details — `subscription-form.tsx` / `platform-subscription-form.tsx`).
+> `paymentMethodDetailsSchema` (api-worker) sigue siendo `text|file|number`.
 
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),

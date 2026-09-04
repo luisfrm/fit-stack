@@ -273,8 +273,10 @@ export type IPaymentMethodDetails = IPaymentMethodDetail[];
 export interface IPaymentMethodField {
   id: string;
   label: string;
-  type: 'text' | 'file' | 'number';
+  type: 'text' | 'file' | 'number' | 'visual';
   required: boolean;
+  /** Contenido de instrucciones para type 'visual' — se renderiza como card informativa, no como input. */
+  value?: string;
 }
 
 export interface IPaymentMethodConfig {

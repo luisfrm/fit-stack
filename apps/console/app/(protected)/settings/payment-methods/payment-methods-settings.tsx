@@ -10,6 +10,7 @@ import {
   Type,
   FileImage,
   Hash,
+  Eye,
   Sparkles,
   ChevronRight,
   AlertCircle
@@ -17,6 +18,7 @@ import {
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
+import { Textarea } from "@workspace/ui/components/textarea";
 import { Button } from "@workspace/ui/components/button";
 import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
@@ -59,6 +61,22 @@ const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
     fields: [
       { id: "fld_tb1", label: "Número de Referencia", type: "text", required: true },
       { id: "fld_tb2", label: "Banco Destino", type: "text", required: true },
+    ],
+    currency: null
+  },
+  {
+    id: "binance",
+    name: "Binance",
+    fields: [
+      {
+        id: "fld_b1",
+        label: "Instrucciones de Pago",
+        type: "visual",
+        required: false,
+        value: "Método de pago: Binance\nEnviar a: pagos@fitstack.app\nRed: BEP-20 (BNB)\n\nAdjunta el comprobante de la transferencia en los campos de abajo."
+      },
+      { id: "fld_b2", label: "Email remitente", type: "text", required: true },
+      { id: "fld_b3", label: "Comprobante / Captura", type: "file", required: true },
     ],
     currency: null
   }
@@ -411,6 +429,20 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave, activeCurrencies
                     </Button>
                   </div>
 
+                  {field.type === 'visual' && (
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
+                      <Text className="text-[9px] font-bold text-foreground-dim uppercase tracking-tighter">Contenido / Instrucciones</Text>
+                      <Textarea
+                        placeholder={"Ej: Método de pago: Binance\nEnviar a: pagos@fitstack.app\nRed: BEP-20"}
+                        value={field.value ?? ""}
+                        onChange={(e) => handleUpdateField(field.id, { value: e.target.value })}
+                      />
+                      <Text className="text-[10px] text-foreground-dim italic">
+                        Se mostrará como una tarjeta informativa en el formulario de pago — no es un input.
+                      </Text>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-2 border-t border-border">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1">
@@ -450,15 +482,29 @@ function PaymentMethodEditor({ method, isOpen, onClose, onSave, activeCurrencies
                         >
                           <Hash className="w-3.5 h-3.5" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => handleUpdateField(field.id, { type: 'visual', required: false })}
+                          className={cn(
+                            "p-1.5 rounded-lg border transition-all h-auto",
+                            field.type === 'visual' ? "bg-primary/20 border-primary/40 text-primary" : "bg-foreground/5 border-transparent text-foreground-dim"
+                          )}
+                          title="Visual (instrucciones informativas)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={field.required}
-                          onCheckedChange={(val) => handleUpdateField(field.id, { required: val })}
-                        />
-                        <Text className="text-[10px] font-bold text-foreground-muted uppercase">Obligatorio</Text>
-                      </div>
+                      {field.type !== 'visual' && (
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={field.required}
+                            onCheckedChange={(val) => handleUpdateField(field.id, { required: val })}
+                          />
+                          <Text className="text-[10px] font-bold text-foreground-muted uppercase">Obligatorio</Text>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

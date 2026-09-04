@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calculator, CircleDollarSign, CreditCard } from "lucide-react";
+import { Calculator, CircleDollarSign, CreditCard, Eye } from "lucide-react";
 import {
   Card,
   Text,
@@ -180,13 +180,25 @@ export function PaymentSection({
       {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
           {selectedPaymentConfig.fields.map(field => (
-            <div key={field.id} className={cn("space-y-2", field.type === 'file' && "md:col-span-2")}>
+            <div key={field.id} className={cn("space-y-2", (field.type === 'file' || field.type === 'visual') && "md:col-span-2")}>
               <Text as="label" variant="muted" size="xs" weight="bold" uppercase className="flex items-center gap-1">
                 {field.label}
                 {field.required && <span className="text-red-500">*</span>}
               </Text>
 
-              {field.type === 'file' ? (
+              {field.type === 'visual' ? (
+                <div className="rounded-xl border border-border bg-foreground/3 p-4 space-y-2 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-primary" />
+                    <Text as="span" variant="muted" size="xs" weight="bold" uppercase className="tracking-wider">
+                      Instrucciones de pago
+                    </Text>
+                  </div>
+                  <Text size="sm" className="whitespace-pre-line leading-relaxed">
+                    {field.value || "Sin instrucciones configuradas."}
+                  </Text>
+                </div>
+              ) : field.type === 'file' ? (
                 <ImageUpload
                   value={typeof dynamicFieldValues[field.id] === 'string' ? dynamicFieldValues[field.id] : undefined}
                   onChange={(file) => onDynamicChange(field.id, file)}
