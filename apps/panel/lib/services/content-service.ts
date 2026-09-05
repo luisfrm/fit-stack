@@ -2,7 +2,7 @@ import { api, type ApiFetchOptions } from "@/lib/api/client";
 import type {
   IContentPage,
   IContentBlock,
-  IContentPageWithBlocks,
+  IContentBlockData,
   ContentBlockType,
 } from "@/types/content";
 
@@ -34,7 +34,7 @@ export const contentService = {
     page: Partial<IContentPage>,
   ): Promise<IContentPage> {
     return await api<IContentPage>(`${CMS_PATH}/pages/${id}`, {
-      method: "PATCH",
+      method: "PUT",
       body: page,
     });
   },
@@ -57,20 +57,22 @@ export const contentService = {
 
   async createBlock(
     pageId: number,
-    block: { blockType: ContentBlockType; data: unknown; displayOrder: number },
+    block: { blockType: ContentBlockType; data: unknown; displayOrder?: number },
   ): Promise<IContentBlock> {
-    return await api<IContentBlock>(`${CMS_PATH}/pages/${pageId}/blocks`, {
+    // The API creates blocks at POST /cms/blocks with pageId in the body;
+    // displayOrder is optional — the server computes max(existing) + 1.
+    return await api<IContentBlock>(`${CMS_PATH}/blocks`, {
       method: "POST",
-      body: block,
+      body: { pageId, ...block },
     });
   },
 
   async updateBlock(
     id: number,
-    block: Partial<IContentBlock>,
+    block: { data?: IContentBlockData; isVisible?: boolean },
   ): Promise<IContentBlock> {
     return await api<IContentBlock>(`${CMS_PATH}/blocks/${id}`, {
-      method: "PATCH",
+      method: "PUT",
       body: block,
     });
   },
@@ -83,19 +85,10 @@ export const contentService = {
     pageId: number,
     orders: { id: number; displayOrder: number }[],
   ): Promise<void> {
-    await api(`${CMS_PATH}/pages/${pageId}/blocks`, {
+    await api(`${CMS_PATH}/pages/${pageId}/blocks/reorder`, {
       method: "PUT",
       body: { orders },
     });
-  },
-
-  // --- PUBLIC ---
-
-  async getPublicPage(
-    slug: string,
-    options?: ApiFetchOptions,
-  ): Promise<IContentPageWithBlocks> {
-    return await api<IContentPageWithBlocks>(`/public/pages/${slug}`, options);
   },
 
   // --- MEDIA ---

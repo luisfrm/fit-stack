@@ -1,33 +1,23 @@
-export type ContentBlockType =
-  | 'hero'
-  | 'services'
-  | 'classes'
-  | 'testimonials'
-  | 'gallery'
-  | 'contact'
-  | 'team';
-
-export interface IContentPage {
-  id: number;
-  slug: string;
-  title: string;
-  description: string | null;
-  isActive: boolean;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface IContentBlock {
-  id: number;
-  pageId: number;
-  blockType: ContentBlockType;
-  data: any; // Tipado dinámico según blockType
-  isVisible: boolean;
-  displayOrder: number;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface IContentPageWithBlocks extends IContentPage {
-  blocks: IContentBlock[];
-}
+// Single source of truth: packages/shared/src/content.ts
+export {
+  HeroBlockSchema,
+  ServicesBlockSchema,
+  ServicesBlockItemSchema,
+  ClassesBlockSchema,
+  TestimonialsBlockSchema,
+  TestimonialItemSchema,
+  GalleryBlockSchema,
+  GalleryItemSchema,
+  ContactBlockSchema,
+  TeamBlockSchema,
+  BLOCK_SCHEMAS,
+  validateBlockData,
+} from "@workspace/shared";
+export type {
+  ContentBlockType,
+  IContentBlockData,
+  BlockDataMap,
+  IContentPage,
+  IContentBlock,
+  IContentPageWithBlocks,
+} from "@workspace/shared";

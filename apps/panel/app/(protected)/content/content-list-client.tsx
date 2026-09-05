@@ -95,8 +95,8 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
   ];
 
   return (
-    <div className="space-y-8">
-      <header className="flex justify-between items-center">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <header className="flex justify-between items-center animate-in fade-in slide-in-from-top-2 duration-500">
         <div>
           <h2 className="text-2xl lg:text-3xl font-bold text-slate-100">Gestión de Contenido</h2>
           <Text variant="muted">Administra las páginas y secciones de tu sitio web.</Text>
@@ -111,15 +111,17 @@ export function ContentListClient({ initialPages }: ContentListClientProps) {
         />
       </header>
 
-      <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden">
+      <Card className="bg-white/5 border-none backdrop-blur-md rounded-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-500 delay-75">
         {pages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4 text-slate-500">
-            <Globe className="w-12 h-12 opacity-20" />
-            <Text>No hay páginas creadas aún.</Text>
-            <PageCreationModal
-              onSuccess={() => router.refresh()}
-              trigger={<Button variant="outlined" size="sm">Crear mi primera página</Button>}
-            />
+            <Globe className="w-12 h-12 opacity-20 animate-in fade-in zoom-in-50 duration-500" />
+            <Text className="animate-in fade-in duration-500 delay-100">No hay páginas creadas aún.</Text>
+            <div className="animate-in fade-in duration-500 delay-150">
+              <PageCreationModal
+                onSuccess={() => router.refresh()}
+                trigger={<Button variant="outlined" size="sm">Crear mi primera página</Button>}
+              />
+            </div>
           </div>
         )}
         {pages.length > 0 && (
