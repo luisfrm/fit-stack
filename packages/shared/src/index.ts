@@ -6,4 +6,5 @@ export * from './access-control';
 export * from './auth-config';
 export * from './permissions';
 export * from './features/catalog';
+export * from './content';
 
