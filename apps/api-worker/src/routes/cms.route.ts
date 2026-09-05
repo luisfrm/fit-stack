@@ -14,6 +14,8 @@ const pageSchema = z.object({
   slug: z.string().min(1, 'El slug es requerido'),
   title: z.string().min(1, 'El título es requerido'),
   description: z.string().nullable().optional(),
+  metaTitle: z.string().nullable().optional(),
+  metaDescription: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -22,7 +24,9 @@ const blockSchema = z.object({
   blockType: z.enum(['hero', 'services', 'classes', 'testimonials', 'gallery', 'contact', 'team']),
   data: z.record(z.string(), z.any()),
   isVisible: z.boolean().default(true),
-  displayOrder: z.number().int().default(0),
+  // Optional: when omitted the service computes `max(existing) + 1` so new
+  // blocks never collide with the unique index after deletions.
+  displayOrder: z.number().int().optional(),
 });
 
 export const cmsRoutes = new Hono<AppEnv>()
