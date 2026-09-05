@@ -177,7 +177,16 @@ export function SubscriptionsTable({
     },
     {
       header: "Status",
-      cell: (sub) => <SubscriptionStatusBadge status={sub.status} />,
+      cell: (sub) => (
+        <div className="flex flex-col gap-1">
+          <SubscriptionStatusBadge status={sub.status} />
+          {(sub.latestPaymentStatus === "pending" || sub.latestPaymentStatus === "processing") && (
+            <Badge variant="warning" size="sm" className="uppercase tracking-widest text-[9px] w-fit">
+              Pago pendiente
+            </Badge>
+          )}
+        </div>
+      ),
     },
     {
       header: "Precio",

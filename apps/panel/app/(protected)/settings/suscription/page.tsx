@@ -4,9 +4,12 @@ import { Gift, Sparkles, Users, Zap, ShieldCheck, Info } from "lucide-react";
 import { sessionService } from "@/lib/services/session-service";
 import { getOrgFeatures, getOrgSeats, getAiUsage } from "@/lib/services/org-features";
 import { getOrgSubscriptionStatus } from "@/lib/services/subscription-status";
+import { getOrgSubscription, getOrgPaymentMethods } from "@/lib/services/org-billing";
+import { SubscriptionStatusCard } from "@/components/billing/subscription-status-card";
 import { FEATURE_CATALOG, formatFeatureLimits, summarizeFeatures, type PlanFeaturesV2 } from "@workspace/shared";
 import { PortalSeatsBanner } from "@/components/dashboard/portal-seats-banner";
 import { AiQuotaBanner } from "@/components/chat/ai-quota-banner";
+import { updateTag } from "next/cache";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -35,18 +38,28 @@ export default async function BillingSettingsPage() {
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
 
-  const [featuresData, seats, usage, subscriptionStatus] = await Promise.all([
+  const [featuresData, seats, usage, subscriptionStatus, subscription, billingPaymentMethods] = await Promise.all([
     getOrgFeatures(activeOrgId, { next: { revalidate: 60, tags: [`org:${activeOrgId}:features`] } }),
     getOrgSeats({ next: { revalidate: 60, tags: [`org:${activeOrgId}:members`] } }),
     getAiUsage(),
     getOrgSubscriptionStatus(activeOrgId),
+    getOrgSubscription({ next: { revalidate: 60, tags: [`org:${activeOrgId}:subscription`] } }),
+    getOrgPaymentMethods({ next: { revalidate: 600, tags: [`org:${activeOrgId}:payment-methods`] } }),
   ]);
+
+  const refreshBilling = async () => {
+    "use server";
+    updateTag(`org:${activeOrgId}:subscription`);
+  };
 
   const features = (featuresData?.features ?? {}) as PlanFeaturesV2;
   const isFreeTier = featuresData?.isFreeTier ?? false;
   const effectiveStatus = featuresData?.subscriptionStatus ?? subscriptionStatus ?? "unknown";
   const planName = featuresData?.planName ?? (isFreeTier ? "Plan Gratuito" : "Sin plan");
   const planId = featuresData?.planId;
+  const subPeriodEnd = subscription ? new Date(subscription.currentPeriodEnd).getTime() : null;
+  const subDaysDiff = subPeriodEnd !== null ? Math.ceil((subPeriodEnd - Date.now()) / 86_400_000) : 0;
+  const subIsExpired = subPeriodEnd !== null && subPeriodEnd < Date.now();
 
   const statusBadge = () => {
     if (isFreeTier) return <Badge variant="info" size="md" className="uppercase tracking-widest">Free Tier</Badge>;
@@ -90,6 +103,16 @@ export default async function BillingSettingsPage() {
           </div>
         ) : null}
       </div>
+
+      {/* Suscripción SaaS — estado, vencimiento y renovación autoservicio */}
+      <SubscriptionStatusCard
+        subscription={subscription}
+        paymentMethods={billingPaymentMethods}
+        isFreeTier={isFreeTier}
+        isExpired={subIsExpired}
+        daysDiff={subDaysDiff}
+        refreshBilling={refreshBilling}
+      />
 
       {/* Plan — sección con lista plana, sin card-en-card */}
       <section className="mt-8 overflow-hidden rounded-xl border border-border bg-surface">

@@ -33,6 +33,9 @@ export type Env = {
   // OpenRouter (free models via `openrouter/free`)
   OPENROUTER_API_KEY?: string;
 
+  // Exchange rates (server-side provider para renovación org-scoped)
+  EXCHANGE_API_URL?: string;
+
   // Cloudflare Bindings
   FILES_BUCKET: R2Bucket;
   TASK_QUEUE: Queue;

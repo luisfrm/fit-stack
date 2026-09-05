@@ -13,12 +13,13 @@ import {
 } from "@workspace/ui/components";
 import { platformSubscriptionsService, type PlatformPayment } from "@/lib/services/platform-subscriptions-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
-import type { PaymentStatus, IPlatformSubscriptionPayment } from "@workspace/shared/types";
+import type { PaymentStatus, IPlatformSubscriptionPayment, IPaymentMethodDetails } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { Trash2, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { SimpleTooltip, TooltipProvider } from "@workspace/ui/components";
 import { summarizeFeatures, type PlanFeaturesV2 } from "@workspace/shared";
+import { PaymentDetailsList } from "./payment-details-list";
 
 type PlatformPaymentWithSnapshot = PlatformPayment & { features_snapshot?: PlanFeaturesV2 | null };
 
@@ -139,15 +140,11 @@ export function PlatformPaymentHistoryModal({
     {
       header: "Método",
       cell: (p) => (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1.5">
           <Text size="sm" className="font-medium">
             {p.paymentMethod}
           </Text>
-          {p.paymentMethodDetails && typeof p.paymentMethodDetails === "object" && (
-            <Text size="xs" variant="muted" className="opacity-50 italic">
-              {Object.keys(p.paymentMethodDetails).length} detalles
-            </Text>
-          )}
+          <PaymentDetailsList details={p.paymentMethodDetails as IPaymentMethodDetails | Record<string, any> | null | undefined} />
         </div>
       ),
     },

@@ -287,6 +287,16 @@ export interface IPaymentMethodConfig {
   currency: string | null; // null = any currency
 }
 
+/**
+ * Ordena los campos de un método de pago: los `visual` (instrucciones
+ * informativas) primero, luego el resto. Aplicado en los payment forms
+ * (panel + console) al momento de renderizar.
+ */
+export function sortPaymentMethodFields(fields: IPaymentMethodField[]): IPaymentMethodField[] {
+  const rank = (t: IPaymentMethodField['type']) => (t === 'visual' ? 0 : 1);
+  return [...fields].sort((a, b) => rank(a.type) - rank(b.type));
+}
+
 export interface ITaxDetail {
   name: string;
   rate: number;

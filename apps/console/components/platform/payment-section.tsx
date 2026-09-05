@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { type IPlatformPlan, type IPaymentMethodConfig } from "@workspace/shared/types";
+import { sortPaymentMethodFields } from "@workspace/shared";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -179,7 +180,7 @@ export function PaymentSection({
 
       {selectedPaymentConfig && selectedPaymentConfig.fields.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border">
-          {selectedPaymentConfig.fields.map(field => (
+          {sortPaymentMethodFields(selectedPaymentConfig.fields).map(field => (
             <div key={field.id} className={cn("space-y-2", (field.type === 'file' || field.type === 'visual') && "md:col-span-2")}>
               <Text as="label" variant="muted" size="xs" weight="bold" uppercase className="flex items-center gap-1">
                 {field.label}

@@ -17,6 +17,15 @@ import {
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 import { normalizeFeatures } from '@workspace/shared';
 import { addDuration } from '../lib/billing-utils';
+import type { ExchangeRateProvider } from '../lib/exchange-rates';
+
+/** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
+const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
+  async getRate(base: string, target: string): Promise<number> {
+    if (base === target) return 1;
+    throw new Error('Rate provider not configured');
+  },
+};
 
 export interface CreatePlatformSubscriptionPayload {
   organizationId: string;
@@ -54,6 +63,17 @@ export interface UpdatePlatformPaymentStatusPayload {
 }
 
 /**
+ * Payload mínimo de la renovación autoservicio (org-scoped).
+ * El body NUNCA contiene montos ni tasas: el backend los dicta.
+ */
+export interface OrgRenewPayload {
+  paymentMethod: string;
+  currencyPaid: string;
+  paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
+  paymentDate?: string;
+}
+
+/**
  * Safely parses a start date input string into a Date object (UTC midnight for YYYY-MM-DD strings).
  */
 function parseStartDate(input?: string): Date {
@@ -74,7 +94,8 @@ function snapshotFeatures(features: PlanFeaturesV2 | null | undefined): PlanFeat
 
 export function createPlatformSubscriptionsService(
   platformSubsRepo: PlatformSubscriptionsRepository,
-  plansRepo: ReturnType<typeof createPlatformPlansRepository>
+  plansRepo: ReturnType<typeof createPlatformPlansRepository>,
+  rateProvider: ExchangeRateProvider = SAME_CURRENCY_ONLY_RATE_PROVIDER
 ) {
   return {
     async getAllSubscriptions(
@@ -248,6 +269,55 @@ export function createPlatformSubscriptionsService(
       }
 
       return { newPeriodEnd };
+    },
+
+    /**
+     * Renovación autoservicio (org-scoped, fase 2): registra el pago con
+     * status `processing` (queda pendiente de aprobación de soporte en
+     * console) SIN extender el periodo. Todo lo económico lo dicta el
+     * backend: snapshot del plan (name/precio/moneda/duración/features),
+     * tasa vía provider server-side y monto total — el body jamás los envía.
+     * Guards de negocio (solo al expirar, sin pendientes, no cancelada)
+     * se validan en la ruta; aquí solo se computa y persiste.
+     */
+    async renewOrgSubscription(
+      subscriptionId: number,
+      data: OrgRenewPayload
+    ): Promise<{ paymentId: number }> {
+      const sub = await platformSubsRepo.findById(subscriptionId);
+      if (!sub) throw new Error('Suscripción no encontrada');
+      if (sub.cancelledAt) throw new Error('No se puede renovar una suscripción cancelada');
+
+      const plan = await plansRepo.findById(sub.planId);
+      if (!plan) throw new Error('Plan no encontrado');
+
+      // Precio efectivo (override del plan si aplica) y conversión server-side
+      const effectivePriceCents = sub.priceOverride ?? plan.price;
+      const rate = await rateProvider.getRate(plan.currency, data.currencyPaid);
+      const amountPaidCents = Math.round(effectivePriceCents * rate);
+
+      const paymentData: NewPlatformPaymentData = {
+        subscriptionId,
+        organizationId: sub.organizationId,
+        planId: sub.planId,
+        planSnapshotName: plan.name,
+        planSnapshotPrice: plan.price,
+        planSnapshotCurrency: plan.currency,
+        planSnapshotDurationValue: plan.durationValue,
+        planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
+        featuresSnapshot: snapshotFeatures(plan.features),
+        amountPaid: amountPaidCents,
+        currencyPaid: data.currencyPaid,
+        exchangeRateApplied: String(rate),
+        baseAmount: effectivePriceCents,
+        paymentMethod: data.paymentMethod,
+        paymentMethodDetails: data.paymentMethodDetails ?? null,
+        status: PAYMENT_STATUSES.PROCESSING,
+        paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
+      };
+      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
+
+      return { paymentId };
     },
 
     /**
