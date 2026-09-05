@@ -596,6 +596,8 @@ export const contentPage = pgTable('content_page', {
   slug: text('slug').notNull(),
   title: text('title').notNull(),
   description: text('description'),
+  metaTitle: text('meta_title'),
+  metaDescription: text('meta_description'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

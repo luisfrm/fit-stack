@@ -7,6 +7,8 @@ export interface IContentPage {
   slug: string;
   title: string;
   description: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -47,6 +49,8 @@ export function createContentPagesRepository(db: Db) {
           slug: data.slug,
           title: data.title,
           description: data.description,
+          metaTitle: data.metaTitle,
+          metaDescription: data.metaDescription,
           isActive: data.isActive,
         })
         .returning();
