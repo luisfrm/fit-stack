@@ -65,7 +65,7 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 | **Platform (SaaS Admin)** | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods. |
 | **Staff & Trainers** | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers). |
 | **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
-| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. |
+| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = config SEO (title, slug, description, metaTitle, metaDescription, isActive) y `/content/[id]/blocks` = editor DnD de bloques. |
 | **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
 | **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Pausado** — endpoints viven solo en `apps/api` legacy, no migrados al api-worker. |
 | **Reports** | Revenue analytics with multi-currency normalization. |
@@ -233,7 +233,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/dashboard` | KPI stats (cache `org:*:dashboard:stats:*`) |
 | `/api/settings` | Gym settings (currencies, payment methods, theme) |
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
-| `/api/organizations` | `GET /subscription-status` (estado de facturación del org) |
+| `/api/organizations` | `GET /subscription-status` (estado de facturación del org) · `GET /subscription` (sub SaaS de la org con detalles del plan, cache 1 min) · `GET /payment-methods` (métodos de pago de plataforma expuestos a la org, cache 10 min) · `POST /subscription/renew` (renovación autoservicio — ver sección "Renovación autoservicio" abajo) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
 | `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → cadena fija OpenRouter o Workers AI GLM, RAG pre-generación + `PANEL_SYSTEM_PROMPT`, cuota `ai_chat` con cota RAG en pre-flight + headers `X-Ai-Credits-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
@@ -307,6 +307,9 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:cms:*` | 5 min | Invalidation de CMS (los reads no se cachean) |
 | `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
+| `org:${orgId}:subscription` | 1 min | Sub SaaS de la org con detalles del plan (renovación autoservicio) |
+| `org:${orgId}:payment-methods` | 10 min | Métodos de pago de plataforma expuestos a la org |
+| `rates:${base}` | 1 hr | Tasas de cambio server-side (open.er-api.com, provider en `api-worker/src/lib/exchange-rates.ts`) |
 | `org:${orgId}:features` | 5 min | Features resueltas + isFreeTier de la org |
 | `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
 | `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
@@ -385,6 +388,20 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 
 **Gate pages dinámicas** (`/no-subscription`, `/unauthorized` en panel y console) — Server Components con `force-dynamic` que chequean la sesión en cada request: sin sesión → `redirect('/login')`; con acceso válido (suscripción activa o rol permitido) → `redirect('/dashboard')`; solo sin acceso se renderizan. Evita quedarse pegado tras cerrar sesión o refrescar.
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
+
+### Renovación autoservicio (fase 2 — org paga desde el panel)
+
+Flujo: la org renueva su suscripción SaaS desde `apps/panel/app/(protected)/settings/suscription` → el pago queda `processing` ("en revisión") → soporte lo aprueba/rechaza en console (badge "Pago pendiente" en la tabla de suscripciones + `PlatformPaymentHistoryModal` que ahora renderiza `paymentMethodDetails` con `PaymentDetailsList`, incl. links "VER CAPTURA" a R2) → al validarlo, el periodo se extiende automáticamente.
+
+- **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **body mínimo** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Todo lo económico lo dicta el backend — **el body jamás puede hardcodear montos ni tasas**:
+  - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← del plan en DB.
+  - Tasa ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override para tests). `rate = 1` si moneda == moneda del plan; fallo del provider → 503.
+  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = precio efectivo`, `exchangeRateApplied = String(rate)`.
+  - `status = processing` (forzado) — NO extiende el periodo (solo `PATCH status VALIDATED` lo hace).
+  - Guards: 400 sin org activa · 404 sin sub · 400 cancelada · 409 si `hasPendingPayment` · **409 si `currentPeriodEnd > now`** (solo al expirar).
+  - Invalida `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
+- **Reads org-scoped**: `GET /api/organizations/subscription` (sub activa con plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (métodos de plataforma + monedas + currencyFormat). Servicios en `apps/panel/lib/services/org-billing.ts`; UI en `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
+- **Pre-sorting de campos**: los campos `visual` (instrucciones) se renderizan primero en todos los payment forms vía `sortPaymentMethodFields` (`@workspace/shared`).
 
 ---
 
@@ -585,6 +602,13 @@ AI_MODEL_IDS, OPENROUTER_FREE_MODEL_IDS, ALL_CHAT_MODEL_IDS (allowlist — singl
 of truth consumida por api-worker para validar/rutear proveedor y por panel para el
 selector vía RSC), AiProvider ("workers-ai" | "openrouter"), getAiProvider(modelId),
 AI_MODELS, IAiChatMessage, IAiChatRequest, IAiSseEvent (contrato SSE del chat)
+
+// content.ts
+Tipos y schemas Zod del módulo CMS (single source of truth — api-worker valida y el
+panel tipa forms con ellos): ContentBlockType, BLOCK_SCHEMAS (hero/services/classes/
+testimonials/gallery/contact/team) + validateBlockData(), IContentPage, IContentBlock
+(discriminado por blockType → data tipada por bloque), IContentPageWithBlocks.
+Requiere `zod` como dependencia de @workspace/shared.
 ```
 
 ---
@@ -643,7 +667,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
-`gym_class` (class schedule), `content_page`, `content_block` (blocks by type with display order)
+`gym_class` (class schedule), `content_page` (incluye `metaTitle`/`metaDescription` SEO; canonical se deriva del slug), `content_block` (blocks by type with display order)
 
 ### Settings
 `platform_setting`, `gym_setting`
