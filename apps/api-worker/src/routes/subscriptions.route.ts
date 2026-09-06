@@ -9,6 +9,7 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createCache, type Cache } from '../lib/cache';
+import { requireOrgTimezone } from '../lib/org-timezone';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
@@ -89,7 +90,9 @@ export const subscriptionRoutes = new Hono<AppEnv>()
   .post('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.CREATE), zValidator('json', createSubSchema), async (c) => {
     const orgId = c.get('session')!.activeOrganizationId!;
     const payload = c.req.valid('json');
-    const timezone = c.req.query('timezone') || 'America/Caracas';
+    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
+    // Esto garantiza que un pago a las 11pm local caiga en el mismo día.
+    const timezone = requireOrgTimezone(c.get('session'));
     const cache = createCache(c.env);
 
     const db = c.get('db');

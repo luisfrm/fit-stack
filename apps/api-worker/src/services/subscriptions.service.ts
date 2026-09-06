@@ -77,7 +77,7 @@ export function createSubscriptionsService(
       }));
     },
 
-    async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone?: string) {
+    async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone: string) {
       const member = await membersRepo.findById(organizationId, payload.memberId);
       if (!member) {
         throw new HTTPException(400, { message: 'El miembro seleccionado no existe' });
@@ -93,7 +93,7 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'No es posible registrar un nuevo pago mientras el anterior esté pendiente de validación' });
       }
 
-      const dateManager = new OrganizationDateManager(timezone || 'America/Caracas');
+      const dateManager = new OrganizationDateManager(timezone);
 
       const startStr = payload.startDate as unknown as string;
       const startDate =

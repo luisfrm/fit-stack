@@ -3,7 +3,7 @@ import { OrganizationDateManager } from '../lib/date-manager';
 
 export function createReportsService(paymentsRepo: PaymentsRepository) {
   return {
-    async getMonthlyRevenue(organizationId: string, timezone: string = 'America/Caracas', monthsCount: number = 12) {
+    async getMonthlyRevenue(organizationId: string, timezone: string, monthsCount: number = 12) {
       const dateManager = new OrganizationDateManager(timezone);
       const startDate = dateManager.getStartOfMonthUtc(monthsCount);
 

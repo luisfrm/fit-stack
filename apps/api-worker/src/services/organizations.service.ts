@@ -21,6 +21,10 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository) {
 
     async createOrganization(data: Omit<NewDbOrganization, 'id'>) {
       if (!data.name) throw new Error('El nombre de la organización es requerido');
+      // La zona horaria es OBLIGATORIA desde la creación (no hay default silencioso).
+      if (!data.timezone || !data.timezone.trim()) {
+        throw new Error('La zona horaria es requerida');
+      }
 
       const slug = data.slug || this.generateSlug(data.name);
 

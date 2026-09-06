@@ -36,7 +36,7 @@ export function createSettingsService(
       }
     },
 
-    getDateManager(timezone: string = 'America/Caracas'): OrganizationDateManager {
+    getDateManager(timezone: string): OrganizationDateManager {
       return new OrganizationDateManager(timezone);
     },
 
