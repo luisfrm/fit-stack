@@ -35,7 +35,9 @@ export const planRoutes = new Hono<AppEnv>()
     const plansService = createPlansService(plansRepo);
 
     const plans = await plansService.getAll(orgId, { includeStats });
-    await cache.set(cacheKey, plans, 300);
+    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
+    // ocurre on-write en POST/PUT/DELETE de esta misma ruta.
+    await cache.set(cacheKey, plans, 3600);
     return c.json(plans);
   })
 

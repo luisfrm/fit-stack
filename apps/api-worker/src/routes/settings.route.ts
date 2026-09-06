@@ -26,7 +26,9 @@ export const settingsRoutes = new Hono<AppEnv>()
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
 
     const allSettings = await settingsService.getAll(orgId);
-    await cache.set(cacheKey, allSettings, 600);
+    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
+    // ocurre on-write en POST /api/settings.
+    await cache.set(cacheKey, allSettings, 3600);
     return c.json(allSettings);
   })
 
@@ -59,6 +61,6 @@ export const settingsRoutes = new Hono<AppEnv>()
     // Return the full settings so the client can update its local state
     // with the complete set (not just the partial patch).
     const allSettings = await settingsService.getAll(orgId);
-    await cache.set(`org:${orgId}:settings`, allSettings, 600);
+    await cache.set(`org:${orgId}:settings`, allSettings, 3600);
     return c.json(allSettings);
   });
