@@ -86,6 +86,27 @@ export interface IRecentRegistration {
 }
 
 /**
+ * Fila de las listas accionables del dashboard (`GET /api/dashboard/action-items`):
+ * - kind 'expiring': sub activa que vence en ≤ 7 días.
+ * - kind 'recently_expired': sub que expiró en los últimos 7 días y no renovó.
+ * `days` es positivo para expiring (vence en N) y negativo para expired
+ * (venció hace N, en valor absoluto).
+ */
+export interface IDashboardActionItem {
+  kind: 'expiring' | 'recently_expired';
+  memberId: number;
+  memberName: string;
+  imageUrl?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  planName?: string | null;
+  /** Fin de la última sub (ISO). */
+  endDate: string;
+  /** Vence en N días (positivo) o venció hace N días (negativo). */
+  days: number;
+}
+
+/**
  * Trend direction for KPI cards.
  */
 export type TrendDirection = "up" | "down" | "neutral";

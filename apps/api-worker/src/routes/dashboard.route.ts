@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireOrgPermission } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createDashboardRepository } from '../repositories/dashboard.repository';
+import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createDashboardService } from '../services/dashboard.service';
 import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
@@ -37,4 +38,25 @@ export const dashboardRoutes = new Hono<AppEnv>()
     await cache.set(cacheKey, stats, 300);
 
     return c.json(stats);
+  })
+
+  // GET /api/dashboard/action-items — listas accionables (próximos a vencer / vencidos recientemente)
+  .get('/action-items', requireOrgPermission(PM.DASHBOARD, PA.READ), async (c) => {
+    const orgId = c.get('session')!.activeOrganizationId!;
+    const cache = createCache(c.env);
+    const cacheKey = `org:${orgId}:dashboard:action-items`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return c.json(cached);
+    }
+
+    const dashboardRepo = createDashboardRepository(c.get('db'));
+    const subsRepo = createSubscriptionsRepository(c.get('db'));
+    const dashboardService = createDashboardService(dashboardRepo, subsRepo);
+
+    const data = await dashboardService.getActionItems(orgId);
+    await cache.set(cacheKey, data, 300);
+
+    return c.json(data);
   });

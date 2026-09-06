@@ -420,6 +420,96 @@ export function createSubscriptionsRepository(db: Db) {
 
       return { altas, bajas };
     },
+
+    /**
+     * Miembros cuya última sub validada vence en ≤ `days` días (aún activa).
+     * Un miembro por fila: la fila es su sub vigente (end_date = MAX por member).
+     */
+    async getExpiringSoonMembers(organizationId: string, now: Date, days: number = 7, limit: number = 10) {
+      const limitDate = new Date(now);
+      limitDate.setDate(limitDate.getDate() + days);
+
+      return db
+        .select({
+          memberId: members.id,
+          firstName: members.firstName,
+          lastName: members.lastName,
+          imageUrl: members.imageUrl,
+          phone: members.phoneNumber,
+          email: members.email,
+          planName: sql<string>`(ARRAY_AGG(${payment.planSnapshotName} ORDER BY ${payment.paymentDate} DESC))[1]`,
+          endDate: sql<Date>`MAX(${subscription.endDate})`,
+        })
+        .from(subscription)
+        .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+        .innerJoin(members, eq(subscription.memberId, members.id))
+        .where(
+          and(
+            eq(subscription.organizationId, organizationId),
+            sql`${subscription.cancelledAt} IS NULL`,
+            eq(payment.status, 'validated'),
+            // Solo la sub vigente del member (MAX global, sin renew posterior)
+            sql`${subscription.endDate} = (
+              SELECT MAX(s2.end_date) FROM subscription s2
+              INNER JOIN payment p2 ON p2.subscription_id = s2.id
+              WHERE s2.organization_id = ${organizationId}
+                AND s2.member_id = ${subscription.memberId}
+                AND s2.cancelled_at IS NULL
+                AND p2.status = 'validated'
+            )`,
+            gte(subscription.endDate, now),
+            lte(subscription.endDate, limitDate)
+          )
+        )
+        .groupBy(members.id, members.firstName, members.lastName, members.imageUrl, members.phoneNumber, members.email)
+        .orderBy(sql`MAX(${subscription.endDate})`)
+        .limit(limit);
+    },
+
+    /**
+     * Miembros cuya última sub validada expiró en los últimos `days` días y no renovaron
+     * (su MAX(end_date) ya quedó en el pasado → ninguna sub vigente posterior).
+     */
+    async getRecentlyExpiredMembers(organizationId: string, now: Date, days: number = 7, limit: number = 10) {
+      const sinceDate = new Date(now);
+      sinceDate.setDate(sinceDate.getDate() - days);
+
+      return db
+        .select({
+          memberId: members.id,
+          firstName: members.firstName,
+          lastName: members.lastName,
+          imageUrl: members.imageUrl,
+          phone: members.phoneNumber,
+          email: members.email,
+          planName: sql<string>`(ARRAY_AGG(${payment.planSnapshotName} ORDER BY ${payment.paymentDate} DESC))[1]`,
+          endDate: sql<Date>`MAX(${subscription.endDate})`,
+        })
+        .from(subscription)
+        .innerJoin(payment, eq(subscription.id, payment.subscriptionId))
+        .innerJoin(members, eq(subscription.memberId, members.id))
+        .where(
+          and(
+            eq(subscription.organizationId, organizationId),
+            sql`${subscription.cancelledAt} IS NULL`,
+            eq(payment.status, 'validated'),
+            // Solo la última sub del member (MAX global, sin renew posterior)
+            sql`${subscription.endDate} = (
+              SELECT MAX(s2.end_date) FROM subscription s2
+              INNER JOIN payment p2 ON p2.subscription_id = s2.id
+              WHERE s2.organization_id = ${organizationId}
+                AND s2.member_id = ${subscription.memberId}
+                AND s2.cancelled_at IS NULL
+                AND p2.status = 'validated'
+            )`,
+            lte(subscription.endDate, now),
+            gte(subscription.endDate, sinceDate)
+          )
+        )
+        .groupBy(members.id, members.firstName, members.lastName, members.imageUrl, members.phoneNumber, members.email)
+        .orderBy(sql`MAX(${subscription.endDate})`)
+        .limit(limit);
+    },
   };
 }
 
