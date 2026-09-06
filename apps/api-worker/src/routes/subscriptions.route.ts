@@ -8,9 +8,22 @@ import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
-import { createCache } from '../lib/cache';
+import { createCache, type Cache } from '../lib/cache';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
+
+/**
+ * Toda escritura de suscripción crea/actualiza un pago y mueve el periodo:
+ * invalida en bloque todo lo que depende de subscriptions + payments.
+ */
+async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string): Promise<void> {
+  await cache.invalidate(`org:${orgId}:subscriptions*`);
+  await cache.invalidateExact(`org:${orgId}:subscription-status`);
+  await cache.invalidateExact(`org:${orgId}:payments:analytics`);
+  await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+  await cache.invalidate(`org:${orgId}:dashboard:action-items`);
+  await cache.invalidate(`org:${orgId}:reports:revenue*`);
+}
 
 const createSubSchema = z.object({
   memberId: z.number().int().positive(),
@@ -86,8 +99,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const newSub = await subsService.create(orgId, payload as any, timezone);
-    await cache.invalidate(`org:${orgId}:subscriptions*`);
-    await cache.invalidateExact(`org:${orgId}:subscription-status`);
+    await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(newSub, 201);
   })
 
@@ -105,8 +117,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     const updated = await subsService.updateStatus(orgId, id, status);
-    await cache.invalidate(`org:${orgId}:subscriptions*`);
-    await cache.invalidateExact(`org:${orgId}:subscription-status`);
+    await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(updated);
   })
 
@@ -123,6 +134,6 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
 
     await subsService.delete(orgId, id);
-    await cache.invalidate(`org:${orgId}:subscriptions*`);
+    await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json({ success: true });
   });

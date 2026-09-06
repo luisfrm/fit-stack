@@ -238,6 +238,9 @@ export const memberRoutes = new Hono<AppEnv>()
     });
 
     await cache.invalidate(`org:${orgId}:members:*`);
+    // Un member nuevo/cambiado afecta KPIs y action-items del dashboard
+    await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json(newMember, 201);
   })
 
@@ -260,6 +263,8 @@ export const memberRoutes = new Hono<AppEnv>()
 
     const updatedMember = await membersService.updateMember(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:members:*`);
+    await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json(updatedMember);
   })
 
@@ -276,6 +281,8 @@ export const memberRoutes = new Hono<AppEnv>()
 
     await membersService.deleteMember(orgId, id);
     await cache.invalidate(`org:${orgId}:members:*`);
+    await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+    await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json({ success: true });
   })
 
