@@ -112,20 +112,20 @@ export interface TableProps<T> {
   readonly pagination?: PaginationProps
 }
 
-function Table<T>({ 
-  data, 
-  columns, 
-  emptyState, 
-  onRowClick, 
-  rowKey, 
-  loading, 
+function Table<T>({
+  data,
+  columns,
+  emptyState,
+  onRowClick,
+  rowKey,
+  loading,
   className,
   pagination
 }: TableProps<T>) {
   const tableId = React.useId();
 
   return (
-    <div className={cn("bg-glass rounded-xl border border-border overflow-hidden flex flex-col", className)}>
+    <div className={cn("bg-glass rounded-xl border-t border-border overflow-hidden flex flex-col", className)}>
       <TablePrimitive>
         <TableHeader className="bg-table-header">
           <TableRow className="border-border hover:bg-transparent">
@@ -162,7 +162,7 @@ function Table<T>({
             ))
           )}
           {data.length === 0 && emptyState && !loading && (
-            <TableRow className="border-border hover:bg-transparent">
+            <TableRow className="border-0 bg-table-header hover:bg-table-header">
               <TableCell colSpan={columns.length} className="py-12 text-center text-foreground-dim">
                 {emptyState}
               </TableCell>
