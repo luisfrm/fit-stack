@@ -129,7 +129,9 @@ export const organizationRoutes = new Hono<AppEnv>()
       activeCurrencies: parseJsonArray(settings[ACTIVE_CURRENCIES_KEY], ['USD', 'VES']),
       currencyFormat: settings[CURRENCY_FORMAT_KEY] ?? 'latam',
     };
-    await cache.set(cacheKey, data, 600);
+    // Dato de baja frecuencia: cambia solo cuando soporte edita platform settings
+    // (la escritura invalida org:*:payment-methods). TTL 1h = red de seguridad.
+    await cache.set(cacheKey, data, 3600);
 
     return c.json(data);
   })
@@ -182,6 +184,20 @@ export const organizationRoutes = new Hono<AppEnv>()
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription`);
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription-status`);
         await cache.invalidateExact(`org:${activeOrganizationId}:features`);
+        await cache.invalidate(`org:${activeOrganizationId}:dashboard:action-items`);
+
+        // Confirmación al payer + owners de la org (el jobs-worker deduplica)
+        const user = c.get('user')!;
+        if (c.env.TASK_QUEUE) {
+          await c.env.TASK_QUEUE.send({
+            type: 'email.org_payment_received',
+            paymentId,
+            organizationId: activeOrganizationId,
+            payerEmail: user.email,
+            payerName: user.name,
+          });
+        }
+
         return c.json({ success: true, paymentId }, 201);
       } catch (err) {
         if (err instanceof Error && err.message === 'Exchange rate API unavailable') {

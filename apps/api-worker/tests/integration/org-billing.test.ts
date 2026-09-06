@@ -310,4 +310,33 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       expect(orgSub.body.subscription.computedStatus).toBe('active');
     });
   });
+
+  describe('POST /api/organizations/subscription/renew — emails', () => {
+    it('enqueues email.org_payment_received with the payer from the session', async () => {
+      // tenantC fue renovada en el test cross-currency (pago processing vigente);
+      // para este test expiramos de nuevo y la renovamos.
+      await testQuery(
+        `UPDATE platform_subscription_payment SET status = 'validated' WHERE subscription_id = $1`,
+        [subC.id],
+      );
+      await testQuery(
+        `UPDATE platform_subscription SET current_period_end = NOW() - INTERVAL '3 days' WHERE id = $1`,
+        [subC.id],
+      );
+      tenantC.owner.client.queue.reset();
+
+      const res = await tenantC.owner.client.post('/api/organizations/subscription/renew', {
+        paymentMethod: 'Zelle',
+        currencyPaid: 'USD',
+      });
+      expect(res.status, res.text).toBe(201);
+
+      const events = tenantC.owner.client.queue.ofType('email.org_payment_received');
+      expect(events).toHaveLength(1);
+      expect(events[0].paymentId).toBe(res.body.paymentId);
+      expect(events[0].organizationId).toBe(tenantC.organization.id);
+      expect(events[0].payerEmail).toBe(tenantC.owner.email);
+      expect(String(events[0].payerName)).toBeTruthy();
+    });
+  });
 });

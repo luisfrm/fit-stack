@@ -59,6 +59,55 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.body.planId).toBe(plan.id);
     });
 
+    it('validated payment enqueues email.payment_receipt automatically', async () => {
+      const { owner, organization, member, plan } = await setupSubscriptionFixture();
+      owner.client.queue.reset();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(res.status, res.text).toBe(201);
+
+      const events = owner.client.queue.ofType('email.payment_receipt');
+      expect(events).toHaveLength(1);
+      expect(events[0].paymentId).toBeDefined();
+      expect(events[0].organizationId).toBe(organization.id);
+    });
+
+    it('processing payment does NOT enqueue a receipt (awaits validation)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      owner.client.queue.reset();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'transfer',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(res.status, res.text).toBe(201);
+
+      expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
+    });
+
     it('rejects object-shaped paymentMethodDetails (contract is an array)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
 

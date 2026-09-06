@@ -129,7 +129,7 @@ export function createSubscriptionsService(
         paymentDateFinal = new Date();
       }
 
-      await paymentsRepo.create(organizationId, {
+      const createdPayment = await paymentsRepo.create(organizationId, {
         memberId: payload.memberId,
         subscriptionId: subscription.id,
         planSnapshotName: plan.name,
@@ -144,10 +144,21 @@ export function createSubscriptionsService(
         paymentDate: paymentDateFinal,
       });
 
+      // Recibo automático al cliente al registrar un pago validado.
+      // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
+      if (createdPayment?.id && payload.payment.status === PAYMENT_STATUSES.VALIDATED && taskQueue) {
+        await taskQueue.send({
+          type: 'email.payment_receipt',
+          paymentId: createdPayment.id,
+          organizationId,
+        });
+      }
+
       return subscription;
     },
 
     async updatePaymentStatus(organizationId: string, paymentId: number, status: string) {
+      const previous = await paymentsRepo.findById(organizationId, paymentId);
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any);
       if (!updated) {
         throw new Error('Registro de pago no encontrado');
@@ -155,6 +166,21 @@ export function createSubscriptionsService(
 
       if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
+      }
+
+      // Un pago que pasa de processing/pending a validated emite su recibo
+      // (el alta con status validated ya lo encola en create()).
+      const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
+      if (
+        status === PAYMENT_STATUSES.VALIDATED &&
+        wasPending &&
+        taskQueue
+      ) {
+        await taskQueue.send({
+          type: 'email.payment_receipt',
+          paymentId,
+          organizationId,
+        });
       }
 
       return updated;

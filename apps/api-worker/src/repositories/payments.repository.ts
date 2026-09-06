@@ -49,6 +49,14 @@ export function createPaymentsRepository(db: Db) {
       return inserted[0] as unknown as IPayment;
     },
 
+    async findById(organizationId: string, id: number): Promise<IPayment | undefined> {
+      const records = await db
+        .select()
+        .from(payment)
+        .where(and(eq(payment.id, id), eq(payment.organizationId, organizationId)));
+      return records[0] as unknown as IPayment | undefined;
+    },
+
     async findBySubscriptionId(organizationId: string, subscriptionId: number): Promise<IPayment | undefined> {
       const records = await db
         .select()
