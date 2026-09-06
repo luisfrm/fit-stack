@@ -181,7 +181,8 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
           );
         },
         onDone: () => undefined,
-        onError: (message) => toast.error(message),
+        // El detalle crudo del stream ya se logueó en consola (chat-service).
+        onError: () => toast.error("No se pudo enviar el mensaje. Intente nuevamente."),
         onUsage: (fresh) => setUsage(fresh),
       });
     } catch (err) {

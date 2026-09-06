@@ -34,8 +34,9 @@ export function useOrganizationActivation() {
       }
 
       if (error) {
-        toast.error(error.message || "Error al cambiar de organización");
+        // El mensaje del API/servicio nunca se muestra al usuario — solo consola.
         console.error("Error activating organization:", error);
+        toast.error("Error al cambiar de organización");
         return false;
       }
 

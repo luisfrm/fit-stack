@@ -6,6 +6,7 @@ import { CalendarClock, RefreshCw, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { OrgPaymentSection } from "./org-payment-section";
 import { renewOrgSubscription, type OrgPaymentMethodsResponse, type OrgSubscriptionInfo } from "@/lib/services/org-billing";
+import { mutationError } from "@/lib/errors";
 import { uploadService } from "@/lib/services/upload-service";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import type { IPaymentMethodDetails } from "@workspace/shared/types";
@@ -159,9 +160,9 @@ export function OrgRenewalModal({
       toast.success("Pago enviado — quedará en revisión por el equipo Fit-Stack");
       onOpenChange(false);
       await onRenewed?.();
-    } catch (err: any) {
-      console.error("Error renewing org subscription:", err);
-      toast.error(err?.data?.error ?? "Error al registrar el pago");
+    } catch (err) {
+      // El mensaje del API nunca se muestra al usuario — solo consola.
+      toast.error(mutationError("OrgRenewalModal", err, "No se pudo registrar el pago. Intente nuevamente."));
     } finally {
       setIsSubmitting(false);
     }

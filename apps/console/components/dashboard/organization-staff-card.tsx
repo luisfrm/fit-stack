@@ -42,16 +42,10 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
       await organizationsService.resendStaffInvite(organizationId, member.id);
       toast.success(`Invitación reenviada a ${member.email}`);
       await fetchStaff();
-    } catch (error: any) {
+    } catch (error) {
+      // El mensaje del API nunca se muestra al usuario — solo consola.
       console.error("Error resending invite:", error);
-      const rawError = error?.data?.error ?? error?.message;
-      let msg = "Ocurrió un error al reenviar la invitación";
-      if (rawError === "El usuario ya tiene una cuenta vinculada") {
-        msg = "Este miembro ya tiene una cuenta vinculada a la plataforma.";
-      } else if (rawError === "Member not found" || rawError === "Miembro no encontrado") {
-        msg = "Miembro no encontrado en esta organización.";
-      }
-      toast.error(msg);
+      toast.error("Ocurrió un error al reenviar la invitación");
     } finally {
       setResendingId(null);
     }

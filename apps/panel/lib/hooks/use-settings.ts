@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { updateTag } from "next/cache";
 import { settingsService } from "@/lib/services/settings-service";
+import { mutationError } from "@/lib/errors";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { toast } from "@workspace/ui";
 
 export const SETTINGS_KEYS = {
@@ -94,6 +97,8 @@ function fetchSettingsShared(): Promise<Record<string, string>> {
  */
 export function useSettings() {
   const router = useRouter();
+  const { activeOrganization } = useAuth();
+  const activeOrgId = activeOrganization?.id;
   const [settings, setSettings] = React.useState<Record<string, string>>(
     () => readCache()?.data ?? EMPTY_SETTINGS,
   );
@@ -137,19 +142,20 @@ export function useSettings() {
         // Use it so the local state and cache always reflect reality.
         setSettings(updated);
         writeCache(updated);
+        // Invalida el data cache de Next (RSC con tags org:{orgId}:settings)
+        // para que router.refresh() traiga los ajustes frescos.
+        if (activeOrgId) updateTag(`org:${activeOrgId}:settings`);
         toast.success("Ajustes actualizados correctamente");
         router.refresh();
       } catch (error) {
-        const message =
-          (error as { data?: { error?: string }; message?: string }).data
-            ?.error ?? "Error al actualizar los ajustes";
-        toast.error(message);
+        // El mensaje del API nunca se muestra al usuario — solo consola.
+        toast.error(mutationError("useSettings.update", error, "Error al actualizar los ajustes"));
         throw error;
       } finally {
         setIsUpdating(false);
       }
     },
-    [router],
+    [router, activeOrgId],
   );
 
   return { settings, isLoading, isUpdating, updateSettings };
@@ -161,22 +167,24 @@ export function useSettings() {
  */
 export function useSettingsMutation() {
   const router = useRouter();
+  const { activeOrganization } = useAuth();
+  const activeOrgId = activeOrganization?.id;
 
   return React.useCallback(
     async (settings: Record<string, string>) => {
       try {
         await settingsService.update(settings);
         clearCache();
+        // Invalida el data cache de Next (RSC con tags org:{orgId}:settings)
+        // para que router.refresh() traiga los ajustes frescos.
+        if (activeOrgId) updateTag(`org:${activeOrgId}:settings`);
         toast.success("Ajustes actualizados correctamente");
         router.refresh();
-      } catch (error) {
-        const message =
-          (error as { data?: { error?: string }; message?: string }).data
-            ?.error ?? "Error al actualizar los ajustes";
-        toast.error(message);
-        throw error;
+    } catch (error) {
+      // El mensaje del API nunca se muestra al usuario — solo consola.
+      toast.error(mutationError("useSettingsMutation", error, "Error al actualizar los ajustes"));        throw error;
       }
     },
-    [router],
+    [router, activeOrgId],
   );
 }
