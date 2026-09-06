@@ -16,6 +16,8 @@ interface MembershipsClientProps {
   readonly initialSummary: IMembershipsSummary;
   readonly activeCurrencies: string[];
   readonly currencyFormat: "latam" | "usa";
+  /** Server action: purga el tag org:{orgId}:plans antes de router.refresh(). */
+  readonly refreshPlans?: () => Promise<void>;
 }
 
 export function MembershipsClient({
@@ -23,6 +25,7 @@ export function MembershipsClient({
   initialSummary,
   activeCurrencies,
   currencyFormat,
+  refreshPlans,
 }: MembershipsClientProps) {
   const router = useRouter();
 
@@ -74,7 +77,10 @@ export function MembershipsClient({
         iconName="LayoutTemplate"
       >
         <PlanModal
-          onSuccess={() => router.refresh()}
+          onSuccess={async () => {
+            await refreshPlans?.();
+            router.refresh();
+          }}
           trigger={
             <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
               NUEVO PLAN
@@ -118,6 +124,7 @@ export function MembershipsClient({
               key={plan.id}
               plan={plan}
               activeMembersCount={plan.activeMembersCount}
+              refreshPlans={refreshPlans}
             />
           ))}
         </div>

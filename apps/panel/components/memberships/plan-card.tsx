@@ -19,16 +19,19 @@ import { plansService } from "@/lib/services/plans-service";
 interface PlanCardProps {
   readonly plan: IMembershipPlan;
   readonly activeMembersCount?: number;
+  /** Server action: purga el tag org:{orgId}:plans antes de router.refresh(). */
+  readonly refreshPlans?: () => Promise<void>;
 }
 
-export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
+export function PlanCard({ plan, activeMembersCount = 0, refreshPlans }: PlanCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [isToggling, setIsToggling] = React.useState(false);
 
-  const refresh = React.useCallback(() => {
+  const refresh = React.useCallback(async () => {
+    await refreshPlans?.();
     router.refresh();
-  }, [router]);
+  }, [router, refreshPlans]);
 
   const handleToggleVisibility = async () => {
     if (!plan.id) return;
@@ -42,7 +45,7 @@ export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
           ? "Plan ocultado correctamente"
           : "Plan publicado correctamente",
       );
-      router.refresh();
+      await refresh();
     } catch (error) {
       console.error("Error toggling plan visibility:", error);
       toast.error("Error al cambiar visibilidad");
@@ -57,7 +60,7 @@ export function PlanCard({ plan, activeMembersCount = 0 }: PlanCardProps) {
       setIsDeleting(true);
       await plansService.delete(plan.id);
       toast.success("Plan eliminado correctamente");
-      router.refresh();
+      await refresh();
     } catch (error) {
       console.error("Error deleting plan:", error);
       toast.error("Error al eliminar el plan");

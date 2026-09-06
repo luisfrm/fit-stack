@@ -3,6 +3,7 @@ import { MembershipsClient } from "./memberships-client";
 import { settingsService } from "@/lib/services/settings-service";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { sessionService } from "@workspace/auth/service";
+import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +35,18 @@ export default async function MembershipsPage() {
     }
   }
 
+  // Server action: purga el data cache de Next (tag org:{orgId}:plans) para que
+  // router.refresh() tras crear/editar/eliminar un plan traiga datos frescos.
+  const refreshPlans = async () => {
+    "use server";
+    updateTag(plansTag);
+  };
+
   return (
     <MembershipsClient
       initialPlans={plans}
       initialSummary={summary}
+      refreshPlans={refreshPlans}
       activeCurrencies={activeCurrencies}
       currencyFormat={
         (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") ||

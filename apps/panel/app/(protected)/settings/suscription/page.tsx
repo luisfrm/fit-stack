@@ -49,7 +49,11 @@ export default async function BillingSettingsPage() {
 
   const refreshBilling = async () => {
     "use server";
+    // Purga todos los tags de billing: la tarjeta y los banners se leen de
+    // subscription/subscription-status/features, no solo de subscription.
     updateTag(`org:${activeOrgId}:subscription`);
+    updateTag(`org:${activeOrgId}:subscription-status`);
+    updateTag(`org:${activeOrgId}:features`);
   };
 
   const features = (featuresData?.features ?? {}) as PlanFeaturesV2;
