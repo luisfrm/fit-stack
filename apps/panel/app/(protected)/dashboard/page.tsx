@@ -64,7 +64,7 @@ export default async function DashboardPage() {
     .catch(() => ({}) as Record<string, string>);
   const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
 
-  const [stats, todayClassesRaw, recentRegistrations, analytics] =
+  const [stats, todayClassesRaw, recentRegistrations, analytics, actionItems] =
     await Promise.all([
       dashboardService.getStats(today, {
         next: { revalidate: 60, tags: [`org:${activeOrgId}:dashboard:stats`] },
@@ -78,6 +78,9 @@ export default async function DashboardPage() {
         .getRecent(5, { next: { revalidate: 60, tags: [`org:${activeOrgId}:subscriptions`] } })
         .catch(() => []),
       financeService.getAnalytics(primaryCurrency).catch(() => null),
+      activeOrgId
+        ? dashboardService.getActionItems(activeOrgId).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
   const todayIncome = analytics
@@ -104,15 +107,7 @@ export default async function DashboardPage() {
         recentRegistrations={recentRegistrations}
         todayIncome={todayIncome}
         pendingPayments={analytics?.kpis.pendingPayments ?? null}
-        analytics={
-          analytics
-            ? {
-                plansDistribution: analytics.plansDistribution,
-                renewals: analytics.renewals,
-                growth: analytics.growth,
-              }
-            : null
-        }
+        actionItems={actionItems}
       />
     </>
   );

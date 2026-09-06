@@ -9,7 +9,8 @@ import { Text } from "@workspace/ui/components/text";
 import { TodayClassesTable } from "@/components/dashboard/today-classes-table";
 import { RecentRegistrationsList } from "@/components/dashboard/recent-registrations";
 import { DashboardStatsView } from "@/components/dashboard/dashboard-stats";
-import { DashboardChartsRow } from "@/components/dashboard/dashboard-charts-row";
+import { ExpiringMembersList } from "@/components/dashboard/expiring-members-list";
+import { RecentlyExpiredList } from "@/components/dashboard/recently-expired-list";
 import { MemberModal } from "@/components/members/member-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { useRouter } from "next/navigation";
@@ -18,15 +19,7 @@ import type {
   IRecentRegistration,
 } from "@workspace/shared/types";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
-
-type AnalyticsSlice = {
-  plansDistribution: Array<{ planName: string; count: number }>;
-  renewals: Array<{ day: string; count: number }>;
-  growth: {
-    altas: Array<{ day: string; count: number }>;
-    bajas: Array<{ day: string; count: number }>;
-  };
-};
+import type { MemberDeadlineItem } from "@/components/dashboard/member-deadline-row";
 
 interface TodayIncome {
   readonly amount: number | null;
@@ -40,7 +33,11 @@ interface GymDashboardProps {
   /** Monto del día normalizado a la divisa primaria (unidades mayores) */
   readonly todayIncome?: TodayIncome | null;
   readonly pendingPayments?: number | null;
-  readonly analytics?: AnalyticsSlice | null;
+  /** Listas accionables: próximos a vencer / vencidos recientemente. */
+  readonly actionItems: {
+    expiring: MemberDeadlineItem[];
+    recentlyExpired: MemberDeadlineItem[];
+  } | null;
 }
 
 export function GymDashboard({
@@ -49,7 +46,7 @@ export function GymDashboard({
   recentRegistrations,
   todayIncome,
   pendingPayments,
-  analytics,
+  actionItems,
 }: GymDashboardProps) {
   const router = useRouter();
 
@@ -84,8 +81,8 @@ export function GymDashboard({
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-        <Card className="lg:col-span-2 overflow-hidden pb-0">
-          <div className="p-6 border-b border-border flex justify-between items-center">
+        <Card className="lg:col-span-2 overflow-hidden pb-0 gap-0">
+          <div className="p-6 flex justify-between items-center">
             <Text as="p" size="lg" weight="bold">Clases de Hoy</Text>
             <Link href="/classes" className="text-primary text-sm font-medium hover:underline">
               Ver todas
@@ -95,14 +92,17 @@ export function GymDashboard({
         </Card>
 
         <Card className="overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-border">
+          <div className="p-6">
             <Text as="p" size="lg" weight="bold">Últimos Pagos</Text>
           </div>
           <RecentRegistrationsList registrations={recentRegistrations} />
         </Card>
       </div>
 
-      <DashboardChartsRow analytics={analytics ?? null} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+        <ExpiringMembersList items={actionItems?.expiring ?? []} />
+        <RecentlyExpiredList items={actionItems?.recentlyExpired ?? []} />
+      </div>
     </>
   );
 }
