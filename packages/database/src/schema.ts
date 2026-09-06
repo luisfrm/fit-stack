@@ -84,7 +84,9 @@ export const organization = pgTable('organization', {
 
   // Localization & Fiscal (Optional)
   countryCode: text('country_code').default('VE').notNull(),
-  timezone: text('timezone').default('America/Caracas').notNull(),
+  // La timezone es OBLIGATORIA y debe setearse explícitamente al crear la org
+  // (sin default silencioso que asigne 'America/Caracas' por accidente).
+  timezone: text('timezone').notNull(),
   taxId: text('tax_id'),
   legalName: text('legal_name'),
   address: text('address'),
