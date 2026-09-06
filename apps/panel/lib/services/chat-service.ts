@@ -1,3 +1,4 @@
+import type { AiUsage } from "@/lib/features/quota";
 import { api, type ApiFetchOptions } from "@/lib/api/client";
 import type { IAiChatMessage, IAiSseEvent } from "@workspace/shared";
 
@@ -7,7 +8,7 @@ export interface ChatStreamCallbacks {
   onDone?: () => void;
   onError?: (message: string) => void;
   signal?: AbortSignal;
-  onUsage?: (usage: import("@/lib/features/quota").AiUsage) => void;
+  onUsage?: (usage: AiUsage) => void;
 }
 
 export interface ChatConversationDto {
@@ -18,9 +19,84 @@ export interface ChatConversationDto {
   updatedAt?: string;
 }
 
+interface StreamContext {
+  callbacks: ChatStreamCallbacks;
+  emitError: (message: string) => void;
+}
+
+/**
+ * Parses an individual SSE line and returns the typed event or null if invalid or empty.
+ */
+function parseSseLine(rawLine: string): IAiSseEvent | null {
+  const line = rawLine.trim();
+  if (!line.startsWith("data:")) return null;
+
+  const payload = line.slice(5).trim();
+  if (!payload) return null;
+
+  try {
+    return JSON.parse(payload) as IAiSseEvent;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dispatches an SSE event to its corresponding callback.
+ * Returns false if the stream should terminate (error or done), true to continue.
+ */
+function handleSseEvent(event: IAiSseEvent, { callbacks, emitError }: StreamContext): boolean {
+  if ("content" in event && event.content) {
+    callbacks.onDelta(event.content);
+    return true;
+  }
+
+  if ("model" in event) {
+    callbacks.onModel?.(event.model);
+    return true;
+  }
+
+  if ("usage" in event && event.usage) {
+    callbacks.onUsage?.({
+      monthly: event.usage.monthly,
+      remaining: event.usage.remaining,
+      disabled: false,
+      periodStart: event.usage.periodStart,
+    });
+    return true;
+  }
+
+  if ("error" in event) {
+    emitError(event.error);
+    return false;
+  }
+
+  if ("done" in event) {
+    callbacks.onDone?.();
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Processes a list of raw SSE event strings from the stream buffer.
+ * Returns false if stream termination was requested by an event.
+ */
+function processSseChunk(events: string[], context: StreamContext): boolean {
+  for (const rawEvent of events) {
+    const event = parseSseLine(rawEvent);
+    if (!event) continue;
+
+    const shouldContinue = handleSseEvent(event, context);
+    if (!shouldContinue) return false;
+  }
+  return true;
+}
+
 export const chatService = {
   async getUsage(options?: ApiFetchOptions) {
-    return await api<import("@/lib/features/quota").AiUsage>("/ai/usage", options);
+    return await api<AiUsage>("/ai/usage", options);
   },
 
   async getConversations(options?: ApiFetchOptions): Promise<ChatConversationDto[]> {
@@ -42,27 +118,35 @@ export const chatService = {
 
   async streamChat(
     messages: IAiChatMessage[],
-    { onDelta, onModel, onDone, onError, signal, onUsage }: ChatStreamCallbacks,
+    callbacks: ChatStreamCallbacks,
   ): Promise<void> {
+    // Global rule: raw API errors are never shown directly to the user toast;
+    // they are logged to console and views display generic friendly messages.
+    const emitError = (message: string) => {
+      console.error("[chat-stream]", message);
+      callbacks.onError?.(message);
+    };
+
     const response = await api.raw("/ai/chat", {
       method: "POST",
       body: { messages },
       responseType: "stream",
-      signal,
+      signal: callbacks.signal,
     });
 
     if (!response.ok) {
       const errBody = (await response.json().catch(() => null)) as { error?: string } | null;
-      onError?.(errBody?.error ?? "Error al comunicarse con el asistente");
+      emitError(errBody?.error ?? "Error al comunicarse con el asistente");
       return;
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
-      onError?.("Sin respuesta del servidor");
+      emitError("Sin respuesta del servidor");
       return;
     }
 
+    const context: StreamContext = { callbacks, emitError };
     const decoder = new TextDecoder();
     let buffer = "";
 
@@ -75,46 +159,18 @@ export const chatService = {
         const events = buffer.split("\n\n");
         buffer = events.pop() ?? "";
 
-        for (const rawEvent of events) {
-          const line = rawEvent.trim();
-          if (!line.startsWith("data:")) continue;
-
-          const payload = line.slice(5).trim();
-          if (!payload) continue;
-
-          const event = JSON.parse(payload) as IAiSseEvent;
-          if ("content" in event && event.content) {
-            onDelta(event.content);
-          } else if ("model" in event) {
-            onModel?.(event.model);
-          } else if ("usage" in event && (event as { usage?: unknown }).usage) {
-            const u = (event as Extract<IAiSseEvent, { usage: unknown }>).usage as {
-              monthly: { used: number; limit: number };
-              remaining: number | null;
-              periodStart: string;
-            };
-            onUsage?.({
-              monthly: u.monthly,
-              remaining: u.remaining,
-              disabled: false,
-              periodStart: u.periodStart,
-            });
-          } else if ("error" in event) {
-            onError?.(event.error);
-            return;
-          } else if ("done" in event) {
-            onDone?.();
-            return;
-          }
-        }
+        const shouldContinue = processSseChunk(events, context);
+        if (!shouldContinue) return;
       }
-      onDone?.();
+      callbacks.onDone?.();
     } catch (err) {
-      if (signal?.aborted) {
-        onDone?.();
+      if (callbacks.signal?.aborted) {
+        callbacks.onDone?.();
         return;
       }
-      onError?.(err instanceof Error ? err.message : "Error inesperado en el stream");
+      const message = err instanceof Error ? err.message : "Error inesperado en el stream";
+      console.error({ err, message })
+      emitError("Ocurrió un error al procesar tu solicitud. Por favor, intenta de nuevo.");
     }
   },
 };
