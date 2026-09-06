@@ -1,5 +1,5 @@
 import { handleRegistrationInvite, handleOrgInvite } from './handlers/email.handler';
-import { handlePaymentReceipt } from './handlers/pdf.handler';
+import { handlePaymentReceipt, handleOrgPaymentReceived } from './handlers/pdf.handler';
 
 export type FitTaskEvent =
   | {
@@ -12,7 +12,15 @@ export type FitTaskEvent =
       role?: string;
     }
   | { type: 'email.org_invite'; email: string; orgName: string; inviterName: string; inviteLink: string }
-  | { type: 'email.payment_receipt'; paymentId: number; organizationId: string };
+  | { type: 'email.payment_receipt'; paymentId: number; organizationId: string }
+  | {
+      type: 'email.org_payment_received';
+      paymentId: number;
+      organizationId: string;
+      /** Usuario que registró el pago (sesión). Recibe confirmación + owners dedupe. */
+      payerEmail: string;
+      payerName: string;
+    };
 
 export interface Env {
   DATABASE_URL: string;
@@ -41,6 +49,9 @@ export default {
             break;
           case 'email.payment_receipt':
             await handlePaymentReceipt(env, event);
+            break;
+          case 'email.org_payment_received':
+            await handleOrgPaymentReceived(env, event);
             break;
           default:
             console.warn(`Unknown queue event type: ${(event as any).type}`);

@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
+import { renderRegistrationInvite } from '../templates/send-invitation';
+import { renderOrgInvite } from '../templates/org-invite';
 
 export interface EmailHandlerEnv {
   EMAIL_PROVIDER?: string;
@@ -11,102 +13,10 @@ export interface EmailHandlerEnv {
   CONSOLE_URL?: string;
 }
 
-export async function handleRegistrationInvite(
-  env: EmailHandlerEnv,
-  payload: { email: string; token: string; target?: 'panel' | 'console'; role?: string }
-) {
-  const target = payload.target === 'console' ? 'console' : 'panel';
-  const baseUrl =
-    target === 'console'
-      ? env.CONSOLE_URL || 'http://localhost:3003'
-      : env.PANEL_URL || 'http://localhost:3001';
-  const inviteLink = `${baseUrl}/register?token=${payload.token}`;
-
-  const appName = target === 'console' ? 'FitStack Console' : 'FitStack Panel';
-  const title = target === 'console' ? 'Invitación de Administración' : 'Invitación al Equipo';
-  const description =
-    target === 'console'
-      ? 'Has sido invitado a unirte al equipo de administración de la plataforma SaaS Fit-Stack. Haz clic en el botón de abajo para activar tu cuenta y configurar tu contraseña.'
-      : 'Has sido invitado a unirte al panel de gestión de tu gimnasio. Haz clic en el botón de abajo para activar tu cuenta y configurar tu contraseña.';
-
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #050505; color: #ffffff; margin: 0; padding: 20px; }
-            .container { max-width: 500px; margin: 40px auto; background: #0f0f0f; border: 1px solid #1f1f1f; border-radius: 16px; padding: 40px; text-align: center; }
-            .logo { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 32px; display: block; text-decoration: none; text-transform: uppercase; }
-            .title { font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #ffffff; }
-            .text { font-size: 15px; line-height: 1.6; color: #a1a1aa; margin-bottom: 32px; }
-            .button { display: inline-block; background: #ffffff; color: #000000; padding: 14px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px; }
-            .footer { margin-top: 48px; font-size: 12px; color: #52525b; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="logo">FIT-STACK</div>
-            <h1 class="title">${title}</h1>
-            <p class="text">${description}</p>
-            <a href="${inviteLink}" class="button">Activar mi cuenta en ${appName}</a>
-            <p class="text" style="margin-top: 32px; font-size: 13px;">Este enlace es válido por 48 horas.</p>
-        </div>
-        <div class="footer">
-            &copy; ${new Date().getFullYear()} Fit-Stack Engine.
-        </div>
-    </body>
-    </html>
-  `;
-
-  return sendEmail(env, {
-    to: payload.email,
-    subject: `Invitación para registrarse en ${appName}`,
-    html: htmlContent,
-  });
-}
-
-export async function handleOrgInvite(
-  env: EmailHandlerEnv,
-  payload: { email: string; orgName: string; inviterName: string; inviteLink: string }
-) {
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #050505; color: #ffffff; margin: 0; padding: 20px; }
-            .container { max-width: 500px; margin: 40px auto; background: #0f0f0f; border: 1px solid #1f1f1f; border-radius: 16px; padding: 40px; text-align: center; }
-            .logo { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 32px; display: block; text-decoration: none; text-transform: uppercase; }
-            .title { font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #ffffff; }
-            .text { font-size: 15px; line-height: 1.6; color: #a1a1aa; margin-bottom: 32px; }
-            .button { display: inline-block; background: #ffffff; color: #000000; padding: 14px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px; }
-            .footer { margin-top: 48px; font-size: 12px; color: #52525b; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="logo">FIT-STACK</div>
-            <h1 class="title">Nueva Invitación</h1>
-            <p class="text"><strong>${payload.inviterName}</strong> te ha invitado a unirte al equipo de <strong>${payload.orgName}</strong>.</p>
-            <a href="${payload.inviteLink}" class="button">Unirme a ${payload.orgName}</a>
-            <p class="text" style="margin-top: 32px; font-size: 13px;">Haz clic en el botón para aceptar la invitación y acceder al panel de la sede.</p>
-        </div>
-        <div class="footer">
-            &copy; ${new Date().getFullYear()} Fit-Stack Engine.
-        </div>
-    </body>
-    </html>
-  `;
-
-  return sendEmail(env, {
-    to: payload.email,
-    subject: `Invitación para unirte a ${payload.orgName}`,
-    html: htmlContent,
-  });
-}
-
+/**
+ * Transporte de email (Resend / Gmail SMTP). El HTML lo componen los
+ * templates en `src/templates/` — este handler SOLO envía.
+ */
 export async function sendEmail(
   env: EmailHandlerEnv,
   options: { to: string; subject: string; html: string; attachments?: Array<{ filename: string; content: Buffer | Uint8Array }> }
@@ -153,4 +63,34 @@ export async function sendEmail(
   }
 
   throw new Error(`Configuración de email incompleta para el proveedor: ${provider}`);
+}
+
+export async function handleRegistrationInvite(
+  env: EmailHandlerEnv,
+  payload: { email: string; token: string; target?: 'panel' | 'console'; role?: string }
+) {
+  const target = payload.target === 'console' ? 'console' : 'panel';
+  const baseUrl =
+    target === 'console'
+      ? env.CONSOLE_URL || 'http://localhost:3003'
+      : env.PANEL_URL || 'http://localhost:3001';
+
+  const { subject, html } = renderRegistrationInvite({
+    email: payload.email,
+    token: payload.token,
+    target,
+    role: payload.role,
+    baseUrl,
+  });
+
+  return sendEmail(env, { to: payload.email, subject, html });
+}
+
+export async function handleOrgInvite(
+  env: EmailHandlerEnv,
+  payload: { email: string; orgName: string; inviterName: string; inviteLink: string }
+) {
+  const { subject, html } = renderOrgInvite(payload);
+
+  return sendEmail(env, { to: payload.email, subject, html });
 }
