@@ -230,7 +230,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 | `/api/classes` | Class schedule CRUD |
 | `/api/trainers` | Trainers (gym_member + coach_profile) |
 | `/api/cms` | Content pages/blocks |
-| `/api/dashboard` | KPI stats (cache `org:*:dashboard:stats:*`) |
+| `/api/dashboard` | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + listas accionables (`GET /action-items`, cache `org:*:dashboard:action-items`) |
 | `/api/settings` | Gym settings (currencies, payment methods, theme) |
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
 | `/api/organizations` | `GET /subscription-status` (estado de facturación del org) · `GET /subscription` (sub SaaS de la org con detalles del plan, cache 1 min) · `GET /payment-methods` (métodos de pago de plataforma expuestos a la org, cache 10 min) · `POST /subscription/renew` (renovación autoservicio — ver sección "Renovación autoservicio" abajo) |
@@ -256,6 +256,7 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 ### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
+- **Toasts y errores del API (regla)**: los toasts JAMÁS muestran mensajes crudos del API (`err?.data?.error`, `error.message`, matcheo de strings del servidor). Patrón obligatorio: `logMutationError(scope, err)` (helper de `apps/{panel,console}/lib/errors.ts` — hace `console.error` del error crudo y retorna el fallback) + `toast.error(<mensaje genérico de la acción>)`, p. ej. "No se pudo guardar el plan". Excepciones con significado de UX (p. ej. cuota IA agotada) se manejan mapeando por **código de error** (`err.data?.code`), nunca por texto.
 - **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
 
 ### 8. HTTP Client (ofetch — NO `fetch` nativo)
@@ -296,34 +297,36 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 
 | Pattern | TTL | Used For |
 |---------|-----|----------|
-| `org:${orgId}:settings` | 10 min | Organization settings |
+| `org:${orgId}:settings` | 1 h | Organization settings (invalidada on-write en POST /api/settings) |
 | `org:${orgId}:profile` | 5 min | Active org profile in custom session (branding/theme/timezone) |
-| `org:${orgId}:plans:*` | 5 min | Membership plans |
+| `org:${orgId}:plans:*` | 1 h | Membership plans (invalidada on-write en POST/PUT/DELETE /api/plans) |
 | `org:${orgId}:classes:*` | 5 min | Classes |
 | `org:${orgId}:members:*` | 5 min | Gym members |
 | `org:${orgId}:subscriptions` | 5 min | Member subscriptions |
 | `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
+| `org:${orgId}:dashboard:action-items` | 5 min | Listas accionables del dashboard (próximos a vencer / vencidos recientemente) |
 | `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
 | `org:${orgId}:cms:*` | 5 min | Invalidation de CMS (los reads no se cachean) |
 | `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
 | `org:${orgId}:subscription` | 1 min | Sub SaaS de la org con detalles del plan (renovación autoservicio) |
-| `org:${orgId}:payment-methods` | 10 min | Métodos de pago de plataforma expuestos a la org |
+| `org:${orgId}:payment-methods` | 1 h | Métodos de pago de plataforma expuestos a la org (invalidada on-write en POST /api/platform/settings) |
 | `rates:${base}` | 1 hr | Tasas de cambio server-side (open.er-api.com, provider en `api-worker/src/lib/exchange-rates.ts`) |
 | `org:${orgId}:features` | 5 min | Features resueltas + isFreeTier de la org |
 | `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
 | `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
-| `platform:settings` | 10 min | SaaS-level global settings |
+| `platform:settings` | 1 h | SaaS-level global settings (invalidada on-write en POST /api/platform/settings) |
 | `platform:features` | 10 min | Feature catalog (console) |
 | `platform:organizations*` | 5 min | Organization list (SaaS admin) |
-| `platform:plans*` | 10 min | Platform plan catalog |
+| `platform:plans*` | 1 h | Platform plan catalog (invalidada on-write en /api/platform/plans) |
 | `platform:subscriptions*` | 5 min | SaaS subscriptions |
 | `platform:subscriptions:stats` | 5 min | Subscription KPI stats |
 | `platform:staff*` | 5 min | Platform staff (SaaS admins: support/admin/owner) |
 
 ### Cache Invalidation Strategy
 
-- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`
+- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`. Datos de baja frecuencia (planes, settings, payment-methods) usan TTL 1 h como red de seguridad: la invalidación real es siempre on-write.
+- **Dashboard invalidations**: writes de members/subscriptions/payments invalidan `org:{orgId}:dashboard:stats:*` y `org:{orgId}:dashboard:action-items` (KPIs y listas accionables).
 - **Role invalidation**: `afterUpdateMemberRole` hook in Better Auth invalidates `member:role:${userId}:${orgId}` so role changes take effect instantly
 - **Graceful degradation**: All cache methods wrap errors with `console.error` and return `null`/void — Redis being down never blocks requests
 
@@ -339,11 +342,16 @@ Los emails y la generación de PDF se procesan **asíncronamente** vía Cloudfla
 |------|---------|----------|
 | `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invitar miembro sin cuenta → panel) + `/api/platform/staff` (invitaciones console) |
 | `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | Hook `sendInvitationEmail` de Better Auth en `lib/auth.ts` (invitación a miembro con cuenta) |
-| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` (al registrar un pago) |
+| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` — automático: al crear sub con pago `validated` y al aprobar un pago `processing` (PATCH status); también en el reenvío manual (`POST /api/payments/:id/send-email`) |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }` | `organizations.route.ts` (POST `/subscription/renew` — renovación autoservicio) → payer + owners de la org (dedupe) |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
-- `email.handler.ts` — envía emails con **Resend** (`EMAIL_PROVIDER=resend`) o **Gmail SMTP** (`EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`).
-- `pdf.handler.ts` — genera el recibo de pago en PDF con `@react-pdf/renderer` y lo envía por email.
+- `email.handler.ts` — SOLO transporte de emails (**Resend** con `EMAIL_PROVIDER=resend` o **Gmail SMTP** con `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); el HTML lo componen los templates.
+- `pdf.handler.ts` — recibos de pago (membresía de gym + confirmación de pago SaaS de la org).
+
+**Templates** (`apps/jobs-worker/src/templates/`) — el HTML vive aquí, nunca en los handlers:
+- `layout.ts` — shells base: `renderDarkShell` (invitaciones, fondo negro) y `renderLightShell` (recibos, estilo comprobante amarillo) + `escapeHtml`.
+- `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — cada uno exporta `renderX(data): { subject, html }`.
 
 **Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
 
