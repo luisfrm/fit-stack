@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Modal, Input, Button } from "@workspace/ui/components";
+import { addDuration, DEFAULT_TIMEZONE, toLocalDayString } from "@workspace/shared/date";
 
 interface ExtendSubscriptionModalProps {
   readonly open: boolean;
@@ -31,8 +32,7 @@ export function ExtendSubscriptionModal({
   React.useEffect(() => {
     if (!open) return;
     const initial = new Date(currentPeriodEnd);
-    initial.setMonth(initial.getMonth() + 1);
-    setNewDate(initial.toISOString().split("T")[0] ?? "");
+    setNewDate(toLocalDayString(DEFAULT_TIMEZONE, addDuration(initial, 1, "month", DEFAULT_TIMEZONE)));
   }, [open, currentPeriodEnd]);
 
   const handleConfirm = async () => {

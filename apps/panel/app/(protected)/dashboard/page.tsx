@@ -7,7 +7,7 @@ import { financeService } from "@/lib/services/finance-service";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { DashboardStatusToaster } from "@/components/dashboard/dashboard-status-toaster";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
-import { DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { toLocalDayString } from "@workspace/shared/date";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import type { IClassToday } from "@workspace/shared/types";
 
@@ -52,11 +52,11 @@ async function normalizeTodayRevenue(
 export default async function DashboardPage() {
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
-  const orgTimezone = DEFAULT_TIMEZONE;
+  // Usa la tz de la org activa (obligatoria, igual que el api-worker) para que
+  // "hoy" no dependa de la tz del servidor ni de un default hardcodeado.
+  const orgTimezone = session?.activeOrganization?.timezone;
 
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: orgTimezone,
-  }).format(new Date());
+  const today = toLocalDayString(orgTimezone);
 
   const settingsTag = `org:${activeOrgId}:settings`;
   const settings = await settingsService
