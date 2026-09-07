@@ -60,6 +60,9 @@ app.use('*', async (c, next) => {
   if (session) {
     c.set('session', session.session);
     c.set('user', session.user);
+    // El objeto completo de la org activa (timezone, branding, etc.) viene como
+    // campo hermano del registro de sesión, NO dentro de `session.session`.
+    c.set('org', (session as any)?.activeOrganization ?? null);
   }
 
   await next();

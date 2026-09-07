@@ -51,6 +51,7 @@ export const requireOrgPermission = <Module extends keyof OrganizationStatement>
     if (!organizationId) {
       throw new HTTPException(400, { message: 'No active organization selected' });
     }
+    c.set('orgId', organizationId);
 
     const auth = c.get('auth');
     try {
@@ -120,6 +121,40 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
 
 /** Alias for platform auth */
 export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
+
+/**
+ * Resuelve la zona horaria de la organización activa desde la sesión y la deja
+ * en `c.get('orgTimezone')` (tipado). Es OBLIGATORIA: si la org no la tiene,
+ * lanza 500 — nunca se usa un fallback silencioso que asigne una tz incorrecta.
+ * Componer DESPUÉS de `requireOrgPermission`/`requireAuth` (necesita la sesión).
+ */
+export const requireOrgTimezone = () =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    const org = c.get('org');
+    const timezone = org?.timezone;
+    if (!timezone || !timezone.trim()) {
+      throw new HTTPException(500, {
+        message: 'La organización no tiene una zona horaria configurada',
+      });
+    }
+    c.set('orgTimezone', timezone);
+    await next();
+  });
+
+/**
+ * Garantiza una org activa y la deja en `c.get('orgId')` (tipado).
+ * Útil para rutas org-scoped sin chequeo de permiso (p. ej. upload).
+ * Componer DESPUÉS de `requireAuth`.
+ */
+export const requireOrg = () =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    const organizationId = c.req.param('orgId') ?? c.get('session')?.activeOrganizationId;
+    if (!organizationId) {
+      throw new HTTPException(400, { message: 'No active organization selected' });
+    }
+    c.set('orgId', organizationId);
+    await next();
+  });
 
 /**
  * Construye el service de features para el contexto de la request.
