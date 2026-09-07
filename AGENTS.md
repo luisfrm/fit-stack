@@ -275,6 +275,20 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 
 ---
 
+### 9. Manejo de fechas y zona horaria
+
+- **Fuente única de verdad**: `packages/shared/src/date.ts` (exportado por `@workspace/shared`), construida sobre `date-fns` + `@date-fns/tz` (ambas puramente funcionales, edge-safe). **NUNCA** reintroducir aritmética de fechas a mano (`Intl.DateTimeFormat("en-CA")`, `new Date().toISOString().slice(0,10)`, offsets con `padStart`, `setUTCMonth`, `Math.floor(ms / 86_400_000)`).
+- **Regla de negocio**: un pago a las 11pm en Venezuela debe caer en el **mismo día local**. Para lograrlo, la tz SIEMPRE se resuelve de la **sesión** (`session.activeOrganization.timezone`, cacheada 5 min en `org:{orgId}:profile`), **nunca** de un query param del cliente (`?timezone=`).
+- **La timezone es OBLIGATORIA**: no hay fallback `?? 'America/Caracas'`. Si la org no la tiene, es un error.
+  - **API**: `requireOrgTimezone(c.get('session'))` (`apps/api-worker/src/lib/org-timezone.ts`) lanza 500 si falta. Usada en `subscriptions`, `reports`, `plans`, `dashboard` y `payments`.
+  - **Servicios**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` exigen `timezone: string` **sin default**.
+  - **Creación de org (console → `/api/platform/organizations`)**: `timezone` es `required` en `createOrgSchema`, validado en `organizations.service.createOrganization`, y `required: true` en `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). El schema `organization.timezone` es `notNull` **sin default** (DB).
+- **SQL vs JS**: la **agregación** por día/mes local (reportes, ingresos del día) se hace **en SQL** con `AT TIME ZONE`. La util JS resuelve la **entrada** (límites de día local como `Date` UTC para los `WHERE gte/lte`) y el **display**; no reemplaza Postgres.
+- **UI** (panel/console): el "hoy" local se obtiene con `toLocalDayString(orgTimezone)`; parseo de `'YYYY-MM-DD'` con `parseDateAsConfigTimezone(dateStr, tz)` (alias de `parseLocalToUtc`). Los helpers de hora wall-clock (`formatTime`/`formatTimeRange`) viven en `apps/{panel,console}/lib/config/display.ts`, que re-exporta los helpers de tz desde `@workspace/shared`.
+- **`billing-utils.ts`** (api-worker) es billing de **plataforma** (SaaS) y opera en UTC — no se mezcla con la tz de la org.
+
+---
+
 ## Redis Caching (Upstash)
 
 The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compatible caching.

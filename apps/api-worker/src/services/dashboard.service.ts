@@ -22,7 +22,7 @@ export function createDashboardService(
   return {
     async getDashboardSummary(
       organizationId: string,
-      timezone: string = 'America/Caracas',
+      timezone: string,
       todayDateStr?: string
     ): Promise<DashboardStats> {
       const dateManager = new OrganizationDateManager(timezone);

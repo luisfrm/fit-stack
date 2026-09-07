@@ -9,6 +9,7 @@ import { renewOrgSubscription, type OrgPaymentMethodsResponse, type OrgSubscript
 import { mutationError } from "@/lib/errors";
 import { uploadService } from "@/lib/services/upload-service";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
+import { toLocalDayString } from "@workspace/shared/date";
 import type { IPaymentMethodDetails } from "@workspace/shared/types";
 
 interface OrgRenewalModalProps {
@@ -38,7 +39,7 @@ export function OrgRenewalModal({
   const [paymentCurrency, setPaymentCurrency] = React.useState(subscription.planCurrency);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
-  const [paymentDate, setPaymentDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = React.useState(() => toLocalDayString(activeOrganization?.timezone));
   const [referenceRate, setReferenceRate] = React.useState(1);
   const [referenceAmount, setReferenceAmount] = React.useState(subscription.planPrice / 100);
   const [isSubmitting, setIsSubmitting] = React.useState(false);

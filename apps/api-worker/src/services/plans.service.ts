@@ -9,7 +9,7 @@ export function createPlansService(plansRepo: PlansRepository) {
       return plansRepo.findAll(organizationId, filters);
     },
 
-    async getSummary(organizationId: string, timezone: string = 'America/Caracas'): Promise<IMembershipsSummary> {
+    async getSummary(organizationId: string, timezone: string): Promise<IMembershipsSummary> {
       const dateManager = new OrganizationDateManager(timezone);
       const utcNow = new Date();
       return plansRepo.getSummary(organizationId, dateManager, utcNow);

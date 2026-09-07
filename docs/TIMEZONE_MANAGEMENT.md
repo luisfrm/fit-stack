@@ -49,8 +49,30 @@ sql`(${table.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone})::date`
 
 ---
 
+## 🧰 Utilidad compartida de fechas (`@workspace/shared`)
+
+Toda la lógica de fecha/zona horaria en JS se centraliza en **`packages/shared/src/date.ts`**
+(construida sobre `date-fns` + `@date-fns/tz`, ambas edge-safe y tree-shakeables). Es la única fuente de verdad para:
+
+- **`parseLocalToUtc(tz, 'YYYY-MM-DD')`** → instante **UTC** de medianoche local (evita el "salto de día").
+- **`toLocalDayString(tz?, date?)`** / **`toLocalMonthString(...)`** → día/mes local (`'YYYY-MM-DD'` / `'YYYY-MM'`) en la tz de la org.
+- **`localDayStartUtc` / `localDayEndUtc` / `localDayRange`** → límites del día local como `Date` UTC (para los `WHERE gte/lte`).
+- **`localMonthStartUtc`** → inicio del mes local.
+- **`getTimezoneOffset(tz?, date?)`** → offset `'+hh:mm'` (reemplaza el parser manual con `Intl.DateTimeFormat(...).timeZoneName`).
+- **`addDuration(base, value, unit, tz?)`** → suma duraciones operando en la tz (maneja DST y fines de mes).
+
+**Regla importante — SQL vs JS:** la **agregación** por día/mes local en reportes sigue en SQL
+(`AT TIME ZONE`). La util JS resuelve la **entrada** (instantes UTC de los límites de día local) y el **display**;
+no reemplaza la agregación de Postgres.
+
+> ⚠️ **No reintroducir aritmética de fechas a mano** (`new Date().toISOString().split("T")[0]`,
+> `Intl.DateTimeFormat("en-CA")`, `setUTCMonth`, offsets con `padStart`, `Math.floor(ms / 86_400_000)`).
+> Usar siempre `@workspace/shared` (módulo `date`).
+
+---
+
 > [!TIP]
-> **Golden Rule:** Whenever you create a new service that handles reports or analytics, make sure to receive the `timezone` from the controller and pass it to the SQL aggregation functions.
+> **Golden Rule:** Whenever you create a new service that handles reports or analytics, make sure to receive the `timezone` from the controller and pass it to the SQL aggregation functions. La tz se resuelve de la **sesión** (`session.activeOrganization.timezone`), NUNCA de un query param del cliente (`?timezone=`), para que un pago registrado a las 11pm en Venezuela caiga en el mismo día local.
 
 ---
 

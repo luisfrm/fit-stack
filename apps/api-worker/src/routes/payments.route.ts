@@ -10,6 +10,7 @@ import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createFinanceService } from '../services/finance.service';
 import { createCache } from '../lib/cache';
+import { requireOrgTimezone } from '../lib/org-timezone';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
@@ -26,12 +27,8 @@ export const paymentRoutes = new Hono<AppEnv>()
     const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
 
-    const auth = c.get('auth');
-    const fullOrg = await (auth.api as any).getFullOrganization({
-      headers: c.req.raw.headers,
-    });
-
-    const timezone = (fullOrg as any)?.timezone ?? 'America/Caracas';
+    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
+    const timezone = requireOrgTimezone(c.get('session'));
 
     const db = c.get('db');
     const paymentsRepo = createPaymentsRepository(db);

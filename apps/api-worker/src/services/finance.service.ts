@@ -7,7 +7,7 @@ export function createFinanceService(
   subsRepo: SubscriptionsRepository
 ) {
   return {
-    async getDashboardAnalytics(organizationId: string, timezone: string = 'America/Caracas') {
+    async getDashboardAnalytics(organizationId: string, timezone: string) {
       const dateManager = new OrganizationDateManager(timezone);
       const utcNow = new Date();
 

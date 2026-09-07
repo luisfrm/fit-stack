@@ -98,7 +98,8 @@ export async function createOrganization(
   const slug = overrides.slug ?? `gym-${uid()}`;
   const name = overrides.name ?? `Gym ${slug}`;
 
-  const res = await client.post('/api/auth/organization/create', { name, slug });
+  // timezone es obligatoria en la organización (no hay default silencioso).
+  const res = await client.post('/api/auth/organization/create', { name, slug, timezone: 'America/Caracas' });
   if (res.status !== 200 && res.status !== 201) {
     throw new Error(`organization create failed (${res.status}): ${res.text}`);
   }

@@ -64,6 +64,13 @@
       "when": 1788500964138,
       "tag": "0008_fearless_microbe",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788726644365,
+      "tag": "0009_mighty_blade",
+      "breakpoints": true
     }
   ]
 }

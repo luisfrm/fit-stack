@@ -24,6 +24,7 @@ import {
 } from "@workspace/ui/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { addDuration, localDayStartUtc, toLocalDayString } from "@workspace/shared/date";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { ORG_ROLES } from "@workspace/shared";
@@ -93,16 +94,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   const selectedPlan = React.useMemo(() => plans.find(p => p.id === planId), [plans, planId]);
 
-  const d = new Date();
-  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayStr = toLocalDayString(timezone);
+  const defaultEndStr = toLocalDayString(timezone, addDuration(new Date(), 1, 'month', timezone));
 
   const [startDate, setStartDate] = React.useState(todayStr);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
-  const [endDate, setEndDate] = React.useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + 1);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  });
+  const [endDate, setEndDate] = React.useState(defaultEndStr);
 
   const [memberSearch, setMemberSearch] = React.useState("");
   const debouncedSearch = useDebounce(memberSearch, 500);
@@ -113,8 +110,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   React.useEffect(() => {
     const start = parseDateAsConfigTimezone(startDate, timezone);
     if (!Number.isNaN(start.getTime()) && selectedPlan) {
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
+      const startOfToday = localDayStartUtc(timezone);
 
       // Determinamos el Baseline para el cálculo acumulativo
       // Si el socio tiene una suscripción VIGENTE, usamos suEndDate como base.
@@ -122,38 +118,18 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       let baseline = new Date(start);
       if (selectedMember?.latestSubscription) {
         const currentExpiration = new Date(selectedMember.latestSubscription.endDate);
-        if (currentExpiration >= now && selectedMember.latestSubscription.status === 'active') {
+        if (currentExpiration >= startOfToday && selectedMember.latestSubscription.status === 'active') {
           baseline = new Date(currentExpiration);
         }
       }
 
-      const end = new Date(baseline);
       const durationValue = selectedPlan.durationValue || 1;
       const durationUnit = selectedPlan.durationUnit || 'month';
 
-      switch (durationUnit) {
-        case 'day':
-          end.setDate(end.getDate() + durationValue);
-          break;
-        case 'week':
-          end.setDate(end.getDate() + (durationValue * 7));
-          break;
-        case 'month':
-          end.setMonth(end.getMonth() + durationValue);
-          break;
-        case 'year':
-          end.setFullYear(end.getFullYear() + durationValue);
-          break;
-        default:
-          end.setMonth(end.getMonth() + 1);
-      }
-
-      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+      const endStr = toLocalDayString(timezone, addDuration(baseline, durationValue, durationUnit, timezone));
       setEndDate(endStr);
     } else if (!Number.isNaN(start.getTime()) && !selectedPlan) {
-      const end = new Date(start);
-      end.setMonth(end.getMonth() + 1);
-      const endStr = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+      const endStr = toLocalDayString(timezone, addDuration(new Date(start), 1, 'month', timezone));
       setEndDate(endStr);
     }
   }, [startDate, timezone, selectedPlan, selectedMember]);

@@ -24,6 +24,8 @@ const createOrgSchema = z.object({
   slug: z.string().optional(),
   logo: z.string().nullable().optional(),
   countryCode: z.string().optional(),
+  // La zona horaria es OBLIGATORIA desde la creación (no hay default silencioso).
+  timezone: z.string().min(1, 'La zona horaria es requerida'),
   taxId: z.string().nullable().optional(),
   legalName: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
