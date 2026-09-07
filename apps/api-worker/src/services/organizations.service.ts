@@ -1,6 +1,8 @@
 import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } from '../repositories/organizations.repository';
+import type { SettingsRepository } from '../repositories/settings.repository';
+import { buildDefaultOrgSettings } from '@workspace/shared';
 
-export function createOrganizationsService(orgsRepo: OrganizationsRepository) {
+export function createOrganizationsService(orgsRepo: OrganizationsRepository, settingsRepo: SettingsRepository) {
   return {
     async getAllOrganizations(filters: OrganizationFilter) {
       return orgsRepo.findAll(filters);
@@ -41,7 +43,19 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository) {
         updatedAt: new Date(),
       };
 
-      return orgsRepo.create(newOrgData);
+      const created = await orgsRepo.create(newOrgData);
+      if (!created) {
+        throw new Error('Error al crear la organización');
+      }
+
+      // Sembrar settings de la org (moneda principal, monedas activas, formato,
+      // métodos de pago) para que la UI no caiga en fallbacks silenciosos.
+      const defaults = buildDefaultOrgSettings(data.countryCode);
+      for (const [key, value] of Object.entries(defaults)) {
+        await settingsRepo.upsert(created.id, key, value);
+      }
+
+      return created;
     },
 
     async updateOrganization(id: string, data: Partial<NewDbOrganization>) {
