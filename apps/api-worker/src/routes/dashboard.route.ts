@@ -1,25 +1,24 @@
 import { Hono } from 'hono';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createDashboardRepository } from '../repositories/dashboard.repository';
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createDashboardService } from '../services/dashboard.service';
 import { createCache } from '../lib/cache';
-import { requireOrgTimezone } from '../lib/org-timezone';
 import type { AppEnv } from '../lib/env';
 
 export const dashboardRoutes = new Hono<AppEnv>()
   // GET /api/dashboard/stats
-  .get('/stats', requireOrgPermission(PM.DASHBOARD, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+  .get('/stats', requireOrgPermission(PM.DASHBOARD, PA.READ), requireOrgTimezone(), async (c) => {
+    const orgId = c.get('orgId')!;
     const today = c.req.query('today');
 
     if (!today) {
       return c.json({ error: 'Parameter today (YYYY-MM-DD) is required' }, 400);
     }
 
-    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
-    const timezone = requireOrgTimezone(c.get('session'));
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:dashboard:stats:${today}`;
 

@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requirePlatformAuth } from '../lib/route-handler';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import { createSettingsRepository } from '../repositories/settings.repository';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
@@ -59,7 +60,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     if (cached) return c.json(cached);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const result = await service.getAllOrganizations({
       query,
@@ -76,7 +77,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   .get('/:id', requirePlatformAuth(), async (c) => {
     const id = c.req.param('id');
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const org = await service.findOrganizationById(id);
     if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
@@ -89,7 +90,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const newOrg = await service.createOrganization(data as any);
     await cache.invalidate('platform:organizations*');
@@ -103,7 +104,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
@@ -118,7 +119,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
@@ -132,7 +133,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     await service.deleteOrganization(id);
     await cache.invalidate('platform:organizations*');
@@ -151,7 +152,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       const cache = createCache(c.env);
 
       const repo = createOrganizationsRepository(c.get('db'));
-      const service = createOrganizationsService(repo);
+      const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
       const org = await service.findOrganizationById(orgId);
       if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
 

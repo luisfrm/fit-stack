@@ -1,18 +1,17 @@
 import { Hono } from 'hono';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createReportsService } from '../services/reports.service';
 import { createCache } from '../lib/cache';
-import { requireOrgTimezone } from '../lib/org-timezone';
 import type { AppEnv } from '../lib/env';
 
 export const reportRoutes = new Hono<AppEnv>()
   // GET /api/reports/revenue
-  .get('/revenue', requireOrgPermission(PM.REPORTS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
-    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
-    const timezone = requireOrgTimezone(c.get('session'));
+  .get('/revenue', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
+    const orgId = c.get('orgId')!;
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
     const monthsCount = Number(c.req.query('monthsCount') || '12');
 
     const cache = createCache(c.env);

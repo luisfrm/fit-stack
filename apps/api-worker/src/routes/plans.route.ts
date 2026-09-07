@@ -1,12 +1,11 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createPlansRepository } from '../repositories/plans.repository';
 import { createPlansService } from '../services/plans.service';
 import { createCache } from '../lib/cache';
-import { requireOrgTimezone } from '../lib/org-timezone';
 import type { AppEnv } from '../lib/env';
 
 const planSchema = z.object({
@@ -43,10 +42,10 @@ export const planRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/plans/summary
-  .get('/summary', requireOrgPermission(PM.PLANS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
-    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
-    const timezone = requireOrgTimezone(c.get('session'));
+  .get('/summary', requireOrgPermission(PM.PLANS, PA.READ), requireOrgTimezone(), async (c) => {
+    const orgId = c.get('orgId')!;
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
 
     const plansRepo = createPlansRepository(c.get('db'));
     const plansService = createPlansService(plansRepo);
