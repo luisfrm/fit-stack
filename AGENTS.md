@@ -115,6 +115,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
+6. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
 
 ---
 
@@ -247,7 +248,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
 | `/api/platform/plans` | SaaS plan catalog (console) |
 | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` |
-| `/api/platform/organizations` | Platform org CRUD (console) |
+| `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug) |
 | `/api/platform/settings` | Platform global settings |
 | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
 | `/api/platform/upload` | Org-less platform assets (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, fixed scope `platform/` |
@@ -607,6 +608,7 @@ PLATFORM_ROLE_LABELS + formatPlatformRole (platform/Console roles: owner, admin,
 // types.ts
 IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
 PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization,
+IPlatformSubscription (incl. `organizationSlug?` — joined from the org, used for slug-based detail routes),
 IPaymentMethodConfig, IPaymentMethodField (type: 'text' | 'file' | 'number' | 'visual' + value?)
 
 > **`visual` field in payment methods**: a field with `type: 'visual'` stores instructions
