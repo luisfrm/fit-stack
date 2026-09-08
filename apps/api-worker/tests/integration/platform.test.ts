@@ -91,11 +91,22 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
         name: `Gym ${uid()}`,
         slug: `gym-${uid()}`,
         countryCode: 'VE',
+        timezone: 'America/Caracas',
       });
 
       expect(res.status, res.text).toBe(201);
       expect(res.body).toHaveProperty('id');
       expect(res.body.name).toContain('Gym');
+      expect(res.body.primaryCurrency).toBe('VES');
+      expect(res.body.currencyFormat).toBe('latam');
+    });
+
+    it('rejects creation without country and timezone', async () => {
+      const res = await admin.client.post('/api/platform/organizations', {
+        name: `Gym ${uid()}`,
+      });
+
+      expect(res.status, res.text).toBe(400);
     });
 
     it('rejects creation by non-admin', async () => {
@@ -113,6 +124,8 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
       const createRes = await admin.client.post('/api/platform/organizations', {
         name: `Provision Gym ${uid()}`,
         slug: `prov-${uid()}`,
+        countryCode: 'VE',
+        timezone: 'America/Caracas',
       });
       expect(createRes.status, createRes.text).toBe(201);
       const orgId = createRes.body.id;
@@ -134,6 +147,8 @@ describe.skipIf(skipReason !== null)('Platform API', () => {
       const createRes = await admin.client.post('/api/platform/organizations', {
         name: `Delete Me ${uid()}`,
         slug: `del-${uid()}`,
+        countryCode: 'VE',
+        timezone: 'America/Caracas',
       });
       const orgId = createRes.body.id;
 
