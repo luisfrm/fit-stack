@@ -41,7 +41,7 @@ export const paymentRoutes = new Hono<AppEnv>()
   })
   // PATCH /api/payments/:id/status
   .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), zValidator('json', updateStatusSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const { status } = c.req.valid('json');
     const cache = createCache(c.env);
@@ -63,7 +63,7 @@ export const paymentRoutes = new Hono<AppEnv>()
 
   // POST /api/payments/:id/send-email
   .post('/:id/send-email', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const db = c.get('db');

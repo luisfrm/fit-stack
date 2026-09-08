@@ -23,7 +23,7 @@ const planSchema = z.object({
 export const planRoutes = new Hono<AppEnv>()
   // GET /api/plans
   .get('/', requireOrgPermission(PM.PLANS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const includeStats = c.req.query('includeStats') === 'true';
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:plans:${c.req.url}`;
@@ -56,7 +56,7 @@ export const planRoutes = new Hono<AppEnv>()
 
   // GET /api/plans/:id
   .get('/:id', requireOrgPermission(PM.PLANS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const plansRepo = createPlansRepository(c.get('db'));
@@ -71,7 +71,7 @@ export const planRoutes = new Hono<AppEnv>()
 
   // POST /api/plans
   .post('/', requireOrgPermission(PM.PLANS, PA.CREATE), zValidator('json', planSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -85,7 +85,7 @@ export const planRoutes = new Hono<AppEnv>()
 
   // PUT /api/plans/:id
   .put('/:id', requireOrgPermission(PM.PLANS, PA.UPDATE), zValidator('json', planSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -105,7 +105,7 @@ export const planRoutes = new Hono<AppEnv>()
 
   // DELETE /api/plans/:id
   .delete('/:id', requireOrgPermission(PM.PLANS, PA.DELETE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

@@ -32,7 +32,7 @@ const blockSchema = z.object({
 export const cmsRoutes = new Hono<AppEnv>()
   // GET /api/cms/pages
   .get('/pages', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const pagesRepo = createContentPagesRepository(c.get('db'));
     const pagesService = createContentPagesService(pagesRepo);
 
@@ -42,7 +42,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // GET /api/cms/pages/:id
   .get('/pages/:id', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const pagesRepo = createContentPagesRepository(c.get('db'));
@@ -54,7 +54,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // POST /api/cms/pages
   .post('/pages', requireOrgPermission(PM.CONTENT, PA.CREATE), requireFeature('cms'), zValidator('json', pageSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -69,7 +69,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // PUT /api/cms/pages/:id
   .put('/pages/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', pageSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -85,7 +85,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // DELETE /api/cms/pages/:id
   .delete('/pages/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), requireFeature('cms'), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 
@@ -100,7 +100,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // GET /api/cms/pages/:id/blocks
   .get('/pages/:id/blocks', requireOrgPermission(PM.CONTENT, PA.READ), requireFeature('cms'), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const pageId = Number(c.req.param('id'));
 
     const pagesRepo = createContentPagesRepository(c.get('db'));
@@ -113,7 +113,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // POST /api/cms/blocks
   .post('/blocks', requireOrgPermission(PM.CONTENT, PA.CREATE), requireFeature('cms'), zValidator('json', blockSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -129,7 +129,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // PUT /api/cms/blocks/:id
   .put('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', blockSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -146,7 +146,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // DELETE /api/cms/blocks/:id
   .delete('/blocks/:id', requireOrgPermission(PM.CONTENT, PA.DELETE), requireFeature('cms'), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 
@@ -162,7 +162,7 @@ export const cmsRoutes = new Hono<AppEnv>()
 
   // PUT /api/cms/pages/:id/blocks/reorder
   .put('/pages/:id/blocks/reorder', requireOrgPermission(PM.CONTENT, PA.UPDATE), requireFeature('cms'), zValidator('json', z.object({ orders: z.array(z.object({ id: z.number(), displayOrder: z.number() })) })), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const pageId = Number(c.req.param('id'));
     const { orders } = c.req.valid('json');
     const cache = createCache(c.env);

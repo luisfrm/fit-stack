@@ -38,7 +38,7 @@ export const dashboardRoutes = new Hono<AppEnv>()
 
   // GET /api/dashboard/action-items — listas accionables (próximos a vencer / vencidos recientemente)
   .get('/action-items', requireOrgPermission(PM.DASHBOARD, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:dashboard:action-items`;
 

@@ -2,6 +2,7 @@ import type { MembersRepository, MembersFilter, NewDbMember } from '../repositor
 import type { UsersRepository } from '../repositories/users.repository';
 import type { TokenService } from './token.service';
 import type { Auth } from '../lib/env';
+import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
 
 const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
   const sanitized = { ...data };
@@ -44,10 +45,12 @@ export function createMembersService(
     async createMember(
       organizationId: string,
       data: Omit<NewDbMember, 'organizationId'>,
-      sendInvite: boolean = false,
+      sendInvite: boolean,
       ctx?: { auth: Auth; headers: Headers }
     ) {
-      const sanitizedData = sanitizeMemberData(data);
+      // Defaults explícitos por spread (`sendInvite` no es columna: se omite del insert).
+      const { sendInvite: _flag, ...memberFields } = { ...DEFAULT_MEMBER_VALUES, ...data };
+      const sanitizedData = sanitizeMemberData(memberFields);
       const existing = await membersRepo.findByEmail(organizationId, sanitizedData.email);
       if (existing) {
         throw new Error('El correo electrónico ya está registrado para otro miembro en esta organización');
@@ -78,7 +81,7 @@ export function createMembersService(
                 headers: ctx.headers,
                 body: {
                   email: sanitizedData.email,
-                  role: (sanitizedData.role as any) || 'member',
+                  role: sanitizedData.role as any,
                   organizationId,
                   resend: true,
                 },

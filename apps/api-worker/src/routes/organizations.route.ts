@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireAuth, requireOrgPermission } from '../lib/route-handler';
+import { requireAuth, requireOrg, requireOrgPermission } from '../lib/route-handler';
 import { PERMISSION_MODULES, PERMISSION_ACTIONS, type IPaymentMethodConfig } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
@@ -77,12 +77,8 @@ export const organizationRoutes = new Hono<AppEnv>()
 
   // GET /api/organizations/subscription
   // Suscripción SaaS activa de la org con detalles del plan (precio, vencimiento, status).
-  .get('/subscription', requireAuth(), async (c) => {
-    const session = c.get('session')!;
-    const activeOrganizationId = session.activeOrganizationId;
-    if (!activeOrganizationId) {
-      return c.json({ error: 'No active organization' }, 400);
-    }
+  .get('/subscription', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
 
     const cache = createCache(c.env);
     const cacheKey = `org:${activeOrganizationId}:subscription`;
@@ -100,12 +96,8 @@ export const organizationRoutes = new Hono<AppEnv>()
 
   // GET /api/organizations/payment-methods
   // Métodos de pago de plataforma expuestos a la org (form de renovación autoservicio).
-  .get('/payment-methods', requireAuth(), async (c) => {
-    const session = c.get('session')!;
-    const activeOrganizationId = session.activeOrganizationId;
-    if (!activeOrganizationId) {
-      return c.json({ error: 'No active organization' }, 400);
-    }
+  .get('/payment-methods', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
 
     const cache = createCache(c.env);
     const cacheKey = `org:${activeOrganizationId}:payment-methods`;
@@ -145,11 +137,7 @@ export const organizationRoutes = new Hono<AppEnv>()
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
     zValidator('json', orgRenewSchema),
     async (c) => {
-      const session = c.get('session')!;
-      const activeOrganizationId = session.activeOrganizationId;
-      if (!activeOrganizationId) {
-        return c.json({ error: 'No active organization' }, 400);
-      }
+      const activeOrganizationId = c.get('orgId')!;
 
       const data = c.req.valid('json');
 

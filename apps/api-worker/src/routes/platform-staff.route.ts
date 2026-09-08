@@ -6,6 +6,7 @@ import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
 import { createCache } from '../lib/cache';
 import { canAssignPlatformRole, platformRoles, type PlatformRole } from '@workspace/shared';
+import { DEFAULT_PLATFORM_STAFF_VALUES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -17,8 +18,8 @@ const platformRoleValues = Object.keys(platformRoles) as [string, ...string[]];
 const createStaffSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').optional(),
   email: z.string().email('Email inválido'),
-  role: z.enum(platformRoleValues).default('admin'),
-  sendInvite: z.boolean().default(false),
+  role: z.enum(platformRoleValues).optional(),
+  sendInvite: z.boolean().optional(),
 });
 
 export const platformStaffRoutes = new Hono<AppEnv>()
@@ -48,7 +49,7 @@ export const platformStaffRoutes = new Hono<AppEnv>()
 
   // POST /api/platform/staff
   .post('/', requirePlatformAuth(), zValidator('json', createStaffSchema), async (c) => {
-    const data = c.req.valid('json');
+    const data = { ...DEFAULT_PLATFORM_STAFF_VALUES, ...c.req.valid('json') };
     // Session user type omits `role` (additionalFields has input:false), so cast like route-handler does.
     const actor = c.get('user') as { role?: string } | undefined;
     const actorRole = (actor?.role || 'user') as PlatformRole;

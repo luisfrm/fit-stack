@@ -18,29 +18,33 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
+import { DEFAULT_ORG_STAFF_VALUES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const createOrgSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   slug: z.string().optional(),
   logo: z.string().nullable().optional(),
-  countryCode: z.string().optional(),
+  slogan: z.string().nullable().optional(),
+  countryCode: z.string().min(1, 'El país de operación es requerido'),
   // La zona horaria es OBLIGATORIA desde la creación (no hay default silencioso).
   timezone: z.string().min(1, 'La zona horaria es requerida'),
+  currencyFormat: z.enum(['latam', 'usa']).optional(),
   taxId: z.string().nullable().optional(),
   legalName: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   fiscalConfig: z.record(z.string(), z.any()).nullable().optional(),
   metadata: z.record(z.string(), z.any()).nullable().optional(),
+  settings: z.record(z.string(), z.string()).optional(),
 });
 
 const provisionOwnerSchema = z.object({
   firstName: z.string().min(1, 'El nombre es requerido'),
   lastName: z.string().min(1, 'El apellido es requerido'),
   email: z.string().email('Email inválido'),
-  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional().default('owner'),
-  isActive: z.boolean().optional().default(true),
-  sendInvite: z.boolean().optional().default(false),
+  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional(),
+  isActive: z.boolean().optional(),
+  sendInvite: z.boolean().optional(),
   phoneNumber: z.string().nullable().optional(),
   documentId: z.string().nullable().optional(),
 });
@@ -261,7 +265,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     zValidator('json', provisionOwnerSchema),
     async (c) => {
       const id = c.req.param('id');
-      const { sendInvite, ...memberData } = c.req.valid('json');
+      const { sendInvite, ...memberData } = { ...DEFAULT_ORG_STAFF_VALUES, ...c.req.valid('json') };
 
       const membersRepo = createMembersRepository(c.get('db'));
       const usersRepo = createUsersRepository(c.get('db'));
@@ -282,7 +286,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       if (existingUser) {
         const isAlreadyAuthMember = await membersRepo.findAuthMember(existingUser.id, id);
         if (!isAlreadyAuthMember) {
-          await membersRepo.addToOrganization(existingUser.id, id, (memberData.role as any) || 'owner');
+          await membersRepo.addToOrganization(existingUser.id, id, memberData.role as any);
         }
       }
 
