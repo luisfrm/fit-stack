@@ -83,10 +83,15 @@ export const organization = pgTable('organization', {
   metadata: jsonb('metadata'),
 
   // Localization & Fiscal (Optional)
-  countryCode: text('country_code').default('VE').notNull(),
+  countryCode: text('country_code').notNull(),
   // La timezone es OBLIGATORIA y debe setearse explícitamente al crear la org
   // (sin default silencioso que asigne 'America/Caracas' por accidente).
   timezone: text('timezone').notNull(),
+  // Moneda principal y formato: OBLIGATORIOS, columnas NOT NULL sin default.
+  // La moneda deriva del país al crear (un solo insert); el formato viene
+  // explícito del request. Nunca se inventan en lectura.
+  primaryCurrency: text('primary_currency').notNull(),
+  currencyFormat: text('currency_format').notNull(),
   taxId: text('tax_id'),
   legalName: text('legal_name'),
   address: text('address'),
