@@ -5,7 +5,7 @@ import { User, CalendarClock } from "lucide-react";
 import { Text } from "@workspace/ui/components";
 import { NextImage } from "@workspace/ui/components/next/image";
 import { uploadService } from "@/lib/services/upload-service";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 
 interface ActivityItemProps {
@@ -19,8 +19,8 @@ interface ActivityItemProps {
 }
 
 export function ActivityItem({ name, time, imageUrl, planName, amountPaid, currencyPaid, endDate }: Readonly<ActivityItemProps>) {
-  const { settings } = useSettings();
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const { activeOrganization } = useAuth();
+  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">

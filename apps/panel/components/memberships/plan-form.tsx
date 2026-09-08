@@ -11,6 +11,7 @@ import {
   Label,
 } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { Plus, Trash2, BadgeDollarSign, Loader2, Save, Send } from "lucide-react";
 
 interface PlanFormProps {
@@ -26,11 +27,12 @@ interface FeatureItem {
 
 export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
   const { settings, isLoading: isLoadingSettings } = useSettings();
+  const { activeOrganization } = useAuth();
   const isEdit = !!initialData?.id;
 
   const [name, setName] = React.useState(initialData?.name || "");
   const [price, setPrice] = React.useState(initialData?.price ? (initialData.price / 100).toString() : "0");
-  const [currency, setCurrency] = React.useState<string>(initialData?.currency || "USD");
+  const [currency, setCurrency] = React.useState<string>(initialData?.currency || activeOrganization?.primaryCurrency || "");
   const [durationValue, setDurationValue] = React.useState(initialData?.durationValue || 1);
   const [durationUnit, setDurationUnit] = React.useState<"day" | "week" | "month" | "year">(initialData?.durationUnit || "month");
 
@@ -45,11 +47,11 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
 
   const activeCurrencies = React.useMemo(() => {
     const rawActive = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!rawActive) return ["USD"];
+    if (!rawActive) return [];
     try {
       return JSON.parse(rawActive) as string[];
     } catch {
-      return ["USD"];
+      return [];
     }
   }, [settings]);
 

@@ -1,9 +1,7 @@
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
-import { settingsService } from "@/lib/services/settings-service";
 import { sessionService } from "@/lib/services/session-service";
 import { PaymentsClient } from "./payments-client";
-import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -34,16 +32,12 @@ export default async function PaymentsPage({
 
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
-  const settingsTag = `org:${activeOrgId}:settings`;
   const subsTag = `org:${activeOrgId}:subscriptions`;
 
-  const settings = await settingsService
-    .getAll({ next: { revalidate: 600, tags: [settingsTag] } })
-    .catch(() => ({}) as Record<string, string>);
-
-  const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
+  // Moneda y formato: columnas obligatorias de la org (sin fallback de config).
+  const primaryCurrency = session?.activeOrganization?.primaryCurrency ?? "";
   const currencyFormat =
-    (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") || "latam";
+    (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam";
 
   const [subsResult, monthlyReport, analytics] = await Promise.all([
     subscriptionsService.getAll(

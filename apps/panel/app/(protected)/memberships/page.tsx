@@ -25,13 +25,13 @@ export default async function MembershipsPage() {
     }),
   ]);
 
-  let activeCurrencies: string[] = ["USD"];
+  let activeCurrencies: string[] = [];
   const rawActive = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
   if (rawActive) {
     try {
       activeCurrencies = JSON.parse(rawActive);
     } catch {
-      activeCurrencies = ["USD"];
+      activeCurrencies = [];
     }
   }
 
@@ -49,8 +49,7 @@ export default async function MembershipsPage() {
       refreshPlans={refreshPlans}
       activeCurrencies={activeCurrencies}
       currencyFormat={
-        (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") ||
-        "latam"
+        (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam"
       }
     />
   );

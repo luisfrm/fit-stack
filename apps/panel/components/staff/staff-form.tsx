@@ -9,7 +9,7 @@ import {
   SimpleSelect,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
-import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X, MapPin } from "lucide-react";
+import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X, MapPin, Calendar } from "lucide-react";
 import { canAssignRole, ORG_ROLES, type OrgRole } from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
@@ -219,6 +219,16 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
           value={formData.phoneNumber ?? ""}
           onChange={(e) => handleChange("phoneNumber", e.target.value)}
           leftIcon={<Phone size={16} />}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Input
+          label="Fecha de Nacimiento"
+          type="date"
+          value={formData.birthday ?? ""}
+          onChange={(e) => handleChange("birthday", e.target.value)}
+          leftIcon={<Calendar size={16} />}
         />
       </div>
 
