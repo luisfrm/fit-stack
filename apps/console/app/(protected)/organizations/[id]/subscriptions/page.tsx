@@ -93,13 +93,6 @@ export default async function OrganizationSubscriptionsPage({
       <SubscriptionsTable
         subscriptions={subsResult.data}
         currencyFormat={currencyFormat}
-        pagination={{
-          page,
-          totalPages: subsResult.totalPages,
-          total: subsResult.total,
-          limit: PAGE_LIMIT,
-          onPageChange: () => {},
-        }}
       />
 
       <SubscriptionsPagination page={page} totalPages={subsResult.totalPages} />

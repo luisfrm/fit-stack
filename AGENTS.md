@@ -9,6 +9,7 @@ pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
 pnpm test         # Full test suite (shared → api-worker → panel → console, Vitest)
+pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
 pnpm format       # Format code (Prettier)
 
 # Database (Drizzle ORM — all run via @workspace/database)
@@ -25,10 +26,10 @@ cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active) — port 8788
 cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
-cd apps/console     && pnpm dev  # Port 3003 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado, read-only reference)
+cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
+cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused, read-only reference)
 
-# Bridge (Python/Flet — managed separately with uv) ⏸ PAUSADO
+# Bridge (Python/Flet — managed separately with uv) ⏸ PAUSED
 # cd apps/bridge
 # uv sync
 # uv run python main.py
@@ -36,9 +37,9 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (créditos IA, vigentes) y `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, histórico) + `how/` (fuente de la Base de Conocimiento IA, tono usuario final) + specs en `docs/superpowers/specs/`.
+- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (AI credits, current) and `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, historical) + `how/` (source of the AI Knowledge Base, end-user tone) + specs in `docs/superpowers/specs/`.
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
@@ -65,9 +66,9 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 | **Platform (SaaS Admin)** | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods. |
 | **Staff & Trainers** | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers). |
 | **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
-| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = config SEO (title, slug, description, metaTitle, metaDescription, isActive) y `/content/[id]/blocks` = editor DnD de bloques. |
+| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = SEO config (title, slug, description, metaTitle, metaDescription, isActive) and `/content/[id]/blocks` = DnD block editor. |
 | **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
-| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Pausado** — endpoints viven solo en `apps/api` legacy, no migrados al api-worker. |
+| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Paused** — endpoints live only in legacy `apps/api`, not migrated to api-worker. |
 | **Reports** | Revenue analytics with multi-currency normalization. |
 | **Settings** | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection). |
 
@@ -105,13 +106,13 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 
 **Tables**: `access_control_log` (audit trail of every access attempt), `biometric_sync_task` (queue of sync tasks for devices)
 
-> **⏸ Estado: PAUSADO.** El Bridge y `apps/api` están pausados. Los 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) y el repositorio `access-control.repository.ts` existen **solo en `apps/api` (legacy)** — el `apps/api-worker` activo **no** monta `/api/access-control` todavía. No hay migración en curso. Cuando se reactive, portar a un `createAccessControlRepository(db)` factory + router Hono con `requireApiKey` middleware, y agregar `ACCESS_CONTROL_API_KEY` a `apps/api-worker/src/lib/env.ts` + `secret_text_bindings` de Terraform.
+> **⏸ Status: PAUSED.** The Bridge and `apps/api` are paused. The 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) and the `access-control.repository.ts` repository exist **only in `apps/api` (legacy)** — the active `apps/api-worker` does **not** mount `/api/access-control` yet. There is no migration in progress. When reactivated, port it to a `createAccessControlRepository(db)` factory + Hono router with `requireApiKey` middleware, and add `ACCESS_CONTROL_API_KEY` to `apps/api-worker/src/lib/env.ts` + Terraform `secret_text_bindings`.
 
 ### 5. Business Rules Summary
 
 1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both configurable dynamically in **Settings**.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
-3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel nunca usa fallback `|| "global"` — es siempre org-scoped vía `(protected)/layout.tsx` (renderiza `OrganizationPicker` si falta org); lo platform-scoped vive en servicios propios de console.
+3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
 
@@ -134,8 +135,8 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 ### 2. UI Design System & Hierarchy
 
 - **Library Origins**: All UI components MUST be imported from `@workspace/ui` (`packages/ui`).
-- **Form required convention**: `Input` usa `required` nativo; `CountrySelector` y `SimpleSelect` aceptan prop `required` (pinta `*` en el label). Los forms agrupan en secciones y cierran con la nota "Los campos con * son obligatorios."
-- **ActiveCurrenciesField** (`packages/ui/.../active-currencies-field.tsx`): multi-toggle de monedas (`currencies` universo, `value/onChange`, `locked[]` no desmarcable con badge, `disabled`, buscador). Fuente de verdad del universo: `COUNTRY_INDEX.currencies` (nunca el exchange API, que es solo para tasas).
+- **Form required convention**: `Input` uses native `required`; `CountrySelector` and `SimpleSelect` accept a `required` prop (renders `*` on the label). Forms group into sections and close with the note "Los campos con * son obligatorios." (Fields with * are required.)
+- **ActiveCurrenciesField** (`packages/ui/.../active-currencies-field.tsx`): currency multi-toggle (`currencies` universe, `value/onChange`, `locked[]` not uncheckable with badge, `disabled`, search). Source of truth for the universe: `COUNTRY_INDEX.currencies` (never the exchange API, which is only for rates).
 - **Variant Enforcement**: Use predefined variants. Do not use ad-hoc Tailwind classes to override sizes/spacing/styles unless absolutely necessary and after notifying the user.
 - **Mathematical Scale + Premium Aesthetic**:
   - **Backgrounds**: `bg-input`, `bg-card`, `bg-surface`, translucent scales (`bg-white/5`, `bg-white/10`).
@@ -144,7 +145,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
     - Inputs, Buttons, CheckboxCards → `rounded-md`
     - Cards, Containers → `rounded-xl`
     - Modals, Dialogs → `rounded-2xl`
-- **Responsive Modal** (`packages/ui/src/components/modal.tsx`): renders a **bottom sheet** (drag handle + drag-to-close, `rounded-t-2xl`) on mobile (<768px vía `useIsMobile`) and a **centered modal** on desktop. Exports the legacy `Modal` (misma API: `trigger`/`title`/`description`/`footer`/`size`/`isScrollable`/`open`/`onOpenChange`) y la API compuesta `ResponsiveModal` / `ResponsiveModalTrigger` / `ResponsiveModalClose` / `ResponsiveModalContent` (icon, subtitle, `desktopMaxWidth`). Built on `radix-ui` Dialog; las animaciones open/close son **keyframes custom** en `packages/ui/src/styles/globals.css` (`animate-sheet-in/out`, `animate-modal-in/out`) que animan `translate`/`scale` para no chocar con el centrado de Tailwind v4; el overlay usa `tw-animate-css` (`data-open:`/`data-closed:`). Hook `useIsMobile` en `packages/ui/src/hooks/use-is-mobile.ts`.
+- **Responsive Modal** (`packages/ui/src/components/modal.tsx`): renders a **bottom sheet** (drag handle + drag-to-close, `rounded-t-2xl`) on mobile (<768px via `useIsMobile`) and a **centered modal** on desktop. Exports the legacy `Modal` (same API: `trigger`/`title`/`description`/`footer`/`size`/`isScrollable`/`open`/`onOpenChange`) and the composite API `ResponsiveModal` / `ResponsiveModalTrigger` / `ResponsiveModalClose` / `ResponsiveModalContent` (icon, subtitle, `desktopMaxWidth`). Built on `radix-ui` Dialog; open/close animations are **custom keyframes** in `packages/ui/src/styles/globals.css` (`animate-sheet-in/out`, `animate-modal-in/out`) that animate `translate`/`scale` so they don't clash with Tailwind v4 centering; the overlay uses `tw-animate-css` (`data-open:`/`data-closed:`). Hook `useIsMobile` in `packages/ui/src/hooks/use-is-mobile.ts`.
 
 ### 3. Database Integrity & ORM
 
@@ -186,7 +187,7 @@ The CORS allowlist is defined **in code only** — no env vars. Single source of
 - `apps/api-worker/src/lib/auth.ts` → `trustedOrigins` of Better Auth
 - `apps/api-worker/src/index.ts` → `corsMiddleware` (Hono CORS)
 
-| Ambiente | Origins permitidos |
+| Environment | Allowed origins |
 |---|---|
 | `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api) |
 | `production` | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
@@ -199,12 +200,12 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 | Middleware | When to use | Auth check / Context |
 |---------|-------------|----------------------|
-| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Setea `c.set('orgId', orgId)` |
-| `requireOrg()` | Org-scoped routes without permission check | Session + org activa. Setea `c.set('orgId', orgId)` |
-| `requireOrgTimezone()` | Rutas que calculan o filtran por fecha local (reportes, stats, cobros) | Valida que la org tenga timezone (500 si falta). Setea `c.set('orgTimezone', tz)` |
-| `requireAuth()` | Rutas autenticadas generales | Session + user only |
+| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Sets `c.set('orgId', orgId)` |
+| `requireOrg()` | Org-scoped routes without permission check | Session + active org. Sets `c.set('orgId', orgId)` |
+| `requireOrgTimezone()` | Routes that compute or filter by local date (reports, stats, billing) | Validates the org has a timezone (500 if missing). Sets `c.set('orgTimezone', tz)` |
+| `requireAuth()` | General authenticated routes | Session + user only |
 | `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`) | Session + platform permission via `auth.api.userHasPermission` |
-| `requirePlatformAuth()` | Alias de `requirePlatformPermission('organization', 'create')` — middleware estándar de las rutas `/api/platform/*` | Session + permiso `organization.create` |
+| `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization', 'create')` — standard middleware for `/api/platform/*` routes | Session + `organization.create` permission |
 
 ```ts
 // Typical org-scoped route (Hono)
@@ -222,83 +223,83 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 #### API Route Map (api-worker)
 
-Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/healthz` y `/favicon.ico`):
+Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/healthz` and `/favicon.ico`):
 
-| Router | Endpoints notables |
+| Router | Notable endpoints |
 |--------|--------------------|
-| `/api/auth/*` | Better Auth engine (sesiones, orgs, invitations) |
-| `/api/members` | CRUD gym members + invites (`members.service` encola `email.registration_invite`) |
-| `/api/plans` | Membership plans (catalog gym) |
-| `/api/subscriptions` | CRUD subscriptions (registro de pago encola `email.payment_receipt`) |
-| `/api/payments` | `PATCH /:id/status`, `POST /:id/send-email` (reenvío de recibo) |
+| `/api/auth/*` | Better Auth engine (sessions, orgs, invitations) |
+| `/api/members` | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) |
+| `/api/plans` | Membership plans (gym catalog) |
+| `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`) |
+| `/api/payments` | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend) |
 | `/api/classes` | Class schedule CRUD |
 | `/api/trainers` | Trainers (gym_member + coach_profile) |
 | `/api/cms` | Content pages/blocks |
-| `/api/dashboard` | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + listas accionables (`GET /action-items`, cache `org:*:dashboard:action-items`) |
+| `/api/dashboard` | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`) |
 | `/api/settings` | Gym settings (currencies, payment methods, theme) |
 | `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
-| `/api/organizations` | `GET /subscription-status` (estado de facturación del org) · `GET /subscription` (sub SaaS de la org con detalles del plan, cache 1 min) · `GET /payment-methods` (métodos de pago de plataforma expuestos a la org, cache 10 min) · `POST /subscription/renew` (renovación autoservicio — ver sección "Renovación autoservicio" abajo) |
+| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) |
 | `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
-| `/api/ai` | `POST /chat` (chat streaming SSE: OpenAI SDK → cadena fija OpenRouter o Workers AI GLM, RAG pre-generación + `PANEL_SYSTEM_PROMPT`, cuota `ai_chat` con cota RAG en pre-flight + headers `X-Ai-Credits-*`), `GET /models` (allowlist), `GET /usage` (cuotas IA), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
+| `/api/ai` | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
-> **Chat IA**: el proveedor se infiere del model id (`getAiProvider` en `@workspace/shared`). Cadena OpenRouter de modelos fijos (`OPENROUTER_TEXT_MODEL_CHAIN`) con fallback a GLM en Workers AI. El primer evento SSE es `{"model": ...}` con el modelo concreto que respondió. `OPENROUTER_API_KEY` opcional; si falta y se pide un modelo OpenRouter → 503. 1 crédito = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), límites `AI_CHAT_LIMITS`, ciclo mensual por suscripción, RAG con embeddings `@cf/baai/bge-m3` (ver `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
-| `/api/init` | Bootstrap de org (sin auth) |
-| `/api/public` | `GET /pages/:slug` (CMS público, cache 15 min), `GET /files/*` (R2) — sin auth |
-| `/api/platform/plans` | Catálogo de planes SaaS (console) |
-| `/api/platform/subscriptions` | Suscripciones SaaS + invoices + `GET /stats` |
-| `/api/platform/organizations` | CRUD orgs plataforma (console) |
-| `/api/platform/settings` | Settings globales de plataforma |
-| `/api/platform/staff` | Staff de plataforma (invites console → encola `email.registration_invite`) |
-| `/api/platform/upload` | Assets de plataforma sin org (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, scope fijo `platform/` |
-| `/api/platform/features` | Catálogo de features (`GET /`, cache `platform:features`) |
-| `/api/platform/knowledge` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3, sin cache Redis) — `GET /:id/content` (solo contenido, sin chunks, para edición sin transferir embeddings) |
-| `/api/organizations/features` | Features resueltas de la org activa + `isFreeTier` (gate del panel, cache `org:*:features`) |
-| `/api/organizations/seats` | Cupos del portal de la org activa (`{ used, limit, pending }`) |
+> **AI Chat**: the provider is inferred from the model id (`getAiProvider` in `@workspace/shared`). Fixed OpenRouter model chain (`OPENROUTER_TEXT_MODEL_CHAIN`) with fallback to GLM in Workers AI. The first SSE event is `{"model": ...}` with the concrete model that responded. `OPENROUTER_API_KEY` optional; if missing and an OpenRouter model is requested → 503. 1 credit = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), limits `AI_CHAT_LIMITS`, monthly cycle per subscription, RAG with embeddings `@cf/baai/bge-m3` (see `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
+| `/api/init` | Org bootstrap (no auth) |
+| `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
+| `/api/platform/plans` | SaaS plan catalog (console) |
+| `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` |
+| `/api/platform/organizations` | Platform org CRUD (console) |
+| `/api/platform/settings` | Platform global settings |
+| `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
+| `/api/platform/upload` | Org-less platform assets (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, fixed scope `platform/` |
+| `/api/platform/features` | Feature catalog (`GET /`, cache `platform:features`) |
+| `/api/platform/knowledge` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings, no Redis cache) — `GET /:id/content` (content only, no chunks, for editing without transferring embeddings) |
+| `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
+| `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
 
-> `/api/access-control/*` **NO está montado** en api-worker (Bridge pausado — ver sección 4).
+> `/api/access-control/*` is **NOT mounted** in api-worker (Bridge paused — see section 4).
 
 ### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
-- **Toasts y errores del API (regla)**: los toasts JAMÁS muestran mensajes crudos del API (`err?.data?.error`, `error.message`, matcheo de strings del servidor). Patrón obligatorio: `logMutationError(scope, err)` (helper de `apps/{panel,console}/lib/errors.ts` — hace `console.error` del error crudo y retorna el fallback) + `toast.error(<mensaje genérico de la acción>)`, p. ej. "No se pudo guardar el plan". Excepciones con significado de UX (p. ej. cuota IA agotada) se manejan mapeando por **código de error** (`err.data?.code`), nunca por texto.
+- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `logMutationError(scope, err)` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(<generic action message>)`, e.g. "No se pudo guardar el plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
 - **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
 
-### 8. HTTP Client (ofetch — NO `fetch` nativo)
+### 8. HTTP Client (ofetch — NOT native `fetch`)
 
-**ESTÁ PROHIBIDO usar `fetch` nativo.** Todas las peticiones HTTP se hacen con **ofetch**:
+**Native `fetch` is PROHIBITED.** All HTTP requests use **ofetch**:
 
-- **API de Fit-Stack (api-worker)** → SIEMPRE a través del cliente context-aware de cada app:
+- **Fit-Stack API (api-worker)** → ALWAYS through each app's context-aware client:
   - Console: `apps/console/lib/api/client.ts` (export `api`)
-  - Panel: `apps/panel/lib/api/client.ts` (exports `api` y `apiBlob`)
-  - El cliente añade `baseURL` (`${apiBaseUrl}/api`), **forwardea cookies en server** (RSC), `credentials: "include"` en client, `retry`/`timeout`, e intercepta `ORGANIZATION_NOT_FOUND`.
-  - Server actions que invalidan cache (`updateTag`) + `router.refresh()` NO hacen peticiones HTTP — se combinan con `api()` para las llamadas.
-- **APIs externas** (ej. exchange rates de open.er-api.com) → `ofetch` directo, SIN pasar por el cliente interno (que no debe enviar sesión ni baseURL del API). Ver `apps/{console,panel}/lib/api/exchange-rates.ts` con `next: { revalidate }` para cache de Next.
-- `next/headers` (`cookies()`, `headers()`) se usa solo para leer contexto de la request — nunca para hacer la petición HTTP.
+  - Panel: `apps/panel/lib/api/client.ts` (exports `api` and `apiBlob`)
+  - The client adds `baseURL` (`${apiBaseUrl}/api`), **forwards cookies on server** (RSC), `credentials: "include"` on client, `retry`/`timeout`, and intercepts `ORGANIZATION_NOT_FOUND`.
+  - Server actions that invalidate cache (`updateTag`) + `router.refresh()` do NOT make HTTP requests — they combine with `api()` for the calls.
+- **External APIs** (e.g. exchange rates from open.er-api.com) → `ofetch` directly, WITHOUT going through the internal client (which must not send session or API baseURL). See `apps/{console,panel}/lib/api/exchange-rates.ts` with `next: { revalidate }` for Next cache.
+- `next/headers` (`cookies()`, `headers()`) is used only to read request context — never to make the HTTP request.
 
-**Env vars frontend** (`apps/{panel,console}/lib/config/envs.ts`, validadas con Zod): `NEXT_PUBLIC_API_BASE_URL` y `NEXT_PUBLIC_R2_URL` (obligatorias); `NEXT_PUBLIC_EXCHANGE_URL` (opcional, leída en `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
+**Frontend env vars** (`apps/{panel,console}/lib/config/envs.ts`, Zod-validated): `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` (required); `NEXT_PUBLIC_EXCHANGE_URL` (optional, read in `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
 
 ---
 
-### 9. Manejo de fechas y zona horaria
+### 9. Date & Timezone Handling
 
-- **Fuente única de verdad**: `packages/shared/src/date.ts` (exportado por `@workspace/shared`), construida sobre `date-fns` + `@date-fns/tz` (ambas puramente funcionales, edge-safe). **NUNCA** reintroducir aritmética de fechas a mano (`Intl.DateTimeFormat("en-CA")`, `new Date().toISOString().slice(0,10)`, offsets con `padStart`, `setUTCMonth`, `Math.floor(ms / 86_400_000)`).
-- **Regla de negocio**: un pago a las 11pm en Venezuela debe caer en el **mismo día local**. Para lograrlo, la tz SIEMPRE se resuelve de la **sesión** (`session.activeOrganization.timezone`, cacheada 5 min en `org:{orgId}:profile`), **nunca** de un query param del cliente (`?timezone=`).
-- **La timezone es OBLIGATORIA**: no hay fallback `?? 'America/Caracas'`. Si la org no la tiene, es un error.
-  - **API**: Middleware composable `requireOrgTimezone()` (`apps/api-worker/src/lib/route-handler.ts`) valida que la org tenga timezone (500 si falta) y la inyecta tipada en `c.get('orgTimezone')!`. Usada en `subscriptions`, `reports`, `plans`, `dashboard` y `payments`.
-  - **Servicios**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` exigen `timezone: string` **sin default**.
-  - **Creación de org (console → `/api/platform/organizations`)**: `timezone` es `required` en `createOrgSchema`, validado en `organizations.service.createOrganization`, y `required: true` en `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). El schema `organization.timezone` es `notNull` **sin default** (DB).
-- **SQL vs JS**: la **agregación** por día/mes local (reportes, ingresos del día) se hace **en SQL** con `AT TIME ZONE`. La util JS resuelve la **entrada** (límites de día local como `Date` UTC para los `WHERE gte/lte`) y el **display**; no reemplaza Postgres.
-- **UI** (panel/console): el "hoy" local se obtiene con `toLocalDayString(orgTimezone)`; parseo de `'YYYY-MM-DD'` con `parseDateAsConfigTimezone(dateStr, tz)` (alias de `parseLocalToUtc`). Los helpers de hora wall-clock (`formatTime`/`formatTimeRange`) viven en `apps/{panel,console}/lib/config/display.ts`, que re-exporta los helpers de tz desde `@workspace/shared`.
-- **`billing-utils.ts`** (api-worker) es billing de **plataforma** (SaaS) y opera en UTC — no se mezcla con la tz de la org.
+- **Single source of truth**: `packages/shared/src/date.ts` (exported by `@workspace/shared`), built on `date-fns` + `@date-fns/tz` (both purely functional, edge-safe). **NEVER** reintroduce manual date arithmetic (`Intl.DateTimeFormat("en-CA")`, `new Date().toISOString().slice(0,10)`, offsets with `padStart`, `setUTCMonth`, `Math.floor(ms / 86_400_000)`).
+- **Business rule**: a payment at 11pm in Venezuela must land on the **same local day**. To achieve this, the tz is ALWAYS resolved from the **session** (`session.activeOrganization.timezone`, cached 5 min in `org:{orgId}:profile`), **never** from a client query param (`?timezone=`).
+- **Timezone is REQUIRED**: no fallback `?? 'America/Caracas'`. If the org doesn't have one, it's an error.
+  - **API**: Composable middleware `requireOrgTimezone()` (`apps/api-worker/src/lib/route-handler.ts`) validates the org has a timezone (500 if missing) and injects it typed into `c.get('orgTimezone')!`. Used in `subscriptions`, `reports`, `plans`, `dashboard` and `payments`.
+  - **Services**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` require `timezone: string` **without default**.
+  - **Org creation (console → `/api/platform/organizations`)**: `timezone` is `required` in `createOrgSchema`, validated in `organizations.service.createOrganization`, and `required: true` in `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). The `organization.timezone` schema is `notNull` **without default** (DB).
+- **SQL vs JS**: **aggregation** by local day/month (reports, daily revenue) is done **in SQL** with `AT TIME ZONE`. The JS util resolves the **input** (local day boundaries as UTC `Date` for the `WHERE gte/lte`) and the **display**; it doesn't replace Postgres.
+- **UI** (panel/console): local "today" is obtained with `toLocalDayString(orgTimezone)`; parsing `'YYYY-MM-DD'` with `parseDateAsConfigTimezone(dateStr, tz)` (alias of `parseLocalToUtc`). Wall-clock helpers (`formatTime`/`formatTimeRange`) live in `apps/{panel,console}/lib/config/display.ts`, which re-exports the tz helpers from `@workspace/shared`.
+- **`billing-utils.ts`** (api-worker) is **platform** (SaaS) billing and operates in UTC — it's not mixed with org tz.
 
-### 10. Configuración explícita sin fallbacks silenciosos (Seeding)
+### 10. Explicit Configuration Without Silent Fallbacks (Seeding)
 
-- **Regla de oro**: NUNCA inventar fallbacks silenciosos en código frontend ni backend (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`). Si una configuración falta, debe ser un error visible y no un comportamiento silencioso asumido.
-- **Taxonomía**: lo **obligatorio** son columnas `NOT NULL` sin default en `organization` (`timezone`, `countryCode`, `primaryCurrency`, `currencyFormat`) — un solo `insert` al crear, imposible que falten. Lo **extensible** vive en KV (`gym_setting`: `active_currencies`, `active_payment_methods`, `brand_*`) con único fallback permitido `[]`/parse seguro. Los guards sobre **datos** (`currencyPaid`, `planCurrency` en UI) no son config y se quedan, documentados.
-- **Creación de org** (`organizations.service.createOrganization`): deriva `primaryCurrency = COUNTRIES[countryCode].currency`, acepta `currencyFormat` explícito (`'latam'` default de **escritura**) + `settings` override (`{ ...buildDefaultOrgSettings(cc), ...settings }`); siembra solo lo extensible. Cambiar `countryCode` recalcula la principal. `POST /api/settings` rechaza `primary_currency`/`currency_format` (400).
-- **Creación de usuarios** (los 3 flujos: `POST /api/members`, `POST /platform/organizations/:id/staff`, `POST /platform/staff`): sin `.default()` en zod — defaults en `@workspace/shared/defaults.ts` (`DEFAULT_MEMBER_VALUES`, `DEFAULT_ORG_STAFF_VALUES`, `DEFAULT_PLATFORM_STAFF_VALUES`) resueltos con spread en ruta/servicio.
-- **Seeding de Plataforma (`platform_setting`)**: sin cambios (KV singleton, se siembra en `/api/init` vía `DEFAULT_PLATFORM_SETTINGS`).
-- **Lectura en UI**: moneda/formato se leen de la org (`session.activeOrganization` / `useAuth().activeOrganization`), nunca de settings. La página de Monedas del panel solo edita `active_currencies` (principal readonly); el formato se edita en Configuración de Sede.
+- **Golden rule**: NEVER invent silent fallbacks in frontend or backend code (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`). If a configuration is missing, it must be a visible error, not silently assumed behavior.
+- **Taxonomy**: **required** are `NOT NULL` columns without default in `organization` (`timezone`, `countryCode`, `primaryCurrency`, `currencyFormat`) — a single `insert` at creation, impossible to miss. **Extensible** lives in KV (`gym_setting`: `active_currencies`, `active_payment_methods`, `brand_*`) with the only allowed fallback `[]`/safe parse. Guards over **data** (`currencyPaid`, `planCurrency` in UI) are not config and stay, documented.
+- **Org creation** (`organizations.service.createOrganization`): derives `primaryCurrency = COUNTRIES[countryCode].currency`, accepts explicit `currencyFormat` (`'latam'` is the **write** default) + `settings` override (`{ ...buildDefaultOrgSettings(cc), ...settings }`); seeds only extensible stuff. Changing `countryCode` recalculates the primary. `POST /api/settings` rejects `primary_currency`/`currency_format` (400).
+- **User creation** (the 3 flows: `POST /api/members`, `POST /platform/organizations/:id/staff`, `POST /platform/staff`): no `.default()` in zod — defaults in `@workspace/shared/defaults.ts` (`DEFAULT_MEMBER_VALUES`, `DEFAULT_ORG_STAFF_VALUES`, `DEFAULT_PLATFORM_STAFF_VALUES`) resolved with spread in route/service.
+- **Platform seeding (`platform_setting`)**: unchanged (KV singleton, seeded in `/api/init` via `DEFAULT_PLATFORM_SETTINGS`).
+- **UI reads**: currency/format are read from the org (`session.activeOrganization` / `useAuth().activeOrganization`), never from settings. The panel Currencies page only edits `active_currencies` (primary readonly); the format is edited in Location Settings.
 
 ---
 
@@ -324,36 +325,36 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 
 | Pattern | TTL | Used For |
 |---------|-----|----------|
-| `org:${orgId}:settings` | 1 h | Organization settings (invalidada on-write en POST /api/settings) |
+| `org:${orgId}:settings` | 1 h | Organization settings (invalidated on-write in POST /api/settings) |
 | `org:${orgId}:profile` | 5 min | Active org profile in custom session (branding/theme/timezone) |
-| `org:${orgId}:plans:*` | 1 h | Membership plans (invalidada on-write en POST/PUT/DELETE /api/plans) |
+| `org:${orgId}:plans:*` | 1 h | Membership plans (invalidated on-write in POST/PUT/DELETE /api/plans) |
 | `org:${orgId}:classes:*` | 5 min | Classes |
 | `org:${orgId}:members:*` | 5 min | Gym members |
 | `org:${orgId}:subscriptions` | 5 min | Member subscriptions |
 | `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
-| `org:${orgId}:dashboard:action-items` | 5 min | Listas accionables del dashboard (próximos a vencer / vencidos recientemente) |
+| `org:${orgId}:dashboard:action-items` | 5 min | Dashboard actionable lists (expiring soon / recently expired) |
 | `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
-| `org:${orgId}:cms:*` | 5 min | Invalidation de CMS (los reads no se cachean) |
+| `org:${orgId}:cms:*` | 5 min | CMS invalidation (reads are not cached) |
 | `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
 | `org:${orgId}:subscription-status` | 1 min | Org billing status |
-| `org:${orgId}:subscription` | 1 min | Sub SaaS de la org con detalles del plan (renovación autoservicio) |
-| `org:${orgId}:payment-methods` | 1 h | Métodos de pago de plataforma expuestos a la org (invalidada on-write en POST /api/platform/settings) |
-| `rates:${base}` | 1 hr | Tasas de cambio server-side (open.er-api.com, provider en `api-worker/src/lib/exchange-rates.ts`) |
-| `org:${orgId}:features` | 5 min | Features resueltas + isFreeTier de la org |
+| `org:${orgId}:subscription` | 1 min | Org SaaS sub with plan details (self-service renewal) |
+| `org:${orgId}:payment-methods` | 1 h | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
+| `rates:${base}` | 1 hr | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`) |
+| `org:${orgId}:features` | 5 min | Resolved features + isFreeTier of the org |
 | `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
 | `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
-| `platform:settings` | 1 h | SaaS-level global settings (invalidada on-write en POST /api/platform/settings) |
+| `platform:settings` | 1 h | SaaS-level global settings (invalidated on-write in POST /api/platform/settings) |
 | `platform:features` | 10 min | Feature catalog (console) |
 | `platform:organizations*` | 5 min | Organization list (SaaS admin) |
-| `platform:plans*` | 1 h | Platform plan catalog (invalidada on-write en /api/platform/plans) |
+| `platform:plans*` | 1 h | Platform plan catalog (invalidated on-write in /api/platform/plans) |
 | `platform:subscriptions*` | 5 min | SaaS subscriptions |
 | `platform:subscriptions:stats` | 5 min | Subscription KPI stats |
 | `platform:staff*` | 5 min | Platform staff (SaaS admins: support/admin/owner) |
 
 ### Cache Invalidation Strategy
 
-- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`. Datos de baja frecuencia (planes, settings, payment-methods) usan TTL 1 h como red de seguridad: la invalidación real es siempre on-write.
-- **Dashboard invalidations**: writes de members/subscriptions/payments invalidan `org:{orgId}:dashboard:stats:*` y `org:{orgId}:dashboard:action-items` (KPIs y listas accionables).
+- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`. Low-frequency data (plans, settings, payment-methods) uses 1 h TTL as a safety net: real invalidation is always on-write.
+- **Dashboard invalidations**: member/subscription/payment writes invalidate `org:{orgId}:dashboard:stats:*` and `org:{orgId}:dashboard:action-items` (KPIs and actionable lists).
 - **Role invalidation**: `afterUpdateMemberRole` hook in Better Auth invalidates `member:role:${userId}:${orgId}` so role changes take effect instantly
 - **Graceful degradation**: All cache methods wrap errors with `console.error` and return `null`/void — Redis being down never blocks requests
 
@@ -361,28 +362,28 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 
 ## Background Jobs (Cloudflare Queues)
 
-Los emails y la generación de PDF se procesan **asíncronamente** vía Cloudflare Queues: el `api-worker` produce eventos en el binding `TASK_QUEUE` (`fit-task-events`, DLQ `fit-task-events-dlq`) y `apps/jobs-worker` los consume.
+Emails and PDF generation are processed **asynchronously** via Cloudflare Queues: the `api-worker` produces events in the `TASK_QUEUE` binding (`fit-task-events`, DLQ `fit-task-events-dlq`) and `apps/jobs-worker` consumes them.
 
-**Contrato de eventos** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
+**Event contract** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
 
 | Type | Payload | Producer |
 |------|---------|----------|
-| `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invitar miembro sin cuenta → panel) + `/api/platform/staff` (invitaciones console) |
-| `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | Hook `sendInvitationEmail` de Better Auth en `lib/auth.ts` (invitación a miembro con cuenta) |
-| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` — automático: al crear sub con pago `validated` y al aprobar un pago `processing` (PATCH status); también en el reenvío manual (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }` | `organizations.route.ts` (POST `/subscription/renew` — renovación autoservicio) → payer + owners de la org (dedupe) |
+| `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations) |
+| `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account) |
+| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal) → payer + org owners (dedupe) |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
-- `email.handler.ts` — SOLO transporte de emails (**Resend** con `EMAIL_PROVIDER=resend` o **Gmail SMTP** con `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); el HTML lo componen los templates.
-- `pdf.handler.ts` — recibos de pago (membresía de gym + confirmación de pago SaaS de la org).
+- `email.handler.ts` — email TRANSPORT ONLY (**Resend** with `EMAIL_PROVIDER=resend` or **Gmail SMTP** with `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); the HTML is composed by the templates.
+- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation).
 
-**Templates** (`apps/jobs-worker/src/templates/`) — el HTML vive aquí, nunca en los handlers:
-- `layout.ts` — shells base: `renderDarkShell` (invitaciones, fondo negro) y `renderLightShell` (recibos, estilo comprobante amarillo) + `escapeHtml`.
-- `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — cada uno exporta `renderX(data): { subject, html }`.
+**Templates** (`apps/jobs-worker/src/templates/`) — the HTML lives here, never in the handlers:
+- `layout.ts` — base shells: `renderDarkShell` (invitations, dark background) and `renderLightShell` (receipts, yellow-receipt style) + `escapeHtml`.
+- `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
 
 **Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
 
-> **Regla**: nunca acoplar el api-worker a envíos síncronos de email/PDF — siempre encolar en `TASK_QUEUE` y dejar que el jobs-worker procese.
+> **Rule**: never couple api-worker to synchronous email/PDF sends — always enqueue in `TASK_QUEUE` and let jobs-worker process it.
 
 ---
 
@@ -393,7 +394,7 @@ Subscription status is **computed dynamically** via SQL CASE — NOT stored in D
 **Constants** (`@workspace/shared/constants`):
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active",      // periodEnd >= now y pago válido
+  ACTIVE: "active",      // periodEnd >= now and valid payment
   TRIAL: "trial",        // isTrial = true
   PAST_DUE: "past_due",  // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
@@ -402,99 +403,99 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 }
 ```
 
-**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, el orden importa):
+**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters):
 - `cancelledAt IS NOT NULL` → `cancelled`
-- `isTrial = true` y period activo → `trial`
-- Último pago `VALIDATED`/`REFUNDED` y period activo → `active`
-- Último pago `PENDING` y period activo → `past_due`
-- Period activo (sin pago validado) → `active`
-- Días vencidos ≤ 7 → `past_due`
-- Días vencidos ≤ 14 → `read_only`
-- Días vencidos > 14 → `suspended`
+- `isTrial = true` and active period → `trial`
+- Last payment `VALIDATED`/`REFUNDED` and active period → `active`
+- Last payment `PENDING` and active period → `past_due`
+- Active period (no validated payment) → `active`
+- Overdue days ≤ 7 → `past_due`
+- Overdue days ≤ 14 → `read_only`
+- Overdue days > 14 → `suspended`
 
-> Ojo: la regla "último pago `VOIDED` → `cancelled`" aplica a la tabla gym `subscription` (`subscriptions.repository.ts`, junto a `INVALID`), **no** a `platform_subscription`.
+> Careful: the "last payment `VOIDED` → `cancelled`" rule applies to the gym `subscription` table (`subscriptions.repository.ts`, along with `INVALID`), **not** to `platform_subscription`.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
 - `ACTIVE` / `TRIAL` → normal render
 
-**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch envuelto en `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), usado por el layout y por la gate page.
+**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch wrapped in `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), used by the layout and by the gate page.
 
-**Gate pages dinámicas** (`/no-subscription`, `/unauthorized` en panel y console) — Server Components con `force-dynamic` que chequean la sesión en cada request: sin sesión → `redirect('/login')`; con acceso válido (suscripción activa o rol permitido) → `redirect('/dashboard')`; solo sin acceso se renderizan. Evita quedarse pegado tras cerrar sesión o refrescar.
+**Dynamic gate pages** (`/no-subscription`, `/unauthorized` in panel and console) — Server Components with `force-dynamic` that check the session on every request: no session → `redirect('/login')`; valid access (active subscription or allowed role) → `redirect('/dashboard')`; only without access they render. Prevents getting stuck after logout or refresh.
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
 
-### Renovación autoservicio (fase 2 — org paga desde el panel)
+### Self-service renewal (phase 2 — org pays from the panel)
 
-Flujo: la org renueva su suscripción SaaS desde `apps/panel/app/(protected)/settings/suscription` → el pago queda `processing` ("en revisión") → soporte lo aprueba/rechaza en console (badge "Pago pendiente" en la tabla de suscripciones + `PlatformPaymentHistoryModal` que ahora renderiza `paymentMethodDetails` con `PaymentDetailsList`, incl. links "VER CAPTURA" a R2) → al validarlo, el periodo se extiende automáticamente.
+Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → support approves/rejects it in console (badge "Pago pendiente" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VER CAPTURA" links to R2) → once validated, the period is extended automatically.
 
-- **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **body mínimo** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Todo lo económico lo dicta el backend — **el body jamás puede hardcodear montos ni tasas**:
-  - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← del plan en DB.
-  - Tasa ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override para tests). `rate = 1` si moneda == moneda del plan; fallo del provider → 503.
-  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = precio efectivo`, `exchangeRateApplied = String(rate)`.
-  - `status = processing` (forzado) — NO extiende el periodo (solo `PATCH status VALIDATED` lo hace).
-  - Guards: 400 sin org activa · 404 sin sub · 400 cancelada · 409 si `hasPendingPayment` · **409 si `currentPeriodEnd > now`** (solo al expirar).
-  - Invalida `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
-- **Reads org-scoped**: `GET /api/organizations/subscription` (sub activa con plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (métodos de plataforma + monedas + currencyFormat). Servicios en `apps/panel/lib/services/org-billing.ts`; UI en `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
-- **Pre-sorting de campos**: los campos `visual` (instrucciones) se renderizan primero en todos los payment forms vía `sortPaymentMethodFields` (`@workspace/shared`).
+- **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
+  - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.
+  - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override for tests). `rate = 1` if currency == plan currency; provider failure → 503.
+  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
+  - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
+  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now`** (only when expired).
+  - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
+- **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
+- **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).
 
 ---
 
 ## Features & Free Tier (SaaS Plan Feature-Flags)
 
-Los planes SaaS de la plataforma se describen con **features (feature-flags)** en vez de booleanos sueltos. Single source of truth en código: `packages/shared/src/features/catalog.ts` (re-exportado por `@workspace/shared`).
+Platform SaaS plans are described with **features (feature-flags)** instead of loose booleans. Single source of truth in code: `packages/shared/src/features/catalog.ts` (re-exported by `@workspace/shared`).
 
-### Catálogo (`FEATURE_CATALOG`, version `FEATURE_CATALOG_VERSION`)
+### Catalog (`FEATURE_CATALOG`, version `FEATURE_CATALOG_VERSION`)
 
 | Feature | kind | Limits | Notes |
 |---------|------|--------|-------|
-| `panel` | boolean | — | `alwaysOn` (no puede desactivarse) |
-| `cms` | boolean | — | Contenido/páginas |
+| `panel` | boolean | — | `alwaysOn` (cannot be disabled) |
+| `cms` | boolean | — | Content/pages |
 | `blog` | boolean | — | Blog |
-| `members_portal` | boolean | `member_seats` | Portal de Miembros (cupos) |
-| `ai_chat` | boolean | `ai_credits_monthly` | Chat IA (créditos/mes; 0 = ilimitado) |
+| `members_portal` | boolean | `member_seats` | Member Portal (seats) |
+| `ai_chat` | boolean | `ai_credits_monthly` | AI Chat (credits/month; 0 = unlimited) |
 
-Reglas de extensión: toda feature nueva nace `defaultEnabled: false` (aditiva); `normalizeFeatures` ignora IDs desconocidos y sanitiza tipos (límites numéricos, 0 = ilimitado); `resolveFeatures(null)` → defaults del catálogo.
+Extension rules: every new feature is born `defaultEnabled: false` (additive); `normalizeFeatures` ignores unknown IDs and sanitizes types (numeric limits, 0 = unlimited); `resolveFeatures(null)` → catalog defaults.
 
-### Free Tier (piso gratuito)
+### Free Tier (free floor)
 
-- **Explicito, NO es un plan**: se configura en `platform_setting` con 2 keys — `feature_flags_free_tier` (JSON de `PlanFeaturesV2`) y `feature_flags_free_tier_enabled` (`"true"`/`"false"`, flag de activación) — editadas desde console → Settings → **Plan Gratuito** (`apps/console/app/dashboard/settings/free-tier/`). No existe `is_free`; planes con `price = 0` son trials normales. El resolver ignora el setting si `feature_flags_free_tier_enabled !== 'true'`.
-- **Defaults de código** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 cupos) + `ai_chat` (500 créditos/mes). Se pueden overridear desde console.
-- **Regla de resolución** (`features.service.ts → getOrgFeatures`):
-  - Sub `ACTIVE`/`TRIAL` → features del plan (con `planId`/`planName`).
-  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **o sin sub** + free tier **habilitado** (`enabled === 'true'`) → piso gratuito (`isFreeTier: true`).
-  - Sin free tier habilitado → comportamiento legado (banner `past_due`/`read_only`, bloqueo `suspended`/`cancelled`).
+- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/dashboard/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
+- **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
+- **Resolution rule** (`features.service.ts → getOrgFeatures`):
+  - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).
+  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **or no sub** + free tier **enabled** (`enabled === 'true'`) → free floor (`isFreeTier: true`).
+  - No free tier enabled → legacy behavior (`past_due`/`read_only` banner, `suspended`/`cancelled` blocking).
 
 ### Enforcement (downgrade = hide)
 
-- **Middleware** `requireFeature(featureId)` en `apps/api-worker/src/lib/route-handler.ts` → 403 `{ code: 'FEATURE_NOT_AVAILABLE' }` si la feature no está habilitada. Se aplica tras `requireOrgPermission`.
-- **Rutas gateadas**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (además de cuota de créditos mensual, ver abajo).
-- **Cupos del portal** (`members_portal.member_seats`): `GET /api/organizations/seats` → `{ used, limit, pending }` (used = gym_members activos con `userId`; pending = invitaciones Better Auth `pending`). Guard en `members.route.ts` (POST `/api/members` con `sendInvite` y role `member`, y en `link-user`) → 403 `FEATURE_LIMIT_REACHED` si `limit > 0` y `used + pending >= limit`. `limit 0` = ilimitado.
-- **Frontend**: `OrgFeaturesProvider` + `filterNavItemsByFeatures` ocultan items del sidebar; guards en `/dashboard/content` y `/dashboard/chat`; `ai-quota-banner` y `portal-seats-banner`.
+- **Middleware** `requireFeature(featureId)` in `apps/api-worker/src/lib/route-handler.ts` → 403 `{ code: 'FEATURE_NOT_AVAILABLE' }` if the feature is not enabled. Applied after `requireOrgPermission`.
+- **Gated routes**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (plus monthly credit quota, see below).
+- **Portal seats** (`members_portal.member_seats`): `GET /api/organizations/seats` → `{ used, limit, pending }` (used = active gym_members with `userId`; pending = Better Auth `pending` invitations). Guard in `members.route.ts` (POST `/api/members` with `sendInvite` and role `member`, and in `link-user`) → 403 `FEATURE_LIMIT_REACHED` if `limit > 0` and `used + pending >= limit`. `limit 0` = unlimited.
+- **Frontend**: `OrgFeaturesProvider` + `filterNavItemsByFeatures` hide sidebar items; guards in `/dashboard/content` and `/dashboard/chat`; `ai-quota-banner` and `portal-seats-banner`.
 
-### Créditos IA (`ai_chat`)
+### AI Credits (`ai_chat`)
 
-- **Unidad**: 1 crédito = 1K tokens (x1.0, ver `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Provider default en `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, fallback automático al otro). Docs: `docs/CHAT_PRICING.md`, `docs/CHAT_INFRASTRUCTURE.md`.
-- **Límites**: `ai_chat.limits.ai_credits_monthly` por plan (configurable en gestores, no hardcode) + free tier `FREE_TIER_FEATURES` (500/mes). Catálogo en `shared/features/catalog.ts`.
-- **Límites de balance**: `AI_CHAT_LIMITS` en `shared/ai.ts` (`maxUserMessageChars: 500`, `maxHistoryMessageChars: 2_000`, `maxInputChars: 8_000`, `maxOutputTokens: 800` normal / `maxToolOutputTokens: 2_048` para tool, `maxHistoryMessages: 10`). Zod y `ai.service` clampean `max_tokens`. El system prompt lo compone el servidor — el cliente nunca envía role `system`.
-- **Fuente de verdad**: tabla `ai_usage` — fila por `(organization_id, period_type='monthly', periodStart)` con `credits`, upsert atómico. `periodStart` = ciclo de suscripción si ACTIVE/TRIAL, si no día 1 calendario (reset perezoso, sin cron). Índice `idx_ai_usage_org_period`.
-- **Evaluación**: `consumeAiCredits(estimated)` (pre-flight) + `settleAiCredits(actual)` post-stream vía `ctx.waitUntil` (DB fuente de verdad). Compat `consumeAiMessage` (3 créditos) para tests. `cache.increment` existe pero no se usa.
-- **RAG (Base de Conocimiento)**: retrieval automático pre-generación en `/api/ai/chat`. Config en `RAG_CONFIG` (`shared/ai.ts`: topK 4, minSimilarity 0.35, chunkSizeChars 800, overlap 100, maxContextChars 2_000). Embeddings SIEMPRE Workers AI `@cf/baai/bge-m3` (1024 dims, multilingüe) vía `aiService.embed()` — independiente del provider de chat. System prompt = `PANEL_SYSTEM_PROMPT` (`shared/prompts.ts`) + bloque `[Contexto]`; fallo del RAG nunca rompe el chat. KB admin: Console → Settings → Base de Conocimiento (`/api/platform/knowledge`, tablas `ai_knowledge_document`/`ai_knowledge_chunk`, pgvector HNSW; `organization_id NULL` = plataforma, seteado = doc de org con aislamiento en el SQL). Fase 2: panel org-KB + function calling (datos vivos).
-- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estima créditos (+ chars del prompt compuesto + cota `RAG_CONFIG.maxContextChars`), valida balance, hace fallback openrouter→glm y liquida `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; si se agota → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = ilimitado.
+- **Unit**: 1 credit = 1K tokens (x1.0, see `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Default provider in `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, automatic fallback to the other). Docs: `docs/CHAT_PRICING.md`, `docs/CHAT_INFRASTRUCTURE.md`.
+- **Limits**: `ai_chat.limits.ai_credits_monthly` per plan (configurable in admins, not hardcoded) + free tier `FREE_TIER_FEATURES` (500/month). Catalog in `shared/features/catalog.ts`.
+- **Balance limits**: `AI_CHAT_LIMITS` in `shared/ai.ts` (`maxUserMessageChars: 500`, `maxHistoryMessageChars: 2_000`, `maxInputChars: 8_000`, `maxOutputTokens: 800` normal / `maxToolOutputTokens: 2_048` for tool, `maxHistoryMessages: 10`). Zod and `ai.service` clamp `max_tokens`. The system prompt is composed server-side — the client never sends role `system`.
+- **Source of truth**: `ai_usage` table — row per `(organization_id, period_type='monthly', periodStart)` with `credits`, atomic upsert. `periodStart` = subscription cycle if ACTIVE/TRIAL, otherwise calendar day 1 (lazy reset, no cron). Index `idx_ai_usage_org_period`.
+- **Accounting**: `consumeAiCredits(estimated)` (pre-flight) + `settleAiCredits(actual)` post-stream via `ctx.waitUntil` (DB is source of truth). Compat `consumeAiMessage` (3 credits) for tests. `cache.increment` exists but is unused.
+- **RAG (Knowledge Base)**: automatic retrieval pre-generation in `/api/ai/chat`. Config in `RAG_CONFIG` (`shared/ai.ts`: topK 4, minSimilarity 0.35, chunkSizeChars 800, overlap 100, maxContextChars 2_000). Embeddings ALWAYS Workers AI `@cf/baai/bge-m3` (1024 dims, multilingual) via `aiService.embed()` — independent of the chat provider. System prompt = `PANEL_SYSTEM_PROMPT` (`shared/prompts.ts`) + `[Contexto]` block; RAG failure never breaks chat. KB admin: Console → Settings → Knowledge Base (`/api/platform/knowledge`, tables `ai_knowledge_document`/`ai_knowledge_chunk`, pgvector HNSW; `organization_id NULL` = platform, set = org doc with isolation in SQL). Phase 2: panel org-KB + function calling (live data).
+- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estimates credits (+ chars of the composed prompt + `RAG_CONFIG.maxContextChars` cap), validates balance, does openrouter→glm fallback and settles `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; if exhausted → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = unlimited.
 
-### Snapshot de features en pagos
+### Feature snapshot in payments
 
-Cada pago de plataforma (`platform_subscription_payment`) guarda `features_snapshot` (JSON de `PlanFeaturesV2`) en crear suscripción, renovar, cambiar plan y registrar pago — para comparar "features al momento de pagar" vs "plan hoy" (`summarizeFeatures` en console). Invalidación de cache: `org:${orgId}:features` en writes de suscripciones, planes y settings de plataforma.
+Every platform payment (`platform_subscription_payment`) stores `features_snapshot` (JSON of `PlanFeaturesV2`) when creating a subscription, renewing, changing plan and recording payment — to compare "features at payment time" vs "plan today" (`summarizeFeatures` in console). Cache invalidation: `org:${orgId}:features` on subscription, plan and platform settings writes.
 
 ### Endpoints
 
-| Endpoint | Auth | Uso |
+| Endpoint | Auth | Use |
 |----------|------|-----|
-| `GET /api/platform/features` | `requirePlatformAuth` | Catálogo (console) |
-| `/api/platform/knowledge` | `requirePlatformAuth` | CRUD Base de Conocimiento IA (docs plataforma, embeddings bge-m3) |
-| `GET /api/organizations/features` | `requireAuth` | Features resueltas + `isFreeTier` + status (gate del panel) |
-| `GET /api/organizations/seats` | `requireAuth` | Cupos del portal |
-| `GET /api/ai/usage` | `requireAuth` | Cuotas IA |
+| `GET /api/platform/features` | `requirePlatformAuth` | Catalog (console) |
+| `/api/platform/knowledge` | `requirePlatformAuth` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
+| `GET /api/organizations/features` | `requireAuth` | Resolved features + `isFreeTier` + status (panel gate) |
+| `GET /api/organizations/seats` | `requireAuth` | Portal seats |
+| `GET /api/ai/usage` | `requireAuth` | AI quotas |
 
 ---
 
@@ -504,9 +505,9 @@ Fit-Stack uses **two levels of roles**: Platform (SaaS) and Organization (tenant
 
 ### Platform Roles
 
-Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared/src/access-control.ts`): `owner`, `admin`, `support` (+ `user` como default de Better Auth, sin rol en `platformRoles`). El campo `user.role` guarda este rol de plataforma.
+Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared/src/access-control.ts`): `owner`, `admin`, `support` (+ `user` as Better Auth default, no role in `platformRoles`). The `user.role` field stores this platform role.
 
-**Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` solo para roles con `organization.create` (admin/owner); `support` es read-only y no entra al layout de console.
+**Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` only for roles with `organization.create` (admin/owner); `support` is read-only and doesn't enter the console layout.
 
 ### Organization Roles
 
@@ -565,11 +566,11 @@ Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/sr
 - `CASHIER` → can only assign `MEMBER`
 
 **Platform anti-escalation** (`canAssignPlatformRole(actor, target)`):
-- `owner` → puede asignar cualquier rol de plataforma (support/admin/owner)
-- `admin` → solo `support` o `admin` (NUNCA `owner`)
-- `support` → no puede asignar
+- `owner` → can assign any platform role (support/admin/owner)
+- `admin` → only `support` or `admin` (NEVER `owner`)
+- `support` → cannot assign
 
-> La anti-escalación se valida **server-side** en `/api/platform/staff` (POST y DELETE) — la UI solo filtra opciones.
+> Anti-escalation is validated **server-side** in `/api/platform/staff` (POST and DELETE) — the UI only filters options.
 
 ### Panel Access Control
 
@@ -599,22 +600,22 @@ if (orgRole && !canAccessCms()) redirect('/unauthorized')
 // constants.ts
 ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
 PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
-COUNTRY_LIST, COUNTRY_INDEX (`indexCountries()` — códigos, monedas, timezones y timezoneOptions derivados; fuente única para recorridos), DEFAULT_COUNTRY, ICountryConfig,
-ORG_ROLE_LABELS + formatOrgRole (roles de organización/Panel),
-PLATFORM_ROLE_LABELS + formatPlatformRole (roles de plataforma/Console: owner, admin, support, user)
+COUNTRY_LIST, COUNTRY_INDEX (`indexCountries()` — derived codes, currencies, timezones and timezoneOptions; single source for iterations), DEFAULT_COUNTRY, ICountryConfig,
+ORG_ROLE_LABELS + formatOrgRole (organization/Panel roles),
+PLATFORM_ROLE_LABELS + formatPlatformRole (platform/Console roles: owner, admin, support, user)
 
 // types.ts
 IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
 PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization,
 IPaymentMethodConfig, IPaymentMethodField (type: 'text' | 'file' | 'number' | 'visual' + value?)
 
-> **Campo `visual` en métodos de pago**: un field con `type: 'visual'` guarda instrucciones
-> en `value` (p. ej. "Método de pago: Binance\nEnviar a: ...") que el editor de payment-methods
-> escribe con un `Textarea`. En los forms de pago (`payment-section.tsx` de panel y console)
-> se renderiza como **card informativa** (`whitespace-pre-line`), nunca como input, nunca
-> `required`, y **no se persiste** en `paymentMethodDetails` (los forms lo filtran en el
-> build de details — `subscription-form.tsx` / `platform-subscription-form.tsx`).
-> `paymentMethodDetailsSchema` (api-worker) sigue siendo `text|file|number`.
+> **`visual` field in payment methods**: a field with `type: 'visual'` stores instructions
+> in `value` (e.g. "Método de pago: Binance\nEnviar a: ...") that the payment-methods editor
+> writes with a `Textarea`. In payment forms (`payment-section.tsx` in panel and console)
+> it renders as an **info card** (`whitespace-pre-line`), never as input, never
+> `required`, and **is not persisted** in `paymentMethodDetails` (forms filter it when
+> building details — `subscription-form.tsx` / `platform-subscription-form.tsx`).
+> `paymentMethodDetailsSchema` (api-worker) remains `text|file|number`.
 
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
@@ -630,20 +631,20 @@ ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode*, taxId, legalName, address,
                       subscriptions, plans, classes, content, settings, organization, ai, panel)
   actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
   can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
-  role-assignment.ts: canAssignRole(actor, target) (org) y canAssignPlatformRole(actor, target) (plataforma)
+  role-assignment.ts: canAssignRole(actor, target) (org) and canAssignPlatformRole(actor, target) (platform)
 
 // ai.ts
 AI_MODEL_IDS, OPENROUTER_FREE_MODEL_IDS, ALL_CHAT_MODEL_IDS (allowlist — single source
-of truth consumida por api-worker para validar/rutear proveedor y por panel para el
-selector vía RSC), AiProvider ("workers-ai" | "openrouter"), getAiProvider(modelId),
-AI_MODELS, IAiChatMessage, IAiChatRequest, IAiSseEvent (contrato SSE del chat)
+of truth consumed by api-worker to validate/route provider and by panel for the
+selector via RSC), AiProvider ("workers-ai" | "openrouter"), getAiProvider(modelId),
+AI_MODELS, IAiChatMessage, IAiChatRequest, IAiSseEvent (chat SSE contract)
 
 // content.ts
-Tipos y schemas Zod del módulo CMS (single source of truth — api-worker valida y el
-panel tipa forms con ellos): ContentBlockType, BLOCK_SCHEMAS (hero/services/classes/
+CMS module types and Zod schemas (single source of truth — api-worker validates and the
+panel types forms with them): ContentBlockType, BLOCK_SCHEMAS (hero/services/classes/
 testimonials/gallery/contact/team) + validateBlockData(), IContentPage, IContentBlock
-(discriminado por blockType → data tipada por bloque), IContentPageWithBlocks.
-Requiere `zod` como dependencia de @workspace/shared.
+(discriminated by blockType → block-typed data), IContentPageWithBlocks.
+Requires `zod` as a dependency of @workspace/shared.
 ```
 
 ---
@@ -679,11 +680,11 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `user`, `session`, `account`, `verification`
 
 ### Organization & Membership
-`organization` (includes: slogan, countryCode (**sin default DB**, requerido al crear), timezone (**notNull**, sin default), **primaryCurrency + currencyFormat (columnas `notNull` sin default — la moneda deriva del país, el formato viene explícito; nunca se leen de settings)**)
+`organization` (includes: slogan, countryCode (**no DB default**, required at creation), timezone (**notNull**, no default), **primaryCurrency + currencyFormat (`notNull` columns without default — currency derives from country, format comes explicit; never read from settings)**)
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`platform_plan` (catalog with features as PlanFeatures, price in centavos), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (créditos IA: `credits` (consumo) + `bonus_credits` (bonus one-off por ciclo, vía **Dar AI Credits** en console) + `count` legacy, índice `idx_ai_usage_org_period`, periodo mensual por ciclo)
+`platform_plan` (catalog with features as PlanFeatures, price in cents), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (AI credits: `credits` (consumption) + `bonus_credits` (one-off bonus per cycle, via **Dar AI Credits** in console) + `count` legacy, index `idx_ai_usage_org_period`, monthly period per cycle)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
@@ -696,13 +697,13 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
 
 ### AI / RAG
-`ai_usage` (créditos IA), `ai_knowledge_document` (KB docs; `organization_id NULL` = plataforma, seteado = org), `ai_knowledge_chunk` (fragmentos con embedding pgvector 1024 dims + HNSW cosine)
+`ai_usage` (AI credits), `ai_knowledge_document` (KB docs; `organization_id NULL` = platform, set = org), `ai_knowledge_chunk` (chunks with pgvector 1024 dims embedding + HNSW cosine)
 
 ### Routines (Fitness)
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
-`gym_class` (class schedule), `content_page` (incluye `metaTitle`/`metaDescription` SEO; canonical se deriva del slug), `content_block` (blocks by type with display order)
+`gym_class` (class schedule), `content_page` (includes `metaTitle`/`metaDescription` SEO; canonical derives from slug), `content_block` (blocks by type with display order)
 
 ### Settings
 `platform_setting`, `gym_setting`
@@ -711,43 +712,43 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ## Console API Layer (ofetch)
 
-`apps/console` usa **ofetch** como wrapper unificado de `fetch` nativo (regla global: **no raw `fetch`** — ver sección 8 de Technical Standards). Reemplaza axios con una API más liviana (~6kb) y soporte nativo para `next: { revalidate, tags }`.
+`apps/console` uses **ofetch** as the unified wrapper for native `fetch` (global rule: **no raw `fetch`** — see section 8 of Technical Standards). Replaces axios with a lighter API (~6kb) and native support for `next: { revalidate, tags }`.
 
-### Estructura
+### Structure
 
 ```
 lib/
 ├── api/
 │   ├── client.ts          ← ofetch.create() context-aware
-│   ├── types.ts           ← ApiFetchOptions (extiende FetchOptions + next)
-│   └── exchange-rates.ts  ← fetch externo (sin auth)
-├── services/              ← métodos tipados (reusables desde RSC y client)
+│   ├── types.ts           ← ApiFetchOptions (extends FetchOptions + next)
+│   └── exchange-rates.ts  ← external fetch (no auth)
+├── services/              ← typed methods (reusable from RSC and client)
 │   ├── organizations-service.ts
 │   ├── platform-plans-service.ts
 │   ├── platform-subscriptions-service.ts
 │   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
-│   ├── currency-service.ts (legacy, usar lib/api/exchange-rates en RSC)
+│   ├── currency-service.ts (legacy, use lib/api/exchange-rates in RSC)
 │   ├── init-service.ts
 │   ├── upload-service.ts
-│   └── session-service.ts (usa authClient, sin cambios)
-└── hooks/                 ← hooks vanilla (sin TanStack Query): use-auth, use-debounce,
+│   └── session-service.ts (uses authClient, unchanged)
+└── hooks/                 ← vanilla hooks (no TanStack Query): use-auth, use-debounce,
                              use-exchange-rates, use-organization-activation, use-theme
 ```
 
-### Comportamiento context-aware (`lib/api/client.ts`)
+### Context-aware behavior (`lib/api/client.ts`)
 
-| Contexto | Manejo de cookies | Interceptors |
+| Context | Cookie handling | Interceptors |
 |----------|------------------|--------------|
-| **Server (RSC)** | Lee `cookies()` de `next/headers` y los forwardea como `Cookie` header | Sin `window.location` (no-op) |
-| **Client (browser)** | `credentials: 'include'` (browser envía cookies automáticamente) | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
+| **Server (RSC)** | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op) |
+| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically) | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
 
-### Patrón de uso en services
+### Service usage pattern
 
 ```ts
 import { api, type ApiFetchOptions } from "@/lib/api/client";
 
 export const exampleService = {
-  // RSC: pasa { next: { revalidate, tags } } para cachear
+  // RSC: pass { next: { revalidate, tags } } to cache
   async getAll(
     params?: { page?: number; limit?: number },
     options?: ApiFetchOptions,
@@ -755,21 +756,21 @@ export const exampleService = {
     return await api("/example", { query: params, ...options });
   },
 
-  // Client: sin options, ofetch no cachea
+  // Client: without options, ofetch doesn't cache
   async create(data: any) {
     return await api("/example", { method: "POST", body: data });
   },
 };
 ```
 
-### Convención post-mutation
+### Post-mutation convention
 
-Toda mutación desde un client component (modal/form) debe:
+Every mutation from a client component (modal/form) must:
 
 ```ts
-// 1. Llamar el service
-// 2. Invalidar el cache tag
-// 3. Refrescar el RSC
+// 1. Call the service
+// 2. Invalidate the cache tag
+// 3. Refresh the RSC
 
 import { updateTag } from "next/cache";
 import { useRouter } from "next/navigation";
@@ -777,16 +778,16 @@ import { useRouter } from "next/navigation";
 const router = useRouter();
 const refresh = async () => {
   "use server";
-  updateTag("console:orgs");  // tag del cache del server component
+  updateTag("console:orgs");  // server component cache tag
 };
 
 const handleSuccess = async () => {
   await organizationsService.create(data);
-  router.refresh();  // re-fetchea el server component
+  router.refresh();  // re-fetches the server component
 };
 ```
 
-> **Nota Next.js 16**: `revalidateTag(tag, profile)` ahora requiere un `profile` (string o `CacheLifeConfig`). Para server actions usar `updateTag(tag)` (nuevo en Next 16, sin profile).
+> **Next.js 16 note**: `revalidateTag(tag, profile)` now requires a `profile` (string or `CacheLifeConfig`). For server actions use `updateTag(tag)` (new in Next 16, no profile).
 
 ### Console Cache Tags
 
@@ -794,15 +795,15 @@ const handleSuccess = async () => {
 |-----|----------|
 | `console:orgs` | `/api/platform/organizations*` |
 | `console:plans` | `/api/platform/plans*` (with-stats, summary) |
-| `console:subs` | `/api/platform/subscriptions*` (incluye /stats) |
+| `console:subs` | `/api/platform/subscriptions*` (includes /stats) |
 | `console:settings` | `/api/platform/settings` |
 | `console:staff` | `/api/platform/staff` |
 | `console:knowledge` | `/api/platform/knowledge*` |
 
-### RSC Pattern en `apps/console`
+### RSC Pattern in `apps/console`
 
-- **Páginas son Server Components** (sin `"use client"`) que llaman services directo con caching options.
-- **Filtros y paginación en URL** (`searchParams` es `Promise<...>` en Next 15+):
+- **Pages are Server Components** (no `"use client"`) that call services directly with caching options.
+- **Filters and pagination in URL** (`searchParams` is `Promise<...>` in Next 15+):
   ```tsx
   export default async function Page({
     searchParams,
@@ -814,42 +815,125 @@ const handleSuccess = async () => {
     // ...
   }
   ```
-- **Hojas cliente** (search inputs, pagination buttons, modales) usan `useRouter` + `searchParams` de `next/navigation` para modificar la URL → re-render server.
-- **Type C pages** (currencies, payment-methods) ya son **RSC parent + client child con `initialData`**: el server fetchea settings (`console:settings`) y el client arranca con el dato (sin loading flash) y guarda vía `api POST` + server action `updateTag`. La página `organizations/[id]/settings` sigue siendo client (fetch con `useState`/`useEffect`, sin TanStack Query).
-- **TanStack Query está ELIMINADO del proyecto** (console y panel). Estándar único: **RSC + ofetch + cache de Next para todos los reads**; las mutaciones en páginas RSC usan `service → toast → updateTag → refresh`. Solo se reintroduciría una librería de fetching client-side si una feature de datos en vivo (polling, UI optimista, infinite scroll) lo justifique.
+- **Client leaves** (search inputs, pagination buttons, modals) use `useRouter` + `searchParams` from `next/navigation` to modify the URL → server re-render.
+- **Type C pages** (currencies, payment-methods) are already **RSC parent + client child with `initialData`**: the server fetches settings (`console:settings`) and the client starts with the data (no loading flash) and saves via `api POST` + server action `updateTag`. The `organizations/[id]/settings` page remains client (fetch with `useState`/`useEffect`, no TanStack Query).
+- **TanStack Query is REMOVED from the project** (console and panel). Single standard: **RSC + ofetch + Next cache for all reads**; mutations in RSC pages use `service → toast → updateTag → refresh`. A client-side fetching library would only be reintroduced if a live-data feature (polling, optimistic UI, infinite scroll) justifies it.
 
-### Constantes de settings
+### Settings constants
 
-- `PLATFORM_SETTINGS_KEYS` → `apps/console/lib/config/platform-settings.ts` (settings de plataforma)
-- `SETTINGS_KEYS` → `apps/console/lib/config/settings.ts` (settings de organización)
+- `PLATFORM_SETTINGS_KEYS` → `apps/console/lib/config/platform-settings.ts` (platform settings)
+- `SETTINGS_KEYS` → `apps/console/lib/config/settings.ts` (organization settings)
 
-Ambas se importan desde server y client (no dependen de hooks).
-
----
-
-## Testing (Vitest)
-
-Suite completa con `pnpm test` (shared → api-worker → panel → console). Config en cada `vitest.config.ts`; helpers en `apps/api-worker/tests/`.
-
-**api-worker — tests de integración** (`tests/integration/`, `pnpm --filter api-worker test:integration`):
-- **HTTP real, sin mocks**: `app.fetch(request, env, ctx)` — el mismo entry point de producción — contra una **branch de Neon** (`TEST_DATABASE_URL` en `apps/api-worker/.dev.vars`; leer `tests/setup.ts`).
-- **Guardas duras**: se niega a correr si `TEST_DATABASE_URL` apunta al mismo host+db que `DATABASE_URL`; sin `TEST_DATABASE_URL` toda la suite se salta con `describe.skipIf` (CI incluido).
-- **Determinismo**: `fileParallelism: false` (una branch compartida), `TRUNCATE ... RESTART IDENTITY CASCADE` entre archivos (`tests/helpers/db.ts`), Redis ausente a propósito (cache no-op).
-- **Spies grabadores** para R2 y Queues (`tests/helpers/env.ts`) — se puede assertear eventos encolados (ej. `email.payment_receipt`).
-- **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs por HTTP real (Better Auth), inserción SQL directa solo para lo que no tiene endpoint (roles globales). **Se comparten por `describe`** (`beforeAll`) cuando los asserts no dependen de estado mutado (emails/keys únicos) — cada sign-up de Better Auth cuesta ~3s (bcrypt + Neon), así que un tenant por test solo donde la isolation lo exige.
-- **Guards de autorización** (`tests/integration/guards.test.ts`): cubren los 3 middlewares de `route-handler.ts` — `requireAuth` (401 sin sesión; deja pasar sesión válida sin org, 200 con `admin`), `requireOrgPermission` (401, **400 sin org activa**, matriz de roles: positivos owner/manager/cashier settings, member/coach plans/classes read; negativos coach settings, cashier staff, coach classes.create aun con update, member subscriptions) y `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** en settings/orgs/staff, user 403, 401).
-- **Sincronizar schema**: `pnpm --filter api-worker test:db:push` (drizzle-kit push contra la branch de test, nunca producción).
-
-**panel/console — tests unit** (`tests/unit/`, jsdom + Testing Library): helpers de UI y utilidades puras.
-
-> Cuando agregues o cambies comportamiento del API, los tests de integración son la primera línea de defensa: corre `pnpm test` antes de pedir review.
+Both are imported from server and client (they don't depend on hooks).
 
 ---
+
+## Testing
+
+Fit-Stack has **3 test layers**.
+
+### 1. `pnpm test` — Unit + Integration (Vitest)
+
+Runs the Vitest suite across all packages/apps:
+
+```bash
+pnpm test  # shared → api-worker → panel → console (Vitest)
+```
+
+**What it includes:**
+
+- **Unit Tests (all packages/apps)**: pure functions, no DB or HTTP.
+  - `packages/shared/tests/`: features catalog, RBAC permissions, constants, RAG helpers, date utils
+  - `apps/api-worker/tests/unit/`: AI helpers (`ai-helpers.test.ts`)
+  - `apps/panel/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`, `error.test.ts`)
+  - `apps/console/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`)
+- **Integration Tests (api-worker)**: real HTTP against the Hono app + Neon branch. `pnpm --filter api-worker test:integration`.
+  - **Real HTTP, no mocks**: `app.fetch(request, env, ctx)` — the same production entry point — against a **Neon branch** (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`; read `tests/setup.ts`).
+  - **Hard guards**: refuses to run if `TEST_DATABASE_URL` points to the same host+db as `DATABASE_URL`; without `TEST_DATABASE_URL` the whole suite is skipped with `describe.skipIf` (CI included).
+  - **Determinism**: `fileParallelism: false` (one shared branch), `TRUNCATE ... RESTART IDENTITY CASCADE` between files (`tests/helpers/db.ts`), Redis intentionally absent (no-op cache).
+  - **Recording spies** for R2 and Queues (`tests/helpers/env.ts`) — can assert enqueued events (e.g. `email.payment_receipt`).
+  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it.
+  - **Auth guards** (`tests/integration/guards.test.ts`): cover the 3 middlewares of `route-handler.ts` — `requireAuth` (401 without session; lets a valid session without org through, 200 with `admin`), `requireOrgPermission` (401, **400 without active org**, role matrix: positive owner/manager/cashier settings, member/coach plans/classes read; negative coach settings, cashier staff, coach classes.create even with update, member subscriptions) and `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** in settings/orgs/staff, user 403, 401).
+  - **Schema sync**: `pnpm --filter api-worker test:db:push` (drizzle-kit push against the test branch, never production).
+
+> **panel/console have no integration tests** — their tests are unit only (`tests/unit/`). api-worker is the only one with an integration suite.
+
+> E2E **don't** run with `pnpm test` — they are a separate layer (`pnpm test:e2e`).
+
+### 2. E2E Tests (Playwright)
+
+End-user tests navigating the real UI in Chromium. Config in `playwright.config.ts` (root).
+
+```bash
+pnpm test:e2e           # All E2E tests
+pnpm test:e2e:panel     # Panel only (Gym Admin)
+pnpm test:e2e:console   # Console only (SaaS Admin)
+pnpm test:e2e:ui        # Playwright UI mode (visual debug)
+pnpm test:e2e:report    # Open HTML report
+```
+
+**Suite coverage** (54 tests): panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS); console — auth, dashboard, organizations, plans, subscriptions, settings.
+
+**Playwright config** (`playwright.config.ts`):
+- `testDir: './e2e'`, `fullyParallel: false` (Next.js dev + Turbopack compile on demand and api-worker shares one dev DB — too many concurrent workers causes compile storms and request timeouts), `workers: 2` locally / `1` in CI, `timeout: 60_000` (absorbs cold compiles), `retries: 1` in CI.
+- `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
+- **Projects with setup dependencies**: `panel-setup` → `panel` (uses `storageState: 'e2e/.auth/panel-user.json'`), `console-setup` → `console` (uses `storageState: 'e2e/.auth/console-user.json'`). Setup projects run with `storageState: undefined`.
+- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
+
+**Structure**:
+```
+e2e/
+├── panel-setup.ts         # Panel setup: creates tenant (user+org) via API, UI login → storageState
+├── console-setup.ts       # Console setup: creates admin (sign-up + owner role in DB), UI login → storageState
+├── helpers/
+│   ├── api.ts             # API-based fixture creation (register, org, plan, member, tenant) over real HTTP
+│   ├── db.ts              # Direct dev DB access (platform role promotion, gym_setting reads)
+│   ├── modal.ts           # openModal(): robust click vs hydration race
+│   ├── nav.ts             # navigateByClick(): robust navigation vs hydration race
+│   └── selectors.ts       # Common design-system selectors (data-testid > role > text > CSS)
+├── panel/
+│   ├── auth.spec.ts       # Login, session, redirect, error toast
+│   ├── dashboard.spec.ts  # KPIs, sidebar nav, navigation
+│   ├── members.spec.ts    # Members list, search, create modal
+│   ├── plans.spec.ts      # Plans list, modal
+│   ├── subscriptions.spec.ts # List, filters, search
+│   ├── classes.spec.ts    # Classes list, modal
+│   ├── settings.spec.ts   # Tab navigation, General/Org/Currencies/Payments
+│   └── content.spec.ts    # CMS pages, list
+└── console/
+    ├── auth.spec.ts       # Login, session
+    ├── dashboard.spec.ts  # Stats, sidebar nav
+    ├── organizations.spec.ts # List, search, create
+    ├── subscriptions.spec.ts # List, filters
+    ├── plans.spec.ts      # List, create
+    └── settings.spec.ts   # Tab navigation, General/Currencies/FreeTier/AI-Provider/Knowledge
+```
+
+**Auth strategy**:
+- `panel-setup.ts` — creates a gym tenant via API (Better Auth sign-up → `organization/create` with `countryCode: 'VE'`, `timezone: 'America/Caracas'`, `primaryCurrency: 'VES'`, `currencyFormat: 'latam'` → `set-active`), logs in via UI (waits for the dashboard to render) and saves `storageState`.
+- `console-setup.ts` — signs up via API and promotes the user to platform `owner` with a direct DB write (`setUserPlatformRole` in `helpers/db.ts`), because the admin plugin's set-role endpoint requires an existing admin; then logs in via UI and saves `storageState`.
+- Tests start already authenticated from the saved `storageState` (cookies + localStorage).
+
+**Helpers**:
+- `helpers/api.ts` — fixture creation over real HTTP (not in-process): `registerUser`, `signIn`, `createOrganization`, `setActiveOrganization`, `createGymTenant`, `createPlan`, `createGymMember`, `uid`/`uniqueEmail`, cookie extraction. Exercises the full stack including CORS, cookies and network latency.
+- `helpers/db.ts` — direct dev DB via `@neondatabase/serverless` (loads `DATABASE_URL` from `apps/api-worker/.dev.vars`, existing env vars win): `setUserPlatformRole`, `readGymSetting`, `e2eQuery`.
+- `helpers/modal.ts` — `openModal()`: retries the trigger click until the `dialog` role is actually visible (a click landing before React hydration completes is a no-op; never clicks again once open).
+- `helpers/nav.ts` — `navigateByClick()`: retries the click until the URL matches the pattern (never clicks again once there).
+- `helpers/selectors.ts` — centralizes common selectors (prefer `data-testid` > role > text > CSS).
+
+**Env vars** (optional):
+- `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` — pre-existing credentials (if not set, users are created automatically)
+- `API_BASE_URL` — api-worker URL (default: `http://localhost:8788`)
+
+**Dev dependencies**: `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`.
+
+> When you add or change API behavior, the integration tests are the first line of defense: run `pnpm test` before asking for review.
+> E2E tests validate complete user flows in the UI — run with `pnpm test:e2e` (separate from `pnpm test`).
 
 ## Important Constraints
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
-- **Tests**: `pnpm test` runs the full suite (shared → api-worker → panel → console, Vitest). Los tests de integración de api-worker hablan HTTP real al Hono app contra una branch de Neon (`TEST_DATABASE_URL` en `apps/api-worker/.dev.vars`); sin esa variable se saltan con mensaje claro, y jamás corren contra la base de producción (guardas duras). CI los ejecuta en PRs (`ci.yml` job `test`).
+- **Tests**: `pnpm test` runs the full suite (shared → api-worker → panel → console, Vitest). api-worker integration tests talk real HTTP to the Hono app against a Neon branch (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`); without that variable they're skipped with a clear message, and they never run against the production database (hard guards). CI runs them on PRs (`ci.yml` job `test`).
 - **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
 - **Keep AGENTS.md updated** — After any structural change, update AGENTS.md to reflect it. When in doubt, update it.
@@ -868,6 +952,7 @@ Suite completa con `pnpm test` (shared → api-worker → panel → console). Co
 - New cache key patterns
 - New RSC patterns or RSC migrations in any app
 - New queue event types or email/PDF flows in jobs-worker
+- New E2E specs, helpers, or Playwright config changes
 
 ---
 
@@ -890,7 +975,7 @@ Use skill tool for specialized tasks:
 | `neon-drizzle` | Drizzle + Neon setup, migrations |
 | `terraform-stacks` | Terraform Stacks configuration |
 
-> Skills instaladas localmente en `.agents/skills/` (vía `npx skills add`). Para descubrir más: `npx skills find <query>` y confirmar con el usuario antes de instalar.
+> Skills installed locally in `.agents/skills/` (via `npx skills add`). To discover more: `npx skills find <query>` and confirm with the user before installing.
 
 ---
 
@@ -910,9 +995,11 @@ Use skill tool for specialized tasks:
 - `packages/auth/src/` — Shared auth client, service, hooks, permissions
 - `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
 - `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI
+- `playwright.config.ts` — E2E config: projects, setup deps, webServers
+- `e2e/panel-setup.ts` / `e2e/console-setup.ts` — E2E auth setup (storageState)
 
 ---
 
 ## Infrastructure & Deployment
 
-> Fuente vigente en `docs/ARCHITECTURE.md` §8. Infra en `infrastructure/terraform/` (Workers, R2, Queues) gestionada con Terraform + GitHub Actions. **Nunca usar `wrangler` manual.**
+> Current source in `docs/ARCHITECTURE.md` §8. Infra in `infrastructure/terraform/` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
