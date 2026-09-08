@@ -401,6 +401,7 @@ export interface IPlatformPlan {
 export interface IPlatformSubscription {
   id: number;
   organizationId: string;
+  organizationSlug?: string | null;
   planId: number;
   /** Status computado (no se guarda en DB) */
   status: PlatformSubscriptionStatus;
