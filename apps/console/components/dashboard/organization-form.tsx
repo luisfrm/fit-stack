@@ -133,7 +133,7 @@ function OrganizationStep1({
         />
 
         <Input
-          label="Moneda principal (derivada del país)"
+          label="Moneda principal)"
           value={primaryCurrency}
           disabled
           hint="Bloqueada al país de operación. No editable."
