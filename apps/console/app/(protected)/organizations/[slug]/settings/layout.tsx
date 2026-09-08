@@ -11,7 +11,7 @@ export default function OrgSettingsLayout({
   children: React.ReactNode;
 }>) {
   const params = useParams();
-  const id = params.id as string;
+  const slug = params.slug as string;
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -21,7 +21,7 @@ export default function OrgSettingsLayout({
         iconName="Building2"
       />
 
-      {id && <OrgSettingsNav organizationId={id} />}
+      {slug && <OrgSettingsNav organizationSlug={slug} />}
 
       <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-right-4 duration-300">
         <div className="flex-1 min-w-0">

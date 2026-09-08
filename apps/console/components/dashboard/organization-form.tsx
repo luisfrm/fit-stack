@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { COUNTRY_LIST, COUNTRIES, COUNTRY_INDEX } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
+import { organizationsService } from "@/lib/services/organizations-service";
+import { useDebounce } from "@/lib/hooks/use-debounce";
 import { IOrganization } from "@workspace/shared/types";
 import type { OwnerData } from "./organization-form-types";
 
@@ -58,6 +60,8 @@ interface Step1Props {
   readonly onLogoChange: (file: File | null) => void;
   readonly onRemoveLogo: () => void;
   readonly onChange: (field: keyof IOrganization, value: unknown) => void;
+  readonly slugStatus: "idle" | "valid" | "error";
+  readonly slugError: string | null;
 }
 
 function OrganizationStep1({
@@ -69,6 +73,8 @@ function OrganizationStep1({
   onLogoChange,
   onRemoveLogo,
   onChange,
+  slugStatus,
+  slugError,
 }: Step1Props) {
   const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
   const primaryCurrency = countryConfig?.currency ?? "";
@@ -105,7 +111,14 @@ function OrganizationStep1({
         value={formData.slug ?? ""}
         onChange={(e) => onChange("slug", e.target.value)}
         leftIcon={<Globe size={16} />}
-        hint="Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre."
+        state={slugStatus === "error" ? "error" : slugStatus === "valid" ? "success" : "default"}
+        hint={
+          slugStatus === "error"
+            ? slugError ?? "El slug ya está en uso por otra organización"
+            : slugStatus === "valid"
+              ? "Slug disponible"
+              : "Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre."
+        }
       />
 
       <Input
@@ -332,7 +345,57 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     initialData?.logo ? uploadService.getMediaUrl(initialData.logo) : "",
   );
 
+  const [slugStatus, setSlugStatus] = React.useState<"idle" | "valid" | "error">("idle");
+  const [slugError, setSlugError] = React.useState<string | null>(null);
+  const slugErrorToastRef = React.useRef<string | null>(null);
+  const debouncedSlug = useDebounce(formData.slug ?? "", 500);
+
+  React.useEffect(() => {
+    const value = debouncedSlug.trim();
+    if (!value) {
+      setSlugStatus("idle");
+      setSlugError(null);
+      slugErrorToastRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    const excludeId = initialData?.id;
+
+    organizationsService
+      .checkSlug(value, excludeId)
+      .then(() => {
+        if (cancelled) return;
+        setSlugStatus("valid");
+        setSlugError(null);
+        slugErrorToastRef.current = null;
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        const isSlugTaken = error?.status === 409 || error?.data?.code === "SLUG_TAKEN";
+        setSlugStatus("error");
+        setSlugError(
+          isSlugTaken
+            ? "El slug ya está en uso por otra organización"
+            : "No se pudo verificar el slug",
+        );
+        if (isSlugTaken && slugErrorToastRef.current !== value) {
+          slugErrorToastRef.current = value;
+          toast.error("El slug ya está en uso por otra organización");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedSlug, initialData?.id]);
+
   const handleChange = (field: keyof IOrganization, value: unknown) => {
+    // Al cambiar el slug se reinicia la validación (se re-evalúa tras el debounce).
+    if (field === "slug") {
+      setSlugStatus("idle");
+      setSlugError(null);
+    }
     // Cambiar de país re-sugiere timezone y re-deriva la principal en activas
     // (conservando las extras que el usuario ya marcó).
     if (field === "countryCode" && typeof value === "string") {
@@ -386,6 +449,10 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         : undefined;
       if (!primary || !activeCurrencies.includes(primary)) {
         toast.error("Las monedas activas deben incluir la principal.");
+        return;
+      }
+      if (slugStatus === "error") {
+        toast.error(slugError ?? "El slug ya está en uso por otra organización");
         return;
       }
       setActiveStep(1);
@@ -456,6 +523,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
               onLogoChange={handleLogoChange}
               onRemoveLogo={removeImage}
               onChange={handleChange}
+              slugStatus={slugStatus}
+              slugError={slugError}
             />
             <div className="col-span-full pt-6">
               <Button
@@ -481,6 +550,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
                 onLogoChange={handleLogoChange}
                 onRemoveLogo={removeImage}
                 onChange={handleChange}
+                slugStatus={slugStatus}
+                slugError={slugError}
               />
             )}
             {activeStep === 1 && (

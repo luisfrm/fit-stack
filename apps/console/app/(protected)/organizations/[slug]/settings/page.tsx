@@ -10,7 +10,7 @@ import type { IPlatformOrganization } from "@workspace/shared/types";
 export default function OrganizationGeneralSettingsPage() {
   const params = useParams();
   const router = useRouter();
-  const id = params.id as string;
+  const slug = params.slug as string;
 
   const [org, setOrg] = React.useState<IPlatformOrganization | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -19,7 +19,7 @@ export default function OrganizationGeneralSettingsPage() {
   React.useEffect(() => {
     async function fetchOrg() {
       try {
-        const data = await organizationsService.getById(id);
+        const data = await organizationsService.getBySlug(slug);
         setOrg(data);
       } catch (error) {
         console.error("Error fetching organization:", error);
@@ -30,15 +30,16 @@ export default function OrganizationGeneralSettingsPage() {
       }
     }
 
-    if (id) {
+    if (slug) {
       fetchOrg();
     }
-  }, [id, router]);
+  }, [slug, router]);
 
   const handleSave = async (data: Record<string, string>) => {
+    if (!org) return;
     setIsUpdating(true);
     try {
-      await organizationsService.update(id, {
+      await organizationsService.update(org.id, {
         // @ts-ignore - Custom payload for updating settings
         settings: data,
       });
