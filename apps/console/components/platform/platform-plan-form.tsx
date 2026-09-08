@@ -34,17 +34,17 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
 
   const activeCurrencies: string[] = React.useMemo(() => {
     const active = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!active) return ["USD"];
+    if (!active) return [];
     try {
       return JSON.parse(active);
     } catch {
-      return ["USD"];
+      return [];
     }
   }, [platformSettings]);
 
   const defaultCurrency = React.useMemo(() => {
     const primary = platformSettings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
-    return primary && activeCurrencies.includes(primary) ? primary : (activeCurrencies[0] || "USD");
+    return primary && activeCurrencies.includes(primary) ? primary : (activeCurrencies[0] || "");
   }, [platformSettings, activeCurrencies]);
 
   const [formData, setFormData] = React.useState({

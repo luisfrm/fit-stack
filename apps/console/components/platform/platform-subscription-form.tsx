@@ -131,7 +131,7 @@ export function PlatformSubscriptionForm({
   const [amountFocus, setAmountFocus] = React.useState(false);
   const [rateFocus, setRateFocus] = React.useState(false);
 
-  const currencyFormat = (platformSettings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const currencyFormat = platformSettings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
 
   const selectedPlan = React.useMemo(() => plans.find((p) => p.id === planId) ?? null, [plans, planId]);
 
@@ -190,8 +190,8 @@ export function PlatformSubscriptionForm({
 
   const activeCurrencies = React.useMemo(() => {
     const val = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!val) return ["USD", "VES"];
-    try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
+    if (!val) return [];
+    try { return JSON.parse(val) as string[]; } catch { return []; }
   }, [platformSettings]);
 
   const activePaymentMethods = React.useMemo(() => {

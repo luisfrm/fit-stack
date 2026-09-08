@@ -27,9 +27,9 @@ export default async function PlatformPlansPage() {
   ]);
 
   const primaryCurrency =
-    settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
+    settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] ?? "";
   const currencyFormat =
-    (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") ||
+    (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as "latam" | "usa") ??
     "latam";
 
   const refreshPlans = async () => {

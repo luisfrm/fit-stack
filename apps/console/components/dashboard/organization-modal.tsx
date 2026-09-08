@@ -6,7 +6,7 @@ import { OrganizationForm } from "./organization-form";
 import type { OwnerData } from "./organization-form-types";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { uploadService } from "@/lib/services/upload-service";
-import { type IPlatformOrganization, ORG_ROLES } from "@workspace/shared";
+import { type IPlatformOrganization, DEFAULT_ORG_STAFF_VALUES } from "@workspace/shared";
 
 interface OrganizationModalProps {
   readonly initialData?: IPlatformOrganization;
@@ -43,14 +43,14 @@ export function OrganizationModal({
 
   const isEdit = !!initialData?.id;
 
-  const handleSubmit = async (formData: Partial<IPlatformOrganization>, ownerData?: OwnerData, logoFile?: File | null) => {
+  const handleSubmit = async (formData: Partial<IPlatformOrganization>, ownerData?: OwnerData, logoFile?: File | null, settings?: Record<string, string>) => {
     try {
       if (isEdit && initialData?.id) {
         await organizationsService.update(initialData.id, formData as any);
         toast.success("Organización actualizada correctamente.");
       } else {
-        // 1. Crear la Organización (Base)
-        const newOrg = await organizationsService.create(formData as any);
+        // 1. Crear la Organización (Base + settings extensibles)
+        const newOrg = await organizationsService.create({ ...(formData as any), ...(settings ? { settings } : {}) });
         
         if (!newOrg?.id) throw new Error("No se pudo obtener el ID de la nueva organización.");
 
@@ -71,11 +71,10 @@ export function OrganizationModal({
         if (ownerData) {
           try {
             await organizationsService.provisionOwner(finalOrgId, {
+              ...DEFAULT_ORG_STAFF_VALUES,
               firstName: ownerData.firstName,
               lastName: ownerData.lastName,
               email: ownerData.email,
-              role: ORG_ROLES.OWNER,
-              isActive: true,
             }, ownerData.sendInvite);
             toast.success("Sede y Propietario configurados exitosamente.");
           } catch (staffError: any) {

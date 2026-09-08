@@ -111,8 +111,8 @@ export function PlatformPaymentMethodsSettings({
 
   const activeCurrencies = React.useMemo(() => {
     const val = initialSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!val) return ["USD", "VES"];
-    try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
+    if (!val) return [];
+    try { return JSON.parse(val) as string[]; } catch { return []; }
   }, [initialSettings]);
 
   const handleOpenCreationModal = () => {

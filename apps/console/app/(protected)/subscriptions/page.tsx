@@ -57,8 +57,7 @@ export default async function PlatformSubscriptionsPage({
   ]);
 
   const currencyFormat =
-    (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) ||
-    "latam";
+    settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
 
   const refreshSubs = async () => {
     "use server";
