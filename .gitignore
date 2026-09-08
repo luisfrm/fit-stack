@@ -20,6 +20,14 @@ node_modules
 # Testing
 coverage
 
+# Playwright
+e2e/.auth/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+.playwright-mcp/
+
 # Turbo
 .turbo
 
