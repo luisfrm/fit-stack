@@ -1,6 +1,16 @@
+import { HTTPException } from 'hono/http-exception';
 import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } from '../repositories/organizations.repository';
 import type { SettingsRepository } from '../repositories/settings.repository';
 import { buildDefaultOrgSettings, primaryCurrencyForCountry } from '@workspace/shared';
+
+const slugTakenError = (message: string) =>
+  new HTTPException(409, {
+    message,
+    res: new Response(JSON.stringify({ error: message, code: 'SLUG_TAKEN' }), {
+      status: 409,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
 
 export function createOrganizationsService(orgsRepo: OrganizationsRepository, settingsRepo: SettingsRepository) {
   return {
@@ -21,6 +31,11 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       return orgsRepo.findById(id);
     },
 
+    /** Resolve una organización por su slug. `null` si no existe. */
+    async findOrganizationBySlug(slug: string) {
+      return orgsRepo.findBySlug(slug);
+    },
+
     async createOrganization(data: Omit<NewDbOrganization, 'id'> & { currencyFormat?: 'latam' | 'usa'; settings?: Record<string, string> }) {
       if (!data.name) throw new Error('El nombre de la organización es requerido');
       // Obligatorios desde la creación, sin defaults silenciosos en lectura.
@@ -35,7 +50,7 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
 
       const existing = await orgsRepo.findBySlug(slug);
       if (existing) {
-        throw new Error('El slug o subdominio ya está en uso por otra organización');
+        throw slugTakenError('El slug o subdominio ya está en uso por otra organización');
       }
 
       // Todo lo obligatorio va en el mismo insert: la moneda deriva del país,
@@ -72,7 +87,7 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       if (data.slug) {
         const existing = await orgsRepo.findBySlug(data.slug);
         if (existing && existing.id !== id) {
-          throw new Error('El slug ya está en uso por otra organización');
+          throw slugTakenError('El slug ya está en uso por otra organización');
         }
       }
 

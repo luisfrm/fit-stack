@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requirePlatformAuth } from '../lib/route-handler';
@@ -75,6 +76,42 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     await cache.set(cacheKey, result, 300);
     return c.json(result);
+  })
+
+  // GET /api/platform/organizations/check-slug — disponibilidad en vivo del slug
+  .get(
+    '/check-slug',
+    requirePlatformAuth(),
+    zValidator(
+      'query',
+      z.object({ slug: z.string().min(1, 'El slug es requerido'), excludeId: z.string().optional() }),
+    ),
+    async (c) => {
+      const { slug, excludeId } = c.req.valid('query');
+      const repo = createOrganizationsRepository(c.get('db'));
+      const existing = await repo.findBySlug(slug);
+      if (existing && existing.id !== excludeId) {
+        throw new HTTPException(409, {
+          message: 'El slug ya está en uso por otra organización',
+          res: c.json(
+            { error: 'El slug ya está en uso por otra organización', code: 'SLUG_TAKEN' },
+            409,
+          ),
+        });
+      }
+      return c.json({ available: true });
+    },
+  )
+
+  // GET /api/platform/organizations/by-slug/:slug
+  .get('/by-slug/:slug', requirePlatformAuth(), async (c) => {
+    const slug = c.req.param('slug');
+    const repo = createOrganizationsRepository(c.get('db'));
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+
+    const org = await service.findOrganizationBySlug(slug);
+    if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
+    return c.json(org);
   })
 
   // GET /api/platform/organizations/:id
