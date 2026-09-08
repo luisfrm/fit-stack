@@ -68,13 +68,23 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
 
       const res = await owner.client.post('/api/settings', {
         brand_primary: '#FF0000',
-        currency_format: 'latam',
+        active_currencies: '["USD","VES"]',
       });
 
       expect(res.status, res.text).toBe(200);
       // POST should return the full settings object, not { success: true }
       expect(res.body.brand_primary).toBe('#FF0000');
-      expect(res.body.currency_format).toBe('latam');
+      expect(res.body.active_currencies).toBe('["USD","VES"]');
+    });
+
+    it('rejects primary_currency and currency_format via settings (org columns)', async () => {
+      const { owner } = await createGymTenant();
+
+      const res = await owner.client.post('/api/settings', {
+        currency_format: 'latam',
+      });
+
+      expect(res.status, res.text).toBe(400);
     });
 
     it('preserves existing settings when updating a subset', async () => {
@@ -112,13 +122,13 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
 
       await owner.client.post('/api/settings', {
         brand_primary: '#ABCDEF',
-        currency_format: 'usa',
+        active_currencies: '["USD","VES"]',
       });
 
       const get = await owner.client.get('/api/settings');
       expect(get.status, get.text).toBe(200);
       expect(get.body.brand_primary).toBe('#ABCDEF');
-      expect(get.body.currency_format).toBe('usa');
+      expect(get.body.active_currencies).toBe('["USD","VES"]');
     });
 
     it('rejects unauthenticated POST', async () => {

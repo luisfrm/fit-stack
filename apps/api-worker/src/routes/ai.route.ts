@@ -62,7 +62,7 @@ export const aiRoutes = new Hono<AppEnv>()
 
   // ── Historial de chat (Redis, sin DB) — cap CHAT_MAX_STORED por conversación ──
   .get('/conversations', requireOrgPermission(PM.AI, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const userId = c.get('user')!.id;
     const repo = createChatRepository(c.env);
     const data = await repo.list(orgId, userId);
@@ -70,7 +70,7 @@ export const aiRoutes = new Hono<AppEnv>()
   })
 
   .put('/conversations/:id', requireOrgPermission(PM.AI, PA.READ), zValidator('json', chatConversationSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const userId = c.get('user')!.id;
     const body = c.req.valid('json');
     const repo = createChatRepository(c.env);
@@ -90,7 +90,7 @@ export const aiRoutes = new Hono<AppEnv>()
   })
 
   .delete('/conversations/:id', requireOrgPermission(PM.AI, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const userId = c.get('user')!.id;
     const id = c.req.param('id');
     const repo = createChatRepository(c.env);
@@ -143,7 +143,7 @@ export const aiRoutes = new Hono<AppEnv>()
       // 3. Features + cuota pre-flight — ANTES del RAG: no gastar embeddings +
       // pgvector si la cuota ya está agotada. consumeAiCredits no reserva nada;
       // el estimate sin chars del RAG se corrige en el settle con el usage real.
-      const orgId = c.get('session')!.activeOrganizationId!;
+      const orgId = c.get('orgId')!;
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
         createPlatformPlansRepository(c.get('db')),

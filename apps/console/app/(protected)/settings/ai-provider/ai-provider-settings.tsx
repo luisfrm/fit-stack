@@ -17,7 +17,7 @@ interface AiProviderSettingsProps {
 
 export function AiProviderSettings({ initialSettings, onSaved }: AiProviderSettingsProps) {
   const [provider, setProvider] = React.useState<string>(
-    () => initialSettings[PLATFORM_SETTINGS_KEYS.AI_PROVIDER_DEFAULT] || "openrouter",
+    () => initialSettings[PLATFORM_SETTINGS_KEYS.AI_PROVIDER_DEFAULT] || "",
   );
   const [isUpdating, setIsUpdating] = React.useState(false);
 

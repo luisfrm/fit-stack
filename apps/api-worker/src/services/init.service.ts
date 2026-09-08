@@ -1,7 +1,9 @@
 import type { InitRepository } from '../repositories/init.repository';
+import type { PlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import type { Auth } from '../lib/env';
+import { DEFAULT_PLATFORM_SETTINGS } from '@workspace/shared';
 
-export function createInitService(initRepo: InitRepository) {
+export function createInitService(initRepo: InitRepository, platformSettingsRepo: PlatformSettingsRepository) {
   return {
     async checkNeedsInit() {
       const userCount = await initRepo.countUsers();
@@ -29,6 +31,12 @@ export function createInitService(initRepo: InitRepository) {
       }
 
       await initRepo.updateUserRole(newUser.user.id, 'admin');
+
+      // Sembrar settings de plataforma (currency, formato, proveedor IA, etc.)
+      // para que el console no caiga en fallbacks silenciosos (`|| "USD"`).
+      for (const [key, value] of Object.entries(DEFAULT_PLATFORM_SETTINGS)) {
+        await platformSettingsRepo.upsert(key, value);
+      }
 
       return {
         id: newUser.user.id,

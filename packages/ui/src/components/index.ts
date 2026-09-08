@@ -54,6 +54,7 @@ export { Tabs, TabsList, TabsTrigger, TabsContent } from "@workspace/ui/componen
 export { FormTabs } from "@workspace/ui/components/form-tabs";
 export { CountrySelector } from "@workspace/ui/components/country-selector";
 export { CurrencySelector } from "@workspace/ui/components/currency-selector";
+export { ActiveCurrenciesField } from "@workspace/ui/components/active-currencies-field";
 export { SimpleSelect } from "@workspace/ui/components/simple-select";
 export type { SimpleSelectOption } from "@workspace/ui/components/simple-select";
 export { Separator } from "@workspace/ui/components/separator";

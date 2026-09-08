@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { createInitRepository } from '../repositories/init.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createInitService } from '../services/init.service';
 import type { AppEnv } from '../lib/env';
 
@@ -15,7 +16,7 @@ export const initRoutes = new Hono<AppEnv>()
   // GET /api/init
   .get('/', async (c) => {
     const initRepo = createInitRepository(c.get('db'));
-    const initService = createInitService(initRepo);
+    const initService = createInitService(initRepo, createPlatformSettingsRepository(c.get('db')));
 
     const status = await initService.checkNeedsInit();
     return c.json(status);
@@ -27,7 +28,7 @@ export const initRoutes = new Hono<AppEnv>()
     const auth = c.get('auth');
 
     const initRepo = createInitRepository(c.get('db'));
-    const initService = createInitService(initRepo);
+    const initService = createInitService(initRepo, createPlatformSettingsRepository(c.get('db')));
 
     const adminUser = await initService.initializeAdmin(auth, data);
     return c.json(adminUser, 201);

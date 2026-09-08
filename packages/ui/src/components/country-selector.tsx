@@ -24,6 +24,7 @@ interface CountrySelectorProps {
   readonly label?: string;
   readonly error?: string;
   readonly placeholder?: string;
+  readonly required?: boolean;
 }
 
 export function CountrySelector({
@@ -32,7 +33,8 @@ export function CountrySelector({
   countries,
   label = "País de Operación",
   error,
-  placeholder = "Seleccionar país..."
+  placeholder = "Seleccionar país...",
+  required = false,
 }: CountrySelectorProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -68,6 +70,7 @@ export function CountrySelector({
       {label && (
         <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
           {label}
+          {required && <span className="text-primary"> *</span>}
         </Label>
       )}
 

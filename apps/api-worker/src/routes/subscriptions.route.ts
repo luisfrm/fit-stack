@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createPaymentsRepository } from '../repositories/payments.repository';
@@ -9,7 +9,6 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createCache, type Cache } from '../lib/cache';
-import { requireOrgTimezone } from '../lib/org-timezone';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
@@ -49,7 +48,7 @@ const updateSubStatusSchema = z.object({
 export const subscriptionRoutes = new Hono<AppEnv>()
   // GET /api/subscriptions
   .get('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const query = c.req.query('query');
     const status = c.req.query('status');
     const page = Number(c.req.query('page') || '1');
@@ -73,7 +72,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
 
   // GET /api/subscriptions/recent?limit=...
   .get('/recent', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const limit = Number(c.req.query('limit') || '5');
 
     const db = c.get('db');
@@ -87,12 +86,11 @@ export const subscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/subscriptions
-  .post('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.CREATE), zValidator('json', createSubSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+  .post('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.CREATE), requireOrgTimezone(), zValidator('json', createSubSchema), async (c) => {
+    const orgId = c.get('orgId')!;
     const payload = c.req.valid('json');
-    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
-    // Esto garantiza que un pago a las 11pm local caiga en el mismo día.
-    const timezone = requireOrgTimezone(c.get('session'));
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 
     const db = c.get('db');
@@ -108,7 +106,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
 
   // PUT /api/subscriptions/:id
   .put('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), zValidator('json', updateSubStatusSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const { status } = c.req.valid('json');
     const cache = createCache(c.env);
@@ -126,7 +124,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
 
   // DELETE /api/subscriptions/:id
   .delete('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.DELETE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

@@ -72,7 +72,7 @@ export function createSubscriptionsService(
         createdAt: r.createdAt.toISOString(),
         planName: r.planName || null,
         amountPaid: r.amountPaid ? Number(r.amountPaid) : null,
-        currencyPaid: r.currencyPaid || 'USD',
+        currencyPaid: r.currencyPaid,
         endDate: r.endDate.toISOString(),
       }));
     },

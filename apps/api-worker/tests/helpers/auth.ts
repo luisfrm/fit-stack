@@ -93,13 +93,21 @@ export interface TestOrganization {
 /** Creates an organization via the Better Auth organization plugin. */
 export async function createOrganization(
   client: TestClient,
-  overrides: { name?: string; slug?: string } = {},
+  overrides: { name?: string; slug?: string; countryCode?: string } = {},
 ): Promise<TestOrganization> {
   const slug = overrides.slug ?? `gym-${uid()}`;
   const name = overrides.name ?? `Gym ${slug}`;
+  const countryCode = overrides.countryCode ?? 'VE';
 
-  // timezone es obligatoria en la organización (no hay default silencioso).
-  const res = await client.post('/api/auth/organization/create', { name, slug, timezone: 'America/Caracas' });
+  // Obligatorios de la org (columnas NOT NULL, sin defaults silenciosos).
+  const res = await client.post('/api/auth/organization/create', {
+    name,
+    slug,
+    countryCode,
+    timezone: 'America/Caracas',
+    primaryCurrency: 'VES',
+    currencyFormat: 'latam',
+  });
   if (res.status !== 200 && res.status !== 201) {
     throw new Error(`organization create failed (${res.status}): ${res.text}`);
   }

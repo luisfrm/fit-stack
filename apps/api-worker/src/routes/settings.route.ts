@@ -14,7 +14,7 @@ const settingsSchema = z.record(z.string(), z.string());
 export const settingsRoutes = new Hono<AppEnv>()
   // GET /api/settings
   .get('/', requireOrgPermission(PM.SETTINGS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:settings`;
 
@@ -34,7 +34,7 @@ export const settingsRoutes = new Hono<AppEnv>()
 
   // GET /api/settings/:key
   .get('/:key', requireOrgPermission(PM.SETTINGS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const key = c.req.param('key');
 
     const settingsRepo = createSettingsRepository(c.get('db'));
@@ -47,9 +47,17 @@ export const settingsRoutes = new Hono<AppEnv>()
 
   // POST /api/settings
   .post('/', requireOrgPermission(PM.SETTINGS, PA.UPDATE), zValidator('json', settingsSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const body = c.req.valid('json');
     const cache = createCache(c.env);
+
+    // primary_currency/currency_format son columnas de `organization`, no settings.
+    if ('primary_currency' in body || 'currency_format' in body) {
+      return c.json(
+        { error: 'primary_currency y currency_format se gestionan en la organización, no en settings' },
+        400
+      );
+    }
 
     const settingsRepo = createSettingsRepository(c.get('db'));
     const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));

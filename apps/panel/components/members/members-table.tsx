@@ -8,7 +8,7 @@ import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@/lib/utils/value-converters";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { differenceInDays, parseISO } from "date-fns";
 
 interface MembersTableProps {
@@ -233,8 +233,8 @@ export function MembersTable({
   emptyTitle,
   emptyDescription
 }: MembersTableProps) {
-  const { settings } = useSettings();
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const { activeOrganization } = useAuth();
+  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
   const columns = React.useMemo(
     () => getColumns(onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal),

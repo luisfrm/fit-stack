@@ -471,13 +471,16 @@ export interface IOrganization {
   metadata?: Record<string, any> | null;
 
   // Fiscal/Localization Fields
-  countryCode?: string;
+  // Obligatorios: columnas NOT NULL en `organization` (un solo insert al crear).
+  countryCode: string;
+  timezone: string;
+  primaryCurrency: string;
+  currencyFormat: "latam" | "usa";
   taxId?: string | null;
   legalName?: string | null;
   address?: string | null;
   fiscalConfig?: Record<string, any> | null;
   slogan?: string | null;
-  timezone?: string | null;
   status?: string | null;
 
   createdAt?: string | Date;

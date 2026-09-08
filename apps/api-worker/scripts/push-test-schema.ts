@@ -70,16 +70,20 @@ console.log(`\n🔄 Pushing schema to TEST_DATABASE_URL...\n`);
 console.log(`   Target: ${TEST_DATABASE_URL.replace(/:([^@]+)@/, ':***@')}\n`);
 
 try {
-  execSync('npx drizzle-kit push --force', {
+  const out = execSync('npx drizzle-kit push --force', {
     cwd: databasePath,
     env: {
       ...process.env,
       DATABASE_URL: TEST_DATABASE_URL,
     },
-    stdio: 'inherit',
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  console.log(out);
   console.log('\n✅ Schema pushed successfully to test database.\n');
-} catch {
-  console.error('\n❌ drizzle-kit push failed. Check the output above.\n');
+} catch (err: any) {
+  console.error('\n❌ drizzle-kit push failed. Full output:\n');
+  console.error(err?.stdout ?? '');
+  console.error(err?.stderr ?? err?.message ?? err);
   process.exit(1);
 }

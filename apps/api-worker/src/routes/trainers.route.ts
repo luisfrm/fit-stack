@@ -25,7 +25,7 @@ const trainerSchema = z.object({
 export const trainerRoutes = new Hono<AppEnv>()
   // GET /api/trainers
   .get('/', requireOrgPermission(PM.STAFF, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const name = c.req.query('name');
     const isVisibleStr = c.req.query('isVisible');
     const isVisible = isVisibleStr !== undefined ? isVisibleStr === 'true' : undefined;
@@ -47,7 +47,7 @@ export const trainerRoutes = new Hono<AppEnv>()
 
   // GET /api/trainers/:id
   .get('/:id', requireOrgPermission(PM.STAFF, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const trainersRepo = createTrainersRepository(c.get('db'));
@@ -59,7 +59,7 @@ export const trainerRoutes = new Hono<AppEnv>()
 
   // POST /api/trainers
   .post('/', requireOrgPermission(PM.STAFF, PA.CREATE), zValidator('json', trainerSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -73,7 +73,7 @@ export const trainerRoutes = new Hono<AppEnv>()
 
   // PUT /api/trainers/:id
   .put('/:id', requireOrgPermission(PM.STAFF, PA.UPDATE), zValidator('json', trainerSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -88,7 +88,7 @@ export const trainerRoutes = new Hono<AppEnv>()
 
   // DELETE /api/trainers/:id
   .delete('/:id', requireOrgPermission(PM.STAFF, PA.DELETE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

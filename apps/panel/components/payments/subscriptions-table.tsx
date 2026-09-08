@@ -22,8 +22,7 @@ import {
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { usePermissions } from "@/lib/hooks/use-auth";
+import { usePermissions, useAuth } from "@/lib/hooks/use-auth";
 
 const getPaymentStatusBadge = (status?: string) => {
   switch (status) {
@@ -128,7 +127,7 @@ const getColumns = (
         <div className="flex flex-col gap-0.5">
           <Text weight="bold" size="sm" className="text-foreground tabular-nums">
             {sub.amountPaid
-              ? ValueConverter.format(sub.amountPaid / 100, sub.currencyPaid || 'USD', currencyFormat)
+              ? ValueConverter.format(sub.amountPaid / 100, sub.currencyPaid, currencyFormat)
               : "---"
             }
           </Text>
@@ -265,9 +264,9 @@ export function SubscriptionsTable({
   loading,
   pagination
 }: SubscriptionsTableProps) {
-  const { settings } = useSettings();
+  const { activeOrganization } = useAuth();
   const { can } = usePermissions();
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
   const canDelete = can(PERMISSION_MODULES.SUBSCRIPTIONS, PERMISSION_ACTIONS.DELETE);
 

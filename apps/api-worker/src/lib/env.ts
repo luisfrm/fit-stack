@@ -1,5 +1,6 @@
 import type { createAuth } from './auth';
 import type { Db } from '@workspace/database/factory';
+import type { IOrganization } from '@workspace/shared';
 
 export type Auth = ReturnType<typeof createAuth>;
 
@@ -56,6 +57,12 @@ export type AppVariables = {
   db: Db;
   session?: Session;
   user?: SessionUser;
+  /** Id de la org activa (set por `requireOrg`/`requireOrgPermission`). */
+  orgId?: string;
+  /** Objeto de la org activa (set en el middleware global; la sesión-solo-registro no lo trae). */
+  org?: IOrganization | null;
+  /** Zona horaria de la org activa (set por `requireOrgTimezone`). */
+  orgTimezone?: string;
   /** Features resueltas de la org activa (set por `requireFeature`) */
   orgFeatures?: {
     features: Record<string, { enabled: boolean; limits?: Record<string, number> }>;

@@ -3,22 +3,18 @@
 import * as React from "react";
 import {
   Coins,
-  Search,
-  CheckCircle2,
   AlertCircle,
-  TrendingUp,
-  Globe,
-  BadgeDollarSign
+  Globe
 } from "lucide-react";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
-import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
+import { ActiveCurrenciesField } from "@workspace/ui/components";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
-import { currencyService } from "@/lib/services/currency-service";
 import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
+import { COUNTRY_INDEX } from "@workspace/shared";
 
 interface PlatformCurrenciesSettingsProps {
   readonly initialSettings: Record<string, string>;
@@ -31,56 +27,21 @@ export function PlatformCurrenciesSettings({
 }: PlatformCurrenciesSettingsProps) {
   const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() => {
     const raw = initialSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!raw) return ["USD"];
+    if (!raw) return [];
     try {
       return JSON.parse(raw) as string[];
     } catch {
-      return ["USD"];
+      return [];
     }
   });
   const [primaryCurrency, setPrimaryCurrency] = React.useState<string>(
-    () => initialSettings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD",
+    () => initialSettings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "",
   );
-  const [allCurrencies, setAllCurrencies] = React.useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [isFetchingCodes, setIsFetchingCodes] = React.useState(false);
-  const [isEditingCurrencies, setIsEditingCurrencies] = React.useState(false);
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [currencyFormat, setCurrencyFormat] = React.useState<"latam" | "usa">(() => {
     const f = initialSettings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT];
     return f === "usa" || f === "latam" ? f : "latam";
   });
-
-  React.useEffect(() => {
-    const fetchCodes = async () => {
-      setIsFetchingCodes(true);
-      try {
-        const data = await currencyService.getExchangeRates();
-        if (data.result === "success") {
-          setAllCurrencies(Object.keys(data.rates).sort((a, b) => a.localeCompare(b)));
-        }
-      } catch (error) {
-        console.error("Error fetching currency codes:", error);
-      } finally {
-        setIsFetchingCodes(false);
-      }
-    };
-    fetchCodes();
-  }, []);
-
-  const handleToggleCurrency = (code: string) => {
-    const exists = activeCurrencies.includes(code);
-    if (exists && code === primaryCurrency) {
-      toast.warning("No puedes desactivar la moneda principal");
-      return;
-    }
-
-    setActiveCurrencies(prev =>
-      exists
-        ? prev.filter(c => c !== code)
-        : [...prev, code]
-    );
-  };
 
   const handleSave = async () => {
     setIsUpdating(true);
@@ -102,19 +63,6 @@ export function PlatformCurrenciesSettings({
       setIsUpdating(false);
     }
   };
-
-  const filteredCurrencies = React.useMemo(() => {
-    return allCurrencies
-      .filter(c => c.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort((a, b) => {
-        const aActive = activeCurrencies.includes(a);
-        const bActive = activeCurrencies.includes(b);
-
-        if (aActive && !bActive) return -1;
-        if (!aActive && bActive) return 1;
-        return a.localeCompare(b);
-      });
-  }, [allCurrencies, searchQuery, activeCurrencies]);
 
   return (
     <div className="space-y-12 pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -138,74 +86,13 @@ export function PlatformCurrenciesSettings({
           </div>
 
           <div className="space-y-6">
-            {isEditingCurrencies ? (
-              <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Buscar moneda (ej: USD, EUR, MXN...)"
-                    leftIcon={<Search className="w-4 h-4" />}
-                    className="px-4"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditingCurrencies(false)}
-                    className="text-white/40 hover:text-white h-12"
-                  >
-                    Cerrar
-                  </Button>
-                </div>
-
-                <div className="h-[250px] overflow-y-auto pr-2 space-y-1 scrollbar-thin scrollbar-thumb-white/10">
-                  {isFetchingCodes ? (
-                    <div className="flex items-center justify-center h-full">
-                      <TrendingUp className="w-5 h-5 text-primary animate-pulse" />
-                    </div>
-                  ) : filteredCurrencies.map(code => (
-                    <Button
-                      key={code}
-                      variant={activeCurrencies.includes(code) ? "glass" : "ghost"}
-                      fullWidth
-                      onClick={() => handleToggleCurrency(code)}
-                      className="justify-between px-4 h-12"
-                      rightIcon={activeCurrencies.includes(code) ? <CheckCircle2 className="w-4 h-4 text-primary" /> : null}
-                    >
-                      <span className="font-mono font-bold text-[11px]">{code}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Monedas Activas</Text>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditingCurrencies(true)}
-                    className="text-primary hover:bg-primary/10 h-7 text-[10px] font-bold uppercase"
-                  >
-                    Modificar Lista
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {activeCurrencies.map(code => (
-                    <div
-                      key={code}
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20 text-white"
-                    >
-                      <span className="font-mono font-bold text-xs">{code}</span>
-                      {code === primaryCurrency && <BadgeDollarSign className="w-3 h-3 text-primary" />}
-                    </div>
-                  ))}
-                  {activeCurrencies.length === 0 && (
-                    <Text className="text-xs text-white/20 italic">No hay monedas seleccionadas.</Text>
-                  )}
-                </div>
-              </div>
-            )}
+            <ActiveCurrenciesField
+              currencies={COUNTRY_INDEX.currencies}
+              value={activeCurrencies}
+              onChange={setActiveCurrencies}
+              locked={primaryCurrency ? [primaryCurrency] : []}
+              onLockedAttempt={() => toast.warning("No puedes desactivar la moneda principal")}
+            />
 
             <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 space-y-4">
               <div className="flex items-center gap-2">

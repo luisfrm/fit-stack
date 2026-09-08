@@ -12,6 +12,7 @@ import {
   ImageUpload,
   CheckboxCard,
   FormTabs,
+  ActiveCurrenciesField,
 } from "@workspace/ui/components";
 import {
   Building2,
@@ -25,7 +26,7 @@ import {
   Mail,
   ArrowRight,
 } from "lucide-react";
-import { LATAM_COUNTRIES, COUNTRY_LIST } from "@workspace/shared/constants";
+import { COUNTRY_LIST, COUNTRIES, COUNTRY_INDEX } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
 import { IOrganization } from "@workspace/shared/types";
 import type { OwnerData } from "./organization-form-types";
@@ -34,14 +35,26 @@ export type { OwnerData };
 
 interface OrganizationFormProps {
   readonly initialData?: IOrganization;
-  readonly onSubmit: (orgData: Partial<IOrganization>, ownerData?: OwnerData, logoFile?: File | null) => Promise<void>;
+  readonly onSubmit: (
+    orgData: Partial<IOrganization>,
+    ownerData?: OwnerData,
+    logoFile?: File | null,
+    settings?: Record<string, string>,
+  ) => Promise<void>;
   readonly isLoading?: boolean;
+}
+
+function deriveActiveCurrencies(countryCode?: string | null): string[] {
+  const primary = (countryCode && COUNTRIES[countryCode]?.currency) || "USD";
+  return [...new Set([primary, "USD"])];
 }
 
 interface Step1Props {
   readonly isEdit: boolean;
   readonly previewUrl: string;
   readonly formData: Partial<IOrganization>;
+  readonly activeCurrencies: string[];
+  readonly onActiveCurrenciesChange: (next: string[]) => void;
   readonly onLogoChange: (file: File | null) => void;
   readonly onRemoveLogo: () => void;
   readonly onChange: (field: keyof IOrganization, value: unknown) => void;
@@ -51,12 +64,22 @@ function OrganizationStep1({
   isEdit,
   previewUrl,
   formData,
+  activeCurrencies,
+  onActiveCurrenciesChange,
   onLogoChange,
   onRemoveLogo,
   onChange,
 }: Step1Props) {
+  const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
+  const primaryCurrency = countryConfig?.currency ?? "";
   return (
     <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
+      <div className="col-span-full pt-2">
+        <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+          Identidad
+        </Text>
+      </div>
+
       <div className="col-span-full flex flex-col items-center justify-center py-4">
         <ImageUpload
           label="Logo de la organización"
@@ -68,7 +91,7 @@ function OrganizationStep1({
       </div>
 
       <Input
-        label="Nombre de la Organización"
+        label="Nombre de la Organización *"
         placeholder="Ej: Premium Gym Central"
         value={formData.name ?? ""}
         onChange={(e) => onChange("name", e.target.value)}
@@ -85,33 +108,82 @@ function OrganizationStep1({
         hint="Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre."
       />
 
+      <Input
+        label="Slogan"
+        placeholder="Ej: Entrena sin límites"
+        value={formData.slogan ?? ""}
+        onChange={(e) => onChange("slogan", e.target.value)}
+      />
+
       <Separator className="col-span-full bg-border my-2" />
 
       <div className="col-span-full pt-2">
         <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
-          Información de la Entidad (Opcional)
+          País y moneda
         </Text>
       </div>
 
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
         <CountrySelector
-          label="País de Operación"
-          value={formData.countryCode || "VE"}
-          onChange={(code: string) => {
-            const config = LATAM_COUNTRIES.find((c) => c.code === code);
-            onChange("countryCode", code);
-            if (config) onChange("timezone", config.timezone);
-          }}
-          countries={LATAM_COUNTRIES}
+          label="País de Operación *"
+          required
+          value={formData.countryCode ?? ""}
+          onChange={(code: string) => onChange("countryCode", code)}
+          countries={COUNTRY_LIST}
+        />
+
+        <Input
+          label="Moneda principal (derivada del país)"
+          value={primaryCurrency}
+          disabled
+          hint="Bloqueada al país de operación. No editable."
+        />
+      </div>
+
+      <ActiveCurrenciesField
+        currencies={COUNTRY_INDEX.currencies}
+        value={activeCurrencies}
+        onChange={onActiveCurrenciesChange}
+        locked={primaryCurrency ? [primaryCurrency] : []}
+        disabled={isEdit}
+        hint={
+          isEdit
+            ? "Las activas de una sede existente se gestionan desde su panel de Monedas."
+            : "La principal siempre está incluida. El backend la deriva del país."
+        }
+      />
+
+      <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <SimpleSelect
+          label="Formato de Moneda"
+          value={formData.currencyFormat ?? "latam"}
+          onChange={(val) => onChange("currencyFormat", val)}
+          options={[
+            { value: "latam", label: "LATAM / EU (1.250,50)" },
+            { value: "usa", label: "USA / UK (1,250.50)" },
+          ]}
+          leftIcon={<Clock size={16} />}
         />
 
         <SimpleSelect
-          label="Zona Horaria"
-          value={formData.timezone || "America/Caracas"}
+          label="Zona Horaria *"
+          required
+          value={formData.timezone ?? ""}
           onChange={(val) => onChange("timezone", val)}
-          options={COUNTRY_LIST.map((c) => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
+          options={COUNTRY_INDEX.timezoneOptions}
           leftIcon={<Clock size={16} />}
         />
+      </div>
+      <Text className="text-[9px] text-white/40 leading-relaxed italic">
+        * Se sugiere la zona del país, pero puedes cambiarla.
+      </Text>
+
+      <Separator className="col-span-full bg-border my-2" />
+
+      <div className="col-span-full pt-2">
+        <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+          Entidad legal (opcional)
+        </Text>
       </div>
 
       <Input
@@ -124,7 +196,7 @@ function OrganizationStep1({
 
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
-          label="ID Fiscal (RIF / NIT)"
+          label={`ID Fiscal (${countryConfig?.taxLabel ?? "Registro"})`}
           placeholder="Ej: J-12345678-9"
           value={formData.taxId ?? ""}
           onChange={(e) => onChange("taxId", e.target.value)}
@@ -138,6 +210,10 @@ function OrganizationStep1({
           leftIcon={<MapPin size={16} />}
         />
       </div>
+
+      <Text className="text-[9px] text-white/40 leading-relaxed italic col-span-full">
+        Los campos con * son obligatorios.
+      </Text>
 
       {!isEdit && (
         <div className="col-span-full pt-4">
@@ -231,13 +307,18 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     name: initialData?.name ?? "",
     slug: initialData?.slug ?? "",
     logo: initialData?.logo ?? "",
-    status: initialData?.status ?? "active",
+    slogan: initialData?.slogan ?? "",
     countryCode: initialData?.countryCode ?? "VE",
     taxId: initialData?.taxId ?? "",
     legalName: initialData?.legalName ?? "",
     address: initialData?.address ?? "",
     timezone: initialData?.timezone ?? "America/Caracas",
+    currencyFormat: initialData?.currencyFormat ?? "latam",
   });
+
+  const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() =>
+    deriveActiveCurrencies(initialData?.countryCode ?? "VE"),
+  );
 
   const [ownerData, setOwnerData] = React.useState<OwnerData>({
     firstName: "",
@@ -251,9 +332,26 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     initialData?.logo ? uploadService.getMediaUrl(initialData.logo) : "",
   );
 
-  const handleChange = React.useCallback((field: keyof IOrganization, value: unknown) => {
+  const handleChange = (field: keyof IOrganization, value: unknown) => {
+    // Cambiar de país re-sugiere timezone y re-deriva la principal en activas
+    // (conservando las extras que el usuario ya marcó).
+    if (field === "countryCode" && typeof value === "string") {
+      const config = COUNTRY_LIST.find((c) => c.code === value);
+      const prevPrimary =
+        formData.countryCode != null ? COUNTRIES[formData.countryCode]?.currency : undefined;
+      const nextPrimary = config?.currency ?? "USD";
+      setActiveCurrencies((prev) => [
+        ...new Set([nextPrimary, "USD", ...prev.filter((c) => c !== prevPrimary)]),
+      ]);
+      setFormData((prev) => ({
+        ...prev,
+        countryCode: value,
+        ...(config ? { timezone: config.timezone } : {}),
+      }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  };
 
   const handleOwnerChange = React.useCallback((field: keyof OwnerData, value: unknown) => {
     setOwnerData((prev) => ({ ...prev, [field]: value }));
@@ -279,6 +377,17 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     e.preventDefault();
 
     if (!isEdit && activeStep === 0) {
+      if (!formData.name?.trim() || !formData.countryCode || !formData.timezone) {
+        toast.error("Completa nombre, país y zona horaria para continuar.");
+        return;
+      }
+      const primary = formData.countryCode
+        ? COUNTRIES[formData.countryCode]?.currency
+        : undefined;
+      if (!primary || !activeCurrencies.includes(primary)) {
+        toast.error("Las monedas activas deben incluir la principal.");
+        return;
+      }
       setActiveStep(1);
       setMaxReachedStep((prev) => Math.max(prev, 1));
       return;
@@ -297,7 +406,12 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         logo: previewUrl ? (finalLogoUrl || null) : null,
       };
 
-      await onSubmit(payload, isEdit ? undefined : ownerData, selectedFile);
+      // Activas solo al crear (en edición se gestionan desde el panel de la sede).
+      const settings = isEdit
+        ? undefined
+        : { active_currencies: JSON.stringify(activeCurrencies) };
+
+      await onSubmit(payload, isEdit ? undefined : ownerData, selectedFile, settings);
     } catch (error: any) {
       console.error("Error al procesar el formulario de organización:", error);
       toast.error("No se pudo guardar la organización. Por favor, verifica la información e intenta nuevamente.");
@@ -337,6 +451,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
               isEdit
               previewUrl={previewUrl}
               formData={formData}
+              activeCurrencies={activeCurrencies}
+              onActiveCurrenciesChange={setActiveCurrencies}
               onLogoChange={handleLogoChange}
               onRemoveLogo={removeImage}
               onChange={handleChange}
@@ -360,6 +476,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
                 isEdit={false}
                 previewUrl={previewUrl}
                 formData={formData}
+                activeCurrencies={activeCurrencies}
+                onActiveCurrenciesChange={setActiveCurrencies}
                 onLogoChange={handleLogoChange}
                 onRemoveLogo={removeImage}
                 onChange={handleChange}

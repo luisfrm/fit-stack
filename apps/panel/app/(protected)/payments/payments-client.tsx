@@ -15,7 +15,7 @@ import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import type { CurrencyFormat } from "@/lib/utils/value-converters";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
@@ -58,12 +58,12 @@ export function PaymentsClient({
   onSuccess,
 }: PaymentsClientProps) {
   const router = useRouter();
-  const { settings } = useSettings();
+  const { activeOrganization } = useAuth();
   const primaryCurrency =
-    settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || initialPrimaryCurrency;
+    activeOrganization?.primaryCurrency || initialPrimaryCurrency;
   const currencyFormat =
-    (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) ||
-    initialCurrencyFormat;
+    ((activeOrganization?.currencyFormat as CurrencyFormat | undefined) ||
+    initialCurrencyFormat);
 
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(initialStatus);

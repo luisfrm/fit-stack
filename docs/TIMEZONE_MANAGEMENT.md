@@ -72,7 +72,7 @@ no reemplaza la agregación de Postgres.
 ---
 
 > [!TIP]
-> **Golden Rule:** Whenever you create a new service that handles reports or analytics, make sure to receive the `timezone` from the controller and pass it to the SQL aggregation functions. La tz se resuelve de la **sesión** (`session.activeOrganization.timezone`), NUNCA de un query param del cliente (`?timezone=`), para que un pago registrado a las 11pm en Venezuela caiga en el mismo día local.
+> **Golden Rule:** Whenever you create a new service that handles reports or analytics, make sure to receive the `timezone` from the controller and pass it to the SQL aggregation functions. La tz se valida y resuelve con el middleware composable **`requireOrgTimezone()`** (`apps/api-worker/src/lib/route-handler.ts`), que la inyecta tipada en `c.get('orgTimezone')!`. NUNCA de un query param del cliente (`?timezone=`) ni con fallbacks silenciosos, para que un pago registrado a las 11pm en Venezuela caiga en el mismo día local.
 
 ---
 

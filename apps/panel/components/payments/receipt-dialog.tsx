@@ -19,7 +19,6 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useReactToPrint } from "react-to-print";
 import { emailsService } from "@/lib/services/emails-service";
 import { uploadService } from "@/lib/services/upload-service";
@@ -33,10 +32,9 @@ interface ReceiptDialogProps {
 }
 
 export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDialogProps) {
-  const { settings } = useSettings();
   const { activeOrganization: org } = useAuth();
   const [isSendingEmail, setIsSendingEmail] = React.useState(false);
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const currencyFormat = (org?.currencyFormat ?? "latam") as CurrencyFormat;
   const countryConfig = COUNTRIES[org?.countryCode || "VE"] || COUNTRIES.VE;
 
   const contentRef = React.useRef<HTMLDivElement>(null);

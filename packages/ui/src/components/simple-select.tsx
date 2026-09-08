@@ -30,6 +30,7 @@ interface SimpleSelectProps {
   readonly size?: "sm" | "md" | "lg" | "xl";
   readonly leftIcon?: React.ReactNode;
   readonly disabled?: boolean;
+  readonly required?: boolean;
 }
 
 export function SimpleSelect({
@@ -44,7 +45,8 @@ export function SimpleSelect({
   variant = "default",
   size = "md",
   leftIcon,
-  disabled
+  disabled,
+  required = false,
 }: SimpleSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -73,6 +75,7 @@ export function SimpleSelect({
       {label && (
         <Label className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
           {label}
+          {required && <span className="text-primary"> *</span>}
         </Label>
       )}
 

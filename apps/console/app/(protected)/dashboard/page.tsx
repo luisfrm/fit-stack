@@ -47,8 +47,8 @@ export default async function DashboardPage() {
 
   // Extract primary platform currency and format settings
   const settingsMap = (settings || {}) as Record<string, string>;
-  const primaryCurrency = settingsMap[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
-  const currencyFormat = (settingsMap[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const primaryCurrency = settingsMap[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
+  const currencyFormat = settingsMap[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
 
   // Calculate dynamic B2B revenue and monthly growth comparison
   const monthlyRevenue = (stats.monthlyRevenueCents ?? 0) / 100;

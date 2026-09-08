@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth, requireOrgPermission } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
+import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
@@ -24,15 +25,15 @@ const memberSchema = z.object({
   birthday: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
-  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).default('member'),
-  isActive: z.boolean().default(true),
-  sendInvite: z.boolean().default(false),
+  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional(),
+  isActive: z.boolean().optional(),
+  sendInvite: z.boolean().optional(),
 });
 
 export const memberRoutes = new Hono<AppEnv>()
   // GET /api/members
   .get('/', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const query = c.req.query('query');
     const role = c.req.query('role') as any;
     const excludeRole = c.req.query('excludeRole') as any;
@@ -184,7 +185,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
   // GET /api/members/:id
   .get('/:id', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const membersRepo = createMembersRepository(c.get('db'));
@@ -201,8 +202,8 @@ export const memberRoutes = new Hono<AppEnv>()
 
   // POST /api/members
   .post('/', requireOrgPermission(PM.MEMBERS, PA.CREATE), zValidator('json', memberSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
-    const { sendInvite, ...data } = c.req.valid('json');
+    const orgId = c.get('orgId')!;
+    const { sendInvite, ...data } = { ...DEFAULT_MEMBER_VALUES, ...c.req.valid('json') };
     const auth = c.get('auth');
     const cache = createCache(c.env);
 
@@ -246,7 +247,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
   // PUT /api/members/:id
   .put('/:id', requireOrgPermission(PM.MEMBERS, PA.UPDATE), zValidator('json', memberSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -270,7 +271,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
   // DELETE /api/members/:id
   .delete('/:id', requireOrgPermission(PM.MEMBERS, PA.DELETE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 
@@ -288,7 +289,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
   // POST /api/members/:id/resend-invite
   .post('/:id/resend-invite', requireOrgPermission(PM.MEMBERS, PA.UPDATE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const auth = c.get('auth');
 

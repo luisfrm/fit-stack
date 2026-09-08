@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requirePlatformAuth } from '../lib/route-handler';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import { createSettingsRepository } from '../repositories/settings.repository';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
@@ -17,29 +18,33 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
+import { DEFAULT_ORG_STAFF_VALUES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const createOrgSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   slug: z.string().optional(),
   logo: z.string().nullable().optional(),
-  countryCode: z.string().optional(),
+  slogan: z.string().nullable().optional(),
+  countryCode: z.string().min(1, 'El país de operación es requerido'),
   // La zona horaria es OBLIGATORIA desde la creación (no hay default silencioso).
   timezone: z.string().min(1, 'La zona horaria es requerida'),
+  currencyFormat: z.enum(['latam', 'usa']).optional(),
   taxId: z.string().nullable().optional(),
   legalName: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   fiscalConfig: z.record(z.string(), z.any()).nullable().optional(),
   metadata: z.record(z.string(), z.any()).nullable().optional(),
+  settings: z.record(z.string(), z.string()).optional(),
 });
 
 const provisionOwnerSchema = z.object({
   firstName: z.string().min(1, 'El nombre es requerido'),
   lastName: z.string().min(1, 'El apellido es requerido'),
   email: z.string().email('Email inválido'),
-  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional().default('owner'),
-  isActive: z.boolean().optional().default(true),
-  sendInvite: z.boolean().optional().default(false),
+  role: z.enum(['owner', 'manager', 'cashier', 'coach', 'member']).optional(),
+  isActive: z.boolean().optional(),
+  sendInvite: z.boolean().optional(),
   phoneNumber: z.string().nullable().optional(),
   documentId: z.string().nullable().optional(),
 });
@@ -59,7 +64,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     if (cached) return c.json(cached);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const result = await service.getAllOrganizations({
       query,
@@ -76,7 +81,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   .get('/:id', requirePlatformAuth(), async (c) => {
     const id = c.req.param('id');
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const org = await service.findOrganizationById(id);
     if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
@@ -89,7 +94,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const newOrg = await service.createOrganization(data as any);
     await cache.invalidate('platform:organizations*');
@@ -103,7 +108,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
@@ -118,7 +123,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
@@ -132,7 +137,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo);
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
     await service.deleteOrganization(id);
     await cache.invalidate('platform:organizations*');
@@ -151,7 +156,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       const cache = createCache(c.env);
 
       const repo = createOrganizationsRepository(c.get('db'));
-      const service = createOrganizationsService(repo);
+      const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
       const org = await service.findOrganizationById(orgId);
       if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
 
@@ -260,7 +265,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     zValidator('json', provisionOwnerSchema),
     async (c) => {
       const id = c.req.param('id');
-      const { sendInvite, ...memberData } = c.req.valid('json');
+      const { sendInvite, ...memberData } = { ...DEFAULT_ORG_STAFF_VALUES, ...c.req.valid('json') };
 
       const membersRepo = createMembersRepository(c.get('db'));
       const usersRepo = createUsersRepository(c.get('db'));
@@ -281,7 +286,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       if (existingUser) {
         const isAlreadyAuthMember = await membersRepo.findAuthMember(existingUser.id, id);
         if (!isAlreadyAuthMember) {
-          await membersRepo.addToOrganization(existingUser.id, id, (memberData.role as any) || 'owner');
+          await membersRepo.addToOrganization(existingUser.id, id, memberData.role as any);
         }
       }
 

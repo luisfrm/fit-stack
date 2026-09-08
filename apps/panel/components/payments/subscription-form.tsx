@@ -90,7 +90,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [amountFocus, setAmountFocus] = React.useState(false);
   const [rateFocus, setRateFocus] = React.useState(false);
 
-  const currencyFormat = (settings[SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) || "latam";
+  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
   const selectedPlan = React.useMemo(() => plans.find(p => p.id === planId), [plans, planId]);
 
@@ -143,8 +143,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   // Dynamic Lists from Settings
   const activeCurrencies = React.useMemo(() => {
     const val = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!val) return ["USD", "VES"];
-    try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
+    if (!val) return [];
+    try { return JSON.parse(val) as string[]; } catch { return []; }
   }, [settings]);
 
   const activePaymentMethods = React.useMemo(() => {

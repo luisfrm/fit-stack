@@ -261,5 +261,31 @@ export const COUNTRY_LIST = Object.values(COUNTRIES);
 export type Country = typeof COUNTRY_LIST[number];
 export const DEFAULT_COUNTRY = COUNTRIES.VE;
 
-/** @deprecated Use COUNTRIES or COUNTRY_LIST instead */
-export const LATAM_COUNTRIES = COUNTRY_LIST;
+/**
+ * Índice global derivado de `COUNTRIES` (fuente única para recorridos:
+ * validación, universos de selección, opciones con label). Se computa una
+ * vez al importar. A futuro, si un país gana `timezones: string[]`, solo
+ * cambia el interior (aplanado) sin romper consumidores.
+ */
+export interface CountryIndex {
+  codes: string[];
+  currencies: string[];
+  timezones: string[];
+  timezoneOptions: { value: string; label: string; countryCode: string }[];
+}
+
+export function indexCountries(countries: readonly ICountryConfig[]): CountryIndex {
+  const list = [...countries];
+  return {
+    codes: list.map((c) => c.code),
+    currencies: [...new Set(list.map((c) => c.currency))],
+    timezones: [...new Set(list.map((c) => c.timezone))],
+    timezoneOptions: list.map((c) => ({
+      value: c.timezone,
+      label: `${c.name} (${c.timezone})`,
+      countryCode: c.code,
+    })),
+  };
+}
+
+export const COUNTRY_INDEX: CountryIndex = indexCountries(COUNTRY_LIST);

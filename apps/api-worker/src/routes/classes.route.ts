@@ -30,7 +30,7 @@ const classSchema = z.object({
 export const classRoutes = new Hono<AppEnv>()
   // GET /api/classes
   .get('/', requireOrgPermission(PM.CLASSES, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const name = c.req.query('name');
     const trainerName = c.req.query('trainerName');
     const isVisibleStr = c.req.query('isVisible');
@@ -68,7 +68,7 @@ export const classRoutes = new Hono<AppEnv>()
 
   // GET /api/classes/:id
   .get('/:id', requireOrgPermission(PM.CLASSES, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const classesRepo = createClassesRepository(c.get('db'));
@@ -80,7 +80,7 @@ export const classRoutes = new Hono<AppEnv>()
 
   // POST /api/classes
   .post('/', requireOrgPermission(PM.CLASSES, PA.CREATE), zValidator('json', classSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -94,7 +94,7 @@ export const classRoutes = new Hono<AppEnv>()
 
   // PUT /api/classes/:id
   .put('/:id', requireOrgPermission(PM.CLASSES, PA.UPDATE), zValidator('json', classSchema.partial()), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -109,7 +109,7 @@ export const classRoutes = new Hono<AppEnv>()
 
   // DELETE /api/classes/:id
   .delete('/:id', requireOrgPermission(PM.CLASSES, PA.DELETE), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

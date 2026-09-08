@@ -29,7 +29,7 @@ const featuresSchema = z
 const platformPlanSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   price: z.union([z.string(), z.number()]),
-  currency: z.string().default('USD'),
+  currency: z.string().min(1, 'La moneda es requerida'),
   durationValue: z.number().int().min(1).optional(),
   durationUnit: z.enum(['day', 'week', 'month', 'year']).optional(),
   isActive: z.boolean().default(true),

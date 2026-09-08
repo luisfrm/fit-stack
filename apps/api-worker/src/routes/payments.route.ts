@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createPaymentsRepository } from '../repositories/payments.repository';
@@ -10,7 +10,6 @@ import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createFinanceService } from '../services/finance.service';
 import { createCache } from '../lib/cache';
-import { requireOrgTimezone } from '../lib/org-timezone';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
@@ -19,16 +18,16 @@ const updateStatusSchema = z.object({
 
 export const paymentRoutes = new Hono<AppEnv>()
   // GET /api/payments/analytics
-  .get('/analytics', requireOrgPermission(PM.REPORTS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+  .get('/analytics', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
+    const orgId = c.get('orgId')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:payments:analytics`;
 
     const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
 
-    // La tz es obligatoria: si la org no la tiene, lanza error (no fallback).
-    const timezone = requireOrgTimezone(c.get('session'));
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
 
     const db = c.get('db');
     const paymentsRepo = createPaymentsRepository(db);
@@ -42,7 +41,7 @@ export const paymentRoutes = new Hono<AppEnv>()
   })
   // PATCH /api/payments/:id/status
   .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), zValidator('json', updateStatusSchema), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
     const { status } = c.req.valid('json');
     const cache = createCache(c.env);
@@ -64,7 +63,7 @@ export const paymentRoutes = new Hono<AppEnv>()
 
   // POST /api/payments/:id/send-email
   .post('/:id/send-email', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
-    const orgId = c.get('session')!.activeOrganizationId!;
+    const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
 
     const db = c.get('db');

@@ -134,6 +134,8 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 ### 2. UI Design System & Hierarchy
 
 - **Library Origins**: All UI components MUST be imported from `@workspace/ui` (`packages/ui`).
+- **Form required convention**: `Input` usa `required` nativo; `CountrySelector` y `SimpleSelect` aceptan prop `required` (pinta `*` en el label). Los forms agrupan en secciones y cierran con la nota "Los campos con * son obligatorios."
+- **ActiveCurrenciesField** (`packages/ui/.../active-currencies-field.tsx`): multi-toggle de monedas (`currencies` universo, `value/onChange`, `locked[]` no desmarcable con badge, `disabled`, buscador). Fuente de verdad del universo: `COUNTRY_INDEX.currencies` (nunca el exchange API, que es solo para tasas).
 - **Variant Enforcement**: Use predefined variants. Do not use ad-hoc Tailwind classes to override sizes/spacing/styles unless absolutely necessary and after notifying the user.
 - **Mathematical Scale + Premium Aesthetic**:
   - **Backgrounds**: `bg-input`, `bg-card`, `bg-surface`, translucent scales (`bg-white/5`, `bg-white/10`).
@@ -195,17 +197,19 @@ The CORS allowlist is defined **in code only** — no env vars. Single source of
 
 The Hono API uses centralized middleware — never write auth/error boilerplate manually.
 
-| Middleware | When to use | Auth check |
-|---------|-------------|------------|
-| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback) |
-| `requireAuth()` | Org-scoped routes without permission check | Session + user only |
+| Middleware | When to use | Auth check / Context |
+|---------|-------------|----------------------|
+| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Setea `c.set('orgId', orgId)` |
+| `requireOrg()` | Org-scoped routes without permission check | Session + org activa. Setea `c.set('orgId', orgId)` |
+| `requireOrgTimezone()` | Rutas que calculan o filtran por fecha local (reportes, stats, cobros) | Valida que la org tenga timezone (500 si falta). Setea `c.set('orgTimezone', tz)` |
+| `requireAuth()` | Rutas autenticadas generales | Session + user only |
 | `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`) | Session + platform permission via `auth.api.userHasPermission` |
 | `requirePlatformAuth()` | Alias de `requirePlatformPermission('organization', 'create')` — middleware estándar de las rutas `/api/platform/*` | Session + permiso `organization.create` |
 
 ```ts
 // Typical org-scoped route (Hono)
 .get('/', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
-  const orgId = c.get('session')!.activeOrganizationId!;
+  const orgId = c.get('orgId')!;
   const repo = createMembersRepository(c.get('db'));
   const service = createMembersService(repo, /* ...deps */);
   return c.json(await service.getAllMembers({ organizationId: orgId }));
@@ -280,12 +284,21 @@ Rutas montadas en `apps/api-worker/src/index.ts` (todas bajo `/api`, salvo `/hea
 - **Fuente única de verdad**: `packages/shared/src/date.ts` (exportado por `@workspace/shared`), construida sobre `date-fns` + `@date-fns/tz` (ambas puramente funcionales, edge-safe). **NUNCA** reintroducir aritmética de fechas a mano (`Intl.DateTimeFormat("en-CA")`, `new Date().toISOString().slice(0,10)`, offsets con `padStart`, `setUTCMonth`, `Math.floor(ms / 86_400_000)`).
 - **Regla de negocio**: un pago a las 11pm en Venezuela debe caer en el **mismo día local**. Para lograrlo, la tz SIEMPRE se resuelve de la **sesión** (`session.activeOrganization.timezone`, cacheada 5 min en `org:{orgId}:profile`), **nunca** de un query param del cliente (`?timezone=`).
 - **La timezone es OBLIGATORIA**: no hay fallback `?? 'America/Caracas'`. Si la org no la tiene, es un error.
-  - **API**: `requireOrgTimezone(c.get('session'))` (`apps/api-worker/src/lib/org-timezone.ts`) lanza 500 si falta. Usada en `subscriptions`, `reports`, `plans`, `dashboard` y `payments`.
+  - **API**: Middleware composable `requireOrgTimezone()` (`apps/api-worker/src/lib/route-handler.ts`) valida que la org tenga timezone (500 si falta) y la inyecta tipada en `c.get('orgTimezone')!`. Usada en `subscriptions`, `reports`, `plans`, `dashboard` y `payments`.
   - **Servicios**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` exigen `timezone: string` **sin default**.
   - **Creación de org (console → `/api/platform/organizations`)**: `timezone` es `required` en `createOrgSchema`, validado en `organizations.service.createOrganization`, y `required: true` en `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). El schema `organization.timezone` es `notNull` **sin default** (DB).
 - **SQL vs JS**: la **agregación** por día/mes local (reportes, ingresos del día) se hace **en SQL** con `AT TIME ZONE`. La util JS resuelve la **entrada** (límites de día local como `Date` UTC para los `WHERE gte/lte`) y el **display**; no reemplaza Postgres.
 - **UI** (panel/console): el "hoy" local se obtiene con `toLocalDayString(orgTimezone)`; parseo de `'YYYY-MM-DD'` con `parseDateAsConfigTimezone(dateStr, tz)` (alias de `parseLocalToUtc`). Los helpers de hora wall-clock (`formatTime`/`formatTimeRange`) viven en `apps/{panel,console}/lib/config/display.ts`, que re-exporta los helpers de tz desde `@workspace/shared`.
 - **`billing-utils.ts`** (api-worker) es billing de **plataforma** (SaaS) y opera en UTC — no se mezcla con la tz de la org.
+
+### 10. Configuración explícita sin fallbacks silenciosos (Seeding)
+
+- **Regla de oro**: NUNCA inventar fallbacks silenciosos en código frontend ni backend (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`). Si una configuración falta, debe ser un error visible y no un comportamiento silencioso asumido.
+- **Taxonomía**: lo **obligatorio** son columnas `NOT NULL` sin default en `organization` (`timezone`, `countryCode`, `primaryCurrency`, `currencyFormat`) — un solo `insert` al crear, imposible que falten. Lo **extensible** vive en KV (`gym_setting`: `active_currencies`, `active_payment_methods`, `brand_*`) con único fallback permitido `[]`/parse seguro. Los guards sobre **datos** (`currencyPaid`, `planCurrency` en UI) no son config y se quedan, documentados.
+- **Creación de org** (`organizations.service.createOrganization`): deriva `primaryCurrency = COUNTRIES[countryCode].currency`, acepta `currencyFormat` explícito (`'latam'` default de **escritura**) + `settings` override (`{ ...buildDefaultOrgSettings(cc), ...settings }`); siembra solo lo extensible. Cambiar `countryCode` recalcula la principal. `POST /api/settings` rechaza `primary_currency`/`currency_format` (400).
+- **Creación de usuarios** (los 3 flujos: `POST /api/members`, `POST /platform/organizations/:id/staff`, `POST /platform/staff`): sin `.default()` en zod — defaults en `@workspace/shared/defaults.ts` (`DEFAULT_MEMBER_VALUES`, `DEFAULT_ORG_STAFF_VALUES`, `DEFAULT_PLATFORM_STAFF_VALUES`) resueltos con spread en ruta/servicio.
+- **Seeding de Plataforma (`platform_setting`)**: sin cambios (KV singleton, se siembra en `/api/init` vía `DEFAULT_PLATFORM_SETTINGS`).
+- **Lectura en UI**: moneda/formato se leen de la org (`session.activeOrganization` / `useAuth().activeOrganization`), nunca de settings. La página de Monedas del panel solo edita `active_currencies` (principal readonly); el formato se edita en Configuración de Sede.
 
 ---
 
@@ -586,7 +599,7 @@ if (orgRole && !canAccessCms()) redirect('/unauthorized')
 // constants.ts
 ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
 PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
-DEFAULT_COUNTRY, COUNTRY_LIST, ICountryConfig,
+COUNTRY_LIST, COUNTRY_INDEX (`indexCountries()` — códigos, monedas, timezones y timezoneOptions derivados; fuente única para recorridos), DEFAULT_COUNTRY, ICountryConfig,
 ORG_ROLE_LABELS + formatOrgRole (roles de organización/Panel),
 PLATFORM_ROLE_LABELS + formatPlatformRole (roles de plataforma/Console: owner, admin, support, user)
 
@@ -610,7 +623,7 @@ orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationState
 OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
-ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode, taxId, legalName, address, fiscalConfig, timezone)
+ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode*, taxId, legalName, address, fiscalConfig, timezone*, primaryCurrency*, currencyFormat* — *required)
 
 // permissions/
   modules.ts:         PERMISSION_MODULES (12 modules: dashboard, reports, members, staff,
@@ -666,7 +679,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 `user`, `session`, `account`, `verification`
 
 ### Organization & Membership
-`organization` (includes: slogan, countryCode, timezone, taxId, legalName, address, fiscalConfig)
+`organization` (includes: slogan, countryCode (**sin default DB**, requerido al crear), timezone (**notNull**, sin default), **primaryCurrency + currencyFormat (columnas `notNull` sin default — la moneda deriva del país, el formato viene explícito; nunca se leen de settings)**)
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)

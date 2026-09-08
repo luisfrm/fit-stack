@@ -35,6 +35,7 @@ export default function OrganizationSettingsPage() {
     address: "",
     countryCode: "VE",
     timezone: "America/Caracas",
+    currencyFormat: "latam",
   });
 
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function OrganizationSettingsPage() {
       address: org.address || "",
       countryCode: org.countryCode || "VE",
       timezone: org.timezone || "America/Caracas",
+      currencyFormat: org.currencyFormat || "latam",
     });
     setLogoUrl(org.logo || null);
   }, [activeOrg]);
@@ -87,6 +89,7 @@ export default function OrganizationSettingsPage() {
         address: formData.address,
         timezone: formData.timezone,
         slogan: formData.slogan || undefined,
+        currencyFormat: formData.currencyFormat as "latam" | "usa",
       });
 
       toast.success("Información de la sede actualizada correctamente");
@@ -272,6 +275,27 @@ export default function OrganizationSettingsPage() {
                 value={formData.timezone}
                 onChange={(value) => handleChange("timezone", value)}
                 options={COUNTRY_LIST.map(c => ({ value: c.timezone, label: `${c.name} (${c.timezone})` }))}
+                leftIcon={<Clock size={16} />}
+              />
+
+              <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
+                <div className="flex flex-col">
+                  <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Moneda Principal</Text>
+                  <Text size="lg" weight="bold" className="tabular-nums">
+                    {activeOrg?.primaryCurrency ?? ""}
+                  </Text>
+                  <Text size="xs" variant="muted" className="italic">Derivada del país. No editable.</Text>
+                </div>
+              </div>
+
+              <SimpleSelect
+                label="Formato de Moneda"
+                value={formData.currencyFormat}
+                onChange={(value) => handleChange("currencyFormat", value)}
+                options={[
+                  { value: "latam", label: "LATAM / EU (1.250,50)" },
+                  { value: "usa", label: "USA / UK (1,250.50)" },
+                ]}
                 leftIcon={<Clock size={16} />}
               />
             </div>

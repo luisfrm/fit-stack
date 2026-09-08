@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { requireAuth } from '../lib/route-handler';
+import { requireAuth, requireOrg } from '../lib/route-handler';
 import { createFeaturesService } from '../services/features.service';
 import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
@@ -12,12 +12,8 @@ import type { AppEnv } from '../lib/env';
  * Features + límites resueltos de la org activa (consumido por el gate del panel).
  */
 export const organizationFeaturesRoutes = new Hono<AppEnv>()
-  .get('/', requireAuth(), async (c) => {
-    const session = c.get('session')!;
-    const orgId = session.activeOrganizationId;
-    if (!orgId) {
-      return c.json({ error: 'No active organization' }, 400);
-    }
+  .get('/', requireAuth(), requireOrg(), async (c) => {
+    const orgId = c.get('orgId')!;
 
     const db = c.get('db');
     const cache = createCache(c.env);

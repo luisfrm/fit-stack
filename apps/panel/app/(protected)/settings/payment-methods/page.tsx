@@ -108,8 +108,8 @@ export default function PaymentMethodsSettingsPage() {
 
   const activeCurrencies = React.useMemo(() => {
     const val = settings[SETTINGS_KEYS.ACTIVE_CURRENCIES];
-    if (!val) return ["USD", "VES"];
-    try { return JSON.parse(val) as string[]; } catch { return ["USD"]; }
+    if (!val) return [];
+    try { return JSON.parse(val) as string[]; } catch { return []; }
   }, [settings]);
 
   const handleOpenCreationModal = () => {

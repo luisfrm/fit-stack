@@ -2,13 +2,11 @@ import { sessionService } from "@workspace/auth/service";
 import { dashboardService } from "@/lib/services/dashboard-service";
 import { classesService } from "@/lib/services/classes-service";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
-import { settingsService } from "@/lib/services/settings-service";
 import { financeService } from "@/lib/services/finance-service";
 import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { DashboardStatusToaster } from "@/components/dashboard/dashboard-status-toaster";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import { toLocalDayString } from "@workspace/shared/date";
-import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import type { IClassToday } from "@workspace/shared/types";
 
 export const dynamic = "force-dynamic";
@@ -58,11 +56,8 @@ export default async function DashboardPage() {
 
   const today = toLocalDayString(orgTimezone);
 
-  const settingsTag = `org:${activeOrgId}:settings`;
-  const settings = await settingsService
-    .getAll({ next: { revalidate: 600, tags: [settingsTag] } })
-    .catch(() => ({}) as Record<string, string>);
-  const primaryCurrency = settings[SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
+  // Moneda principal: columna obligatoria de la org (sin fallback de config).
+  const primaryCurrency = session?.activeOrganization?.primaryCurrency ?? "";
 
   const [stats, todayClassesRaw, recentRegistrations, analytics, actionItems] =
     await Promise.all([
