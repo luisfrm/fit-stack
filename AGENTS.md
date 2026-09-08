@@ -9,6 +9,7 @@ pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
 pnpm test         # Full test suite (shared → api-worker → panel → console, Vitest)
+pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
 pnpm format       # Format code (Prettier)
 
 # Database (Drizzle ORM — all run via @workspace/database)
@@ -25,8 +26,8 @@ cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active) — port 8788
 cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
-cd apps/console     && pnpm dev  # Port 3003 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado, read-only reference)
+cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
+cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ pausado, read-only reference)
 
 # Bridge (Python/Flet — managed separately with uv) ⏸ PAUSADO
 # cd apps/bridge
@@ -36,7 +37,7 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3000 (⏸ pausado
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3003), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — ⏸ pausado, kept only as reference, excluded from pnpm workspace).
+- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSADO**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ pausado, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
 - **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (créditos IA, vigentes) y `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, histórico) + `how/` (fuente de la Base de Conocimiento IA, tono usuario final) + specs en `docs/superpowers/specs/`.
 - **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
@@ -827,11 +828,21 @@ Ambas se importan desde server y client (no dependen de hooks).
 
 ---
 
-## Testing (Vitest)
+## Testing
 
-Suite completa con `pnpm test` (shared → api-worker → panel → console). Config en cada `vitest.config.ts`; helpers en `apps/api-worker/tests/`.
+Fit-Stack tiene **3 capas de tests**:
 
-**api-worker — tests de integración** (`tests/integration/`, `pnpm --filter api-worker test:integration`):
+### 1. Unit Tests (Vitest)
+Funciones puras, sin DB ni HTTP. Config en cada `vitest.config.ts`.
+
+- **`packages/shared/tests/`**: catálogo features, permisos RBAC, constantes, RAG helpers, date utils
+- **`apps/api-worker/tests/unit/`**: helpers de IA (`ai-helpers.test.ts`)
+- **`apps/panel/tests/unit/`**: utilidades UI (`helper.test.ts`, `display.test.ts`, `features.test.ts`, `error.test.ts`)
+- **`apps/console/tests/unit/`**: utilidades UI (`helper.test.ts`, `display.test.ts`, `features.test.ts`)
+
+### 2. Integration Tests (Vitest — api-worker)
+HTTP real contra la app Hono + branch de Neon. `pnpm --filter api-worker test:integration`.
+
 - **HTTP real, sin mocks**: `app.fetch(request, env, ctx)` — el mismo entry point de producción — contra una **branch de Neon** (`TEST_DATABASE_URL` en `apps/api-worker/.dev.vars`; leer `tests/setup.ts`).
 - **Guardas duras**: se niega a correr si `TEST_DATABASE_URL` apunta al mismo host+db que `DATABASE_URL`; sin `TEST_DATABASE_URL` toda la suite se salta con `describe.skipIf` (CI incluido).
 - **Determinismo**: `fileParallelism: false` (una branch compartida), `TRUNCATE ... RESTART IDENTITY CASCADE` entre archivos (`tests/helpers/db.ts`), Redis ausente a propósito (cache no-op).
@@ -840,9 +851,55 @@ Suite completa con `pnpm test` (shared → api-worker → panel → console). Co
 - **Guards de autorización** (`tests/integration/guards.test.ts`): cubren los 3 middlewares de `route-handler.ts` — `requireAuth` (401 sin sesión; deja pasar sesión válida sin org, 200 con `admin`), `requireOrgPermission` (401, **400 sin org activa**, matriz de roles: positivos owner/manager/cashier settings, member/coach plans/classes read; negativos coach settings, cashier staff, coach classes.create aun con update, member subscriptions) y `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** en settings/orgs/staff, user 403, 401).
 - **Sincronizar schema**: `pnpm --filter api-worker test:db:push` (drizzle-kit push contra la branch de test, nunca producción).
 
-**panel/console — tests unit** (`tests/unit/`, jsdom + Testing Library): helpers de UI y utilidades puras.
+### 3. E2E Tests (Playwright)
+Tests de usuario final navegando la UI real en Chromium. Config en `playwright.config.ts` (raíz).
 
-> Cuando agregues o cambies comportamiento del API, los tests de integración son la primera línea de defensa: corre `pnpm test` antes de pedir review.
+```bash
+pnpm test:e2e           # Todos los E2E tests
+pnpm test:e2e:panel     # Solo panel (Gym Admin)
+pnpm test:e2e:console   # Solo console (SaaS Admin)
+pnpm test:e2e:ui        # Playwright UI mode (debug visual)
+pnpm test:e2e:report    # Abrir reporte HTML
+```
+
+**Estructura**:
+```
+e2e/
+├── panel-setup.ts         # Panel setup: crea tenant (user+org) via API, login UI → storageState
+├── console-setup.ts       # Console setup: crea admin (sign-up + rol owner en DB), login UI → storageState
+├── helpers/
+│   ├── api.ts             # API-based fixture creation (register, org, plan, member)
+│   ├── db.ts              # Acceso directo a la DB dev (promoción de rol platform)
+│   ├── modal.ts           # openModal(): click robusto vs carrera de hidratación
+│   ├── nav.ts             # navigateByClick(): navegación robusta vs hidratación
+│   └── selectors.ts       # Selectores comunes del design system
+├── panel/
+│   ├── auth.spec.ts       # Login, sesión, redirect
+│   ├── dashboard.spec.ts  # KPIs, sidebar nav, navegación
+│   ├── members.spec.ts    # CRUD miembros, búsqueda, modal
+│   ├── plans.spec.ts      # CRUD planes, modal
+│   ├── subscriptions.spec.ts # Lista, filtros, búsqueda
+│   ├── classes.spec.ts    # CRUD clases, modal
+│   ├── settings.spec.ts   # Navegación tabs, General/Org/Moneda/Pagos
+│   └── content.spec.ts    # CMS pages, lista
+└── console/
+    ├── auth.spec.ts       # Login, sesión
+    ├── dashboard.spec.ts  # Stats, sidebar nav
+    ├── organizations.spec.ts # Lista, búsqueda, crear
+    ├── subscriptions.spec.ts # Lista, filtros
+    ├── plans.spec.ts      # Lista, crear
+    └── settings.spec.ts   # Navegación tabs, General/Moneda/FreeTier/Knowledge
+```
+
+**Auth strategy**: `panel-setup.ts` / `console-setup.ts` crean usuarios via API (Better Auth sign-up), loguean via UI y guardan `storageState` (cookies + localStorage). Los tests arrancan autenticados.
+
+**Env vars** (opcional):
+- `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` — credenciales pre-existentes (si no, crea usuarios automáticamente)
+- `API_BASE_URL` — URL del api-worker (default: `http://localhost:8788`)
+
+**Web servers**: `playwright.config.ts` lanza api-worker + panel + console en paralelo. En CI, usa `reuseExistingServer: false`.
+
+> Cuando agregues o cambies comportamiento del API, los tests de integración son la primera línea de defensa: corre `pnpm test` antes de pedir review. Los E2E tests validan flujos de usuario completos en la UI.
 
 ---
 
