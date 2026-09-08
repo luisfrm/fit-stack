@@ -123,7 +123,7 @@ export function SubscriptionsTable({
       headerClassName: "pl-6",
       cell: (sub) => (
         <button
-          onClick={() => router.push(`/organizations/${sub.organizationId}/subscriptions`)}
+          onClick={() => router.push(`/organizations/${sub.organizationSlug ?? sub.organizationId}/subscriptions`)}
           className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
         >
           <Text weight="bold" className="text-foreground hover:text-primary transition-colors leading-tight">
@@ -231,7 +231,7 @@ export function SubscriptionsTable({
                     label: "Registrar Pago",
                     icon: <CreditCard size={14} />,
                     variant: "default",
-                    onClick: () => router.push(`/organizations/${sub.organizationId}/subscriptions?addPayment=${sub.id}`),
+                    onClick: () => router.push(`/organizations/${sub.organizationSlug ?? sub.organizationId}/subscriptions?addPayment=${sub.id}`),
                   },
                   {
                     label: "Extender Periodo",

@@ -47,7 +47,7 @@ apps/console/
 │   ├── init/                      # First admin setup
 │   └── dashboard/
 │       ├── page.tsx               # SaaS admin dashboard (KPIs + recent orgs)
-│       ├── organizations/         # List + detail/[id]/settings + subscriptions
+│       ├── organizations/         # List + detail/[slug]/settings + subscriptions
 │       ├── plans/                 # FitStack plan CRUD
 │       ├── settings/              # Global platform settings
 │       │   ├── currencies/        # Supported currencies
@@ -72,8 +72,8 @@ apps/console/
 |------|-------------|
 | `/dashboard` | KPIs globales (organizaciones totales, ingresos, suscripciones activas) |
 | `/dashboard/organizations` | Lista de organizaciones + crear nueva |
-| `/dashboard/organizations/[id]/settings` | Editar org (name, legal, fiscal, timezone) |
-| `/dashboard/organizations/[id]/subscriptions` | Suscripciones de la org + crear manual |
+| `/dashboard/organizations/[slug]/settings` | Editar org (name, legal, fiscal, timezone) |
+| `/dashboard/organizations/[slug]/subscriptions` | Suscripciones de la org + crear manual |
 | `/dashboard/plans` | Catálogo de planes Fit-Stack |
 | `/dashboard/subscriptions` | Lista global de suscripciones |
 | `/dashboard/staff` | Equipo de administración de la plataforma (support/admin/owner) — alta con invitación por correo o acceso directo, y revocación |

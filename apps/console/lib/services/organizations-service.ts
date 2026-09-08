@@ -66,6 +66,31 @@ export const organizationsService = {
   },
 
   /**
+   * Retrieves an organization by its slug (route detail: /organizations/[slug]).
+   */
+  async getBySlug(
+    slug: string,
+    options?: ApiFetchOptions,
+  ): Promise<IPlatformOrganization> {
+    return await api<IPlatformOrganization>(
+      `${ORGANIZATIONS_PATH}/by-slug/${slug}`,
+      options,
+    );
+  },
+
+  /**
+   * Live slug availability check. Throws 409 { code: 'SLUG_TAKEN' } if in use.
+   */
+  async checkSlug(
+    slug: string,
+    excludeId?: string,
+  ): Promise<{ available: boolean }> {
+    return await api<{ available: boolean }>(`${ORGANIZATIONS_PATH}/check-slug`, {
+      query: { slug, ...(excludeId ? { excludeId } : {}) },
+    });
+  },
+
+  /**
    * Creates a new platform organization.
    */
   async create(

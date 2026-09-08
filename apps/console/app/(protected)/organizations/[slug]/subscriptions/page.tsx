@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { SubscriptionsPagination } from "./subscriptions-pagination";
@@ -20,10 +21,10 @@ export default async function OrganizationSubscriptionsPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
   searchParams: Promise<{ page?: string }>;
 }) {
-  const [{ id }, sp, settings] = await Promise.all([
+  const [{ slug }, sp, settings] = await Promise.all([
     params,
     searchParams,
     api<Record<string, string>>("/platform/settings", {
@@ -33,12 +34,15 @@ export default async function OrganizationSubscriptionsPage({
 
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const [org, subsResult, catalogData] = await Promise.all([
-    organizationsService.getById(id, {
-      next: { revalidate: 60, tags: ["console:orgs"] },
-    }).catch(() => null),
+  const org = await organizationsService.getBySlug(slug, {
+    next: { revalidate: 60, tags: ["console:orgs"] },
+  }).catch(() => null);
+
+  if (!org) notFound();
+
+  const [subsResult, catalogData] = await Promise.all([
     platformSubscriptionsService.getAll(
-      { organizationId: id, page, limit: PAGE_LIMIT },
+      { organizationId: org.id, page, limit: PAGE_LIMIT },
       { next: { revalidate: 60, tags: ["console:subs"] } },
     ),
     featuresService.getCatalog({ next: { revalidate: 3600, tags: ["console:settings"] } }).catch(() => null),
@@ -86,7 +90,7 @@ export default async function OrganizationSubscriptionsPage({
         subscriptionPlanFeatures={activePlanFeatures as never}
         freeTierFeatures={freeTierFeatures}
         catalog={catalogData?.catalog}
-        organizationName={org?.name ?? id}
+        organizationName={org.name}
         isFreeTierFallback={isFreeTierFallback}
       />
 

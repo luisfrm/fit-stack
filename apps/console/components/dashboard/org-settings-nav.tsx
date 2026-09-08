@@ -5,22 +5,22 @@ import { Building2, Users } from "lucide-react";
 import { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 
 interface OrgSettingsNavProps {
-  readonly organizationId: string;
+  readonly organizationSlug: string;
 }
 
-export function OrgSettingsNav({ organizationId }: OrgSettingsNavProps) {
+export function OrgSettingsNav({ organizationSlug }: OrgSettingsNavProps) {
   const navItems = React.useMemo(() => [
     {
       label: "General",
-      href: `/organizations/${organizationId}/settings`,
+      href: `/organizations/${organizationSlug}/settings`,
       icon: Building2,
     },
     {
       label: "Personal / Propietario",
-      href: `/organizations/${organizationId}/settings/staff`,
+      href: `/organizations/${organizationSlug}/settings/staff`,
       icon: Users,
     },
-  ], [organizationId]);
+  ], [organizationSlug]);
 
   return (
     <NavTabs
