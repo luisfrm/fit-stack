@@ -4,13 +4,15 @@
  */
 export const ORGANIZATION_ADDITIONAL_FIELDS = {
   slogan: { type: "string", required: false },
-  countryCode: { type: "string", required: false },
+  countryCode: { type: "string", required: true },
   taxId: { type: "string", required: false },
   legalName: { type: "string", required: false },
   address: { type: "string", required: false },
   fiscalConfig: { type: "string", required: false },
   status: { type: "string", required: false },
   timezone: { type: "string", required: true },
+  primaryCurrency: { type: "string", required: true },
+  currencyFormat: { type: "string", required: true },
 } as const;
 
 export type OrganizationAdditionalFields = typeof ORGANIZATION_ADDITIONAL_FIELDS;

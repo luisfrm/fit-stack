@@ -9,4 +9,5 @@ export * from './features/catalog';
 export * from './content';
 export * from './date';
 export * from './settings';
+export * from './defaults';
 

@@ -15,21 +15,25 @@ function currencyForCountry(countryCode?: string | null): string {
   return COUNTRIES[countryCode]?.currency ?? defaultCurrency;
 }
 
+/** Moneda principal derivada del país (usada como columna `organization.primary_currency` al crear). */
+export function primaryCurrencyForCountry(countryCode?: string | null): string {
+  return currencyForCountry(countryCode);
+}
+
 /** Active currencies: local + USD (sin duplicar si la local ya es USD). */
 function activeCurrenciesFor(primary: string, fallbacks: string[]): string {
   return JSON.stringify(Array.from(new Set([primary, ...fallbacks])));
 }
 
 /**
- * Defaults de settings de ORGANIZACIÓN (gym_setting). Se siembran al crear la org,
- * derivando la moneda principal del país de operación.
+ * Defaults de settings EXTENSIBLES de ORGANIZACIÓN (gym_setting). Se siembran
+ * al crear la org. Las keys obligatorias (primary_currency, currency_format,
+ * timezone) son columnas NOT NULL de `organization` — no viven aquí.
  */
 export function buildDefaultOrgSettings(countryCode?: string | null): Record<string, string> {
   const primary = currencyForCountry(countryCode);
   return {
-    primary_currency: primary,
     active_currencies: activeCurrenciesFor(primary, ['USD']),
-    currency_format: 'latam',
     active_payment_methods: '[]',
   };
 }
