@@ -11,7 +11,21 @@ import type {
 
 const ORGANIZATIONS_PATH = "/platform/organizations";
 
-export type PaginatedOrganizationsResult = IPaginatedResult<IPlatformOrganization>;
+export type PaginatedOrganizationsResult =
+  IPaginatedResult<IPlatformOrganization>;
+
+export interface OrgAiQuota {
+  monthly: { used: number; limit: number };
+  remaining: number | null;
+  disabled: boolean;
+  periodStart: string;
+}
+
+export interface OrgGymOverview {
+  totalMembers: number;
+  activeSubMembers: number;
+  portal: { used: number; limit: number; pending: number };
+}
 
 export interface AddSubscriptionPayload {
   planId: number;
@@ -53,7 +67,17 @@ export const organizationsService = {
   },
 
   /**
-   * Retrieves an organization by its ID.
+   * Reads the AI quota of an organization for the current cycle.
+   */
+  async getAiUsage(id: string, options?: ApiFetchOptions): Promise<OrgAiQuota> {
+    return await api<OrgAiQuota>(
+      `${ORGANIZATIONS_PATH}/${id}/ai-usage`,
+      options,
+    );
+  },
+
+  /**
+   * Retrieves an organization by its id.
    */
   async getById(
     id: string,
@@ -70,10 +94,24 @@ export const organizationsService = {
    */
   async getBySlug(
     slug: string,
+    params?: { includeMemberCount?: boolean },
     options?: ApiFetchOptions,
   ): Promise<IPlatformOrganization> {
     return await api<IPlatformOrganization>(
       `${ORGANIZATIONS_PATH}/by-slug/${slug}`,
+      { query: params, ...options },
+    );
+  },
+
+  /**
+   * Reads the gym adoption + portal seats of an organization (console analytics).
+   */
+  async getGymOverview(
+    id: string,
+    options?: ApiFetchOptions,
+  ): Promise<OrgGymOverview> {
+    return await api<OrgGymOverview>(
+      `${ORGANIZATIONS_PATH}/${id}/gym-overview`,
       options,
     );
   },
@@ -85,9 +123,12 @@ export const organizationsService = {
     slug: string,
     excludeId?: string,
   ): Promise<{ available: boolean }> {
-    return await api<{ available: boolean }>(`${ORGANIZATIONS_PATH}/check-slug`, {
-      query: { slug, ...(excludeId ? { excludeId } : {}) },
-    });
+    return await api<{ available: boolean }>(
+      `${ORGANIZATIONS_PATH}/check-slug`,
+      {
+        query: { slug, ...(excludeId ? { excludeId } : {}) },
+      },
+    );
   },
 
   /**
@@ -144,10 +185,13 @@ export const organizationsService = {
     data: IProvisionOwnerDTO,
     sendInvite: boolean = false,
   ): Promise<Record<string, unknown>> {
-    return await api<Record<string, unknown>>(`${ORGANIZATIONS_PATH}/${id}/staff`, {
-      method: "POST",
-      body: { ...data, sendInvite },
-    });
+    return await api<Record<string, unknown>>(
+      `${ORGANIZATIONS_PATH}/${id}/staff`,
+      {
+        method: "POST",
+        body: { ...data, sendInvite },
+      },
+    );
   },
 
   /**
@@ -160,10 +204,13 @@ export const organizationsService = {
   /**
    * Resends an invitation to a staff member of an organization.
    */
-  async resendStaffInvite(id: string, memberId: number): Promise<{ success: boolean; message?: string }> {
+  async resendStaffInvite(
+    id: string,
+    memberId: number,
+  ): Promise<{ success: boolean; message?: string }> {
     return await api<{ success: boolean; message?: string }>(
       `${ORGANIZATIONS_PATH}/${id}/staff/${memberId}/resend-invite`,
-      { method: "POST" }
+      { method: "POST" },
     );
   },
 
@@ -174,10 +221,22 @@ export const organizationsService = {
   async grantAiCredits(
     id: string,
     credits: number,
-  ): Promise<{ success: boolean; granted: number; monthly: { used: number; limit: number }; remaining: number | null; periodStart: string }> {
-    return await api<{ success: boolean; granted: number; monthly: { used: number; limit: number }; remaining: number | null; periodStart: string }>(
-      `${ORGANIZATIONS_PATH}/${id}/ai-credits`,
-      { method: "POST", body: { credits } },
-    );
+  ): Promise<{
+    success: boolean;
+    granted: number;
+    monthly: { used: number; limit: number };
+    remaining: number | null;
+    periodStart: string;
+  }> {
+    return await api<{
+      success: boolean;
+      granted: number;
+      monthly: { used: number; limit: number };
+      remaining: number | null;
+      periodStart: string;
+    }>(`${ORGANIZATIONS_PATH}/${id}/ai-credits`, {
+      method: "POST",
+      body: { credits },
+    });
   },
 };

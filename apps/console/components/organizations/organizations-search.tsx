@@ -41,6 +41,7 @@ export function OrganizationsSearch({
       />
       <input
         type="text"
+        data-testid="orgs-search"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Buscar por nombre o slug..."

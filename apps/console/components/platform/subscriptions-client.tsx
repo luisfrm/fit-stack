@@ -3,12 +3,13 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
-import { Button, Text } from "@workspace/ui/components";
+import { Button, Text, SimpleSelect } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@workspace/ui/lib/utils";
 import type { CurrencyFormat } from "@/lib/utils/value-converters";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
+import type { IPlatformPlan } from "@workspace/shared/types";
 
 interface SubscriptionsClientProps {
   readonly initialSubscriptions: SubscriptionWithDetails[];
@@ -19,13 +20,33 @@ interface SubscriptionsClientProps {
   readonly currencyFormat: CurrencyFormat;
   readonly initialQuery: string;
   readonly initialStatus: string | null;
+  readonly initialPlanId?: number | null;
+  readonly plans?: IPlatformPlan[];
+  readonly settings?: Record<string, string>;
+  readonly onRefresh?: () => Promise<void>;
 }
 
 const FILTER_OPTIONS = [
-  { id: "active", label: "Activas", className: "text-emerald-500 border-emerald-500/20 bg-emerald-500/5" },
-  { id: "trial", label: "Trial", className: "text-blue-500 border-blue-500/20 bg-blue-500/5" },
-  { id: "expiring", label: "Por Vencer", className: "text-orange-500 border-orange-500/20 bg-orange-500/5" },
-  { id: "suspended", label: "Suspendidas", className: "text-red-500 border-red-500/20 bg-red-500/5" },
+  {
+    id: "active",
+    label: "Activas",
+    className: "text-emerald-500 border-emerald-500/20 bg-emerald-500/5",
+  },
+  {
+    id: "trial",
+    label: "Trial",
+    className: "text-blue-500 border-blue-500/20 bg-blue-500/5",
+  },
+  {
+    id: "expiring",
+    label: "Por Vencer",
+    className: "text-orange-500 border-orange-500/20 bg-orange-500/5",
+  },
+  {
+    id: "suspended",
+    label: "Suspendidas",
+    className: "text-red-500 border-red-500/20 bg-red-500/5",
+  },
 ] as const;
 
 export function SubscriptionsClient({
@@ -37,12 +58,18 @@ export function SubscriptionsClient({
   currencyFormat,
   initialQuery,
   initialStatus,
+  initialPlanId = null,
+  plans = [],
+  settings,
+  onRefresh,
 }: SubscriptionsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
   const debouncedSearch = useDebounce(searchTerm, 500);
-  const [activeFilter, setActiveFilter] = React.useState<string | null>(initialStatus);
+  const [activeFilter, setActiveFilter] = React.useState<string | null>(
+    initialStatus,
+  );
 
   React.useEffect(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -76,7 +103,18 @@ export function SubscriptionsClient({
     router.push(`/subscriptions?${params.toString()}`);
   };
 
-  const refresh = () => router.refresh();
+  const setPlanFilter = (planId: number | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (planId) params.set("planId", planId.toString());
+    else params.delete("planId");
+    params.set("page", "1");
+    router.push(`/subscriptions?${params.toString()}`);
+  };
+
+  const handleChanged = async () => {
+    await onRefresh?.();
+    router.refresh();
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -89,6 +127,7 @@ export function SubscriptionsClient({
             />
             <input
               type="text"
+              data-testid="subs-search"
               placeholder="Buscar por organización o plan..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -104,11 +143,11 @@ export function SubscriptionsClient({
                 variant={activeFilter === btn.id ? "primary" : "glass"}
                 className={cn(
                   "cursor-pointer font-medium transition-all normal-case tracking-normal",
-                  activeFilter === btn.id
-                    ? "border-primary"
-                    : btn.className,
+                  activeFilter === btn.id ? "border-primary" : btn.className,
                 )}
-                onClick={() => setStatusFilter(activeFilter === btn.id ? null : btn.id)}
+                onClick={() =>
+                  setStatusFilter(activeFilter === btn.id ? null : btn.id)
+                }
               >
                 {btn.label}
               </Button>
@@ -124,20 +163,53 @@ export function SubscriptionsClient({
               </Button>
             )}
           </div>
+
+          {plans.length > 0 && (
+            <div className="flex items-center gap-1 shrink-0">
+              <div className="w-48">
+                <SimpleSelect
+                  className="subs-plan-filter"
+                  value={initialPlanId ? initialPlanId.toString() : ""}
+                  onChange={(value) =>
+                    setPlanFilter(value ? Number(value) : null)
+                  }
+                  options={plans.map((plan) => ({
+                    value: plan.id.toString(),
+                    label: plan.name,
+                  }))}
+                  placeholder="Todos los planes"
+                />
+              </div>
+              {initialPlanId && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full shrink-0"
+                  onClick={() => setPlanFilter(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      <SubscriptionsTable
-        subscriptions={initialSubscriptions}
-        currencyFormat={currencyFormat}
-        pagination={{
-          page,
-          totalPages: initialTotalPages,
-          total: initialTotal,
-          limit,
-          onPageChange: setPage,
-        }}
-      />
+      <div data-testid="subs-table">
+        <SubscriptionsTable
+          subscriptions={initialSubscriptions}
+          currencyFormat={currencyFormat}
+          settings={settings}
+          pagination={{
+            page,
+            totalPages: initialTotalPages,
+            total: initialTotal,
+            limit,
+            onPageChange: setPage,
+          }}
+          onChange={handleChanged}
+        />
+      </div>
     </div>
   );
 }

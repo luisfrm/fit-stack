@@ -23,12 +23,12 @@ function FeatureDiffRow({
   planValue,
   freeValue,
   alwaysOn,
-}: {
+}: Readonly<{
   label: string;
   planValue?: { enabled: boolean; limits?: Record<string, number> };
   freeValue?: { enabled: boolean; limits?: Record<string, number> };
   alwaysOn?: boolean;
-}) {
+}>) {
   const planLimits = formatFeatureLimits(planValue);
   const freeLimits = formatFeatureLimits(freeValue);
   return (
@@ -80,7 +80,7 @@ export function OrgFeaturesInspector({
           <div className="min-w-0">
             <div className="text-sm font-bold tracking-tight">Features efectivas</div>
             <div className="text-[11px] font-medium text-foreground-muted truncate">
-              {organizationName ? organizationName : "Comparativa"} · Plan vs Gratis {isFreeTierFallback && "· Free Tier activo"}
+              {organizationName || "Comparativa"} · Plan vs Gratis {isFreeTierFallback && "· Free Tier activo"}
             </div>
           </div>
         </div>

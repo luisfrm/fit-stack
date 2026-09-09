@@ -7,12 +7,8 @@ import { Text } from "@workspace/ui/components";
 import { COUNTRIES } from "@workspace/shared/constants";
 import type { IPlatformOrganization } from "@workspace/shared/types";
 import { DASHBOARD_WIDGET_PAGE_SIZE } from "@/lib/dashboard/selectors";
-import {
-  formatShortDate,
-  OrgAvatar,
-  WidgetCard,
-  WidgetEmpty,
-} from "./dashboard-widget-card";
+import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
+import { formatShortDate } from "@/lib/utils/value-converters";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 export function NewOrgsWidget({
@@ -55,7 +51,7 @@ export function NewOrgsWidget({
           <Link
             key={org.id}
             id={`dashboard-new-orgs-row-${org.id}`}
-            href={`/organizations/${org.slug ?? org.id}/subscriptions`}
+            href={`/organizations/${org.slug ?? org.id}`}
             title={`Ver ${org.name}`}
             className="flex items-center gap-3 py-3 border-b border-white/5 last:border-b-0 transition-colors hover:bg-white/[0.03]"
           >
@@ -71,7 +67,11 @@ export function NewOrgsWidget({
                 · alta {org.createdAt ? formatShortDate(org.createdAt) : "—"}
               </Text>
             </div>
-            <ChevronRight size={14} className="text-foreground/50 shrink-0" aria-hidden />
+            <ChevronRight
+              size={14}
+              className="text-foreground/50 shrink-0"
+              aria-hidden
+            />
           </Link>
         ))
       )}

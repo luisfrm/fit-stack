@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { updateTag } from "next/cache";
-import { PlatformGeneralSettings } from "./general-settings";
+import { PlatformGeneralSettings } from "@/components/settings/general/general-settings";
 
 export const dynamic = "force-dynamic";
 

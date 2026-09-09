@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   type ColumnDef,
@@ -20,7 +20,16 @@ import { SubscriptionStatusBadge } from "./subscription-status-badge";
 import { PlatformPaymentHistoryModal } from "./platform-payment-history-modal";
 import { CancelSubscriptionModal } from "./cancel-subscription-modal";
 import { ExtendSubscriptionModal } from "./extend-subscription-modal";
+import { DeleteSubscriptionModal } from "./delete-subscription-modal";
+import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
+import { formatCents } from "@/lib/utils/value-converters";
+import {
+  canManageBilling,
+  hasActiveSubscription,
+} from "@/lib/platform-permissions";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { mutationError } from "@/lib/errors";
 import {
   Trash2,
   Calendar,
@@ -30,7 +39,7 @@ import {
   CreditCard,
   History,
 } from "lucide-react";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { type CurrencyFormat } from "@/lib/utils/value-converters";
 
 interface SubscriptionsTableProps {
   subscriptions: SubscriptionWithDetails[];
@@ -44,6 +53,9 @@ interface SubscriptionsTableProps {
   };
   currencyFormat?: CurrencyFormat;
   onChange?: () => void;
+  settings?: Record<string, string>;
+  /** Enlaza el nombre de la org a su perfil. Desactivar en la propia página de detalle. */
+  linkOrganization?: boolean;
 }
 
 function formatDate(date: string | Date) {
@@ -54,8 +66,25 @@ function formatDate(date: string | Date) {
   });
 }
 
-function formatCurrency(amount: number, currency: string, currencyFormat: CurrencyFormat) {
-  return ValueConverter.format(amount, currency, currencyFormat);
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-white/5 py-2.5 last:border-b-0">
+      <Text
+        size="xs"
+        variant="muted"
+        className="uppercase tracking-widest font-bold shrink-0"
+      >
+        {label}
+      </Text>
+      <div className="text-right min-w-0">{children}</div>
+    </div>
+  );
 }
 
 export function SubscriptionsTable({
@@ -64,23 +93,43 @@ export function SubscriptionsTable({
   pagination,
   currencyFormat = "latam",
   onChange,
+  settings,
+  linkOrganization = true,
 }: SubscriptionsTableProps) {
-  const router = useRouter();
-  const [detailModal, setDetailModal] = React.useState<SubscriptionWithDetails | null>(null);
-  const [cancelModal, setCancelModal] = React.useState<SubscriptionWithDetails | null>(null);
-  const [extendModal, setExtendModal] = React.useState<SubscriptionWithDetails | null>(null);
-  const [historyModal, setHistoryModal] = React.useState<SubscriptionWithDetails | null>(null);
+  const { user } = useAuth();
+  const canMutateBilling = canManageBilling(user?.role);
+  const [detailModal, setDetailModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
+  const [cancelModal, setCancelModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
+  const [extendModal, setExtendModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
+  const [deleteModal, setDeleteModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
+  const [paymentModal, setPaymentModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
+  const [historyModal, setHistoryModal] =
+    React.useState<SubscriptionWithDetails | null>(null);
   const [actionLoading, setActionLoading] = React.useState(false);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de eliminar esta suscripción?")) return;
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setActionLoading(true);
     try {
-      await platformSubscriptionsService.delete(id);
+      await platformSubscriptionsService.delete(deleteModal.id);
       toast.success("Suscripción eliminada");
+      setDeleteModal(null);
       onChange?.();
-    } catch (error: any) {
-      console.error("Error deleting subscription:", error);
-      toast.error("Error al eliminar");
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "SubscriptionsTable",
+          err,
+          "No se pudo eliminar la suscripción",
+        ),
+      );
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -92,9 +141,14 @@ export function SubscriptionsTable({
       toast.success("Suscripción cancelada");
       setCancelModal(null);
       onChange?.();
-    } catch (error: any) {
-      console.error("Error cancelling subscription:", error);
-      toast.error("Error al cancelar");
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "SubscriptionsTable",
+          err,
+          "No se pudo cancelar la suscripción",
+        ),
+      );
     } finally {
       setActionLoading(false);
     }
@@ -108,9 +162,14 @@ export function SubscriptionsTable({
       toast.success("Periodo extendido");
       setExtendModal(null);
       onChange?.();
-    } catch (error: any) {
-      console.error("Error extending subscription:", error);
-      toast.error("Error al extender");
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "SubscriptionsTable",
+          err,
+          "No se pudo extender el periodo",
+        ),
+      );
     } finally {
       setActionLoading(false);
     }
@@ -121,39 +180,60 @@ export function SubscriptionsTable({
       header: "Organización",
       className: "pl-6",
       headerClassName: "pl-6",
-      cell: (sub) => (
-        <button
-          onClick={() => router.push(`/organizations/${sub.organizationSlug ?? sub.organizationId}/subscriptions`)}
-          className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
-        >
-          <Text weight="bold" className="text-foreground hover:text-primary transition-colors leading-tight">
-            {sub.organizationName || sub.organizationId}
-          </Text>
-          {sub.organizationId && (
-            <Text size="xs" variant="muted" className="opacity-50 font-mono">
-              {sub.organizationId}
+      cell: (sub) => {
+        const name = (
+          <>
+            <Text
+              weight="bold"
+              className="text-foreground hover:text-primary transition-colors leading-tight"
+            >
+              {sub.organizationName || sub.organizationId}
             </Text>
-          )}
-        </button>
-      ),
+            {sub.organizationId && (
+              <Text size="xs" variant="muted" className="opacity-50 font-mono">
+                {sub.organizationId}
+              </Text>
+            )}
+          </>
+        );
+        if (!linkOrganization) {
+          return <div className="flex flex-col gap-0.5 text-left">{name}</div>;
+        }
+        return (
+          <Link
+            href={`/organizations/${sub.organizationSlug ?? sub.organizationId}`}
+            className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
+          >
+            {name}
+          </Link>
+        );
+      },
     },
     {
       header: "Plan",
       cell: (sub) => (
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <Text as="span" size="sm" className="uppercase font-bold tracking-widest text-primary leading-tight">
+            <Text
+              as="span"
+              size="sm"
+              className="uppercase font-bold tracking-widest text-primary leading-tight"
+            >
               {sub.planName ?? "—"}
             </Text>
             {sub.isTrial && (
-              <Badge variant="info" size="sm" className="uppercase font-bold tracking-widest">
+              <Badge
+                variant="info"
+                size="sm"
+                className="uppercase font-bold tracking-widest"
+              >
                 Trial
               </Badge>
             )}
           </div>
           {sub.planPrice !== undefined && sub.planCurrency && (
-            <Text size="xs" variant="muted" className="opacity-60">
-              {formatCurrency(sub.planPrice, sub.planCurrency, currencyFormat)}
+            <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
+              {formatCents(sub.planPrice, sub.planCurrency, currencyFormat)}
             </Text>
           )}
         </div>
@@ -180,8 +260,13 @@ export function SubscriptionsTable({
       cell: (sub) => (
         <div className="flex flex-col gap-1">
           <SubscriptionStatusBadge status={sub.status} />
-          {(sub.latestPaymentStatus === "pending" || sub.latestPaymentStatus === "processing") && (
-            <Badge variant="warning" size="sm" className="uppercase tracking-widest text-[9px] w-fit">
+          {(sub.latestPaymentStatus === "pending" ||
+            sub.latestPaymentStatus === "processing") && (
+            <Badge
+              variant="warning"
+              size="sm"
+              className="uppercase tracking-widest text-[9px] w-fit"
+            >
               Pago pendiente
             </Badge>
           )}
@@ -191,13 +276,18 @@ export function SubscriptionsTable({
     {
       header: "Precio",
       cell: (sub) => (
-        <PriceCell
-          isTrial={sub.isTrial}
-          priceOverride={sub.priceOverride}
-          planPrice={sub.planPrice}
-          planCurrency={sub.planCurrency}
-          currencyFormat={currencyFormat}
-        />
+        <div className="flex flex-col gap-0.5">
+          <PriceCell
+            isTrial={sub.isTrial}
+            priceOverride={sub.priceOverride}
+            planPrice={sub.planPrice}
+            planCurrency={sub.planCurrency}
+            currencyFormat={currencyFormat}
+          />
+          <Text size="xs" variant="muted" className="opacity-50 tabular-nums">
+            {sub.paymentsCount ?? 0} pago(s)
+          </Text>
+        </div>
       ),
     },
     {
@@ -205,18 +295,22 @@ export function SubscriptionsTable({
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
       cell: (sub) => (
-        <div className="flex justify-end gap-1">
+        <div
+          className="flex justify-end gap-1"
+          data-testid={`subs-row-${sub.id}`}
+        >
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setDetailModal(sub)}
-            className="h-8 w-8"
+            className="h-8 w-8 subs-row-detail"
             title="Ver detalle"
           >
             <ExternalLink size={14} className="text-foreground/50" />
           </Button>
           <ActionsDropdown
             modalData={sub}
+            className="subs-row-menu"
             sections={[
               {
                 label: "Gestión de Suscripción",
@@ -231,18 +325,21 @@ export function SubscriptionsTable({
                     label: "Registrar Pago",
                     icon: <CreditCard size={14} />,
                     variant: "default",
-                    onClick: () => router.push(`/organizations/${sub.organizationSlug ?? sub.organizationId}/subscriptions?addPayment=${sub.id}`),
+                    show: canMutateBilling && hasActiveSubscription(sub),
+                    onClick: () => setPaymentModal(sub),
                   },
                   {
                     label: "Extender Periodo",
                     icon: <CalendarPlus size={14} />,
                     variant: "default",
+                    show: canMutateBilling && hasActiveSubscription(sub),
                     onClick: () => setExtendModal(sub),
                   },
                   {
                     label: "Cancelar Suscripción",
                     icon: <XCircle size={14} />,
                     variant: "destructive",
+                    show: canMutateBilling && hasActiveSubscription(sub),
                     onClick: () => setCancelModal(sub),
                   },
                 ],
@@ -254,7 +351,8 @@ export function SubscriptionsTable({
                     label: "Eliminar Registro",
                     icon: <Trash2 size={14} />,
                     variant: "destructive",
-                    onClick: () => handleDelete(sub.id),
+                    show: canMutateBilling,
+                    onClick: () => setDeleteModal(sub),
                   },
                 ],
               },
@@ -271,71 +369,80 @@ export function SubscriptionsTable({
         data={subscriptions}
         columns={columns}
         loading={loading}
-        emptyState={<Text className="text-center py-8 text-foreground-dim">No hay suscripciones registradas.</Text>}
+        emptyState={
+          <Text className="text-center py-8 text-foreground-dim">
+            No hay suscripciones registradas.
+          </Text>
+        }
         pagination={pagination}
       />
-
       {detailModal && (
         <Modal
           open={!!detailModal}
           onOpenChange={() => setDetailModal(null)}
           trigger={null}
           title={`Suscripción: ${detailModal.organizationName || detailModal.organizationId}`}
-          className="max-w-lg"
+          className="max-w-lg subs-detail-modal"
+          footer={
+            <Button variant="outlined" onClick={() => setDetailModal(null)}>
+              Cerrar
+            </Button>
+          }
         >
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Plan</Text>
+          <div className="flex flex-col">
+            <DetailRow label="Plan">
+              <div className="flex items-center justify-end gap-2">
                 <Text weight="bold">{detailModal.planName ?? "—"}</Text>
+                {detailModal.isTrial && (
+                  <Badge
+                    variant="info"
+                    size="sm"
+                    className="uppercase font-bold tracking-widest"
+                  >
+                    Trial
+                  </Badge>
+                )}
               </div>
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Status</Text>
-                <SubscriptionStatusBadge status={detailModal.status} />
-              </div>
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Inicio</Text>
-                <Text>{formatDate(detailModal.startDate)}</Text>
-              </div>
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Fin</Text>
-                <Text>{formatDate(detailModal.currentPeriodEnd)}</Text>
-              </div>
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Precio</Text>
-                <Text weight="bold">
-                  {detailModal.isTrial
-                    ? "Gratuito"
-                    : formatCurrency(
-                        (detailModal.priceOverride ?? detailModal.planPrice ?? 0) / 100,
-                        detailModal.planCurrency ?? "USD",
-                        currencyFormat
-                      )}
-                </Text>
-              </div>
-              <div className="space-y-1">
-                <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Trial</Text>
-                <Text>{detailModal.isTrial ? "Sí" : "No"}</Text>
-              </div>
-              {detailModal.cancellationReason && (
-                <div className="space-y-1 col-span-2">
-                  <Text size="xs" variant="muted" className="uppercase tracking-widest font-bold">Motivo cancelación</Text>
-                  <Text>{detailModal.cancellationReason}</Text>
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <Button variant="outlined" onClick={() => setDetailModal(null)}>Cerrar</Button>
-            </div>
+            </DetailRow>
+            <DetailRow label="Status">
+              <SubscriptionStatusBadge status={detailModal.status} />
+            </DetailRow>
+            <DetailRow label="Periodo">
+              <Text className="tabular-nums">
+                {formatDate(detailModal.startDate)} →{" "}
+                {formatDate(detailModal.currentPeriodEnd)}
+              </Text>
+            </DetailRow>
+            <DetailRow label="Precio">
+              <Text weight="bold">
+                {detailModal.isTrial
+                  ? "Gratuito"
+                  : formatCents(
+                      detailModal.priceOverride ?? detailModal.planPrice ?? 0,
+                      detailModal.planCurrency ?? "USD",
+                      currencyFormat,
+                    )}
+              </Text>
+            </DetailRow>
+            <DetailRow label="Pagos">
+              <Text className="tabular-nums">
+                {detailModal.paymentsCount ?? 0} registrado(s)
+              </Text>
+            </DetailRow>
+            {detailModal.cancellationReason && (
+              <DetailRow label="Motivo cancelación">
+                <Text>{detailModal.cancellationReason}</Text>
+              </DetailRow>
+            )}
           </div>
         </Modal>
       )}
-
       <CancelSubscriptionModal
         open={!!cancelModal}
         onOpenChange={(open) => !open && setCancelModal(null)}
         onConfirm={handleCancel}
         isLoading={actionLoading}
+        className="subs-cancel-modal"
       />
 
       <ExtendSubscriptionModal
@@ -344,14 +451,40 @@ export function SubscriptionsTable({
         currentPeriodEnd={extendModal?.currentPeriodEnd ?? new Date()}
         onConfirm={handleExtend}
         isLoading={actionLoading}
+        className="subs-extend-modal"
       />
+
+      <DeleteSubscriptionModal
+        subscription={deleteModal}
+        open={!!deleteModal}
+        onOpenChange={(open) => !open && setDeleteModal(null)}
+        onConfirm={handleDelete}
+        isLoading={actionLoading}
+        className="subs-delete-modal"
+      />
+
+      {paymentModal && (
+        <PlatformPaymentModal
+          subscription={paymentModal}
+          open={!!paymentModal}
+          onOpenChange={(open) => !open && setPaymentModal(null)}
+          onSuccess={onChange}
+          settings={settings}
+        />
+      )}
 
       {historyModal && (
         <PlatformPaymentHistoryModal
           open={!!historyModal}
           onOpenChange={() => setHistoryModal(null)}
+          className="subs-history-modal"
           subscriptionId={historyModal.id}
           subscriptionLabel={`${historyModal.organizationName || historyModal.organizationId} - ${historyModal.planName ?? ""}`}
+          canRegister={canMutateBilling && hasActiveSubscription(historyModal)}
+          onRegisterPayment={() => {
+            setHistoryModal(null);
+            setPaymentModal(historyModal);
+          }}
           onChange={onChange}
         />
       )}

@@ -3,14 +3,6 @@ import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { Badge, Button, Card, Text } from "@workspace/ui/components";
 
-export function formatShortDate(value: string | Date): string {
-  return new Date(value).toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export function OrgAvatar({ name }: { readonly name: string }) {
   return (
     <div

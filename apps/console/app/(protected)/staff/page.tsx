@@ -5,7 +5,7 @@ import { updateTag } from "next/cache";
 import { staffService } from "@/lib/services/staff-service";
 import { StaffModal } from "@/components/staff/staff-modal";
 import { StaffSidePanel } from "@/components/staff/staff-side-panel";
-import { StaffClient } from "./staff-client";
+import { StaffClient } from "@/components/staff/staff-client";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,8 @@ export default async function StaffPage({
   searchParams: Promise<{ role?: string; search?: string }>;
 }>) {
   const params = await searchParams;
-  const role = params.role && STAFF_ROLES.has(params.role)
-    ? params.role
-    : undefined;
+  const role =
+    params.role && STAFF_ROLES.has(params.role) ? params.role : undefined;
   const search = params.search || undefined;
 
   // Tabla filtrada + panel lateral con el equipo completo (conteos globales).

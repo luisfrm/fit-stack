@@ -6,12 +6,8 @@ import { ChevronRight } from "lucide-react";
 import { Badge, Text } from "@workspace/ui/components";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 import { DASHBOARD_WIDGET_PAGE_SIZE } from "@/lib/dashboard/selectors";
-import {
-  formatShortDate,
-  OrgAvatar,
-  WidgetCard,
-  WidgetEmpty,
-} from "./dashboard-widget-card";
+import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
+import { formatShortDate } from "@/lib/utils/value-converters";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 export function PaymentsReviewWidget({
@@ -37,7 +33,7 @@ export function PaymentsReviewWidget({
       title="Pagos en revisión"
       count={subs.length}
       description="Pagos recibidos pendientes de validación por soporte."
-      viewAllHref="/subscriptions"
+      viewAllHref=""
       footer={
         <WidgetPagination
           id="dashboard-payments-review-pagination"
@@ -54,7 +50,7 @@ export function PaymentsReviewWidget({
           <Link
             key={sub.id}
             id={`dashboard-payments-review-row-${sub.id}`}
-            href={`/organizations/${sub.organizationSlug ?? sub.organizationId}/subscriptions`}
+            href={`/organizations/${sub.organizationSlug ?? sub.organizationId}`}
             title={`Revisar pago de ${sub.organizationName || sub.organizationId}`}
             className="flex items-center gap-3 py-3 border-b border-white/5 last:border-b-0 transition-colors hover:bg-white/[0.03]"
           >
@@ -74,7 +70,11 @@ export function PaymentsReviewWidget({
             >
               En revisión
             </Badge>
-            <ChevronRight size={14} className="text-foreground/50 shrink-0" aria-hidden />
+            <ChevronRight
+              size={14}
+              className="text-foreground/50 shrink-0"
+              aria-hidden
+            />
           </Link>
         ))
       )}

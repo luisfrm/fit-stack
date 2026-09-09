@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { updateTag } from "next/cache";
-import { PlatformPaymentMethodsSettings } from "./payment-methods-settings";
+import { PlatformPaymentMethodsSettings } from "@/components/settings/payment-methods/payment-methods-settings";
 
 export const dynamic = "force-dynamic";
 
