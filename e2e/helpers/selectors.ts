@@ -9,24 +9,24 @@
 export const SELECTORS = {
   // Login page
   login: {
-    emailInput: '#email',
-    passwordInput: '#password',
+    emailInput: "#email",
+    passwordInput: "#password",
     submitButton: 'button[type="submit"]',
-    rememberCheckbox: '#remember',
+    rememberCheckbox: "#remember",
     errorMessage: '[role="alert"]',
   },
 
   // Dashboard
   dashboard: {
     kpiCards: '[data-testid="kpi-card"], .kpi-card',
-    statsSection: 'text=Miembros Totales',
-    todayClasses: 'text=Clases de Hoy',
-    recentRegistrations: 'text=Registros Recientes',
+    statsSection: "text=Miembros Totales",
+    todayClasses: "text=Clases de Hoy",
+    recentRegistrations: "text=Registros Recientes",
   },
 
   // Sidebar navigation
   sidebar: {
-    nav: 'nav',
+    nav: "nav",
     membersLink: 'a[href="/members"]',
     staffLink: 'a[href="/staff"]',
     trainersLink: 'a[href="/trainers"]',
@@ -41,16 +41,19 @@ export const SELECTORS = {
 
   // Common UI patterns
   common: {
-    searchInput: 'input[placeholder*="Buscar"], input[placeholder*="buscar"], input[type="search"]',
-    addButton: 'button:has-text("Agregar"), button:has-text("Nuevo"), button:has-text("Crear")',
+    searchInput:
+      'input[placeholder*="Buscar"], input[placeholder*="buscar"], input[type="search"]',
+    addButton:
+      'button:has-text("Agregar"), button:has-text("Nuevo"), button:has-text("Crear")',
     modal: 'dialog, [role="dialog"]',
-    modalClose: 'dialog button[aria-label="Cerrar"], [role="dialog"] button[aria-label="Cerrar"], dialog button:has-text("Cancelar"), [role="dialog"] button:has-text("Cancelar")',
+    modalClose:
+      'dialog button[aria-label="Cerrar"], [role="dialog"] button[aria-label="Cerrar"], dialog button:has-text("Cancelar"), [role="dialog"] button:has-text("Cancelar")',
     toast: '[role="status"], .sonner-toast',
-    toastSuccess: 'text=éxito, text=creado, text=guardado, text=eliminado',
+    toastSuccess: "text=éxito, text=creado, text=guardado, text=eliminado",
     table: 'table, [role="grid"]',
     tableRows: 'table tbody tr, [role="grid"] [role="row"]',
     pagination: 'nav[aria-label*="pagination"], nav[aria-label*="paginación"]',
-    emptyState: 'text=No hay, text=Sin resultados, text=No se encontraron',
+    emptyState: "text=No hay, text=Sin resultados, text=No se encontraron",
     loadingSpinner: '[role="status"][aria-label*="loading"], .animate-spin',
     saveButton: 'button:has-text("Guardar")',
     deleteButton: 'button:has-text("Eliminar"), button:has-text("Borrar")',
@@ -60,8 +63,9 @@ export const SELECTORS = {
 
   // Members page
   members: {
-    pageContainer: 'text=Miembros',
-    createButton: 'button:has-text("Agregar Miembro"), button:has-text("Nuevo Miembro")',
+    pageContainer: "text=Miembros",
+    createButton:
+      'button:has-text("Agregar Miembro"), button:has-text("Nuevo Miembro")',
     firstNameInput: 'input[name="firstName"], #firstName',
     lastNameInput: 'input[name="lastName"], #lastName',
     emailInput: 'input[name="email"], #email',
@@ -71,8 +75,9 @@ export const SELECTORS = {
 
   // Plans / Memberships page
   plans: {
-    pageContainer: 'text=Membresías, text=Planes',
-    createButton: 'button:has-text("Crear Plan"), button:has-text("Nuevo Plan")',
+    pageContainer: "text=Membresías, text=Planes",
+    createButton:
+      'button:has-text("Crear Plan"), button:has-text("Nuevo Plan")',
     nameInput: 'input[name="name"], #name',
     priceInput: 'input[name="price"], #price',
     durationSelect: 'select[name="durationUnit"], #durationUnit',
@@ -80,8 +85,9 @@ export const SELECTORS = {
 
   // Subscriptions / Payments page
   subscriptions: {
-    pageContainer: 'text=Pagos, text=Suscripciones',
-    createButton: 'button:has-text("Nueva Suscripción"), button:has-text("Crear Suscripción")',
+    pageContainer: "text=Pagos, text=Suscripciones",
+    createButton:
+      'button:has-text("Nueva Suscripción"), button:has-text("Crear Suscripción")',
     memberSelect: 'select[name="memberId"], #memberId',
     planSelect: 'select[name="planId"], #planId',
     statusFilter: 'select[name="status"], [data-testid="status-filter"]',
@@ -89,8 +95,9 @@ export const SELECTORS = {
 
   // Classes page
   classes: {
-    pageContainer: 'text=Clases',
-    createButton: 'button:has-text("Crear Clase"), button:has-text("Nueva Clase")',
+    pageContainer: "text=Clases",
+    createButton:
+      'button:has-text("Crear Clase"), button:has-text("Nueva Clase")',
     nameInput: 'input[name="name"], #name',
     daySelect: 'select[name="dayOfWeek"], #dayOfWeek',
     startTimeInput: 'input[name="startTime"], #startTime',
@@ -99,7 +106,7 @@ export const SELECTORS = {
 
   // Settings page
   settings: {
-    pageContainer: 'text=Configuración',
+    pageContainer: "text=Configuración",
     generalTab: 'a[href="/settings/general"]',
     organizationTab: 'a[href="/settings/organization"]',
     currenciesTab: 'a[href="/settings/currencies"]',
@@ -110,11 +117,13 @@ export const SELECTORS = {
 
   // Content / CMS page
   content: {
-    pageContainer: 'text=Contenido, text=Páginas',
-    createButton: 'button:has-text("Crear Página"), button:has-text("Nueva Página")',
+    pageContainer: "text=Contenido, text=Páginas",
+    createButton:
+      'button:has-text("Crear Página"), button:has-text("Nueva Página")',
     titleInput: 'input[name="title"], #title',
     slugInput: 'input[name="slug"], #slug',
-    addBlockButton: 'button:has-text("Agregar Bloque"), button:has-text("Nuevo Bloque")',
+    addBlockButton:
+      'button:has-text("Agregar Bloque"), button:has-text("Nuevo Bloque")',
   },
 
   // Console-specific
@@ -124,6 +133,58 @@ export const SELECTORS = {
     plansLink: 'a[href="/plans"]',
     staffLink: 'a[href="/staff"]',
     settingsLink: 'a[href="/settings"]',
-    newOrgButton: 'button:has-text("Nueva Organización"), button:has-text("Crear Organización")',
+    newOrgButton:
+      'button:has-text("Nueva Organización"), button:has-text("Crear Organización")',
+  },
+
+  // Console — subscriptions (unique → data-testid, repeated → class)
+  consoleSubscriptions: {
+    table: '[data-testid="subs-table"]',
+    search: '[data-testid="subs-search"]',
+    kpiMrr: '[data-testid="subs-kpi-mrr"]',
+    kpiMonth: '[data-testid="subs-kpi-month"]',
+    kpiPrev: '[data-testid="subs-kpi-prev"]',
+    panelExpiring: '[data-testid="subs-panel-expiring"]',
+    panelRevenue: '[data-testid="subs-panel-revenue"]',
+    panelPlans: '[data-testid="subs-panel-plans"]',
+    panelMethods: '[data-testid="subs-panel-methods"]',
+    planFilter: ".subs-plan-filter",
+    rowMenu: ".subs-row-menu",
+    rowDetail: ".subs-row-detail",
+    row: (id: string | number) => `[data-testid="subs-row-${id}"]`,
+    paymentModal: ".subs-payment-modal",
+    deleteModal: ".subs-delete-modal",
+    cancelModal: ".subs-cancel-modal",
+    extendModal: ".subs-extend-modal",
+    historyModal: ".subs-history-modal",
+    detailModal: ".subs-detail-modal",
+  },
+
+  // Console — organization detail profile
+  consoleOrgDetail: {
+    backButton: 'button:has-text("Volver")',
+    planCard: '[data-testid="org-profile-plan"]',
+    membersCard: '[data-testid="org-profile-members"]',
+    adoptionCard: '[data-testid="org-profile-adoption"]',
+    billingCard: '[data-testid="org-profile-billing"]',
+    subsTable: '[data-testid="org-subs-table"]',
+  },
+
+  // Console — organizations (unique → data-testid, repeated → class)
+  consoleOrganizations: {
+    table: '[data-testid="orgs-table"]',
+    cards: '[data-testid="orgs-cards"]',
+    search: '[data-testid="orgs-search"]',
+    kpiTotal: '[data-testid="orgs-kpi-total"]',
+    kpiNew: '[data-testid="orgs-kpi-new"]',
+    kpiActive: '[data-testid="orgs-kpi-active"]',
+    kpiNone: '[data-testid="orgs-kpi-none"]',
+    countryFilter: ".orgs-country-filter",
+    statusFilter: ".orgs-status-filter",
+    rowMenu: ".org-row-menu",
+    mobileCard: ".org-mobile-card",
+    row: (id: string | number) => `[data-testid="org-row-${id}"]`,
+    health: (id: string | number) => `[data-testid="org-health-${id}"]`,
+    aiUsage: (id: string | number) => `[data-testid="org-ai-${id}"]`,
   },
 } as const;
