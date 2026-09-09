@@ -44,6 +44,12 @@ export interface SeatsResult {
   pending: number;
 }
 
+export interface GymOverviewResult {
+  totalMembers: number;
+  activeSubMembers: number;
+  portal: SeatsResult;
+}
+
 /** Aplana los límites de todas las features habilitadas a un Record plano. */
 function flattenLimits(features: PlanFeaturesV2): Record<string, number> {
   const limits: Record<string, number> = {};
@@ -85,7 +91,7 @@ export function createFeaturesService(
   async function getCreditPeriodStart(orgId: string): Promise<Date> {
     const sub = await subsRepo.findActiveByOrganization(orgId);
     if (sub) {
-      const status = sub.computedStatus;
+      const status = sub.status;
       const isActiveBilling =
         status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
         status === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
@@ -120,7 +126,7 @@ export function createFeaturesService(
     let planName: string | undefined;
 
     if (sub) {
-      subscriptionStatus = sub.computedStatus;
+      subscriptionStatus = sub.status;
       const isActiveBilling =
         subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
         subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
@@ -186,6 +192,14 @@ export function createFeaturesService(
     getAiQuota,
     getSeatsUsage,
     getCreditPeriodStart,
+
+    async getGymOverview(orgId: string): Promise<GymOverviewResult> {
+      const [adoption, portal] = await Promise.all([
+        featuresRepo.getGymAdoption(orgId),
+        getSeatsUsage(orgId),
+      ]);
+      return { ...adoption, portal };
+    },
 
     async consumeAiCredits(
       orgId: string,

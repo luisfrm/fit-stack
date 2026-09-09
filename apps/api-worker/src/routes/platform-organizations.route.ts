@@ -106,10 +106,11 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // GET /api/platform/organizations/by-slug/:slug
   .get('/by-slug/:slug', requirePlatformAuth(), async (c) => {
     const slug = c.req.param('slug');
+    const includeMemberCount = c.req.query('includeMemberCount') === 'true';
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
-    const org = await service.findOrganizationBySlug(slug);
+    const org = await service.findOrganizationBySlug(slug, { includeMemberCount });
     if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
     return c.json(org);
   })
@@ -208,6 +209,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
       // Bonus no está en cache de features, pero invalidamos por si la UI lo deriva de ahí
       await cache.invalidateExact(`org:${orgId}:features`);
+      await cache.invalidateExact(`platform:ai-usage:${orgId}`);
 
       return c.json({
         success: true,
@@ -218,6 +220,65 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       });
     },
   )
+
+  // GET /api/platform/organizations/:id/ai-usage — lectura de cuota IA por org (console)
+  .get('/:id/ai-usage', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    const cache = createCache(c.env);
+
+    const cacheKey = `platform:ai-usage:${orgId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const repo = createOrganizationsRepository(c.get('db'));
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+    const org = await service.findOrganizationById(orgId);
+    if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
+
+    const featuresService = createFeaturesService(
+      createPlatformSubscriptionsRepository(c.get('db')),
+      createPlatformPlansRepository(c.get('db')),
+      createPlatformSettingsRepository(c.get('db')),
+      createFeaturesRepository(c.get('db')),
+      cache,
+    );
+    const quota = await featuresService.getAiQuota(orgId);
+    const payload = {
+      monthly: quota.monthly,
+      remaining: quota.remaining,
+      disabled: quota.disabled,
+      periodStart: quota.periodStart,
+    };
+    await cache.set(cacheKey, payload, 300);
+    return c.json(payload);
+  })
+
+  // GET /api/platform/organizations/:id/gym-overview — adopción gym + portal (console).
+  // Staleness aceptada (5 min): los writes del gym no invalidan claves platform.
+  .get('/:id/gym-overview', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    const cache = createCache(c.env);
+
+    const cacheKey = `platform:gym-overview:${orgId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const repo = createOrganizationsRepository(c.get('db'));
+    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+    const org = await service.findOrganizationById(orgId);
+    if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
+
+    const featuresService = createFeaturesService(
+      createPlatformSubscriptionsRepository(c.get('db')),
+      createPlatformPlansRepository(c.get('db')),
+      createPlatformSettingsRepository(c.get('db')),
+      createFeaturesRepository(c.get('db')),
+      cache,
+    );
+    const overview = await featuresService.getGymOverview(orgId);
+    await cache.set(cacheKey, overview, 300);
+    return c.json(overview);
+  })
 
   // GET /api/platform/organizations/:id/subscriptions
   .get('/:id/subscriptions', requirePlatformAuth(), async (c) => {

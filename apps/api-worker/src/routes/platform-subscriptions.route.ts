@@ -116,6 +116,41 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json(stats);
   })
 
+  // GET /api/platform/subscriptions/revenue?months=12 — serie mensual SaaS en UTC.
+  // Va antes de /:id para que Hono no la trague como param.
+  .get('/revenue', requirePlatformAuth(), async (c) => {
+    const raw = Number(c.req.query('months') || '12');
+    const months = Math.min(24, Math.max(1, Number.isFinite(raw) ? Math.floor(raw) : 12));
+
+    const cache = createCache(c.env);
+    const cacheKey = `platform:subscriptions:revenue:${months}m`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const { service } = buildService(c);
+    const revenue = await service.getRevenue(months);
+    await cache.set(cacheKey, revenue, 3600);
+    return c.json(revenue);
+  })
+
+  // GET /api/platform/subscriptions/by-organization/:orgId/invoices — historial SaaS de la org.
+  // Va antes de /:id para que Hono no la trague como param.
+  .get('/by-organization/:orgId/invoices', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('orgId');
+
+    const cache = createCache(c.env);
+    const cacheKey = `platform:subscriptions:invoices:${orgId}`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const { service } = buildService(c);
+    const invoices = await service.getOrganizationInvoices(orgId);
+    await cache.set(cacheKey, invoices, 300);
+    return c.json(invoices);
+  })
+
   // GET /api/platform/subscriptions/:id
   .get('/:id', requirePlatformAuth(), async (c) => {
     const id = Number(c.req.param('id'));
@@ -226,7 +261,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
     const payments = await service.getSubscriptionPayments(id);
-    return c.json({ data: payments });
+    return c.json(payments);
   })
 
   // POST /api/platform/subscriptions/:id/payments

@@ -32,8 +32,8 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
     },
 
     /** Resolve una organización por su slug. `null` si no existe. */
-    async findOrganizationBySlug(slug: string) {
-      return orgsRepo.findBySlug(slug);
+    async findOrganizationBySlug(slug: string, opts?: { includeMemberCount?: boolean }) {
+      return orgsRepo.findBySlug(slug, opts);
     },
 
     async createOrganization(data: Omit<NewDbOrganization, 'id'> & { currencyFormat?: 'latam' | 'usa'; settings?: Record<string, string> }) {

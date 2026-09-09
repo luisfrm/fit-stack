@@ -124,10 +124,14 @@ export function createPlatformSubscriptionsService(
       return platformSubsRepo.getStats();
     },
 
+    async getRevenue(months: number) {
+      return platformSubsRepo.getMonthlyRevenue(months);
+    },
+
     async getOrganizationStatus(organizationId: string): Promise<PlatformSubscriptionStatus> {
       const sub = await platformSubsRepo.findActiveByOrganization(organizationId);
       if (!sub) return PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED;
-      return sub.computedStatus;
+      return sub.status;
     },
 
     /* ── Mutations ── */

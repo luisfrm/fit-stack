@@ -93,7 +93,7 @@ export function SubscriptionStatusCard({
             size="sm"
             className="uppercase tracking-widest"
           >
-            {isCancelled ? "Cancelada" : isExpired ? "Expirada" : hasPending ? "En revisión" : subscription.computedStatus}
+            {isCancelled ? "Cancelada" : isExpired ? "Expirada" : hasPending ? "En revisión" : subscription.status}
           </Badge>
         </div>
 

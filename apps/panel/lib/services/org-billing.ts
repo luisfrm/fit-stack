@@ -17,7 +17,7 @@ export interface OrgSubscriptionInfo {
   cancelledAt: string | null;
   cancellationReason: string | null;
   createdAt: string;
-  computedStatus: string;
+  status: string;
   latestPaymentStatus: string | null;
   organizationName: string;
   planName: string;
