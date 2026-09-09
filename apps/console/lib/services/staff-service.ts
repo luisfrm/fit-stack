@@ -33,10 +33,17 @@ export interface CreateStaffResult {
  */
 export const staffService = {
   /**
-   * Lists all platform staff members.
+   * Lists platform staff members, optionally filtered by platform role
+   * and/or a name/email search (case-insensitive).
    */
-  async getAll(options?: ApiFetchOptions): Promise<PlatformStaffMember[]> {
-    return await api<PlatformStaffMember[]>(STAFF_PATH, options);
+  async getAll(
+    params?: { role?: string; search?: string },
+    options?: ApiFetchOptions,
+  ): Promise<PlatformStaffMember[]> {
+    return await api<PlatformStaffMember[]>(STAFF_PATH, {
+      query: params,
+      ...options,
+    });
   },
 
   /**
@@ -75,9 +82,12 @@ export const staffService = {
    * Activates the current user as platform staff using an invite token.
    */
   async accept(token: string): Promise<{ success: boolean; role: string }> {
-    return await api<{ success: boolean; role: string }>(`${STAFF_PATH}/accept`, {
-      method: "POST",
-      body: { token },
-    });
+    return await api<{ success: boolean; role: string }>(
+      `${STAFF_PATH}/accept`,
+      {
+        method: "POST",
+        body: { token },
+      },
+    );
   },
 };

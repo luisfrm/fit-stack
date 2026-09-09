@@ -1,9 +1,14 @@
-import { desc, eq, inArray, type Db } from '@workspace/database/factory';
+import { and, desc, eq, ilike, inArray, or, type Db } from '@workspace/database/factory';
 import { user } from '@workspace/database/schema';
 import { platformRoles } from '@workspace/shared';
 
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
+
+export interface PlatformStaffFilter {
+  role?: string;
+  search?: string;
+}
 
 export function createUsersRepository(db: Db) {
   return {
@@ -14,13 +19,26 @@ export function createUsersRepository(db: Db) {
     /**
      * Users with a platform role (support, admin, owner) — the SaaS staff.
      * Role values come from `platformRoles` keys to avoid magic strings.
+     * Optional `role` narrows to one platform role; optional `search`
+     * matches name or email (ILIKE, case-insensitive).
      */
-    async findPlatformStaff() {
+    async findPlatformStaff(filters: PlatformStaffFilter = {}) {
       const roles = Object.keys(platformRoles);
+      const conditions = [inArray(user.role, roles)];
+
+      if (filters.role && roles.includes(filters.role)) {
+        conditions.push(eq(user.role, filters.role));
+      }
+
+      if (filters.search) {
+        const pattern = `%${filters.search}%`;
+        conditions.push(or(ilike(user.name, pattern), ilike(user.email, pattern))!);
+      }
+
       return db
         .select()
         .from(user)
-        .where(inArray(user.role, roles))
+        .where(and(...conditions))
         .orderBy(desc(user.createdAt));
     },
 

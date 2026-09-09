@@ -24,7 +24,7 @@ const buttonVariants = cva(
          * Use for main CTA actions
          */
         primary: [
-          "bg-primary text-primary-foreground",
+          "bg-primary text-primary-foreground border border-transparent",
           "hover:bg-primary-hover",
           "active:scale-[0.98]",
         ],

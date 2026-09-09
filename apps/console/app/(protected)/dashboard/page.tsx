@@ -1,20 +1,31 @@
 import { Building2, Users, TrendingUp, ShieldCheck, Plus } from "lucide-react";
-import { Button, Text, StatCard } from "@workspace/ui/components";
+import { Button, StatCard } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
-import { OrganizationsList } from "@/components/dashboard/organizations-list";
+import { RenewalsWidget } from "@/components/dashboard/dashboard-renewals-widget";
+import { PaymentsReviewWidget } from "@/components/dashboard/dashboard-payments-review-widget";
+import { TrialsWidget } from "@/components/dashboard/dashboard-trials-widget";
+import { NewOrgsWidget } from "@/components/dashboard/dashboard-new-orgs-widget";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
+import {
+  selectNewOrgsThisMonth,
+  selectPaymentsReview,
+  selectRenewals,
+  selectTrials,
+} from "@/lib/dashboard/selectors";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import {
+  ValueConverter,
+  type CurrencyFormat,
+} from "@/lib/utils/value-converters";
 import { updateTag } from "next/cache";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [{ data: orgs }, stats, settings] = await Promise.all([
+  const [{ data: orgs }, stats, settings, recentSubs] = await Promise.all([
     organizationsService.getAll(
       { limit: 50, includeMemberCount: true },
       { next: { revalidate: 60, tags: ["console:orgs"] } },
@@ -37,7 +48,13 @@ export default async function DashboardPage() {
       })),
     api<Record<string, string>>("/platform/settings", {
       next: { revalidate: 600, tags: ["console:settings"] },
-    }).catch(() => ({} as Record<string, string>)),
+    }).catch(() => ({}) as Record<string, string>),
+    platformSubscriptionsService
+      .getAll(
+        { limit: 50 },
+        { next: { revalidate: 60, tags: ["console:subs"] } },
+      )
+      .catch(() => ({ data: [], total: 0, page: 1, limit: 50, totalPages: 0 })),
   ]);
 
   const totalMembers = orgs.reduce(
@@ -48,23 +65,36 @@ export default async function DashboardPage() {
   // Extract primary platform currency and format settings
   const settingsMap = (settings || {}) as Record<string, string>;
   const primaryCurrency = settingsMap[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY];
-  const currencyFormat = settingsMap[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
+  const currencyFormat = settingsMap[
+    PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT
+  ] as CurrencyFormat;
 
   // Calculate dynamic B2B revenue and monthly growth comparison
   const monthlyRevenue = (stats.monthlyRevenueCents ?? 0) / 100;
-  const formattedRevenue = ValueConverter.format(monthlyRevenue, primaryCurrency, currencyFormat);
+  const formattedRevenue = ValueConverter.format(
+    monthlyRevenue,
+    primaryCurrency,
+    currencyFormat,
+  );
 
   const prevRevenueCents = stats.previousMonthRevenueCents ?? 0;
   const currRevenueCents = stats.monthlyRevenueCents ?? 0;
   let revenueChangeLabel = "0% vs mes anterior";
 
   if (prevRevenueCents > 0) {
-    const growth = ((currRevenueCents - prevRevenueCents) / prevRevenueCents) * 100;
+    const growth =
+      ((currRevenueCents - prevRevenueCents) / prevRevenueCents) * 100;
     const sign = growth >= 0 ? "+" : "";
     revenueChangeLabel = `${sign}${growth.toFixed(1)}% vs mes anterior`;
   } else if (currRevenueCents > 0) {
     revenueChangeLabel = "+100% vs mes anterior";
   }
+
+  // Widget datasets (derivados sin endpoints nuevos)
+  const newOrgs = selectNewOrgsThisMonth(orgs);
+  const renewals = selectRenewals(orgs);
+  const trials = selectTrials(orgs);
+  const paymentsReview = selectPaymentsReview(recentSubs.data);
 
   const refreshOrgs = async () => {
     "use server";
@@ -92,7 +122,7 @@ export default async function DashboardPage() {
         <StatCard
           title="Total Gimnasios"
           value={orgs.length.toString()}
-          change="+2 este mes"
+          change={`+${newOrgs.length} este mes`}
           icon={<Building2 className="text-primary" size={24} />}
         />
         <StatCard
@@ -115,20 +145,11 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="space-y-6 mb-10">
-        <div className="flex justify-between items-end">
-          <div className="space-y-1">
-            <Text as="p" size="lg" weight="bold">Gimnasios Activos</Text>
-            <Text size="sm" variant="muted">Monitoreo y gestión de inquilinos de la plataforma.</Text>
-          </div>
-          <Button asChild variant="ghost" size="sm" className="text-primary font-bold hover:bg-primary/5">
-            <Link href="/organizations">
-              Ver todas las organizaciones
-            </Link>
-          </Button>
-        </div>
-
-        <OrganizationsList organizations={orgs} onSuccess={refreshOrgs} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+        <RenewalsWidget items={renewals} />
+        <PaymentsReviewWidget subs={paymentsReview} />
+        <TrialsWidget trials={trials} />
+        <NewOrgsWidget orgs={newOrgs} />
       </div>
     </>
   );

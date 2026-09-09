@@ -23,14 +23,21 @@ const createStaffSchema = z.object({
 });
 
 export const platformStaffRoutes = new Hono<AppEnv>()
-  // GET /api/platform/staff
+  // GET /api/platform/staff?role=&search=
   .get('/', requirePlatformAuth(), async (c) => {
+    const role = c.req.query('role');
+    const search = c.req.query('search');
+    if (role && !(role in platformRoles)) {
+      return c.json({ error: 'Rol inválido' }, 400);
+    }
+
     const cache = createCache(c.env);
-    const cached = await cache.get('platform:staff');
+    const cacheKey = `platform:staff:role=${role ?? 'all'}:search=${search ?? ''}`;
+    const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
 
     const usersRepo = createUsersRepository(c.get('db'));
-    const staff = await usersRepo.findPlatformStaff();
+    const staff = await usersRepo.findPlatformStaff({ role, search });
 
     const result = staff.map((u) => ({
       id: u.id,
@@ -43,7 +50,7 @@ export const platformStaffRoutes = new Hono<AppEnv>()
       createdAt: u.createdAt,
     }));
 
-    await cache.set('platform:staff', result, 300);
+    await cache.set(cacheKey, result, 300);
     return c.json(result);
   })
 
