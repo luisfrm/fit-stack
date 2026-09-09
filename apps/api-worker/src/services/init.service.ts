@@ -30,7 +30,7 @@ export function createInitService(initRepo: InitRepository, platformSettingsRepo
         throw new Error('Fallo al crear el usuario administrador');
       }
 
-      await initRepo.updateUserRole(newUser.user.id, 'admin');
+      await initRepo.updateUserRole(newUser.user.id, 'owner');
 
       // Sembrar settings de plataforma (currency, formato, proveedor IA, etc.)
       // para que el console no caiga en fallbacks silenciosos (`|| "USD"`).
@@ -42,7 +42,7 @@ export function createInitService(initRepo: InitRepository, platformSettingsRepo
         id: newUser.user.id,
         email: newUser.user.email,
         name: newUser.user.name,
-        role: 'admin',
+        role: 'owner',
       };
     },
   };
