@@ -16,7 +16,7 @@ Transformar el CMS en una aplicación nativa para Windows/macOS/Linux.
 Para evitar conflictos con el CMS en la web (Vercel), usaremos una **Configuración Condicional** en `next.config.mjs`:
 
 ```javascript
-// apps/cms/next.config.mjs
+// apps/panel/next.config.mjs (o apps/web según el caso)
 const isTauri = process.env.TAURI_PLATFORM !== undefined;
 
 /** @type {import('next').NextConfig} */
@@ -39,7 +39,7 @@ export default nextConfig;
 Para que las sesiones funcionen en el `.exe`, integraremos el plugin nativo de HTTP de Tauri en el cliente de auth:
 
 ```typescript
-// apps/cms/lib/auth-client.ts
+// apps/panel/lib/auth-client.ts (o apps/web según el caso)
 import { createAuthClient } from "better-auth/client"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
 
@@ -55,31 +55,24 @@ export const authClient = createAuthClient({
 ```
 
 ### Comandos de Desarrollo
-Se añadirán estos scripts al `package.json` de `apps/cms`:
+Se añadirán estos scripts al `package.json` de la app correspondiente (`apps/panel` o `apps/web`):
 - `npm run tauri dev`: Abre la ventana de escritorio en modo desarrollo.
 - `npm run tauri build`: Genera el instalador `.exe` (MSI) optimizado.
 
 ---
 
 ## ⚡ 2. Optimizaciones de Red y Offline
-- **SWR / React Query**: Implementar estrategias de cacheo agresivas para que los listados de miembros carguen instantáneamente.
 - **Modo Offline Crítico**: Permitir que el Bridge registre accesos localmente aunque el servidor de Fit-Stack esté caído, sincronizando los logs al recuperar la conexión.
 
 ---
 
 ## 📊 3. Dashboard Pro / Analíticas
-- **Reportes en PDF**: Generación de reportes de asistencia y pagos directamente desde la app.
+- **Reportes y exports**: Los recibos de pago en PDF ya existen vía `jobs-worker` (`pdf.handler.ts` + templates). Pendiente: reportes de asistencia del gym y export de revenue SaaS (CSV/PDF).
 - **Heatmaps**: Visualización de las horas de mayor afluencia en el gimnasio mediante los datos de control de acceso.
 
 ---
 
-## 🛠️ 4. Estabilización del Schema (Actual)
-- [ ] Refactorizar tipos redundantes en `packages/database`.
-- [ ] Asegurar que las migraciones de Drizzle sean 100% compatibles con Neon DB.
-
----
-
-## 🤖 5. IA — Créditos, RAG y Escalabilidad (post-créditos 2026-08)
+## 🤖 4. IA — Créditos, RAG y Escalabilidad (post-créditos 2026-08)
 
 > Migración a créditos completada (`ai_credits_monthly`, `ai_usage.credits`). Lo de abajo son **ideas no comprometidas** — ver `PENDING.md` § 6 para los follow-ups comprometidos (packs Stripe, RAG). Docs vigentes: `CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`.
 
@@ -89,3 +82,14 @@ Se añadirán estos scripts al `package.json` de `apps/cms`:
 - **Modelos por org / pricing dinámico:** `creditMultiplier` por modelo en `shared/ai.ts` hoy es `1.0` para GLM y `openrouter/free`; a futuro cada modelo podría tener multiplicador (ej. razonamiento ×2) sin tocar el ledger. Panel: selector por org con coste preview.
 - **Observabilidad de créditos:** dashboard de consumo por org (créditos/día, top prompts truncados, ratio in/out), alertas a 80%/100% vía Queue + email (jobs-worker), y export CSV para el SaaS admin.
 - **Ideas descartadas del modelo por mensajes:** límites `ai_messages_daily/weekly/monthly` y planes por mensajes (30 msgs/día) — reemplazados por `ai_credits_monthly`. Se conservan en `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED) solo como historial.
+
+---
+
+## 📈 5. Analíticas SaaS (Console)
+
+> Backend listo: `GET /api/platform/subscriptions/revenue?months=12` (buckets mensuales UTC desde `platform_subscription_payment`, solo `validated`, `COALESCE(baseAmount, amountPaid)` — el bucket del mes corriente cuadra con `monthlyRevenueCents` de `/stats`). La UI queda futura.
+
+- **Chart de revenue en el módulo de suscripciones**: serie 12 meses consumiendo el endpoint (mini-lista de 6M ya existe en el side panel como adelanto).
+- **Normalización multi-moneda real**: hoy las sumas mezclan monedas exactamente igual que `monthlyRevenueCents` (caveat documentado, no bloquea). A futuro: normalizar a una moneda base con tasas históricas.
+- **Agregados org server-side**: si el dataset de 500 orgs de la página de organizaciones se queda corto, mover KPIs/filtros al backend.
+- **Alertas de créditos 80%/100%** vía Queue + email (jobs-worker) si se pide.

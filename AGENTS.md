@@ -57,36 +57,39 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 
 ### 2. Module Breakdown
 
-| Module | Purpose |
-|--------|---------|
-| **Members** | Centralized identity for gym clients. Tracks historical behavior and preferences. |
-| **Membership Plans** | Commercial product catalog. Defines durations (Daily, Weekly, Monthly, Yearly) and pricing in a configurable base currency (USD by default). |
-| **Subscriptions** | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to current `endDate` so no paid day is lost. |
-| **Payments** | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots). Prevents duplicate registrations while `processing`. |
-| **Platform (SaaS Admin)** | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods. |
-| **Staff & Trainers** | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers). |
-| **Classes** | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management. |
-| **CMS (Dynamic Content)** | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = SEO config (title, slug, description, metaTitle, metaDescription, isActive) and `/content/[id]/blocks` = DnD block editor. |
-| **Routines** | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app). |
-| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Paused** — endpoints live only in legacy `apps/api`, not migrated to api-worker. |
-| **Reports** | Revenue analytics with multi-currency normalization. |
-| **Settings** | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection). |
+| Module                      | Purpose                                                                                                                                                                                                                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Members**                 | Centralized identity for gym clients. Tracks historical behavior and preferences.                                                                                                                                                                                                              |
+| **Membership Plans**        | Commercial product catalog. Defines durations (Daily, Weekly, Monthly, Yearly) and pricing in a configurable base currency (USD by default).                                                                                                                                                   |
+| **Subscriptions**           | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to current `endDate` so no paid day is lost.                                                                                                                                     |
+| **Payments**                | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots). Prevents duplicate registrations while `processing`.                                                                                                                                           |
+| **Platform (SaaS Admin)**   | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods.                                                                                                                                                        |
+| **Staff & Trainers**        | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers).                                                                                                                                                                                      |
+| **Classes**                 | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management.                                                                                                                                                                                                                     |
+| **CMS (Dynamic Content)**   | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = SEO config (title, slug, description, metaTitle, metaDescription, isActive) and `/content/[id]/blocks` = DnD block editor. |
+| **Routines**                | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app).                                                                                                                                                                                          |
+| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Paused** — endpoints live only in legacy `apps/api`, not migrated to api-worker.                                                                                                                |
+| **Reports**                 | Revenue analytics with multi-currency normalization.                                                                                                                                                                                                                                           |
+| **Settings**                | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection).                                                                                                                                                                                         |
 
 ### 3. Staff & Trainers Architecture
 
 **Data model:**
+
 - `gym_member` (base table) — all gym members: clients, staff, trainers
 - `coach_profile` (extension) — optional 1:1 for gym_members with role `COACH`. Fields: `specialities`, `bio`, `isVisible`, `displayOrder`
 - `auth_member` — Better Auth membership linking user ↔ organization with role (`OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`)
 - `coach_assignment` — links a coach (gym_member) to a client (gym_member)
 
 **Staff (`/dashboard/staff`):**
+
 - Table view for gym_members with roles: Owner, Manager, Cashier, Coach
 - Components: `StaffTable`, `StaffModal`, `StaffForm` (`apps/panel/components/staff/`)
 - Columns: Avatar+Name, Email, Role, Status, Actions
 - Service: `membersService` (shared with Members module)
 
 **Trainers (`/dashboard/trainers`):**
+
 - Table view for gym_members with role `COACH` that have a `coach_profile`
 - Components: `TrainersTable`, `TrainerModal`, `TrainerForm` (`apps/panel/components/trainers/`)
 - Fields: name, photo, specialities, bio, visibility toggle, display order
@@ -100,6 +103,7 @@ Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily tar
 A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
 
 **API contract** (authenticated via `x-api-key` header → `ACCESS_CONTROL_API_KEY`):
+
 - `POST /api/access-control/verify` — validate `documentId` + `organizationId`, returns access decision, creates audit log
 - `GET /api/access-control/sync-tasks` — poll pending biometric enroll/delete tasks
 - `POST /api/access-control/mark-synced` — confirm task completion
@@ -136,7 +140,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 ### 2. UI Design System & Hierarchy
 
 - **Library Origins**: All UI components MUST be imported from `@workspace/ui` (`packages/ui`).
-- **Form required convention**: `Input` uses native `required`; `CountrySelector` and `SimpleSelect` accept a `required` prop (renders `*` on the label). Forms group into sections and close with the note "Los campos con * son obligatorios." (Fields with * are required.)
+- **Form required convention**: `Input` uses native `required`; `CountrySelector` and `SimpleSelect` accept a `required` prop (renders `*` on the label). Forms group into sections and close with the note "Los campos con _ son obligatorios." (Fields with _ are required.)
 - **ActiveCurrenciesField** (`packages/ui/.../active-currencies-field.tsx`): currency multi-toggle (`currencies` universe, `value/onChange`, `locked[]` not uncheckable with badge, `disabled`, search). Source of truth for the universe: `COUNTRY_INDEX.currencies` (never the exchange API, which is only for rates).
 - **Variant Enforcement**: Use predefined variants. Do not use ad-hoc Tailwind classes to override sizes/spacing/styles unless absolutely necessary and after notifying the user.
 - **Mathematical Scale + Premium Aesthetic**:
@@ -170,6 +174,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 Fit-Stack uses **Better Auth** for authentication.
 
 **Package layers:**
+
 - **`@workspace/auth`** — canonical auth package. Entry points:
   - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
   - `@workspace/auth/service` — `sessionService.getSession()` for server components
@@ -178,6 +183,7 @@ Fit-Stack uses **Better Auth** for authentication.
 - **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
 
 **Conventions:**
+
 - Client MUST use `useAuth()`. It exposes `activeOrganization` (the org object, resolved by the api-worker custom session) alongside `member`. NEVER use `useSession()` directly in components.
 - For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
@@ -185,13 +191,14 @@ Fit-Stack uses **Better Auth** for authentication.
 #### CORS & Allowed Origins
 
 The CORS allowlist is defined **in code only** — no env vars. Single source of truth in `apps/api-worker/src/lib/cors.ts`, consumed by:
+
 - `apps/api-worker/src/lib/auth.ts` → `trustedOrigins` of Better Auth
 - `apps/api-worker/src/index.ts` → `corsMiddleware` (Hono CORS)
 
-| Environment | Allowed origins |
-|---|---|
-| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api) |
-| `production` | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
+| Environment   | Allowed origins                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api)                                                                                 |
+| `production`  | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
 
 **Public routes skip auth**: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`. The global middleware tries to resolve a session but never blocks unauthenticated requests — machine-to-machine routes (e.g. access-control with `x-api-key`) work without a session.
 
@@ -199,14 +206,14 @@ The CORS allowlist is defined **in code only** — no env vars. Single source of
 
 The Hono API uses centralized middleware — never write auth/error boilerplate manually.
 
-| Middleware | When to use | Auth check / Context |
-|---------|-------------|----------------------|
-| `requireOrgPermission(module, action)` | Org-scoped CRUD routes | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Sets `c.set('orgId', orgId)` |
-| `requireOrg()` | Org-scoped routes without permission check | Session + active org. Sets `c.set('orgId', orgId)` |
-| `requireOrgTimezone()` | Routes that compute or filter by local date (reports, stats, billing) | Validates the org has a timezone (500 if missing). Sets `c.set('orgTimezone', tz)` |
-| `requireAuth()` | General authenticated routes | Session + user only |
-| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`) | Session + platform permission via `auth.api.userHasPermission` |
-| `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization', 'create')` — standard middleware for `/api/platform/*` routes | Session + `organization.create` permission |
+| Middleware                                  | When to use                                                                                                       | Auth check / Context                                                                                            |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `requireOrgPermission(module, action)`      | Org-scoped CRUD routes                                                                                            | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Sets `c.set('orgId', orgId)` |
+| `requireOrg()`                              | Org-scoped routes without permission check                                                                        | Session + active org. Sets `c.set('orgId', orgId)`                                                              |
+| `requireOrgTimezone()`                      | Routes that compute or filter by local date (reports, stats, billing)                                             | Validates the org has a timezone (500 if missing). Sets `c.set('orgTimezone', tz)`                              |
+| `requireAuth()`                             | General authenticated routes                                                                                      | Session + user only                                                                                             |
+| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`)                                                                             | Session + platform permission via `auth.api.userHasPermission`                                                  |
+| `requirePlatformAuth()`                     | Alias of `requirePlatformPermission('organization', 'create')` — standard middleware for `/api/platform/*` routes | Session + `organization.create` permission                                                                      |
 
 ```ts
 // Typical org-scoped route (Hono)
@@ -226,36 +233,36 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/healthz` and `/favicon.ico`):
 
-| Router | Notable endpoints |
-|--------|--------------------|
-| `/api/auth/*` | Better Auth engine (sessions, orgs, invitations) |
-| `/api/members` | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) |
-| `/api/plans` | Membership plans (gym catalog) |
-| `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`) |
-| `/api/payments` | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend) |
-| `/api/classes` | Class schedule CRUD |
-| `/api/trainers` | Trainers (gym_member + coach_profile) |
-| `/api/cms` | Content pages/blocks |
-| `/api/dashboard` | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`) |
-| `/api/settings` | Gym settings (currencies, payment methods, theme) |
-| `/api/reports` | `GET /revenue` (multi-currency, cache 1h) |
-| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) |
-| `/api/upload` | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2) |
-| `/api/ai` | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
+| Router               | Notable endpoints                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
+| `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`)                                                                                                                                                                                                                                                                                                  |
+| `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
+| `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`)                                                                                                                                                                                                                                                                                                           |
+| `/api/payments`      | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend)                                                                                                                                                                                                                                                                                                                         |
+| `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
+| `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
+| `/api/cms`           | Content pages/blocks                                                                                                                                                                                                                                                                                                                                                                 |
+| `/api/dashboard`     | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`)                                                                                                                                                                                                                                             |
+| `/api/settings`      | Gym settings (currencies, payment methods, theme)                                                                                                                                                                                                                                                                                                                                    |
+| `/api/reports`       | `GET /revenue` (multi-currency, cache 1h)                                                                                                                                                                                                                                                                                                                                            |
+| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below)                                                                                      |
+| `/api/upload`        | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2)                                                                                                                                                                                                                                                                                                                    |
+| `/api/ai`            | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
 > **AI Chat**: the provider is inferred from the model id (`getAiProvider` in `@workspace/shared`). Fixed OpenRouter model chain (`OPENROUTER_TEXT_MODEL_CHAIN`) with fallback to GLM in Workers AI. The first SSE event is `{"model": ...}` with the concrete model that responded. `OPENROUTER_API_KEY` optional; if missing and an OpenRouter model is requested → 503. 1 credit = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), limits `AI_CHAT_LIMITS`, monthly cycle per subscription, RAG with embeddings `@cf/baai/bge-m3` (see `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
-| `/api/init` | Org bootstrap (no auth) |
-| `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
-| `/api/platform/plans` | SaaS plan catalog (console) |
-| `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` |
-| `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug) |
-| `/api/platform/settings` | Platform global settings |
-| `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
-| `/api/platform/upload` | Org-less platform assets (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, fixed scope `platform/` |
-| `/api/platform/features` | Feature catalog (`GET /`, cache `platform:features`) |
-| `/api/platform/knowledge` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings, no Redis cache) — `GET /:id/content` (content only, no chunks, for editing without transferring embeddings) |
-| `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
-| `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
+> | `/api/init` | Org bootstrap (no auth) |
+> | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
+> | `/api/platform/plans` | SaaS plan catalog (console) |
+> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) |
+> | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (AI quota del ciclo, cache 5 min, invalidada en grant) + `GET /:id/gym-overview` (adopción gym + portal seats, cache 5 min, staleness aceptada: writes del gym no invalidan claves platform) |
+> | `/api/platform/settings` | Platform global settings |
+> | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
+> | `/api/platform/upload` | Org-less platform assets (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, fixed scope `platform/` |
+> | `/api/platform/features` | Feature catalog (`GET /`, cache `platform:features`) |
+> | `/api/platform/knowledge` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings, no Redis cache) — `GET /:id/content` (content only, no chunks, for editing without transferring embeddings) |
+> | `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
+> | `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
 
 > `/api/access-control/*` is **NOT mounted** in api-worker (Bridge paused — see section 4).
 
@@ -315,42 +322,46 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 
 ### Cache Methods
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `get` | `get<T>(key: string)` | Fetch cached value by key |
-| `set` | `set(key, data, ttlSeconds?)` | Store value with optional TTL (default 5 min) |
-| `invalidate` | `invalidate(pattern: string)` | Delete all keys matching a glob pattern (uses SCAN) |
-| `invalidateExact` | `invalidateExact(key: string)` | Delete a single key |
+| Method            | Signature                      | Description                                         |
+| ----------------- | ------------------------------ | --------------------------------------------------- |
+| `get`             | `get<T>(key: string)`          | Fetch cached value by key                           |
+| `set`             | `set(key, data, ttlSeconds?)`  | Store value with optional TTL (default 5 min)       |
+| `invalidate`      | `invalidate(pattern: string)`  | Delete all keys matching a glob pattern (uses SCAN) |
+| `invalidateExact` | `invalidateExact(key: string)` | Delete a single key                                 |
 
 ### Cache Key Conventions
 
-| Pattern | TTL | Used For |
-|---------|-----|----------|
-| `org:${orgId}:settings` | 1 h | Organization settings (invalidated on-write in POST /api/settings) |
-| `org:${orgId}:profile` | 5 min | Active org profile in custom session (branding/theme/timezone) |
-| `org:${orgId}:plans:*` | 1 h | Membership plans (invalidated on-write in POST/PUT/DELETE /api/plans) |
-| `org:${orgId}:classes:*` | 5 min | Classes |
-| `org:${orgId}:members:*` | 5 min | Gym members |
-| `org:${orgId}:subscriptions` | 5 min | Member subscriptions |
-| `org:${orgId}:dashboard:stats:*` | 5 min | Dashboard KPIs |
-| `org:${orgId}:dashboard:action-items` | 5 min | Dashboard actionable lists (expiring soon / recently expired) |
-| `org:${orgId}:coaches:*` | 5 min | Coaches/trainers |
-| `org:${orgId}:cms:*` | 5 min | CMS invalidation (reads are not cached) |
-| `org:${orgId}:public:page:*` | 15 min | Public page slugs (web) |
-| `org:${orgId}:subscription-status` | 1 min | Org billing status |
-| `org:${orgId}:subscription` | 1 min | Org SaaS sub with plan details (self-service renewal) |
-| `org:${orgId}:payment-methods` | 1 h | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
-| `rates:${base}` | 1 hr | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`) |
-| `org:${orgId}:features` | 5 min | Resolved features + isFreeTier of the org |
-| `org:${orgId}:reports:revenue:12m` | 1 hr | Monthly revenue reports |
-| `member:role:${userId}:${orgId}` | 1 min | Cached Better Auth member role (custom session) |
-| `platform:settings` | 1 h | SaaS-level global settings (invalidated on-write in POST /api/platform/settings) |
-| `platform:features` | 10 min | Feature catalog (console) |
-| `platform:organizations*` | 5 min | Organization list (SaaS admin) |
-| `platform:plans*` | 1 h | Platform plan catalog (invalidated on-write in /api/platform/plans) |
-| `platform:subscriptions*` | 5 min | SaaS subscriptions |
-| `platform:subscriptions:stats` | 5 min | Subscription KPI stats |
-| `platform:staff*` | 5 min | Platform staff (SaaS admins: support/admin/owner) |
+| Pattern                                    | TTL    | Used For                                                                                          |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------- |
+| `org:${orgId}:settings`                    | 1 h    | Organization settings (invalidated on-write in POST /api/settings)                                |
+| `org:${orgId}:profile`                     | 5 min  | Active org profile in custom session (branding/theme/timezone)                                    |
+| `org:${orgId}:plans:*`                     | 1 h    | Membership plans (invalidated on-write in POST/PUT/DELETE /api/plans)                             |
+| `org:${orgId}:classes:*`                   | 5 min  | Classes                                                                                           |
+| `org:${orgId}:members:*`                   | 5 min  | Gym members                                                                                       |
+| `org:${orgId}:subscriptions`               | 5 min  | Member subscriptions                                                                              |
+| `org:${orgId}:dashboard:stats:*`           | 5 min  | Dashboard KPIs                                                                                    |
+| `org:${orgId}:dashboard:action-items`      | 5 min  | Dashboard actionable lists (expiring soon / recently expired)                                     |
+| `org:${orgId}:coaches:*`                   | 5 min  | Coaches/trainers                                                                                  |
+| `org:${orgId}:cms:*`                       | 5 min  | CMS invalidation (reads are not cached)                                                           |
+| `org:${orgId}:public:page:*`               | 15 min | Public page slugs (web)                                                                           |
+| `org:${orgId}:subscription-status`         | 1 min  | Org billing status                                                                                |
+| `org:${orgId}:subscription`                | 1 min  | Org SaaS sub with plan details (self-service renewal)                                             |
+| `org:${orgId}:payment-methods`             | 1 h    | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
+| `rates:${base}`                            | 1 hr   | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`)  |
+| `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
+| `org:${orgId}:reports:revenue:12m`         | 1 hr   | Monthly revenue reports                                                                           |
+| `member:role:${userId}:${orgId}`           | 1 min  | Cached Better Auth member role (custom session)                                                   |
+| `platform:settings`                        | 1 h    | SaaS-level global settings (invalidated on-write in POST /api/platform/settings)                  |
+| `platform:features`                        | 10 min | Feature catalog (console)                                                                         |
+| `platform:organizations*`                  | 5 min  | Organization list (SaaS admin)                                                                    |
+| `platform:plans*`                          | 1 h    | Platform plan catalog (invalidated on-write in /api/platform/plans)                               |
+| `platform:subscriptions*`                  | 5 min  | SaaS subscriptions                                                                                |
+| `platform:subscriptions:stats`             | 5 min  | Subscription KPI stats                                                                            |
+| `platform:subscriptions:revenue:{months}m` | 1 h    | Monthly SaaS revenue series (invalidada on-write vía `platform:subscriptions*`)                   |
+| `platform:ai-usage:{orgId}`                | 5 min  | AI quota por org (invalidada en `POST /:id/ai-credits`)                                           |
+| `platform:subscriptions:invoices:{orgId}`  | 5 min  | SaaS invoices per org (invalidada on-write vía `platform:subscriptions*`)                         |
+| `platform:gym-overview:{orgId}`            | 5 min  | Adopción gym + portal por org (sin invalidación cruzada desde writes del gym)                     |
+| `platform:staff*`                          | 5 min  | Platform staff (SaaS admins: support/admin/owner)                                                 |
 
 ### Cache Invalidation Strategy
 
@@ -367,18 +378,20 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 
 **Event contract** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
 
-| Type | Payload | Producer |
-|------|---------|----------|
-| `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations) |
-| `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account) |
-| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal) → payer + org owners (dedupe) |
+| Type                         | Payload                                                  | Producer                                                                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `email.registration_invite`  | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations)                                                                                                 |
+| `email.org_invite`           | `{ email, orgName, inviterName, inviteLink }`            | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account)                                                                                                                  |
+| `email.payment_receipt`      | `{ paymentId, organizationId }`                          | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }`   | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal) → payer + org owners (dedupe)                                                                                                 |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
+
 - `email.handler.ts` — email TRANSPORT ONLY (**Resend** with `EMAIL_PROVIDER=resend` or **Gmail SMTP** with `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); the HTML is composed by the templates.
 - `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation).
 
 **Templates** (`apps/jobs-worker/src/templates/`) — the HTML lives here, never in the handlers:
+
 - `layout.ts` — base shells: `renderDarkShell` (invitations, dark background) and `renderLightShell` (receipts, yellow-receipt style) + `escapeHtml`.
 - `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
 
@@ -393,18 +406,20 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 Subscription status is **computed dynamically** via SQL CASE — NOT stored in DB.
 
 **Constants** (`@workspace/shared/constants`):
+
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active",      // periodEnd >= now and valid payment
-  TRIAL: "trial",        // isTrial = true
-  PAST_DUE: "past_due",  // 1-7 days overdue
+  ACTIVE: "active", // periodEnd >= now and valid payment
+  TRIAL: "trial", // isTrial = true
+  PAST_DUE: "past_due", // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
   SUSPENDED: "suspended", // 15+ days overdue
   CANCELLED: "cancelled", // cancelledAt != null
-}
+};
 ```
 
 **Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters):
+
 - `cancelledAt IS NOT NULL` → `cancelled`
 - `isTrial = true` and active period → `trial`
 - Last payment `VALIDATED`/`REFUNDED` and active period → `active`
@@ -417,6 +432,7 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 > Careful: the "last payment `VOIDED` → `cancelled`" rule applies to the gym `subscription` table (`subscriptions.repository.ts`, along with `INVALID`), **not** to `platform_subscription`.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
+
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
 - `ACTIVE` / `TRIAL` → normal render
@@ -424,6 +440,7 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 **Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch wrapped in `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), used by the layout and by the gate page.
 
 **Dynamic gate pages** (`/no-subscription`, `/unauthorized` in panel and console) — Server Components with `force-dynamic` that check the session on every request: no session → `redirect('/login')`; valid access (active subscription or allowed role) → `redirect('/dashboard')`; only without access they render. Prevents getting stuck after logout or refresh.
+
 - **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
 
 ### Self-service renewal (phase 2 — org pays from the panel)
@@ -448,13 +465,13 @@ Platform SaaS plans are described with **features (feature-flags)** instead of l
 
 ### Catalog (`FEATURE_CATALOG`, version `FEATURE_CATALOG_VERSION`)
 
-| Feature | kind | Limits | Notes |
-|---------|------|--------|-------|
-| `panel` | boolean | — | `alwaysOn` (cannot be disabled) |
-| `cms` | boolean | — | Content/pages |
-| `blog` | boolean | — | Blog |
-| `members_portal` | boolean | `member_seats` | Member Portal (seats) |
-| `ai_chat` | boolean | `ai_credits_monthly` | AI Chat (credits/month; 0 = unlimited) |
+| Feature          | kind    | Limits               | Notes                                  |
+| ---------------- | ------- | -------------------- | -------------------------------------- |
+| `panel`          | boolean | —                    | `alwaysOn` (cannot be disabled)        |
+| `cms`            | boolean | —                    | Content/pages                          |
+| `blog`           | boolean | —                    | Blog                                   |
+| `members_portal` | boolean | `member_seats`       | Member Portal (seats)                  |
+| `ai_chat`        | boolean | `ai_credits_monthly` | AI Chat (credits/month; 0 = unlimited) |
 
 Extension rules: every new feature is born `defaultEnabled: false` (additive); `normalizeFeatures` ignores unknown IDs and sanitizes types (numeric limits, 0 = unlimited); `resolveFeatures(null)` → catalog defaults.
 
@@ -490,13 +507,13 @@ Every platform payment (`platform_subscription_payment`) stores `features_snapsh
 
 ### Endpoints
 
-| Endpoint | Auth | Use |
-|----------|------|-----|
-| `GET /api/platform/features` | `requirePlatformAuth` | Catalog (console) |
-| `/api/platform/knowledge` | `requirePlatformAuth` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
-| `GET /api/organizations/features` | `requireAuth` | Resolved features + `isFreeTier` + status (panel gate) |
-| `GET /api/organizations/seats` | `requireAuth` | Portal seats |
-| `GET /api/ai/usage` | `requireAuth` | AI quotas |
+| Endpoint                          | Auth                  | Use                                                       |
+| --------------------------------- | --------------------- | --------------------------------------------------------- |
+| `GET /api/platform/features`      | `requirePlatformAuth` | Catalog (console)                                         |
+| `/api/platform/knowledge`         | `requirePlatformAuth` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
+| `GET /api/organizations/features` | `requireAuth`         | Resolved features + `isFreeTier` + status (panel gate)    |
+| `GET /api/organizations/seats`    | `requireAuth`         | Portal seats                                              |
+| `GET /api/ai/usage`               | `requireAuth`         | AI quotas                                                 |
 
 ---
 
@@ -514,36 +531,37 @@ Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared
 
 ```ts
 ORG_ROLES = {
-  OWNER: "owner",     // Super Admin / Creator — total control
+  OWNER: "owner", // Super Admin / Creator — total control
   MANAGER: "manager", // Gym Owner/Manager — full tenant control
   CASHIER: "cashier", // Staff/Cashier — payments and check-ins
-  COACH: "coach",     // Trainer — routines and athlete progress
-  MEMBER: "member",   // Gym client — app access to their own data
-}
+  COACH: "coach", // Trainer — routines and athlete progress
+  MEMBER: "member", // Gym client — app access to their own data
+};
 ```
 
 ### Permission Matrix
 
 **Source of truth**: `packages/shared/src/access-control.ts` — `organizationStatement` + `organizationAc.newRole(...)` (Better Auth Access Control). Helpers in `packages/shared/src/permissions/` expose the matrix through `can(role, module, action)`.
 
-| Module | Owner | Manager | Cashier | Coach | Member |
-|--------|:-----:|:-------:|:-------:|:-----:|:------:|
-| **Panel** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Dashboard** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Reports** | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Members** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
-| **Staff** | ✅ CRUD | ✅ (no delete) | ❌ | ❌ | ❌ |
-| **Subscriptions** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ❌ | ❌ |
-| **Plans** | ✅ CRUD | ✅ (no delete) | ✅ read | ✅ read | ✅ read |
-| **Classes** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
-| **Content** | ✅ CRUD | ✅ (no delete) | ❌ | ✅ read | ✅ read |
-| **Settings** | ✅ r+w | ✅ r+w | ✅ read | ❌ | ❌ |
-| **Organization** | ✅ r+w | ✅ r+w | ❌ | ❌ | ❌ |
-| **AI (Chat)** | ✅ read | ✅ read | ✅ read | ❌ | ❌ |
+| Module            |  Owner  |    Manager     |    Cashier     |         Coach         | Member  |
+| ----------------- | :-----: | :------------: | :------------: | :-------------------: | :-----: |
+| **Panel**         |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
+| **Dashboard**     |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
+| **Reports**       |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
+| **Members**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
+| **Staff**         | ✅ CRUD | ✅ (no delete) |       ❌       |          ❌           |   ❌    |
+| **Subscriptions** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
+| **Plans**         | ✅ CRUD | ✅ (no delete) |    ✅ read     |        ✅ read        | ✅ read |
+| **Classes**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
+| **Content**       | ✅ CRUD | ✅ (no delete) |       ❌       |        ✅ read        | ✅ read |
+| **Settings**      | ✅ r+w  |     ✅ r+w     |    ✅ read     |          ❌           |   ❌    |
+| **Organization**  | ✅ r+w  |     ✅ r+w     |       ❌       |          ❌           |   ❌    |
+| **AI (Chat)**     | ✅ read |    ✅ read     |    ✅ read     |          ❌           |   ❌    |
 
 ### How to Verify Permissions
 
 **In API routes (api-worker)**: Use `requireOrgPermission` / `requirePlatformPermission` middleware from `apps/api-worker/src/lib/route-handler.ts`
+
 ```ts
 import { requireOrgPermission } from '../lib/route-handler'
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
@@ -552,21 +570,27 @@ import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
 ```
 
 **In UI (client-side)**: Use `useAuth()` and `usePermissions()` from `@workspace/auth/hooks`
+
 ```tsx
-import { useAuth, usePermissions } from '@workspace/auth/hooks'
-const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth()
-const { can } = usePermissions()
-const canEditClasses = can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)
+import { useAuth, usePermissions } from "@workspace/auth/hooks";
+const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth();
+const { can } = usePermissions();
+const canEditClasses = can(
+  PERMISSION_MODULES.CLASSES,
+  PERMISSION_ACTIONS.UPDATE,
+);
 ```
 
 ### Anti-escalation
 
 Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/src/permissions/role-assignment.ts`) to prevent role escalation:
+
 - `OWNER` → can assign any role
 - `MANAGER` → cannot assign `OWNER`
 - `CASHIER` → can only assign `MEMBER`
 
 **Platform anti-escalation** (`canAssignPlatformRole(actor, target)`):
+
 - `owner` → can assign any platform role (support/admin/owner)
 - `admin` → only `support` or `admin` (NEVER `owner`)
 - `support` → cannot assign
@@ -576,10 +600,11 @@ Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/sr
 ### Panel Access Control
 
 Only `OWNER`, `MANAGER`, `CASHIER` can use the panel app (`apps/panel`). Implemented via the `panel: ["access"]` permission (`PANEL` module, `ACCESS` action):
+
 ```ts
-import { usePermissions } from '@workspace/auth/hooks'
-const { canAccessCms } = usePermissions()  // equivalent to can(PANEL, ACCESS)
-if (orgRole && !canAccessCms()) redirect('/unauthorized')
+import { usePermissions } from "@workspace/auth/hooks";
+const { canAccessCms } = usePermissions(); // equivalent to can(PANEL, ACCESS)
+if (orgRole && !canAccessCms()) redirect("/unauthorized");
 ```
 
 ### Security Rules
@@ -679,35 +704,45 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 ## Database Schema (30 tables)
 
 ### Better Auth Core
+
 `user`, `session`, `account`, `verification`
 
 ### Organization & Membership
+
 `organization` (includes: slogan, countryCode (**no DB default**, required at creation), timezone (**notNull**, no default), **primaryCurrency + currencyFormat (`notNull` columns without default — currency derives from country, format comes explicit; never read from settings)**)
 `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
+
 `platform_plan` (catalog with features as PlanFeatures, price in cents), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (AI credits: `credits` (consumption) + `bonus_credits` (one-off bonus per cycle, via **Dar AI Credits** in console) + `count` legacy, index `idx_ai_usage_org_period`, monthly period per cycle)
 
 ### Gym Domain
+
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
 `coach_assignment` (coach ↔ client)
 
 ### Memberships & Payments
+
 `membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail)
 
 ### Access Control
+
 `access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
 
 ### AI / RAG
+
 `ai_usage` (AI credits), `ai_knowledge_document` (KB docs; `organization_id NULL` = platform, set = org), `ai_knowledge_chunk` (chunks with pgvector 1024 dims embedding + HNSW cosine)
 
 ### Routines (Fitness)
+
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
+
 `gym_class` (class schedule), `content_page` (includes `metaTitle`/`metaDescription` SEO; canonical derives from slug), `content_block` (blocks by type with display order)
 
 ### Settings
+
 `platform_setting`, `gym_setting`
 
 ---
@@ -739,10 +774,10 @@ lib/
 
 ### Context-aware behavior (`lib/api/client.ts`)
 
-| Context | Cookie handling | Interceptors |
-|----------|------------------|--------------|
-| **Server (RSC)** | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op) |
-| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically) | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
+| Context              | Cookie handling                                                            | Interceptors                                                             |
+| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op)                                             |
+| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
 
 ### Service usage pattern
 
@@ -765,42 +800,57 @@ export const exampleService = {
 };
 ```
 
-### Post-mutation convention
+### Post-mutation convention (invalidación + refetch por petición)
 
-Every mutation from a client component (modal/form) must:
+Every mutation from a client component (modal/form/table action) must run
+all three steps **in this order** — neither one alone is enough:
 
 ```ts
-// 1. Call the service
-// 2. Invalidate the cache tag
-// 3. Refresh the RSC
-
-import { updateTag } from "next/cache";
-import { useRouter } from "next/navigation";
-
-const router = useRouter();
-const refresh = async () => {
-  "use server";
-  updateTag("console:orgs");  // server component cache tag
-};
-
-const handleSuccess = async () => {
-  await organizationsService.create(data);
-  router.refresh();  // re-fetches the server component
-};
+// 1. Call the service (ofetch `api()` — the HTTP request)
+// 2. Purge the Next cache tag via a server action (`updateTag`)
+// 3. Re-fetch the RSC (`router.refresh()`)
 ```
+
+```tsx
+// RSC page — owns the server action (it alone can call `updateTag`):
+import { updateTag } from "next/cache";
+
+const refreshOrgs = async () => {
+  "use server";
+  updateTag("console:orgs");  // purges every fetch tagged `console:orgs`
+};
+
+return <OrganizationsResults organizations={...} onRefreshServer={refreshOrgs} />;
+```
+
+```tsx
+// Client component — awaits the purge BEFORE refreshing:
+const refresh = React.useCallback(async () => {
+  if (onRefreshServer) {
+    await onRefreshServer(); // without this, refresh() re-reads stale cache
+  }
+  router.refresh(); // without this, the purge never reaches the screen
+}, [router, onRefreshServer]);
+```
+
+Why both: `router.refresh()` re-fetches the RSC but still hits fresh
+(`revalidate`, `tags`) cache entries — without `updateTag` the screen shows
+stale data until the TTL expires. `updateTag` without `refresh()` purges
+silently without re-rendering. Panel uses the same shape
+(`members-client.tsx` + `onRefreshServer` prop).
 
 > **Next.js 16 note**: `revalidateTag(tag, profile)` now requires a `profile` (string or `CacheLifeConfig`). For server actions use `updateTag(tag)` (new in Next 16, no profile).
 
 ### Console Cache Tags
 
-| Tag | Endpoint |
-|-----|----------|
-| `console:orgs` | `/api/platform/organizations*` |
-| `console:plans` | `/api/platform/plans*` (with-stats, summary) |
-| `console:subs` | `/api/platform/subscriptions*` (includes /stats) |
-| `console:settings` | `/api/platform/settings` |
-| `console:staff` | `/api/platform/staff` |
-| `console:knowledge` | `/api/platform/knowledge*` |
+| Tag                 | Endpoint                                         |
+| ------------------- | ------------------------------------------------ |
+| `console:orgs`      | `/api/platform/organizations*`                   |
+| `console:plans`     | `/api/platform/plans*` (with-stats, summary)     |
+| `console:subs`      | `/api/platform/subscriptions*` (includes /stats) |
+| `console:settings`  | `/api/platform/settings`                         |
+| `console:staff`     | `/api/platform/staff`                            |
+| `console:knowledge` | `/api/platform/knowledge*`                       |
 
 ### RSC Pattern in `apps/console`
 
@@ -877,12 +927,14 @@ pnpm test:e2e:report    # Open HTML report
 **Suite coverage** (54 tests): panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS); console — auth, dashboard, organizations, plans, subscriptions, settings.
 
 **Playwright config** (`playwright.config.ts`):
+
 - `testDir: './e2e'`, `fullyParallel: false` (Next.js dev + Turbopack compile on demand and api-worker shares one dev DB — too many concurrent workers causes compile storms and request timeouts), `workers: 2` locally / `1` in CI, `timeout: 60_000` (absorbs cold compiles), `retries: 1` in CI.
 - `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
 - **Projects with setup dependencies**: `panel-setup` → `panel` (uses `storageState: 'e2e/.auth/panel-user.json'`), `console-setup` → `console` (uses `storageState: 'e2e/.auth/console-user.json'`). Setup projects run with `storageState: undefined`.
 - **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
 
 **Structure**:
+
 ```
 e2e/
 ├── panel-setup.ts         # Panel setup: creates tenant (user+org) via API, UI login → storageState
@@ -912,11 +964,13 @@ e2e/
 ```
 
 **Auth strategy**:
+
 - `panel-setup.ts` — creates a gym tenant via API (Better Auth sign-up → `organization/create` with `countryCode: 'VE'`, `timezone: 'America/Caracas'`, `primaryCurrency: 'VES'`, `currencyFormat: 'latam'` → `set-active`), logs in via UI (waits for the dashboard to render) and saves `storageState`.
 - `console-setup.ts` — signs up via API and promotes the user to platform `owner` with a direct DB write (`setUserPlatformRole` in `helpers/db.ts`), because the admin plugin's set-role endpoint requires an existing admin; then logs in via UI and saves `storageState`.
 - Tests start already authenticated from the saved `storageState` (cookies + localStorage).
 
 **Helpers**:
+
 - `helpers/api.ts` — fixture creation over real HTTP (not in-process): `registerUser`, `signIn`, `createOrganization`, `setActiveOrganization`, `createGymTenant`, `createPlan`, `createGymMember`, `uid`/`uniqueEmail`, cookie extraction. Exercises the full stack including CORS, cookies and network latency.
 - `helpers/db.ts` — direct dev DB via `@neondatabase/serverless` (loads `DATABASE_URL` from `apps/api-worker/.dev.vars`, existing env vars win): `setUserPlatformRole`, `readGymSetting`, `e2eQuery`.
 - `helpers/modal.ts` — `openModal()`: retries the trigger click until the `dialog` role is actually visible (a click landing before React hydration completes is a no-op; never clicks again once open).
@@ -924,6 +978,7 @@ e2e/
 - `helpers/selectors.ts` — centralizes common selectors (prefer `data-testid` > role > text > CSS).
 
 **Env vars** (optional):
+
 - `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` — pre-existing credentials (if not set, users are created automatically)
 - `API_BASE_URL` — api-worker URL (default: `http://localhost:8788`)
 
@@ -962,20 +1017,20 @@ e2e/
 
 Use skill tool for specialized tasks:
 
-| Skill | When to use |
-|-------|-------------|
-| `database-designer` | Database schema design (Drizzle) |
-| `neon-postgres` | Neon database questions |
-| `interface-design` | Admin panels, dashboards |
-| `copywriting` | Marketing copy changes |
-| `vercel-react-best-practices` | React/Next.js performance |
-| `next-best-practices` | Next.js route handlers, data fetching, bundling, image optimization |
-| `drizzle` | Type-safe SQL ORM operations |
-| `best-practices` | Better Auth best practices |
-| `organization` | Better Auth organizations, members, RBAC |
-| `frontend-design` | Distinctive frontend interfaces / UI polish |
-| `neon-drizzle` | Drizzle + Neon setup, migrations |
-| `terraform-stacks` | Terraform Stacks configuration |
+| Skill                         | When to use                                                         |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `database-designer`           | Database schema design (Drizzle)                                    |
+| `neon-postgres`               | Neon database questions                                             |
+| `interface-design`            | Admin panels, dashboards                                            |
+| `copywriting`                 | Marketing copy changes                                              |
+| `vercel-react-best-practices` | React/Next.js performance                                           |
+| `next-best-practices`         | Next.js route handlers, data fetching, bundling, image optimization |
+| `drizzle`                     | Type-safe SQL ORM operations                                        |
+| `best-practices`              | Better Auth best practices                                          |
+| `organization`                | Better Auth organizations, members, RBAC                            |
+| `frontend-design`             | Distinctive frontend interfaces / UI polish                         |
+| `neon-drizzle`                | Drizzle + Neon setup, migrations                                    |
+| `terraform-stacks`            | Terraform Stacks configuration                                      |
 
 > Skills installed locally in `.agents/skills/` (via `npx skills add`). To discover more: `npx skills find <query>` and confirm with the user before installing.
 
