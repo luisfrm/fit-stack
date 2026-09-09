@@ -870,6 +870,7 @@ silently without re-rendering. Panel uses the same shape
 - **Client leaves** (search inputs, pagination buttons, modals) use `useRouter` + `searchParams` from `next/navigation` to modify the URL → server re-render.
 - **Type C pages** (currencies, payment-methods) are already **RSC parent + client child with `initialData`**: the server fetches settings (`console:settings`) and the client starts with the data (no loading flash) and saves via `api POST` + server action `updateTag`. The `organizations/[id]/settings` page remains client (fetch with `useState`/`useEffect`, no TanStack Query).
 - **TanStack Query is REMOVED from the project** (console and panel). Single standard: **RSC + ofetch + Next cache for all reads**; mutations in RSC pages use `service → toast → updateTag → refresh`. A client-side fetching library would only be reintroduced if a live-data feature (polling, optimistic UI, infinite scroll) justifies it.
+- **Reusable module pattern** (dashboard/staff/subscriptions/organizations): pure selectors in `lib/platform/*-selectors.ts` (unit-tested) + permissions in `lib/platform-permissions.ts` + server-safe formatting in `lib/utils/value-converters.ts` (`formatCents`, `formatShortDate`); tables with `MAX_ITEMS=10` and URL filters; unique hooks → `data-testid`, repeated hooks → `class`.
 
 ### Settings constants
 
@@ -898,7 +899,7 @@ pnpm test  # shared → api-worker → panel → console (Vitest)
   - `packages/shared/tests/`: features catalog, RBAC permissions, constants, RAG helpers, date utils
   - `apps/api-worker/tests/unit/`: AI helpers (`ai-helpers.test.ts`)
   - `apps/panel/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`, `error.test.ts`)
-  - `apps/console/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`)
+  - `apps/console/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`) + pure selectors/permissions (`dashboard-selectors`, `subscription-selectors`, `organization-selectors`, `platform-permissions`, `paginate`, `staff-role-counts`)
 - **Integration Tests (api-worker)**: real HTTP against the Hono app + Neon branch. `pnpm --filter api-worker test:integration`.
   - **Real HTTP, no mocks**: `app.fetch(request, env, ctx)` — the same production entry point — against a **Neon branch** (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`; read `tests/setup.ts`).
   - **Hard guards**: refuses to run if `TEST_DATABASE_URL` points to the same host+db as `DATABASE_URL`; without `TEST_DATABASE_URL` the whole suite is skipped with `describe.skipIf` (CI included).
@@ -924,7 +925,7 @@ pnpm test:e2e:ui        # Playwright UI mode (visual debug)
 pnpm test:e2e:report    # Open HTML report
 ```
 
-**Suite coverage** (54 tests): panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS); console — auth, dashboard, organizations, plans, subscriptions, settings.
+**Suite coverage**: panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS); console — auth, dashboard, organizations, org-detail (profile cards), plans, subscriptions, staff, settings.
 
 **Playwright config** (`playwright.config.ts`):
 
@@ -958,7 +959,9 @@ e2e/
     ├── auth.spec.ts       # Login, session
     ├── dashboard.spec.ts  # Stats, sidebar nav
     ├── organizations.spec.ts # List, search, create
+    ├── org-detail.spec.ts # Org profile (cards, back button)
     ├── subscriptions.spec.ts # List, filters
+    ├── staff.spec.ts      # Table, side panel, role/search URL filters
     ├── plans.spec.ts      # List, create
     └── settings.spec.ts   # Tab navigation, General/Currencies/FreeTier/AI-Provider/Knowledge
 ```

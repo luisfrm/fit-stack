@@ -14,7 +14,6 @@ import {
   platformSubscriptionsService,
   type PlatformPayment,
 } from "@/lib/services/platform-subscriptions-service";
-import { platformPlansService } from "@/lib/services/platform-plans-service";
 import type {
   PaymentStatus,
   IPaymentMethodDetails,
@@ -28,6 +27,8 @@ import {
   XCircle,
   Plus,
   ChevronDown,
+  Loader2,
+  MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { canManageBilling } from "@/lib/platform-permissions";
@@ -99,63 +100,56 @@ export function PlatformPaymentHistoryModal({
   canRegister = false,
   onRegisterPayment,
   className,
-}: PlatformPaymentHistoryModalProps) {
+}: Readonly<PlatformPaymentHistoryModalProps>) {
   const [payments, setPayments] = React.useState<PlatformPaymentWithSnapshot[]>(
     [],
   );
-  const [planFeatures, setPlanFeatures] = React.useState<PlanFeaturesV2 | null>(
-    null,
-  );
   const [loading, setLoading] = React.useState(false);
-  const [actionLoading, setActionLoading] = React.useState(false);
+  const [actionPaymentId, setActionPaymentId] = React.useState<number | null>(null);
+  const actionLoading = actionPaymentId !== null;
   const [expandedId, setExpandedId] = React.useState<number | null>(null);
   const { user } = useAuth();
   const canChangeStatus = canManageBilling(user?.role);
 
-  const loadPayments = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const [data, subscription] = await Promise.all([
-        platformSubscriptionsService.getPayments(subscriptionId),
-        platformSubscriptionsService.getById(subscriptionId).catch(() => null),
-      ]);
-      setPayments(data as PlatformPaymentWithSnapshot[]);
-
-      if (subscription?.planId) {
-        const plan = await platformPlansService
-          .getById(subscription.planId)
-          .catch(() => null);
-        setPlanFeatures(
-          (plan?.features as PlanFeaturesV2 | null | undefined) ?? null,
+  const loadPayments = React.useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const data = await platformSubscriptionsService.getPayments(
+          subscriptionId,
+          signal ? { signal } : undefined,
         );
-      } else {
-        setPlanFeatures(null);
+        setPayments(data as PlatformPaymentWithSnapshot[]);
+      } catch (err) {
+        if (signal?.aborted) return;
+        toast.error(
+          mutationError(
+            "PlatformPaymentHistoryModal",
+            err,
+            "No se pudieron cargar los pagos",
+          ),
+        );
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-    } catch (err) {
-      toast.error(
-        mutationError(
-          "PlatformPaymentHistoryModal",
-          err,
-          "No se pudieron cargar los pagos",
-        ),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [subscriptionId]);
+    },
+    [subscriptionId],
+  );
 
   React.useEffect(() => {
-    if (open) {
-      setExpandedId(null);
-      loadPayments();
-    }
+    if (!open) return;
+    const controller = new AbortController();
+    setExpandedId(null);
+    loadPayments(controller.signal);
+    return () => controller.abort();
   }, [open, loadPayments]);
 
   const handleChangeStatus = async (
     paymentId: number,
     status: PaymentStatus,
   ) => {
-    setActionLoading(true);
+    if (actionLoading) return;
+    setActionPaymentId(paymentId);
     try {
       await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
       toast.success(`Pago marcado como ${status}`);
@@ -170,14 +164,16 @@ export function PlatformPaymentHistoryModal({
         ),
       );
     } finally {
-      setActionLoading(false);
+      setActionPaymentId(null);
     }
   };
 
   return (
     <Modal
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(nextOpen) => {
+        if (!actionLoading) onOpenChange(nextOpen);
+      }}
       trigger={null}
       className={className}
       title="Historial de Pagos"
@@ -193,7 +189,12 @@ export function PlatformPaymentHistoryModal({
           </Text>
           <div className="flex items-center gap-2">
             {canRegister && onRegisterPayment && (
-              <Button size="sm" onClick={onRegisterPayment} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={onRegisterPayment}
+                disabled={loading || actionLoading}
+                className="gap-1.5"
+              >
                 <Plus size={14} />
                 Registrar pago
               </Button>
@@ -201,8 +202,8 @@ export function PlatformPaymentHistoryModal({
             <Button
               variant="ghost"
               size="sm"
-              onClick={loadPayments}
-              disabled={loading}
+              onClick={() => loadPayments()}
+              disabled={loading || actionLoading}
               className="gap-1.5"
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -234,9 +235,7 @@ export function PlatformPaymentHistoryModal({
               const snapshotSummary = snapshot
                 ? summarizeFeatures(snapshot)
                 : null;
-              const planSummary = planFeatures
-                ? summarizeFeatures(planFeatures)
-                : null;
+              const isRowUpdating = actionPaymentId === p.id;
               return (
                 <div
                   key={p.id}
@@ -300,6 +299,20 @@ export function PlatformPaymentHistoryModal({
                     </button>
                     <ActionsDropdown
                       modalData={p}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={actionLoading}
+                          aria-label={isRowUpdating ? "Actualizando estado..." : "Acciones de pago"}
+                        >
+                          {isRowUpdating ? (
+                            <Loader2 size={16} className="animate-spin text-primary" />
+                          ) : (
+                            <MoreHorizontal size={18} />
+                          )}
+                        </Button>
+                      }
                       sections={[
                         {
                           label: "Cambiar Estado",
@@ -362,10 +375,10 @@ export function PlatformPaymentHistoryModal({
                         <PaymentDetailsList
                           details={
                             p.paymentMethodDetails as
-                              | IPaymentMethodDetails
-                              | Record<string, any>
-                              | null
-                              | undefined
+                            | IPaymentMethodDetails
+                            | Record<string, any>
+                            | null
+                            | undefined
                           }
                         />
                         {p.exchangeRateApplied && (
@@ -393,14 +406,6 @@ export function PlatformPaymentHistoryModal({
                           >
                             {snapshotSummary}
                           </Text>
-                          {planSummary && planSummary !== snapshotSummary && (
-                            <Text
-                              size="xs"
-                              className="text-foreground-muted leading-relaxed opacity-70"
-                            >
-                              Hoy: {planSummary}
-                            </Text>
-                          )}
                         </div>
                       )}
                       <div className="flex items-center gap-4">

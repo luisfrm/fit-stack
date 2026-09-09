@@ -479,7 +479,7 @@ export function SubscriptionsTable({
           onOpenChange={() => setHistoryModal(null)}
           className="subs-history-modal"
           subscriptionId={historyModal.id}
-          subscriptionLabel={`${historyModal.organizationName || historyModal.organizationId} - ${historyModal.planName ?? ""}`}
+          subscriptionLabel={`${historyModal.organizationName || historyModal.organizationId}`}
           canRegister={canMutateBilling && hasActiveSubscription(historyModal)}
           onRegisterPayment={() => {
             setHistoryModal(null);
