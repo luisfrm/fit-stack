@@ -1,5 +1,6 @@
 import { eq, and, sql, type Db } from '@workspace/database/factory';
-import { gymMember, invitation, aiUsage } from '@workspace/database/schema';
+import { gymMember, invitation, aiUsage, subscription, payment } from '@workspace/database/schema';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
 // Período mensual por ciclo de suscripción (o calendario si no hay sub).
 export interface AiCreditPeriod {
@@ -215,6 +216,41 @@ export function createFeaturesRepository(db: Db) {
           )
         );
       return row?.count ?? 0;
+    },
+
+    /**
+     * Adopción del gym: miembros registrados (rol member) y cuántos tienen
+     * al menos una suscripción gym activa (endDate vigente, no cancelada,
+     * pago no anulado/rechazado). Base del % fuera del Member Platform.
+     */
+    async getGymAdoption(orgId: string): Promise<{
+      totalMembers: number;
+      activeSubMembers: number;
+    }> {
+      const [totals] = await db
+        .select({ totalMembers: sql<number>`count(*)::int` })
+        .from(gymMember)
+        .where(
+          and(eq(gymMember.organizationId, orgId), eq(gymMember.role, 'member')),
+        );
+
+      const [active] = await db
+        .select({ activeSubMembers: sql<number>`COUNT(DISTINCT ${subscription.memberId})::int` })
+        .from(subscription)
+        .innerJoin(payment, eq(payment.subscriptionId, subscription.id))
+        .where(
+          and(
+            eq(subscription.organizationId, orgId),
+            sql`${subscription.endDate} >= CURRENT_TIMESTAMP`,
+            sql`${subscription.cancelledAt} IS NULL`,
+            sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`,
+          ),
+        );
+
+      return {
+        totalMembers: totals?.totalMembers ?? 0,
+        activeSubMembers: active?.activeSubMembers ?? 0,
+      };
     },
 
     /**

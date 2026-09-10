@@ -8,12 +8,8 @@ import {
   DASHBOARD_WIDGET_PAGE_SIZE,
   type TrialsSelection,
 } from "@/lib/dashboard/selectors";
-import {
-  formatShortDate,
-  OrgAvatar,
-  WidgetCard,
-  WidgetEmpty,
-} from "./dashboard-widget-card";
+import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
+import { formatShortDate } from "@/lib/utils/value-converters";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 type TrialsFilter = "expiring" | "all";
@@ -90,7 +86,7 @@ export function TrialsWidget({ trials }: { readonly trials: TrialsSelection }) {
           <Link
             key={item.org.id}
             id={`dashboard-trials-row-${item.org.id}`}
-            href={`/organizations/${item.org.slug ?? item.org.id}/subscriptions`}
+            href={`/organizations/${item.org.slug ?? item.org.id}`}
             title={`Ver ${item.org.name}`}
             className="flex items-center gap-3 py-3 border-b border-white/5 last:border-b-0 transition-colors hover:bg-white/[0.03]"
           >
@@ -110,7 +106,11 @@ export function TrialsWidget({ trials }: { readonly trials: TrialsSelection }) {
             >
               Trial
             </Badge>
-            <ChevronRight size={14} className="text-foreground/50 shrink-0" aria-hidden />
+            <ChevronRight
+              size={14}
+              className="text-foreground/50 shrink-0"
+              aria-hidden
+            />
           </Link>
         ))
       )}

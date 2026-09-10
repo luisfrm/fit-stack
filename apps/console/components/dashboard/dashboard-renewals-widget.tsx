@@ -8,12 +8,8 @@ import {
   DASHBOARD_WIDGET_PAGE_SIZE,
   type RenewalItem,
 } from "@/lib/dashboard/selectors";
-import {
-  formatShortDate,
-  OrgAvatar,
-  WidgetCard,
-  WidgetEmpty,
-} from "./dashboard-widget-card";
+import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
+import { formatShortDate } from "@/lib/utils/value-converters";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 function RenewalRow({
@@ -47,7 +43,11 @@ function RenewalRow({
       >
         {urgency === "overdue" ? "Vencida" : "Por vencer"}
       </Badge>
-      <ChevronRight size={14} className="text-foreground/50 shrink-0" aria-hidden />
+      <ChevronRight
+        size={14}
+        className="text-foreground/50 shrink-0"
+        aria-hidden
+      />
     </Link>
   );
 }
@@ -70,7 +70,7 @@ export function RenewalsWidget({ items }: { readonly items: RenewalItem[] }) {
   const expiringPage = pageItems.filter((i) => i.urgency === "expiring");
 
   const orgHref = (slug: string | null, id: string) =>
-    `/organizations/${slug ?? id}/subscriptions`;
+    `/organizations/${slug ?? id}`;
 
   return (
     <WidgetCard
@@ -79,7 +79,7 @@ export function RenewalsWidget({ items }: { readonly items: RenewalItem[] }) {
       title="Pendientes de renovar"
       count={items.length}
       description="Vencidas y por vencer en 7 días (sin trials ni free tier)."
-      viewAllHref="/subscriptions"
+      viewAllHref=""
       footer={
         <WidgetPagination
           id="dashboard-renewals-pagination"

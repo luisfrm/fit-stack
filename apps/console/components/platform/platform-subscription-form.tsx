@@ -1,11 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Input,
-  Button,
-  toast,
-} from "@workspace/ui/components";
+import { Input, Button, toast } from "@workspace/ui/components";
 import {
   type IPlatformOrganization,
   type IPlatformPlan,
@@ -50,18 +46,30 @@ interface PlatformSubscriptionFormProps {
   readonly isLoading?: boolean;
   readonly initialOrganization?: IPlatformOrganization | null;
   readonly settings?: Record<string, string>;
+  /** Plan precargado (modo pago sobre una suscripción existente). */
+  readonly initialPlan?: IPlatformPlan | null;
+  /** Solo pago: oculta selector de plan, trial y fechas; cambia el submit. */
+  readonly paymentOnly?: boolean;
+  readonly submitLabel?: string;
 }
 
 function calculateEndDate(
   startDate: string,
   durationValue: number,
-  durationUnit: "day" | "week" | "month" | "year"
+  durationUnit: "day" | "week" | "month" | "year",
 ): string {
   const parts = startDate.split("-").map(Number);
   const year = parts[0];
   const month = parts[1];
   const day = parts[2];
-  if (year === undefined || month === undefined || day === undefined || Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    Number.isNaN(year) ||
+    Number.isNaN(month) ||
+    Number.isNaN(day)
+  ) {
     return "";
   }
 
@@ -88,14 +96,16 @@ export function PlatformSubscriptionForm({
   onSubmit,
   isLoading,
   initialOrganization,
-  settings
+  settings,
+  initialPlan,
+  paymentOnly = false,
+  submitLabel,
 }: PlatformSubscriptionFormProps) {
   const platformSettings = React.useMemo(() => settings ?? {}, [settings]);
   const [plans, setPlans] = React.useState<IPlatformPlan[]>([]);
 
-  const [selectedOrganization, setSelectedOrganization] = React.useState<IPlatformOrganization | null>(
-    initialOrganization ?? null
-  );
+  const [selectedOrganization, setSelectedOrganization] =
+    React.useState<IPlatformOrganization | null>(initialOrganization ?? null);
 
   React.useEffect(() => {
     if (initialOrganization) {
@@ -104,11 +114,21 @@ export function PlatformSubscriptionForm({
   }, [initialOrganization]);
 
   const organizationId = selectedOrganization?.id ?? null;
-  const [planId, setPlanId] = React.useState<number | null>(null);
+  const [planId, setPlanId] = React.useState<number | null>(
+    initialPlan?.id ?? null,
+  );
+
+  React.useEffect(() => {
+    if (initialPlan) {
+      setPlanId(initialPlan.id);
+    }
+  }, [initialPlan]);
 
   const [orgSearch, setOrgSearch] = React.useState("");
   const debouncedOrgSearch = useDebounce(orgSearch, 500);
-  const [orgResults, setOrgResults] = React.useState<IPlatformOrganization[]>([]);
+  const [orgResults, setOrgResults] = React.useState<IPlatformOrganization[]>(
+    [],
+  );
   const [isSearchingOrg, setIsSearchingOrg] = React.useState(false);
 
   const d = new Date();
@@ -123,7 +143,9 @@ export function PlatformSubscriptionForm({
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [paymentDetails, setPaymentDetails] = React.useState("");
-  const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
+  const [dynamicFieldValues, setDynamicFieldValues] = React.useState<
+    Record<string, any>
+  >({});
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
@@ -131,14 +153,26 @@ export function PlatformSubscriptionForm({
   const [amountFocus, setAmountFocus] = React.useState(false);
   const [rateFocus, setRateFocus] = React.useState(false);
 
-  const currencyFormat = platformSettings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
+  const currencyFormat = platformSettings[
+    PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT
+  ] as CurrencyFormat;
 
-  const selectedPlan = React.useMemo(() => plans.find((p) => p.id === planId) ?? null, [plans, planId]);
+  const allPlans = React.useMemo(
+    () =>
+      initialPlan && !plans.some((p) => p.id === initialPlan.id)
+        ? [initialPlan, ...plans]
+        : plans,
+    [plans, initialPlan],
+  );
+  const selectedPlan = React.useMemo(
+    () => allPlans.find((p) => p.id === planId) ?? null,
+    [allPlans, planId],
+  );
 
   // Plan free (precio 0) o trial explícito
   const isFreePlan = selectedPlan ? Number(selectedPlan.price) === 0 : false;
   const hasTrialDays = selectedPlan ? (selectedPlan.trialDays ?? 0) > 0 : false;
-  const showPayment = selectedPlan && !isTrial && !isFreePlan;
+  const showPayment = selectedPlan && !isFreePlan && (!isTrial || paymentOnly);
 
   // Preview de la fecha de fin (solo visual)
   const previewEndDate = React.useMemo(() => {
@@ -149,14 +183,15 @@ export function PlatformSubscriptionForm({
     return calculateEndDate(
       startDate,
       selectedPlan.durationValue,
-      selectedPlan.durationUnit
+      selectedPlan.durationUnit,
     );
   }, [selectedPlan, startDate, isTrial, hasTrialDays]);
 
   const planCurrency = selectedPlan?.currency || "USD";
   const { data: planRates } = useExchangeRates(planCurrency);
 
-  const isForced = initialOrganization !== undefined && initialOrganization !== null;
+  const isForced =
+    initialOrganization !== undefined && initialOrganization !== null;
 
   const loadPlans = React.useCallback(async () => {
     try {
@@ -167,50 +202,77 @@ export function PlatformSubscriptionForm({
     }
   }, []);
 
-  React.useEffect(() => { loadPlans(); }, [loadPlans]);
+  React.useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
 
   React.useEffect(() => {
     setAllowPriceOverride(platformSettings["allow_price_override"] === "true");
   }, [platformSettings]);
 
   React.useEffect(() => {
-    if (!debouncedOrgSearch) { setOrgResults([]); return; }
+    if (!debouncedOrgSearch) {
+      setOrgResults([]);
+      return;
+    }
     let cancelled = false;
     const search = async () => {
       setIsSearchingOrg(true);
       try {
-        const res = await organizationsService.getAll({ query: debouncedOrgSearch, limit: 5 });
+        const res = await organizationsService.getAll({
+          query: debouncedOrgSearch,
+          limit: 5,
+        });
         if (!cancelled) setOrgResults(res.data);
-      } catch { if (!cancelled) setOrgResults([]); }
-      finally { if (!cancelled) setIsSearchingOrg(false); }
+      } catch {
+        if (!cancelled) setOrgResults([]);
+      } finally {
+        if (!cancelled) setIsSearchingOrg(false);
+      }
     };
     search();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedOrgSearch]);
 
   const activeCurrencies = React.useMemo(() => {
     const val = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
     if (!val) return [];
-    try { return JSON.parse(val) as string[]; } catch { return []; }
+    try {
+      return JSON.parse(val) as string[];
+    } catch {
+      return [];
+    }
   }, [platformSettings]);
 
   const activePaymentMethods = React.useMemo(() => {
     const val = platformSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_PAYMENT_METHODS];
     if (!val) return [];
-    try { return JSON.parse(val) as IPaymentMethodConfig[]; } catch { return []; }
+    try {
+      return JSON.parse(val) as IPaymentMethodConfig[];
+    } catch {
+      return [];
+    }
   }, [platformSettings]);
 
   const selectedPaymentConfig = React.useMemo(
     () => activePaymentMethods.find((m) => m.id === paymentMethodId),
-    [activePaymentMethods, paymentMethodId]
+    [activePaymentMethods, paymentMethodId],
   );
 
   const filteredPaymentMethods = React.useMemo(() => {
-    return activePaymentMethods.filter((m) => m.currency === null || m.currency === paymentCurrency);
+    return activePaymentMethods.filter(
+      (m) => m.currency === null || m.currency === paymentCurrency,
+    );
   }, [activePaymentMethods, paymentCurrency]);
 
   React.useEffect(() => {
-    if (!selectedPlan) { setFinalAmount(0); setExchangeRate(1); return; }
+    if (!selectedPlan) {
+      setFinalAmount(0);
+      setExchangeRate(1);
+      return;
+    }
     let rate = 1;
     if (paymentCurrency !== selectedPlan.currency && planRates) {
       rate = planRates[paymentCurrency] ?? 1;
@@ -240,14 +302,24 @@ export function PlatformSubscriptionForm({
     const finalDetails: Record<string, any> = { ...dynamicFieldValues };
     if (!selectedPaymentConfig) return finalDetails;
     for (const field of selectedPaymentConfig.fields) {
-      const isFilePending = field.type === "file" && dynamicFieldValues[field.id] instanceof File;
+      const isFilePending =
+        field.type === "file" && dynamicFieldValues[field.id] instanceof File;
       if (isFilePending) {
         const file = dynamicFieldValues[field.id] as File;
         const timestamp = Date.now().toString().slice(-6);
-        const orgName = selectedOrganization?.name.toLowerCase().replaceAll(/\s+/g, "-") || "org";
-        const methodName = selectedPaymentConfig.name.toLowerCase().replaceAll(/\s+/g, "-");
+        const orgName =
+          selectedOrganization?.name.toLowerCase().replaceAll(/\s+/g, "-") ||
+          "org";
+        const methodName = selectedPaymentConfig.name
+          .toLowerCase()
+          .replaceAll(/\s+/g, "-");
         const customName = `${orgName}_${methodName}_${timestamp}`;
-        finalDetails[field.id] = await uploadService.uploadFile(file, customName, organizationId || undefined, "receipts");
+        finalDetails[field.id] = await uploadService.uploadFile(
+          file,
+          customName,
+          organizationId || undefined,
+          "receipts",
+        );
       }
     }
     return finalDetails;
@@ -255,8 +327,14 @@ export function PlatformSubscriptionForm({
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    if (!organizationId) { toast.error("Debes seleccionar una organización"); return; }
-    if (!planId) { toast.error("Debes seleccionar un plan"); return; }
+    if (!organizationId) {
+      toast.error("Debes seleccionar una organización");
+      return;
+    }
+    if (!planId) {
+      toast.error("Debes seleccionar un plan");
+      return;
+    }
 
     setIsProcessingUploads(true);
     try {
@@ -284,14 +362,19 @@ export function PlatformSubscriptionForm({
       if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
         // visual fields are instructions, never persisted as payment details
         finalPaymentMethodDetails = selectedPaymentConfig.fields
-          .filter((field) => field.type !== "visual" && finalDetails[field.id] !== undefined)
+          .filter(
+            (field) =>
+              field.type !== "visual" && finalDetails[field.id] !== undefined,
+          )
           .map((field) => ({
             label: field.label,
             value: finalDetails[field.id],
             type: field.type === "visual" ? "text" : field.type,
           }));
       } else if (paymentDetails) {
-        finalPaymentMethodDetails = [{ label: "Nota / Referencia", value: paymentDetails, type: "text" }];
+        finalPaymentMethodDetails = [
+          { label: "Nota / Referencia", value: paymentDetails, type: "text" },
+        ];
       }
 
       await onSubmit({
@@ -302,10 +385,13 @@ export function PlatformSubscriptionForm({
         payment: {
           amountPaidCents: Math.round(finalAmount * 100),
           currencyPaid: paymentCurrency,
-          exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
+          exchangeRateApplied:
+            exchangeRate === 1 ? undefined : String(exchangeRate),
           paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
           paymentMethodDetails: finalPaymentMethodDetails,
-          status: paymentValidated ? PAYMENT_STATUSES.VALIDATED : PAYMENT_STATUSES.PROCESSING,
+          status: paymentValidated
+            ? PAYMENT_STATUSES.VALIDATED
+            : PAYMENT_STATUSES.PROCESSING,
           paymentDate: paymentDate,
         },
       });
@@ -319,26 +405,52 @@ export function PlatformSubscriptionForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <OrganizationSelector
-        selectedOrganization={selectedOrganization}
-        searchTerm={orgSearch}
-        isSearching={isSearchingOrg}
-        searchResults={orgResults}
-        onSearchChange={setOrgSearch}
-        onSelect={handleSelectOrg}
-        onClear={handleClearOrg}
-        forced={isForced}
-      />
+      {paymentOnly ? (
+        <OrganizationSelector
+          selectedOrganization={selectedOrganization}
+          searchTerm=""
+          isSearching={false}
+          searchResults={[]}
+          onSearchChange={() => {}}
+          onSelect={() => {}}
+          onClear={() => {}}
+          forced
+        />
+      ) : (
+        <OrganizationSelector
+          selectedOrganization={selectedOrganization}
+          searchTerm={orgSearch}
+          isSearching={isSearchingOrg}
+          searchResults={orgResults}
+          onSearchChange={setOrgSearch}
+          onSelect={handleSelectOrg}
+          onClear={handleClearOrg}
+          forced={isForced}
+        />
+      )}
 
-      <PlatformPlanSelector
-        plans={plans}
-        planId={planId}
-        onPlanSelect={setPlanId}
-        disabled={!organizationId}
-      />
+      {paymentOnly ? (
+        selectedPlan && (
+          <div className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+            <p className="text-sm font-bold uppercase tracking-widest text-primary">
+              {selectedPlan.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Plan de la suscripción — no se puede cambiar al registrar un pago.
+            </p>
+          </div>
+        )
+      ) : (
+        <PlatformPlanSelector
+          plans={plans}
+          planId={planId}
+          onPlanSelect={setPlanId}
+          disabled={!organizationId}
+        />
+      )}
 
       {/* Trial toggle si el plan lo permite */}
-      {selectedPlan && hasTrialDays && (
+      {selectedPlan && hasTrialDays && !paymentOnly && (
         <div className="flex items-center gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
           <input
             id="is-trial"
@@ -347,7 +459,10 @@ export function PlatformSubscriptionForm({
             onChange={(e) => setIsTrial(e.target.checked)}
             className="h-4 w-4 rounded border-white/20"
           />
-          <label htmlFor="is-trial" className="text-sm font-medium cursor-pointer flex-1">
+          <label
+            htmlFor="is-trial"
+            className="text-sm font-medium cursor-pointer flex-1"
+          >
             Iniciar como prueba
             <span className="block text-xs text-muted-foreground font-normal">
               {selectedPlan.trialDays} días gratis antes del primer cobro
@@ -365,23 +480,25 @@ export function PlatformSubscriptionForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          id="start-date"
-          type="date"
-          label="Fecha de Inicio"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-        <Input
-          id="end-date"
-          type="date"
-          label="Fecha de Vencimiento"
-          value={previewEndDate}
-          disabled
-          title="Calculada según la duración del plan"
-        />
-      </div>
+      {!paymentOnly && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            id="start-date"
+            type="date"
+            label="Fecha de Inicio"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <Input
+            id="end-date"
+            type="date"
+            label="Fecha de Vencimiento"
+            value={previewEndDate}
+            disabled
+            title="Calculada según la duración del plan"
+          />
+        </div>
+      )}
 
       {showPayment && (
         <PaymentSection
@@ -394,32 +511,57 @@ export function PlatformSubscriptionForm({
           currencyFormat={currencyFormat}
           selectedPaymentConfig={selectedPaymentConfig}
           dynamicFieldValues={dynamicFieldValues}
-          onDynamicChange={(id, value) => setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))}
+          onDynamicChange={(id, value) =>
+            setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))
+          }
           exchangeRate={exchangeRate}
           rateFocus={rateFocus}
           amountFocus={amountFocus}
           onRateFocus={setRateFocus}
           onAmountFocus={setAmountFocus}
-          onRateChange={(val) => { setExchangeRate(val); setFinalAmount((Number(selectedPlan!.price) * val) / 100); }}
+          onRateChange={(val) => {
+            setExchangeRate(val);
+            setFinalAmount((Number(selectedPlan!.price) * val) / 100);
+          }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
           paymentDate={paymentDate}
           onPaymentDateChange={setPaymentDate}
-          onMethodChange={(v) => { setPaymentMethodId(v); setDynamicFieldValues({}); }}
+          onMethodChange={(v) => {
+            setPaymentMethodId(v);
+            setDynamicFieldValues({});
+          }}
           allowPriceOverride={allowPriceOverride}
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
         />
       )}
 
+      {paymentOnly && isFreePlan && (
+        <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
+          <p className="text-sm font-medium text-emerald-400">Plan gratuito</p>
+          <p className="text-xs text-muted-foreground">
+            Esta suscripción no requiere pagos.
+          </p>
+        </div>
+      )}
+
       <Button
         type="submit"
-        disabled={isLoading || isProcessingUploads || !organizationId || !planId}
+        disabled={
+          isLoading ||
+          isProcessingUploads ||
+          !organizationId ||
+          !planId ||
+          (paymentOnly && isFreePlan)
+        }
         className="w-full h-12 uppercase tracking-widest font-bold shadow-xl shadow-primary/5"
       >
-        {isLoading || isProcessingUploads ? "PROCESANDO..." : "GENERAR SUSCRIPCIÓN"}
+        {isLoading || isProcessingUploads
+          ? "PROCESANDO..."
+          : (submitLabel ?? "GENERAR SUSCRIPCIÓN")}
       </Button>
     </form>
   );

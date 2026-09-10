@@ -1,10 +1,7 @@
 "use client";
 
 import { Text } from "@workspace/ui/components";
-import {
-  ValueConverter,
-  type CurrencyFormat,
-} from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@/lib/utils/value-converters";
 
 interface PriceCellProps {
   readonly isTrial: boolean;
@@ -31,9 +28,10 @@ export function PriceCell({
 
   if (priceOverride !== null && priceOverride !== undefined) {
     const baseText =
-      planPrice !== undefined ? formatAmount(planPrice, planCurrency ?? "USD", currencyFormat) : "";
-    const showBase =
-      planPrice !== undefined && priceOverride !== planPrice;
+      planPrice !== undefined
+        ? formatAmount(planPrice, planCurrency ?? "USD", currencyFormat)
+        : "";
+    const showBase = planPrice !== undefined && priceOverride !== planPrice;
 
     return (
       <div className="flex flex-col gap-0.5">
@@ -63,6 +61,10 @@ export function PriceCell({
   );
 }
 
-function formatAmount(amount: number, currency: string, format: CurrencyFormat): string {
-  return ValueConverter.format(amount / 100, currency, format);
+function formatAmount(
+  amount: number,
+  currency: string,
+  format: CurrencyFormat,
+): string {
+  return formatCents(amount, currency, format);
 }

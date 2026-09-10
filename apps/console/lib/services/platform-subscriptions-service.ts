@@ -13,8 +13,14 @@ export type PaginatedSubscriptions = IPaginatedResult<IPlatformSubscription>;
 export type PlatformPayment = IPlatformSubscriptionPayment;
 export type PaginatedPayments = IPaginatedResult<IPlatformSubscriptionPayment>;
 
+export interface RevenuePoint {
+  month: string;
+  totalCents: number;
+  count: number;
+}
+
 export interface SubscriptionFilters {
-  status?: PlatformSubscriptionStatus | "all";
+  status?: PlatformSubscriptionStatus | "all" | "expiring";
   planId?: number;
   organizationId?: string;
   isTrial?: boolean;
@@ -108,16 +114,31 @@ export const platformSubscriptionsService = {
   },
 
   /**
-   * Retrieves all subscriptions for a specific organization.
+   * Retrieves the paginated subscriptions of a specific organization
+   * (same shape as the global list — feeds the shared SubscriptionsTable).
    */
-  async getByOrganization(
+  async getSubscriptionsByOrg(
     organizationId: string,
+    params?: { page?: number; limit?: number },
     options?: ApiFetchOptions,
-  ): Promise<IPlatformSubscription[]> {
-    return await api<IPlatformSubscription[]>(SUBSCRIPTIONS_PATH, {
-      query: { organizationId },
+  ): Promise<PaginatedSubscriptions> {
+    return await api<PaginatedSubscriptions>(SUBSCRIPTIONS_PATH, {
+      query: { organizationId, ...params },
       ...options,
     });
+  },
+
+  /**
+   * Retrieves the SaaS invoice history (payments) of an organization.
+   */
+  async getInvoicesByOrg(
+    organizationId: string,
+    options?: ApiFetchOptions,
+  ): Promise<PlatformPayment[]> {
+    return await api<PlatformPayment[]>(
+      `${SUBSCRIPTIONS_PATH}/by-organization/${organizationId}/invoices`,
+      options,
+    );
   },
 
   /**
@@ -203,10 +224,20 @@ export const platformSubscriptionsService = {
    * Retrieves KPI statistics.
    */
   async getStats(options?: ApiFetchOptions): Promise<SubscriptionStats> {
-    return await api<SubscriptionStats>(
-      `${SUBSCRIPTIONS_PATH}/stats`,
-      options,
-    );
+    return await api<SubscriptionStats>(`${SUBSCRIPTIONS_PATH}/stats`, options);
+  },
+
+  /**
+   * Retrieves the monthly SaaS revenue series in UTC (validated payments only).
+   */
+  async getRevenue(
+    months = 12,
+    options?: ApiFetchOptions,
+  ): Promise<RevenuePoint[]> {
+    return await api<RevenuePoint[]>(`${SUBSCRIPTIONS_PATH}/revenue`, {
+      query: { months },
+      ...options,
+    });
   },
 
   /* ── Payments ── */

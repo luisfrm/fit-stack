@@ -37,7 +37,7 @@ export interface SubscriptionWithDetails {
   cancellationReason: string | null;
   createdAt: Date;
   /** Status computado (no se guarda) */
-  computedStatus: PlatformSubscriptionStatus;
+  status: PlatformSubscriptionStatus;
   /** Status del último pago (para lógica de UX) */
   latestPaymentStatus: PaymentStatus | null;
 
@@ -207,7 +207,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
           planFeatures: platformPlan.features,
-          computedStatus: this.getSubscriptionStatusSql(),
+          status: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
         })
@@ -260,7 +260,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
           planFeatures: platformPlan.features,
-          computedStatus: this.getSubscriptionStatusSql(),
+          status: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
         })
@@ -294,7 +294,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
           planFeatures: platformPlan.features,
-          computedStatus: this.getSubscriptionStatusSql(),
+          status: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
         })
@@ -328,7 +328,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planDurationValue: platformPlan.durationValue,
           planDurationUnit: platformPlan.durationUnit,
           planFeatures: platformPlan.features,
-          computedStatus: this.getSubscriptionStatusSql(),
+          status: this.getSubscriptionStatusSql(),
           latestPaymentStatus: this.getLatestPaymentStatusSql(),
           paymentsCount: this.getPaymentsCountSql(),
         })
@@ -523,6 +523,45 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         previousMonthRevenueCents: Number(revenueResult?.previousMonthRevenueCents ?? 0),
         mrrCents: Number(mrrResult?.mrrCents ?? 0),
       };
+    },
+
+    /**
+     * Serie mensual de revenue SaaS en UTC (solo pagos `validated`).
+     * Usa la misma fórmula que `getStats().monthlyRevenueCents`
+     * (`COALESCE(baseAmount, amountPaid)`) para que el bucket del mes
+     * corriente cuadre con el KPI.
+     * Nota: si hay planes en distintas monedas, las sumas mezclan monedas
+     * igual que `monthlyRevenueCents` — la normalización multi-moneda real
+     * es follow-up (ver `docs/FUTURE_IDEAS.md` §5).
+     */
+    async getMonthlyRevenue(months: number): Promise<
+      { month: string; totalCents: number; count: number }[]
+    > {
+      const safeMonths = Math.min(24, Math.max(1, Math.floor(months)));
+      const rows = await db
+        .select({
+          month: sql<string>`TO_CHAR(m.month, 'YYYY-MM-01')`,
+          totalCents: sql<number>`COALESCE(SUM(COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid})), 0)::int`,
+          count: sql<number>`COUNT(${platformSubscriptionPayment.id})::int`,
+        })
+        .from(
+          sql`(SELECT DATE_TRUNC('month', CURRENT_TIMESTAMP) - (GENERATE_SERIES(0, ${safeMonths} - 1)) * INTERVAL '1 month' AS month) m`,
+        )
+        .leftJoin(
+          platformSubscriptionPayment,
+          and(
+            eq(platformSubscriptionPayment.status, PAYMENT_STATUSES.VALIDATED),
+            sql`DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate} AT TIME ZONE 'UTC') = m.month`,
+          ),
+        )
+        .groupBy(sql`m.month`)
+        .orderBy(sql`m.month`);
+
+      return rows.map((r) => ({
+        month: r.month,
+        totalCents: Number(r.totalCents ?? 0),
+        count: Number(r.count ?? 0),
+      }));
     },
 
     async getOrganizationInvoices(organizationId: string) {

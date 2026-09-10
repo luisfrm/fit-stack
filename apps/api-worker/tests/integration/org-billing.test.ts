@@ -147,7 +147,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       expect(res.body.subscription.planName).toBeDefined();
       expect(res.body.subscription.planPrice).toBe(5000);
       expect(res.body.subscription.planCurrency).toBe('USD');
-      expect(res.body.subscription.computedStatus).toBe('past_due');
+      expect(res.body.subscription.status).toBe('past_due');
       expect(new Date(res.body.subscription.currentPeriodEnd).getTime()).toBeLessThan(Date.now());
     });
 
@@ -307,7 +307,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       // La org vuelve a leer su sub como activa
       const orgSub = await tenantA.owner.client.get('/api/organizations/subscription');
       expect(orgSub.status, orgSub.text).toBe(200);
-      expect(orgSub.body.subscription.computedStatus).toBe('active');
+      expect(orgSub.body.subscription.status).toBe('active');
     });
   });
 

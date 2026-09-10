@@ -1,35 +1,99 @@
-import { Plus, Building2, Users } from "lucide-react";
-import { Button, Text } from "@workspace/ui/components";
+import { Plus } from "lucide-react";
+import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
-import { organizationsService } from "@/lib/services/organizations-service";
-import { OrganizationsSearch } from "./organizations-search";
-import { OrganizationsResults } from "./organizations-results";
-import { OrganizationsPagination } from "./organizations-pagination";
+import {
+  organizationsService,
+  type OrgAiQuota,
+} from "@/lib/services/organizations-service";
+import { OrganizationsSearch } from "@/components/organizations/organizations-search";
+import { OrganizationsFilters } from "@/components/organizations/organizations-filters";
+import { OrganizationsKpiSection } from "@/components/organizations/organizations-kpi-section";
+import { OrganizationsResults } from "@/components/organizations/organizations-results";
+import { OrganizationsPagination } from "@/components/organizations/organizations-pagination";
+import {
+  selectOrgKpis,
+  filterOrgsByCountry,
+  filterOrgsBySubStatus,
+  type OrgSubStatusFilter,
+} from "@/lib/platform/organization-selectors";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_LIMIT = 10;
+/**
+ * Tope del dataset en memoria para KPIs/filtros exactos. Si `total` lo supera,
+ * los KPIs son aproximados (ver nota en FUTURE_IDEAS §5: agregados server-side).
+ */
+const DATASET_LIMIT = 500;
+
+const SUB_STATUS_VALUES: OrgSubStatusFilter[] = [
+  "active",
+  "past_due",
+  "read_only",
+  "suspended",
+  "cancelled",
+  "none",
+];
 
 export default async function OrganizationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ query?: string; page?: string }>;
+  searchParams: Promise<{
+    query?: string;
+    country?: string;
+    subStatus?: string;
+    page?: string;
+  }>;
 }) {
   const params = await searchParams;
   const query = params.query || "";
+  const country = params.country || null;
+  const subStatus = SUB_STATUS_VALUES.includes(
+    params.subStatus as OrgSubStatusFilter,
+  )
+    ? (params.subStatus as OrgSubStatusFilter)
+    : null;
   const page = Math.max(1, Number(params.page) || 1);
 
-  const result = await organizationsService.getAll(
+  const dataset = await organizationsService.getAll(
     {
       query: query || undefined,
-      page,
-      limit: PAGE_LIMIT,
+      page: 1,
+      limit: DATASET_LIMIT,
       includeMemberCount: true,
     },
     { next: { revalidate: 60, tags: ["console:orgs"] } },
   );
+
+  const filtered = filterOrgsBySubStatus(
+    filterOrgsByCountry(dataset.data, country),
+    subStatus,
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_LIMIT));
+  const safePage = Math.min(page, totalPages);
+  const visible = filtered.slice(
+    (safePage - 1) * PAGE_LIMIT,
+    safePage * PAGE_LIMIT,
+  );
+
+  const aiEntries = await Promise.allSettled(
+    visible.map(async (org) => {
+      const quota = await organizationsService.getAiUsage(org.id, {
+        next: { revalidate: 300, tags: ["console:orgs"] },
+      });
+      return [org.id, quota] as const;
+    }),
+  );
+  const aiUsage: Record<string, OrgAiQuota> = {};
+  for (const entry of aiEntries) {
+    if (entry.status === "fulfilled") {
+      aiUsage[entry.value[0]] = entry.value[1];
+    }
+  }
+
+  const kpis = selectOrgKpis(dataset.data, new Date());
 
   const refreshOrgs = async () => {
     "use server";
@@ -53,34 +117,26 @@ export default async function OrganizationsPage({
         />
       </DashboardHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white/5 border border-white/5 p-5 rounded-2xl flex items-center justify-between">
-          <div>
-            <Text size="xs" variant="muted" className="uppercase font-black tracking-widest leading-none mb-1">Total Clientes</Text>
-            <Text size="lg" weight="bold" className="text-white">{result.total}</Text>
-          </div>
-          <div className="p-3 bg-primary/10 rounded-xl text-primary">
-            <Building2 size={20} />
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/5 p-5 rounded-2xl flex items-center justify-between opacity-50 grayscale select-none">
-          <div>
-            <Text size="xs" variant="muted" className="uppercase font-black tracking-widest leading-none mb-1">Activos Hoy</Text>
-            <Text size="lg" weight="bold" className="text-success">---</Text>
-          </div>
-          <div className="p-3 bg-success/10 rounded-xl text-success">
-            <Users size={20} />
-          </div>
-        </div>
-      </div>
+      <OrganizationsKpiSection kpis={kpis} />
 
-      <OrganizationsSearch initialValue={query} />
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
+        <OrganizationsSearch initialValue={query} />
+        <OrganizationsFilters
+          initialCountry={country}
+          initialSubStatus={subStatus}
+        />
+      </div>
 
       <div className="h-px w-full bg-white/5" />
 
-      <OrganizationsResults organizations={result.data} />
+      <OrganizationsResults
+        organizations={visible}
+        aiUsage={aiUsage}
+        totalFiltered={filtered.length}
+        onRefreshServer={refreshOrgs}
+      />
 
-      <OrganizationsPagination page={page} totalPages={result.totalPages} />
+      <OrganizationsPagination page={safePage} totalPages={totalPages} />
     </div>
   );
 }

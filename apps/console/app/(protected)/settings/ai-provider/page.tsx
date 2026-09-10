@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { updateTag } from "next/cache";
-import { AiProviderSettings } from "./ai-provider-settings";
+import { AiProviderSettings } from "@/components/settings/ai-provider/ai-provider-settings";
 
 export const dynamic = "force-dynamic";
 

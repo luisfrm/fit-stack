@@ -5,7 +5,7 @@ import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { featuresService } from "@/lib/services/features-service";
 import { FEATURE_CATALOG } from "@workspace/shared";
 import { updateTag } from "next/cache";
-import { PlansClient } from "./plans-client";
+import { PlansClient } from "@/components/plans/plans-client";
 
 export const dynamic = "force-dynamic";
 
@@ -50,4 +50,3 @@ export default async function PlatformPlansPage() {
     />
   );
 }
-

@@ -30,6 +30,24 @@ export interface PaginatedOrganizationsResult {
   totalPages: number;
 }
 
+async function getMemberCounts(
+  db: Db,
+  organizationId: string,
+): Promise<{ memberCount: number; userCount: number }> {
+  const [mCount] = await db
+    .select({ total: count() })
+    .from(gymMember)
+    .where(eq(gymMember.organizationId, organizationId));
+  const [uCount] = await db
+    .select({ total: count() })
+    .from(authMember)
+    .where(eq(authMember.organizationId, organizationId));
+  return {
+    memberCount: Number(mCount?.total || 0),
+    userCount: Number(uCount?.total || 0),
+  };
+}
+
 export function createOrganizationsRepository(db: Db) {
   return {
     async findAll(filters: OrganizationFilter): Promise<PaginatedOrganizationsResult> {
@@ -102,17 +120,9 @@ export function createOrganizationsRepository(db: Db) {
           let userCountNum: number | undefined = undefined;
 
           if (filters.includeMemberCount) {
-            const [mCount] = await db
-              .select({ total: count() })
-              .from(gymMember)
-              .where(eq(gymMember.organizationId, org.id));
-            memberCountNum = Number(mCount?.total || 0);
-
-            const [uCount] = await db
-              .select({ total: count() })
-              .from(authMember)
-              .where(eq(authMember.organizationId, org.id));
-            userCountNum = Number(uCount?.total || 0);
+            const counts = await getMemberCounts(db, org.id);
+            memberCountNum = counts.memberCount;
+            userCountNum = counts.userCount;
           }
 
           let subscriptionDto: (IPlatformSubscription & { planName?: string }) | null = null;
@@ -178,13 +188,19 @@ export function createOrganizationsRepository(db: Db) {
       return result;
     },
 
-    async findBySlug(slug: string): Promise<DbOrganization | undefined> {
+    async findBySlug(
+      slug: string,
+      opts?: { includeMemberCount?: boolean },
+    ): Promise<(DbOrganization & { memberCount?: number; userCount?: number }) | undefined> {
       const [result] = await db
         .select()
         .from(organization)
         .where(eq(organization.slug, slug))
         .limit(1);
-      return result;
+      if (!result) return result;
+      if (!opts?.includeMemberCount) return result;
+      const counts = await getMemberCounts(db, result.id);
+      return { ...result, ...counts };
     },
 
     async create(data: NewDbOrganization) {

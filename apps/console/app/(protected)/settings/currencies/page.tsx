@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { updateTag } from "next/cache";
-import { PlatformCurrenciesSettings } from "./currencies-settings";
+import { PlatformCurrenciesSettings } from "@/components/settings/currencies/currencies-settings";
 
 export const dynamic = "force-dynamic";
 

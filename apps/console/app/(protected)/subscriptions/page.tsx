@@ -3,11 +3,13 @@ import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { SubscriptionsKpiSection } from "@/components/platform/subscriptions-kpi-section";
 import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
+import { SubscriptionsSidePanel } from "@/components/platform/subscriptions-side-panel";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
+import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { updateTag } from "next/cache";
-import { SubscriptionsClient } from "./subscriptions-client";
+import { SubscriptionsClient } from "@/components/platform/subscriptions-client";
 import type { CurrencyFormat } from "@/lib/utils/value-converters";
 import type { PlatformSubscriptionStatus } from "@workspace/shared/types";
 
@@ -27,14 +29,28 @@ const FILTER_TO_STATUS: Record<string, string | undefined> = {
 export default async function PlatformSubscriptionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; search?: string; page?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    search?: string;
+    page?: string;
+    planId?: string;
+  }>;
 }) {
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search || "";
   const statusFilter = params.status || null;
+  const planId = params.planId ? Number(params.planId) : undefined;
 
-  const [subsResult, stats, settings] = await Promise.all([
+  const [
+    subsResult,
+    stats,
+    settings,
+    plans,
+    revenue,
+    activeSample,
+    expiringSample,
+  ] = await Promise.all([
     platformSubscriptionsService.getAll(
       {
         page,
@@ -43,8 +59,11 @@ export default async function PlatformSubscriptionsPage({
         isTrial: statusFilter === "trial" ? true : undefined,
         status:
           statusFilter && statusFilter !== "trial"
-            ? (FILTER_TO_STATUS[statusFilter] as any)
+            ? (FILTER_TO_STATUS[statusFilter] as
+                | PlatformSubscriptionStatus
+                | undefined)
             : undefined,
+        planId,
       },
       { next: { revalidate: 60, tags: ["console:subs"] } },
     ),
@@ -54,10 +73,26 @@ export default async function PlatformSubscriptionsPage({
     api<Record<string, string>>("/platform/settings", {
       next: { revalidate: 600, tags: ["console:settings"] },
     }),
+    platformPlansService.getAll({
+      next: { revalidate: 300, tags: ["console:plans"] },
+    }),
+    platformSubscriptionsService.getRevenue(12, {
+      next: { revalidate: 3600, tags: ["console:subs"] },
+    }),
+    platformSubscriptionsService.getAll(
+      { status: "active", limit: 200 },
+      { next: { revalidate: 60, tags: ["console:subs"] } },
+    ),
+    platformSubscriptionsService.getAll(
+      { status: "expiring", limit: 200 },
+      { next: { revalidate: 60, tags: ["console:subs"] } },
+    ),
   ]);
 
-  const currencyFormat =
-    settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat;
+  const currencyFormat = settings[
+    PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT
+  ] as CurrencyFormat;
+  const currency = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
 
   const refreshSubs = async () => {
     "use server";
@@ -85,6 +120,8 @@ export default async function PlatformSubscriptionsPage({
       <SubscriptionsKpiSection
         stats={stats}
         activeFilter={statusFilter}
+        currencyFormat={currencyFormat}
+        currency={currency}
         onFilterChange={async (newFilter) => {
           "use server";
           const { redirect } = await import("next/navigation");
@@ -95,16 +132,32 @@ export default async function PlatformSubscriptionsPage({
         }}
       />
 
-      <SubscriptionsClient
-        initialSubscriptions={subsResult.data}
-        initialTotal={subsResult.total}
-        initialTotalPages={subsResult.totalPages}
-        page={page}
-        limit={PAGE_LIMIT}
-        currencyFormat={currencyFormat}
-        initialQuery={search}
-        initialStatus={statusFilter}
-      />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <SubscriptionsClient
+            initialSubscriptions={subsResult.data}
+            initialTotal={subsResult.total}
+            initialTotalPages={subsResult.totalPages}
+            page={page}
+            limit={PAGE_LIMIT}
+            currencyFormat={currencyFormat}
+            initialQuery={search}
+            initialStatus={statusFilter}
+            initialPlanId={planId ?? null}
+            plans={plans}
+            settings={settings}
+            onRefresh={refreshSubs}
+          />
+        </div>
+        <SubscriptionsSidePanel
+          revenue={revenue}
+          activeSubscriptions={activeSample.data}
+          expiringSubscriptions={expiringSample.data}
+          currencyFormat={currencyFormat}
+          currency={currency}
+          settings={settings}
+        />
+      </div>
     </div>
   );
 }

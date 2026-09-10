@@ -1,6 +1,6 @@
 import { knowledgeService } from "@/lib/services/knowledge-service";
 import { updateTag } from "next/cache";
-import { KnowledgeSettings } from "./knowledge-settings";
+import { KnowledgeSettings } from "@/components/settings/knowledge/knowledge-settings";
 
 export const dynamic = "force-dynamic";
 

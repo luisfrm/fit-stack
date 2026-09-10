@@ -2,7 +2,7 @@ import { api } from "@/lib/api/client";
 import { updateTag } from "next/cache";
 import { featuresService } from "@/lib/services/features-service";
 import { FEATURE_CATALOG } from "@workspace/shared";
-import { FreeTierSettings } from "./free-tier-settings";
+import { FreeTierSettings } from "@/components/settings/free-tier/free-tier-settings";
 
 export const dynamic = "force-dynamic";
 
