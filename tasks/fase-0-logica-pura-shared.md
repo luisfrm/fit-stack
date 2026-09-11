@@ -52,3 +52,28 @@ pnpm --filter @workspace/shared test
 pnpm typecheck
 pnpm lint
 ```
+
+---
+
+## Estado: COMPLETADA (commit `709a821`)
+
+### Archivos
+
+- **Nuevos** `packages/shared/src/documents/`: `document-label-gate.ts`, `fiscal-profile.ts`, `tax-math.ts`, `receipt-number.ts`, `masking.ts`, `receipt-data.ts`, `index.ts`.
+- **Tests** `packages/shared/tests/documents/`: `document-label-gate`, `fiscal-profile`, `tax-math`, `receipt-number`, `masking`, `receipt-data` (17 casos).
+- **Modificados**: `packages/shared/src/index.ts` (`export * from './documents'`), `packages/shared/src/types.ts` (`ITaxConfig`, `IFiscalMechanism`, `IFiscalConfig` + campos de documento en `IPayment`), `apps/api-worker/src/lib/schemas.ts` (`taxDetailSchema`, `fiscalConfigSchema`, `taxOverrideSchema`), `apps/api-worker/src/routes/subscriptions.route.ts` (`createSubSchema.payment` acepta `subtotal/taxTotal/taxDetails/taxOverrideReason`).
+
+### Conclusiones / decisiones materializadas
+
+- El gate devuelve `'Factura'` solo con las 3 condiciones; `FISCAL_HOMOLOGATION_AVAILABLE = false` fuerza `'Comprobante de pago'` por construcción.
+- Los impuestos del país nacen `enabled: false` en el perfil; la org los habilita en `fiscalConfig.taxes`. El IGTF condicional (`payment_currency !== 'VES'`) conserva su `condition` en el perfil y se evalúa en `computeTaxes`.
+- Redondeo monetario centralizado en `roundCurrency` (half-up, 2 decimales).
+- Base `$0` (trial/free) no genera desglose de impuestos.
+- `applyTaxOverride` exige `taxOverrideReason` no vacío + al menos `taxTotal`/`taxDetails`.
+- `masking.ts` se añadió como archivo propio (el task lo mencionaba implícito en los tests); `file` nunca se enmascara.
+- `types.ts` no re-exporta `IReceiptData` (evita colisión de `export *` entre `types` y `documents`); el contrato se importa desde `documents/receipt-data`.
+
+### Pendiente (fuera de Fase 0)
+
+- La persistencia de `taxDetails/impuestos` en el pago se cablea en Fase 2/4; aquí solo quedan contrato y schema zod.
+

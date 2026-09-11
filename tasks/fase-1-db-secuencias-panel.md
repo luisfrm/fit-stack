@@ -75,3 +75,37 @@ pnpm db:check
 pnpm --filter api-worker test:integration
 pnpm typecheck
 ```
+
+---
+
+## Estado: COMPLETADA (commit `d384cbd`)
+
+### Migración
+
+- `packages/database/migrations/0011_lowly_human_fly.sql` generada con `pnpm db:generate` y revisada a mano: columnas `NOT NULL` con default (seguro en filas existentes), **sin backfill**, `receipt_number` nullable, e índices parciales con `WHERE`.
+- Aplicada con `pnpm db:migrate` al entorno de desarrollo. `pnpm db:check` → OK.
+
+### Archivos
+
+- **Nuevos**: `apps/api-worker/src/repositories/receipts.repository.ts` (`nextDocumentNumber` con `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`, `attachReceipt` idempotente, `markVoided`, `findByReceiptNumber`), `apps/api-worker/tests/integration/receipts-sequence.test.ts`.
+- **Modificados**: `packages/database/src/schema.ts` (tabla `organization_document_sequence` + columnas + 3 índices), `apps/api-worker/src/repositories/payments.repository.ts` (interfaz `IPayment` extendida + `create`), `apps/api-worker/tests/helpers/db.ts` (truncar `organization_document_sequence`).
+
+### Conclusiones / decisiones materializadas
+
+- Una sola sentencia atómica, sin transacción interactiva ni `SELECT FOR UPDATE` (compatible con el driver HTTP de Neon). El test de 12 llamadas concurrentes devolvió 1..12 únicos, incluyendo la carrera del primer comprobante del año.
+- El año de la secuencia es responsabilidad del llamador (tz del emisor); el repo solo recibe `year`.
+- `attachReceipt` y `markVoided` son org-scoped (regla de multi-tenancy), no solo por `paymentId`.
+- `markVoided` conserva el número y registra `voided_by/voided_at/void_reason`.
+
+### Proceso de migraciones (importante)
+
+- La **rama de test** se había creado con `drizzle-kit push`, por lo que su journal `drizzle.__drizzle_migrations` estaba desactualizado y `db:migrate` intentaba reaplicar migraciones viejas (fallaba en `content_page.meta_title`).
+- Se corrigió **una sola vez**: se reseteó el esquema de la rama de test y se reconstruyó **con `drizzle-kit migrate`** (aplicando 0000–0011 en orden). A partir de ahora la rama de test queda gestionada por migraciones.
+- **Regla en adelante: siempre `pnpm db:generate` → revisar → `pnpm db:migrate`. Nunca `push` ni SQL directo para aplicar esquema.**
+
+### Verificación ejecutada
+
+- `pnpm db:check` → OK.
+- `apps/api-worker/tests/integration/receipts-sequence.test.ts` → 6/6 (2 corridas, la última sobre la rama ya gestionada por migraciones).
+- `pnpm typecheck` → 9/9. `pnpm lint` → 0 errores.
+
