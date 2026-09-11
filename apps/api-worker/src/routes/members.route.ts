@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireAuth, requireOrgPermission } from '../lib/route-handler';
+import { requireAuth, requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
 import { createMembersRepository } from '../repositories/members.repository';
@@ -39,6 +39,9 @@ export const memberRoutes = new Hono<AppEnv>()
     const excludeRole = c.req.query('excludeRole') as any;
     const isActiveStr = c.req.query('isActive');
     const isActive = isActiveStr !== undefined ? isActiveStr === 'true' : undefined;
+    const hasActiveSubStr = c.req.query('hasActiveSubscription');
+    const hasActiveSubscription =
+      hasActiveSubStr !== undefined ? hasActiveSubStr === 'true' : undefined;
     const page = Number(c.req.query('page') || '1');
     const limit = Number(c.req.query('limit') || '10');
     const includeLatestSubscription = c.req.query('includeLatestSubscription') === 'true';
@@ -59,6 +62,7 @@ export const memberRoutes = new Hono<AppEnv>()
       role,
       excludeRole,
       isActive,
+      hasActiveSubscription,
       page,
       limit,
       includeLatestSubscription,
@@ -66,6 +70,27 @@ export const memberRoutes = new Hono<AppEnv>()
 
     await cache.set(cacheKey, result, 300);
     return c.json(result);
+  })
+
+  // GET /api/members/stats — ANTES de /:id (si no, "stats" caería en el param).
+  .get('/stats', requireOrgPermission(PM.MEMBERS, PA.READ), requireOrgTimezone(), async (c) => {
+    const orgId = c.get('orgId')!;
+    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    const timezone = c.get('orgTimezone')!;
+    const cache = createCache(c.env);
+    const cacheKey = `org:${orgId}:members:stats`;
+
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const membersRepo = createMembersRepository(c.get('db'));
+    const usersRepo = createUsersRepository(c.get('db'));
+    const tokenService = createTokenService(c.env.JWT_SECRET);
+    const membersService = createMembersService(membersRepo, usersRepo, tokenService, c.env.TASK_QUEUE);
+
+    const stats = await membersService.getMemberStats(orgId, timezone);
+    await cache.set(cacheKey, stats, 300);
+    return c.json(stats);
   })
 
   // GET /api/members/me
@@ -239,6 +264,7 @@ export const memberRoutes = new Hono<AppEnv>()
     });
 
     await cache.invalidate(`org:${orgId}:members:*`);
+    await cache.invalidateExact(`org:${orgId}:members:stats`);
     // Un member nuevo/cambiado afecta KPIs y action-items del dashboard
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
@@ -264,6 +290,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
     const updatedMember = await membersService.updateMember(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:members:*`);
+    await cache.invalidateExact(`org:${orgId}:members:stats`);
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json(updatedMember);
@@ -282,6 +309,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
     await membersService.deleteMember(orgId, id);
     await cache.invalidate(`org:${orgId}:members:*`);
+    await cache.invalidateExact(`org:${orgId}:members:stats`);
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json({ success: true });

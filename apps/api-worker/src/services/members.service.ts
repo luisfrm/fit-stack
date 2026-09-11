@@ -2,6 +2,7 @@ import type { MembersRepository, MembersFilter, NewDbMember } from '../repositor
 import type { UsersRepository } from '../repositories/users.repository';
 import type { TokenService } from './token.service';
 import type { Auth } from '../lib/env';
+import { OrganizationDateManager } from '../lib/date-manager';
 import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
 
 const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
@@ -24,6 +25,16 @@ export function createMembersService(
     async getAllMembers(filters: MembersFilter) {
       if (!filters.organizationId) throw new Error('organizationId is required');
       return membersRepo.findAll(filters);
+    },
+
+    /**
+     * KPIs de clientes. `timezone` es obligatorio y sin default (AGENTS §9):
+     * viene del middleware `requireOrgTimezone()` (sesión, nunca query param).
+     */
+    async getMemberStats(organizationId: string, timezone: string) {
+      if (!organizationId) throw new Error('organizationId is required');
+      const dateManager = new OrganizationDateManager(timezone);
+      return membersRepo.getMemberStats(organizationId, dateManager, new Date());
     },
 
     async getMemberById(organizationId: string, id: number) {

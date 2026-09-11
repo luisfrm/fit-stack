@@ -1,6 +1,7 @@
-import { eq, ilike, and, or, count, desc, ne, sql, gte, type Db } from '@workspace/database/factory';
+import { eq, ilike, and, or, count, desc, ne, sql, gte, isNull, isNotNull, type Db } from '@workspace/database/factory';
 import { gymMember, authMember, user, subscription, payment } from '@workspace/database/schema';
 import type { OrgRole } from '@workspace/shared';
+import type { OrganizationDateManager } from '../lib/date-manager';
 import { createSubscriptionsRepository } from './subscriptions.repository';
 
 export type DbMember = typeof gymMember.$inferSelect;
@@ -22,6 +23,8 @@ export interface MembersFilter {
   role?: OrgRole;
   excludeRole?: OrgRole;
   isActive?: boolean;
+  /** Solo miembros CON (true) o SIN (false) suscripción gym-activa. */
+  hasActiveSubscription?: boolean;
   page?: number;
   limit?: number;
   requireTotal?: boolean;
@@ -41,7 +44,7 @@ export function createMembersRepository(db: Db) {
 
   return {
     async findAll(filters: MembersFilter): Promise<PaginatedMembersResult> {
-      const { organizationId, query, role, excludeRole, isActive, page = 1, limit = 10 } = filters;
+      const { organizationId, query, role, excludeRole, isActive, hasActiveSubscription, page = 1, limit = 10 } = filters;
       const offset = (page - 1) * limit;
 
       const conditions = [eq(gymMember.organizationId, organizationId)];
@@ -67,6 +70,21 @@ export function createMembersRepository(db: Db) {
 
       if (excludeRole) {
         conditions.push(ne(gymMember.role, excludeRole));
+      }
+
+      // Filtro por suscripción gym-activa (misma semántica que
+      // `getSubscriptionIsActiveSql`: `processing` cuenta como activa).
+      if (hasActiveSubscription !== undefined) {
+        const activeSubExists = sql`EXISTS (
+          SELECT 1 FROM ${subscription}
+          INNER JOIN ${payment} ON ${payment.subscriptionId} = ${subscription.id}
+          WHERE ${subscription.memberId} = ${gymMember.id}
+            AND ${subscription.organizationId} = ${organizationId}
+            AND ${subsRepo.getSubscriptionIsActiveSql(new Date())}
+        )`;
+        conditions.push(
+          hasActiveSubscription ? activeSubExists : sql`NOT (${activeSubExists})`
+        );
       }
 
       const whereClause = and(...conditions);
@@ -245,6 +263,147 @@ export function createMembersRepository(db: Db) {
           )
         );
       return Number(result[0]?.value ?? 0);
+    },
+
+    /**
+     * KPIs de clientes (`GET /api/members/stats`).
+     *
+     * Población: `gym_member` con `role = 'member'` de la org.
+     * - `newThisMonth`: corte de mes en hora LOCAL de la org (`AT TIME ZONE`
+     *   vía `dateManager`), no UTC del servidor.
+     * - Suscripción gym-activa = semántica `getSubscriptionIsActiveSql`
+     *   (`endDate` vigente + no cancelada + pago NOT IN (`voided`,`invalid`)).
+     *   Un pago `processing` SÍ cuenta como activa: el acceso aún no fue
+     *   revocado, solo está pendiente de validación manual.
+     * - `withPortal`: espejo exacto de `countActivePortalUsers`
+     *   (`userId NOT NULL + isActive + role member`).
+     */
+    async getMemberStats(organizationId: string, dateManager: OrganizationDateManager, now: Date = new Date()) {
+      const memberScope = and(
+        eq(gymMember.organizationId, organizationId),
+        eq(gymMember.role, 'member')
+      );
+
+      const [counts] = await db
+        .select({
+          total: sql<number>`count(*)::int`,
+          active: sql<number>`count(*) FILTER (WHERE ${gymMember.isActive})::int`,
+          inactive: sql<number>`count(*) FILTER (WHERE NOT ${gymMember.isActive})::int`,
+          newThisMonth: sql<number>`count(*) FILTER (WHERE DATE_TRUNC('month', ${dateManager.toLocalSql(gymMember.createdAt)}) = DATE_TRUNC('month', ${dateManager.toLocalValueSql(now)}))::int`,
+        })
+        .from(gymMember)
+        .where(memberScope);
+
+      // Miembros con al menos una suscripción gym-activa (subconsulta anti-join).
+      const activeSubs = db
+        .select({ memberId: subscription.memberId })
+        .from(subscription)
+        .innerJoin(payment, eq(payment.subscriptionId, subscription.id))
+        .where(
+          and(
+            eq(subscription.organizationId, organizationId),
+            subsRepo.getSubscriptionIsActiveSql(now)
+          )
+        )
+        .as('active_subs');
+
+      const [withoutSub] = await db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(gymMember)
+        .leftJoin(activeSubs, eq(activeSubs.memberId, gymMember.id))
+        .where(
+          and(
+            eq(gymMember.organizationId, organizationId),
+            eq(gymMember.role, 'member'),
+            isNull(activeSubs.memberId)
+          )
+        );
+
+      const [portal] = await db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(gymMember)
+        .where(
+          and(
+            eq(gymMember.organizationId, organizationId),
+            sql`${gymMember.userId} IS NOT NULL`,
+            eq(gymMember.isActive, true),
+            eq(gymMember.role, 'member')
+          )
+        );
+
+      const [growth, upcomingBirthdays] = await Promise.all([
+        this.getMemberGrowth(organizationId, dateManager),
+        this.getUpcomingBirthdays(organizationId, dateManager),
+      ]);
+
+      return {
+        total: counts?.total ?? 0,
+        active: counts?.active ?? 0,
+        inactive: counts?.inactive ?? 0,
+        newThisMonth: counts?.newThisMonth ?? 0,
+        withoutActiveSubscription: withoutSub?.value ?? 0,
+        withPortal: portal?.value ?? 0,
+        growth,
+        upcomingBirthdays,
+      };
+    },
+
+    /**
+     * Altas por mes local ('YYYY-MM'). Ventana de 6 meses calendario
+     * (agregado SQL con `AT TIME ZONE` vía `dateManager`); los meses sin
+     * altas no generan bucket (el frontend rellena los huecos con 0).
+     */
+    async getMemberGrowth(organizationId: string, dateManager: OrganizationDateManager) {
+      const windowStart = dateManager.getStartOfMonthUtc(5);
+      const rows = await db
+        .select({
+          month: dateManager.formatMonthSql(gymMember.createdAt),
+          count: sql<number>`count(*)::int`,
+        })
+        .from(gymMember)
+        .where(
+          and(
+            eq(gymMember.organizationId, organizationId),
+            eq(gymMember.role, 'member'),
+            gte(gymMember.createdAt, windowStart)
+          )
+        )
+        .groupBy(sql`1`)
+        .orderBy(sql`1`);
+      return rows.map((r) => ({ month: r.month, count: Number(r.count) }));
+    },
+
+    /**
+     * Próximos cumpleaños (top 5, solo `role = 'member'` con fecha).
+     * La columna es `date` sin tz: se ordena por MM-DD con vuelta de año
+     * (los que ya pasaron este año van al final).
+     */
+    async getUpcomingBirthdays(organizationId: string, dateManager: OrganizationDateManager, limit = 5) {
+      const todayMonthDay = dateManager.getTodayLocalString().slice(5);
+      const monthDay = sql<string>`TO_CHAR(${gymMember.birthday}, 'MM-DD')`;
+      const rows = await db
+        .select({
+          id: gymMember.id,
+          firstName: gymMember.firstName,
+          lastName: gymMember.lastName,
+          birthday: gymMember.birthday,
+        })
+        .from(gymMember)
+        .where(
+          and(
+            eq(gymMember.organizationId, organizationId),
+            eq(gymMember.role, 'member'),
+            isNotNull(gymMember.birthday)
+          )
+        )
+        .orderBy(sql`CASE WHEN ${monthDay} >= ${todayMonthDay} THEN 0 ELSE 1 END`, monthDay)
+        .limit(limit);
+      return rows.map((r) => ({
+        id: r.id,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        birthday: r.birthday as string,
+      }));
     },
 
     async countByRole(organizationId: string) {
