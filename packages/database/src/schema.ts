@@ -367,7 +367,7 @@ export const membershipPlan = pgTable('membership_plan', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+  price: bigint('price', { mode: 'number' }).notNull(), // centavos
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
   durationUnit: text('duration_unit').default('month').notNull(),
@@ -412,10 +412,10 @@ export const payment = pgTable(
       .references(() => subscription.id),
 
     planSnapshotName: text('plan_snapshot_name').notNull(),
-    planSnapshotPrice: numeric('plan_snapshot_price', { precision: 10, scale: 2 }).notNull(),
+    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
     planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
 
-    amountPaid: numeric('amount_paid', { precision: 10, scale: 2 }).notNull(),
+    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
     currencyPaid: text('currency_paid').notNull(),
     exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
@@ -423,9 +423,9 @@ export const payment = pgTable(
     paymentMethod: text('payment_method').notNull(),
     paymentMethodDetails: jsonb('payment_method_details'),
 
-    // Invoice Breakdown (Optional)
-    subtotal: numeric('subtotal', { precision: 15, scale: 2 }),
-    taxTotal: numeric('tax_total', { precision: 15, scale: 2 }),
+    // Invoice Breakdown (Optional, centavos)
+    subtotal: bigint('subtotal', { mode: 'number' }),
+    taxTotal: bigint('tax_total', { mode: 'number' }),
     taxDetails: jsonb('tax_details'),
 
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),

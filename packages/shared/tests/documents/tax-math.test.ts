@@ -1,19 +1,20 @@
 /**
  * Cálculo de impuestos: automático por defecto + override auditado.
- * Todo en unidades mayores con 2 decimales (ver money.ts).
+ * Todo en centavos enteros (ver money.ts).
  */
 import { describe, expect, it } from 'vitest';
 import {
   applyTaxOverride,
   computeTaxes,
-  round2,
+  roundCents,
 } from '../../src/documents/tax-math';
 import { resolveFiscalProfile } from '../../src/documents/fiscal-profile';
 
-describe('round2', () => {
-  it('es half-up a 2 decimales y único punto de redondeo', () => {
-    expect(round2(5.3328)).toBe(5.33);
-    expect(round2(2.675)).toBe(2.68);
+describe('roundCents', () => {
+  it('redondea al centavo entero y es el único punto de redondeo', () => {
+    expect(roundCents(533.28)).toBe(533);
+    expect(roundCents(533.5)).toBe(534);
+    expect(roundCents(800)).toBe(800);
   });
 });
 
@@ -65,15 +66,16 @@ describe('computeTaxes', () => {
     });
   });
 
-  it('redondea por línea y el total es suma de líneas', () => {
-    const result = computeTaxes(33.33, [{ name: 'IVA', rate: 0.16, enabled: true }]);
-    expect(result.taxDetails).toEqual([{ name: 'IVA', rate: 0.16, amount: 5.33 }]);
-    expect(result.taxTotal).toBe(5.33);
-    expect(result.total).toBe(38.66);
+  it('redondea por línea al centavo y el total es suma de líneas', () => {
+    const result = computeTaxes(3333, [{ name: 'IVA', rate: 0.16, enabled: true }]);
+    expect(result.taxDetails).toEqual([{ name: 'IVA', rate: 0.16, amount: 533 }]);
+    expect(result.taxTotal).toBe(533);
+    expect(result.total).toBe(3866);
   });
 
-  it('base negativa o NaN lanza', () => {
+  it('base no entera o negativa lanza (centavos enteros ≥ 0)', () => {
     expect(() => computeTaxes(-1, [])).toThrow();
+    expect(() => computeTaxes(33.33, [])).toThrow();
     expect(() => computeTaxes(Number.NaN, [])).toThrow();
   });
 });
@@ -91,11 +93,11 @@ describe('applyTaxOverride', () => {
     ).toThrow();
   });
 
-  it('descuadre entre líneas y total lanza', () => {
+  it('descuadre entre líneas y total lanza (más de 1 centavo)', () => {
     expect(() =>
       applyTaxOverride(100, taxes, {
         taxTotal: 10,
-        taxDetails: [{ name: 'IVA', rate: 0.1, amount: 9 }],
+        taxDetails: [{ name: 'IVA', rate: 0.1, amount: 8 }],
         taxOverrideReason: 'Exoneración parcial',
       }),
     ).toThrow();

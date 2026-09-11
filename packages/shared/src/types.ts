@@ -309,7 +309,7 @@ export interface ISubscription {
   role?: string;
   isActive?: boolean;
 
-  // Payment Data (From Join)
+  // Payment Data (From Join) — montos en centavos enteros (convención Money)
   paymentId?: number;
   amountPaid?: number;
   currencyPaid?: string;
@@ -388,6 +388,8 @@ export type {
 
 /**
  * Interface for a Payment record.
+ * Montos (planSnapshotPrice, amountPaid, subtotal, taxTotal) en centavos
+ * enteros (convención Money). Display solo vía `formatCents`.
  */
 export interface IPayment {
   id?: number;

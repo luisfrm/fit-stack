@@ -1,7 +1,7 @@
 /* ── Documents / receipt-data — contrato del comprobante ─────────────────
    `ReceiptData` es TODO lo que el PDF, el email y el reporte necesitan y
    nada más: emisor congelado, receptor, detalle snapshot, periodo, montos
-   en unidades mayores, método enmascarado, impuestos y pie legal.
+   en centavos enteros, método enmascarado, impuestos y pie legal.
    El UUID técnico (`payment.id`) NUNCA va en campos visibles: solo viaja
    como `internalPaymentId` marcado @internal y `checklistPrePdf` lo
    detecta si se filtra a un campo visible.
@@ -9,6 +9,7 @@
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { ITaxDetail } from '../types';
+import { TAX_TOTAL_TOLERANCE } from './tax-math';
 import {
   isValidConsoleReceiptNumber,
   isValidPanelReceiptNumber,
@@ -52,7 +53,7 @@ export interface ReceiptSale {
   paymentDate: string;
 }
 
-/** Montos en unidades mayores con 2 decimales (ver `money.ts`). */
+/** Montos en centavos enteros (ver `money.ts`). */
 export interface ReceiptAmounts {
   subtotal: number;
   taxDetails: ITaxDetail[];
@@ -141,12 +142,13 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
   }
 
   if (
-    Math.abs(data.amounts.total - (data.amounts.subtotal + data.amounts.taxTotal)) > 0.01
+    Math.abs(data.amounts.total - (data.amounts.subtotal + data.amounts.taxTotal)) >
+    TAX_TOTAL_TOLERANCE
   ) {
     errors.push('El total no cuadra con subtotal + impuestos.');
   }
   const linesSum = data.amounts.taxDetails.reduce((sum, line) => sum + line.amount, 0);
-  if (Math.abs(linesSum - data.amounts.taxTotal) > 0.01) {
+  if (Math.abs(linesSum - data.amounts.taxTotal) > TAX_TOTAL_TOLERANCE) {
     errors.push('El desglose de impuestos no cuadra con el total de impuestos.');
   }
 

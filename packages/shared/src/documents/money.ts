@@ -1,12 +1,12 @@
 /* ── Documents / money — unidades monetarias ───────────────────────────
-   Convención de Fase 0 (verificada contra el schema Drizzle):
-   - El pago del gym (`payment.amountPaid`, `numeric`) viaja en UNIDADES
-     MAYORES con 2 decimales — NO en centavos.
-   - El pago SaaS (`platform_subscription_payment.amountPaid`, `bigint`)
-     viaja en CENTAVOS.
-   Todo el motor fiscal (`tax-math`, `receipt-data`) opera en unidades
-   mayores. Los callers con centavos convierten en la frontera con estos
-   helpers puros. Funciones puras, sin I/O, edge-safe (Workers).
+   Convención del proyecto (verificada contra el schema Drizzle y los
+   contratos de API/E2E): TODO monto de pago y precio viaja y se guarda en
+   CENTAVOS ENTEROS (`bigint` en DB, `int` en contratos).
+   Estos helpers solo existen para la frontera con display/inputs en
+   unidades mayores (formularios que editan "50.00" y muestran con
+   `formatCents`). El motor fiscal (`tax-math`, `receipt-data`) opera
+   siempre en centavos enteros.
+   Funciones puras, sin I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 /** Convierte centavos enteros a unidades mayores (199 → 1.99). */
