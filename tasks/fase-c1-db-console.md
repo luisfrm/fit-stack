@@ -17,16 +17,23 @@ Secuencia **global única** (FitStack es un solo emisor) + columnas de documento
 
 ```sql
 TABLE platform_document_sequence (
-  document_type  text PRIMARY KEY,   -- 'receipt' | 'invoice' (global, sin org)
+  document_type  text PRIMARY KEY,   -- 'receipt' | 'invoice' (global, sin org, sin año)
   next_number    integer NOT NULL DEFAULT 0
 );
--- NOTA: el doc propone secuencia global continua (FS-0000001). Si se quiere
--- reinicio anual también aquí, usar PK (document_type, year) como en Panel.
--- Default: seguir el doc (continua) salvo pedido explícito.
+-- DECISIÓN CERRADA: secuencia global CONTINUA, sin reinicio anual (a diferencia
+-- de Panel). FitStack es un único emisor legal; una secuencia continua evita
+-- ambigüedad de "año fiscal de FitStack" mientras la empresa no esté constituida
+-- ni tenga país/timezone fiscal propio definido (ver disclaimer proxy en C2).
+-- Si en el futuro se homologa facturación real y el régimen del país de FitStack
+-- exige reinicio anual, migrar entonces a PK (document_type, year) como Panel —
+-- no antes, para no introducir una regla sin un régimen fiscal real que la exija.
 TABLE platform_subscription_payment ADD COLUMN
   receipt_number     text UNIQUE,     -- 'FS-0000001', NULL = histórico
   receipt_issued_at  timestamptz,
   receipt_pdf_key    text;            -- 'platform/receipts/<año>/FS-<n>.pdf'
+-- Índice PARCIAL para el barrido (mismo mecanismo de Fase 2, extendido a esta tabla):
+--   CREATE INDEX idx_psp_receipt_pending ON platform_subscription_payment (receipt_issued_at)
+--   WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL;
 ```
 
 Nuevas keys `platform_setting` (seed en `DEFAULT_PLATFORM_SETTINGS` + edición en console): `fitstack_legal_name`, `fitstack_tax_id`, `fitstack_address`, `fitstack_country_code`. Vacías hoy → emisor genérico "FitStack" y gate invoice bloqueado (coherente con "hoy NO puede ser invoice: FitStack sin RIF").
@@ -35,7 +42,7 @@ Nuevas keys `platform_setting` (seed en `DEFAULT_PLATFORM_SETTINGS` + edición e
 |---|---|
 | `packages/database/src/schema.ts` | Tabla + columnas + migración (`generate → review → migrate`, sin backfill, prohibido `push`). |
 | `packages/shared/src/settings.ts` | 4 keys en `DEFAULT_PLATFORM_SETTINGS`. |
-| `apps/api-worker/src/repositories/platform-receipts.repository.ts` (nuevo) | `nextPlatformDocumentNumber(type)` (misma técnica upsert + `FOR UPDATE` o `UPDATE…RETURNING`) + `attachPlatformReceipt`. |
+| `apps/api-worker/src/repositories/platform-receipts.repository.ts` (nuevo) | `nextPlatformDocumentNumber(type)` = **una sola sentencia atómica** (`INSERT … ON CONFLICT (document_type) DO UPDATE SET next_number = platform_document_sequence.next_number + 1 RETURNING next_number`, sin transacción) + `attachPlatformReceipt` (guarda `WHERE receipt_number IS NULL`). |
 | `apps/console/.../settings/` | UI de "Emisor FitStack" (4 campos) con tag `console:settings`. |
 
 ## Criterios de aceptación
