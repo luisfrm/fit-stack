@@ -10,4 +10,5 @@ export * from './content';
 export * from './date';
 export * from './settings';
 export * from './defaults';
+export * from './documents';
 

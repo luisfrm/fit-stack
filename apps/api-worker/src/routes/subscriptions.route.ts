@@ -9,7 +9,7 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createCache, type Cache } from '../lib/cache';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -40,6 +40,10 @@ const createSubSchema = z.object({
     paymentMethodDetails: paymentMethodDetailsSchema,
     status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
     paymentDate: z.string().optional(),
+    subtotal: z.number().nonnegative().optional(),
+    taxTotal: z.number().nonnegative().optional(),
+    taxDetails: z.array(taxDetailSchema).nullable().optional(),
+    taxOverrideReason: z.string().min(1).optional(),
   }),
 });
 

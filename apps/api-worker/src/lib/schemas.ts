@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FiscalConfigSchema, TaxDetailSchema } from '@workspace/shared';
 
 /**
  * Schema canónico de `paymentMethodDetails` — el contrato de escritura es un
@@ -16,3 +17,16 @@ export const paymentMethodDetailsSchema = z
   )
   .nullable()
   .optional();
+
+/** Desglose de impuestos de un pago (espejo de `ITaxDetail`). */
+export const taxDetailSchema = TaxDetailSchema;
+
+/** Configuración fiscal de la organización (single source of truth en @workspace/shared). */
+export const fiscalConfigSchema = FiscalConfigSchema;
+
+/** Override manual de impuestos: exige motivo (auditoría). */
+export const taxOverrideSchema = z.object({
+  taxOverrideReason: z.string().min(1),
+  taxTotal: z.number().nonnegative().optional(),
+  taxDetails: z.array(taxDetailSchema).optional(),
+});

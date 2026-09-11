@@ -368,6 +368,38 @@ export interface ITaxDetail {
 }
 
 /**
+ * Impuesto configurable de una organización (overrides de `organization.fiscalConfig`).
+ * `rate` es decimal (0.16 = 16%). Los defaults del país viven en `COUNTRIES`.
+ */
+export interface ITaxConfig {
+  name: string;
+  rate: number;
+  enabled: boolean;
+}
+
+/**
+ * Mecanismo de homologación fiscal real (numero_control SENIAT, folio CFDI,
+ * CUFE DIAN…). Necesario (con `taxId` + `isFormalTaxpayer`) para que el gate
+ * permita rotular "Factura".
+ */
+export interface IFiscalMechanism {
+  type: string;
+  value: string;
+}
+
+/**
+ * Configuración fiscal editable por la org (`organization.fiscalConfig`, jsonb).
+ * El país define los defaults; la org los sobreescribe.
+ */
+export interface IFiscalConfig {
+  documentLabel?: string;
+  isFormalTaxpayer?: boolean;
+  taxes?: ITaxConfig[];
+  disclaimerOverride?: string[];
+  fiscalMechanism?: IFiscalMechanism | null;
+}
+
+/**
  * Interface for a Payment record.
  */
 export interface IPayment {
@@ -392,6 +424,19 @@ export interface IPayment {
   subtotal?: number;
   taxTotal?: number;
   taxDetails?: ITaxDetail[] | null;
+
+  // Documento correlativo (comprobantes)
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | null;
+  receiptPdfKey?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptVoided?: boolean;
+  taxOverrideReason?: string | null;
+
+  // Anulación (auditoría)
+  voidedBy?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
 
   paymentDate: string;
   createdAt?: string;
