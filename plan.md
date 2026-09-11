@@ -64,7 +64,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 **Infraestructura y storage**
 - Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con `cms/<org>/receipts/` (capturas de pago, distinto propósito).
 - Infra de cola/cron se gestiona por Terraform + GitHub Actions (`infrastructure/terraform/queues.tf`, `workers.tf`), nunca con `wrangler` manual.
-- Migraciones de DB: flujo estricto `generate → review → migrate`; **prohibido `db:push`** en ramas compartidas (aprendido en Fase 1: una rama de test creada con `push` tenía el journal desalineado y rompió `db:migrate`).
+- Migraciones de DB: flujo estricto `generate → review → migrate`; **prohibido `db:push`** en ramas compartidas.
 
 ## Riesgos activos a vigilar
 

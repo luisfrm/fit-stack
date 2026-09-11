@@ -52,6 +52,15 @@ Emisión en **dos pasos separados** (sin transacciones interactivas en serverles
 
 jobs-worker: solo el cron del barrido en esta fase (los cambios de email/adjunto son Fase 3); panel (Fase 3-4); `platform_subscription_payment` (C2); `constructStorageKey` existente.
 
+## Constraints heredados del review de Fase 1 (obligatorios aquí)
+
+- **Doble numeración silenciosa**: si `attachReceipt` recibe un número distinto para un pago ya numerado, hoy lo ignora en silencio (quema un número de secuencia sin señal). El servicio (paso 1) debe detectar `existing.receiptNumber !== input` y responder **409 `{ code: 'ALREADY_NUMBERED' }`** (o equivalente documentado). Cubrir con test.
+- **`markVoided` sin número / re-anulación**: hoy acepta pagos con `receipt_number IS NULL` y pisa la auditoría al re-anular. El servicio debe: pago sin número → **409 `{ code: 'RECEIPT_NOT_ISSUED' }`** (o anular sin flags de comprobante — definir); pago ya anulado → idempotente sin pisar `voided_by/at/reason` **o** 409 `ALREADY_VOIDED` (definir). Cubrir con tests.
+- **Coherencia número↔secuencia**: el servicio debe garantizar `parsePanelReceiptNumber(n).year === añoReservado` y `slug === org.slug` (vía `formatPanelReceiptNumber`, nunca string manual) antes de `attachReceipt`. El reporte de huecos (Fase 5) asume esta coherencia.
+- **Mapeo de errores a códigos**: los `Error` genéricos del repo se mapean en ruta/servicio a `{ error, code }`: formato/año inválido → 400, pago de otra org → 404, duplicado/ya-anulado → 409. Nunca texto crudo al cliente (regla toasts).
+- **Índice pending sin org**: `idx_payment_receipt_pending` es global `(receipt_issued_at)`; si el barrido filtra por org, medir y, si hace falta, migrar a `(organization_id, receipt_issued_at)` en esta fase.
+- **Índice `org+issued_at` con NULLs legacy**: si el reporte/caché lo justifica, parcializarlo con `WHERE receipt_number IS NOT NULL` (Fase 5 lo necesita; adelantar aquí solo si hace falta).
+
 ## Criterios de aceptación
 
 - **Paso 1**: crear sub con pago `validated` → `receipt_number` con formato de inmediato (`pdfStatus: "pending"`) + mensaje `receipt.render` en `fit-receipt-events` + impuestos persistidos (`subtotal/tax_total/tax_details`).

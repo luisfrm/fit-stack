@@ -48,7 +48,7 @@ TABLE payment ADD COLUMN
 |---|---|
 | `packages/database/src/schema.ts` | Nueva tabla `organizationDocumentSequence` + columnas en `payment` + índices de arriba. |
 | Migración generada | `pnpm db:generate` → revisar SQL a mano → `pnpm db:migrate` con aprobación explícita. |
-| `apps/api-worker/src/repositories/receipts.repository.ts` (nuevo, factory `createReceiptsRepository(db)`) | `nextDocumentNumber(orgId, type, year)` = **una sola sentencia atómica** (sin transacción, sin `SELECT FOR UPDATE`, funciona con el driver HTTP de Neon — Postgres garantiza atomicidad por sentencia): `INSERT INTO organization_document_sequence (organization_id, document_type, year, last_number) VALUES ($1,$2,$3,1) ON CONFLICT (organization_id, document_type, year) DO UPDATE SET last_number = organization_document_sequence.last_number + 1 RETURNING last_number`. Cubre también la carrera del primer comprobante del año (no hace falta upsert previo separado). Además: `attachReceipt(paymentId, {...})` con guarda `WHERE receipt_number IS NULL` (UPDATE condicional idempotente), `markVoided(paymentId, { by, reason })` (setea flags, nunca libera número), `findByReceiptNumber(orgId, receiptNumber)`. **Sin rollback del número**: si un paso posterior falla (render/PUT R2), el estado `receipt_number NOT NULL AND receipt_pdf_key IS NULL` = "numerado, PDF pendiente" es válido y reintentable con el mismo número (Fase 2). |
+| `apps/api-worker/src/repositories/receipts.repository.ts` (nuevo, factory `createReceiptsRepository(db)`) | `nextDocumentNumber(orgId, type, year)` = **una sola sentencia atómica** (sin transacción, sin `SELECT FOR UPDATE`, funciona con el driver HTTP de Neon — Postgres garantiza atomicidad por sentencia): `INSERT INTO organization_document_sequence (organization_id, document_type, year, last_number) VALUES ($1,$2,$3,1) ON CONFLICT (organization_id, document_type, year) DO UPDATE SET last_number = organization_document_sequence.last_number + 1 RETURNING last_number`. Cubre también la carrera del primer comprobante del año (no hace falta upsert previo separado). Además: `attachReceipt(paymentId, orgId, {...})` con guarda `WHERE receipt_number IS NULL` (UPDATE condicional idempotente; si ya estaba numerado devuelve la fila existente re-leída), `markVoided(paymentId, orgId, { by, reason })` (setea flags, nunca libera número), `findByReceiptNumber(orgId, receiptNumber)` (`orgId` obligatorio en los 3 por aislamiento estricto). **Sin rollback del número**: si un paso posterior falla (render/PUT R2), el estado `receipt_number NOT NULL AND receipt_pdf_key IS NULL` = "numerado, PDF pendiente" es válido y reintentable con el mismo número (Fase 2). |
 | `apps/api-worker/src/repositories/payments.repository.ts` | Extender interfaz `IPayment` + `create`/`findById` para los nuevos campos (lectura/escritura), sin cambiar lógica de agregados. |
 
 ## Modificar
@@ -77,3 +77,12 @@ pnpm db:check
 pnpm --filter api-worker test:integration
 pnpm typecheck
 ```
+
+## Estado: COMPLETADA (en revisión, sin commit)
+
+- Migración `0012_bent_squadron_sinister.sql`: tabla `organization_document_sequence` (PK triple + FK cascade) + 9 columnas en `payment` + 3 índices (UNIQUE parcial, `org+issued_at`, pending). Revisada contra checklist, aplicada por el usuario, `db:check` verde.
+- `receipts.repository.ts` nuevo (factory): `nextDocumentNumber` con builder `onConflictDoUpdate` (precedente `consumeCredits`, sin SQL crudo), `attachReceipt(paymentId, orgId, ...)` opción A (re-lee el existente), `markVoided` (reason no vacío, conserva número), `findByReceiptNumber`. Validaciones con símbolos de Fase 0 (nada redefinido).
+- `payments.repository.ts`: 9 campos en `IPayment` + passthrough en `create`. Agregados intactos.
+- `receipts-sequence.test.ts`: 5/5 verde (carrera 1..N, año virgen {1,2}, attach idempotente, UNIQUE por org + NULLs, void conserva). Nota: `testQuery` devuelve `bigint` como string → `paymentId` se normaliza con `Number()`.
+- Nota de entorno: `test:db:push` falla en este sandbox (`cmd.exe` ausente para `execSync`); la rama test se sincronizó con script equivalente sin shell (misma guarda anti-producción). Sin cambios al repo por esto.
+- Spec ajustada: `orgId` obligatorio en los 3 métodos del repo; `plan.md` sin la cláusula descartada.
