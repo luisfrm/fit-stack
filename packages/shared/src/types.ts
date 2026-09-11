@@ -325,7 +325,6 @@ export interface IPaymentMethodDetail {
   value: string;
   type?: 'text' | 'file' | 'number';
 }
-
 /**
  * Contracto canónico de `paymentMethodDetails` (panel + console + API).
  * Los forms envían un array de items auto-descriptivos; el API lo valida
@@ -368,6 +367,26 @@ export interface ITaxDetail {
 }
 
 /**
+ * Contratos del módulo `documents/` (Fase 0). Se re-exportan aquí para que
+ * los consumers que ya importan de `@workspace/shared` (tipos) los
+ * encuentren sin importar rutas profundas. La implementación canónica vive
+ * en `src/documents/` — nunca duplicar.
+ */
+export type { FiscalConfig } from './documents/fiscal-profile';
+export type {
+  ReceiptData,
+  ReceiptChecklist,
+  ReceiptDocumentType,
+  ReceiptEmitter,
+  ReceiptRecipient,
+  ReceiptDocument,
+  ReceiptSale,
+  ReceiptAmounts,
+  ReceiptMethod,
+  ReceiptFooter,
+} from './documents/receipt-data';
+
+/**
  * Interface for a Payment record.
  */
 export interface IPayment {
@@ -392,6 +411,17 @@ export interface IPayment {
   subtotal?: number;
   taxTotal?: number;
   taxDetails?: ITaxDetail[] | null;
+
+  // Correlative receipt (Fase 0: tipos; columnas reales en Fase 1)
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | null;
+  receiptPdfKey?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptVoided?: boolean;
+  taxOverrideReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
 
   paymentDate: string;
   createdAt?: string;

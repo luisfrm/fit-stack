@@ -9,7 +9,7 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createCache, type Cache } from '../lib/cache';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -40,6 +40,12 @@ const createSubSchema = z.object({
     paymentMethodDetails: paymentMethodDetailsSchema,
     status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
     paymentDate: z.string().optional(),
+    // Desglose fiscal (Fase 0: schema abierto; el servicio lo calcula por
+    // defecto y solo acepta override con taxOverrideReason en Fase 2).
+    subtotal: z.number().positive().optional(),
+    taxTotal: z.number().min(0).optional(),
+    taxDetails: z.array(taxDetailSchema).optional(),
+    taxOverrideReason: z.string().optional(),
   }),
 });
 
