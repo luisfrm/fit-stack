@@ -6,6 +6,7 @@ import { Button, toast, FloatingActionButton } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
 import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
+import { PendingPaymentsList } from "@/components/payments/pending-payments-list";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
 import { KpiSection } from "@/components/payments/kpi-section";
@@ -20,6 +21,8 @@ import type { CurrencyFormat } from "@/lib/utils/value-converters";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
+import { monthCollectedTotal, perActiveSubscription } from "@/lib/payments/payment-selectors";
+import { mutationError } from "@/lib/errors";
 import type { ISubscription, PaginatedSubscriptions } from "@workspace/shared/types";
 
 interface PaymentsClientProps {
@@ -29,6 +32,7 @@ interface PaymentsClientProps {
   readonly initialTotal: number;
   readonly initialQuery: string;
   readonly initialStatus: string | null;
+  readonly initialPending: ISubscription[];
   readonly initialAnalytics: Awaited<ReturnType<typeof financeService.getAnalytics>> | null;
   readonly initialMonthlyReport: Array<{
     month: string;
@@ -50,6 +54,7 @@ export function PaymentsClient({
   initialTotal,
   initialQuery,
   initialStatus,
+  initialPending,
   initialAnalytics,
   initialMonthlyReport,
   initialCurrencyFormat,
@@ -71,6 +76,17 @@ export function PaymentsClient({
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [analytics, setAnalytics] = React.useState(initialAnalytics);
   const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
+  const [pendingActionId, setPendingActionId] = React.useState<number | null>(null);
+
+  // P2: solo inputs ya disponibles (último bucket + subs activas del KPI).
+  const monthCollectedCents = React.useMemo(
+    () => monthCollectedTotal(initialMonthlyReport),
+    [initialMonthlyReport],
+  );
+  const perSubscriptionCents = React.useMemo(
+    () => perActiveSubscription(monthCollectedCents, analytics?.kpis.activeSubscriptions ?? 0),
+    [monthCollectedCents, analytics?.kpis.activeSubscriptions],
+  );
 
   React.useEffect(() => {
     if (debouncedSearch === initialQuery) return;
@@ -121,9 +137,8 @@ export function PaymentsClient({
         `Suscripción ${status === SUBSCRIPTION_STATUSES.ACTIVE ? "activada" : "revocada"}.`,
       );
       refreshAll();
-    } catch (error) {
-      console.error("Error updating subscription status:", error);
-      toast.error("Fallo al cambiar estado");
+    } catch (err) {
+      toast.error(mutationError("PaymentsClient", err, "Fallo al cambiar estado"));
     }
   };
 
@@ -132,9 +147,8 @@ export function PaymentsClient({
       await subscriptionsService.delete(id);
       toast.success("Registro eliminado.");
       refreshAll();
-    } catch (error) {
-      console.error("Error deleting subscription:", error);
-      toast.error("Fallo al eliminar");
+    } catch (err) {
+      toast.error(mutationError("PaymentsClient", err, "Fallo al eliminar"));
     }
   };
 
@@ -143,9 +157,24 @@ export function PaymentsClient({
       await financeService.updatePaymentStatus(paymentId, status);
       toast.success("Estado de pago actualizado correctamente");
       refreshAll();
-    } catch (error) {
-      console.error("Error updating payment status:", error);
-      toast.error("Error al actualizar pago");
+    } catch (err) {
+      toast.error(mutationError("PaymentsClient", err, "Error al actualizar pago"));
+    }
+  };
+
+  /** Validar/rechazar rápido desde el accionable "Por validar". */
+  const handlePendingAction = async (paymentId: number, status: string) => {
+    setPendingActionId(paymentId);
+    try {
+      await financeService.updatePaymentStatus(paymentId, status);
+      toast.success(
+        status === PAYMENT_STATUSES.VALIDATED ? "Pago validado." : "Pago rechazado.",
+      );
+      refreshAll();
+    } catch (err) {
+      toast.error(mutationError("PendingPaymentsList", err, "No se pudo actualizar el pago"));
+    } finally {
+      setPendingActionId(null);
     }
   };
 
@@ -182,6 +211,9 @@ export function PaymentsClient({
             activeFilter={activeFilter}
             onFilterChange={setFilterAndNavigate}
             currencyFormat={currencyFormat}
+            monthCollectedCents={monthCollectedCents}
+            perSubscriptionCents={perSubscriptionCents}
+            primaryCurrency={primaryCurrency}
           />
           <div className="flex flex-col xl:flex-row gap-4 w-full">
             <div className="w-full xl:w-1/2">
@@ -203,6 +235,14 @@ export function PaymentsClient({
       ) : null}
 
       <div className="flex flex-col gap-4">
+        <PendingPaymentsList
+          items={initialPending}
+          currencyFormat={currencyFormat}
+          actionId={pendingActionId}
+          onValidate={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VALIDATED)}
+          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.INVALID)}
+        />
+
         <FilterPanel
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}

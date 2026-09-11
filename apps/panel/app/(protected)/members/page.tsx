@@ -13,27 +13,43 @@ const PAGE_LIMIT = 10;
 export default async function MembersPage({
   searchParams,
 }: Readonly<{
-  searchParams: Promise<{ query?: string; page?: string }>;
+  searchParams: Promise<{
+    query?: string;
+    page?: string;
+    active?: string;
+    subscription?: string;
+  }>;
 }>) {
   const params = await searchParams;
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
+  // `?active=` = flag `isActive` del perfil; `?subscription=` = filtro nuevo
+  // por suscripción gym-activa (`active` = con plan, `none` = sin plan).
+  const activeParam = params.active === "true" ? true : params.active === "false" ? false : undefined;
+  const subscriptionParam =
+    params.subscription === "active" ? true : params.subscription === "none" ? false : undefined;
 
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
   const tag = `org:${activeOrgId}:members`;
+  const statsTag = `org:${activeOrgId}:members:stats`;
 
-  const [result, featuresData, seats] = await Promise.all([
+  const [result, stats, featuresData, seats] = await Promise.all([
     membersService.getMembers(
       {
         query: query || undefined,
         page,
         limit: PAGE_LIMIT,
         role: ORG_ROLES.MEMBER,
+        isActive: activeParam,
+        hasActiveSubscription: subscriptionParam,
         includeLatestSubscription: true,
       },
       { next: { revalidate: 60, tags: [tag] } },
     ),
+    membersService
+      .getMemberStats({ next: { revalidate: 60, tags: [statsTag] } })
+      .catch(() => null),
     getOrgFeatures(activeOrgId),
     getOrgSeats({ next: { revalidate: 60, tags: [tag] } }),
   ]);
@@ -43,6 +59,7 @@ export default async function MembersPage({
   const refreshMembers = async () => {
     "use server";
     updateTag(tag);
+    updateTag(statsTag);
   };
 
   return (
@@ -55,7 +72,9 @@ export default async function MembersPage({
         initialPage={result.page}
         initialTotalPages={result.totalPages}
         initialQuery={query}
-        limit={PAGE_LIMIT}
+        initialActive={params.active ?? null}
+        initialSubscription={params.subscription ?? null}
+        initialStats={stats}
         onRefreshServer={refreshMembers}
       />
     </div>

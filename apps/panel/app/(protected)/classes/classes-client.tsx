@@ -6,9 +6,13 @@ import { Button, Text } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
 import { ClassesTable } from "@/components/classes/classes-table";
 import { ClassModal } from "@/components/classes/class-modal";
+import { WeekCalendarView } from "@/components/classes/week-calendar-view";
+import { ClassesSummaryStrip } from "@/components/classes/classes-summary-strip";
+import type { WeekCalendarDay, WeekOccurrence } from "@/lib/classes/week-calendar";
 import { classesService } from "@/lib/services/classes-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { useDebounce } from "@/lib/hooks/use-debounce";
+import { mutationError } from "@/lib/errors";
 import { toast } from "@workspace/ui/components";
 
 interface ClassesClientProps {
@@ -20,6 +24,16 @@ interface ClassesClientProps {
   };
   readonly initialQuery: string;
   readonly initialVisibility: "all" | "visible" | "hidden";
+  readonly initialWeek: string | null;
+  readonly weekDays: WeekCalendarDay[];
+  readonly weekLabel: string;
+  readonly prevWeekUrl: string;
+  readonly nextWeekUrl: string;
+  readonly todayUrl: string;
+  readonly todayOccurrences: WeekOccurrence[];
+  readonly visibleCount: number;
+  readonly hiddenCount: number;
+  readonly timezone: string | null | undefined;
   readonly limit: number;
   readonly onSuccess?: () => Promise<void> | void;
 }
@@ -30,6 +44,16 @@ export function ClassesClient({
   initialClasses,
   initialQuery,
   initialVisibility,
+  initialWeek,
+  weekDays,
+  weekLabel,
+  prevWeekUrl,
+  nextWeekUrl,
+  todayUrl,
+  todayOccurrences,
+  visibleCount,
+  hiddenCount,
+  timezone,
   limit,
   onSuccess,
 }: ClassesClientProps) {
@@ -46,8 +70,9 @@ export function ClassesClient({
     params.set("page", "1");
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
+    if (initialWeek) params.set("week", initialWeek);
     router.push(`/classes?${params.toString()}`);
-  }, [debouncedSearch, initialQuery, router, visibility]);
+  }, [debouncedSearch, initialQuery, router, visibility, initialWeek]);
 
   const setVisibilityAndNavigate = (next: VisibilityFilter) => {
     setVisibility(next);
@@ -56,6 +81,7 @@ export function ClassesClient({
     params.set("page", "1");
     if (next === "visible") params.set("isVisible", "true");
     if (next === "hidden") params.set("isVisible", "false");
+    if (initialWeek) params.set("week", initialWeek);
     router.push(`/classes?${params.toString()}`);
   };
 
@@ -64,6 +90,7 @@ export function ClassesClient({
     if (initialQuery) params.set("query", initialQuery);
     if (visibility === "visible") params.set("isVisible", "true");
     if (visibility === "hidden") params.set("isVisible", "false");
+    if (initialWeek) params.set("week", initialWeek);
     params.set("page", String(newPage));
     router.push(`/classes?${params.toString()}`);
   };
@@ -75,8 +102,8 @@ export function ClassesClient({
       await classesService.deleteClass(id);
       toast.success("Clase eliminada correctamente");
       await onSuccess?.();
-    } catch (error) {
-      toast.error("Error al eliminar la clase. Intente más tarde.");
+    } catch (err) {
+      toast.error(mutationError("ClassesClient", err, "Error al eliminar la clase. Intente más tarde."));
     } finally {
       setDeletingId(null);
     }
@@ -132,6 +159,21 @@ export function ClassesClient({
           </Button>
         </div>
       </div>
+
+      <ClassesSummaryStrip
+        todayOccurrences={todayOccurrences}
+        visible={visibleCount}
+        hidden={hiddenCount}
+        timezone={timezone}
+      />
+
+      <WeekCalendarView
+        days={weekDays}
+        weekLabel={weekLabel}
+        prevWeekUrl={prevWeekUrl}
+        nextWeekUrl={nextWeekUrl}
+        todayUrl={todayUrl}
+      />
 
       <section className="animate-in fade-in slide-in-from-bottom-3 duration-500">
         <div className="flex items-center justify-between mb-4">

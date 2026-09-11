@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   // Moneda principal: columna obligatoria de la org (sin fallback de config).
   const primaryCurrency = session?.activeOrganization?.primaryCurrency ?? "";
 
-  const [stats, todayClassesRaw, recentRegistrations, analytics, actionItems] =
+  const [stats, todayClassesRaw, recentRegistrations, analytics, monthlyReport, actionItems] =
     await Promise.all([
       dashboardService.getStats(today, {
         next: { revalidate: 60, tags: [`org:${activeOrgId}:dashboard:stats`] },
@@ -73,6 +73,9 @@ export default async function DashboardPage() {
         .getRecent(5, { next: { revalidate: 60, tags: [`org:${activeOrgId}:subscriptions`] } })
         .catch(() => []),
       financeService.getAnalytics(primaryCurrency).catch(() => null),
+      // Fuente única de la mini-gráfica 6M: reporte mensual (sin ApiFetchOptions;
+      // el cache server vive en el endpoint 1h + rates Next 1h).
+      financeService.getRevenueReport(primaryCurrency).catch(() => []),
       activeOrgId
         ? dashboardService.getActionItems(activeOrgId).catch(() => null)
         : Promise.resolve(null),
@@ -103,6 +106,9 @@ export default async function DashboardPage() {
         todayIncome={todayIncome}
         pendingPayments={analytics?.kpis.pendingPayments ?? null}
         actionItems={actionItems}
+        analytics={analytics}
+        monthlyReport={monthlyReport}
+        primaryCurrency={primaryCurrency}
       />
     </>
   );

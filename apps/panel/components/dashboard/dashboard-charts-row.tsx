@@ -13,7 +13,7 @@ import {
   GROWTH_CHART_CONFIG,
 } from "@/lib/charts/analytics-shapes";
 
-interface AnalyticsSlice {
+export interface AnalyticsSlice {
   plansDistribution: Array<{ planName: string; count: number }>;
   renewals: Array<{ day: string; count: number }>;
   growth: {
@@ -55,7 +55,7 @@ export function DashboardChartsRow({ analytics }: Readonly<DashboardChartsRowPro
   if (!analytics) return null;
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+    <section data-testid="dashboard-charts-row" className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
       <ChartCard
         title="Crecimiento Neto"
         description="Altas vs Bajas en los últimos 30 días."
