@@ -10,10 +10,12 @@ export interface IPayment {
   subscriptionId?: number | null;
 
   planSnapshotName: string;
-  planSnapshotPrice: string | number;
+  /** Centavos enteros. */
+  planSnapshotPrice: number;
   planSnapshotCurrency: string;
 
-  amountPaid: string | number;
+  /** Centavos enteros. */
+  amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
 
@@ -35,9 +37,9 @@ export function createPaymentsRepository(db: Db) {
           memberId: data.memberId,
           subscriptionId: data.subscriptionId,
           planSnapshotName: data.planSnapshotName,
-          planSnapshotPrice: data.planSnapshotPrice.toString(),
+          planSnapshotPrice: data.planSnapshotPrice,
           planSnapshotCurrency: data.planSnapshotCurrency,
-          amountPaid: data.amountPaid.toString(),
+          amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied?.toString() ?? null,
           status: data.status ?? 'validated',
@@ -91,7 +93,7 @@ export function createPaymentsRepository(db: Db) {
         .select({
           day: dateManager.formatDaySql(payment.paymentDate),
           currency: payment.currencyPaid,
-          amount: sql<number>`SUM(${payment.amountPaid})`,
+          amount: sql<number>`SUM(${payment.amountPaid})`.mapWith(Number),
           exchangeRate: payment.exchangeRateApplied,
         })
         .from(payment)
@@ -111,7 +113,7 @@ export function createPaymentsRepository(db: Db) {
         .select({
           month: dateManager.formatMonthSql(payment.paymentDate),
           currency: payment.currencyPaid,
-          amount: sql<number>`SUM(${payment.amountPaid})`,
+          amount: sql<number>`SUM(${payment.amountPaid})`.mapWith(Number),
           exchangeRate: payment.exchangeRateApplied,
         })
         .from(payment)

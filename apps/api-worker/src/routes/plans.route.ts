@@ -10,7 +10,8 @@ import type { AppEnv } from '../lib/env';
 
 const planSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  price: z.union([z.string(), z.number()]),
+  // Precio en centavos enteros (convención Money, ver AGENTS.md).
+  price: z.number().int().nonnegative(),
   currency: z.string().min(1, 'La moneda es requerida'),
   durationValue: z.number().int().positive(),
   durationUnit: z.enum(['day', 'week', 'month', 'year']),

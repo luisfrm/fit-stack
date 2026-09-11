@@ -20,13 +20,13 @@ export const paymentMethodDetailsSchema = z
 
 /**
  * Línea de impuesto persistida en el pago. `rate` es fracción 0–1 y los
- * montos van en unidades mayores con 2 decimales (ver `money.ts` en
- * `@workspace/shared`). Única fuente de verdad para PDF y reportes.
+ * montos son centavos enteros (ver `money.ts` en `@workspace/shared`).
+ * Única fuente de verdad para PDF y reportes.
  */
 export const taxDetailSchema = z.object({
   name: z.string().min(1),
   rate: z.number().min(0).max(1),
-  amount: z.number().min(0),
+  amount: z.number().int().min(0),
 });
 
 /** Contrato fiscal de la org — re-export del de shared, no duplicado. */
@@ -34,10 +34,11 @@ export { FiscalConfigSchema };
 
 /**
  * Override manual de impuestos con auditoría: exige motivo no vacío.
- * El servicio valida además que Σ líneas ≈ taxTotal (ver `applyTaxOverride`).
+ * Montos en centavos enteros. El servicio valida además que Σ líneas ≈
+ * taxTotal (ver `applyTaxOverride`).
  */
 export const taxOverrideSchema = z.object({
-  taxTotal: z.number().min(0),
+  taxTotal: z.number().int().min(0),
   taxDetails: z.array(taxDetailSchema),
   taxOverrideReason: z.string().trim().min(1),
 });

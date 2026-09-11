@@ -133,7 +133,7 @@ export function createSubscriptionsService(
         memberId: payload.memberId,
         subscriptionId: subscription.id,
         planSnapshotName: plan.name,
-        planSnapshotPrice: plan.price.toString(),
+        planSnapshotPrice: plan.price,
         planSnapshotCurrency: plan.currency,
         amountPaid: payload.payment.amountPaid,
         currencyPaid: payload.payment.currencyPaid,
