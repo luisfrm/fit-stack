@@ -7,9 +7,9 @@ import { Timer, CreditCard, Trophy, ChartColumn } from "lucide-react";
 import type { IPaymentMethodConfig } from "@workspace/shared/types";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import {
-  ValueConverter,
+  formatCents,
   type CurrencyFormat,
-} from "@/lib/utils/value-converters";
+} from "@workspace/shared";
 import {
   selectTopPlansByRevenue,
   selectExpiringSoon,
@@ -170,11 +170,7 @@ export function SubscriptionsSidePanel({
                 {formatMonth(point.month)}
               </Text>
               <Text size="sm" weight="bold" className="tabular-nums">
-                {ValueConverter.format(
-                  point.totalCents / 100,
-                  currency,
-                  currencyFormat,
-                )}
+                {formatCents(point.totalCents, currency, currencyFormat)}
               </Text>
             </div>
           ))}
@@ -213,11 +209,7 @@ export function SubscriptionsSidePanel({
                 </Text>
               </div>
               <Text size="sm" weight="bold" className="tabular-nums shrink-0">
-                {ValueConverter.format(
-                  plan.revenueCents / 100,
-                  currency,
-                  currencyFormat,
-                )}
+                {formatCents(plan.revenueCents, currency, currencyFormat)}
               </Text>
             </div>
           ))}

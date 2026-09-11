@@ -21,6 +21,7 @@ import { PlatformPlanModal } from "./platform-plan-modal";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import {
   FEATURE_CATALOG,
+  centsToUnits,
   formatFeatureLimits,
   resolveFeatures,
   type FeatureCatalog,
@@ -153,7 +154,7 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, 
           <div className="flex flex-col gap-0.5">
             <div className="flex items-center gap-1.5 text-primary">
               <Text size="lg" weight="bold">
-                ${(Number(plan.price) / 100).toLocaleString()}
+                ${centsToUnits(Number(plan.price)).toLocaleString()}
               </Text>
               <Text size="xs" variant="muted" className="uppercase font-bold tracking-widest">
                 / {getDurationText(plan.durationValue, plan.durationUnit)}

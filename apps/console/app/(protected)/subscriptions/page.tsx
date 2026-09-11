@@ -10,7 +10,7 @@ import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { updateTag } from "next/cache";
 import { SubscriptionsClient } from "@/components/platform/subscriptions-client";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import type { PlatformSubscriptionStatus } from "@workspace/shared/types";
 
 export const dynamic = "force-dynamic";

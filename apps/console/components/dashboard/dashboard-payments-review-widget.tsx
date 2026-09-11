@@ -7,7 +7,7 @@ import { Badge, Text } from "@workspace/ui/components";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 import { DASHBOARD_WIDGET_PAGE_SIZE } from "@/lib/dashboard/selectors";
 import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
-import { formatShortDate } from "@/lib/utils/value-converters";
+import { formatShortDate } from "@workspace/shared";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 export function PaymentsReviewWidget({

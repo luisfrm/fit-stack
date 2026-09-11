@@ -21,7 +21,7 @@ import {
   Clock,
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 import { usePermissions, useAuth } from "@/lib/hooks/use-auth";
 
 const getPaymentStatusBadge = (status?: string) => {
@@ -98,7 +98,7 @@ const getColumns = (
           <div className="flex flex-col">
             {sub.planSnapshotPrice !== undefined && (
               <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
-                Precio base: {ValueConverter.format(sub.planSnapshotPrice / 100, 'USD', currencyFormat)}
+                Precio base: {formatCents(sub.planSnapshotPrice, 'USD', currencyFormat)}
               </Text>
             )}
           </div>
@@ -127,7 +127,7 @@ const getColumns = (
         <div className="flex flex-col gap-0.5">
           <Text weight="bold" size="sm" className="text-foreground tabular-nums">
             {sub.amountPaid
-              ? ValueConverter.format(sub.amountPaid / 100, sub.currencyPaid, currencyFormat)
+              ? formatCents(sub.amountPaid, sub.currencyPaid ?? "", currencyFormat)
               : "---"
             }
           </Text>

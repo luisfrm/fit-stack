@@ -7,7 +7,7 @@ import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-rea
 import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
-import { ValueConverter, CurrencyFormat } from "@/lib/utils/value-converters";
+import { ValueConverter, CurrencyFormat } from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { differenceInDays, parseISO } from "date-fns";
 

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, SimpleChart, ChartConfig, ChartHeader, useChartPagination, Spinner } from "@workspace/ui";
-import { CurrencyFormat, ValueConverter } from "@/lib/utils/value-converters";
+import { CurrencyFormat, centsToUnits, formatCents } from "@workspace/shared";
 
 // Helper function extracted to prevent unstable nested components warning
 function customTooltipFormatter(
@@ -30,11 +30,11 @@ function customTooltipFormatter(
       </div>
       <div className="flex items-baseline gap-1.5 ml-auto">
         <span className="font-mono font-medium text-foreground">
-          {ValueConverter.format(rawVal as number, String(finalName), currencyFormat)}
+          {formatCents(rawVal as number, String(finalName), currencyFormat)}
         </span>
         {showConversion && (
           <span className="text-[10px] text-muted-foreground/80 font-mono">
-            (Eq: {ValueConverter.format(Number(finalValue), baseCurrency, currencyFormat)})
+            (Eq: {formatCents(Number(finalValue), baseCurrency, currencyFormat)})
           </span>
         )}
       </div>
@@ -94,8 +94,10 @@ export function RevenueChart({
         grouped[dateLabel] = group;
       }
 
-      group[item.currency] = ((group[item.currency] as number) || 0) + (item.normalizedAmount / 100);
-      group[`${item.currency}_raw`] = ((group[`${item.currency}_raw`] as number) || 0) + (item.amount / 100);
+      // Agregación en centavos enteros (convención Money); el display
+      // convierte con formatCents en el tooltip y el eje.
+      group[item.currency] = ((group[item.currency] as number) || 0) + item.normalizedAmount;
+      group[`${item.currency}_raw`] = ((group[`${item.currency}_raw`] as number) || 0) + item.amount;
     });
 
     const currencies = Array.from(new Set(activeData.map((d) => d.currency)));
@@ -201,7 +203,8 @@ export function RevenueChart({
               showGrid={true}
               showYAxis={true}
               yAxisFormatter={(val) => {
-                return Number(val) >= 1000 ? `${(Number(val) / 1000).toFixed(0)}k` : String(val);
+                // Eje en centavos: 100000 = $1k; el resto igual que antes (unidades).
+                return Number(val) >= 100000 ? `${(Number(val) / 100000).toFixed(0)}k` : String(centsToUnits(Number(val)));
               }}
               tooltipFormatter={(value, name, item, index, payload) =>
                 customTooltipFormatter(value, name, item, index, payload, baseCurrency, currencyFormat)

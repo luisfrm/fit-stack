@@ -12,9 +12,9 @@ import {
   History,
 } from "lucide-react";
 import {
-  ValueConverter,
+  formatCents,
   type CurrencyFormat,
-} from "@/lib/utils/value-converters";
+} from "@workspace/shared";
 import { selectRevenueGrowth } from "@/lib/platform/subscription-selectors";
 import type { SubscriptionStats } from "@/lib/services/platform-subscriptions-service";
 
@@ -153,11 +153,7 @@ export function SubscriptionsKpiSection({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MoneyCard
           label="Ingreso recurrente"
-          value={ValueConverter.format(
-            displayStats.mrrCents / 100,
-            currency,
-            currencyFormat,
-          )}
+          value={formatCents(displayStats.mrrCents, currency, currencyFormat)}
           sub="MRR · suscripciones activas"
           icon={<Wallet className="w-4 h-4 text-primary" />}
           isLoading={isLoading}
@@ -165,11 +161,7 @@ export function SubscriptionsKpiSection({
         />
         <MoneyCard
           label="Ingreso del mes"
-          value={ValueConverter.format(
-            displayStats.monthlyRevenueCents / 100,
-            currency,
-            currencyFormat,
-          )}
+          value={formatCents(displayStats.monthlyRevenueCents, currency, currencyFormat)}
           sub={growthLabel}
           icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}
           isLoading={isLoading}
@@ -177,11 +169,7 @@ export function SubscriptionsKpiSection({
         />
         <MoneyCard
           label="Mes previo"
-          value={ValueConverter.format(
-            displayStats.previousMonthRevenueCents / 100,
-            currency,
-            currencyFormat,
-          )}
+          value={formatCents(displayStats.previousMonthRevenueCents, currency, currencyFormat)}
           icon={<History className="w-4 h-4 text-blue-400" />}
           isLoading={isLoading}
           testId="subs-kpi-prev"

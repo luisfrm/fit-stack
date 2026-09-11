@@ -17,7 +17,7 @@ import {
   type IPaymentMethodConfig
 } from "@/types/dashboard";
 import { sortPaymentMethodFields } from "@workspace/shared";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { ValueConverter, type CurrencyFormat } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface PaymentSectionProps {

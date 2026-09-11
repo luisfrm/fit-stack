@@ -18,7 +18,7 @@ import {
   Printer,
   ShieldCheck
 } from "lucide-react";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 import { useReactToPrint } from "react-to-print";
 import { emailsService } from "@/lib/services/emails-service";
 import { uploadService } from "@/lib/services/upload-service";
@@ -236,11 +236,11 @@ export function ReceiptDialog({ initialData: subscription, trigger }: ReceiptDia
             <div className="flex justify-between items-center">
               <Text className="label-text">Total Pagado</Text>
               <Title as="h2" size="lg" accent="primary">
-                {ValueConverter.format((subscription.amountPaid ?? 0) / 100, subscription.currencyPaid ?? 'USD', currencyFormat)}
+                {formatCents(subscription.amountPaid ?? 0, subscription.currencyPaid ?? 'USD', currencyFormat)}
               </Title>
             </div>
             <Text variant="muted" size="xs" italic className="opacity-30 mt-0.5">
-              Valor del plan original: {ValueConverter.format((subscription.planSnapshotPrice ?? 0) / 100, subscription.planSnapshotCurrency ?? 'USD', currencyFormat)}
+              Valor del plan original: {formatCents(subscription.planSnapshotPrice ?? 0, subscription.planSnapshotCurrency ?? 'USD', currencyFormat)}
             </Text>
           </div>
 

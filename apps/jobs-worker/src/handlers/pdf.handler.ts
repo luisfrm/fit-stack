@@ -10,14 +10,11 @@ import {
 import { sendEmail, type EmailHandlerEnv } from './email.handler';
 import { renderPaymentReceipt } from '../templates/payment-receipt';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
+import { formatCents, type CurrencyFormat } from '@workspace/shared';
 import { and, eq } from 'drizzle-orm';
 
 export interface PdfHandlerEnv extends EmailHandlerEnv {
   DATABASE_URL: string;
-}
-
-function formatAmount(amount: number, currency: string): string {
-  return `${amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 function formatDate(date: Date): string {
@@ -56,8 +53,14 @@ export async function handlePaymentReceipt(
     return;
   }
 
-  const amountPaid = Number.parseFloat(paymentData.payment.amountPaid.toString());
-  const amountFormatted = formatAmount(amountPaid, paymentData.payment.currencyPaid);
+  // Montos en centavos enteros (convención Money): display vía formatCents
+  // con el formato de la org emisora.
+  const orgFormat = (paymentData.org.currencyFormat ?? 'latam') as CurrencyFormat;
+  const amountFormatted = formatCents(
+    Number(paymentData.payment.amountPaid),
+    paymentData.payment.currencyPaid,
+    orgFormat,
+  );
 
   const { subject, html } = renderPaymentReceipt({
     paymentId: paymentData.payment.id,
@@ -117,9 +120,11 @@ export async function handleOrgPaymentReceived(
 
   const recipients = new Set<string>([payload.payerEmail, ...ownerRows.map((r) => r.email)]);
 
-  const amountFormatted = formatAmount(
+  const orgFormat = (paymentData.org.currencyFormat ?? 'latam') as CurrencyFormat;
+  const amountFormatted = formatCents(
     Number(paymentData.payment.amountPaid),
     paymentData.payment.currencyPaid,
+    orgFormat,
   );
   const pendingReview = paymentData.payment.status === 'processing';
 

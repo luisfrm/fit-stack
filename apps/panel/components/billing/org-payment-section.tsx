@@ -11,7 +11,7 @@ import {
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { sortPaymentMethodFields } from "@workspace/shared";
-import type { IPaymentMethodConfig } from "@workspace/shared/types";
+import { formatCents, unitsToCents } from "@workspace/shared";import type { IPaymentMethodConfig } from "@workspace/shared/types";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface OrgPaymentSectionProps {
@@ -54,8 +54,6 @@ export function OrgPaymentSection({
   onMethodChange,
   disabled,
 }: OrgPaymentSectionProps) {
-  const baseAmount = planPriceCents / 100;
-
   return (
     <Card className={cn(
       "p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-500",
@@ -105,7 +103,7 @@ export function OrgPaymentSection({
               Monto a Pagar
             </Text>
             <Text weight="bold" className="tabular-nums">
-              {baseAmount.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {planCurrency}
+              {formatCents(planPriceCents, planCurrency)}
             </Text>
           </div>
           {paymentCurrency !== planCurrency && referenceRate > 0 && (
@@ -114,7 +112,7 @@ export function OrgPaymentSection({
                 Monto referencial ({paymentCurrency})
               </Text>
               <Text size="sm" className="tabular-nums opacity-80">
-                {referenceAmount.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {paymentCurrency}
+                {formatCents(unitsToCents(referenceAmount), paymentCurrency)}
               </Text>
             </div>
           )}

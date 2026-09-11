@@ -17,9 +17,9 @@ import {
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import {
-  ValueConverter,
+  formatCents,
   type CurrencyFormat,
-} from "@/lib/utils/value-converters";
+} from "@workspace/shared";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -70,10 +70,9 @@ export default async function DashboardPage() {
   ] as CurrencyFormat;
 
   // Calculate dynamic B2B revenue and monthly growth comparison
-  const monthlyRevenue = (stats.monthlyRevenueCents ?? 0) / 100;
-  const formattedRevenue = ValueConverter.format(
-    monthlyRevenue,
-    primaryCurrency,
+  const formattedRevenue = formatCents(
+    stats.monthlyRevenueCents ?? 0,
+    primaryCurrency ?? "",
     currencyFormat,
   );
 

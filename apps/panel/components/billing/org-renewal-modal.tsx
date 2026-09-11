@@ -10,6 +10,7 @@ import { mutationError } from "@/lib/errors";
 import { uploadService } from "@/lib/services/upload-service";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import { toLocalDayString } from "@workspace/shared/date";
+import { centsToUnits } from "@workspace/shared";
 import type { IPaymentMethodDetails } from "@workspace/shared/types";
 
 interface OrgRenewalModalProps {
@@ -41,7 +42,7 @@ export function OrgRenewalModal({
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [paymentDate, setPaymentDate] = React.useState(() => toLocalDayString(activeOrganization?.timezone));
   const [referenceRate, setReferenceRate] = React.useState(1);
-  const [referenceAmount, setReferenceAmount] = React.useState(subscription.planPrice / 100);
+  const [referenceAmount, setReferenceAmount] = React.useState(centsToUnits(subscription.planPrice));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const activeCurrencies = paymentMethods?.activeCurrencies ?? [subscription.planCurrency];
@@ -64,7 +65,7 @@ export function OrgRenewalModal({
   React.useEffect(() => {
     if (paymentCurrency === subscription.planCurrency) {
       setReferenceRate(1);
-      setReferenceAmount(subscription.planPrice / 100);
+      setReferenceAmount(centsToUnits(subscription.planPrice));
       return;
     }
     let cancelled = false;
@@ -73,7 +74,7 @@ export function OrgRenewalModal({
         if (cancelled) return;
         const rate = rates[paymentCurrency] ?? 0;
         setReferenceRate(rate);
-        setReferenceAmount((subscription.planPrice / 100) * rate);
+        setReferenceAmount(centsToUnits(subscription.planPrice) * rate);
       })
       .catch(() => {
         if (!cancelled) {

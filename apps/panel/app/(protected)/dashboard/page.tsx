@@ -7,6 +7,7 @@ import { GymDashboard } from "@/components/dashboard/gym-dashboard";
 import { DashboardStatusToaster } from "@/components/dashboard/dashboard-status-toaster";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
 import { toLocalDayString } from "@workspace/shared/date";
+import { centsToUnits } from "@workspace/shared";
 import type { IClassToday } from "@workspace/shared/types";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ async function normalizeTodayRevenue(
     0,
   );
 
-  return { amount: normalizedCents / 100, currency: primaryCurrency };
+  return { amount: centsToUnits(normalizedCents), currency: primaryCurrency };
 }
 
 export default async function DashboardPage() {

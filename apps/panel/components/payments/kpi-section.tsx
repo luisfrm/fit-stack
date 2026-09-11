@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { TrendingUp, Clock, AlertTriangle, Users, Wallet, Receipt } from "lucide-react";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { ValueConverter, formatCents, type CurrencyFormat } from "@workspace/shared";
 import { KpiCard } from "./kpi-card";
 
 interface CurrencyBreakdown {
@@ -45,7 +45,7 @@ export function KpiSection({
     }
 
     return stats.todayRevenue
-      .map(r => ValueConverter.format(r.amount / 100, r.currency, currencyFormat))
+      .map(r => formatCents(r.amount, r.currency, currencyFormat))
       .join(" • ");
   }, [stats.todayRevenue, currencyFormat]);
 
@@ -64,7 +64,7 @@ export function KpiSection({
           {stats.todayRevenue.map((r, idx) => (
             <div key={`${r.currency}-${r.id ?? idx}`} className="flex justify-between gap-4 text-xs">
               <span className="opacity-70">{r.currency}</span>
-              <span className="font-mono">{ValueConverter.format(r.amount / 100, "", currencyFormat)}</span>
+              <span className="font-mono">{formatCents(r.amount, "", currencyFormat)}</span>
             </div>
           ))}
         </div>
@@ -98,7 +98,7 @@ export function KpiSection({
       ? [
           {
             title: "Cobrado del Mes",
-            value: ValueConverter.format(monthCollectedCents / 100, primaryCurrency, currencyFormat),
+            value: formatCents(monthCollectedCents, primaryCurrency, currencyFormat),
             description: "Último mes normalizado",
             icon: Wallet,
             className: "text-emerald-500",
@@ -110,7 +110,7 @@ export function KpiSection({
       ? [
           {
             title: "Cobro por Suscripción",
-            value: ValueConverter.format(perSubscriptionCents / 100, primaryCurrency, currencyFormat),
+            value: formatCents(perSubscriptionCents, primaryCurrency, currencyFormat),
             description: "Promedio por plan activo",
             icon: Receipt,
             className: "text-violet-500",

@@ -16,7 +16,8 @@ import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
-import { type CurrencyFormat } from "@/lib/utils/value-converters";
+import { type CurrencyFormat } from "@workspace/shared";
+import { centsToUnits, unitsToCents } from "@workspace/shared";
 import { OrganizationSelector } from "./organization-selector";
 import { PaymentSection } from "./payment-section";
 import { PlatformPlanSelector } from "./platform-plan-selector";
@@ -278,8 +279,8 @@ export function PlatformSubscriptionForm({
       rate = planRates[paymentCurrency] ?? 1;
     }
     setExchangeRate(rate);
-    // price ya está en centavos → dividir por 100 para mostrar
-    setFinalAmount((Number(selectedPlan.price) * rate) / 100);
+    // price ya está en centavos → unidades para mostrar
+    setFinalAmount(centsToUnits(Number(selectedPlan.price) * rate));
   }, [selectedPlan, paymentCurrency, planRates]);
 
   const handleSelectOrg = (org: IPlatformOrganization) => {
@@ -383,7 +384,7 @@ export function PlatformSubscriptionForm({
         startDate,
         isTrial: false,
         payment: {
-          amountPaidCents: Math.round(finalAmount * 100),
+          amountPaidCents: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
           exchangeRateApplied:
             exchangeRate === 1 ? undefined : String(exchangeRate),
@@ -521,7 +522,7 @@ export function PlatformSubscriptionForm({
           onAmountFocus={setAmountFocus}
           onRateChange={(val) => {
             setExchangeRate(val);
-            setFinalAmount((Number(selectedPlan!.price) * val) / 100);
+            setFinalAmount(centsToUnits(Number(selectedPlan!.price) * val));
           }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}

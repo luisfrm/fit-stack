@@ -23,7 +23,7 @@ import { ExtendSubscriptionModal } from "./extend-subscription-modal";
 import { DeleteSubscriptionModal } from "./delete-subscription-modal";
 import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
-import { formatCents } from "@/lib/utils/value-converters";
+import { formatCents } from "@workspace/shared";
 import {
   canManageBilling,
   hasActiveSubscription,
@@ -39,7 +39,7 @@ import {
   CreditCard,
   History,
 } from "lucide-react";
-import { type CurrencyFormat } from "@/lib/utils/value-converters";
+import { type CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionsTableProps {
   subscriptions: SubscriptionWithDetails[];

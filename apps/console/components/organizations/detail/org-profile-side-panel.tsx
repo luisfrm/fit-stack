@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Text } from "@workspace/ui/components";
 import { Building2, ExternalLink } from "lucide-react";
 import { COUNTRIES } from "@workspace/shared/constants";
-import { formatShortDate } from "@/lib/utils/value-converters";
+import { formatShortDate } from "@workspace/shared";
 
 interface OrgProfileSidePanelProps {
   readonly slug: string;

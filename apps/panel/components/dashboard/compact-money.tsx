@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@workspace/ui/lib/utils";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 
 interface CompactMoneyProps {
   /** Monto en unidades mayores (ej. 1250.45), ya normalizado a la divisa mostrada */

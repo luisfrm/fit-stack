@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 
 interface OrgSubscriptionsProps {

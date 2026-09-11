@@ -17,7 +17,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAuth } from "@/lib/hooks/use-auth";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";

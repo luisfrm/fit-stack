@@ -19,7 +19,7 @@ import type {
   IPaymentMethodDetails,
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
-import { formatCents, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 import {
   Trash2,
   RefreshCw,

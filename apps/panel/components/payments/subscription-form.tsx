@@ -28,12 +28,13 @@ import { addDuration, localDayStartUtc, toLocalDayString } from "@workspace/shar
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { ORG_ROLES } from "@workspace/shared";
+import { centsToUnits, unitsToCents } from "@workspace/shared";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
-import { CurrencyFormat } from "@/lib/utils/value-converters";
+import { CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
   payment: {
@@ -189,7 +190,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       }
 
       setExchangeRate(rate);
-      setFinalAmount((selectedPlan.price * rate) / 100);
+      setFinalAmount(centsToUnits(selectedPlan.price * rate));
     };
 
     updateFinance();
@@ -304,7 +305,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         startDate: startDate, // Raw YYYY-MM-DD string, backend will handle timezone
         endDate: endDate, // Raw YYYY-MM-DD string, backend will handle timezone
         payment: {
-          amountPaid: Math.round(finalAmount * 100),
+          amountPaid: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
           paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
@@ -400,7 +401,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           onAmountFocus={setAmountFocus}
           onRateChange={(val) => {
             setExchangeRate(val);
-            setFinalAmount((selectedPlan.price * val) / 100);
+            setFinalAmount(centsToUnits(selectedPlan.price * val));
           }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}

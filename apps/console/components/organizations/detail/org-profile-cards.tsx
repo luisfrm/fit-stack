@@ -11,9 +11,8 @@ import {
 import { SubscriptionStatusBadge } from "@/components/platform/subscription-status-badge";
 import {
   formatCents,
-  ValueConverter,
   type CurrencyFormat,
-} from "@/lib/utils/value-converters";
+} from "@workspace/shared";
 import { selectPortalAdoption } from "@/lib/platform/organization-selectors";
 import {
   selectOrgBilledTotal,
@@ -373,11 +372,7 @@ export function OrgProfileCards({
         testId="org-profile-billing"
       >
         <Text size="lg" weight="bold" className="tabular-nums">
-          {ValueConverter.format(
-            billed.totalCents / 100,
-            currency,
-            currencyFormat,
-          )}
+          {formatCents(billed.totalCents, currency, currencyFormat)}
         </Text>
         <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
           {billed.count} pago(s) validados
@@ -389,8 +384,8 @@ export function OrgProfileCards({
           <div>
             <Text size="sm" weight="bold" className="tabular-nums">
               {billed.count > 0
-                ? ValueConverter.format(
-                    billed.totalCents / billed.count / 100,
+                ? formatCents(
+                    Math.round(billed.totalCents / billed.count),
                     currency,
                     currencyFormat,
                   )
@@ -406,11 +401,7 @@ export function OrgProfileCards({
           </div>
           <div>
             <Text size="sm" weight="bold" className="tabular-nums">
-              {ValueConverter.format(
-                currentMonth.totalCents / 100,
-                currency,
-                currencyFormat,
-              )}
+              {formatCents(currentMonth.totalCents, currency, currencyFormat)}
             </Text>
             <Text
               size="xs"
