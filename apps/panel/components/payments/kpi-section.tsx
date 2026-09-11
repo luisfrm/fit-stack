@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { TrendingUp, Clock, AlertTriangle, Users } from "lucide-react";
+import { TrendingUp, Clock, AlertTriangle, Users, Wallet, Receipt } from "lucide-react";
 import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
 import { KpiCard } from "./kpi-card";
 
@@ -21,13 +21,21 @@ interface KpiSectionProps {
   onFilterChange: (filter: string | null) => void;
   activeFilter: string | null;
   currencyFormat: CurrencyFormat;
+  /** Cobrado del mes en centavos normalizados (P2, opcional). */
+  monthCollectedCents?: number | null;
+  /** Cobro por suscripción activa en centavos (P2, opcional). */
+  perSubscriptionCents?: number | null;
+  primaryCurrency?: string;
 }
 
 export function KpiSection({
   stats,
   onFilterChange,
   activeFilter,
-  currencyFormat = "latam"
+  currencyFormat = "latam",
+  monthCollectedCents,
+  perSubscriptionCents,
+  primaryCurrency = "",
 }: Readonly<KpiSectionProps>) {
 
   // Format currency list for the ticker using ValueConverter
@@ -86,10 +94,34 @@ export function KpiSection({
       className: "text-red-500",
       filterId: "expiring",
     },
+    ...(monthCollectedCents !== undefined && monthCollectedCents !== null
+      ? [
+          {
+            title: "Cobrado del Mes",
+            value: ValueConverter.format(monthCollectedCents / 100, primaryCurrency, currencyFormat),
+            description: "Último mes normalizado",
+            icon: Wallet,
+            className: "text-emerald-500",
+            filterId: undefined,
+          },
+        ]
+      : []),
+    ...(perSubscriptionCents !== undefined && perSubscriptionCents !== null
+      ? [
+          {
+            title: "Cobro por Suscripción",
+            value: ValueConverter.format(perSubscriptionCents / 100, primaryCurrency, currencyFormat),
+            description: "Promedio por plan activo",
+            icon: Receipt,
+            className: "text-violet-500",
+            filterId: undefined,
+          },
+        ]
+      : []),
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
         <KpiCard
           key={card.title}

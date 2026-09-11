@@ -47,14 +47,15 @@ type RevenueRow = {
  */
 export const financeService = {
   /**
-   * Updates the status of a payment.
+   * Updates the status of a payment (`PATCH /:id/status` — el backend no
+   * acepta POST en esta ruta).
    */
   async updatePaymentStatus(
     paymentId: number,
     status: string,
   ): Promise<void> {
     await api(`${PAYMENTS_PATH}/${paymentId}/status`, {
-      method: "POST",
+      method: "PATCH",
       body: { status },
     });
   },

@@ -10,6 +10,7 @@ pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
 pnpm test         # Full test suite (shared → api-worker → panel → console, Vitest)
 pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
+pnpm seed:e2e       # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
 pnpm format       # Format code (Prettier)
 
 # Database (Drizzle ORM — all run via @workspace/database)
@@ -236,7 +237,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | Router               | Notable endpoints                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
-| `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`)                                                                                                                                                                                                                                                                                                  |
+| `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
 | `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
 | `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`)                                                                                                                                                                                                                                                                                                           |
 | `/api/payments`      | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend)                                                                                                                                                                                                                                                                                                                         |
@@ -269,7 +270,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 ### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
-- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `logMutationError(scope, err)` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(<generic action message>)`, e.g. "No se pudo guardar el plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
+- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `mutationError(scope, err, "<generic action message>")` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(...)`, e.g. "No se pudo guardar el plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
 - **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
@@ -338,6 +339,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:plans:*`                     | 1 h    | Membership plans (invalidated on-write in POST/PUT/DELETE /api/plans)                             |
 | `org:${orgId}:classes:*`                   | 5 min  | Classes                                                                                           |
 | `org:${orgId}:members:*`                   | 5 min  | Gym members                                                                                       |
+| `org:${orgId}:members:stats`                | 5 min  | Member KPIs (`GET /api/members/stats`; cross-invalidated on subscription/payment writes because `withoutActiveSubscription` depends on subs/pagos) |
 | `org:${orgId}:subscriptions`               | 5 min  | Member subscriptions                                                                              |
 | `org:${orgId}:dashboard:stats:*`           | 5 min  | Dashboard KPIs                                                                                    |
 | `org:${orgId}:dashboard:action-items`      | 5 min  | Dashboard actionable lists (expiring soon / recently expired)                                     |
@@ -913,79 +915,93 @@ pnpm test  # shared → api-worker → panel → console (Vitest)
 
 > E2E **don't** run with `pnpm test` — they are a separate layer (`pnpm test:e2e`).
 
-### 2. E2E Tests (Playwright)
+### 2. E2E Tests (Playwright) — suite normal: solo tests, cero evidencias
 
 End-user tests navigating the real UI in Chromium. Config in `playwright.config.ts` (root).
+The suite creates its own tenant (`e2e-suite` + `e2e-empty`), tests the flows
+(create/edit), and deletes everything on teardown — no residue. This is NOT demo
+data: the demo org (`Fit Stack` / `fit-stack`) is filled by `pnpm seed:e2e` and
+is never touched by the suite.
 
 ```bash
-pnpm test:e2e           # All E2E tests
-pnpm test:e2e:panel     # Panel only (Gym Admin)
-pnpm test:e2e:console   # Console only (SaaS Admin)
+pnpm test:e2e           # All E2E tests (console first, then panel)
 pnpm test:e2e:ui        # Playwright UI mode (visual debug)
+pnpm test:e2e:panel     # Panel only (Gym Admin, + its login setup)
+pnpm test:e2e:console   # Console only (SaaS Admin, + its login setup)
 pnpm test:e2e:report    # Open HTML report
+pnpm seed:e2e           # Demo seed: fills Fit Stack/fit-stack (NOT a test, keeps data)
 ```
 
-**Suite coverage**: panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS); console — auth, dashboard, organizations, org-detail (profile cards), plans, subscriptions, staff, settings.
+**Suite coverage**: panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS), empty-state; console — auth, dashboard, organizations, subscriptions, staff, plans, settings.
+
+**Lifecycle** (`global-setup.ts` → setups → specs → `global-teardown.ts`):
+
+1. Reset (crash-safe, fixed slugs/emails): wipe `e2e-suite` + `e2e-empty` orgs + reserved users. Worst case is "suite orgs exist", never accumulation.
+2. Platform owner (`e2e-platform@e2e.test`, role promoted via SQL).
+3. Console creates the suite org via `POST /api/platform/organizations` (same path as prod) → provisions the panel owner via `POST /:id/staff` (role owner) → trial platform sub → minimal gym seed (1 plan, 3 members, 1 sub, 1 class, 1 CMS page). Same for the empty org `e2e-empty` (no gym seed, used by `empty-state.spec.ts`).
+4. `console-setup` / `panel-setup` do UI login only + `storageState` (+ route prewarm).
+5. Teardown wipes the suite orgs + users (best-effort; skipped with `E2E_KEEP_DATA=1` for inspection). The platform plan catalog row is shared and reused by name — never deleted (other orgs' subs reference it).
 
 **Playwright config** (`playwright.config.ts`):
 
-- `testDir: './e2e'`, `fullyParallel: false` (Next.js dev + Turbopack compile on demand and api-worker shares one dev DB — too many concurrent workers causes compile storms and request timeouts), `workers: 2` locally / `1` in CI, `timeout: 60_000` (absorbs cold compiles), `retries: 1` in CI.
+- `testDir: './e2e'`, `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org), `timeout: 60_000`, `retries: 1` in CI.
 - `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
-- **Projects with setup dependencies**: `panel-setup` → `panel` (uses `storageState: 'e2e/.auth/panel-user.json'`), `console-setup` → `console` (uses `storageState: 'e2e/.auth/console-user.json'`). Setup projects run with `storageState: undefined`.
+- **Project order: console first, then panel** (`console-setup` → `console` → `panel-setup` → `panel`). `--project` filters still run isolated (each pulls only its login setup).
 - **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
 
 **Structure**:
 
 ```
 e2e/
-├── panel-setup.ts         # Panel setup: creates tenant (user+org) via API, UI login → storageState
-├── console-setup.ts       # Console setup: creates admin (sign-up + owner role in DB), UI login → storageState
+├── global-setup.ts      # Suite tenant: console user → org (platform endpoint) → owner → seed
+├── global-teardown.ts   # Wipes suite orgs + users (never fit-stack, never the plan catalog)
+├── seed.ts              # Demo seed (pnpm seed:e2e): fills Fit Stack/fit-stack, idempotent, keeps data
+├── fixtures.ts          # Shared test/api/consoleApi (panelApi.create/track auto-deletes per test, LIFO)
+├── panel-setup.ts       # UI login only → panel-user.json (+ prewarm)
+├── console-setup.ts     # UI login only → console-user.json (+ prewarm)
 ├── helpers/
-│   ├── api.ts             # API-based fixture creation (register, org, plan, member, tenant) over real HTTP
-│   ├── db.ts              # Direct dev DB access (platform role promotion, gym_setting reads)
+│   ├── api.ts             # HTTP over real network: registerUser/signIn/organization/invite helpers + uid/uniqueEmail (per-test disposables only, org-scoped)
+│   ├── api-client.ts      # ApiClient with resource tracking (create/track + cleanupDisposables)
+│   ├── db.ts              # Direct dev DB (DATABASE_URL from apps/api-worker/.dev.vars): roles, lookups, wipeTenant (orgs+users; never the platform plan)
+│   ├── domain.ts          # findByName/Email (resolve UI-created resources for track())
+│   ├── platform.ts        # Provisioning: platform tenant, suite org via console endpoint, staff owner, platform sub, gym seed (check-then-create)
+│   ├── test-tenant.ts     # Fixed identities: e2e-suite / e2e-empty slugs, reserved emails, seed literals, state.json
+│   ├── prewarm.ts         # Route prewarm (Turbopack compile out of test time)
 │   ├── modal.ts           # openModal(): robust click vs hydration race
 │   ├── nav.ts             # navigateByClick(): robust navigation vs hydration race
 │   └── selectors.ts       # Common design-system selectors (data-testid > role > text > CSS)
 ├── panel/
 │   ├── auth.spec.ts       # Login, session, redirect, error toast
-│   ├── dashboard.spec.ts  # KPIs, sidebar nav, navigation
-│   ├── members.spec.ts    # Members list, search, create modal
+│   ├── dashboard.spec.ts  # KPIs, sidebar nav, navigation, charts row + revenue mini + report button
+│   ├── members.spec.ts    # Members list, search, create via UI (tracked), KPI section, growth/birthdays, status/subscription URL filters
 │   ├── plans.spec.ts      # Plans list, modal
-│   ├── subscriptions.spec.ts # List, filters, search
-│   ├── classes.spec.ts    # Classes list, modal
+│   ├── subscriptions.spec.ts # Pending-payment actionable (per-test API fixture + validate flow)
+│   ├── classes.spec.ts    # Classes list, modal, week calendar (?week= nav), next class + visibility summary
 │   ├── settings.spec.ts   # Tab navigation, General/Org/Currencies/Payments
-│   └── content.spec.ts    # CMS pages, list
+│   ├── content.spec.ts    # CMS pages, list
+│   └── empty-state.spec.ts # Empty states on e2e-empty (own storageState; never touches e2e-suite)
 └── console/
     ├── auth.spec.ts       # Login, session
     ├── dashboard.spec.ts  # Stats, sidebar nav
-    ├── organizations.spec.ts # List, search, create
-    ├── org-detail.spec.ts # Org profile (cards, back button)
-    ├── subscriptions.spec.ts # List, filters
+    ├── organizations.spec.ts # List, search, create button, KPI filters
+    ├── subscriptions.spec.ts # List, filters, KPIs, side panel
     ├── staff.spec.ts      # Table, side panel, role/search URL filters
     ├── plans.spec.ts      # List, create
     └── settings.spec.ts   # Tab navigation, General/Currencies/FreeTier/AI-Provider/Knowledge
 ```
 
-**Auth strategy**:
+**TestTenantState** (`e2e/.auth/state.json`, written by global-setup): `orgId/orgSlug` (suite), `ownerUserId`, `platformUserId`, `emptyOrgId/emptyOrgSlug/emptyOwnerEmail`, `ids` (seeded fixtures), `reusedExisting` (true when pre-existing users were reused, e.g. after `E2E_KEEP_DATA=1`), `createdAt`. Specs import `test`/`expect` from `../fixtures` (never from `@playwright/test` when they need `tenant`/`panelApi`/`consoleApi`).
 
-- `panel-setup.ts` — creates a gym tenant via API (Better Auth sign-up → `organization/create` with `countryCode: 'VE'`, `timezone: 'America/Caracas'`, `primaryCurrency: 'VES'`, `currencyFormat: 'latam'` → `set-active`), logs in via UI (waits for the dashboard to render) and saves `storageState`.
-- `console-setup.ts` — signs up via API and promotes the user to platform `owner` with a direct DB write (`setUserPlatformRole` in `helpers/db.ts`), because the admin plugin's set-role endpoint requires an existing admin; then logs in via UI and saves `storageState`.
-- Tests start already authenticated from the saved `storageState` (cookies + localStorage).
+**Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
 
-**Helpers**:
-
-- `helpers/api.ts` — fixture creation over real HTTP (not in-process): `registerUser`, `signIn`, `createOrganization`, `setActiveOrganization`, `createGymTenant`, `createPlan`, `createGymMember`, `uid`/`uniqueEmail`, cookie extraction. Exercises the full stack including CORS, cookies and network latency.
-- `helpers/db.ts` — direct dev DB via `@neondatabase/serverless` (loads `DATABASE_URL` from `apps/api-worker/.dev.vars`, existing env vars win): `setUserPlatformRole`, `readGymSetting`, `e2eQuery`.
-- `helpers/modal.ts` — `openModal()`: retries the trigger click until the `dialog` role is actually visible (a click landing before React hydration completes is a no-op; never clicks again once open).
-- `helpers/nav.ts` — `navigateByClick()`: retries the click until the URL matches the pattern (never clicks again once there).
-- `helpers/selectors.ts` — centralizes common selectors (prefer `data-testid` > role > text > CSS).
+**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
 
 **Env vars** (optional):
 
-- `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` — pre-existing credentials (if not set, users are created automatically)
-- `API_BASE_URL` — api-worker URL (default: `http://localhost:8788`)
+- `E2E_KEEP_DATA=1` — skip teardown to inspect the suite tenant (next run resets anyway).
+- `API_BASE_URL` / `PANEL_URL` / `CONSOLE_URL` — override app URLs (defaults: 8788/3001/3000).
 
-**Dev dependencies**: `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`.
+**Dev dependencies** (root): `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`, `tsx` (seed runner), `@workspace/shared` (date utils in e2e/seed).
 
 > When you add or change API behavior, the integration tests are the first line of defense: run `pnpm test` before asking for review.
 > E2E tests validate complete user flows in the UI — run with `pnpm test:e2e` (separate from `pnpm test`).

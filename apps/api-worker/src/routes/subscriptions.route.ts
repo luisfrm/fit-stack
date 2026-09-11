@@ -20,6 +20,8 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
   await cache.invalidate(`org:${orgId}:subscriptions*`);
   await cache.invalidateExact(`org:${orgId}:subscription-status`);
   await cache.invalidateExact(`org:${orgId}:payments:analytics`);
+  // `withoutActiveSubscription` de members:stats depende de subs/pagos.
+  await cache.invalidateExact(`org:${orgId}:members:stats`);
   await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
   await cache.invalidate(`org:${orgId}:dashboard:action-items`);
   await cache.invalidate(`org:${orgId}:reports:revenue*`);

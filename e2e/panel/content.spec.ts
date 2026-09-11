@@ -1,20 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "../fixtures";
+import { openModal } from "../helpers/modal";
+import { TEST_CMS_PAGE } from "../helpers/test-tenant";
 
-test.describe('Panel — Content / CMS', () => {
-  test('displays content pages list', async ({ page }) => {
+test.describe("Panel — Contenido / CMS", () => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/content', { waitUntil: 'domcontentloaded' });
+  });
+
+  test('lista la página sembrada por el setup', async ({ page }) => {
     await expect(page.getByText('Gestión de Contenido')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(TEST_CMS_PAGE.title)).toBeVisible({ timeout: 20_000 });
   });
 
-  test('shows create page button', async ({ page }) => {
-    await page.goto('/content', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: 'Nueva Página' })).toBeVisible({
-      timeout: 20_000,
-    });
-  });
-
-  test('shows empty state for new org', async ({ page }) => {
-    await page.goto('/content', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText('No hay páginas creadas aún.')).toBeVisible({ timeout: 20_000 });
+  test('abre el modal de creación de página', async ({ page }) => {
+    const modal = await openModal(page, page.getByRole('button', { name: 'Nueva Página' }));
+    await expect(modal).toBeVisible();
   });
 });

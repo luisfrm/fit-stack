@@ -1,30 +1,26 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { openModal } from '../helpers/modal';
+import { TEST_PLAN } from '../helpers/test-tenant';
 
-test.describe('Panel — Plans / Memberships', () => {
+test.describe('Panel — Planes de membresía', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/memberships', { waitUntil: 'domcontentloaded' });
   });
 
-  test('displays memberships page', async ({ page }) => {
+  test('lista el plan sembrado por el setup', async ({ page }) => {
     await expect(page.locator('h1').filter({ hasText: 'Planes de Membresía' })).toBeVisible({
       timeout: 20_000,
     });
+    await expect(page.getByText(TEST_PLAN.name)).toBeVisible({ timeout: 20_000 });
   });
 
-  test('shows create plan button', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'NUEVO PLAN' })).toBeVisible({
-      timeout: 20_000,
-    });
-  });
-
-  test('can open create plan modal', async ({ page }) => {
-    const modal = await openModal(page, page.getByRole('button', { name: 'NUEVO PLAN' }));
-    await expect(modal).toBeVisible();
-  });
-
-  test('shows stat cards', async ({ page }) => {
+  test('muestra las tarjetas de estadísticas', async ({ page }) => {
     await expect(page.getByText('Planes Activos')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('Suscripciones Totales')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('abre el modal de creación de plan', async ({ page }) => {
+    const modal = await openModal(page, page.getByRole('button', { name: 'NUEVO PLAN' }));
+    await expect(modal).toBeVisible();
   });
 });

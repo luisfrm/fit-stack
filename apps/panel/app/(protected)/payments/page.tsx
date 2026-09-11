@@ -1,6 +1,7 @@
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
 import { sessionService } from "@/lib/services/session-service";
+import { PAYMENT_STATUSES } from "@workspace/shared";
 import { PaymentsClient } from "./payments-client";
 import { updateTag } from "next/cache";
 
@@ -39,7 +40,7 @@ export default async function PaymentsPage({
   const currencyFormat =
     (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam";
 
-  const [subsResult, monthlyReport, analytics] = await Promise.all([
+  const [subsResult, pendingResult, monthlyReport, analytics] = await Promise.all([
     subscriptionsService.getAll(
       {
         page,
@@ -47,6 +48,11 @@ export default async function PaymentsPage({
         query: search || undefined,
         status: statusFilter || undefined,
       },
+      { next: { revalidate: 60, tags: [subsTag] } },
+    ),
+    // Accionable "Por validar": top-5 con pago `processing` (mismo tag).
+    subscriptionsService.getAll(
+      { status: PAYMENT_STATUSES.PROCESSING, limit: 5 },
       { next: { revalidate: 60, tags: [subsTag] } },
     ),
     financeService
@@ -71,6 +77,7 @@ export default async function PaymentsPage({
       initialTotal={subsResult.total}
       initialQuery={search}
       initialStatus={statusFilter}
+      initialPending={pendingResult.data}
       initialAnalytics={analytics}
       initialMonthlyReport={monthlyReport}
       initialCurrencyFormat={currencyFormat}

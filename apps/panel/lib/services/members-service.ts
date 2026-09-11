@@ -1,5 +1,5 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import type { IMember, MemberFilter, PaginatedMembers } from "@workspace/shared/types";
+import type { IMember, IMemberStats, MemberFilter, PaginatedMembers } from "@workspace/shared/types";
 
 const MEMBERS_PATH = "/members";
 
@@ -72,5 +72,9 @@ export const membersService = {
     return await api(`${MEMBERS_PATH}/${id}/resend-invite`, {
       method: "POST",
     });
+  },
+
+  async getMemberStats(options?: ApiFetchOptions): Promise<IMemberStats> {
+    return await api<IMemberStats>(`${MEMBERS_PATH}/stats`, options);
   },
 };

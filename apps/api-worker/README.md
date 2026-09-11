@@ -109,7 +109,8 @@ apps/api-worker/
 
 | Método | Ruta | Permiso | Descripción |
 |--------|------|---------|-------------|
-| GET | `/api/members` | `members.read` | Lista paginada (`query`, `role`, `excludeRole`, `isActive`, `page`, `limit`, `includeLatestSubscription`) |
+| GET | `/api/members` | `members.read` | Lista paginada (`query`, `role`, `excludeRole`, `isActive`, `hasActiveSubscription`, `page`, `limit`, `includeLatestSubscription`) |
+| GET | `/api/members/stats` | `members.read` | KPIs de clientes + `growth` 6M + `upcomingBirthdays` (cache `org:*:members:stats` 5 min) |
 | GET | `/api/members/me` | `requireAuth` | Perfil del miembro logueado |
 | POST | `/api/members/link-user` | `requireAuth` | Vincula cuenta a miembro vía token de invitación + setActiveOrganization |
 | GET | `/api/members/:id` | `members.read` | Detalle de miembro |

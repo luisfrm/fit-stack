@@ -164,6 +164,30 @@ export function isPlatformSubscriptionExpired(status: PlatformSubscriptionStatus
  * Detailed configuration for each supported country.
  * Includes labels for identification and tax registration to avoid hardcoding.
  */
+
+/**
+ * Tipo de campo para el taxForm
+ */
+export type countryTax = {
+  name: string;
+  type: string;
+  value: string;
+}
+
+
+export type taxType = "number" | "conditional";
+export type taxCondition = "payment_currency !== 'VES'";
+
+export interface ICountryTax {
+  name: string;
+  type: taxType;
+  value: string;
+}
+
+export interface ICountryTaxConditional extends ICountryTax {
+  condition: taxCondition;
+}
+
 export interface ICountryConfig {
   name: string;
   code: string;
@@ -172,6 +196,10 @@ export interface ICountryConfig {
   timezone: string;
   docLabel: string; // e.g. "C.I.", "C.C.", "Doc. Identidad"
   taxLabel: string; // e.g. "R.I.F.", "NIT", "Registro"
+  docType: string[]; // e.g. ["V", "E", "P"]
+  legalDisclaimer: string[]; // e.g. ["", ""]
+  countryTaxes: ICountryTax[];
+  conditionalTaxes?: ICountryTaxConditional[];
 }
 
 /**
@@ -187,6 +215,17 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Caracas",
     docLabel: "C.I.",
     taxLabel: "R.I.F.",
+    docType: ["V", "E", "P"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa del SENIAT. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "16%" }
+    ],
+    conditionalTaxes: [
+      { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", value: "3%" }
+    ]
   },
   CO: {
     name: "Colombia",
@@ -196,6 +235,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Bogota",
     docLabel: "C.C.",
     taxLabel: "NIT",
+    docType: ["C.C.", "NIT"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la DIAN. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "19%" }
+    ]
   },
   MX: {
     name: "México",
@@ -205,6 +252,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Mexico_City",
     docLabel: "CURP",
     taxLabel: "RFC",
+    docType: ["CURP", "RFC"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa del SAT. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "16%" }
+    ]
   },
   AR: {
     name: "Argentina",
@@ -214,6 +269,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Argentina/Buenos_Aires",
     docLabel: "DNI",
     taxLabel: "CUIT",
+    docType: ["DNI", "CUIT"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la AFIP. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "21%" }
+    ]
   },
   CL: {
     name: "Chile",
@@ -223,6 +286,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Santiago",
     docLabel: "RUT",
     taxLabel: "RUT",
+    docType: ["RUT"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la SII. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "19%" }
+    ]
   },
   PE: {
     name: "Perú",
@@ -232,6 +303,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Lima",
     docLabel: "DNI",
     taxLabel: "RUC",
+    docType: ["DNI", "RUC"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la SUNAT. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IGV", type: "number", value: "18%" }
+    ]
   },
   ES: {
     name: "España",
@@ -241,6 +320,14 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "Europe/Madrid",
     docLabel: "DNI/NIE",
     taxLabel: "NIF/CIF",
+    docType: ["DNI", "NIE", "NIF", "CIF"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la AEAT. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "IVA", type: "number", value: "21%" }
+    ]
   },
   US: {
     name: "Estados Unidos",
@@ -250,6 +337,13 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/New_York",
     docLabel: "ID",
     taxLabel: "Tax ID",
+    docType: ["ID", "Tax ID"],
+    legalDisclaimer: [
+      "Sales tax, if applicable, is determined by your state and is not included in this default configuration",
+      "This receipt is a non-tax document and is for informational purposes only.",
+      "Generated with FitStack",
+    ],
+    countryTaxes: []
   },
 };
 

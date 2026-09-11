@@ -169,6 +169,8 @@ export interface MemberFilter {
   query?: string;
   role?: string;
   isActive?: boolean;
+  /** Solo miembros CON (true) o SIN (false) suscripción gym-activa. */
+  hasActiveSubscription?: boolean;
   page?: number;
   limit?: number;
   includeLatestSubscription?: boolean;
@@ -186,6 +188,47 @@ export interface IPaginatedResult<T> {
 }
 
 export type PaginatedMembers = IPaginatedResult<IMember>;
+
+/**
+ * KPIs de clientes del gym (`GET /api/members/stats`).
+ *
+ * Población: `gym_member` con `role = 'member'` de la org activa.
+ * - `active`/`inactive`: flag `isActive` del perfil.
+ * - `newThisMonth`: `createdAt` dentro del mes local de la org.
+ * - `withoutActiveSubscription`: sin suscripción gym-activa, es decir, sin
+ *   fila que cumpla `getSubscriptionIsActiveSql` (`endDate` vigente, no
+ *   cancelada, pago NO `voided`/`invalid` — `processing` SÍ cuenta como
+ *   activa porque el acceso aún no fue revocado).
+ * - `withPortal`: espejo exacto de `countActivePortalUsers`
+ *   (`userId NOT NULL + isActive + role member`).
+ */
+export interface IMemberStats {
+  total: number;
+  active: number;
+  inactive: number;
+  newThisMonth: number;
+  withoutActiveSubscription: number;
+  withPortal: number;
+  /** Altas por mes local ('YYYY-MM'), últimos 6 meses con actividad. */
+  growth: IMemberGrowthPoint[];
+  /** Próximos cumpleaños (top 5, ordenados por MM-DD con vuelta de año). */
+  upcomingBirthdays: IMemberBirthday[];
+}
+
+/** Un bucket mensual de altas de clientes. */
+export interface IMemberGrowthPoint {
+  month: string;
+  count: number;
+}
+
+/** Cumpleañero próximo (dominio miembro, nada de pagos). */
+export interface IMemberBirthday {
+  id: number;
+  firstName: string;
+  lastName: string;
+  /** 'YYYY-MM-DD' (columna `date` sin tz). */
+  birthday: string;
+}
 
 export interface SubscriptionsFilter {
   query?: string;
