@@ -1,6 +1,8 @@
 # Fase 1 — DB Panel: secuencia unificada + columnas de comprobante
 
-> Depende de: Fase 0 (tipos `document_type`, formato de número). Una sola migración. Flujo estricto `generate → review → migrate`, **prohibido `db:push`** en ramas compartidas.
+> Depende de: Fase 0 (tipos `document_type`, formato de número) + Fase 0.5 (dinero gym en `bigint` centavos — ver nota abajo). Una sola migración. Flujo estricto `generate → review → migrate`, **prohibido `db:push`** en ramas compartidas.
+
+> **Nota Fase 0.5**: `membership_plan.price`, `payment.plan_snapshot_price/amount_paid/subtotal/tax_total` ya son `bigint` (migración `0011`). Las columnas nuevas de esta fase no son dinero salvo referencia; si alguna lo fuera, nace `bigint`, nunca `numeric`.
 
 ## Objetivo
 

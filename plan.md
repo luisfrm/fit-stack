@@ -7,6 +7,7 @@
 | Fase | Estado | Commit |
 |---|---|---|
 | Fase 0 — Lógica pura (`@workspace/shared`) | ⏳ Pendiente |  |
+| Fase 0.5 — Centavos honestos + `ValueConverter` único | 🔧 En revisión (sin commit) |  |
 | Fase 1 — DB Panel (secuencia + columnas) | ⏳ Pendiente |  |
 | Fase 2 — Emisión Panel en dos pasos | ⏳ Pendiente |  |
 | Fase 3 — Email + PDF adjunto + UI panel | ⏳ Pendiente (requiere Fase 2) |  |
