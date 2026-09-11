@@ -86,6 +86,7 @@ const TABLES_TO_TRUNCATE = [
   'content_page',
   'gym_class',
   'gym_setting',
+  'organization_document_sequence',
   'payment',
   'subscription',
   'membership_plan',

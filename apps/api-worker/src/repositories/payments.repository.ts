@@ -1,6 +1,6 @@
 import { eq, and, sql, gte, type Db } from '@workspace/database/factory';
 import { payment } from '@workspace/database/schema';
-import type { IPaymentMethodDetails } from '@workspace/shared';
+import type { IPaymentMethodDetails, ITaxDetail } from '@workspace/shared';
 import { OrganizationDateManager } from '../lib/date-manager';
 
 export interface IPayment {
@@ -20,6 +20,22 @@ export interface IPayment {
   status?: 'processing' | 'validated' | 'invalid' | 'voided';
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
+
+  // Desglose monetario (opcional)
+  subtotal?: string | number | null;
+  taxTotal?: string | number | null;
+  taxDetails?: ITaxDetail[] | null;
+
+  // Documento correlativo (comprobantes)
+  receiptNumber?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptIssuedAt?: Date | null;
+  receiptPdfKey?: string | null;
+  taxOverrideReason?: string | null;
+  receiptVoided?: boolean;
+  voidedBy?: string | null;
+  voidedAt?: Date | null;
+  voidReason?: string | null;
 
   paymentDate?: Date;
   createdAt?: string | Date;
@@ -43,6 +59,18 @@ export function createPaymentsRepository(db: Db) {
           status: data.status ?? 'validated',
           paymentMethod: data.paymentMethod,
           paymentMethodDetails: data.paymentMethodDetails,
+          subtotal: data.subtotal?.toString() ?? null,
+          taxTotal: data.taxTotal?.toString() ?? null,
+          taxDetails: data.taxDetails ?? null,
+          receiptNumber: data.receiptNumber ?? null,
+          documentType: data.documentType ?? 'receipt',
+          receiptIssuedAt: data.receiptIssuedAt ?? null,
+          receiptPdfKey: data.receiptPdfKey ?? null,
+          taxOverrideReason: data.taxOverrideReason ?? null,
+          receiptVoided: data.receiptVoided ?? false,
+          voidedBy: data.voidedBy ?? null,
+          voidedAt: data.voidedAt ?? null,
+          voidReason: data.voidReason ?? null,
           paymentDate: data.paymentDate ?? new Date(),
         })
         .returning();

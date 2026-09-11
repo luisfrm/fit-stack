@@ -8,11 +8,12 @@ import {
   date,
   uniqueIndex,
   index,
+  primaryKey,
   bigint,
   numeric,
   vector,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { type PlanFeaturesV2 } from '@workspace/shared';
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
@@ -428,6 +429,18 @@ export const payment = pgTable(
     taxTotal: numeric('tax_total', { precision: 15, scale: 2 }),
     taxDetails: jsonb('tax_details'),
 
+    // Documento correlativo (comprobantes). receiptNumber queda NULL para todo
+    // el histórico anterior al sistema (sin backfill): nunca se inventa.
+    receiptNumber: text('receipt_number'),
+    documentType: text('document_type').default('receipt').notNull(),
+    receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
+    receiptPdfKey: text('receipt_pdf_key'),
+    taxOverrideReason: text('tax_override_reason'),
+    receiptVoided: boolean('receipt_voided').default(false).notNull(),
+    voidedBy: text('voided_by'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidReason: text('void_reason'),
+
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -435,6 +448,40 @@ export const payment = pgTable(
     index('idx_payment_subscription_id').on(table.subscriptionId),
     index('idx_payment_payment_date').on(table.paymentDate),
     index('idx_payment_org_status').on(table.organizationId, table.status),
+    // Correlativo único por organización (ignora el histórico sin número).
+    uniqueIndex('idx_payment_org_receipt_number')
+      .on(table.organizationId, table.receiptNumber)
+      .where(sql`${table.receiptNumber} IS NOT NULL`),
+    // Reporte de comprobantes (Fase 5).
+    index('idx_payment_org_receipt_issued').on(table.organizationId, table.receiptIssuedAt),
+    // Barrido de PDFs pendientes: numerado pero aún sin PDF (Fase 2).
+    index('idx_payment_receipt_pending')
+      .on(table.receiptIssuedAt)
+      .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
+  ]
+);
+
+/**
+ * organization_document_sequence: secuencia correlativa POR EMISOR (cada gym),
+ * tipo de documento y año. PK triple = reinicio anual independiente por org.
+ * El incremento se hace con una sola sentencia atómica
+ * (`INSERT ... ON CONFLICT DO UPDATE ... RETURNING`), segura en serverless.
+ */
+export const organizationDocumentSequence = pgTable(
+  'organization_document_sequence',
+  {
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    documentType: text('document_type').notNull(), // 'receipt' | 'invoice' (validado por Zod)
+    year: integer('year').notNull(), // año LOCAL del emisor (su timezone)
+    lastNumber: integer('last_number').default(0).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.documentType, table.year],
+      name: 'organization_document_sequence_pkey',
+    }),
   ]
 );
 
