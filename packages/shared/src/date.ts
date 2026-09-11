@@ -132,6 +132,36 @@ export function localMonthStartUtc(tz?: string | null, monthsAgo: number = 0): D
 }
 
 /**
+ * Día de la semana local (0=dom … 6=sáb) del 'YYYY-MM-DD' en la tz indicada.
+ * TZ-aware (vía TZDate): no usa la tz del servidor ni aritmética manual.
+ */
+export function localWeekday(tz: string | null | undefined, dateStr?: string): number {
+  const timezone = resolveOrgTimezone(tz);
+  const base = dateStr ? localMidnightTz(timezone, dateStr) : TZDate.tz(timezone);
+  return base.getDay();
+}
+
+/**
+ * Hora local 'HH:MM' (24 h) del instante en la tz indicada.
+ * Útil para comparar rangos `startTime/endTime` ("HH:MM" lexicográfico).
+ */
+export function localTimeString(tz: string | null | undefined, date: Date | string | number = new Date()): string {
+  const timezone = resolveOrgTimezone(tz);
+  const d = toTzDate(timezone, date);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Suma N días calendario a un 'YYYY-MM-DD' local y devuelve 'YYYY-MM-DD'.
+ * Opera en la tz indicada (evita saltos de día por DST).
+ */
+export function addLocalDays(tz: string | null | undefined, dateStr: string, days: number): string {
+  const timezone = resolveOrgTimezone(tz);
+  const base = localMidnightTz(timezone, dateStr);
+  return toLocalDayString(timezone, addDays(base, days));
+}
+
+/**
  * Alias de `parseLocalToUtc` para compatibilidad con el antiguo helper de `display.ts`.
  * Crea un `Date` estable apuntando a la medianoche del día en la tz de la org
  * (evita el off-by-one día con inputs 'YYYY-MM-DD').
