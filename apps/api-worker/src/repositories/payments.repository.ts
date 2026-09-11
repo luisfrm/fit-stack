@@ -23,6 +23,17 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
+  // Correlative receipt (Fase 1). NULL = anterior al sistema (pre_system).
+  receiptNumber?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptIssuedAt?: Date | null;
+  receiptPdfKey?: string | null;
+  taxOverrideReason?: string | null;
+  receiptVoided?: boolean;
+  voidedBy?: string | null;
+  voidedAt?: Date | null;
+  voidReason?: string | null;
+
   paymentDate?: Date;
   createdAt?: string | Date;
 }
@@ -45,6 +56,15 @@ export function createPaymentsRepository(db: Db) {
           status: data.status ?? 'validated',
           paymentMethod: data.paymentMethod,
           paymentMethodDetails: data.paymentMethodDetails,
+          receiptNumber: data.receiptNumber ?? null,
+          documentType: data.documentType ?? 'receipt',
+          receiptIssuedAt: data.receiptIssuedAt ?? null,
+          receiptPdfKey: data.receiptPdfKey ?? null,
+          taxOverrideReason: data.taxOverrideReason ?? null,
+          receiptVoided: data.receiptVoided ?? false,
+          voidedBy: data.voidedBy ?? null,
+          voidedAt: data.voidedAt ?? null,
+          voidReason: data.voidReason ?? null,
           paymentDate: data.paymentDate ?? new Date(),
         })
         .returning();
