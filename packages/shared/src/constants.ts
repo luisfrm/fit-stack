@@ -278,6 +278,23 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
       { name: "IVA", type: "number", value: "21%" }
     ]
   },
+  PA: {
+    name: "Panamá",
+    code: "PA",
+    currency: "PAB",
+    flag: "🇵🇦",
+    timezone: "America/Panama",
+    docLabel: "Cédula",
+    taxLabel: "RUC",
+    docType: ["C.C.", "R.U.C"],
+    legalDisclaimer: [
+      "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la DGI. Es un registro interno emitido por el sistema de gestión del establecimiento.",
+      "Generado con FitStack",
+    ],
+    countryTaxes: [
+      { name: "ITBMS", type: "number", value: "7%" }
+    ]
+  },
   CL: {
     name: "Chile",
     code: "CL",
