@@ -28,14 +28,17 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:panel": "playwright test --project=panel",
     "test:e2e:console": "playwright test --project=console",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "seed:e2e": "tsx e2e/seed.ts"
   },
   "devDependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@playwright/test": "^1.63.0",
     "@workspace/eslint-config": "workspace:*",
+    "@workspace/shared": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "prettier": "^3.8.1",
+    "tsx": "^4.23.13",
     "turbo": "^2.8.1",
     "typescript": "5.9.3",
     "vitest": "^3"

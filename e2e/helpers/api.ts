@@ -14,7 +14,7 @@ export const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8788';
 export const TEST_PASSWORD = 'TestPassw0rd!E2E';
 
 /** Default headers for all API calls — includes Origin for Better Auth. */
-function apiHeaders(extra?: Record<string, string>): Record<string, string> {
+export function apiHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Origin': API_BASE_URL,
@@ -26,8 +26,58 @@ export function uid(prefix = ''): string {
   return `${prefix}${randomUUID().replace(/-/g, '').slice(0, 8)}`;
 }
 
+/**
+ * Solo para fixtures desechables dentro de un test de la suite (nunca para el
+ * tenant compartido, que usa identidades fijas en `test-tenant.ts`, ni para la
+ * org de demo `fit-stack` del seed). Todo lo creado vive en la org de la suite
+ * (`e2e-suite`), que el teardown global borra completa — además el fixture
+ * `panelApi` lo borra al terminar cada test.
+ */
 export function uniqueEmail(label = 'user'): string {
   return `${label}-${uid()}@e2e.test`;
+}
+
+export interface ApiRequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  body?: unknown;
+  /** Cookie header value (e.g. the output of `signIn`). */
+  cookies?: string;
+  /** Query params appended to the path. */
+  query?: Record<string, string | number | boolean | undefined>;
+}
+
+function buildUrl(path: string, query?: ApiRequestOptions['query']): string {
+  const url = new URL(path.startsWith('http') ? path : `${API_BASE_URL}${path}`);
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined) url.searchParams.set(key, String(value));
+  }
+  return url.toString();
+}
+
+/** Raw request against the api-worker. Throws with status + body on failure. */
+export async function apiRequest(path: string, options: ApiRequestOptions = {}): Promise<Response> {
+  const { method = 'GET', body, cookies, query } = options;
+  const res = await fetch(buildUrl(path, query), {
+    method,
+    headers: apiHeaders(cookies ? { cookie: cookies } : undefined),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`${method} ${path} failed (${res.status}): ${await res.text()}`);
+  }
+  return res;
+}
+
+/** Same as `apiRequest` but parses the JSON body. */
+export async function apiJson<T = any>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  const res = await apiRequest(path, options);
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export interface ApiUser {
@@ -134,16 +184,11 @@ export async function setActiveOrganization(
   cookies: string,
   organizationId: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/auth/organization/set-active`, {
+  await apiJson('/api/auth/organization/set-active', {
     method: 'POST',
-    headers: apiHeaders({ cookie: cookies }),
-    body: JSON.stringify({ organizationId }),
+    cookies,
+    body: { organizationId },
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`set-active-organization failed (${res.status}): ${text}`);
-  }
 }
 
 export interface GymTenant {
@@ -153,8 +198,11 @@ export interface GymTenant {
 }
 
 /**
- * Creates a complete gym tenant: user + organization + active session.
- * Returns credentials and cookies for API calls.
+ * Crea un tenant de gimnasio desechable: usuario + organización + sesión.
+ *
+ * Utilidad genérica (hoy sin uso en los specs: la suite usa `e2e-suite` y los
+ * vacíos usan `e2e-empty`, ambas del global-setup). Si se usa, la org creada
+ * debe borrarse con `wipeTenant` en `afterAll`.
  */
 export async function createGymTenant(label = 'owner'): Promise<GymTenant> {
   const user = await registerUser({ email: uniqueEmail(label) });
@@ -171,10 +219,10 @@ export async function createPlan(
   cookies: string,
   overrides: Record<string, unknown> = {},
 ): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/plans`, {
+  return apiJson('/api/plans', {
     method: 'POST',
-    headers: apiHeaders({ cookie: cookies }),
-    body: JSON.stringify({
+    cookies,
+    body: {
       name: `Plan ${uid()}`,
       price: 50,
       currency: 'USD',
@@ -185,14 +233,8 @@ export async function createPlan(
       isActive: true,
       isVisibleOnSite: true,
       ...overrides,
-    }),
+    },
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`create plan failed (${res.status}): ${text}`);
-  }
-  return res.json();
 }
 
 /**
@@ -202,10 +244,10 @@ export async function createGymMember(
   cookies: string,
   overrides: Record<string, unknown> = {},
 ): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}/api/members`, {
+  return apiJson('/api/members', {
     method: 'POST',
-    headers: apiHeaders({ cookie: cookies }),
-    body: JSON.stringify({
+    cookies,
+    body: {
       firstName: 'Ana',
       lastName: `Perez ${uid()}`,
       email: uniqueEmail('member'),
@@ -213,14 +255,8 @@ export async function createGymMember(
       isActive: true,
       sendInvite: false,
       ...overrides,
-    }),
+    },
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`create member failed (${res.status}): ${text}`);
-  }
-  return res.json();
 }
 
 /**

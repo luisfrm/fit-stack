@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { navigateByClick } from '../helpers/nav';
+import { SELECTORS } from '../helpers/selectors';
 
 test.describe('Panel — Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -38,6 +39,19 @@ test.describe('Panel — Dashboard', () => {
     await expect(page.locator('h1').filter({ hasText: 'Clientes' })).toBeVisible({
       timeout: 15_000,
     });
+  });
+
+  test('shows analytics charts row and revenue mini chart', async ({ page }) => {
+    await expect(page.locator(SELECTORS.dashboard.chartsRow)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator(SELECTORS.dashboard.revenueMini)).toBeVisible();
+  });
+
+  test('shows working report export button', async ({ page }) => {
+    const reportButton = page.locator(SELECTORS.dashboard.reportButton);
+    await expect(reportButton).toBeVisible({ timeout: 20_000 });
+    await expect(reportButton).toContainText('Reporte');
   });
 
   test('navigates to settings page from sidebar', async ({ page }) => {

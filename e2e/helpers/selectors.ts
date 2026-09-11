@@ -22,6 +22,9 @@ export const SELECTORS = {
     statsSection: "text=Miembros Totales",
     todayClasses: "text=Clases de Hoy",
     recentRegistrations: "text=Registros Recientes",
+    chartsRow: '[data-testid="dashboard-charts-row"]',
+    revenueMini: '[data-testid="dashboard-revenue-mini"]',
+    reportButton: '[data-testid="dashboard-report-button"]',
   },
 
   // Sidebar navigation
@@ -71,6 +74,17 @@ export const SELECTORS = {
     emailInput: 'input[name="email"], #email',
     phoneInput: 'input[name="phone"], #phone',
     documentIdInput: 'input[name="documentId"], #documentId',
+    kpiSection: '[data-testid="members-kpi-section"]',
+    kpiTotal: '[data-testid="members-kpi-total"]',
+    kpiActive: '[data-testid="members-kpi-active"]',
+    kpiInactive: '[data-testid="members-kpi-inactive"]',
+    kpiNew: '[data-testid="members-kpi-new"]',
+    kpiWithoutSubscription: '[data-testid="members-kpi-without-subscription"]',
+    kpiPortal: '[data-testid="members-kpi-portal"]',
+    filterStatus: '[data-testid="members-filter-status"]',
+    filterSubscription: '[data-testid="members-filter-subscription"]',
+    growthChart: '[data-testid="members-growth-chart"]',
+    birthdays: '[data-testid="members-birthdays"]',
   },
 
   // Plans / Memberships page
@@ -91,6 +105,8 @@ export const SELECTORS = {
     memberSelect: 'select[name="memberId"], #memberId',
     planSelect: 'select[name="planId"], #planId',
     statusFilter: 'select[name="status"], [data-testid="status-filter"]',
+    pendingSection: '[data-testid="pending-payments-section"]',
+    pendingItem: (id: string | number) => `[data-testid="pending-payment-${id}"]`,
   },
 
   // Classes page
@@ -102,6 +118,12 @@ export const SELECTORS = {
     daySelect: 'select[name="dayOfWeek"], #dayOfWeek',
     startTimeInput: 'input[name="startTime"], #startTime',
     endTimeInput: 'input[name="endTime"], #endTime',
+    weekCalendar: '[data-testid="classes-week-calendar"]',
+    weekLabel: '[data-testid="classes-week-label"]',
+    weekPrev: '[data-testid="classes-week-prev"]',
+    weekNext: '[data-testid="classes-week-next"]',
+    nextClass: '[data-testid="classes-next-class"]',
+    visibilitySummary: '[data-testid="classes-visibility-summary"]',
   },
 
   // Settings page
