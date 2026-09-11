@@ -11,8 +11,9 @@ import {
   bigint,
   numeric,
   vector,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { type PlanFeaturesV2 } from '@workspace/shared';
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
@@ -430,11 +431,60 @@ export const payment = pgTable(
 
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+
+    // Correlative receipt (Fase 1). NULL = anterior al sistema (pre_system).
+    receiptNumber: text('receipt_number'),
+    documentType: text('document_type').notNull().default('receipt'),
+    receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
+    receiptPdfKey: text('receipt_pdf_key'),
+    taxOverrideReason: text('tax_override_reason'),
+    receiptVoided: boolean('receipt_voided').notNull().default(false),
+    voidedBy: text('voided_by'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidReason: text('void_reason'),
   },
   (table) => [
     index('idx_payment_subscription_id').on(table.subscriptionId),
     index('idx_payment_payment_date').on(table.paymentDate),
     index('idx_payment_org_status').on(table.organizationId, table.status),
+    // Correlativo único por org (los NULL no entran al índice parcial).
+    uniqueIndex('idx_payment_org_receipt_number')
+      .on(table.organizationId, table.receiptNumber)
+      .where(sql`${table.receiptNumber} IS NOT NULL`),
+    // Reporte de huecos (Fase 5): rango por fecha de emisión.
+    index('idx_payment_org_issued_at')
+      .on(table.organizationId, table.receiptIssuedAt),
+    // Barrido de PDFs pendientes (Fase 2): numerados sin PDF.
+    index('idx_payment_receipt_pending')
+      .on(table.receiptIssuedAt)
+      .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
+  ]
+);
+
+// ── RECEIPT SEQUENCES (Fase 1) ──
+
+/**
+ * Correlativo por organización / tipo de documento / año (reinicio anual
+ * por emisor). Cada fila es el contador de una combinación (org, tipo, año);
+ * `nextDocumentNumber` lo incrementa con una sola sentencia atómica
+ * (INSERT ... ON CONFLICT DO UPDATE), sin transacciones interactivas.
+ * El año es el año LOCAL del emisor (lo resuelve el caller, nunca el repo).
+ */
+export const organizationDocumentSequence = pgTable(
+  'organization_document_sequence',
+  {
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    // 'receipt' | 'invoice' (valida Zod; hoy solo 'receipt' efectivo). Sin pgEnum.
+    documentType: text('document_type').notNull(),
+    year: integer('year').notNull(),
+    lastNumber: integer('last_number').notNull().default(0),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.documentType, table.year],
+    }),
   ]
 );
 
