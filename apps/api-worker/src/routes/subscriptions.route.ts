@@ -8,6 +8,8 @@ import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
+import { createReceiptsService } from '../services/receipts.service';
+import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createCache, type Cache } from '../lib/cache';
 import { paymentMethodDetailsSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
@@ -108,8 +110,16 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE);
+    const orgSlug =
+      c.get('org')?.slug ??
+      (await createOrganizationsRepository(db).findById(orgId))?.slug ??
+      null;
 
-    const newSub = await subsService.create(orgId, payload as any, timezone);
+    const newSub = await subsService.create(orgId, payload as any, timezone, {
+      receipts: receiptsService,
+      orgSlug,
+    });
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(newSub, 201);
   })

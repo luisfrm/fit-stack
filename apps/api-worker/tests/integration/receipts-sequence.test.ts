@@ -25,7 +25,7 @@ import {
   isoDate,
 } from '../helpers/auth';
 import { createDb } from '@workspace/database/factory';
-import { createReceiptsRepository } from '../../src/repositories/receipts.repository';
+import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 
 describe.skipIf(skipReason !== null)('Receipts sequence (Fase 1)', () => {
   beforeAll(async () => {
@@ -48,7 +48,8 @@ describe.skipIf(skipReason !== null)('Receipts sequence (Fase 1)', () => {
         currencyPaid: 'USD',
         paymentMethod: 'cash',
         paymentMethodDetails: [],
-        status: 'validated',
+        // processing: sin emisión automática (paso 1); el repo attach no exige estado.
+        status: 'processing',
         paymentDate: isoDate(0),
       },
     });
@@ -123,7 +124,8 @@ describe.skipIf(skipReason !== null)('Receipts sequence (Fase 1)', () => {
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
-          status: 'validated',
+          // processing: sin emisión automática (paso 1); el repo attach no exige estado.
+          status: 'processing',
           paymentDate: isoDate(0),
         },
       });

@@ -4,7 +4,8 @@ import type { PlansRepository } from '../repositories/plans.repository';
 import type { MembersRepository } from '../repositories/members.repository';
 import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
-import { PAYMENT_STATUSES, type IPaymentMethodDetails } from '@workspace/shared';
+import { PAYMENT_STATUSES, type IPaymentMethodDetails, type ITaxDetail } from '@workspace/shared';
+import { ReceiptError } from './receipts.service';
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
@@ -17,7 +18,44 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
     paymentMethodDetails?: IPaymentMethodDetails | null;
     status?: string;
     paymentDate?: string | Date;
+    subtotal?: number;
+    taxTotal?: number;
+    taxDetails?: ITaxDetail[];
+    taxOverrideReason?: string;
   };
+}
+
+/**
+ * Hooks de comprobantes (paso 1 + void). Estructural para no acoplar
+ * servicios: lo implementa `createReceiptsService`.
+ */
+export interface ReceiptHooks {
+  assignReceiptNumber(input: {
+    orgId: string;
+    paymentId: number;
+    timezone: string;
+    orgSlug?: string | null;
+    actor?: string;
+    taxOverride?: {
+      subtotal: number;
+      taxTotal: number;
+      taxDetails: ITaxDetail[];
+      taxOverrideReason: string;
+    } | null;
+  }): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }>;
+  markReceiptVoided(input: {
+    orgId: string;
+    paymentId: number;
+    by: string;
+    reason: string;
+  }): Promise<unknown>;
+}
+
+export interface ReceiptContext {
+  receipts?: ReceiptHooks;
+  orgSlug?: string | null;
+  timezone?: string;
+  by?: string;
 }
 
 export function createSubscriptionsService(
@@ -77,7 +115,12 @@ export function createSubscriptionsService(
       }));
     },
 
-    async create(organizationId: string, payload: ICreateSubscriptionPayload, timezone: string) {
+    async create(
+      organizationId: string,
+      payload: ICreateSubscriptionPayload,
+      timezone: string,
+      opts?: ReceiptContext,
+    ) {
       const member = await membersRepo.findById(organizationId, payload.memberId);
       if (!member) {
         throw new HTTPException(400, { message: 'El miembro seleccionado no existe' });
@@ -144,20 +187,47 @@ export function createSubscriptionsService(
         paymentDate: paymentDateFinal,
       });
 
-      // Recibo automático al cliente al registrar un pago validado.
+      // Emisión automática al registrar un pago validado: el paso 1 asigna
+      // el número y encola el render. El email lo encola el paso 2 al
+      // completar el PDF (nunca aquí). Sin receipts inyectado (tests
+      // directos del servicio) se conserva el envío legacy.
       // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
-      if (createdPayment?.id && payload.payment.status === PAYMENT_STATUSES.VALIDATED && taskQueue) {
-        await taskQueue.send({
-          type: 'email.payment_receipt',
-          paymentId: createdPayment.id,
-          organizationId,
-        });
+      if (createdPayment?.id && payload.payment.status === PAYMENT_STATUSES.VALIDATED) {
+        if (opts?.receipts) {
+          const p = payload.payment;
+          await opts.receipts.assignReceiptNumber({
+            orgId: organizationId,
+            paymentId: createdPayment.id,
+            timezone,
+            orgSlug: opts.orgSlug,
+            taxOverride:
+              p.taxTotal !== undefined && p.taxDetails !== undefined
+                ? {
+                    subtotal: p.subtotal ?? p.amountPaid,
+                    taxTotal: p.taxTotal,
+                    taxDetails: p.taxDetails,
+                    taxOverrideReason: p.taxOverrideReason ?? '',
+                  }
+                : null,
+          });
+        } else if (taskQueue) {
+          await taskQueue.send({
+            type: 'email.payment_receipt',
+            paymentId: createdPayment.id,
+            organizationId,
+          });
+        }
       }
 
       return subscription;
     },
 
-    async updatePaymentStatus(organizationId: string, paymentId: number, status: string) {
+    async updatePaymentStatus(
+      organizationId: string,
+      paymentId: number,
+      status: string,
+      opts?: ReceiptContext,
+    ) {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any);
       if (!updated) {
@@ -167,20 +237,43 @@ export function createSubscriptionsService(
       if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
+      // Void con número emitido: conserva número + PDF y marca ANULADO.
+      if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+        await opts.receipts
+          .markReceiptVoided({
+            orgId: organizationId,
+            paymentId,
+            by: opts.by,
+            reason: 'Pago anulado',
+          })
+          .catch((err) => {
+            // Sin comprobante emitido no hay nada que anular (código, nunca texto).
+            if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') return;
+            throw err;
+          });
+      }
 
       // Un pago que pasa de processing/pending a validated emite su recibo
-      // (el alta con status validated ya lo encola en create()).
+      // (el alta con status validated ya lo numera en create()).
       const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
-      if (
-        status === PAYMENT_STATUSES.VALIDATED &&
-        wasPending &&
-        taskQueue
-      ) {
-        await taskQueue.send({
-          type: 'email.payment_receipt',
-          paymentId,
-          organizationId,
-        });
+      if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
+        if (opts?.receipts) {
+          if (!opts.timezone) {
+            throw new Error('updatePaymentStatus: timezone es obligatoria para numerar.');
+          }
+          await opts.receipts.assignReceiptNumber({
+            orgId: organizationId,
+            paymentId,
+            timezone: opts.timezone,
+            orgSlug: opts.orgSlug,
+          });
+        } else if (taskQueue) {
+          await taskQueue.send({
+            type: 'email.payment_receipt',
+            paymentId,
+            organizationId,
+          });
+        }
       }
 
       return updated;
@@ -201,18 +294,6 @@ export function createSubscriptionsService(
 
     async delete(organizationId: string, id: number): Promise<void> {
       await subsRepo.delete(organizationId, id);
-    },
-
-    async sendReceiptEmail(organizationId: string, paymentId: number) {
-      if (taskQueue) {
-        await taskQueue.send({
-          type: 'email.payment_receipt',
-          paymentId,
-          organizationId,
-        });
-        return { success: true, queued: true };
-      }
-      return { success: false, error: 'Task queue not available' };
     },
   };
 }

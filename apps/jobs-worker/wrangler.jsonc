@@ -6,12 +6,14 @@
   "compatibility_flags": ["nodejs_compat"],
 
   "queues": {
-    "consumers": [
+    "producers": [
       {
         "queue": "fit-task-events-dev",
-        "max_batch_size": 10,
-        "max_retries": 3,
-        "dead_letter_queue": "fit-task-events-dlq-dev"
+        "binding": "TASK_QUEUE"
+      },
+      {
+        "queue": "fit-receipt-events-dev",
+        "binding": "RECEIPT_QUEUE"
       }
     ]
   },
@@ -31,12 +33,14 @@
     "dev": {
       "name": "fit-stack-jobs-dev",
       "queues": {
-        "consumers": [
+        "producers": [
           {
             "queue": "fit-task-events-dev",
-            "max_batch_size": 10,
-            "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-dlq-dev"
+            "binding": "TASK_QUEUE"
+          },
+          {
+            "queue": "fit-receipt-events-dev",
+            "binding": "RECEIPT_QUEUE"
           }
         ]
       },
@@ -50,12 +54,14 @@
     "staging": {
       "name": "fit-stack-jobs-staging",
       "queues": {
-        "consumers": [
+        "producers": [
           {
             "queue": "fit-task-events-staging",
-            "max_batch_size": 10,
-            "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-dlq-staging"
+            "binding": "TASK_QUEUE"
+          },
+          {
+            "queue": "fit-receipt-events-staging",
+            "binding": "RECEIPT_QUEUE"
           }
         ]
       },
@@ -69,12 +75,14 @@
     "production": {
       "name": "fit-stack-jobs",
       "queues": {
-        "consumers": [
+        "producers": [
           {
             "queue": "fit-task-events",
-            "max_batch_size": 10,
-            "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-dlq"
+            "binding": "TASK_QUEUE"
+          },
+          {
+            "queue": "fit-receipt-events",
+            "binding": "RECEIPT_QUEUE"
           }
         ]
       },

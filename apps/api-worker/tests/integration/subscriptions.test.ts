@@ -59,9 +59,10 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.body.planId).toBe(plan.id);
     });
 
-    it('validated payment enqueues email.payment_receipt automatically', async () => {
+    it('validated payment numbers the receipt and enqueues render (email waits for step 2)', async () => {
       const { owner, organization, member, plan } = await setupSubscriptionFixture();
       owner.client.queue.reset();
+      owner.client.receiptQueue.reset();
 
       const res = await owner.client.post('/api/subscriptions', {
         memberId: member.id,
@@ -79,10 +80,11 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(res.status, res.text).toBe(201);
 
-      const events = owner.client.queue.ofType('email.payment_receipt');
-      expect(events).toHaveLength(1);
-      expect(events[0].paymentId).toBeDefined();
-      expect(events[0].organizationId).toBe(organization.id);
+      // Paso 1: número + render encolado; el email lo encola el paso 2 (Fase 2).
+      const renders = owner.client.receiptQueue.ofType('receipt.render');
+      expect(renders).toHaveLength(1);
+      expect(renders[0].organizationId).toBe(organization.id);
+      expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
     });
 
     it('processing payment does NOT enqueue a receipt (awaits validation)', async () => {

@@ -4,6 +4,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { APIError } from 'better-auth/api';
 import { ZodError } from 'zod';
 import type { AppEnv } from './env';
+import { ReceiptError } from '../services/receipts.service';
 
 const KNOWN_STATUS_CODES = new Set([
   400, 401, 403, 404, 405, 409, 410, 422, 429, 500, 502, 503,
@@ -78,6 +79,11 @@ export const onError: ErrorHandler<AppEnv> = (err, c) => {
 
   if (err instanceof HTTPException) {
     return c.json({ error: err.message }, err.status);
+  }
+
+  // Errores de negocio de comprobantes: código explícito para el cliente.
+  if (err instanceof ReceiptError) {
+    return c.json({ error: err.message, code: err.code }, err.status);
   }
 
   const dbError = unwrapDbError(err);

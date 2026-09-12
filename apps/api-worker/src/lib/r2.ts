@@ -48,6 +48,41 @@ export function createR2Service(env: Env) {
       await bucket.delete(key);
       return { success: true };
     },
+
+    /**
+     * Stores bytes under a deterministic key (overwrite = idempotent).
+     * Used for immutable receipt PDFs (Fase 2); the key comes from
+     * `panelReceiptKey` (shared), never random.
+     */
+    async putFile(
+      key: string,
+      body: Uint8Array | ArrayBuffer | string,
+      contentType: string,
+    ) {
+      if (!bucket) {
+        throw new Error('FILES_BUCKET binding is missing');
+      }
+
+      await bucket.put(key, body, { httpMetadata: { contentType } });
+      return { key };
+    },
+
+    /**
+     * Reads a file key. Returns null when the object does not exist
+     * (the route maps it to 404).
+     */
+    async getFile(key: string) {
+      if (!bucket) {
+        throw new Error('FILES_BUCKET binding is missing');
+      }
+
+      const obj = await bucket.get(key);
+      if (!obj) return null;
+      return {
+        bytes: new Uint8Array(await obj.arrayBuffer()),
+        contentType: obj.httpMetadata?.contentType ?? 'application/octet-stream',
+      };
+    },
   };
 }
 

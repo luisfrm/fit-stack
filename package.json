@@ -23,7 +23,7 @@
     "typecheck": "pnpm turbo typecheck",
     "repair-db": "pnpm --filter @workspace/database exec node scripts/repair-migrations.mjs",
     "repair-db-test": "pnpm --filter @workspace/database exec node scripts/repair-test-migrations.mjs",
-    "test": "pnpm --filter @workspace/shared test && pnpm --filter api-worker test && pnpm --filter panel test && pnpm --filter console test",
+    "test": "pnpm --filter @workspace/shared test && pnpm --filter api-worker test && pnpm --filter jobs-worker test && pnpm --filter panel test && pnpm --filter console test",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:panel": "playwright test --project=panel",

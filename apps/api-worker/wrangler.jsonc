@@ -13,12 +13,16 @@
     }
   ],
   "queues": {
-    "producers": [
-      {
-        "queue": "fit-task-events-dev",
-        "binding": "TASK_QUEUE"
-      }
-    ]
+      "producers": [
+        {
+          "queue": "fit-task-events-dev",
+          "binding": "TASK_QUEUE"
+        },
+        {
+          "queue": "fit-receipt-events-dev",
+          "binding": "RECEIPT_QUEUE"
+        }
+      ]
   },
   "observability": {
     "enabled": true
@@ -37,6 +41,10 @@
           {
             "queue": "fit-task-events-dev",
             "binding": "TASK_QUEUE"
+          },
+          {
+            "queue": "fit-receipt-events-dev",
+            "binding": "RECEIPT_QUEUE"
           }
         ]
       }
@@ -50,12 +58,16 @@
         }
       ],
       "queues": {
-        "producers": [
-          {
-            "queue": "fit-task-events-staging",
-            "binding": "TASK_QUEUE"
-          }
-        ]
+      "producers": [
+        {
+          "queue": "fit-task-events-staging",
+          "binding": "TASK_QUEUE"
+        },
+        {
+          "queue": "fit-receipt-events-staging",
+          "binding": "RECEIPT_QUEUE"
+        }
+      ]
       }
     },
     "production": {
@@ -67,12 +79,16 @@
         }
       ],
       "queues": {
-        "producers": [
-          {
-            "queue": "fit-task-events",
-            "binding": "TASK_QUEUE"
-          }
-        ]
+      "producers": [
+        {
+          "queue": "fit-task-events",
+          "binding": "TASK_QUEUE"
+        },
+        {
+          "queue": "fit-receipt-events",
+          "binding": "RECEIPT_QUEUE"
+        }
+      ]
       }
     }
   }
