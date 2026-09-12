@@ -437,6 +437,8 @@ export const payment = pgTable(
     documentType: text('document_type').notNull().default('receipt'),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
+    // Marca de notificación por email: gate anti-pérdida (reintentos).
+    receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
     taxOverrideReason: text('tax_override_reason'),
     receiptVoided: boolean('receipt_voided').notNull().default(false),
     voidedBy: text('voided_by'),

@@ -83,8 +83,10 @@ export function resolveFiscalProfile(
       `resolveFiscalProfile: countryCode desconocido ("${countryCode}"). Sin fallback silencioso.`,
     );
   }
+  // `fiscalConfig` es jsonb nullable: null y undefined significan "sin
+  // override" (defaults del país), no un objeto vacío inválido.
   const config: FiscalConfig =
-    fiscalConfig === undefined ? {} : FiscalConfigSchema.parse(fiscalConfig);
+    fiscalConfig == null ? {} : FiscalConfigSchema.parse(fiscalConfig);
 
   const taxes: ResolvedTax[] = [
     ...country.countryTaxes.map((t) => ({

@@ -75,6 +75,12 @@ describe('resolveFiscalProfile', () => {
     expect(() => resolveFiscalProfile('XX')).toThrow();
   });
 
+  it('fiscalConfig null se trata como ausente (jsonb nullable)', () => {
+    const profile = resolveFiscalProfile('VE', null);
+    expect(profile.taxes).toContainEqual({ name: 'IVA', rate: 0.16, enabled: true });
+    expect(profile.isFormalTaxpayer).toBe(false);
+  });
+
   it('fiscalConfig inválido lanza (tasa > 1, schema estricto)', () => {
     expect(() =>
       resolveFiscalProfile('VE', { taxes: [{ name: 'IVA', rate: 5, enabled: true }] }),

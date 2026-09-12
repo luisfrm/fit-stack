@@ -60,6 +60,11 @@ export interface ReceiptAmounts {
   taxTotal: number;
   total: number;
   currencyPaid: string;
+  /**
+   * Moneda comercial base (la del plan). Si difiere de `currencyPaid` se
+   * exige tasa. Si se omite, el checklist usa la moneda del emisor.
+   */
+  baseCurrency?: string;
   exchangeRateApplied?: string | null;
 }
 
@@ -82,6 +87,10 @@ export interface ReceiptData {
   amounts: ReceiptAmounts;
   method: ReceiptMethod;
   footer: ReceiptFooter;
+  /** Zona horaria del emisor: fechas se muestran en hora local, no UTC. */
+  timezone?: string;
+  /** `true` si el comprobante fue anulado (se conserva el número). */
+  voided?: boolean;
   /**
    * @internal UUID técnico para trazabilidad interna. NUNCA renderizar.
    */
@@ -135,10 +144,10 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
   }
 
   if (
-    data.amounts.currencyPaid !== data.emitter.currency &&
+    data.amounts.currencyPaid !== (data.amounts.baseCurrency ?? data.emitter.currency) &&
     (data.amounts.exchangeRateApplied ?? '').trim().length === 0
   ) {
-    errors.push('Falta la tasa de cambio (moneda del pago ≠ moneda del emisor).');
+    errors.push('Falta la tasa de cambio (moneda del pago ≠ moneda base del plan).');
   }
 
   if (
