@@ -1,82 +1,150 @@
 import { createDb } from '@workspace/database/factory';
+import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 import {
-  payment,
-  gymMember,
   organization,
   platformSubscriptionPayment,
   authMember,
   user,
 } from '@workspace/database/schema';
 import { sendEmail, type EmailHandlerEnv } from './email.handler';
-import { renderPaymentReceipt } from '../templates/payment-receipt';
+import { renderPaymentReceiptShort } from '../templates/payment-receipt-short';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
 import { formatCents, type CurrencyFormat } from '@workspace/shared';
 import { and, eq } from 'drizzle-orm';
 
 export interface PdfHandlerEnv extends EmailHandlerEnv {
   DATABASE_URL: string;
+  FILES_BUCKET: R2Bucket;
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: Date, timezone: string): string {
+  // Siempre en la TZ de la org emisora (UTC del runtime partiría días).
   return new Date(date).toLocaleDateString('es-ES', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
+    timeZone: timezone,
   });
 }
 
 /**
- * Recibo de pago de membresía de gym (email.payment_receipt): PDF-style HTML
- * para el cliente. Encolado automáticamente al validar un pago (create con
- * status validated, o PATCH processing → validated) y por el reenvío manual.
+ * Recibo de pago de membresía de gym (email.payment_receipt): notificación
+ * corta + PDF adjunto leído desde R2 (nunca regenerado: el PDF es la
+ * fuente de verdad). Tres ramas:
+ * - **A numerado con PDF** (`receipt_pdf_key` existe) → email con adjunto
+ *   `<número>.pdf` idéntico byte-a-byte al descargado en el panel.
+ * - **B histórico** (`receipt_number IS NULL`, pre-sistema) → email sin
+ *   adjunto, sin error (viene solo del reenvío manual).
+ * - **C número sin PDF** → defensiva, no debería ocurrir (el evento se
+ *   encola desde el paso 2 tras `completeReceiptPdf`): log + return sin
+ *   enviar (el barrido de Fase 2 completará el PDF y re-encolará el email).
+ * Sin `member.email` → log + return (la emisión ya ocurrió en api-worker;
+ * el fallo es solo de envío, reintentar sería inútil).
  */
 export async function handlePaymentReceipt(
   env: PdfHandlerEnv,
-  payload: { paymentId: number; organizationId: string }
+  payload: { paymentId: number; organizationId: string; receiptNumber?: string }
 ) {
   const db = createDb(env.DATABASE_URL);
+  // Lectura org-scoped por construcción (filtra pago + miembro por org;
+  // `undefined` también cuando el pago es de otra org). El `receiptNumber?`
+  // del evento es solo hint de observabilidad: la verdad vive en DB.
+  const composed = await createReceiptsRepository(db).getReceiptComposedData(
+    payload.organizationId,
+    payload.paymentId,
+  );
 
-  const [paymentData] = await db
-    .select({
-      payment,
-      member: gymMember,
-      org: organization,
-    })
-    .from(payment)
-    .innerJoin(gymMember, eq(payment.memberId, gymMember.id))
-    .innerJoin(organization, eq(payment.organizationId, organization.id))
-    .where(eq(payment.id, payload.paymentId))
-    .limit(1);
-
-  if (!paymentData || !paymentData.member) {
+  if (!composed || !composed.member) {
     console.error(`Payment ${payload.paymentId} not found for email receipt`);
     return;
   }
+  const { payment: paymentRow, member, organization: org } = composed;
+
+  const email = member.email?.trim();
+  if (!email) {
+    console.warn(
+      `Payment ${payload.paymentId}: miembro sin correo, emisión intacta, envío omitido.`,
+    );
+    return;
+  }
+
+  // Sin fallbacks silenciosos: timezone y currencyFormat son NOT NULL.
+  if (!org.timezone || !org.currencyFormat) {
+    console.error(
+      `Payment ${payload.paymentId}: org sin timezone/formato, envío omitido (mala config, no asumir).`,
+    );
+    return;
+  }
+  const orgFormat = org.currencyFormat as CurrencyFormat;
 
   // Montos en centavos enteros (convención Money): display vía formatCents
   // con el formato de la org emisora.
-  const orgFormat = (paymentData.org.currencyFormat ?? 'latam') as CurrencyFormat;
   const amountFormatted = formatCents(
-    Number(paymentData.payment.amountPaid),
-    paymentData.payment.currencyPaid,
+    Number(paymentRow.amountPaid),
+    paymentRow.currencyPaid,
     orgFormat,
   );
-
-  const { subject, html } = renderPaymentReceipt({
-    paymentId: paymentData.payment.id,
-    memberName: `${paymentData.member.firstName} ${paymentData.member.lastName}`,
-    planName: paymentData.payment.planSnapshotName,
+  const orgName = org.legalName || org.name || 'Fit-Stack';
+  const memberName =
+    [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Cliente';
+  const baseData = {
+    memberName,
+    planName: paymentRow.planSnapshotName,
     amountPaid: amountFormatted,
-    paymentMethod: paymentData.payment.paymentMethod,
-    paymentDate: formatDate(paymentData.payment.paymentDate),
-    orgName: paymentData.org.name || 'Fit-Stack',
-  });
+    paymentMethod: paymentRow.paymentMethod,
+    paymentDate: formatDate(paymentRow.paymentDate, org.timezone),
+    orgName,
+  };
 
-  await sendEmail(env, {
-    to: paymentData.member.email,
-    subject,
-    html,
-  });
+  const receiptNumber = paymentRow.receiptNumber;
+  const receiptPdfKey = paymentRow.receiptPdfKey;
+
+  // Rama B — histórico pre-sistema: sin adjunto, sin error.
+  if (!receiptNumber) {
+    const { subject, html } = renderPaymentReceiptShort({
+      ...baseData,
+      receiptNumber: null,
+      hasAttachment: false,
+    });
+    await sendEmail(env, { to: email, subject, html });
+    return;
+  }
+
+  // Rama A — numerado con PDF: adjunta los bytes de R2 tal cual.
+  if (receiptPdfKey) {
+    const stored = await env.FILES_BUCKET.get(receiptPdfKey);
+    const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
+    if (!bytes) {
+      // R2 inconsistente (key seteada pero objeto ausente): como Rama C.
+      console.error(
+        `Payment ${payload.paymentId}: número ${receiptNumber} (evento: ${payload.receiptNumber ?? '—'}) con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
+      );
+      return;
+    }
+    const { subject, html } = renderPaymentReceiptShort({
+      ...baseData,
+      receiptNumber,
+      hasAttachment: true,
+    });
+    await sendEmail(env, {
+      to: email,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `${receiptNumber}.pdf`,
+          content: bytes,
+          contentType: 'application/pdf',
+        },
+      ],
+    });
+    return;
+  }
+
+  // Rama C — número sin PDF: defensiva, log + ack sin enviar.
+  console.error(
+    `Payment ${payload.paymentId}: número ${receiptNumber} (evento: ${payload.receiptNumber ?? '—'}) sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+  );
 }
 
 /**
@@ -98,7 +166,12 @@ export async function handleOrgPaymentReceived(
     })
     .from(platformSubscriptionPayment)
     .innerJoin(organization, eq(platformSubscriptionPayment.organizationId, organization.id))
-    .where(eq(platformSubscriptionPayment.id, payload.paymentId))
+    .where(
+      and(
+        eq(platformSubscriptionPayment.id, payload.paymentId),
+        eq(platformSubscriptionPayment.organizationId, payload.organizationId),
+      ),
+    )
     .limit(1);
 
   if (!paymentData) {
@@ -120,7 +193,14 @@ export async function handleOrgPaymentReceived(
 
   const recipients = new Set<string>([payload.payerEmail, ...ownerRows.map((r) => r.email)]);
 
-  const orgFormat = (paymentData.org.currencyFormat ?? 'latam') as CurrencyFormat;
+  // Sin fallbacks silenciosos: timezone y currencyFormat son NOT NULL.
+  if (!paymentData.org.timezone || !paymentData.org.currencyFormat) {
+    console.error(
+      `Platform payment ${payload.paymentId}: org sin timezone/formato, envío omitido (mala config, no asumir).`,
+    );
+    return;
+  }
+  const orgFormat = paymentData.org.currencyFormat as CurrencyFormat;
   const amountFormatted = formatCents(
     Number(paymentData.payment.amountPaid),
     paymentData.payment.currencyPaid,
@@ -133,7 +213,7 @@ export async function handleOrgPaymentReceived(
     planName: paymentData.payment.planSnapshotName,
     amountPaid: amountFormatted,
     paymentMethod: paymentData.payment.paymentMethod,
-    paymentDate: formatDate(paymentData.payment.paymentDate),
+    paymentDate: formatDate(paymentData.payment.paymentDate, paymentData.org.timezone),
     payerName: payload.payerName,
     pendingReview,
   });

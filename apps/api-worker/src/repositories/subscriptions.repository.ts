@@ -129,6 +129,10 @@ export function createSubscriptionsRepository(db: Db) {
           exchangeRateApplied: payment.exchangeRateApplied,
           paymentStatus: payment.status,
           paymentDate: payment.paymentDate,
+          receiptNumber: payment.receiptNumber,
+          receiptIssuedAt: payment.receiptIssuedAt,
+          documentType: payment.documentType,
+          receiptVoided: payment.receiptVoided,
         })
         .from(subscription)
         .innerJoin(members, eq(subscription.memberId, members.id))
@@ -187,6 +191,10 @@ export function createSubscriptionsRepository(db: Db) {
           exchangeRateApplied: payment.exchangeRateApplied,
           paymentStatus: payment.status,
           paymentDate: payment.paymentDate,
+          receiptNumber: payment.receiptNumber,
+          receiptIssuedAt: payment.receiptIssuedAt,
+          documentType: payment.documentType,
+          receiptVoided: payment.receiptVoided,
         })
         .from(subscription)
         .innerJoin(members, eq(subscription.memberId, members.id))

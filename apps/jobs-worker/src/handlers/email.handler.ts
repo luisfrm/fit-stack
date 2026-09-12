@@ -13,13 +13,19 @@ export interface EmailHandlerEnv {
   CONSOLE_URL?: string;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | Uint8Array;
+  contentType?: string;
+}
+
 /**
  * Transporte de email (Resend / Gmail SMTP). El HTML lo componen los
  * templates en `src/templates/` — este handler SOLO envía.
  */
 export async function sendEmail(
   env: EmailHandlerEnv,
-  options: { to: string; subject: string; html: string; attachments?: Array<{ filename: string; content: Buffer | Uint8Array }> }
+  options: { to: string; subject: string; html: string; attachments?: EmailAttachment[] }
 ) {
   const provider = env.EMAIL_PROVIDER || 'gmail';
 
@@ -33,6 +39,7 @@ export async function sendEmail(
       attachments: options.attachments?.map((a) => ({
         filename: a.filename,
         content: Buffer.from(a.content),
+        contentType: a.contentType ?? 'application/pdf',
       })),
     });
     console.log(`✉️ [RESEND] Email enviado a ${options.to}`);
@@ -56,6 +63,7 @@ export async function sendEmail(
       attachments: options.attachments?.map((a) => ({
         filename: a.filename,
         content: Buffer.from(a.content),
+        contentType: a.contentType ?? 'application/pdf',
       })),
     });
     console.log(`✉️ [GMAIL SMTP] Email enviado a ${options.to}`);

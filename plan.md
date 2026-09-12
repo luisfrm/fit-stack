@@ -11,7 +11,7 @@
 | Addendum Fase 1 — repo de comprobantes a `packages/database` | 🔧 En revisión (sin commit) |  |
 | Fase 1 — DB Panel (secuencia + columnas) | ✅ Hecha | `24e9ab1`…`455cc37` |
 | Fase 2 — Emisión Panel (render en jobs-worker) | 🔧 En revisión (sin commit) |  |
-| Fase 3 — Email + PDF adjunto + UI panel | ⏳ Pendiente (requiere Fase 2) |  |
+| Fase 3 — Email + PDF adjunto + UI panel | 🔧 En revisión (sin commit) |  |
 | Fase 4 — Config fiscal por org | ⏳ Pendiente (requiere Fase 0, paralelizable con Fase 3) |  |
 | Fase 5 — Reporte de gaps y auditoría | ⏳ Pendiente (requiere Fase 2) |  |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ⏳ Pendiente (requiere 0–5) |  |
@@ -83,4 +83,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-Cerrar **Fase 2** (revisión de los cambios sin commit: addendum Fase 1 + emisión en dos pasos con render en `jobs-worker`), y luego **Fase 3** (`fase-3-email-pdf-jobs-panel.md`, email corto + adjunto desde R2 + UI del comprobante en el panel).
+Revisar **Fase 3** (`fase-3-email-pdf-jobs-panel.md`, email corto + adjunto desde R2 + UI del comprobante en el panel: cambios sin commit), y luego **Fase 4** (config fiscal por org, paralelizable) y **Fase 5** (reporte de gaps).

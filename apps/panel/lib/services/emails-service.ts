@@ -1,12 +1,17 @@
 import { api } from "@/lib/api/client";
+import { receiptsService } from "./receipts-service";
 
 /**
  * Service to handle all email-related operations.
  * Centralizes the communication with the backend email dispatchers.
  */
 export const emailsService = {
+  /**
+   * Alias: el dueño del endpoint es `receiptsService` (Fase 3).
+   * Firma intacta (`Promise<void>`) para no romper callers externos.
+   */
   async sendReceiptByEmail(paymentId: number): Promise<void> {
-    await api(`/payments/${paymentId}/send-email`, { method: "POST" });
+    await receiptsService.sendReceiptEmail(paymentId);
   },
 
   async sendInvitationEmail(

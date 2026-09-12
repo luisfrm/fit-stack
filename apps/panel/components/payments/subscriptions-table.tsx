@@ -21,8 +21,9 @@ import {
   Clock,
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
-import { formatCents, type CurrencyFormat } from "@workspace/shared";
+import { formatCents, maskReference, type CurrencyFormat } from "@workspace/shared";
 import { usePermissions, useAuth } from "@/lib/hooks/use-auth";
+import { NoData } from "../dashboard/no-data";
 
 const getPaymentStatusBadge = (status?: string) => {
   switch (status) {
@@ -68,7 +69,8 @@ const getColumns = (
   onPaymentStatusChange: (paymentId: number, status: string) => void | Promise<void>,
   onDelete: (id: number) => void | Promise<void>,
   currencyFormat: CurrencyFormat,
-  canDelete: boolean
+  canDelete: boolean,
+  onReceiptSuccess?: () => void | Promise<void>
 ): ColumnDef<ISubscription>[] => [
     {
       header: "Miembro",
@@ -98,7 +100,7 @@ const getColumns = (
           <div className="flex flex-col">
             {sub.planSnapshotPrice !== undefined && (
               <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
-                Precio base: {formatCents(sub.planSnapshotPrice, 'USD', currencyFormat)}
+                Precio base: {formatCents(sub.planSnapshotPrice, sub.planSnapshotCurrency ?? sub.currencyPaid ?? 'USD', currencyFormat)}
               </Text>
             )}
           </div>
@@ -125,11 +127,11 @@ const getColumns = (
       header: "Cobro Real",
       cell: (sub) => (
         <div className="flex flex-col gap-0.5">
-          <Text weight="bold" size="sm" className="text-foreground tabular-nums">
-            {sub.amountPaid
-              ? formatCents(sub.amountPaid, sub.currencyPaid ?? "", currencyFormat)
-              : "---"
-            }
+            <Text weight="bold" size="sm" className="text-foreground tabular-nums">
+              {sub.amountPaid
+                ? formatCents(sub.amountPaid, sub.currencyPaid ?? "USD", currencyFormat)
+                : "---"
+              }
           </Text>
           {sub.currencyPaid !== 'USD' && sub.exchangeRateApplied && (
             <Text size="xs" variant="muted" className="opacity-50 text-[10px] uppercase tracking-tighter">
@@ -154,12 +156,15 @@ const getColumns = (
               REF: {(() => {
                 if (Array.isArray(sub.paymentMethodDetails)) {
                   const refField = sub.paymentMethodDetails.find(d =>
-                    d.label.toLowerCase().includes('ref') ||
-                    d.label.toLowerCase().includes('pago')
+                    (d.label ?? '').toLowerCase().includes('ref') ||
+                    (d.label ?? '').toLowerCase().includes('pago')
                   );
-                  return refField?.value || "---";
+                  return refField?.value !== undefined && refField?.value !== null && refField?.value !== ""
+                    ? maskReference(String(refField.value))
+                    : "---";
                 }
-                return sub.paymentMethodDetails.reference || "---";
+                const ref = (sub.paymentMethodDetails as Record<string, unknown>).reference;
+                return typeof ref === "string" && ref ? maskReference(ref) : "---";
               })()}
             </Text>
           )}
@@ -168,28 +173,56 @@ const getColumns = (
     },
     {
       header: "Estado Cobro",
-      cell: (sub) => getPaymentStatusBadge(sub.paymentStatus)
+      cell: (sub) => (
+        <div className="flex flex-col items-start gap-1">
+          {getPaymentStatusBadge(sub.paymentStatus)}
+          {sub.receiptVoided && (
+            <Badge variant="destructive" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">
+              Anulado
+            </Badge>
+          )}
+        </div>
+      )
     },
     {
       header: "Acciones",
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
-      cell: (sub) => (
+      cell: (sub) => {
+        // Auditoría del comprobante: con número siempre se puede ver
+        // (emitido, anulado o invalidado después de emitir); sin número
+        // solo `validated` puede emitir. `processing`/`invalid` sin número
+        // no ofrecen nada.
+        const canViewReceipt =
+          !!sub.receiptNumber || sub.paymentStatus === PAYMENT_STATUSES.VALIDATED;
+        const receiptLabel = !sub.receiptNumber
+          ? "Emitir comprobante"
+          : sub.receiptVoided
+            ? "Ver comprobante (Anulado)"
+            : sub.paymentStatus === PAYMENT_STATUSES.VALIDATED
+              ? "Reimprimir comprobante"
+              : "Ver comprobante";
+        return (
         <div className="flex justify-end">
           <ActionsDropdown
             modalData={sub}
+            onSuccess={onReceiptSuccess}
             sections={[
-              {
-                label: "Auditoría de Pago",
-                items: [
-                  {
-                    label: "Ver Comprobante",
-                    icon: <Receipt size={14} />,
-                    variant: "primary",
-                    Modal: ReceiptDialog
-                  }
-                ]
-              },
+              ...(canViewReceipt
+                ? [
+                    {
+                      label: "Auditoría de Pago",
+                      items: [
+                        {
+                          label: receiptLabel,
+                          icon: <Receipt size={14} />,
+                          variant: "primary" as const,
+                          Modal: ReceiptDialog
+                        }
+                      ]
+                    }
+                  ]
+                : []),
               {
                 label: "Gestión Administrativa",
                 items: [
@@ -241,7 +274,8 @@ const getColumns = (
             ]}
           />
         </div>
-      )
+        );
+      }
     }
   ];
 
@@ -252,9 +286,9 @@ interface SubscriptionsTableProps {
   readonly onPaymentStatusChange: (paymentId: number, status: string) => void;
   readonly loading?: boolean;
   readonly pagination?: any;
+  /** Refresca la página tras acciones del comprobante (updateTag + refresh). */
+  readonly onSuccess?: () => void | Promise<void>;
 }
-
-import { NoData } from "../dashboard/no-data";
 
 export function SubscriptionsTable({
   subscriptions,
@@ -262,7 +296,8 @@ export function SubscriptionsTable({
   onStatusChange,
   onPaymentStatusChange,
   loading,
-  pagination
+  pagination,
+  onSuccess
 }: SubscriptionsTableProps) {
   const { activeOrganization } = useAuth();
   const { can } = usePermissions();
@@ -275,8 +310,9 @@ export function SubscriptionsTable({
     onPaymentStatusChange,
     onDelete,
     currencyFormat,
-    canDelete
-  ), [onStatusChange, onDelete, onPaymentStatusChange, currencyFormat, canDelete]);
+    canDelete,
+    onSuccess
+  ), [onStatusChange, onDelete, onPaymentStatusChange, currencyFormat, canDelete, onSuccess]);
 
   return (
     <Table

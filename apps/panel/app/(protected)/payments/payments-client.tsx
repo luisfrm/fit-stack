@@ -298,6 +298,7 @@ export function PaymentsClient({
             onDelete={handleDelete}
             onStatusChange={handleStatusChange}
             onPaymentStatusChange={handlePaymentStatusChange}
+            onSuccess={refreshAll}
             loading={false}
             pagination={{
               page: initialPage,

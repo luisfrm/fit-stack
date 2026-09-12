@@ -318,6 +318,12 @@ export interface ISubscription {
   exchangeRateApplied?: string;
   paymentStatus?: PaymentStatus;
   paymentDate?: string;
+
+  // Correlative receipt (columnas reales desde Fase 1; ver IPayment)
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptVoided?: boolean;
 }
 
 export interface IPaymentMethodDetail {

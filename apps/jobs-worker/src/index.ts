@@ -14,7 +14,16 @@ export type FitTaskEvent =
       role?: string;
     }
   | { type: 'email.org_invite'; email: string; orgName: string; inviterName: string; inviteLink: string }
-  | { type: 'email.payment_receipt'; paymentId: number; organizationId: string }
+  | {
+      type: 'email.payment_receipt';
+      paymentId: number;
+      organizationId: string;
+      /**
+       * Número correlativo (hint de display; la verdad vive en DB).
+       * Opcional = compat con eventos en vuelo sin el campo.
+       */
+      receiptNumber?: string;
+    }
   | {
       type: 'email.org_payment_received';
       paymentId: number;
@@ -91,7 +100,7 @@ export default {
   },
 
   /**
-   * Barrido cada 10 min (cron en wrangler.jsonc): re-encola renders de
+   * Barrido (cron en Terraform, pre-venta cada 10 h): re-encola renders de
    * pagos numerados sin PDF. Cierra el hueco "número asignado pero evento
    * nunca llegó a la cola". Idempotente con el paso 2.
    */
