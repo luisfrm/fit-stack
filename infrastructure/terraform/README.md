@@ -7,7 +7,13 @@ Esta carpeta contiene toda la infraestructura de Cloudflare como código.
 - **Workers** (`api-worker`, `jobs-worker`) con bindings de R2, Queues y plain text.
 - **R2 Bucket** para archivos (logos, imágenes CMS, etc.).
 - **Queues** para tareas asíncronas (emails, PDFs) y su DLQ.
+- **Queue consumers** de `jobs-worker`: `fit-task-events` (emails) y `fit-receipt-events` (render de comprobantes), cada uno con su DLQ.
+- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver `docs/PENDING.md`).
 - **Secrets** de cada worker (DATABASE_URL, BETTER_AUTH_SECRET, etc.).
+
+> **Dueño único de consumers/cron = Terraform.** Los `wrangler.jsonc` de los workers solo declaran `producers` (y R2), nunca `queues.consumers` ni `triggers`, para que `wrangler deploy` no compita con el estado. Los `wrangler deploy` suben el **código** (incl. el `scheduled()`); el trigger lo crea este Terraform.
+>
+> **Orden por ambiente:** `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`). El `scheduled()` debe existir en el script para que el cron haga algo.
 
 ## Modelo de ambientes
 
@@ -15,7 +21,7 @@ Un solo set de archivos Terraform. Cada ambiente se selecciona en el workflow de
 
 **Los secrets y variables son nombres simples** (sin prefijo). GitHub ya los aísla por environment, así que `CLOUDFLARE_API_TOKEN` en `production` es distinto de `CLOUDFLARE_API_TOKEN` en `staging`.
 
-Actualmente configurado: **`production`**.
+Actualmente configurados: **`dev`**, **`staging`** y **`production`** (cada uno con su state en `key=<env>/terraform.tfstate`).
 
 ## Prerrequisitos
 
@@ -72,6 +78,10 @@ Solo los nombres de los recursos. No son sensibles:
 | `FILES_BUCKET_NAME` | `fit-stack-files` |
 | `QUEUE_NAME` | `fit-task-events` |
 | `DLQ_QUEUE_NAME` | `fit-task-events-dlq` |
+| `RECEIPT_QUEUE_NAME` | `fit-receipt-events` |
+| `RECEIPT_DLQ_QUEUE_NAME` | `fit-receipt-events-dlq` |
+
+> Repetir por environment (`dev`/`staging`/`production`). Si se omiten, `main.tf` usa los mismos nombres con el sufijo del ambiente (`-dev`/`-staging`; producción sin sufijo).
 
 ### 4. Configurar Repository secrets (compartidos)
 
@@ -104,6 +114,8 @@ export TF_VAR_jobs_worker_name="fit-stack-jobs"
 export TF_VAR_files_bucket_name="fit-stack-files"
 export TF_VAR_queue_name="fit-task-events"
 export TF_VAR_dlq_queue_name="fit-task-events-dlq"
+export TF_VAR_receipt_queue_name="fit-receipt-events"
+export TF_VAR_receipt_dlq_queue_name="fit-receipt-events-dlq"
 export TF_VAR_better_auth_url="https://api.fit-stack.com"
 # ... resto de variables
 

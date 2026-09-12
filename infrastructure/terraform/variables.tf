@@ -39,6 +39,16 @@ variable "dlq_queue_name" {
   default = ""
 }
 
+variable "receipt_queue_name" {
+  type    = string
+  default = ""
+}
+
+variable "receipt_dlq_queue_name" {
+  type    = string
+  default = ""
+}
+
 variable "compatibility_date" {
   type    = string
   default = "2026-07-01"

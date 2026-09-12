@@ -137,6 +137,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
   - Service: Business logic layer.
   - Route Handler: HTTP concerns only.
 - **Worker DB Pattern**: In `api-worker` the DB client is created **per request** via `createDb(c.env.DATABASE_URL)` (`@workspace/database/factory`) — `process.env` does not exist in Workers. Repositories and services are **factory functions** that receive dependencies by parameter (`createXRepository(db)`, `createXService(repo)`).
+- **Shared repositories (conscious exception, not a general rule)**: repositories live in the app — UNLESS 2+ apps need the byte-identical implementation (criterion: same SQL, same atomicity guarantees). Only then it lives in `packages/database/src/repositories/` (today solely `receipts.repository.ts`: atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`, consumed by api-worker step 1 and jobs-worker step 2). Any other new repo stays in `apps/api-worker/src/repositories/`. This exception exists because two runtimes need identical SQL; it does not authorize moving business logic or other repos.
 
 ### 2. UI Design System & Hierarchy
 
@@ -406,6 +407,8 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 **Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
 
 > **Rule**: never couple api-worker to synchronous email/PDF sends — always enqueue in `TASK_QUEUE` and let jobs-worker process it.
+
+> **Receipts queue (`fit-receipt-events`)**: dedicated queue, own DLQ, **single consumer = jobs-worker**. `api-worker` is only a producer (step 1 + manual issue + re-enqueues); jobs-worker consumes **two** queues (`fit-task-events` emails + `fit-receipt-events` render) and branches `queue()` by `batch.queue`. Consumer + cron are owned by **Terraform** (`cloudflare_queue_consumer` ×2 + `cloudflare_workers_cron_trigger` in `workers.tf`); `wrangler.jsonc` declares only producers. Sweep cron runs **every 10 hours in pre-sale** (`0 */10 * * *`; revert to `*/10 * * * *` with real customers — see `docs/PENDING.md`). The render lives in `apps/jobs-worker/src/receipt-pdf.tsx` (lazy `@react-pdf/renderer`) — **api-worker must never depend on `@react-pdf/renderer`**. Shared receipt data access lives in `packages/database/src/repositories/receipts.repository.ts` (see §1 exception): atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`/`markReceiptNotified`. The receipt email is gated by `markReceiptNotified` (with `clearReceiptNotified` rollback on send failure) so a transient queue error never loses the email.
 
 ---
 

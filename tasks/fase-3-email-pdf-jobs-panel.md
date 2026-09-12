@@ -1,6 +1,6 @@
 # Fase 3 — Email-notificación con PDF adjunto (jobs-worker) + UI panel del comprobante
 
-> Depende de: Fase 2 (paso 1 número + paso 2 PDF en R2 vía consumer api-worker; **el email lo encola el paso 2** tras confirmar `receipt_pdf_key`). Dos tracks: **3A jobs-worker** y **3B panel**. Paralelizables entre sí.
+> Depende de: Fase 2 (paso 1 número + paso 2 PDF en R2 vía consumer **jobs-worker**; **el email lo encola el paso 2** tras confirmar `receipt_pdf_key` con `completeReceiptPdf`). Dos tracks: **3A jobs-worker** y **3B panel**. Paralelizables entre sí.
 
 ## Objetivo
 
@@ -14,7 +14,7 @@ El HTML del email queda como notificación corta; el PDF adjunto es la fuente de
 - `apps/jobs-worker/src/handlers/email.handler.ts` — `sendEmail` **ya soporta** `attachments [{ filename, content: Buffer|Uint8Array }]` en Resend y Gmail SMTP. Falta `contentType` explícito (agregar).
 - `apps/jobs-worker/src/templates/payment-receipt.ts` — `renderPaymentReceipt` con `headerSubtitle: 'Operación #${paymentId}'` (**UUID visible → eliminar**). Tema claro vía `layout.ts` (`renderLightShell`).
 - `Env` de jobs-worker (`index.ts`): `DATABASE_URL, EMAIL_PROVIDER, RESEND_*, SMTP_*, PANEL_URL, CONSOLE_URL`. El binding R2 `FILES_BUCKET` **ya existe** en los 3 envs de `wrangler.jsonc` (dev/staging/production) — solo verificar que los tipos `PdfHandlerEnv`/`Env` lo declaren para leer el PDF.
-- `@react-pdf/renderer` ^4.2.1 ya es dependencia de jobs-worker, pero **no se renderiza aquí**: el render vive en el consumer del paso 2 en `apps/api-worker` (co-ubicado con `composeReceiptData`). jobs-worker **solo lee el PDF ya subido a R2 y lo adjunta** — nada de duplicar lógica de generación en dos workers.
+- `@react-pdf/renderer` ^4.2.1 ya es dependencia de jobs-worker y el **render YA vive aquí** (Fase 2, `receipt-pdf.tsx`): el paso 2 y el adjunto comparten worker y repositorio/builder compartido, así que no hay duplicación. jobs-worker **lee de R2 el PDF ya generado y lo adjunta** (nunca lo regenera en el email). El email del numerado se encola tras `completeReceiptPdf` (`rowCount===1`).
 - El email de comprobantes numerados lo encola **el paso 2** (Fase 2) solo después de confirmar el `UPDATE receipt_pdf_key`: cuando `handlePaymentReceipt` corre para un pago numerado, el PDF **siempre** existe. La única rama sin adjunto es el histórico (`receipt_number IS NULL`), disparado por el reenvío manual (`POST :id/send-email`).
 
 **Panel:**

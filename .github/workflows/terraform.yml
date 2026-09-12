@@ -43,6 +43,8 @@ jobs:
       TF_VAR_files_bucket_name: ${{ vars.FILES_BUCKET_NAME }}
       TF_VAR_queue_name: ${{ vars.QUEUE_NAME }}
       TF_VAR_dlq_queue_name: ${{ vars.DLQ_QUEUE_NAME }}
+      TF_VAR_receipt_queue_name: ${{ vars.RECEIPT_QUEUE_NAME }}
+      TF_VAR_receipt_dlq_queue_name: ${{ vars.RECEIPT_DLQ_QUEUE_NAME }}
       TF_VAR_better_auth_url: ${{ secrets.BETTER_AUTH_URL }}
       TF_VAR_r2_public_url: ${{ secrets.R2_PUBLIC_URL }}
       TF_VAR_database_url: ${{ secrets.DATABASE_URL }}

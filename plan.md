@@ -6,10 +6,11 @@
 
 | Fase | Estado | Commit |
 |---|---|---|
-| Fase 0 — Lógica pura (`@workspace/shared`) | ⏳ Pendiente |  |
-| Fase 0.5 — Centavos honestos + `ValueConverter` único | 🔧 En revisión (sin commit) |  |
-| Fase 1 — DB Panel (secuencia + columnas) | ⏳ Pendiente |  |
-| Fase 2 — Emisión Panel en dos pasos | ⏳ Pendiente |  |
+| Fase 0 — Lógica pura (`@workspace/shared`) | ✅ Hecha | `bc77afd` |
+| Fase 0.5 — Centavos honestos + `ValueConverter` único | ✅ Hecha | `8736a90`…`a00cc73` |
+| Addendum Fase 1 — repo de comprobantes a `packages/database` | 🔧 En revisión (sin commit) |  |
+| Fase 1 — DB Panel (secuencia + columnas) | ✅ Hecha | `24e9ab1`…`455cc37` |
+| Fase 2 — Emisión Panel (render en jobs-worker) | 🔧 En revisión (sin commit) |  |
 | Fase 3 — Email + PDF adjunto + UI panel | ⏳ Pendiente (requiere Fase 2) |  |
 | Fase 4 — Config fiscal por org | ⏳ Pendiente (requiere Fase 0, paralelizable con Fase 3) |  |
 | Fase 5 — Reporte de gaps y auditoría | ⏳ Pendiente (requiere Fase 2) |  |
@@ -50,10 +51,10 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 **Concurrencia (sin transacciones interactivas en serverless)**
 - La asignación del número correlativo es **una sola sentencia atómica** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`), sin transacción interactiva ni `SELECT FOR UPDATE` — compatible con el driver HTTP de Neon. Cubre también la carrera del primer comprobante del año/emisor sin fila previa.
 - **Nunca hay rollback de un número.** El estado `receipt_number IS NOT NULL AND receipt_pdf_key IS NULL` es válido y significa "numerado, PDF pendiente" — no un error.
-- Emisión en **dos pasos**: paso 1 síncrono (asigna número, rápido, sin I/O externo, en el request que valida el pago) + paso 2 asíncrono (render PDF + `PUT` R2 + `UPDATE receipt_pdf_key`) en un **consumer de cola dedicada `fit-receipt-events`**, co-ubicado en `apps/api-worker` (no en `jobs-worker`, para no duplicar la lógica de `composeReceiptData`).
+- Emisión en **dos pasos**: paso 1 síncrono (asigna número, rápido, sin I/O externo, en el request que valida el pago) + paso 2 asíncrono (render PDF + `PUT` R2 + `UPDATE receipt_pdf_key`) en un **consumer de cola dedicada `fit-receipt-events`** que vive en `apps/jobs-worker` (compose vía repo compartido `packages/database` + fiscal `@workspace/shared`, sin duplicar lógica). `api-worker` es solo **productor** de esa cola (paso 1 + `issue` + re-encolados); no agrega `@react-pdf/renderer`.
 - El **email se encola desde el paso 2**, solo tras confirmar `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` con `rowCount === 1` — nunca desde el paso 1. Esto garantiza que un comprobante numerado nunca dispare un email sin su PDF adjunto.
 - **Idempotencia ante entrega duplicada** (colas *at-least-once*): reintentar el paso 2 con el mismo número/key es un simple overwrite sin efecto adicional; el `UPDATE … RETURNING` actúa como gate para no encolar un segundo email.
-- **Barrido periódico** (cron cada 10 min en `jobs-worker`) cierra el hueco "número asignado pero mensaje nunca llegó a la cola": busca filas con número y sin PDF más viejas que 15 minutos y re-encola el render. Cubre tanto Panel como Console (mismo mecanismo, extendido a `platform_subscription_payment` en C2).
+- **Barrido periódico** (cron en `jobs-worker`, **pre-venta cada 10 h**; bajar a 10 min con clientes reales — ver `docs/PENDING.md`) cierra el hueco "número asignado pero mensaje nunca llegó a la cola": busca filas con número y sin PDF más viejas que 15 minutos y re-encola el render. Cubre tanto Panel como Console (mismo mecanismo, extendido a `platform_subscription_payment` en C2).
 - Console reutiliza la **misma cola y el mismo tipo de evento** `receipt.render`, discriminado por un campo `scope: 'panel' | 'platform'` en el payload — no un evento nuevo, para no duplicar el registro de tipos ni el consumer.
 
 **Contrato de API**
@@ -68,8 +69,9 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Riesgos activos a vigilar
 
-- **Peso de `@react-pdf/renderer` en el bundle de `api-worker`.** Corre solo en el consumer de cola (no en el request HTTP), lo que mitiga límites de CPU, pero el tamaño del bundle del Worker debe medirse en Fase 2 antes de dar por cerrado el criterio de aceptación.
-- **Una cola, un consumer.** `fit-receipt-events` no puede compartirse con `jobs-worker` sin migrar explícitamente el consumer — si a futuro se necesita mover el render, no configurar dos consumers sobre la misma cola.
+- **Bundle PDF**: `@react-pdf/renderer` vive solo en `jobs-worker` (donde ya era dependencia) y se importa lazy en el path de render; `api-worker` NO lo agrega (criterio de aceptación de Fase 2).
+- **Una cola, UN consumer**: `fit-receipt-events` la consume solo `jobs-worker`; `jobs-worker` consume DOS colas distintas (`fit-task-events` emails + `fit-receipt-events` renders), cada una con su DLQ. Nunca dos consumers sobre la misma cola.
+- **Repo compartido como excepción**: `packages/database/src/repositories/receipts.repository.ts` (numeración atómica + `getReceiptComposedData` + `completeReceiptPdf`) existe porque dos runtimes necesitan la implementación idéntica; no autoriza mover otros repos (ver AGENTS.md §1).
 - **Disclaimer proxy de Console.** Mientras FitStack no tenga `fitstack_country_code` configurado, el disclaimer legal de los comprobantes de Console usa el país del Org receptor. Esto es una aproximación temporal, no la regla correcta a largo plazo — no dejar que este TODO sobreviva silenciosamente hasta producción.
 
 ## Reglas de ejecución para todas las fases
@@ -81,4 +83,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-Ejecutar **Fase 0** (`fase-0-logica-pura-shared.md`) — es la que desbloquea Fase 1
+Cerrar **Fase 2** (revisión de los cambios sin commit: addendum Fase 1 + emisión en dos pasos con render en `jobs-worker`), y luego **Fase 3** (`fase-3-email-pdf-jobs-panel.md`, email corto + adjunto desde R2 + UI del comprobante en el panel).
