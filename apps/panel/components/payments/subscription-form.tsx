@@ -7,7 +7,8 @@ import {
   type PaginatedMembers,
   type IMember,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetails
+  type IPaymentMethodDetails,
+  type ITaxDetail
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
@@ -27,13 +28,20 @@ import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/displa
 import { addDuration, localDayStartUtc, toLocalDayString } from "@workspace/shared/date";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { ORG_ROLES } from "@workspace/shared";
-import { centsToUnits, unitsToCents } from "@workspace/shared";
+import {
+  centsToUnits,
+  unitsToCents,
+  parseRateValue,
+  previewReceiptTaxes,
+  resolveFiscalProfile,
+  ORG_ROLES
+} from "@workspace/shared";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
+import { type TaxMode } from "./tax-block";
 import { CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
@@ -45,6 +53,10 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
     paymentDate?: Date | string;
+    subtotal?: number;
+    taxTotal?: number;
+    taxDetails?: ITaxDetail[];
+    taxOverrideReason?: string;
   }
 }
 
@@ -86,6 +98,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
+
+  // Fiscal override (modo auto = el backend descompone; override = tasas
+  // manuales + motivo de auditoría, montos siempre en centavos).
+  const [taxMode, setTaxMode] = React.useState<TaxMode>("auto");
+  const [taxRateOverrides, setTaxRateOverrides] = React.useState<Record<string, string>>({});
+  const [taxOverrideReason, setTaxOverrideReason] = React.useState("");
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
@@ -165,10 +183,55 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Filter payment methods by selected currency
   const filteredPaymentMethods = React.useMemo(() => {
-    return activePaymentMethods.filter(m => 
+    return activePaymentMethods.filter(m =>
       m.currency === null || m.currency === paymentCurrency
     );
   }, [activePaymentMethods, paymentCurrency]);
+
+  // Perfil fiscal de la org emisora (defaults del país + overrides).
+  const fiscalProfile = React.useMemo(() => {
+    const countryCode = activeOrganization?.countryCode;
+    if (!countryCode) return null;
+    try {
+      return resolveFiscalProfile(countryCode, activeOrganization?.fiscalConfig);
+    } catch {
+      return null;
+    }
+  }, [activeOrganization]);
+
+  // Preview del desglose con la única fuente compartida. En override se
+  // aplican las tasas manuales; si alguna es inválida se muestra el auto y
+  // el submit se bloquea con toast.
+  const taxPreview = React.useMemo(() => {
+    if (!fiscalProfile) return null;
+    const totalCents = unitsToCents(finalAmount);
+    try {
+      if (taxMode !== "override") {
+        const auto = previewReceiptTaxes(totalCents, fiscalProfile, paymentCurrency);
+        return { ...auto, lines: auto.taxDetails };
+      }
+      const taxes = fiscalProfile.taxes.map((tax) => {
+        const raw = taxRateOverrides[tax.name];
+        if (raw === undefined || raw.trim() === "") return tax;
+        return { ...tax, rate: parseRateValue(raw) };
+      });
+      const custom = previewReceiptTaxes(totalCents, { ...fiscalProfile, taxes }, paymentCurrency);
+      return { ...custom, lines: custom.taxDetails };
+    } catch {
+      return null;
+    }
+  }, [fiscalProfile, taxMode, taxRateOverrides, finalAmount, paymentCurrency]);
+
+  const handleTaxModeChange = (mode: TaxMode) => {
+    setTaxMode(mode);
+    if (mode === "override" && fiscalProfile && Object.keys(taxRateOverrides).length === 0) {
+      setTaxRateOverrides(
+        Object.fromEntries(
+          fiscalProfile.taxes.map((tax) => [tax.name, String(Number((tax.rate * 100).toFixed(4)))]),
+        ),
+      );
+    }
+  };
 
   // Fetch Exchange Rate and Calculate Amount
   React.useEffect(() => {
@@ -248,6 +311,26 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         }
       }
     }
+
+    if (taxMode === "override") {
+      if (!taxOverrideReason.trim()) {
+        toast.error("Indica el motivo del ajuste manual de impuestos");
+        return false;
+      }
+      for (const [name, raw] of Object.entries(taxRateOverrides)) {
+        if (raw.trim() === "") continue;
+        try {
+          parseRateValue(raw);
+        } catch {
+          toast.error(`Tasa inválida para ${name}`);
+          return false;
+        }
+      }
+      if (!taxPreview) {
+        toast.error("No se pudo calcular el desglose de impuestos");
+        return false;
+      }
+    }
     return true;
   };
 
@@ -312,6 +395,16 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentMethodDetails: finalPaymentMethodDetails,
           status: paymentValidated ? 'validated' : 'processing',
           paymentDate: paymentDate, // Send the selected date string
+          // Modo auto: sin campos fiscales (el backend descompone).
+          // Override: desglose en centavos + motivo de auditoría.
+          ...(taxMode === "override" && taxPreview
+            ? {
+              subtotal: taxPreview.subtotal,
+              taxTotal: taxPreview.taxTotal,
+              taxDetails: taxPreview.lines,
+              taxOverrideReason: taxOverrideReason.trim(),
+            }
+            : {}),
         }
       });
     } catch (err: any) {
@@ -417,6 +510,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
           disabled={isSectionDisabled}
+          taxPreview={taxPreview}
+          taxMode={taxMode}
+          onTaxModeChange={handleTaxModeChange}
+          taxRateOverrides={taxRateOverrides}
+          onTaxRateChange={(name, pct) =>
+            setTaxRateOverrides((prev) => ({ ...prev, [name]: pct }))
+          }
+          taxOverrideReason={taxOverrideReason}
+          onTaxOverrideReasonChange={setTaxOverrideReason}
         />
       )}
 
