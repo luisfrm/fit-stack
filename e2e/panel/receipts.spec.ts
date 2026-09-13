@@ -3,6 +3,7 @@ import { uid, uniqueEmail } from '../helpers/api';
 import { SELECTORS } from '../helpers/selectors';
 import { TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
+import type { IPaginatedResult, ISubscription } from '@workspace/shared';
 
 // El consumer de renders (jobs-worker) no corre en E2E: tras validar, el
 // comprobante queda numerado con PDF pendiente. El spec aserta lo
@@ -86,5 +87,84 @@ test.describe('Panel — Comprobante de pago', () => {
     await expect(
       page.getByText(/Comprobante (enviado|en preparación)/).first(),
     ).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('anular conserva el número y muestra Anulado sin UUID', async ({
+    page,
+    panelApi,
+  }) => {
+    const email = uniqueEmail('receipt-void');
+    const lastName = `Anulado ${uid()}`;
+    const tz = TEST_ORG.timezone;
+    const today = toLocalDayString(tz);
+
+    const plan = await panelApi.create<any>('plan', '/api/plans', {
+      name: `Plan Anulado ${uid()}`,
+      price: 5000,
+      currency: 'USD',
+      durationValue: 1,
+      durationUnit: 'month',
+      features: ['Acceso'],
+      isPopular: false,
+      isActive: true,
+      isVisibleOnSite: true,
+    });
+    const member = await panelApi.create<any>('member', '/api/members', {
+      firstName: 'Comprobante',
+      lastName,
+      email,
+      role: 'member',
+      isActive: true,
+      sendInvite: false,
+    });
+    await panelApi.create('subscription', '/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: today,
+      endDate: addLocalDays(tz, today, 30),
+      payment: {
+        amountPaid: 5000,
+        currencyPaid: 'USD',
+        paymentMethod: 'transferencia',
+        paymentMethodDetails: [
+          { label: 'Referencia', value: '123456789012', type: 'text' },
+        ],
+        status: 'validated',
+        paymentDate: today,
+      },
+    });
+
+    // paymentId desde el listado (ISubscription lo incluye) y anulación.
+    const list = await panelApi.get<IPaginatedResult<ISubscription>>(
+      '/api/subscriptions',
+      { search: lastName },
+    );
+    const found = list.data.find((s) => s.memberName?.includes(lastName));
+    expect(found?.paymentId).toBeDefined();
+    await panelApi.patch(`/api/payments/${found!.paymentId}/status`, {
+      status: 'voided',
+    });
+
+    await page.goto(`/payments?search=${encodeURIComponent(lastName)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const row = page.locator('table tbody tr', { hasText: lastName }).first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    // Badge de estado en la tabla (determinista: no depende del PDF).
+    await expect(row.getByText('Anulado').first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await row.getByRole('button').click();
+    await page.getByRole('menuitem', { name: /ver comprobante \(anulado\)/i }).click();
+
+    const dialog = page.locator(SELECTORS.common.modal);
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+
+    // El número se conserva tras anular; nunca el UUID técnico.
+    await expect(dialog.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(dialog.getByText('Operación #')).toHaveCount(0);
   });
 });
