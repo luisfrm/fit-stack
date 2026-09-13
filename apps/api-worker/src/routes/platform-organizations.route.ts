@@ -17,7 +17,7 @@ import { createFeaturesService } from '../services/features.service';
 import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import { DEFAULT_ORG_STAFF_VALUES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
@@ -34,7 +34,7 @@ const createOrgSchema = z.object({
   taxId: z.string().nullable().optional(),
   legalName: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
-  fiscalConfig: z.record(z.string(), z.any()).nullable().optional(),
+  fiscalConfig: FiscalConfigSchema.nullable().optional(),
   metadata: z.record(z.string(), z.any()).nullable().optional(),
   settings: z.record(z.string(), z.string()).optional(),
 });

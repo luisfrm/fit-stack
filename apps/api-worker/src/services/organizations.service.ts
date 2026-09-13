@@ -1,7 +1,8 @@
 import { HTTPException } from 'hono/http-exception';
 import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } from '../repositories/organizations.repository';
 import type { SettingsRepository } from '../repositories/settings.repository';
-import { buildDefaultOrgSettings, primaryCurrencyForCountry } from '@workspace/shared';
+import { buildDefaultOrgSettings, primaryCurrencyForCountry, FiscalConfigSchema, StoredFiscalConfigSchema } from '@workspace/shared';
+import type { FiscalConfig } from '@workspace/shared';
 
 const slugTakenError = (message: string) =>
   new HTTPException(409, {
@@ -11,6 +12,51 @@ const slugTakenError = (message: string) =>
       headers: { 'content-type': 'application/json' },
     }),
   });
+
+/**
+ * Base del merge: la almacenada puede venir de una versión previa con keys
+ * extra (cuando el schema era laxo) o de un campo futuro. Se parsea con un
+ * schema tolerante (`.strip()`, no el `.strict()`) para NO perder `taxes`,
+ * `disclaimerOverride` ni `isFormalTaxpayer` por una key desconocida.
+ */
+function parseStoredFiscalConfig(stored: unknown): FiscalConfig {
+  if (stored == null) return {};
+  const parsed = StoredFiscalConfigSchema.safeParse(stored);
+  if (!parsed.success) {
+    console.error('fiscalConfig almacenada inválida, se ignora como base del merge.');
+    return {};
+  }
+  return parsed.data;
+}
+
+/**
+ * Fusiona el `fiscalConfig` entrante sobre el existente (merge, no reemplazo
+ * ciego): los escalares presentes reemplazan; `taxes[]` se fusiona por
+ * `name` (override actualiza rate/enabled; nombres desconocidos se conservan
+ * tal cual — el resolver los ignora). `null` explícito = reset a defaults.
+ */
+export function mergeFiscalConfig(
+  current: unknown,
+  incoming: FiscalConfig | null,
+): FiscalConfig | null {
+  if (incoming === null) return null;
+  const base = parseStoredFiscalConfig(current);
+
+  const merged: FiscalConfig = { ...base };
+  if (incoming.documentLabel !== undefined) merged.documentLabel = incoming.documentLabel;
+  if (incoming.disclaimerOverride !== undefined) merged.disclaimerOverride = incoming.disclaimerOverride;
+  if (incoming.isFormalTaxpayer !== undefined) merged.isFormalTaxpayer = incoming.isFormalTaxpayer;
+
+  if (incoming.taxes !== undefined) {
+    const byName = new Map((base.taxes ?? []).map((t) => [t.name, t]));
+    for (const override of incoming.taxes) {
+      byName.set(override.name, override);
+    }
+    merged.taxes = [...byName.values()];
+  }
+
+  return merged;
+}
 
 export function createOrganizationsService(orgsRepo: OrganizationsRepository, settingsRepo: SettingsRepository) {
   return {
@@ -82,7 +128,7 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
     },
 
     async updateOrganization(id: string, data: Partial<NewDbOrganization>) {
-      await this.getOrganizationById(id);
+      const current = await this.getOrganizationById(id);
 
       if (data.slug) {
         const existing = await orgsRepo.findBySlug(data.slug);
@@ -94,6 +140,17 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       // Cambiar de país recalcula la moneda principal (bloqueada al país).
       if (data.countryCode) {
         (data as Partial<NewDbOrganization>).primaryCurrency = primaryCurrencyForCountry(data.countryCode);
+      }
+
+      // `fiscalConfig` (jsonb) se fusiona sobre la almacenada, nunca se
+      // reemplaza a ciegas: un PATCH parcial de `taxes[]` no debe borrar
+      // `disclaimerOverride` ni `isFormalTaxpayer`.
+      if ('fiscalConfig' in data) {
+        const incoming = data.fiscalConfig as FiscalConfig | null | undefined;
+        if (incoming !== undefined) {
+          (data as { fiscalConfig?: FiscalConfig | null }).fiscalConfig =
+            mergeFiscalConfig(current.fiscalConfig, incoming);
+        }
       }
 
       return orgsRepo.update(id, data);

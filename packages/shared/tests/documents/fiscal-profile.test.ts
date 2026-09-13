@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FiscalConfigSchema,
   parseRateValue,
+  previewReceiptTaxes,
   resolveFiscalProfile,
 } from '../../src/documents/fiscal-profile';
 
@@ -86,5 +87,61 @@ describe('resolveFiscalProfile', () => {
       resolveFiscalProfile('VE', { taxes: [{ name: 'IVA', rate: 5, enabled: true }] }),
     ).toThrow();
     expect(() => FiscalConfigSchema.parse({ otroCampo: 1 })).toThrow();
+  });
+});
+
+describe('previewReceiptTaxes (descomposición tax-inclusive)', () => {
+  it('VE con USD: IVA + IGTF y cuadre exacto subtotal + taxTotal = total', () => {
+    const result = previewReceiptTaxes(11600, resolveFiscalProfile('VE'), 'USD');
+    expect(result.taxDetails.map((t) => t.name)).toEqual(['IVA', 'IGTF']);
+    expect(result.subtotal + result.taxTotal).toBe(11600);
+    expect(result.taxTotal).toBe(11600 - result.subtotal);
+  });
+
+  it('VE con VES: solo IVA (IGTF condicional fail-closed)', () => {
+    const result = previewReceiptTaxes(11600, resolveFiscalProfile('VE'), 'VES');
+    expect(result.taxDetails.map((t) => t.name)).toEqual(['IVA']);
+    expect(result.subtotal + result.taxTotal).toBe(11600);
+  });
+
+  it('VE sin moneda: IGTF no aplica (fail-closed)', () => {
+    const result = previewReceiptTaxes(11600, resolveFiscalProfile('VE'));
+    expect(result.taxDetails.map((t) => t.name)).toEqual(['IVA']);
+  });
+
+  it('PE: IGV 18% descompuesto', () => {
+    const result = previewReceiptTaxes(11800, resolveFiscalProfile('PE'), 'PEN');
+    expect(result.taxDetails).toEqual([{ name: 'IGV', rate: 0.18, amount: 1800 }]);
+    expect(result.subtotal).toBe(10000);
+    expect(result.taxTotal).toBe(1800);
+  });
+
+  it('US: sin impuestos (taxDetails vacío, subtotal = total)', () => {
+    const result = previewReceiptTaxes(5000, resolveFiscalProfile('US'), 'USD');
+    expect(result.taxDetails).toEqual([]);
+    expect(result.subtotal).toBe(5000);
+    expect(result.taxTotal).toBe(0);
+  });
+
+  it('base 0 → sin desglose', () => {
+    expect(previewReceiptTaxes(0, resolveFiscalProfile('VE'), 'USD')).toEqual({
+      subtotal: 0,
+      taxDetails: [],
+      taxTotal: 0,
+    });
+  });
+
+  it('respeta impuestos apagados por la org', () => {
+    const profile = resolveFiscalProfile('VE', {
+      taxes: [{ name: 'IVA', rate: 0.16, enabled: false }],
+    });
+    const result = previewReceiptTaxes(10000, profile, 'VES');
+    expect(result.taxDetails).toEqual([]);
+    expect(result.subtotal).toBe(10000);
+  });
+
+  it('lanza con total no entero o negativo (sin fallback)', () => {
+    expect(() => previewReceiptTaxes(10.5, resolveFiscalProfile('VE'), 'USD')).toThrow();
+    expect(() => previewReceiptTaxes(-1, resolveFiscalProfile('VE'), 'USD')).toThrow();
   });
 });

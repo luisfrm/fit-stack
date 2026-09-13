@@ -9,7 +9,11 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
+import { createOrganizationsService } from '../services/organizations.service';
+import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import { createSettingsRepository } from '../repositories/settings.repository';
+import type { NewDbOrganization } from '../repositories/organizations.repository';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -29,6 +33,27 @@ const orgRenewSchema = z.object({
   paymentMethodDetails: paymentMethodDetailsSchema,
   paymentDate: z.string().optional(),
 });
+
+/**
+ * Perfil fiscal org-scoped (Fase 4). `countryCode`/`primaryCurrency` son
+ * inmutables desde aquí (required de creación): se rechazan con 400 si vienen.
+ * `confirmed` es la fricción de la declaración de contribuyente formal.
+ *
+ * `.passthrough()` (no `.strict()`) es deliberado: permite DETECTAR las keys
+ * prohibidas para responder 400 explícito. El handler solo reenvía campos
+ * conocidos, así que lo demás no se persiste (sin mass-assignment).
+ */
+const orgProfileSchema = z
+  .object({
+    legalName: z.string().min(1).nullable().optional(),
+    taxId: z.string().min(1).nullable().optional(),
+    address: z.string().min(1).nullable().optional(),
+    fiscalConfig: FiscalConfigSchema.nullable().optional(),
+    confirmed: z.boolean().optional(),
+  })
+  .passthrough();
+
+const FORBIDDEN_PROFILE_KEYS = ['countryCode', 'primaryCurrency'] as const;
 
 function parseJsonArray(raw: string | undefined, fallback: string[]): string[] {
   if (!raw) return fallback;
@@ -197,4 +222,75 @@ export const organizationRoutes = new Hono<AppEnv>()
         throw err;
       }
     }
+  )
+
+  // PATCH /api/organizations/profile — identidad emisora + fiscalConfig (Fase 4).
+  // Org-scoped: owner/manager (ORGANIZATION.UPDATE). `countryCode` y
+  // `primaryCurrency` son inmutables post-creación (400 si vienen).
+  .patch(
+    '/profile',
+    requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
+    zValidator('json', orgProfileSchema),
+    async (c) => {
+      const orgId = c.get('orgId')!;
+      const body = c.req.valid('json');
+
+      // El schema es `.passthrough()` para poder detectar las keys prohibidas
+      // (un `.strict()` las strippearía en silencio).
+      const forbidden = FORBIDDEN_PROFILE_KEYS.filter((key) => key in body);
+      if (forbidden.length > 0) {
+        return c.json(
+          {
+            error: 'El país y la moneda principal se definen al crear la organización.',
+            code: 'IMMUTABLE_FIELD',
+            fields: forbidden,
+          },
+          400,
+        );
+      }
+
+      const orgsRepo = createOrganizationsRepository(c.get('db'));
+      const service = createOrganizationsService(
+        orgsRepo,
+        createSettingsRepository(c.get('db')),
+      );
+
+      const current = await service.findOrganizationById(orgId);
+      if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
+
+      const incomingFiscal = body.fiscalConfig;
+      const wantsFormal = incomingFiscal?.isFormalTaxpayer === true;
+      const wasFormal =
+        current.fiscalConfig != null &&
+        (current.fiscalConfig as { isFormalTaxpayer?: boolean }).isFormalTaxpayer === true;
+      // Fricción intencional SOLO en la transición false→true: declaración
+      // explícita + confirmación (nunca un toggle cosmético).
+      if (wantsFormal && !wasFormal && body.confirmed !== true) {
+        return c.json(
+          {
+            error: 'Confirma la declaración de contribuyente formal para continuar.',
+            code: 'FORMAL_TAXPAYER_CONFIRMATION_REQUIRED',
+          },
+          400,
+        );
+      }
+
+      // Solo los campos presentes: un body sin campos persistibles es un
+      // no-op idempotente, nunca un 500 de Drizzle ("No values to set").
+      const patch: Partial<NewDbOrganization> = {};
+      if (body.legalName !== undefined) patch.legalName = body.legalName;
+      if (body.taxId !== undefined) patch.taxId = body.taxId;
+      if (body.address !== undefined) patch.address = body.address;
+      if (incomingFiscal !== undefined) patch.fiscalConfig = incomingFiscal;
+      if (Object.keys(patch).length === 0) return c.json(current);
+
+      const updated = await service.updateOrganization(orgId, patch);
+
+      // El perfil de la sesión se cachea 5 min: invalidar para que el cambio
+      // se refleje en `useAuth().activeOrganization` sin esperar el TTL.
+      const cache = createCache(c.env);
+      await cache.invalidateExact(`org:${orgId}:profile`);
+
+      return c.json(updated);
+    },
   );

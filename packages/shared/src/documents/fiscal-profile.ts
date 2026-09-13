@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 import { COUNTRIES } from '../constants';
+import type { ITaxDetail } from '../types';
+import { computeInclusiveTaxes } from './tax-math';
 
 /** Override de un impuesto por la org: apagarlo o cambiar su tasa. */
 export const FiscalTaxOverrideSchema = z.object({
@@ -34,6 +36,14 @@ export const FiscalConfigSchema = z
   .strict();
 
 export type FiscalConfig = z.infer<typeof FiscalConfigSchema>;
+
+/**
+ * Lectura tolerante de `fiscalConfig` ya almacenada (jsonb): parsea con
+ * `.strip()` para NO perder los campos conocidos si la fila trae keys de una
+ * versión previa/futura. Para escritura se usa siempre `FiscalConfigSchema`
+ * (`.strict()`). `null`/inválida → `{}` (base vacía, sin romper el merge).
+ */
+export const StoredFiscalConfigSchema = FiscalConfigSchema.strip();
 
 /** Impuesto resuelto: default del país + override de la org. */
 export interface ResolvedTax {
@@ -116,4 +126,34 @@ export function resolveFiscalProfile(
     taxLabel: country.taxLabel,
     isFormalTaxpayer: config.isFormalTaxpayer ?? false,
   };
+}
+
+/** Desglose de impuestos previsualizado (centavos enteros). */
+export interface PreviewTaxesResult {
+  subtotal: number;
+  taxDetails: ITaxDetail[];
+  taxTotal: number;
+}
+
+/**
+ * Previsualiza los impuestos del modo AUTOMÁTICO para un total cobrado
+ * (tax-INCLUSIVE). Delega en `computeInclusiveTaxes` (misma función que usa
+ * el paso 1 de emisión en `receipts.service.ts`): preview y comprobante real
+ * comparten una única fuente, nunca divergen.
+ *
+ * `totalCents` es el total cobrado (centavos enteros, ya con impuestos).
+ * Base 0 → sin desglose. Condiciones sin evaluar (p. ej. IGTF VE) requieren
+ * `currencyPaid`; sin ella NO aplican (fail-closed, igual que el backend).
+ */
+export function previewReceiptTaxes(
+  totalCents: number,
+  profile: FiscalProfile,
+  currencyPaid?: string,
+): PreviewTaxesResult {
+  const { subtotal, taxDetails, taxTotal } = computeInclusiveTaxes(
+    totalCents,
+    profile.taxes,
+    { currencyPaid },
+  );
+  return { subtotal, taxDetails, taxTotal };
 }

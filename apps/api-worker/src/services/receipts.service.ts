@@ -4,10 +4,10 @@ import {
   applyTaxOverride,
   buildReceiptDataFromComposed,
   buildReceiptRenderEvent,
+  computeInclusiveTaxes,
   formatPanelReceiptNumber,
   parsePanelReceiptNumber,
   resolveFiscalProfile,
-  roundCents,
   toLocalDayString,
   type ITaxDetail,
   type ReceiptData,
@@ -172,40 +172,21 @@ export function createReceiptsService(
         taxDetails = computed.taxDetails;
         taxOverrideReason = o.taxOverrideReason;
       } else {
-        const applicable = profile.taxes.filter((t) => {
-          if (!t.enabled) return false;
-          if (t.condition === undefined) return true;
-          if (t.condition === "payment_currency !== 'VES'") {
-            return payment.currencyPaid !== 'VES';
-          }
-          return false;
+        // Descomposición tax-inclusive: fuente única en shared
+        // (`computeInclusiveTaxes`), la misma que previsualiza el panel.
+        const computed = computeInclusiveTaxes(amountPaid, profile.taxes, {
+          currencyPaid: payment.currencyPaid,
         });
-        if (amountPaid === 0) {
-          subtotal = 0;
-          taxTotal = 0;
-          taxDetails = [];
-        } else {
-          const rateSum = applicable.reduce((s, t) => s + t.rate, 0);
-          subtotal = roundCents(amountPaid / (1 + rateSum));
-          const lines = applicable.map((t) => ({
-            name: t.name,
-            rate: t.rate,
-            amount: roundCents(subtotal * t.rate),
-          }));
-          taxTotal = amountPaid - subtotal;
-          // Polvo de redondeo (≤1¢) a la última línea: la suma cuadra exacto.
-          const dust =
-            taxTotal - lines.reduce((s, l) => s + l.amount, 0);
-          if (lines.length > 0 && dust !== 0) {
-            lines[lines.length - 1]!.amount += dust;
-          }
-          taxDetails = lines;
-        }
+        subtotal = computed.subtotal;
+        taxTotal = computed.taxTotal;
+        taxDetails = computed.taxDetails;
       }
 
       // Número AUTORITATIVO: el que attachReceipt persistió (bajo concurrencia,
       // un segundo request puede perder el WHERE receipt_number IS NULL y recibir
       // la fila existente; el evento debe llevar SIEMPRE ese número, no el local).
+      // `document_type` siempre `'receipt'`: la etiqueta aplicada la decide el
+      // gate (`resolveDocumentLabel`, HAS_FISCAL_HOMOLOGATION=false), no el caller.
       const attached = await receiptsRepo.attachReceipt(paymentId, orgId, {
         receiptNumber,
         documentType: 'receipt',

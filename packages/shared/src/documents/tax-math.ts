@@ -52,7 +52,7 @@ function assertValidBase(base: number): void {
   }
 }
 
-function isTaxApplicable(tax: TaxInput, currencyPaid?: string): boolean {
+export function isTaxApplicable(tax: TaxInput, currencyPaid?: string): boolean {
   if (!tax.enabled) return false;
   if (tax.condition === undefined) return true;
   if (tax.condition === "payment_currency !== 'VES'") {
@@ -81,6 +81,41 @@ export function computeTaxes(
     .map((t) => ({ name: t.name, rate: t.rate, amount: roundCents(base * t.rate) }));
   const taxTotal = taxDetails.reduce((sum, line) => sum + line.amount, 0);
   return { subtotal: base, taxDetails, taxTotal, total: base + taxTotal };
+}
+
+/**
+ * Descomposición tax-INCLUSIVE (el total cobrado ya trae los impuestos):
+ * `subtotal = round(total / (1 + Σtasas))`; las líneas se calculan sobre el
+ * subtotal y el polvo de redondeo (≤1¢) va a la última para que
+ * `subtotal + taxTotal === total` exacto. Base 0 → sin desglose.
+ * ÚNICA fuente de esta descomposición: la consumen el paso 1 de emisión
+ * (`receipts.service.ts`) y el preview del panel (`previewReceiptTaxes`),
+ * para que nunca diverjan.
+ */
+export function computeInclusiveTaxes(
+  total: number,
+  taxes: TaxInput[],
+  opts?: ComputeTaxesOptions,
+): ComputedTaxes {
+  assertValidBase(total);
+  if (total === 0) {
+    return { subtotal: 0, taxDetails: [], taxTotal: 0, total: 0 };
+  }
+  const applicable = taxes.filter((t) => isTaxApplicable(t, opts?.currencyPaid));
+  const rateSum = applicable.reduce((sum, t) => sum + t.rate, 0);
+  const subtotal = roundCents(total / (1 + rateSum));
+  const taxDetails: ITaxDetail[] = applicable.map((t) => ({
+    name: t.name,
+    rate: t.rate,
+    amount: roundCents(subtotal * t.rate),
+  }));
+  const taxTotal = total - subtotal;
+  // Polvo de redondeo (≤1¢) a la última línea: la suma cuadra exacto.
+  const dust = taxTotal - taxDetails.reduce((sum, l) => sum + l.amount, 0);
+  if (taxDetails.length > 0 && dust !== 0) {
+    taxDetails[taxDetails.length - 1]!.amount += dust;
+  }
+  return { subtotal, taxDetails, taxTotal, total };
 }
 
 export interface TaxOverrideInput {
