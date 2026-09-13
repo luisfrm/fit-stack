@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { navigateByClick } from '../helpers/nav';
+import { uid } from '../helpers/api';
+import { TEST_MEMBERS, TEST_PLAN } from '../helpers/test-tenant';
 
 test.describe('Panel — Settings', () => {
   test('displays settings page (redirects to general)', async ({ page }) => {
@@ -41,5 +43,59 @@ test.describe('Panel — Settings', () => {
     await expect(page.getByRole('button', { name: 'Guardar Ajustes' })).toBeVisible({
       timeout: 30_000,
     });
+  });
+
+  test('guarda la configuración fiscal y la re-renderiza persistida', async ({ page }) => {
+    await page.goto('/settings/organization', { waitUntil: 'domcontentloaded' });
+    const section = page.getByTestId('org-fiscal-section');
+    await expect(section).toBeVisible({ timeout: 30_000 });
+
+    const disclaimer = `Aviso fiscal E2E ${uid()}`;
+    await section.getByLabel('Disclaimer legal alternativo').fill(disclaimer);
+
+    // Declaración formal con doble confirmación (fricción intencional).
+    await section.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }).check();
+    await section.getByRole('button', { name: 'Guardar facturación' }).click();
+    const confirmDialog = page.getByRole('dialog').filter({ hasText: 'Confirmar declaración formal' });
+    await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
+    await confirmDialog.getByRole('button', { name: 'Confirmar declaración' }).click();
+
+    await expect(page.getByText('Configuración fiscal guardada correctamente').first()).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const reloaded = page.getByTestId('org-fiscal-section');
+    await expect(reloaded).toBeVisible({ timeout: 30_000 });
+    await expect(reloaded.getByLabel('Disclaimer legal alternativo')).toHaveValue(disclaimer);
+    await expect(
+      reloaded.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }),
+    ).toBeChecked();
+    // Sin homologación real, la etiqueta aplicada sigue siendo comprobante.
+    await expect(reloaded.getByText('Comprobante de pago').first()).toBeVisible();
+  });
+
+  test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
+    await page.goto('/payments', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'NUEVO PAGO' }).click();
+
+    const dialog = page.locator('dialog, [role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+
+    await dialog.getByPlaceholder('Escribe el nombre, email o DNI...').fill(
+      TEST_MEMBERS.withoutPlan.email,
+    );
+    await expect(dialog.getByText(TEST_MEMBERS.withoutPlan.email).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await dialog.getByText(TEST_MEMBERS.withoutPlan.email).first().click();
+    await dialog.getByRole('button', { name: new RegExp(TEST_PLAN.name, 'i') }).click();
+
+    await dialog.getByRole('switch', { name: 'Ajuste manual de impuestos' }).click();
+    await dialog.getByRole('button', { name: 'GENERAR SUSCRIPCIÓN' }).click();
+
+    await expect(
+      page.getByText('Indica el motivo del ajuste manual de impuestos').first(),
+    ).toBeVisible({ timeout: 20_000 });
   });
 });
