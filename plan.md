@@ -12,8 +12,8 @@
 | Fase 1 — DB Panel (secuencia + columnas) | ✅ Hecha | `24e9ab1`…`455cc37` |
 | Fase 2 — Emisión Panel (render en jobs-worker) | ✅ Hecha | `309158b` |
 | Fase 3 — Email + PDF adjunto + UI panel | ✅ Hecha | `72df4ea` |
-| Fase 4 — Config fiscal por org | 🔧 En revisión (sin commit) |  |
-| Fase 5 — Reporte de gaps y auditoría | ⏳ Pendiente (requiere Fase 2) |  |
+| Fase 4 — Config fiscal por org | ✅ Hecha | `bb64026`…`80a8d05` |
+| Fase 5 — Reporte de gaps y auditoría | ✅ Hecha | `dd0249e`…`9fd6787` |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ⏳ Pendiente (requiere 0–5) |  |
 | C1 — DB Console (secuencia global + emisor) | ⏳ Pendiente (requiere Fase 0, config paralelizable con 1–2) |  |
 | C2 — Emisión Console en dos pasos | ⏳ Pendiente (requiere C1 + Fase 2) |  |
@@ -42,6 +42,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - Impuestos: modelo híbrido — automático desde `resolveFiscalProfile` (país + override de la org), con override manual solo si viene acompañado de `taxOverrideReason` no vacío (auditable).
 - Numeración: Panel reinicia por año en timezone del emisor (gym); Console es continua sin año (ver nota de C1).
 - Pago `voided` con número ya emitido: se marca **ANULADO** (`receipt_voided`, `voided_by/at/reason`), nunca se libera ni reusa el número. El reporte de huecos distingue explícitamente "anulado" (explicado) de "hueco" (sospechoso).
+- Reporte de comprobantes (`GET /api/reports/receipts`): lee impuestos persistidos, nunca recalcula; `issued` exige número + PDF (numerado sin PDF es `pending`); totales solo sobre emitidos no anulados, agrupados por moneda; gaps = `1..lastNumber` por (org, año).
 - Sin backfill de históricos: quedan con `receipt_number IS NULL`, tratados como estado terminal `pre_system`, no como error.
 - Emitir ≠ enviar: la emisión (asignar número + generar PDF) nunca depende de que el miembro tenga email; el envío es una acción aparte, solo disponible si hay email.
 - `isFormalTaxpayer: true` exige declaración explícita con checkbox + confirmación (`confirmed: true` en el body), no un toggle cosmético.
@@ -61,6 +62,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - `GET /:id/receipt` responde uno de tres estados, nunca `409`: `200 { available:true, pdfStatus:'ready', ... }` · `202 { available:true, pdfStatus:'pending' }` · `200 { available:false, reason:'pre_system' }` (histórico, terminal).
 - `GET /:id/receipt/pdf` es la descarga binaria aparte: `200` bytes `application/pdf` o `404`.
 - `POST /:id/issue` (fallback manual, owner/manager) responde de inmediato con `pdfStatus: "pending"`, sin bloquear esperando el render.
+- `GET /api/reports/receipts` (auditoría Panel): filas + resumen + totales por moneda + `gaps[]`; filtros `from/to/status/method/year/page/limit`, caché 5 min invalidada on-write en issue/status/alta.
 
 **Infraestructura y storage**
 - Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con `cms/<org>/receipts/` (capturas de pago, distinto propósito).
@@ -83,4 +85,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-**Fase 5** (`fase-5-gaps-auditoria.md`, reporte de gaps y auditoría): planificar y luego implementar. Fase 4 queda en revisión sin commit (backend + UI + tests + E2E verificados).
+**Fase 6** (`fase-6-cierre-panel.md`, cierre Panel: tests, E2E, docs y verificación manual). Fases 4 y 5 quedan commiteadas y verificadas.
