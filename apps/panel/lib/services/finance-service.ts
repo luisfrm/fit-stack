@@ -1,5 +1,9 @@
-import { api } from "@/lib/api/client";
+import { api, type ApiFetchOptions } from "@/lib/api/client";
 import { getExchangeRates } from "@/lib/api/exchange-rates";
+import type {
+  IReceiptsReportFilters,
+  IReceiptsReportResult,
+} from "@workspace/shared/types";
 
 const PAYMENTS_PATH = "/payments";
 const REPORTS_PATH = "/reports";
@@ -112,5 +116,19 @@ export const financeService = {
     }
 
     return data;
+  },
+
+  /**
+   * Auditoría del correlativo (`GET /api/reports/receipts`).
+   * Filtros en query; `options` lleva el tag de caché en RSC.
+   */
+  async getReceiptsReport(
+    params?: IReceiptsReportFilters,
+    options?: ApiFetchOptions,
+  ): Promise<IReceiptsReportResult> {
+    return await api<IReceiptsReportResult>(`${REPORTS_PATH}/receipts`, {
+      query: params as Record<string, string | number | boolean | undefined>,
+      ...options,
+    });
   },
 };

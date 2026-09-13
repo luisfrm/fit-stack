@@ -66,6 +66,8 @@ export default async function PaymentsPage({
   const refreshPayments = async () => {
     "use server";
     updateTag(subsTag);
+    // Toda escritura de pago mueve el reporte de comprobantes.
+    updateTag(`org:${activeOrgId}:reports:receipts`);
   };
 
   return (
