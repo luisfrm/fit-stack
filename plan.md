@@ -8,11 +8,11 @@
 |---|---|---|
 | Fase 0 — Lógica pura (`@workspace/shared`) | ✅ Hecha | `bc77afd` |
 | Fase 0.5 — Centavos honestos + `ValueConverter` único | ✅ Hecha | `8736a90`…`a00cc73` |
-| Addendum Fase 1 — repo de comprobantes a `packages/database` | 🔧 En revisión (sin commit) |  |
+| Addendum Fase 1 — repo de comprobantes a `packages/database` | ✅ Hecha | `77a7d8b` |
 | Fase 1 — DB Panel (secuencia + columnas) | ✅ Hecha | `24e9ab1`…`455cc37` |
-| Fase 2 — Emisión Panel (render en jobs-worker) | 🔧 En revisión (sin commit) |  |
-| Fase 3 — Email + PDF adjunto + UI panel | 🔧 En revisión (sin commit) |  |
-| Fase 4 — Config fiscal por org | ⏳ Pendiente (requiere Fase 0, paralelizable con Fase 3) |  |
+| Fase 2 — Emisión Panel (render en jobs-worker) | ✅ Hecha | `309158b` |
+| Fase 3 — Email + PDF adjunto + UI panel | ✅ Hecha | `72df4ea` |
+| Fase 4 — Config fiscal por org | 🔧 En revisión (sin commit) |  |
 | Fase 5 — Reporte de gaps y auditoría | ⏳ Pendiente (requiere Fase 2) |  |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ⏳ Pendiente (requiere 0–5) |  |
 | C1 — DB Console (secuencia global + emisor) | ⏳ Pendiente (requiere Fase 0, config paralelizable con 1–2) |  |
@@ -83,4 +83,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-Revisar **Fase 3** (`fase-3-email-pdf-jobs-panel.md`, email corto + adjunto desde R2 + UI del comprobante en el panel: cambios sin commit), y luego **Fase 4** (config fiscal por org, paralelizable) y **Fase 5** (reporte de gaps).
+**Fase 5** (`fase-5-gaps-auditoria.md`, reporte de gaps y auditoría): planificar y luego implementar. Fase 4 queda en revisión sin commit (backend + UI + tests + E2E verificados).
