@@ -34,7 +34,8 @@ import {
   parseRateValue,
   previewReceiptTaxes,
   resolveFiscalProfile,
-  ORG_ROLES
+  ORG_ROLES,
+  CurrencyFormat
 } from "@workspace/shared";
 
 // Sub-components
@@ -42,7 +43,6 @@ import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
 import { type TaxMode } from "./tax-block";
-import { CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
   payment: {
@@ -58,6 +58,70 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     taxDetails?: ITaxDetail[];
     taxOverrideReason?: string;
   }
+}
+
+/**
+ * Checks whether a dynamic field value is considered empty.
+ */
+function isFieldValueEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  return typeof value === "string" && value.trim() === "";
+}
+
+/**
+ * Validates that all required fields for the selected payment method are populated.
+ */
+function validateDynamicPaymentFields(
+  config: IPaymentMethodConfig | undefined,
+  fieldValues: Record<string, any>
+): boolean {
+  if (!config) return true;
+
+  for (const field of config.fields) {
+    if (field.type === "visual") continue;
+
+    const value = fieldValues[field.id];
+    if (field.required && isFieldValueEmpty(value)) {
+      toast.error(`El campo "${field.label}" es obligatorio`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Validates tax override inputs and rates when taxMode is set to 'override'.
+ */
+function validateTaxOverrides(
+  taxMode: TaxMode,
+  reason: string,
+  rateOverrides: Record<string, string>,
+  preview: unknown
+): boolean {
+  if (taxMode !== "override") return true;
+
+  if (!reason.trim()) {
+    toast.error("Indica el motivo del ajuste manual de impuestos");
+    return false;
+  }
+
+  for (const [name, raw] of Object.entries(rateOverrides)) {
+    if (raw.trim() === "") continue;
+    try {
+      parseRateValue(raw);
+    } catch {
+      toast.error(`Tasa inválida para ${name}`);
+      return false;
+    }
+  }
+
+  if (!preview) {
+    toast.error("No se pudo calcular el desglose de impuestos");
+    return false;
+  }
+
+  return true;
 }
 
 interface SubscriptionFormProps {
@@ -299,39 +363,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
-    if (selectedPaymentConfig) {
-      for (const field of selectedPaymentConfig.fields) {
-        if (field.type === 'visual') continue;
-        const value = dynamicFieldValues[field.id];
-        const isEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === "");
-
-        if (field.required && isEmpty) {
-          toast.error(`El campo "${field.label}" es obligatorio`);
-          return false;
-        }
-      }
+    if (!validateDynamicPaymentFields(selectedPaymentConfig, dynamicFieldValues)) {
+      return false;
     }
 
-    if (taxMode === "override") {
-      if (!taxOverrideReason.trim()) {
-        toast.error("Indica el motivo del ajuste manual de impuestos");
-        return false;
-      }
-      for (const [name, raw] of Object.entries(taxRateOverrides)) {
-        if (raw.trim() === "") continue;
-        try {
-          parseRateValue(raw);
-        } catch {
-          toast.error(`Tasa inválida para ${name}`);
-          return false;
-        }
-      }
-      if (!taxPreview) {
-        toast.error("No se pudo calcular el desglose de impuestos");
-        return false;
-      }
-    }
-    return true;
+    return validateTaxOverrides(taxMode, taxOverrideReason, taxRateOverrides, taxPreview);
   };
 
   // Helper to process file uploads in dynamic fields
