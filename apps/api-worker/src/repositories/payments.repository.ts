@@ -1,7 +1,7 @@
-import { eq, and, sql, gte, type Db } from '@workspace/database/factory';
-import { payment } from '@workspace/database/schema';
+import { eq, and, or, sql, gte, lte, desc, like, isNull, isNotNull, type Db } from '@workspace/database/factory';
+import { payment, gymMember, organizationDocumentSequence } from '@workspace/database/schema';
 import type { IPaymentMethodDetails } from '@workspace/shared';
-import { OrganizationDateManager } from '../lib/date-manager';
+import type { OrganizationDateManager } from '../lib/date-manager';
 
 export interface IPayment {
   id?: number;
@@ -36,6 +36,45 @@ export interface IPayment {
 
   paymentDate?: Date;
   createdAt?: string | Date;
+}
+
+export interface ReceiptReportScope {
+  fromUtc?: Date;
+  toUtc?: Date;
+  method?: string;
+}
+
+/**
+ * Scope base del reporte (Fase 5): pagos `validated` + cualquier pago con
+ * número (cubre `voided` con número conservado). `processing` / `invalid`
+ * sin número no son comprobantes y quedan fuera. Rango por
+ * `receipt_issued_at` en numerados y por `payment_date` en sin numerar.
+ */
+function receiptReportScope(organizationId: string, filters: ReceiptReportScope) {
+  const conds = [
+    eq(payment.organizationId, organizationId),
+    or(eq(payment.status, 'validated'), isNotNull(payment.receiptNumber)),
+  ];
+
+  if (filters.fromUtc || filters.toUtc) {
+    const numberedRange = [
+      isNotNull(payment.receiptNumber),
+      ...(filters.fromUtc ? [gte(payment.receiptIssuedAt, filters.fromUtc)] : []),
+      ...(filters.toUtc ? [lte(payment.receiptIssuedAt, filters.toUtc)] : []),
+    ];
+    const unnumberedRange = [
+      isNull(payment.receiptNumber),
+      ...(filters.fromUtc ? [gte(payment.paymentDate, filters.fromUtc)] : []),
+      ...(filters.toUtc ? [lte(payment.paymentDate, filters.toUtc)] : []),
+    ];
+    conds.push(or(and(...numberedRange), and(...unnumberedRange)));
+  }
+
+  if (filters.method) {
+    conds.push(eq(payment.paymentMethod, filters.method));
+  }
+
+  return and(...conds);
 }
 
 export function createPaymentsRepository(db: Db) {
@@ -156,8 +195,7 @@ export function createPaymentsRepository(db: Db) {
       return result[0]?.count || 0;
     },
 
-    async getPaymentsByMethod(organizationId: string, startDate: Date) {
-      return db
+    async getPaymentsByMethod(organizationId: string, startDate: Date) {      return db
         .select({
           paymentMethod: payment.paymentMethod,
           currencyPaid: payment.currencyPaid,
@@ -174,6 +212,178 @@ export function createPaymentsRepository(db: Db) {
         )
         .groupBy(payment.paymentMethod, payment.currencyPaid)
         .orderBy(sql`count(*) DESC`);
+    },
+
+    /**
+     * Reporte de comprobantes (Fase 5). La clasificación por estado vive en
+     * el servicio; aquí solo se filtra por SQL lo expresable (estado pedido,
+     * método, rango) sobre el scope base compartido.
+     */
+    async findReceiptReportRows(
+      organizationId: string,
+      filters: ReceiptReportScope & {
+        state?: 'all' | 'issued' | 'pending' | 'voided' | 'pre_system';
+        page: number;
+        limit: number;
+      },
+    ) {
+      const conds = [receiptReportScope(organizationId, filters)];
+
+      switch (filters.state ?? 'all') {
+        // Emitido = numerado, no anulado Y con PDF (pendiente es subconjunto
+        // propio: numerado sin PDF). El summary usa la misma regla.
+        case 'issued':
+          conds.push(
+            and(
+              isNotNull(payment.receiptNumber),
+              eq(payment.receiptVoided, false),
+              isNotNull(payment.receiptPdfKey),
+            ),
+          );
+          break;
+        case 'pending':
+          conds.push(
+            and(
+              isNotNull(payment.receiptNumber),
+              eq(payment.receiptVoided, false),
+              isNull(payment.receiptPdfKey),
+            ),
+          );
+          break;
+        case 'voided':
+          conds.push(eq(payment.receiptVoided, true));
+          break;
+        case 'pre_system':
+          conds.push(isNull(payment.receiptNumber));
+          break;
+      }
+
+      const where = and(...conds);
+      const offset = (Math.max(1, filters.page) - 1) * filters.limit;
+
+      const rows = await db
+        .select({
+          paymentId: payment.id,
+          receiptNumber: payment.receiptNumber,
+          receiptVoided: payment.receiptVoided,
+          receiptPdfKey: payment.receiptPdfKey,
+          receiptIssuedAt: payment.receiptIssuedAt,
+          memberName: gymMember.firstName,
+          memberLastName: gymMember.lastName,
+          memberEmail: gymMember.email,
+          planSnapshotName: payment.planSnapshotName,
+          subtotal: payment.subtotal,
+          taxTotal: payment.taxTotal,
+          taxDetails: payment.taxDetails,
+          amountPaid: payment.amountPaid,
+          currencyPaid: payment.currencyPaid,
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.status,
+          paymentDate: payment.paymentDate,
+          taxOverrideReason: payment.taxOverrideReason,
+          voidedBy: payment.voidedBy,
+          voidedAt: payment.voidedAt,
+          voidReason: payment.voidReason,
+        })
+        .from(payment)
+        // LEFT: un pago huérfano (miembro borrado) debe aparecer en filas
+        // igual que en summary/totales, no descuadrar el reporte.
+        .leftJoin(gymMember, eq(payment.memberId, gymMember.id))
+        .where(where)
+        .orderBy(sql`${payment.receiptIssuedAt} DESC NULLS LAST`, desc(payment.id))
+        .limit(filters.limit)
+        .offset(offset);
+
+      const countResult = await db
+        .select({ total: sql<number>`count(*)`.mapWith(Number) })
+        .from(payment)
+        .where(where);
+
+      return { rows, total: countResult[0]?.total ?? 0 };
+    },
+
+    /**
+     * Columnas de dinero del universo de emitidos no anulados (sin paginar)
+     * para agregar totales por moneda en el servicio. Solo lectura.
+     */
+    async findReceiptMoneyRows(organizationId: string, filters: ReceiptReportScope) {
+      const where = and(
+        receiptReportScope(organizationId, filters),
+        isNotNull(payment.receiptNumber),
+        eq(payment.receiptVoided, false),
+      );
+
+      return db
+        .select({
+          subtotal: payment.subtotal,
+          taxTotal: payment.taxTotal,
+          taxDetails: payment.taxDetails,
+          amountPaid: payment.amountPaid,
+          currencyPaid: payment.currencyPaid,
+        })
+        .from(payment)
+        .where(where);
+    },
+
+    /**
+     * Conteo por estado en una sola query (para el summary, sobre el mismo
+     * scope que las filas). La etiqueta final la pone el servicio con la
+     * misma regla que clasifica las filas.
+     */
+    async countReceiptStates(organizationId: string, filters: ReceiptReportScope) {
+      return db
+        .select({
+          voided: payment.receiptVoided,
+          noNumber: sql<boolean>`${payment.receiptNumber} IS NULL`,
+          noPdf: sql<boolean>`${payment.receiptPdfKey} IS NULL`,
+          count: sql<number>`count(*)`.mapWith(Number),
+        })
+        .from(payment)
+        .where(receiptReportScope(organizationId, filters))
+        .groupBy(
+          payment.receiptVoided,
+          sql`${payment.receiptNumber} IS NULL`,
+          sql`${payment.receiptPdfKey} IS NULL`,
+        );
+    },
+
+    /**
+     * Estado de la secuencia anual + números emitidos del año (para gaps).
+     * El parse/validación vive en el servicio (helper puro de shared).
+     */
+    async getReceiptSequenceState(organizationId: string, year: number, slug: string) {      const [seq] = await db
+        .select({ lastNumber: organizationDocumentSequence.lastNumber })
+        .from(organizationDocumentSequence)
+        .where(
+          and(
+            eq(organizationDocumentSequence.organizationId, organizationId),
+            eq(organizationDocumentSequence.documentType, 'receipt'),
+            eq(organizationDocumentSequence.year, year),
+          ),
+        );
+
+      const numbers = await db
+        .select({
+          receiptNumber: payment.receiptNumber,
+          receiptVoided: payment.receiptVoided,
+          voidedBy: payment.voidedBy,
+          voidedAt: payment.voidedAt,
+          voidReason: payment.voidReason,
+        })
+        .from(payment)
+        .where(
+          and(
+            eq(payment.organizationId, organizationId),
+            // Slug en minúsculas (el correlativo normaliza) y con `%_\\`
+            // escapados para no alterar el universo de gaps vía LIKE.
+            like(
+              payment.receiptNumber,
+              `${slug.toLowerCase().replaceAll(/[%_\\]/g, (c) => `\\${c}`)}-${year}-%`,
+            ),
+          ),
+        );
+
+      return { lastNumber: seq?.lastNumber ?? 0, numbers };
     },
   };
 }

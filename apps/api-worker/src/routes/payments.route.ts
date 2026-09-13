@@ -77,6 +77,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     await cache.invalidate(`org:${orgId}:reports:revenue*`);
+    await cache.invalidate(`org:${orgId}:reports:receipts*`);
     return c.json(updated);
   })
 
@@ -144,6 +145,8 @@ export const paymentRoutes = new Hono<AppEnv>()
       timezone,
       orgSlug: await resolveOrgSlug(c, orgId),
     });
+    // La emisión manual mueve el correlativo: invalida el reporte.
+    await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);
     return c.json(result);
   })
 

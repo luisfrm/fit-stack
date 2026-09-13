@@ -1,6 +1,7 @@
 import { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
 import type { PlatformRole } from './access-control';
 import type { PlanFeaturesV2 } from './features/catalog';
+import type { ReceiptGapItem } from './documents/receipt-gaps';
 
 export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
@@ -391,6 +392,12 @@ export type {
   ReceiptMethod,
   ReceiptFooter,
 } from './documents/receipt-data';
+export type {
+  ReceiptGapItem,
+  ReceiptGapKind,
+  ReceiptGapEntry,
+  ComputeReceiptGapsInput,
+} from './documents/receipt-gaps';
 
 /**
  * Interface for a Payment record.
@@ -433,6 +440,88 @@ export interface IPayment {
 
   paymentDate: string;
   createdAt?: string;
+}
+
+/* ── Receipts report (Fase 5) ── */
+
+/** Estado de auditoría de una fila del reporte (nunca mezcla anulado/hueco). */
+export type ReceiptReportState = 'issued' | 'pending' | 'voided' | 'pre_system';
+
+export type ReceiptReportStatusFilter =
+  | 'all'
+  | ReceiptReportState
+  | 'gaps';
+
+export interface IReceiptReportRow {
+  /** @internal UUID técnico: solo para fetch del dialog, NUNCA renderizar. */
+  paymentId: number;
+  /** Número humano; `null` = anterior al sistema (pre_system). */
+  receiptNumber: string | null;
+  state: ReceiptReportState;
+  /** `ready` | `pending` | `null` (pre_system no tiene PDF). */
+  pdfStatus: 'ready' | 'pending' | null;
+  memberName: string;
+  memberEmail?: string | null;
+  planName: string;
+  /** Centavos enteros (convención Money). */
+  subtotal: number | null;
+  taxTotal: number | null;
+  taxDetails: ITaxDetail[];
+  amountPaid: number;
+  currencyPaid: string;
+  paymentMethod: string;
+  paymentStatus?: string;
+  paymentDate: string;
+  receiptIssuedAt: string | null;
+  voided: boolean;
+  taxOverrideReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+}
+
+export interface IReceiptTaxTotal {
+  name: string;
+  /** Centavos enteros. */
+  amount: number;
+}
+
+/** Totales por moneda (nunca sumas mixtas). */
+export interface IReceiptCurrencyTotal {
+  currency: string;
+  /** Centavos enteros. */
+  subtotal: number;
+  taxTotal: number;
+  amount: number;
+  byTax: IReceiptTaxTotal[];
+}
+
+export interface IReceiptReportSummary {
+  issued: number;
+  pending: number;
+  voided: number;
+  preSystem: number;
+}
+
+export interface IReceiptsReportFilters {
+  from?: string;
+  to?: string;
+  status?: ReceiptReportStatusFilter;
+  method?: string;
+  year?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface IReceiptsReportResult {
+  rows: IReceiptReportRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: IReceiptReportSummary;
+  totals: IReceiptCurrencyTotal[];
+  gaps: ReceiptGapItem[];
 }
 
 /* ── API DTOs ── */

@@ -27,6 +27,7 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
   await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
   await cache.invalidate(`org:${orgId}:dashboard:action-items`);
   await cache.invalidate(`org:${orgId}:reports:revenue*`);
+  await cache.invalidate(`org:${orgId}:reports:receipts*`);
 }
 
 const createSubSchema = z.object({
