@@ -74,6 +74,12 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Al pasar a clientes reales, volver a `*/10 * * * *` (recuperación ≤ 25 min). Cambio en Terraform + actualizar este ítem y los docs que citan la cadencia.
   - El flujo normal NO depende del barrido: el render se dispara al instante por el `send` del paso 1.
 
+## 8. Comprobantes Console — disclaimer con país proxy
+
+- [ ] **Disclaimer Console usa el país del org receptor como proxy hasta configurar `fitstack_country_code`.**
+  - El disclaimer legal de los comprobantes de Console debería corresponder al país del **emisor** (FitStack), pero FitStack aún no tiene país propio configurado: se usa el `countryCode` del org receptor como aproximación temporal (ver `plan.md`, decisión congelada).
+  - Al definir `fitstack_country_code`, cambiar el disclaimer a ese país y tachar este ítem. No dejar que el proxy sobreviva silenciosamente hasta producción.
+
 ---
 
 > [!NOTE]

@@ -413,6 +413,18 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 
 ---
 
+## Payment Receipts (Panel)
+
+Panel receipts are internal payment records — never fiscal invoices (see `docs/ORGANIZATION_RECEIPT_MODEL.md`). Source of truth for frozen decisions: `plan.md`; module map: `tasks/README.md`.
+
+- **Two-step emission**: step 1 assigns the number atomically (single `INSERT … ON CONFLICT DO UPDATE … RETURNING`, per-org yearly sequence `{slug}-año-n`) in the validating request; step 2 renders the PDF in `jobs-worker` (`fit-receipt-events` queue + DLQ, sweep cron 10 h pre-sale) and `PUT`s it to R2 (`receipts/<org>/<año>/<n>.pdf`, immutable, generated once).
+- **Email only from step 2**, after `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` (`rowCount === 1` gate); `markReceiptNotified` with `clearReceiptNotified` rollback on send failure.
+- **Contract**: `GET /:id/receipt` → 200 ready / 202 pending / 200 `available:false,reason:pre_system` (never 409); `GET /:id/receipt/pdf` binary download; `POST /:id/issue` manual fallback (owner/manager).
+- **Document gate** forces `"Comprobante de pago"` (`HAS_FISCAL_HOMOLOGATION=false` by construction); the technical UUID is never shown (only `receiptNumber`); voided = `ANULADO`, the number is never released or reused; serial audit at `GET /api/reports/receipts` (rows + per-currency totals + `gaps[]` = `1..lastNumber` per org/year).
+- Shared-repo exception (§1): `packages/database/src/repositories/receipts.repository.ts` — the only shared repo (two runtimes need identical SQL).
+
+---
+
 ## Platform Subscription Status (Organization Billing)
 
 Subscription status is **computed dynamically** via SQL CASE — NOT stored in DB.

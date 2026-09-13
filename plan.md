@@ -14,7 +14,7 @@
 | Fase 3 — Email + PDF adjunto + UI panel | ✅ Hecha | `72df4ea` |
 | Fase 4 — Config fiscal por org | ✅ Hecha | `bb64026`…`80a8d05` |
 | Fase 5 — Reporte de gaps y auditoría | ✅ Hecha | `dd0249e`…`9fd6787` |
-| Fase 6 — Cierre Panel (tests, E2E, docs) | ⏳ Pendiente (requiere 0–5) |  |
+| Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | commits `phase-6` por ordenar |
 | C1 — DB Console (secuencia global + emisor) | ⏳ Pendiente (requiere Fase 0, config paralelizable con 1–2) |  |
 | C2 — Emisión Console en dos pasos | ⏳ Pendiente (requiere C1 + Fase 2) |  |
 | C3 — UI Console + cierre | ⏳ Pendiente (requiere C2 + Fase 3) |  |
@@ -85,4 +85,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-**Fase 6** (`fase-6-cierre-panel.md`, cierre Panel: tests, E2E, docs y verificación manual). Fases 4 y 5 quedan commiteadas y verificadas.
+**C1** (`fase-c1-db-console.md`, DB Console: secuencia global + keys emisor FitStack). El track Panel queda cerrado y verificado (Fases 0–6).
