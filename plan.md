@@ -15,7 +15,7 @@
 | Fase 4 — Config fiscal por org | ✅ Hecha | `bb64026`…`80a8d05` |
 | Fase 5 — Reporte de gaps y auditoría | ✅ Hecha | `dd0249e`…`9fd6787` |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | `0ce7013`…`7544fef` |
-| C1 — DB Console (secuencia global + emisor) | ⏳ Pendiente (requiere Fase 0, config paralelizable con 1–2) |  |
+| C1 — DB Console (secuencia global + emisor) | ✅ Hecha | commits `c1` por ordenar |
 | C2 — Emisión Console en dos pasos | ⏳ Pendiente (requiere C1 + Fase 2) |  |
 | C3 — UI Console + cierre | ⏳ Pendiente (requiere C2 + Fase 3) |  |
 
@@ -85,4 +85,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-**C1** (`fase-c1-db-console.md`, DB Console: secuencia global + keys emisor FitStack). El track Panel queda cerrado y verificado (Fases 0–6).
+**C2** (`fase-c2-emision-console.md`, emisión SaaS automática en dos pasos). El track Panel queda cerrado (Fases 0–6) y C1 commiteado y verificado.
