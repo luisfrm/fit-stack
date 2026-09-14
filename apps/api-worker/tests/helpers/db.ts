@@ -95,6 +95,7 @@ const TABLES_TO_TRUNCATE = [
   'ai_usage',
   'ai_knowledge_chunk',
   'ai_knowledge_document',
+  'platform_document_sequence',
   'platform_subscription_payment',
   'platform_subscription',
   'platform_plan',
