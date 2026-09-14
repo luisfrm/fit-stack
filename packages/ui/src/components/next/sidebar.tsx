@@ -72,7 +72,7 @@ export function MobileNav({ user, branding, navigation, footer, themeToggle }: R
   const FallbackIcon = branding.fallbackIcon;
 
   return (
-    <header className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between font-display">
+    <header data-testid="mobile-nav-header" className="lg:hidden sticky top-0 z-40 w-full border-b border-border-dark bg-background/80 backdrop-blur-md px-4 py-3 flex items-center justify-between font-display">
       <div className="flex items-center gap-2">
         {branding.isLoading ? (
           <div id="mobile-nav-logo-skeleton" className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border overflow-hidden bg-white/5 border-white/5">
@@ -109,11 +109,18 @@ export function MobileNav({ user, branding, navigation, footer, themeToggle }: R
         )}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <button className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none">
+            <button
+              type="button"
+              data-testid="mobile-nav-toggle"
+              aria-label={open ? "Cerrar navegación" : "Abrir navegación"}
+              aria-expanded={open}
+              aria-controls="mobile-nav-sheet"
+              className="p-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-md"
+            >
               <Menu className="w-6 h-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="right" className="p-0 w-72 bg-background border-r-border text-foreground">
+          <SheetContent id="mobile-nav-sheet" data-testid="mobile-nav-sheet" side="right" className="p-0 w-72 bg-background border-r-border text-foreground">
             <SheetHeader className="sr-only">
               <SheetTitle>Navegación</SheetTitle>
             </SheetHeader>
