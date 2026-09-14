@@ -8,4 +8,8 @@ export const PLATFORM_SETTINGS_KEYS = {
   FEATURE_FLAGS_FREE_TIER: "feature_flags_free_tier",
   FEATURE_FLAGS_FREE_TIER_ENABLED: "feature_flags_free_tier_enabled",
   AI_PROVIDER_DEFAULT: "ai_provider_default",
+  FITSTACK_LEGAL_NAME: "fitstack_legal_name",
+  FITSTACK_TAX_ID: "fitstack_tax_id",
+  FITSTACK_ADDRESS: "fitstack_address",
+  FITSTACK_COUNTRY_CODE: "fitstack_country_code",
 } as const;

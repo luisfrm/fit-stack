@@ -3,7 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, Coins, Wallet, Gift, Cpu, BookOpen, ChevronLeft } from "lucide-react";
+import { Sparkles, Coins, Wallet, Gift, Cpu, BookOpen, Building2, ChevronLeft } from "lucide-react";
 import { NavTabs } from "@workspace/ui/components/next/nav-tabs";
 import { Button } from "@workspace/ui/components/button";
 
@@ -14,6 +14,7 @@ const PLATFORM_SETTINGS_NAV_ITEMS = [
   { label: "Plan Gratuito", href: "/settings/free-tier", icon: Gift, disabled: false },
   { label: "IA Provider", href: "/settings/ai-provider", icon: Cpu, disabled: false },
   { label: "Base de Conocimiento", href: "/settings/knowledge", icon: BookOpen, disabled: false },
+  { label: "Emisor", href: "/settings/emitter", icon: Building2, disabled: false },
 ];
 
 export function SettingsNav() {
