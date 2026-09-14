@@ -225,14 +225,41 @@ export const platformSubscriptionPayment = pgTable(
     paidAt: timestamp('paid_at', { withTimezone: true }),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
+    // Correlative receipt (C1). NULL = anterior al sistema (pre_system).
+    // Secuencia GLOBAL continua (un solo emisor: FitStack), sin año.
+    receiptNumber: text('receipt_number').unique(),
+    receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
+    receiptPdfKey: text('receipt_pdf_key'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_psp_subscription_id').on(table.subscriptionId),
     index('idx_psp_payment_date').on(table.paymentDate),
     index('idx_psp_subscription_status').on(table.subscriptionId, table.status),
+    // Barrido de PDFs pendientes (C2): numerados sin PDF.
+    index('idx_psp_receipt_pending')
+      .on(table.receiptIssuedAt)
+      .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
   ]
 );
+
+// ── PLATFORM RECEIPT SEQUENCE (C1) ──
+
+/**
+ * Correlativo GLOBAL continuo del emisor FitStack (un solo emisor legal).
+ * Sin org ni año: una sola fila por tipo de documento ('receipt' | 'invoice').
+ * `nextPlatformDocumentNumber` lo incrementará con una sola sentencia atómica
+ * (INSERT ... ON CONFLICT DO UPDATE), sin transacciones interactivas.
+ * Sin reinicio anual por decisión cerrada (plan.md): mientras FitStack no esté
+ * constituida ni tenga régimen fiscal propio, una secuencia continua evita la
+ * ambigüedad de "año fiscal de FitStack".
+ */
+export const platformDocumentSequence = pgTable('platform_document_sequence', {
+  // 'receipt' | 'invoice' (valida Zod; hoy solo 'receipt' efectivo). Sin pgEnum.
+  documentType: text('document_type').primaryKey(),
+  nextNumber: integer('next_number').notNull().default(0),
+});
 
 // ── AI USAGE (rate-limit de chat IA por período) ──
 // Fuente de verdad de créditos (1 crédito = 1K tokens). Reset mensual por ciclo de suscripción (o calendario si no hay sub).
