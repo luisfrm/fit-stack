@@ -7,6 +7,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
+import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
@@ -192,15 +193,22 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       const cache = createCache(c.env);
       try {
-        const { paymentId } = await service.renewOrgSubscription(sub.id, data);
+        // Pagador real = sesión org renovadora (el paso 1 lo persiste solo
+        // si está vacío; `processing` no numera).
+        const user = c.get('user')!;
+        const receipts = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+        const { paymentId } = await service.renewOrgSubscription(sub.id, data, {
+          receipts,
+          payer: { email: user.email, name: user.name },
+        });
         await cache.invalidate('platform:subscriptions*');
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription`);
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription-status`);
         await cache.invalidateExact(`org:${activeOrganizationId}:features`);
         await cache.invalidate(`org:${activeOrganizationId}:dashboard:action-items`);
+        await cache.invalidateExact(`platform:subscriptions:invoices:${activeOrganizationId}`);
 
         // Confirmación al payer + owners de la org (el jobs-worker deduplica)
-        const user = c.get('user')!;
         if (c.env.TASK_QUEUE) {
           await c.env.TASK_QUEUE.send({
             type: 'email.org_payment_received',

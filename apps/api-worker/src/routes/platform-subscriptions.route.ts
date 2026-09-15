@@ -5,6 +5,7 @@ import { requirePlatformAuth } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
+import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
@@ -68,6 +69,18 @@ function buildService(c: any) {
   const repo = createPlatformSubscriptionsRepository(c.get('db'));
   const plansRepo = createPlatformPlansRepository(c.get('db'));
   return { repo, plansRepo, service: createPlatformSubscriptionsService(repo, plansRepo) };
+}
+
+/** Emisión C2: paso 1 donde el pago queda validado (sin I/O salvo DB+cola). */
+function buildReceipts(c: any) {
+  return createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+}
+
+/** La emisión afecta el historial de facturas de la org (C3 lo lee). */
+async function invalidateInvoicesCache(c: any, organizationId: string) {
+  await createCache(c.env).invalidateExact(
+    `platform:subscriptions:invoices:${organizationId}`,
+  );
 }
 
 export const platformSubscriptionRoutes = new Hono<AppEnv>()
@@ -168,11 +181,15 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const { service } = buildService(c);
-    const result = await service.createSubscriptionWithPayment(data);
+    const result = await service.createSubscriptionWithPayment(data, {
+      receipts: buildReceipts(c),
+    });
 
     await cache.invalidate('platform:subscriptions*');
+    await cache.invalidateExact(`org:${data.organizationId}:subscription`);
     await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${data.organizationId}:features`);
+    await invalidateInvoicesCache(c, data.organizationId);
 
     const created = await service.getSubscriptionById(result.subscriptionId);
     return c.json(created, 201);
@@ -224,10 +241,14 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.renewSubscription(id, data);
+    const result = await service.renewSubscription(id, data, {
+      receipts: buildReceipts(c),
+    });
     await cache.invalidate('platform:subscriptions*');
+    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await invalidateInvoicesCache(c, sub.organizationId);
 
     return c.json({ success: true, ...result });
   })
@@ -242,11 +263,15 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const payment = await service.getPaymentById(paymentId);
     if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
 
-    await service.updatePaymentStatus(paymentId, data);
+    await service.updatePaymentStatus(paymentId, data, {
+      receipts: buildReceipts(c),
+    });
     await cache.invalidate('platform:subscriptions*');
     if (payment.organizationId) {
+      await cache.invalidateExact(`org:${payment.organizationId}:subscription`);
       await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${payment.organizationId}:features`);
+      await invalidateInvoicesCache(c, payment.organizationId);
     }
 
     return c.json({ success: true, paymentId, status: data.status });
@@ -274,10 +299,14 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.registerPayment(id, data);
+    const result = await service.registerPayment(id, data, {
+      receipts: buildReceipts(c),
+    });
     await cache.invalidate('platform:subscriptions*');
+    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await invalidateInvoicesCache(c, sub.organizationId);
 
     return c.json({ success: true, ...result }, 201);
   })
