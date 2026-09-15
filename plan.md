@@ -16,7 +16,7 @@
 | Fase 5 — Reporte de gaps y auditoría | ✅ Hecha | `dd0249e`…`9fd6787` |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | `0ce7013`…`7544fef` |
 | C1 — DB Console (secuencia global + emisor) | ✅ Hecha | `c1b6310`…`20fb386` |
-| C2 — Emisión Console en dos pasos | ✅ Hecha | commits `c2` por ordenar |
+| C2 — Emisión Console en dos pasos | ✅ Hecha | `7c3c376`…`f1433ab` |
 | C3 — UI Console + cierre | ⏳ Pendiente (requiere C2 + Fase 3) |  |
 
 ## Orden de ejecución
