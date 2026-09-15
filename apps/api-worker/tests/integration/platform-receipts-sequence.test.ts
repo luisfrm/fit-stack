@@ -27,7 +27,7 @@ import {
   type AuthedUser,
 } from '../helpers/auth';
 import { createDb } from '@workspace/database/factory';
-import { createPlatformReceiptsRepository } from '../../src/repositories/platform-receipts.repository';
+import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { formatConsoleReceiptNumber } from '@workspace/shared';
 
 describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
@@ -67,7 +67,9 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
     return res.body;
   }
 
-  /** Platform subscription with a `validated` payment via HTTP. */
+  /** Platform subscription with a `processing` payment via HTTP (el repo
+   *  attach no exige estado; `processing` evita el paso 1 automático de C2
+   *  para probar el repo en aislamiento). */
   async function createPaidPlatformPayment(): Promise<number> {
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
@@ -80,7 +82,7 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
         baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
-        status: 'validated',
+        status: 'processing',
         paymentDate: isoDate(0),
       },
     });
