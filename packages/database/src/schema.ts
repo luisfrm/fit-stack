@@ -230,6 +230,22 @@ export const platformSubscriptionPayment = pgTable(
     receiptNumber: text('receipt_number').unique(),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
+    // Desglose fiscal persistido por el paso 1 (C2). El paso 2 nunca
+    // recalcula: los lee (NULL = legacy/pre-C2). Centavos enteros.
+    subtotal: bigint('subtotal', { mode: 'number' }),
+    taxTotal: bigint('tax_total', { mode: 'number' }),
+    taxDetails: jsonb('tax_details'),
+    // Gate de notificación (C2, espejo Panel): email encolado solo tras PDF.
+    receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
+    // Pagador (C2): solo se escribe en creación `processing` (sesión org
+    // renovadora); en validación SET solo si IS NULL, nunca overwrite.
+    payerEmail: text('payer_email'),
+    payerName: text('payer_name'),
+    // ANULADO (C2, espejo Panel): conserva número y PDF, nunca se reusa.
+    receiptVoided: boolean('receipt_voided').notNull().default(false),
+    voidedBy: text('voided_by'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    voidReason: text('void_reason'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
