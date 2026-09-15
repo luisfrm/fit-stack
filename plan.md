@@ -16,7 +16,7 @@
 | Fase 5 — Reporte de gaps y auditoría | ✅ Hecha | `dd0249e`…`9fd6787` |
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | `0ce7013`…`7544fef` |
 | C1 — DB Console (secuencia global + emisor) | ✅ Hecha | `c1b6310`…`20fb386` |
-| C2 — Emisión Console en dos pasos | ⏳ Pendiente (requiere C1 + Fase 2) |  |
+| C2 — Emisión Console en dos pasos | ✅ Hecha | commits `c2` por ordenar |
 | C3 — UI Console + cierre | ⏳ Pendiente (requiere C2 + Fase 3) |  |
 
 ## Orden de ejecución
@@ -56,6 +56,8 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - El **email se encola desde el paso 2**, solo tras confirmar `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` con `rowCount === 1` — nunca desde el paso 1. Esto garantiza que un comprobante numerado nunca dispare un email sin su PDF adjunto.
 - **Idempotencia ante entrega duplicada** (colas *at-least-once*): reintentar el paso 2 con el mismo número/key es un simple overwrite sin efecto adicional; el `UPDATE … RETURNING` actúa como gate para no encolar un segundo email.
 - **Barrido periódico** (cron en `jobs-worker`, **pre-venta cada 10 h**; bajar a 10 min con clientes reales — ver `docs/PENDING.md`) cierra el hueco "número asignado pero mensaje nunca llegó a la cola": busca filas con número y sin PDF más viejas que 15 minutos y re-encola el render. Cubre tanto Panel como Console (mismo mecanismo, extendido a `platform_subscription_payment` en C2).
+- El pagador SaaS (`payer_email/payer_name`) se persiste **solo en creación `processing`** (sesión org renovadora); en validación `SET` solo si `IS NULL`, nunca overwrite (la sesión de soporte no es el pagador). El barrido —que no conoce al pagador— notifica solo a owners con log `payer-missing`.
+- Trial/free $0 **no queman serie**: quedan con `receipt_number IS NULL` → `available:false, reason:'pre_system'` (terminal documentado, nunca 409).
 - Console reutiliza la **misma cola y el mismo tipo de evento** `receipt.render`, discriminado por un campo `scope: 'panel' | 'platform'` en el payload — no un evento nuevo, para no duplicar el registro de tipos ni el consumer.
 
 **Contrato de API**
@@ -63,6 +65,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - `GET /:id/receipt/pdf` es la descarga binaria aparte: `200` bytes `application/pdf` o `404`.
 - `POST /:id/issue` (fallback manual, owner/manager) responde de inmediato con `pdfStatus: "pending"`, sin bloquear esperando el render.
 - `GET /api/reports/receipts` (auditoría Panel): filas + resumen + totales por moneda + `gaps[]`; filtros `from/to/status/method/year/page/limit`, caché 5 min invalidada on-write en issue/status/alta.
+- El email SaaS con comprobante sale **con el PDF adjunto leído de R2** (nunca regenerado); numerado sin PDF → log sin enviar (lo repara el barrido).
 
 **Infraestructura y storage**
 - Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con `cms/<org>/receipts/` (capturas de pago, distinto propósito).
@@ -85,4 +88,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-**C2** (`fase-c2-emision-console.md`, emisión SaaS automática en dos pasos). El track Panel queda cerrado (Fases 0–6) y C1 commiteado y verificado.
+**C3** (`fase-c3-ui-console.md`, UI Console: descarga/reenvío + cierre). C2 commiteado y verificado (el attach del email ya vive en C2; C3 conserva rutas GET/resend + UI + E2E).
