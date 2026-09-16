@@ -137,7 +137,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
   - Service: Business logic layer.
   - Route Handler: HTTP concerns only.
 - **Worker DB Pattern**: In `api-worker` the DB client is created **per request** via `createDb(c.env.DATABASE_URL)` (`@workspace/database/factory`) — `process.env` does not exist in Workers. Repositories and services are **factory functions** that receive dependencies by parameter (`createXRepository(db)`, `createXService(repo)`).
-- **Shared repositories (conscious exception, not a general rule)**: repositories live in the app — UNLESS 2+ apps need the byte-identical implementation (criterion: same SQL, same atomicity guarantees). Only then it lives in `packages/database/src/repositories/` (today solely `receipts.repository.ts`: atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`, consumed by api-worker step 1 and jobs-worker step 2). Any other new repo stays in `apps/api-worker/src/repositories/`. This exception exists because two runtimes need identical SQL; it does not authorize moving business logic or other repos.
+- **Shared repositories (conscious exception, not a general rule)**: repositories live in the app — UNLESS 2+ apps need the byte-identical implementation (criterion: same SQL, same atomicity guarantees). Only then it lives in `packages/database/src/repositories/` (today solely `receipts.repository.ts`: atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`, consumed by api-worker step 1 and jobs-worker step 2 — plus `platform-receipts.repository.ts`: the SaaS mirror, same criterion). Any other new repo stays in `apps/api-worker/src/repositories/`. This exception exists because two runtimes need identical SQL; it does not authorize moving business logic or other repos.
 
 ### 2. UI Design System & Hierarchy
 
@@ -256,7 +256,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 > | `/api/init` | Org bootstrap (no auth) |
 > | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
 > | `/api/platform/plans` | SaaS plan catalog (console) |
-> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) |
+> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
 > | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (AI quota del ciclo, cache 5 min, invalidada en grant) + `GET /:id/gym-overview` (adopción gym + portal seats, cache 5 min, staleness aceptada: writes del gym no invalidan claves platform) |
 > | `/api/platform/settings` | Platform global settings |
 > | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
@@ -393,7 +393,7 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 | `email.registration_invite`  | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations)                                                                                                 |
 | `email.org_invite`           | `{ email, orgName, inviterName, inviteLink }`            | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account)                                                                                                                  |
 | `email.payment_receipt`      | `{ paymentId, organizationId }`                          | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }`   | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal) → payer + org owners (dedupe)                                                                                                 |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal, processing, payer+owners) + paso 2 platform (PDF listo, payer desde DB u owners-only) + resend manual |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
 
@@ -413,7 +413,7 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 
 ---
 
-## Payment Receipts (Panel)
+## Payment Receipts (Panel + Console)
 
 Panel receipts are internal payment records — never fiscal invoices (see `docs/ORGANIZATION_RECEIPT_MODEL.md`). Source of truth for frozen decisions: `plan.md`; module map: `tasks/README.md`.
 
@@ -421,7 +421,13 @@ Panel receipts are internal payment records — never fiscal invoices (see `docs
 - **Email only from step 2**, after `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` (`rowCount === 1` gate); `markReceiptNotified` with `clearReceiptNotified` rollback on send failure.
 - **Contract**: `GET /:id/receipt` → 200 ready / 202 pending / 200 `available:false,reason:pre_system` (never 409); `GET /:id/receipt/pdf` binary download; `POST /:id/issue` manual fallback (owner/manager).
 - **Document gate** forces `"Comprobante de pago"` (`HAS_FISCAL_HOMOLOGATION=false` by construction); the technical UUID is never shown (only `receiptNumber`); voided = `ANULADO`, the number is never released or reused; serial audit at `GET /api/reports/receipts` (rows + per-currency totals + `gaps[]` = `1..lastNumber` per org/year).
-- Shared-repo exception (§1): `packages/database/src/repositories/receipts.repository.ts` — the only shared repo (two runtimes need identical SQL).
+- Shared-repo exception (§1): `packages/database/src/repositories/receipts.repository.ts` + `platform-receipts.repository.ts` — the only shared repos (two runtimes need identical SQL each).
+
+**Console (SaaS) receipts** mirror the same guarantees with one legal emitter (FitStack):
+- Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
+- Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
+- Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
+- Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emisor); empty = generic "FitStack" + gate Comprobante.
 
 ---
 

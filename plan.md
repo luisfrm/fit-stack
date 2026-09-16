@@ -17,7 +17,7 @@
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | `0ce7013`…`7544fef` |
 | C1 — DB Console (secuencia global + emisor) | ✅ Hecha | `c1b6310`…`20fb386` |
 | C2 — Emisión Console en dos pasos | ✅ Hecha | `7c3c376`…`f1433ab` |
-| C3 — UI Console + cierre | ⏳ Pendiente (requiere C2 + Fase 3) |  |
+| C3 — UI Console + cierre | ✅ Hecha | commits `c3` por ordenar |
 
 ## Orden de ejecución
 
@@ -66,6 +66,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - `POST /:id/issue` (fallback manual, owner/manager) responde de inmediato con `pdfStatus: "pending"`, sin bloquear esperando el render.
 - `GET /api/reports/receipts` (auditoría Panel): filas + resumen + totales por moneda + `gaps[]`; filtros `from/to/status/method/year/page/limit`, caché 5 min invalidada on-write en issue/status/alta.
 - El email SaaS con comprobante sale **con el PDF adjunto leído de R2** (nunca regenerado); numerado sin PDF → log sin enviar (lo repara el barrido).
+- E2E Console cubre aprobar → número + reenvío pending (sin consumer no hay PDF real); descarga de bytes y adjunto idéntico se verifican en integración + manual.
 
 **Infraestructura y storage**
 - Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con `cms/<org>/receipts/` (capturas de pago, distinto propósito).
@@ -88,4 +89,4 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 
 ## Próximo paso inmediato
 
-**C3** (`fase-c3-ui-console.md`, UI Console: descarga/reenvío + cierre). C2 commiteado y verificado (el attach del email ya vive en C2; C3 conserva rutas GET/resend + UI + E2E).
+**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado). Siguiente: lo que ordene el usuario.
