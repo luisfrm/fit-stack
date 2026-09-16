@@ -17,7 +17,7 @@
 | Fase 6 — Cierre Panel (tests, E2E, docs) | ✅ Hecha | `0ce7013`…`7544fef` |
 | C1 — DB Console (secuencia global + emisor) | ✅ Hecha | `c1b6310`…`20fb386` |
 | C2 — Emisión Console en dos pasos | ✅ Hecha | `7c3c376`…`f1433ab` |
-| C3 — UI Console + cierre | ✅ Hecha | commits `c3` por ordenar |
+| C3 — UI Console + cierre | ✅ Hecha | `2f6c15b`…`4c34d6c` |
 
 ## Orden de ejecución
 
