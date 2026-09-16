@@ -29,6 +29,8 @@ import {
   ChevronDown,
   Loader2,
   MoreHorizontal,
+  Download,
+  Send,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { canManageBilling } from "@/lib/platform-permissions";
@@ -147,8 +149,7 @@ export function PlatformPaymentHistoryModal({
   const handleChangeStatus = async (
     paymentId: number,
     status: PaymentStatus,
-  ) => {
-    if (actionLoading) return;
+  ) => {    if (actionLoading) return;
     setActionPaymentId(paymentId);
     try {
       await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
@@ -161,6 +162,60 @@ export function PlatformPaymentHistoryModal({
           "PlatformPaymentHistoryModal",
           err,
           "No se pudo cambiar el estado del pago",
+        ),
+      );
+    } finally {
+      setActionPaymentId(null);
+    }
+  };
+
+  const handleDownloadReceipt = async (payment: PlatformPaymentWithSnapshot) => {
+    if (actionLoading || !payment.receiptNumber) return;
+    setActionPaymentId(payment.id);
+    try {
+      const blob = await platformSubscriptionsService.downloadReceipt(payment.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${payment.receiptNumber}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Comprobante descargado correctamente");
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "PlatformPaymentHistoryModal",
+          err,
+          "No se pudo descargar el comprobante",
+        ),
+      );
+    } finally {
+      setActionPaymentId(null);
+    }
+  };
+
+  const handleResendReceipt = async (payment: PlatformPaymentWithSnapshot) => {
+    if (actionLoading || !payment.receiptNumber) return;
+    setActionPaymentId(payment.id);
+    try {
+      const result = await platformSubscriptionsService.resendReceipt(payment.id);
+      if (result.available === false) {
+        toast.success("El pago es anterior al sistema de comprobantes");
+      } else if (result.queued === false) {
+        toast.success("El comprobante se enviará al generarse el PDF");
+      } else {
+        toast.success("Comprobante reenviado correctamente");
+      }
+      await loadPayments();
+      onChange?.();
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "PlatformPaymentHistoryModal",
+          err,
+          "No se pudo reenviar el comprobante",
         ),
       );
     } finally {
@@ -408,6 +463,57 @@ export function PlatformPaymentHistoryModal({
                           </Text>
                         </div>
                       )}
+                      <div className="flex flex-col gap-1">
+                        <Text
+                          size="xs"
+                          variant="muted"
+                          className="uppercase tracking-widest font-bold opacity-60"
+                        >
+                          Comprobante
+                        </Text>
+                        {p.receiptVoided && (
+                          <Badge variant="destructive" size="sm" className="w-fit">
+                            Anulado (se conserva el número)
+                          </Badge>
+                        )}
+                        {!p.receiptNumber ? (
+                          <Text size="xs" variant="muted" className="opacity-60 italic">
+                            Anterior al sistema de comprobantes
+                          </Text>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <Text size="xs" className="tabular-nums">
+                              {p.receiptNumber}
+                            </Text>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outlined"
+                                size="sm"
+                                onClick={() => handleDownloadReceipt(p)}
+                                disabled={loading || actionLoading}
+                                data-testid={`receipt-download-${p.id}`}
+                                className="gap-1.5"
+                              >
+                                <Download size={14} />
+                                Descargar PDF
+                              </Button>
+                              {canChangeStatus && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleResendReceipt(p)}
+                                  disabled={loading || actionLoading}
+                                  data-testid={`receipt-resend-${p.id}`}
+                                  className="gap-1.5"
+                                >
+                                  <Send size={14} />
+                                  Reenviar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-4">
                         <Text
                           size="xs"

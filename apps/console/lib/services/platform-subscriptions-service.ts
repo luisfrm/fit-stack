@@ -1,4 +1,4 @@
-import { api, type ApiFetchOptions } from "@/lib/api/client";
+import { api, apiBlob, type ApiFetchOptions } from "@/lib/api/client";
 import type {
   PlatformSubscriptionStatus,
   IPaginatedResult,
@@ -278,6 +278,34 @@ export const platformSubscriptionsService = {
     await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`, {
       method: "PATCH",
       body: { status },
+    });
+  },
+
+  /* ── Comprobantes SaaS (C3) ── */
+
+  /**
+   * Descarga el PDF del comprobante (`FS-N.pdf`). Lanza si no está listo.
+   */
+  async downloadReceipt(paymentId: number): Promise<Blob> {
+    return await apiBlob(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/receipt/pdf`);
+  },
+
+  /**
+   * Reenvía el comprobante a payer+owners (contrato 4 ramas del POST resend:
+   * ready / pending-202 / presystem / error).
+   */
+  async resendReceipt(
+    paymentId: number,
+  ): Promise<{
+    success: boolean;
+    queued?: boolean;
+    available?: boolean;
+    pdfStatus?: "ready" | "pending";
+    reason?: string;
+    attachment?: boolean;
+  }> {
+    return await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/resend`, {
+      method: "POST",
     });
   },
 };

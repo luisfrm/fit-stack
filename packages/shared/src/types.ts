@@ -629,6 +629,12 @@ export interface IPlatformSubscriptionPayment {
 
   // Estado
   status: PaymentStatus;
+
+  // Comprobante SaaS (C1-C3). NULL = anterior al sistema / $0 SKIP.
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | Date | null;
+  receiptPdfKey?: string | null;
+  receiptVoided?: boolean;
 }
 
 /** @deprecated usar IPlatformSubscriptionPayment */
