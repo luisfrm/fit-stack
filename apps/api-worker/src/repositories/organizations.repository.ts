@@ -5,6 +5,7 @@ import {
   platformPlan,
   authMember,
   gymMember,
+  user,
 } from '@workspace/database/schema';
 import type { IPlatformOrganization, IPlatformSubscription } from '@workspace/shared/types';
 import {
@@ -50,6 +51,23 @@ async function getMemberCounts(
 
 export function createOrganizationsRepository(db: Db) {
   return {
+    /**
+     * Emails de los owners de la org (`authMember role=owner → user.email`).
+     * Dedupe y filtrado los hace el caller (resend encola, jobs deduplica).
+     */
+    async listOwnerEmails(organizationId: string): Promise<string[]> {
+      const rows = await db
+        .select({ email: user.email })
+        .from(authMember)
+        .innerJoin(user, eq(authMember.userId, user.id))
+        .where(
+          and(
+            eq(authMember.organizationId, organizationId),
+            eq(authMember.role, 'owner'),
+          ),
+        );
+      return rows.map((r) => r.email).filter((e) => !!e && e.trim().length > 0);
+    },
     async findAll(filters: OrganizationFilter): Promise<PaginatedOrganizationsResult> {
       const { query, page = 1, limit = 10 } = filters;
       const offset = (page - 1) * limit;

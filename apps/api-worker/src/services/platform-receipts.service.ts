@@ -1,12 +1,14 @@
 import type { Db } from '@workspace/database/factory';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import {
+  buildPlatformReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
   formatConsoleReceiptNumber,
   parseConsoleReceiptNumber,
   resolveFiscalProfile,
   type ITaxDetail,
+  type ReceiptData,
 } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
@@ -39,7 +41,7 @@ export interface PlatformReceiptContext {
   payer?: { email: string; name: string } | null;
 }
 
-export function createPlatformReceiptsService(db: Db, receiptQueue: Queue) {
+export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQueue?: Queue) {
   const platformReceiptsRepo = createPlatformReceiptsRepository(db);
   const platformSubsRepo = createPlatformSubscriptionsRepository(db);
   const orgsRepo = createOrganizationsRepository(db);
@@ -166,6 +168,137 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue) {
         payer.email,
         payer.name,
       );
+    },
+
+    /**
+     * Estado del comprobante SaaS (contrato 3 estados, nunca 409; espejo
+     * `getReceiptState` de Panel). El mapeo a `PlatformComposeReceiptInput`
+     * es twin intencional del consumer jobs-worker (precedente Panel).
+     */
+    async getPlatformReceiptState(paymentId: number): Promise<
+      | { available: true; pdfStatus: 'ready'; receiptNumber: string; receipt: ReceiptData; pdfKey: string }
+      | { available: true; pdfStatus: 'pending'; receiptNumber: string }
+      | { available: false; reason: 'pre_system' }
+    > {
+      const composed = await platformReceiptsRepo.getPlatformReceiptComposedData(paymentId);
+      if (!composed) {
+        throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
+      }
+      if (!composed.payment.receiptNumber) {
+        return { available: false, reason: 'pre_system' };
+      }
+      if (!composed.payment.receiptPdfKey) {
+        return {
+          available: true,
+          pdfStatus: 'pending',
+          receiptNumber: composed.payment.receiptNumber,
+        };
+      }
+      const { payment, subscription, organization, emitter } = composed;
+      const receipt = buildPlatformReceiptDataFromComposed({
+        receiptNumber: composed.payment.receiptNumber,
+        // Defensivo: invariante receiptIssuedAt non-null cuando hay pdfKey
+        // (ambos se setean juntos en el paso 1 / attach).
+        issuedAt: composed.payment.receiptIssuedAt ?? new Date(),
+        payment: {
+          id: payment.id,
+          amountPaid: Number(payment.amountPaid),
+          currencyPaid: payment.currencyPaid,
+          exchangeRateApplied: payment.exchangeRateApplied,
+          paymentMethod: payment.paymentMethod,
+          paymentMethodDetails: payment.paymentMethodDetails,
+          paymentDate: payment.paymentDate,
+          subtotal: payment.subtotal != null ? Number(payment.subtotal) : null,
+          taxTotal: payment.taxTotal != null ? Number(payment.taxTotal) : null,
+          taxDetails: payment.taxDetails,
+          planSnapshotName: payment.planSnapshotName,
+          planSnapshotCurrency: payment.planSnapshotCurrency,
+          voided: payment.receiptVoided,
+        },
+        subscription: subscription
+          ? {
+              startDate: subscription.startDate,
+              currentPeriodEnd: subscription.currentPeriodEnd,
+            }
+          : null,
+        receptor: {
+          name: organization.name,
+          legalName: organization.legalName,
+          taxId: organization.taxId,
+          countryCode: organization.countryCode,
+          timezone: organization.timezone,
+        },
+        emitter: {
+          legalName: emitter['fitstack_legal_name'] || null,
+          taxId: emitter['fitstack_tax_id'] || null,
+          address: emitter['fitstack_address'] || null,
+          countryCode: emitter['fitstack_country_code'] || null,
+        },
+      });
+      return {
+        available: true,
+        pdfStatus: 'ready',
+        receiptNumber: composed.payment.receiptNumber,
+        receipt,
+        pdfKey: composed.payment.receiptPdfKey,
+      };
+    },
+
+    /**
+     * Reenvío manual (4 ramas congeladas): sin destinatarios → 422;
+     * pre_system → `presystem` (sin encolar: terminal, nunca 409);
+     * numerado sin PDF → `pending` (re-encola render, el paso 2 avisa);
+     * ready → encola `email.org_payment_received` con payer de DB.
+     */
+    async resendPlatformReceiptEmail(
+      paymentId: number,
+    ): Promise<
+      | { kind: 'queued'; attachment: boolean }
+      | { kind: 'pending' }
+      | { kind: 'presystem' }
+    > {
+      const composed = await platformReceiptsRepo.getPlatformReceiptComposedData(paymentId);
+      if (!composed) {
+        throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
+      }
+      if (!taskQueue) {
+        throw new ReceiptError(500, 'QUEUE_MISSING', 'Cola de emails no disponible.');
+      }
+      const owners = await orgsRepo.listOwnerEmails(composed.organization.id);
+      const payerEmail = composed.payment.payerEmail?.trim() || null;
+      const recipients = new Set(
+        [payerEmail, ...owners].filter((e): e is string => !!e && e.trim().length > 0),
+      );
+      if (recipients.size === 0) {
+        throw new ReceiptError(
+          422,
+          'PAYER_EMAIL_MISSING',
+          'El pago no tiene destinatarios: registre un email del pagador.',
+        );
+      }
+      if (!composed.payment.receiptNumber) {
+        return { kind: 'presystem' };
+      }
+      if (composed.payment.receiptPdfKey) {
+        await taskQueue.send({
+          type: 'email.org_payment_received',
+          paymentId,
+          organizationId: composed.organization.id,
+          ...(payerEmail
+            ? { payerEmail, payerName: composed.payment.payerName?.trim() || '' }
+            : {}),
+        });
+        return { kind: 'queued', attachment: true };
+      }
+      await receiptQueue.send(
+        buildReceiptRenderEvent({
+          scope: 'platform',
+          paymentId,
+          organizationId: composed.organization.id,
+          receiptNumber: composed.payment.receiptNumber,
+        }),
+      );
+      return { kind: 'pending' };
     },
   };
 }

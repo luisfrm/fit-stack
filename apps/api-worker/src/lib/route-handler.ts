@@ -111,7 +111,9 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
       if (err instanceof APIError) {
         throw new HTTPException(err.statusCode === 401 ? 401 : 403, { message: err.message });
       }
-      if ((user as any).role !== 'admin') {
+      // Fallback fail-closed: si la evaluación de Better Auth falla, solo el
+      // staff pleno (owner/admin) pasa; el resto (incluido support) recibe 403.
+      if ((user as any).role !== 'admin' && (user as any).role !== 'owner') {
         throw new HTTPException(403, { message: 'Forbidden: Requires platform admin' });
       }
     }

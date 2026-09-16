@@ -1,12 +1,13 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformAuth, requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createCache } from '../lib/cache';
+import { createR2Service } from '../lib/r2';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
@@ -277,6 +278,77 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json({ success: true, paymentId, status: data.status });
   })
 
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt — contrato
+  // de 3 estados, nunca 409 (espejo Panel). Lectura granular: support sí.
+  .get('/payments/:paymentId/receipt', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available) return c.json(state, 200);
+    if (state.pdfStatus === 'pending') {
+      return c.json(
+        {
+          available: true,
+          receiptNumber: state.receiptNumber,
+          pdfStatus: 'pending',
+        },
+        202,
+      );
+    }
+    return c.json({
+      available: true,
+      receiptNumber: state.receiptNumber,
+      pdfStatus: 'ready',
+      receipt: state.receipt,
+      pdfUrl: `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    });
+  })
+
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt/pdf —
+  // descarga binaria (200 bytes o 404). Lectura granular: support sí.
+  .get('/payments/:paymentId/receipt/pdf', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const r2 = createR2Service(c.env);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available || state.pdfStatus !== 'ready') {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    const file = await r2.getFile(state.pdfKey);
+    if (!file) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    return new Response(file.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${state.receiptNumber}.pdf"`,
+      },
+    });
+  })
+
+  // POST /api/platform/subscriptions/payments/:paymentId/resend — reenvío
+  // manual a payer+owners (4 ramas congeladas). Solo admin/owner: support 403.
+  .post('/payments/:paymentId/resend', requirePlatformAuth(), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(
+      c.get('db'),
+      c.env.RECEIPT_QUEUE,
+      c.env.TASK_QUEUE,
+    );
+    const result = await receiptsService.resendPlatformReceiptEmail(paymentId);
+    if (result.kind === 'presystem') {
+      return c.json({ success: true, available: false, reason: 'pre_system' }, 200);
+    }
+    if (result.kind === 'pending') {
+      return c.json({ success: true, queued: false, pdfStatus: 'pending' }, 202);
+    }
+    return c.json({ success: true, queued: true, attachment: result.attachment });
+  })
+
   // GET /api/platform/subscriptions/:id/payments
   .get('/:id/payments', requirePlatformAuth(), async (c) => {
     const id = Number(c.req.param('id'));
@@ -324,6 +396,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate('platform:subscriptions*');
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await cache.invalidateExact(`platform:subscriptions:invoices:${sub.organizationId}`);
 
     return c.json({ success: true });
   });
