@@ -20,6 +20,9 @@ const DELETE_ROUTES: Record<string, (id: number | string) => string> = {
   plan: (id) => `/api/plans/${id}`,
   platformOrg: (id) => `/api/platform/organizations/${id}`,
   platformPlan: (id) => `/api/platform/plans/${id}`,
+  // Borra la suscripción SaaS; los pagos cascaddean por FK
+  // (`subscription_id` → `platform_subscription.id` onDelete cascade).
+  platformSubscription: (id) => `/api/platform/subscriptions/${id}`,
 };
 
 export type DisposableKind = keyof typeof DELETE_ROUTES;
