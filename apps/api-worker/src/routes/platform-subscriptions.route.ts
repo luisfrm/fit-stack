@@ -266,6 +266,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.updatePaymentStatus(paymentId, data, {
       receipts: buildReceipts(c),
+      // `requirePlatformAuth` garantiza sesión: actor no-nulo para ANULADO.
+      by: c.get('user')!.id,
     });
     await cache.invalidate('platform:subscriptions*');
     if (payment.organizationId) {

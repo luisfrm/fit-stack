@@ -19,6 +19,7 @@ import { normalizeFeatures } from '@workspace/shared';
 import { addDuration } from '../lib/billing-utils';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import type { PlatformReceiptContext } from './platform-receipts.service';
+import { ReceiptError } from './receipts.service';
 
 /** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
 const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
@@ -463,6 +464,23 @@ export function createPlatformSubscriptionsService(
       const wasPending = payment.status !== PAYMENT_STATUSES.VALIDATED;
 
       await platformSubsRepo.updatePaymentStatus(paymentId, data.status);
+
+      // VOIDED con número emitido: conserva número + PDF y marca ANULADO
+      // (motivo fijo: el schema no pide motivo al usuario). Sin número no
+      // hay comprobante que anular (código, nunca texto). Solo VOIDED:
+      // REFUNDED e INVALID no tocan `receiptVoided`.
+      if (data.status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+        await opts.receipts
+          .markPlatformReceiptVoided({
+            paymentId,
+            by: opts.by,
+            reason: 'Pago anulado',
+          })
+          .catch((err) => {
+            if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') return;
+            throw err;
+          });
+      }
 
       // Side effects según nuevo status
       if (data.status === PAYMENT_STATUSES.VALIDATED && payment.subscriptionId) {

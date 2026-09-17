@@ -103,4 +103,75 @@ test.describe('Console — Comprobante SaaS', () => {
       page.getByText(/comprobante (reenviado|se enviará)/i).first(),
     ).toBeVisible({ timeout: 20_000 });
   });
+
+  test('anular conserva el número y muestra ANULADO', async ({
+    page,
+    consoleApi,
+  }) => {
+    const slug = `anulado-${uid()}`;
+    const orgName = `Org Anulado ${uid()}`;
+    const today = toLocalDayString(TZ);
+
+    const org = await consoleApi.create<any>('platformOrg', '/api/platform/organizations', {
+      name: orgName,
+      slug,
+      countryCode: 'VE',
+      timezone: TZ,
+    });
+    const plan = await consoleApi.create<any>('platformPlan', '/api/platform/plans', {
+      name: `Plan Anulado ${uid()}`,
+      price: 5000,
+      currency: 'USD',
+      durationValue: 1,
+      durationUnit: 'month',
+      isActive: true,
+      trialDays: 0,
+    });
+    const sub = await consoleApi.create<any>(
+      'platformSubscription',
+      '/api/platform/subscriptions',
+      {
+        organizationId: org.id,
+        planId: plan.id,
+        startDate: today,
+        isTrial: false,
+        payment: {
+          amountPaidCents: 5000,
+          currencyPaid: 'USD',
+          baseAmountCents: 5000,
+          paymentMethod: 'zelle',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: today,
+        },
+      },
+    );
+    const payments = await consoleApi.get<Array<{ id: number }>>(
+      `/api/platform/subscriptions/${sub.id}/payments`,
+    );
+    const paymentId = payments[0]!.id;
+
+    await page.goto(`/subscriptions?search=${encodeURIComponent(orgName)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const row = page.locator(`[data-testid="subs-row-${sub.id}"]`);
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.locator(SUBS.rowMenu).click();
+    await page.getByRole('menuitem', { name: 'Ver Pagos' }).click();
+
+    const paymentRow = page.locator(`[data-testid="subs-payment-${paymentId}"]`);
+    await expect(paymentRow).toBeVisible({ timeout: 20_000 });
+    await paymentRow.getByRole('button', { name: 'Acciones de pago' }).click();
+    await page.getByRole('menuitem', { name: 'Anular' }).click();
+
+    // El flag ANULADO vive en el bloque expandido, junto al número.
+    await paymentRow.getByRole('button', { name: 'Expandir' }).click();
+    await expect(paymentRow.getByText(/FS-\d{7,}/).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      paymentRow.getByText('Anulado (se conserva el número)').first(),
+    ).toBeVisible({ timeout: 20_000 });
+  });
 });

@@ -24,6 +24,11 @@ export interface AssignPlatformReceiptNumberInput {
 export interface PlatformReceiptHooks {
   assignPlatformReceiptNumber(input: AssignPlatformReceiptNumberInput): Promise<PlatformAssignResult>;
   setPayerIfMissing(paymentId: number, payer: { email: string; name: string }): Promise<void>;
+  markPlatformReceiptVoided(input: {
+    paymentId: number;
+    by: string;
+    reason: string;
+  }): Promise<unknown>;
 }
 
 /**
@@ -39,6 +44,8 @@ export interface PlatformReceiptContext {
   receipts?: PlatformReceiptHooks;
   /** Actor de sesión (para `payer_*`; solo rellena si está vacío). */
   payer?: { email: string; name: string } | null;
+  /** Actor de sesión (para `voided_by`; obligatorio en rama VOIDED). */
+  by?: string;
 }
 
 export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQueue?: Queue) {
@@ -168,6 +175,40 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         payer.email,
         payer.name,
       );
+    },
+
+    /**
+     * Anulación con número: idempotente sin pisar auditoría (el repo hace
+     * UPDATE siempre, así que el early-return vive aquí); sin número →
+     * 409 (no hay comprobante que anular). `by` obligatorio (fail-closed:
+     * nunca void anónimo).
+     */
+    async markPlatformReceiptVoided(input: {
+      paymentId: number;
+      by: string;
+      reason: string;
+    }) {
+      if (!input.by || input.by.trim().length === 0) {
+        throw new ReceiptError(400, 'ACTOR_REQUIRED', 'La anulación exige actor.');
+      }
+      const payment = await platformSubsRepo.findPaymentById(input.paymentId);
+      if (!payment) {
+        throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
+      }
+      if (!payment.receiptNumber) {
+        throw new ReceiptError(
+          409,
+          'RECEIPT_NOT_ISSUED',
+          'El pago no tiene comprobante emitido.',
+        );
+      }
+      if (payment.receiptVoided) {
+        return payment;
+      }
+      return platformReceiptsRepo.markPlatformVoided(input.paymentId, {
+        by: input.by,
+        reason: input.reason,
+      });
     },
 
     /**

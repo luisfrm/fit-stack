@@ -427,6 +427,7 @@ Panel receipts are internal payment records — never fiscal invoices (see `docs
 - Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
 - Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
 - Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
+- Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed, 409 without number); voiding never cancels the subscription nor reverts the cumulative period; `REFUNDED`/`INVALID` don't touch the flag.
 - Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emisor); empty = generic "FitStack" + gate Comprobante.
 
 ---
