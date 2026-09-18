@@ -1,6 +1,6 @@
 # Checklist — estados de suscripción, flujo de pago y fases
 
-> Estado verificado: **2026-09-18** (commit `4d5a626`).
+> Estado verificado: **2026-09-18** (C6 en `622b28e` + documentos en `46f4347`; los cambios de C7 quedan pendientes del commit del usuario).
 > Documentos relacionados: `docs/PAYMENT_STATUSES.md` (semántica completa), `tasks/correcciones-comprobantes.md` (plan del track), `docs/PENDING.md` (pendientes).
 
 ## 1. Estados de una suscripción (derivados, no se guardan)
@@ -40,7 +40,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] **C5** Trazabilidad de emisión (`issued_by`) — misma `0016`
 - [x] **C9** ANULADA ≠ CANCELADA + registro no eliminable + los 2 fallos de E2E
 - [x] **C6** Robustez del barrido (2.º predicado) y contrato de anulación explícito
-- [ ] **C7** Higiene, docs y matriz de tests
+- [x] **C7** Higiene, docs y matriz de tests
 
 ## 4. Pendientes abiertos (`docs/PENDING.md`)
 
@@ -52,6 +52,8 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [ ] **§11** Los comprobantes emitidos antes de C1 recomponen en vivo (limitación documentada, sin backfill inventado).
 - [ ] **§10** Universo de `gaps[]` a escala (disparador de performance).
 - [ ] **§8** Disclaimer de Console con país proxy hasta configurar `fitstack_country_code`.
+- [ ] **§15** Naming `platform_document_sequence.next_number` → `last_number` (cosmético, requiere migración; agrupar).
+- [ ] **§16** Claim-then-number para cerrar la carrera de correlativo (disparador: hueco no explicado en `gaps[]`).
 
 ## 5. Verificación
 
@@ -61,7 +63,8 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] Integración C6: `receipts-emission` **13** (T4b y T8b nuevos) + `platform-receipts-emission` **8** (T4b nuevo) + `platform-receipts-void` **4** (nombre y assert corregidos) → 25/25; + `subscriptions` 18 + `receipts-integrity` 4 + `reports-receipts` 6 → **28/28**
 - [x] **E2E completo (estado C9, commit `4d5a626`): 86/86** (panel 52 + console 34), 0 warnings de borrado
 - [x] E2E de comprobantes tras C6: **7/7** (consola 3 + panel 2 + los 2 setups), incluido el clic real de "Anular"/"Marcar como Validado" en la consola
-- [ ] Commit de C6 y de estos documentos (lo hace el usuario)
+- [x] C7 (sin migración): units de `emitterSnapshot`/`baseTotal`/gating fiscal y E2E del guardado de sede ya estaban en la suite; `.gitignore` (`*.log`) + destrackeo de los 3 logs de `spec/`, script `push-test-schema` sin shell y naming documentado.
+- [x] Commit de C6 (`622b28e`) y de la versión previa de estos documentos (`46f4347`); los cambios de C7 quedan pendientes del commit del usuario.
 
 ## 6. Checklist de release (no es fase: es el día que entra un cliente real)
 

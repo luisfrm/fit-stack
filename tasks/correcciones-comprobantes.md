@@ -18,7 +18,7 @@
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M | ✅ Hecha |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí (0016) | 🟡 Media | S | ✅ Hecha |
 | C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S | ✅ Hecha |
-| C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S |
+| C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S | ✅ Hecha |
 | C9 | Estados reales (ANULADA ≠ CANCELADA) + registro no eliminable | Correctitud de modelo | No | 🟠 Alta | S | ✅ Hecha |
 
 **C0 + C8 + C2 + C3 + C4 cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
@@ -338,15 +338,35 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 
 ---
 
-## C7 — Higiene, documentación y matriz de tests 🟡
+## C7 — Higiene, documentación y matriz de tests ✅
 
-| Ítem | Cambio |
-|---|---|
-| Artefactos de E2E | `.gitignore`: añadir `*.log` (los archivos ya se eliminaron, la regla evita la reincidencia). |
-| Naming cosmético | `platform_document_sequence.nextNumber` se comporta como `lastNumber`. Renombrar es cosmético y **sí** requiere migración → se agrupa con C1/C5 **si** se aprueba; si no, queda documentado (no vale un ciclo de migración por un nombre). |
-| Documentación | `plan.md` (decisiones nuevas: snapshot de emisor, gating fiscal, auditoría Console, riesgo residual de carrera), `AGENTS.md` (§1 sigue con 2 repos compartidos, route map +1 endpoint, cache key `platform:receipts:*`, columnas nuevas, semántica real de void sin número), `docs/PENDING.md` (§8 proxy de país Console sigue abierto; ítem **IGTF: base y tasa a confirmar con contador**; ítem **claim-then-number** como opción de cierre total; §12 integridad del registro financiero; §13 borrado de la suscripción SaaS en Console). Nuevos documentos de referencia: **`docs/PAYMENT_STATUSES.md`** (semántica de los 6 estados en Panel y Console + las diferencias reales entre los dos flujos) y **`docs/CHECKLIST-COMPROBANTES.md`** (estados → flujo → fases → pendientes → verificación). |
-| Tests E2E | Añadir al spec de settings del panel el guardado del **formulario general** de organización (hoy solo se prueba "Guardar facturación") — habría detectado el 403 de D5. |
-| Unit tests faltantes | `emitterSnapshot` (inmutable vs composición viva), `issuedBy`, gating fiscal por `isFormalTaxpayer`, `baseTotal` del PDF. |
+**Naturaleza:** deuda de higiene/docs/tests, **sin migración**. No se reimplementó nada: se verificó que la cobertura exigida ya existía (en varios casos entró con fases anteriores) y se cerraron los huecos reales.
+
+### Matriz de tests (lo exigido vs lo que existe)
+
+- ✅ **E2E del guardado del formulario general de sede**: ya existe en `e2e/panel/settings.spec.ts:78-98` (entró con C8) → habría detectado el 403 de D5.
+- ✅ **Unit `emitterSnapshot` inmutable vs composición viva**: ya existe en `packages/shared/tests/documents/receipt-compose.test.ts:112-181` + espejo en `platform-receipt-compose.test.ts`.
+- ✅ **Unit `baseTotal`**: ya existe en `receipt-compose.test.ts:83-108` + platform + `apps/jobs-worker/tests/receipt-pdf.test.ts:118`.
+- ✅ **Unit del gating fiscal (`isFormalTaxpayer`)**: ya existe en `fiscal-profile.test.ts`, `tax-math.test.ts` y `document-label-gate.test.ts`.
+- ✅ **`issuedBy`**: cubierto por integración (`apps/api-worker/tests/integration/receipts-snapshot.test.ts` y `platform-receipts-snapshot.test.ts`). Decisión: **no** se añade unit — es un passthrough de string sin lógica propia.
+
+### Higiene
+
+- ✅ `.gitignore`: regla `*.log` + **destrackeo** de los 3 logs de `spec/` (`baseline-console-build.log`, `final-build.log`, `migration-build.log`); siguen en disco como artefactos locales.
+- ✅ `spec/baseline-console-bundle.md`: la referencia al build log pasa a marcarse como artefacto no versionado (el `.md` es la evidencia; el log era el insumo crudo).
+- ✅ `apps/api-worker/scripts/push-test-schema.ts`: `execSync` → `spawnSync` shell-less; guardas de `TEST_DATABASE_URL` y de host≠producción intactas.
+- ✅ Naming `platform_document_sequence.next_number` (se comporta como `last_number`): documentado en `packages/database/src/schema.ts` + `docs/PENDING.md` §15, **sin migración** (renombrar exigiría migración y no aporta; se agrupa si alguna vez se hace otra).
+
+### Documentación
+
+- `plan.md`: tabla del track con C7 ✅, cierre del track y **riesgo residual de carrera** (el perdedor con `seq` menor es irreclaimable sin renumerar; la guarda tardía reduce la ventana a ~ms; disparador de *claim-then-number* documentado).
+- `AGENTS.md`: ya reflejaba el estado real (2 repos compartidos, `/receipts` en el route map, cache `platform:receipts:*`, columnas `emitter_snapshot`/`issued_by`, semántica `receiptVoided`/`not_issued`). Sin diff.
+- `docs/PENDING.md`: §15 (naming) y §16 (*claim-then-number*); §9/§12/§13/§14 ya existían.
+- `docs/CHECKLIST-COMPROBANTES.md`: C7 marcada y pendientes §15/§16 enlazados.
+
+### Fuera de alcance
+
+El fallo de `prettier --check` por CRLF es **deuda preexistente** (el repo mezcla finales de línea) y no se aborda en C7.
 
 ---
 
@@ -407,7 +427,7 @@ C8 ──┘                └──▶ C1 + C5 ──▶ C6 ──▶ C7
 - **C1+C5** en **una sola** migración (`0016`), con aprobación explícita. ✅
 - **C9** (estados reales + registro no eliminable + los 2 fallos de E2E) es ortogonal y sin migración. ✅
 - **C6** (barrido de dos predicados + contrato de anulación explícito) sin migración. ✅
-- **C7** cierra la higiene, docs y matriz de tests. ← pendiente
+- **C7** cerró la higiene, docs y matriz de tests. ✅
 
 ## Verificación por fase
 
@@ -428,16 +448,17 @@ Verificación manual obligatoria (adjuntar al PR): PDF de gym informal sin `taxI
 - [x] Activar IGTF es explícito: tasa manual, confirmación y aviso de impacto en la base de IVA. — C2
 - [x] La auditoría de la serie existe en los DOS espejos, con emisor congelado y actor. — C4 + C1/C5
 - [x] Ningún registro de pago se elimina: se anula (`voided`, ANULADA) o se revoca (`cancelled`). — C9
+- [x] Higiene, documentación y matriz de tests cerradas (sin migración). — C7
 
-### Hallazgos abiertos para C7
+### Hallazgos de C7 (resueltos)
 
-**El sincronizador de la rama de pruebas no corre en este entorno:** `pnpm --filter api-worker test:db:push` falla con `spawnSync cmd.exe ENOENT` (el script usa `execSync`, que en el shell actual no encuentra `cmd.exe` aunque exista en `C:\Windows\System32`). Se aplicó el equivalente manual (`drizzle-kit push` con `DATABASE_URL = TEST_DATABASE_URL` y guarda previa: host de pruebas ≠ host de desarrollo). Conviene que el script no dependa de `execSync`/shell (p. ej. importar el API programático de drizzle-kit o usar `spawnSync` con `shell: false`).
+**El sincronizador de la rama de pruebas no corre en este entorno (RESUELTO en C7):** `pnpm --filter api-worker test:db:push` fallaba con `spawnSync cmd.exe ENOENT` (el script usaba `execSync`, que en el shell actual no encontraba `cmd.exe` aunque exista en `C:\Windows\System32`). Mientras tanto se aplicó el equivalente manual (`drizzle-kit push` con `DATABASE_URL = TEST_DATABASE_URL` y guarda previa: host de pruebas ≠ host de desarrollo). **C7** eliminó la dependencia de `execSync`/shell: `apps/api-worker/scripts/push-test-schema.ts` usa ahora `spawnSync` con `shell: false` y las guardas siguen intactas.
 
 **E2E preexistente (RESUELTO en C9):**
 
 `e2e/panel/subscriptions.spec.ts` → *“validar desde la lista quita el pendiente”* fallaba de forma determinista y **no** era regresión de C1/C5 (verificado en su momento: fallaba igual en el commit anterior con los cambios revertidos). Causa: `panel-setup` precalienta `/payments` (`PANEL_PREWARM_ROUTES`) y la página cacheaba su fetch con `next: { revalidate: 60 }`; el fixture del test se crea **después** del prewarm por API (sin invalidar el Data Cache de Next), así que la primera visita reutilizaba el render cacheado sin el pendiente. Se aplicó la opción (b): la lista accionable `processing` ya no se cachea. Ver C9.
-- [ ] El guardado de la organización en Panel funciona para owners reales (sin depender de un rol de plataforma).
+- [x] El guardado de la organización en Panel funciona para owners reales (sin depender de un rol de plataforma). — C8
 - [x] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export. — C4
 - [x] Anular sin número es explícito para el usuario, no un silencio. — C6
 - [x] Un PDF listo cuya notificación se perdió vuelve a intentarse (barrido de 2 predicados). — C6
-- [ ] `AGENTS.md`, `plan.md` y `docs/PENDING.md` reflejan el estado real.
+- [x] `AGENTS.md`, `plan.md` y `docs/PENDING.md` reflejan el estado real. — C7

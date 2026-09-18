@@ -78,6 +78,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - **Bundle PDF**: `@react-pdf/renderer` vive solo en `jobs-worker` (donde ya era dependencia) y se importa lazy en el path de render; `api-worker` NO lo agrega (criterio de aceptación de Fase 2).
 - **Una cola, UN consumer**: `fit-receipt-events` la consume solo `jobs-worker`; `jobs-worker` consume DOS colas distintas (`fit-task-events` emails + `fit-receipt-events` renders), cada una con su DLQ. Nunca dos consumers sobre la misma cola.
 - **Repo compartido como excepción**: `packages/database/src/repositories/receipts.repository.ts` (numeración atómica + `getReceiptComposedData` + `completeReceiptPdf`) existe porque dos runtimes necesitan la implementación idéntica; no autoriza mover otros repos (ver AGENTS.md §1).
+- **Carrera de correlativo (riesgo residual de C0).** La asignación del número es atómica, pero si dos emisiones concurrentes del mismo pago compiten y **el perdedor de la carrera obtuvo el `seq` menor**, ese número queda irreclaimable sin renumerar (renumerar está prohibido). La guarda tardía + la compensación de C0 cierran el caso común y reducen la ventana a ~milisegundos, pero no la eliminan. **Disparador:** si `gaps[]` muestra un hueco **no explicado** (ni anulado ni `pre_system`), implementar *claim-then-number* (`docs/PENDING.md` §16).
 - **Disclaimer proxy de Console.** Mientras FitStack no tenga `fitstack_country_code` configurado, el disclaimer legal de los comprobantes de Console usa el país del Org receptor. Esto es una aproximación temporal, no la regla correcta a largo plazo — no dejar que este TODO sobreviva silenciosamente hasta producción.
 
 ## Reglas de ejecución para todas las fases
@@ -101,7 +102,7 @@ Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-co
 | C4 — Auditoría espejo en Console (`FS-N`) | ✅ Hecha |
 | C5 — Trazabilidad de emisión (`issued_by`) | ✅ Hecha (misma migración `0016`) |
 | C6 — Barrido (2.º predicado) y contrato de anulación | ✅ Hecha |
-| C7 — Higiene, docs y matriz de tests | ⏳ Pendiente |
+| C7 — Higiene, docs y matriz de tests | ✅ Hecha |
 | C9 — Estados reales (ANULADA ≠ CANCELADA) + registro no eliminable | ✅ Hecha |
 
 Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglose de impuestos (no solo la etiqueta); IGTF activable, apagado por defecto, con base `gross_first`; el snapshot del emisor se persiste en columna jsonb; *claim-then-number* queda en `docs/PENDING.md` con disparador explícito.
@@ -118,4 +119,6 @@ Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglo
 
 **C6 completada** (sin migración): el barrido cubre sus **dos** estados de fallo (numerado sin PDF, y PDF listo sin notificar) con una única definición de query para las dos tablas, y la anulación de un pago **sin comprobante** dejó de ser un 200 mudo: el body del PATCH trae `receiptVoided` + `receiptVoidReason: 'not_issued'` y el Panel/Console lo dicen con un toast diferenciado (el código `RECEIPT_NOT_ISSUED` queda como contrato interno del servicio).
 
-Queda **C7** (higiene, docs y matriz de tests). En `docs/PENDING.md` quedan anotadas las aristas abiertas: §12 (`create()` no es atómico de verdad y el borrado de un miembro arrastra su histórico financiero) y §13 (el DELETE de la suscripción SaaS en Console puede vaciar la serie `FS-N`), más §14 (email que agota reintentos y cae a la DLQ después de la marca de notificado: recuperación manual).
+**C7 completada** (sin migración: higiene, docs y matriz de tests): la matriz de tests ya cubría lo exigido (E2E del guardado general de sede en `e2e/panel/settings.spec.ts:78-98`; units de `emitterSnapshot`, `baseTotal` y gating fiscal; integración de `issuedBy`). Se añadió `*.log` al `.gitignore` y se destrackearon los 3 logs de `spec/` (siguen en disco), el script `push-test-schema` pasó de `execSync` a `spawnSync` shell-less (guardas intactas) y el naming de `platform_document_sequence.next_number` quedó documentado en `schema.ts` + `docs/PENDING.md` §15, sin migración. El fallo de `prettier --check` por CRLF es deuda preexistente fuera de alcance. **El track C0–C9 queda cerrado.**
+
+En `docs/PENDING.md` quedan anotadas las aristas abiertas: §12 (`create()` no es atómico de verdad y el borrado de un miembro arrastra su histórico financiero), §13 (el DELETE de la suscripción SaaS en Console puede vaciar la serie `FS-N`), §14 (email que agota reintentos y cae a la DLQ después de la marca de notificado: recuperación manual), §15 (naming de la secuencia, requiere migración) y §16 (*claim-then-number* como cierre total de la carrera de correlativo).

@@ -278,6 +278,11 @@ export const platformSubscriptionPayment = pgTable(
 export const platformDocumentSequence = pgTable('platform_document_sequence', {
   // 'receipt' | 'invoice' (valida Zod; hoy solo 'receipt' efectivo). Sin pgEnum.
   documentType: text('document_type').primaryKey(),
+  // OJO: `next_number` guarda el ÚLTIMO número entregado, no el siguiente
+  // (mismo significado que `organizationDocumentSequence.last_number`). El
+  // nombre es cosmético; renombrarlo a `last_number` requiere migración y se
+  // agrupará con la próxima migración que se genere por otro motivo
+  // (ver docs/PENDING.md §15).
   nextNumber: integer('next_number').notNull().default(0),
 });
 

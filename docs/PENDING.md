@@ -131,6 +131,21 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Opciones si se quiere automático: (a) que el handler de email limpie la marca al fallar de forma definitiva (requiere que conozca el `paymentId`/scope, hoy no lo hace), o (b) un barrido de la DLQ, que Cloudflare no expone como cola consultable (habría que persistir el fallo en DB).
   - Disparador: si aparece un comprobante con `receipt_pdf_key` y sin email entregado en una auditoría real.
 
+## 15. Comprobantes — naming cosmético `platform_document_sequence.next_number` (C7)
+
+- [ ] **Renombrar `next_number` a `last_number` para alinear con `organization_document_sequence.last_number`.**
+  - `platform_document_sequence.next_number` guarda el **ÚLTIMO** número entregado, no el siguiente (ver `packages/database/src/repositories/platform-receipts.repository.ts`). El nombre induce a error, pero el comportamiento es el correcto.
+  - Puramente cosmético y **sí** requiere migración → no vale un ciclo propio: agrupar con la próxima migración que se genere por otro motivo.
+  - El contrato del repositorio ya expone `getPlatformReceiptSequenceState(...).lastNumber`, así que todos los consumidores hablan en términos de "último"; solo el nombre de la columna queda desalineado.
+
+## 16. Comprobantes — claim-then-number, cierre total de la carrera de correlativo (D4 / C0)
+
+- [ ] **Riesgo residual de la carrera de doble emisión: si el perdedor no es el último consumidor, su número queda irreclaimable sin renumerar (prohibido).**
+  - Contexto: C0 dejó documentado este riesgo. La compensación (`releaseLastPlatformNumber`) solo revierte cuando el perdedor sigue siendo el último consumidor; si otro pago consumió la secuencia después, el número perdido queda como hueco auditado. La guarda tardía reduce la ventana a milisegundos, pero no la cierra.
+  - Disparador explícito para implementar la solución completa: **si el reporte de huecos (`gaps[]`) muestra un hueco no explicado en producción.**
+  - Esbozo de la solución completa (claim-then-number): reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` (persistiendo ya los impuestos) **antes** de consumir la secuencia y asignar el número después. Obligaría a una rama extra de reparación en el barrido para el estado intermedio "reclamado sin número".
+  - Estado: NO implementado; decisión D4 congelada (ver `tasks/correcciones-comprobantes.md`).
+
 ---
 
 > [!NOTE]

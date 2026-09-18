@@ -5,7 +5,7 @@ Total .next/ size: 22,496,855 B (~21.5 MB)
   static/  (client):  3,027,526 B (~2.9 MB)
   server/  (server): 19,469,329 B (~18.6 MB)
 
-Build output: spec/baseline-console-build.log
+Build output: spec/baseline-console-build.log (artefacto local, no versionado — ver .gitignore, regla `*.log`)
 Build status: succeeded (with expected DYNAMIC_SERVER_USAGE warnings from headers() in auth)
 
 Routes (all dynamic ƒ due to session validation in dashboard/layout.tsx):
