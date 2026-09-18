@@ -7,7 +7,8 @@
  * Faked dependencies: only the Cloudflare *bindings* that have no local
  * equivalent (R2, Queues). They are recording spies, so tests can assert on
  * the side effects the API is contractually required to produce — e.g. that
- * registering a payment enqueues `email.payment_receipt`.
+ * numbering a payment enqueues `receipt.render`, and that completing its PDF
+ * enqueues `email.payment_receipt`.
  *
  * Redis is intentionally left unconfigured: `createCache` degrades to a no-op,
  * which keeps tests deterministic (no cross-test cache bleed) while still
@@ -35,6 +36,7 @@ export interface R2Spy {
 export interface TestEnv {
   env: Record<string, unknown>;
   queue: QueueSpy;
+  receiptQueue: QueueSpy;
   r2: R2Spy;
 }
 
@@ -45,11 +47,11 @@ function createQueueSpy() {
     async send(message: QueuedMessage) {
       // Structured-clone to mimic the real queue boundary: handlers must not
       // be able to observe live object references from the producer.
-      messages.push(JSON.parse(JSON.stringify(message)));
+      messages.push(structuredClone(message));
     },
     async sendBatch(batch: Array<{ body: QueuedMessage }>) {
       for (const item of batch) {
-        messages.push(JSON.parse(JSON.stringify(item.body)));
+        messages.push(structuredClone(item.body));
       }
     },
   };
@@ -75,7 +77,9 @@ function createR2Spy() {
           ? value
           : value instanceof ArrayBuffer
             ? Buffer.from(value).toString('utf8')
-            : String(value);
+            : ArrayBuffer.isView(value)
+              ? Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('utf8')
+              : String(value);
       objects.set(key, { body, contentType: options?.httpMetadata?.contentType });
       return { key };
     },
@@ -87,6 +91,9 @@ function createR2Spy() {
         httpEtag: `"${key}"`,
         async text() {
           return found.body;
+        },
+        async arrayBuffer() {
+          return Buffer.from(found.body, 'utf8');
         },
         writeHttpMetadata(headers: Headers) {
           if (found.contentType) headers.set('content-type', found.contentType);
@@ -122,6 +129,7 @@ function createR2Spy() {
  */
 export function createTestEnv(baseUrl = 'http://localhost:8788'): TestEnv {
   const queue = createQueueSpy();
+  const receiptQueue = createQueueSpy();
   const r2 = createR2Spy();
 
   const env: Record<string, unknown> = {
@@ -139,7 +147,8 @@ export function createTestEnv(baseUrl = 'http://localhost:8788'): TestEnv {
 
     FILES_BUCKET: r2.binding,
     TASK_QUEUE: queue.binding,
+    RECEIPT_QUEUE: receiptQueue.binding,
   };
 
-  return { env, queue: queue.spy, r2: r2.spy };
+  return { env, queue: queue.spy, receiptQueue: receiptQueue.spy, r2: r2.spy };
 }

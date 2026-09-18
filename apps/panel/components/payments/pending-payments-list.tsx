@@ -5,7 +5,7 @@ import { Check, X } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 import type { ISubscription } from "@workspace/shared/types";
 
 interface PendingPaymentsListProps {
@@ -56,7 +56,7 @@ export function PendingPaymentsList({
             </div>
             <Text as="p" size="sm" weight="bold" className="font-mono shrink-0">
               {typeof sub.amountPaid === "number"
-                ? ValueConverter.format(sub.amountPaid / 100, sub.currencyPaid ?? "", currencyFormat)
+                ? formatCents(sub.amountPaid, sub.currencyPaid ?? "", currencyFormat)
                 : "—"}
             </Text>
             <div className="flex gap-2 shrink-0">

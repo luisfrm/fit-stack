@@ -5,6 +5,7 @@ import { Plus, LayoutTemplate, Users, CreditCard } from "lucide-react";
 import { Button, Text } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
 import { type IMembershipPlan, type IMembershipsSummary } from "@workspace/shared/types";
+import { centsToUnits } from "@workspace/shared";
 import { PlanCard } from "@/components/memberships/plan-card";
 import { PlanModal } from "@/components/memberships/plan-modal";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -41,7 +42,7 @@ export function MembershipsClient({
       <div className="flex flex-col gap-0.5">
         {allDisplayCurrencies.map((cur) => {
           const rawAmount = revenue[cur] ?? 0;
-          const amount = rawAmount / 100;
+          const amount = centsToUnits(rawAmount);
           const locale = currencyFormat === "usa" ? "en-US" : "es-ES";
 
           if (!activeCurrencies.includes(cur) && rawAmount === 0) return null;

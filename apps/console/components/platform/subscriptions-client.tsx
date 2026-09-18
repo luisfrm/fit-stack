@@ -7,7 +7,7 @@ import { Button, Text, SimpleSelect } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { cn } from "@workspace/ui/lib/utils";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 import type { IPlatformPlan } from "@workspace/shared/types";
 

@@ -15,7 +15,7 @@ import { featuresService } from "@/lib/services/features-service";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import type { IPlatformOrganization } from "@workspace/shared/types";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";

@@ -8,6 +8,7 @@ import {
   Text
 } from "@workspace/ui/components";
 import { type IMembershipPlan } from "@/types/dashboard";
+import { centsToUnits } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface PlanSelectorProps {
@@ -56,7 +57,7 @@ export function PlanSelector({
                 </Text>
               </div>
               <Text size="sm" variant="muted">
-                {plan.price / 100} {plan.currency}/mes
+                {centsToUnits(plan.price)} {plan.currency}/mes
               </Text>
             </ToggleGroupItem>
           ))}

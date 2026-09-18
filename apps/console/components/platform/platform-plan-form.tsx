@@ -15,7 +15,9 @@ import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { FeaturesEditor } from "./features-editor";
 import {
   FEATURE_CATALOG,
+  centsToUnits,
   resolveFeatures,
+  unitsToCents,
   type FeatureCatalog,
   type PlanFeaturesV2,
 } from "@workspace/shared";
@@ -49,7 +51,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
 
   const [formData, setFormData] = React.useState({
     name: initialData?.name || "",
-    price: initialData?.price ? (initialData.price / 100).toString() : "0",
+    price: initialData?.price ? centsToUnits(initialData.price).toString() : "0",
     currency: initialData?.currency || defaultCurrency,
     durationValue: initialData?.durationValue?.toString() || "1",
     durationUnit: initialData?.durationUnit || "month",
@@ -82,8 +84,8 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
-    // Convert dezenas para el API
-    const priceInCents = Math.round(Number(formData.price) * 100);
+    // Convert dezenas para el API (centavos enteros)
+    const priceInCents = unitsToCents(Number(formData.price));
 
     const submissionData = {
       name: formData.name,

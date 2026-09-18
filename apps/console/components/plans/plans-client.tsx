@@ -8,6 +8,7 @@ import { PlatformPlanCard } from "@/components/platform/platform-plan-card";
 import { PlatformPlanModal } from "@/components/platform/platform-plan-modal";
 import type { PlatformPlanWithStats, PlatformPlansSummary } from "@/lib/services/platform-plans-service";
 import type { FeatureCatalog } from "@workspace/shared";
+import { centsToUnits } from "@workspace/shared";
 import { useRouter } from "next/navigation";
 
 interface PlansClientProps {
@@ -51,7 +52,7 @@ export function PlansClient({
     const breakdown: { currency: string; amount: number; converted: number; rate: number }[] = [];
 
     for (const [cur, rawAmount] of Object.entries(revenue)) {
-      const amount = Number(rawAmount) / 100;
+      const amount = centsToUnits(Number(rawAmount));
       if (amount === 0) continue;
 
       let rate = 1;
@@ -159,7 +160,7 @@ export function PlansClient({
     );
   };
 
-  const hasTrialPlan = plans.some(p => (Number(p.price) / 100) === 0);
+  const hasTrialPlan = plans.some(p => Number(p.price) === 0);
   const trialPlanStatus = hasTrialPlan ? "Habilitado" : "No detectado";
 
   return (

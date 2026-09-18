@@ -9,17 +9,27 @@
 import type { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL } from './api';
 
-/** Endpoint de borrado por tipo de recurso creado desde los tests. */
-const DELETE_ROUTES: Record<string, (id: number | string) => string> = {
+/**
+ * Endpoint de borrado por tipo de recurso creado desde los tests.
+ *
+ * `null` = el recurso NO se borra por API. Es el caso de `subscription`: un
+ * registro financiero (suscripción + pago) no tiene DELETE — se anula. La
+ * limpieza sigue siendo completa porque el borrado del **miembro** lo arrastra
+ * por FK (`member_id` → ON DELETE CASCADE) y se ejecuta después (LIFO).
+ */
+const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = {
   cmsBlock: (id) => `/api/cms/blocks/${id}`,
   cmsPage: (id) => `/api/cms/pages/${id}`,
   class: (id) => `/api/classes/${id}`,
   trainer: (id) => `/api/trainers/${id}`,
-  subscription: (id) => `/api/subscriptions/${id}`,
+  subscription: null,
   member: (id) => `/api/members/${id}`,
   plan: (id) => `/api/plans/${id}`,
   platformOrg: (id) => `/api/platform/organizations/${id}`,
   platformPlan: (id) => `/api/platform/plans/${id}`,
+  // Borra la suscripción SaaS; los pagos cascaddean por FK
+  // (`subscription_id` → `platform_subscription.id` onDelete cascade).
+  platformSubscription: (id) => `/api/platform/subscriptions/${id}`,
 };
 
 export type DisposableKind = keyof typeof DELETE_ROUTES;

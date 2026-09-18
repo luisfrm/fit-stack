@@ -18,6 +18,8 @@ import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 import { normalizeFeatures } from '@workspace/shared';
 import { addDuration } from '../lib/billing-utils';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
+import type { PlatformReceiptContext } from './platform-receipts.service';
+import { ReceiptError } from './receipts.service';
 
 /** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
 const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
@@ -60,6 +62,8 @@ export interface ChangePlatformPlanPayload {
 
 export interface UpdatePlatformPaymentStatusPayload {
   status: PaymentStatus;
+  /** Motivo de anulación/rechazo (se persiste y viaja al void del comprobante). */
+  voidReason?: string;
 }
 
 /**
@@ -141,8 +145,9 @@ export function createPlatformSubscriptionsService(
      * Soporta planes trial (isTrial=true) y planes free (precio = 0).
      */
     async createSubscriptionWithPayment(
-      data: CreatePlatformSubscriptionPayload
-    ): Promise<{ subscriptionId: number }> {
+      data: CreatePlatformSubscriptionPayload,
+      opts?: PlatformReceiptContext
+    ): Promise<{ subscriptionId: number; paymentId: number }> {
       const plan = await plansRepo.findById(data.planId);
       if (!plan) throw new Error('Plan no encontrado');
 
@@ -153,12 +158,6 @@ export function createPlatformSubscriptionsService(
       if (!isTrial && plan.price === 0) {
         // Para planes free, forzar status=validated
       }
-
-      // Trial: usar trialDays del plan si existen, sino duración del plan
-      const trialDays = plan.trialDays ?? 0;
-      const currentPeriodEnd = isTrial && trialDays > 0
-        ? addDuration(startDate, trialDays, 'day')
-        : addDuration(startDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
 
       // Si es trial o free, forzar status=validated con paymentMethod='trial'|'free'
       let paymentStatus = data.payment.status;
@@ -173,6 +172,18 @@ export function createPlatformSubscriptionsService(
         paymentMethod = 'free';
         amountPaidCents = 0;
       }
+
+      // Punto 7(a): el periodo solo se front-loadea si el alta nace pagada.
+      // Un alta `processing`/`voided`/`refunded` NO regala tiempo:
+      // `currentPeriodEnd = startDate` hasta que se valide (ahí el PATCH lo
+      // extiende usando el snapshot). Trial/free fuerzan `validated` arriba.
+      const trialDays = plan.trialDays ?? 0;
+      const currentPeriodEnd =
+        paymentStatus === PAYMENT_STATUSES.VALIDATED
+          ? isTrial && trialDays > 0
+            ? addDuration(startDate, trialDays, 'day')
+            : addDuration(startDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year")
+          : startDate;
 
       // 1. Crear subscription
       const newSubData: NewPlatformSubscriptionData = {
@@ -207,9 +218,16 @@ export function createPlatformSubscriptionsService(
           ? new Date(data.payment.paymentDate)
           : new Date(),
       };
-      await platformSubsRepo.createPayment(paymentData);
+      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
 
-      return { subscriptionId };
+      // Emisión C2: el paso 1 numera donde el pago queda validado (trial/
+      // free $0 hacen SKIP dentro del servicio). Sesión console ≠ pagador:
+      // no se pasa payer (queda NULL → solo owners + log).
+      if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
+        await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+      }
+
+      return { subscriptionId, paymentId };
     },
 
     /**
@@ -218,8 +236,9 @@ export function createPlatformSubscriptionsService(
      */
     async renewSubscription(
       subscriptionId: number,
-      data: RenewPlatformSubscriptionPayload
-    ): Promise<{ newPeriodEnd: Date }> {
+      data: RenewPlatformSubscriptionPayload,
+      opts?: PlatformReceiptContext
+    ): Promise<{ newPeriodEnd: Date; paymentId: number }> {
       const sub = await platformSubsRepo.findById(subscriptionId);
       if (!sub) throw new Error('Suscripción no encontrada');
       if (sub.cancelledAt) throw new Error('No se puede renovar una suscripción cancelada');
@@ -265,14 +284,18 @@ export function createPlatformSubscriptionsService(
           ? new Date(data.payment.paymentDate)
           : new Date(),
       };
-      await platformSubsRepo.createPayment(paymentData);
+      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
 
       // Extender periodo (side effect del pago)
       if (data.payment.status === PAYMENT_STATUSES.VALIDATED) {
         await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
+        // Emisión C2 (sesión console ≠ pagador: sin payer).
+        if (opts?.receipts) {
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        }
       }
 
-      return { newPeriodEnd };
+      return { newPeriodEnd, paymentId };
     },
 
     /**
@@ -286,7 +309,8 @@ export function createPlatformSubscriptionsService(
      */
     async renewOrgSubscription(
       subscriptionId: number,
-      data: OrgRenewPayload
+      data: OrgRenewPayload,
+      opts?: PlatformReceiptContext
     ): Promise<{ paymentId: number }> {
       const sub = await platformSubsRepo.findById(subscriptionId);
       if (!sub) throw new Error('Suscripción no encontrada');
@@ -321,6 +345,12 @@ export function createPlatformSubscriptionsService(
       };
       const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
 
+      // Pagador real (sesión org renovadora). `processing` no numera: la
+      // emisión ocurre al validar en `updatePaymentStatus`.
+      if (opts?.receipts && opts?.payer) {
+        await opts.receipts.setPayerIfMissing(paymentId, opts.payer);
+      }
+
       return { paymentId };
     },
 
@@ -329,7 +359,8 @@ export function createPlatformSubscriptionsService(
      */
     async changePlan(
       organizationId: string,
-      data: ChangePlatformPlanPayload
+      data: ChangePlatformPlanPayload,
+      opts?: PlatformReceiptContext
     ): Promise<{ subscriptionId: number }> {
       const current = await platformSubsRepo.findActiveByOrganization(organizationId);
 
@@ -338,14 +369,14 @@ export function createPlatformSubscriptionsService(
         await platformSubsRepo.cancel(current.id, 'Plan cambiado');
       }
 
-      // Crear nueva suscripción
+      // Crear nueva suscripción (reenvía opts: el hook emite si valida).
       return this.createSubscriptionWithPayment({
         organizationId,
         planId: data.newPlanId,
         isTrial: data.isTrial,
         priceOverrideCents: data.priceOverrideCents,
         payment: data.payment,
-      });
+      }, opts);
     },
 
     /**
@@ -354,14 +385,15 @@ export function createPlatformSubscriptionsService(
      */
     async registerPayment(
       subscriptionId: number,
-      data: PlatformPaymentPayload
+      data: PlatformPaymentPayload,
+      opts?: PlatformReceiptContext
     ): Promise<{ paymentId: number }> {
       const sub = await platformSubsRepo.findById(subscriptionId);
       if (!sub) throw new Error('Suscripción no encontrada');
       if (sub.cancelledAt) throw new Error('No se puede registrar un pago en una suscripción cancelada');
 
       const hasPending = await platformSubsRepo.hasPendingPayment(subscriptionId);
-      if (hasPending && (data.status === PAYMENT_STATUSES.PENDING || data.status === PAYMENT_STATUSES.PROCESSING)) {
+      if (hasPending && data.status === PAYMENT_STATUSES.PROCESSING) {
         throw new Error('Ya existe un pago pendiente o en proceso para esta suscripción');
       }
 
@@ -396,6 +428,10 @@ export function createPlatformSubscriptionsService(
           const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
           await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
         }
+        // Emisión C2 (sesión console ≠ pagador: sin payer).
+        if (opts?.receipts) {
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        }
       }
 
       return { paymentId };
@@ -426,26 +462,89 @@ export function createPlatformSubscriptionsService(
       return platformSubsRepo.findPaymentById(paymentId);
     },
 
+    /**
+     * Cambia el estado de un pago SaaS y devuelve el resultado del intento de
+     * anulación: el servicio interno LANZA `RECEIPT_NOT_ISSUED` cuando el pago
+     * no tiene número, pero el endpoint responde **200** con
+     * `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6): un
+     * silencio no le dice nada al operador.
+     */
     async updatePaymentStatus(
       paymentId: number,
-      data: UpdatePlatformPaymentStatusPayload
-    ): Promise<void> {
+      data: UpdatePlatformPaymentStatusPayload,
+      opts?: PlatformReceiptContext
+    ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
       const payment = await platformSubsRepo.findPaymentById(paymentId);
       if (!payment) throw new Error('Pago no encontrado');
+      // `wasPending` = no estaba validado. Re-PATCH a `validated` no
+      // re-extiende ni renumera (idempotencia).
+      const wasPending = payment.status !== PAYMENT_STATUSES.VALIDATED;
 
-      await platformSubsRepo.updatePaymentStatus(paymentId, data.status);
+      // Auditoría de anulación SIEMPRE en el pago (haya o no comprobante).
+      await platformSubsRepo.updatePaymentStatus(paymentId, data.status, {
+        voidedBy: opts?.by,
+        voidReason: data.voidReason,
+      });
 
-      // Side effects según nuevo status
-      if (data.status === PAYMENT_STATUSES.VALIDATED && payment.subscriptionId) {
-        const sub = await platformSubsRepo.findById(payment.subscriptionId);
-        const plan = await plansRepo.findById(payment.planId);
-        if (sub && plan && !sub.cancelledAt) {
-          const baseDate =
-            sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-          const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
-          await platformSubsRepo.updatePeriodEnd(sub.id, newPeriodEnd);
+      // VOIDED con número emitido: conserva número + PDF y marca ANULADO.
+      // Sin número no hay comprobante que anular, y eso se informa. Solo
+      // VOIDED: REFUNDED no toca `receiptVoided`.
+      let receiptVoided = false;
+      let receiptVoidReason: 'not_issued' | undefined;
+      if (data.status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+        try {
+          await opts.receipts.markPlatformReceiptVoided({
+            paymentId,
+            by: opts.by,
+            reason: data.voidReason ?? 'Pago anulado',
+          });
+          receiptVoided = true;
+        } catch (err) {
+          if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') {
+            receiptVoidReason = 'not_issued';
+          } else {
+            throw err;
+          }
         }
       }
+
+      // Side effects según nuevo status: extender periodo SOLO en la
+      // transición a validado, con la duración del SNAPSHOT del pago (no el
+      // plan vivo, que pudo cambiar desde la creación). Fallback al plan vivo
+      // solo si el snapshot no trae duración.
+      if (data.status === PAYMENT_STATUSES.VALIDATED && wasPending && payment.subscriptionId) {
+        const sub = await platformSubsRepo.findById(payment.subscriptionId);
+        if (sub && !sub.cancelledAt) {
+          let duration: { value: number; unit: 'day' | 'week' | 'month' | 'year' } | null = null;
+          if (payment.planSnapshotDurationValue != null && payment.planSnapshotDurationUnit) {
+            duration = {
+              value: payment.planSnapshotDurationValue,
+              unit: payment.planSnapshotDurationUnit as 'day' | 'week' | 'month' | 'year',
+            };
+          } else {
+            const plan = await plansRepo.findById(payment.planId);
+            if (plan) {
+              duration = {
+                value: plan.durationValue,
+                unit: plan.durationUnit as 'day' | 'week' | 'month' | 'year',
+              };
+            }
+          }
+          if (duration) {
+            const baseDate =
+              sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
+            const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit);
+            await platformSubsRepo.updatePeriodEnd(sub.id, newPeriodEnd);
+          }
+        }
+        // Emisión C2 solo en transición →validated (re-PATCH no renumera
+        // por idempotencia del attach; sesión console ≠ pagador: sin payer).
+        if (opts?.receipts) {
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        }
+      }
+
+      return { receiptVoided, receiptVoidReason };
     },
 
     async getOrganizationInvoices(organizationId: string) {
@@ -459,11 +558,13 @@ export function createPlatformSubscriptionsService(
       currentPeriodEnd: Date;
       cancelledAt?: Date | null;
       isTrial?: boolean;
+      hasValidatedPayment: boolean;
     }): PlatformSubscriptionStatus {
       return computePlatformSubscriptionStatus({
         currentPeriodEnd: sub.currentPeriodEnd,
         cancelledAt: sub.cancelledAt,
         isTrial: sub.isTrial,
+        hasValidatedPayment: sub.hasValidatedPayment,
       });
     },
   };

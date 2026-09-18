@@ -1,11 +1,13 @@
-import { api, type ApiFetchOptions } from "@/lib/api/client";
+import { api, apiBlob, type ApiFetchOptions } from "@/lib/api/client";
 import type {
   PlatformSubscriptionStatus,
   IPaginatedResult,
   IPlatformSubscription,
   IPlatformSubscriptionPayment,
   IPaymentMethodDetails,
+  IReceiptsReportResult,
   PaymentStatus,
+  ReceiptReportStatusFilter,
 } from "@workspace/shared/types";
 
 export type SubscriptionWithDetails = IPlatformSubscription;
@@ -67,6 +69,17 @@ export interface ChangePlanPayload {
   isTrial?: boolean;
   priceOverrideCents?: number;
   payment: PlatformPaymentPayload;
+}
+
+export interface ReceiptsReportFilters {
+  from?: string;
+  to?: string;
+  status?: ReceiptReportStatusFilter;
+  method?: string;
+  /** Año UTC de `payment_date` (la serie FS-N es continua, no lleva año). */
+  year?: number;
+  page?: number;
+  limit?: number;
 }
 
 const SUBSCRIPTIONS_PATH = "/platform/subscriptions";
@@ -270,14 +283,72 @@ export const platformSubscriptionsService = {
 
   /**
    * Updates the status of an existing payment.
+   *
+   * Devuelve el resultado del intento de anulación del comprobante: con
+   * `voided` sin comprobante emitido, `receiptVoided` es `false` y
+   * `receiptVoidReason` es `'not_issued'` (C6).
    */
   async updatePaymentStatus(
     paymentId: number,
     status: PaymentStatus,
-  ): Promise<void> {
-    await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`, {
-      method: "PATCH",
-      body: { status },
+    voidReason?: string,
+  ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
+    return await api<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }>(
+      `${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`,
+      { method: 'PATCH', body: voidReason ? { status, voidReason } : { status } },
+    );
+  },
+
+  /* ── Auditoría del correlativo (C4) ── */
+
+  /**
+   * Reporte de comprobantes `FS-N`: filas, resumen, totales por moneda y
+   * gaps (hueco sospechoso vs anulado explicado). Espejo del Panel.
+   * `limit` admite hasta 1000 para la exportación CSV.
+   */
+  async getReceiptsReport(
+    filters: ReceiptsReportFilters = {},
+    options?: ApiFetchOptions,
+  ): Promise<IReceiptsReportResult> {
+    const query: Record<string, string | number> = {};
+    if (filters.from) query.from = filters.from;
+    if (filters.to) query.to = filters.to;
+    if (filters.status && filters.status !== "all") query.status = filters.status;
+    if (filters.method) query.method = filters.method;
+    if (filters.year) query.year = filters.year;
+    if (filters.page) query.page = filters.page;
+    if (filters.limit) query.limit = filters.limit;
+    return await api<IReceiptsReportResult>(`${SUBSCRIPTIONS_PATH}/receipts`, {
+      query,
+      ...options,
+    });
+  },
+
+  /* ── Comprobantes SaaS (C3) ── */
+
+  /**
+   * Descarga el PDF del comprobante (`FS-N.pdf`). Lanza si no está listo.
+   */
+  async downloadReceipt(paymentId: number): Promise<Blob> {
+    return await apiBlob(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/receipt/pdf`);
+  },
+
+  /**
+   * Reenvía el comprobante a payer+owners (contrato 4 ramas del POST resend:
+   * ready / pending-202 / presystem / error).
+   */
+  async resendReceipt(
+    paymentId: number,
+  ): Promise<{
+    success: boolean;
+    queued?: boolean;
+    available?: boolean;
+    pdfStatus?: "ready" | "pending";
+    reason?: string;
+    attachment?: boolean;
+  }> {
+    return await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/resend`, {
+      method: "POST",
     });
   },
 };

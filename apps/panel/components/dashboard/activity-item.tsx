@@ -6,7 +6,7 @@ import { Text } from "@workspace/ui/components";
 import { NextImage } from "@workspace/ui/components/next/image";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 
 interface ActivityItemProps {
   name: string;
@@ -50,7 +50,7 @@ export function ActivityItem({ name, time, imageUrl, planName, amountPaid, curre
         <div className="flex items-center gap-2">
           {amountPaid !== undefined && (
             <Text as="span" size="xs" variant="muted" className="tabular-nums">
-              {ValueConverter.format(amountPaid / 100, currencyPaid || 'USD', currencyFormat)}
+              {formatCents(amountPaid, currencyPaid || 'USD', currencyFormat)}
             </Text>
           )}
           {endDate && (

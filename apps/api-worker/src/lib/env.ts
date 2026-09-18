@@ -40,6 +40,8 @@ export type Env = {
   // Cloudflare Bindings
   FILES_BUCKET: R2Bucket;
   TASK_QUEUE: Queue;
+  /** Producer de fit-receipt-events (paso 1 + issue + re-encolados). */
+  RECEIPT_QUEUE: Queue;
 };
 
 export type Session = NonNullable<

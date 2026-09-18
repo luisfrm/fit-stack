@@ -6,7 +6,8 @@ export interface IMembershipPlan {
   id?: number;
   organizationId: string;
   name: string;
-  price: string | number;
+  /** Precio en centavos enteros. */
+  price: number;
   currency: string;
   durationValue: number;
   durationUnit: 'day' | 'week' | 'month' | 'year';
@@ -109,7 +110,7 @@ export function createPlansRepository(db: Db) {
         .values({
           organizationId,
           name: data.name,
-          price: data.price.toString(),
+          price: data.price,
           currency: data.currency,
           durationValue: data.durationValue,
           durationUnit: data.durationUnit,
@@ -127,7 +128,7 @@ export function createPlansRepository(db: Db) {
         .update(membershipPlan)
         .set({
           name: data.name,
-          price: data.price?.toString(),
+          price: data.price,
           currency: data.currency,
           durationValue: data.durationValue,
           durationUnit: data.durationUnit as any,

@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures';
 import { uid, uniqueEmail } from '../helpers/api';
 import { SELECTORS } from '../helpers/selectors';
 import { TEST_CLASS, TEST_ORG } from '../helpers/test-tenant';
-import { addLocalDays, toLocalDayString } from '@workspace/shared';
+import { addLocalDays, toLocalDayString, getVoidKind } from '@workspace/shared';
 
 // Fixture por test con limpieza automática (fixture `panelApi` → LIFO al
 // terminar, incluso si el test falla). La org de la suite se borra completa en
@@ -74,6 +74,79 @@ test.describe('Panel — Pago pendiente accionable', () => {
 
     // La tabla y los KPIs siguen visibles tras el refresh.
     await expect(page.locator(SELECTORS.common.table).first()).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('rechazar desde el accionable deja la suscripción ANULADA y quita el pendiente', async ({
+    page,
+    panelApi,
+  }) => {
+    const email = uniqueEmail('reject');
+    const lastName = `Rechazado ${uid()}`;
+    const tz = TEST_ORG.timezone;
+    const today = toLocalDayString(tz);
+
+    const plan = await panelApi.create<any>('plan', '/api/plans', {
+      name: `Plan Rechazo ${uid()}`,
+      price: 50,
+      currency: 'USD',
+      durationValue: 1,
+      durationUnit: 'month',
+      features: ['Acceso'],
+      isPopular: false,
+      isActive: true,
+      isVisibleOnSite: true,
+    });
+    const member = await panelApi.create<any>('member', '/api/members', {
+      firstName: 'Rechazado',
+      lastName,
+      email,
+      role: 'member',
+      isActive: true,
+      sendInvite: false,
+    });
+    await panelApi.create('subscription', '/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: today,
+      endDate: addLocalDays(tz, today, 30),
+      payment: {
+        amountPaid: 5000,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        status: 'processing',
+        paymentDate: today,
+      },
+    });
+
+    const list = await panelApi.get<{
+      data?: Array<{ memberEmail?: string; paymentId?: number; receiptNumber?: string | null }>;
+    }>('/api/subscriptions', { status: 'processing', limit: 50 });
+    const row = list.data?.find((r) => r.memberEmail === email);
+    const paymentId = row?.paymentId ?? 0;
+    expect(paymentId, 'el fixture de pago processing debe aparecer en el listado').toBeTruthy();
+
+    await page.goto('/payments', { waitUntil: 'domcontentloaded' });
+    const item = page.locator(SELECTORS.subscriptions.pendingItem(paymentId));
+    await expect(item).toBeVisible({ timeout: 30_000 });
+
+    await item.locator('.pending-reject').click();
+    // Rechazar = `voided`: sale de la lista de trabajo (`processing`).
+    await expect(item).toBeHidden({ timeout: 20_000 });
+
+    // La fila persiste como ANULADA; el cobro sin comprobante se etiqueta
+    // "Rechazado" (no "Anulado"), derivado con `getVoidKind`.
+    const paymentLabel =
+      getVoidKind({ receiptNumber: row?.receiptNumber ?? null }) === 'rejected'
+        ? 'Rechazado'
+        : 'Anulado';
+
+    const search = page.getByPlaceholder('Buscar por usuario o nivel de plan...');
+    await search.fill(lastName);
+    const tableRow = page.locator('tr', { hasText: lastName }).first();
+    await expect(tableRow).toBeVisible({ timeout: 20_000 });
+    await expect(tableRow).toContainText('ANULADA');
+    await expect(tableRow).toContainText(paymentLabel);
   });
 });
 

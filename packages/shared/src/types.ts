@@ -1,6 +1,7 @@
 import { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@workspace/shared/constants';
 import type { PlatformRole } from './access-control';
 import type { PlanFeaturesV2 } from './features/catalog';
+import type { ReceiptGapItem } from './documents/receipt-gaps';
 
 export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
 
@@ -309,7 +310,7 @@ export interface ISubscription {
   role?: string;
   isActive?: boolean;
 
-  // Payment Data (From Join)
+  // Payment Data (From Join) — montos en centavos enteros (convención Money)
   paymentId?: number;
   amountPaid?: number;
   currencyPaid?: string;
@@ -318,6 +319,12 @@ export interface ISubscription {
   exchangeRateApplied?: string;
   paymentStatus?: PaymentStatus;
   paymentDate?: string;
+
+  // Correlative receipt (columnas reales desde Fase 1; ver IPayment)
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptVoided?: boolean;
 }
 
 export interface IPaymentMethodDetail {
@@ -325,7 +332,6 @@ export interface IPaymentMethodDetail {
   value: string;
   type?: 'text' | 'file' | 'number';
 }
-
 /**
  * Contracto canónico de `paymentMethodDetails` (panel + console + API).
  * Los forms envían un array de items auto-descriptivos; el API lo valida
@@ -368,7 +374,35 @@ export interface ITaxDetail {
 }
 
 /**
+ * Contratos del módulo `documents/` (Fase 0). Se re-exportan aquí para que
+ * los consumers que ya importan de `@workspace/shared` (tipos) los
+ * encuentren sin importar rutas profundas. La implementación canónica vive
+ * en `src/documents/` — nunca duplicar.
+ */
+export type { FiscalConfig } from './documents/fiscal-profile';
+export type {
+  ReceiptData,
+  ReceiptChecklist,
+  ReceiptDocumentType,
+  ReceiptEmitter,
+  ReceiptRecipient,
+  ReceiptDocument,
+  ReceiptSale,
+  ReceiptAmounts,
+  ReceiptMethod,
+  ReceiptFooter,
+} from './documents/receipt-data';
+export type {
+  ReceiptGapItem,
+  ReceiptGapKind,
+  ReceiptGapEntry,
+  ComputeReceiptGapsInput,
+} from './documents/receipt-gaps';
+
+/**
  * Interface for a Payment record.
+ * Montos (planSnapshotPrice, amountPaid, subtotal, taxTotal) en centavos
+ * enteros (convención Money). Display solo vía `formatCents`.
  */
 export interface IPayment {
   id?: number;
@@ -393,8 +427,110 @@ export interface IPayment {
   taxTotal?: number;
   taxDetails?: ITaxDetail[] | null;
 
+  // Correlative receipt (Fase 0: tipos; columnas reales en Fase 1)
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | null;
+  receiptPdfKey?: string | null;
+  documentType?: 'receipt' | 'invoice';
+  receiptVoided?: boolean;
+  taxOverrideReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+
   paymentDate: string;
   createdAt?: string;
+}
+
+/* ── Receipts report (Fase 5) ── */
+
+/** Estado de auditoría de una fila del reporte (nunca mezcla anulado/hueco). */
+export type ReceiptReportState = 'issued' | 'pending' | 'voided' | 'pre_system';
+
+export type ReceiptReportStatusFilter =
+  | 'all'
+  | ReceiptReportState
+  | 'gaps';
+
+export interface IReceiptReportRow {
+  /** @internal UUID técnico: solo para fetch del dialog, NUNCA renderizar. */
+  paymentId: number;
+  /** Número humano; `null` = anterior al sistema (pre_system). */
+  receiptNumber: string | null;
+  state: ReceiptReportState;
+  /** `ready` | `pending` | `null` (pre_system no tiene PDF). */
+  pdfStatus: 'ready' | 'pending' | null;
+  /**
+   * Receptor del comprobante: el miembro (Panel) o la organización que paga
+   * (Console, donde el emisor es FitStack).
+   */
+  memberName: string;
+  /** Solo Panel; `null` en Console (el receptor es una organización). */
+  memberEmail?: string | null;
+  planName: string;
+  /** Centavos enteros (convención Money). */
+  subtotal: number | null;
+  taxTotal: number | null;
+  taxDetails: ITaxDetail[];
+  amountPaid: number;
+  currencyPaid: string;
+  paymentMethod: string;
+  paymentStatus?: string;
+  paymentDate: string;
+  receiptIssuedAt: string | null;
+  voided: boolean;
+  taxOverrideReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+  /** Actor que emitió (`issued_by`, C5); `null` en históricos o barrido. */
+  issuedBy?: string | null;
+  /** Emisor congelado en el snapshot (`emitter.name`, C1); `null` pre-C1. */
+  emitterName?: string | null;
+}
+
+export interface IReceiptTaxTotal {
+  name: string;
+  /** Centavos enteros. */
+  amount: number;
+}
+
+/** Totales por moneda (nunca sumas mixtas). */
+export interface IReceiptCurrencyTotal {
+  currency: string;
+  /** Centavos enteros. */
+  subtotal: number;
+  taxTotal: number;
+  amount: number;
+  byTax: IReceiptTaxTotal[];
+}
+
+export interface IReceiptReportSummary {
+  issued: number;
+  pending: number;
+  voided: number;
+  preSystem: number;
+}
+
+export interface IReceiptsReportFilters {
+  from?: string;
+  to?: string;
+  status?: ReceiptReportStatusFilter;
+  method?: string;
+  year?: number;
+  page?: number;
+  limit?: number;
+}
+
+export interface IReceiptsReportResult {
+  rows: IReceiptReportRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: IReceiptReportSummary;
+  totals: IReceiptCurrencyTotal[];
+  gaps: ReceiptGapItem[];
 }
 
 /* ── API DTOs ── */
@@ -502,6 +638,12 @@ export interface IPlatformSubscriptionPayment {
 
   // Estado
   status: PaymentStatus;
+
+  // Comprobante SaaS (C1-C3). NULL = anterior al sistema / $0 SKIP.
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | Date | null;
+  receiptPdfKey?: string | null;
+  receiptVoided?: boolean;
 }
 
 /** @deprecated usar IPlatformSubscriptionPayment */

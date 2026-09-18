@@ -49,4 +49,10 @@ export const DEFAULT_PLATFORM_SETTINGS: Record<string, string> = {
   active_payment_methods: '[]',
   ai_provider_default: 'openrouter',
   feature_flags_free_tier_enabled: 'false',
+  // Identidad legal del emisor FitStack (C1, comprobantes Console). Vacías =
+  // emisor genérico "FitStack" + gate "Comprobante de pago" (nunca "Factura").
+  fitstack_legal_name: '',
+  fitstack_tax_id: '',
+  fitstack_address: '',
+  fitstack_country_code: '',
 };

@@ -18,7 +18,7 @@
 
 - Registrar con exactitud cada pago: monto, moneda, tasa de cambio aplicada, método, fecha, estado.
 - Generar un documento (PDF) claro, consistente y exportable en cualquier momento por la Org — no solo un envío de correo puntual.
-- Ser honesto en el documento sobre su naturaleza: es un **comprobante de pago**, no una factura fiscal, salvo que la Org cumpla los tres requisitos de la sección "Cuándo pasar a factura" (ver `facturacion-comprobantes.md`).
+- Ser honesto en el documento sobre su naturaleza: es un **comprobante de pago**, no una factura fiscal, salvo que la Org cumpla los tres requisitos de la sección "Cuándo pasar a factura" (ver `docs/FACTURATION.md`).
 - Dar a la Org herramientas para exportar/estructurar su data si necesita facturar por su cuenta.
 - No impedir ni encarecer que la Org use esa data en su propio sistema contable externo.
 - Documentar en Términos de Servicio que FitStack no asume responsabilidad tributaria de las ventas gym → member.

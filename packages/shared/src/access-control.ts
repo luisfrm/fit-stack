@@ -58,7 +58,9 @@ const organizationStatement = {
   reports: ["read"],
   members: ["read", "create", "update", "delete"],
   staff: ["read", "create", "update", "delete"],
-  subscriptions: ["read", "create", "update", "delete"],
+  // Un registro financiero (suscripción + pago) NO se elimina: se anula.
+  // Por eso `subscriptions` no expone `delete` a ningún rol.
+  subscriptions: ["read", "create", "update"],
   plans: ["read", "create", "update", "delete"],
   classes: ["read", "create", "update", "delete"],
   content: ["read", "create", "update", "delete"],
@@ -133,7 +135,7 @@ export const organizationRoles = {
     reports: ["read"],
     members: ["read", "create", "update", "delete"],
     staff: ["read", "create", "update", "delete"],
-    subscriptions: ["read", "create", "update", "delete"],
+    subscriptions: ["read", "create", "update"],
     plans: ["read", "create", "update", "delete"],
     classes: ["read", "create", "update", "delete"],
     content: ["read", "create", "update", "delete"],

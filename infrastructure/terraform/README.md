@@ -7,7 +7,15 @@ Esta carpeta contiene toda la infraestructura de Cloudflare como código.
 - **Workers** (`api-worker`, `jobs-worker`) con bindings de R2, Queues y plain text.
 - **R2 Bucket** para archivos (logos, imágenes CMS, etc.).
 - **Queues** para tareas asíncronas (emails, PDFs) y su DLQ.
+- **Queue consumers** de `jobs-worker`: `fit-task-events` (emails) y `fit-receipt-events` (render de comprobantes), cada uno con su DLQ.
+- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver `docs/PENDING.md`).
 - **Secrets** de cada worker (DATABASE_URL, BETTER_AUTH_SECRET, etc.).
+
+> **Dueño único de consumers/cron = Terraform.** Los `wrangler.jsonc` de los workers solo declaran `producers` (y R2), nunca `queues.consumers` ni `triggers`, para que `wrangler deploy` no compita con el estado. Los `wrangler deploy` suben el **código** (incl. el `scheduled()`); el trigger lo crea este Terraform.
+>
+> **Orden por ambiente:** `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`). El `scheduled()` debe existir en el script para que el cron haga algo.
+>
+> **⚠️ Si una cola se creó fuera de Terraform** (a mano con `wrangler`/dashboard), el primer `apply` fallará con "already exists" (409). Hay que importarla antes: `terraform import module.receipt_queue.cloudflare_queue.this <queue_id>` y lo mismo para su DLQ (`module.receipt_dlq_queue.cloudflare_queue.this`). Los `.tf` no incluyen bloques `import`.
 
 ## Modelo de ambientes
 
@@ -15,7 +23,7 @@ Un solo set de archivos Terraform. Cada ambiente se selecciona en el workflow de
 
 **Los secrets y variables son nombres simples** (sin prefijo). GitHub ya los aísla por environment, así que `CLOUDFLARE_API_TOKEN` en `production` es distinto de `CLOUDFLARE_API_TOKEN` en `staging`.
 
-Actualmente configurado: **`production`**.
+Actualmente configurados: **`dev`**, **`staging`** y **`production`** (cada uno con su state en `key=<env>/terraform.tfstate`).
 
 ## Prerrequisitos
 
@@ -56,22 +64,24 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 | `RESEND_FROM_EMAIL` | Email de envío |
 | `PANEL_URL` | URL del panel de tenants (ej: `https://fitstack-panel.luisrivas.site`) |
 | `CONSOLE_URL` | URL del console SaaS (ej: `https://fitstack-console.luisrivas.site`) |
-| `EMAIL_PROVIDER` | `smtp` o `resend` (jobs-worker) |
+| `EMAIL_PROVIDER` | `resend` o `gmail` (jobs-worker) |
 | `SMTP_USER` | Usuario SMTP (si EMAIL_PROVIDER=smtp) |
 | `SMTP_PASS` | Contraseña SMTP (si EMAIL_PROVIDER=smtp) |
 | `ACCESS_CONTROL_API_KEY` | API key del Bridge (pausado — se agrega al migrar access-control al api-worker) |
 
-### 3. Configurar Environment variables (en `production`)
+### 3. Nombres de recursos (derivados — sin variables)
 
-Solo los nombres de los recursos. No son sensibles:
+Los nombres de workers, bucket R2 y colas **se derivan en `main.tf`** como `nombre fijo + sufijo de ambiente` (producción sin sufijo, `staging`/`dev` con `-<env>`). **No se configuran variables de nombre** en GitHub: el fallback derivado es la única fuente.
 
-| Variable | Ejemplo |
-|----------|---------|
-| `API_WORKER_NAME` | `fit-stack-api` |
-| `JOBS_WORKER_NAME` | `fit-stack-jobs` |
-| `FILES_BUCKET_NAME` | `fit-stack-files` |
-| `QUEUE_NAME` | `fit-task-events` |
-| `DLQ_QUEUE_NAME` | `fit-task-events-dlq` |
+| Recurso | production | staging | dev |
+|---|---|---|---|
+| Worker API | `fit-stack-api` | `fit-stack-api-staging` | `fit-stack-api-dev` |
+| Worker Jobs | `fit-stack-jobs` | `fit-stack-jobs-staging` | `fit-stack-jobs-dev` |
+| Bucket R2 | `fit-stack-files` | `fit-stack-files-staging` | `fit-stack-files-dev` |
+| Cola emails (DLQ) | `fit-task-events` (`fit-task-events-dlq`) | `…-staging` | `…-dev` |
+| Cola receipts (DLQ) | `fit-receipt-events` (`fit-receipt-events-dlq`) | `…-staging` | `…-dev` |
+
+> **Paridad 1:1 con los `wrangler.jsonc` de `apps/*`.** Cambiar un nombre exige tocar `main.tf` y el `wrangler.jsonc` en el mismo PR. `pnpm check:infra-parity` (paso en `ci.yml`) falla si divergen.
 
 ### 4. Configurar Repository secrets (compartidos)
 
@@ -97,13 +107,9 @@ Estos se usan para acceder al bucket de estado de Terraform. Son **repository se
 ```bash
 cd infrastructure/terraform
 
+export TF_VAR_environment="production"
 export TF_VAR_cloudflare_api_token="..."
 export TF_VAR_cloudflare_account_id="..."
-export TF_VAR_api_worker_name="fit-stack-api"
-export TF_VAR_jobs_worker_name="fit-stack-jobs"
-export TF_VAR_files_bucket_name="fit-stack-files"
-export TF_VAR_queue_name="fit-task-events"
-export TF_VAR_dlq_queue_name="fit-task-events-dlq"
 export TF_VAR_better_auth_url="https://api.fit-stack.com"
 # ... resto de variables
 
@@ -132,11 +138,9 @@ Cada ambiente tiene su propio path en R2:
 1. Settings > Environments > New environment (ej: `staging`).
 2. Decide si requiere aprobador.
 3. En "Environment secrets", agrega los mismos secrets que tiene `production` (con los valores de staging).
-4. En "Environment variables", agrega los nombres de los recursos de staging (ej: `API_WORKER_NAME=fit-stack-api-staging`).
-5. Ejecuta `terraform.yml` con `environment: staging`.
-6. Listo. Los workflows de deploy también lo soportan.
+4. Ejecuta `terraform.yml` con `environment: staging`.
 
-**No necesitas modificar archivos del repo.**
+**No necesitas modificar archivos del repo ni definir variables de nombre**: los recursos se derivan con el sufijo del ambiente.
 
 ## Cómo desplegar en otra cuenta de Cloudflare
 
@@ -145,10 +149,9 @@ Cada ambiente tiene su propio path en R2:
 3. Settings > Environments > New environment (ej: `fitstack`).
 4. En ese environment, configura `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID` con los valores de la nueva cuenta.
 5. Configura el resto de secrets apuntando a esa cuenta.
-6. Configura las variables de nombres de recursos.
-7. Ejecuta `terraform.yml` con `environment: fitstack`.
+6. Ejecuta `terraform.yml` con `environment: fitstack`.
 
-**Cero cambios en código.**
+> Con nombres fijos `fit-*`, la nueva cuenta reutiliza los mismos nombres de recursos (aislados por cuenta). Si necesitas otros nombres, cambia `main.tf` **y** los `wrangler.jsonc` de `apps/*` en el mismo PR (la paridad la verifica `pnpm check:infra-parity`).
 
 ## Estructura
 
@@ -163,6 +166,8 @@ infrastructure/terraform/
 ├── storage.tf            # R2 bucket
 ├── secrets.tf            # Nota: secrets van inline en workers.tf
 ├── outputs.tf            # Outputs
+├── scripts/
+│   └── check-name-parity.mjs  # Verifica paridad de nombres con los wrangler.jsonc (CI)
 ├── .gitignore
 └── modules/
     ├── worker/

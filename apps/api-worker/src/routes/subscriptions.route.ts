@@ -8,8 +8,10 @@ import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
+import { createReceiptsService } from '../services/receipts.service';
+import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createCache, type Cache } from '../lib/cache';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -25,6 +27,7 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
   await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
   await cache.invalidate(`org:${orgId}:dashboard:action-items`);
   await cache.invalidate(`org:${orgId}:reports:revenue*`);
+  await cache.invalidate(`org:${orgId}:reports:receipts*`);
 }
 
 const createSubSchema = z.object({
@@ -33,13 +36,21 @@ const createSubSchema = z.object({
   startDate: z.string(),
   endDate: z.string(),
   payment: z.object({
-    amountPaid: z.number().positive(),
+    // Todo dinero en centavos enteros (convención Money, ver AGENTS.md).
+    amountPaid: z.number().int().positive(),
     currencyPaid: z.string(),
     exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: z.string(),
     paymentMethodDetails: paymentMethodDetailsSchema,
-    status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
+    status: z.enum(['processing', 'validated', 'voided']).optional(),
     paymentDate: z.string().optional(),
+    // Desglose fiscal en centavos enteros (Fase 0: schema abierto; el
+    // servicio lo calcula por defecto y solo acepta override con
+    // taxOverrideReason en Fase 2).
+    subtotal: z.number().int().positive().optional(),
+    taxTotal: z.number().int().min(0).optional(),
+    taxDetails: z.array(taxDetailSchema).optional(),
+    taxOverrideReason: z.string().optional(),
   }),
 });
 
@@ -100,8 +111,18 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE);
+    const orgSlug =
+      c.get('org')?.slug ??
+      (await createOrganizationsRepository(db).findById(orgId))?.slug ??
+      null;
 
-    const newSub = await subsService.create(orgId, payload as any, timezone);
+    const newSub = await subsService.create(orgId, payload as any, timezone, {
+      receipts: receiptsService,
+      orgSlug,
+      // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
+      by: c.get('user')?.id,
+    });
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(newSub, 201);
   })
@@ -122,21 +143,6 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const updated = await subsService.updateStatus(orgId, id, status);
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(updated);
-  })
-
-  // DELETE /api/subscriptions/:id
-  .delete('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.DELETE), async (c) => {
-    const orgId = c.get('orgId')!;
-    const id = Number(c.req.param('id'));
-    const cache = createCache(c.env);
-
-    const db = c.get('db');
-    const subsRepo = createSubscriptionsRepository(db);
-    const paymentsRepo = createPaymentsRepository(db);
-    const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
-
-    await subsService.delete(orgId, id);
-    await invalidateSubscriptionDependentCaches(cache, orgId);
-    return c.json({ success: true });
   });
+// Nota: no existe DELETE /:id. Un registro financiero (suscripción + pago) no
+// se elimina nunca — se anula el cobro (`PATCH /api/payments/:id/status`).

@@ -25,6 +25,8 @@ interface CountrySelectorProps {
   readonly error?: string;
   readonly placeholder?: string;
   readonly required?: boolean;
+  /** Read-only: el trigger no abre el listado (p. ej. país inmutable). */
+  readonly disabled?: boolean;
 }
 
 export function CountrySelector({
@@ -35,6 +37,7 @@ export function CountrySelector({
   error,
   placeholder = "Seleccionar país...",
   required = false,
+  disabled = false,
 }: CountrySelectorProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -79,6 +82,7 @@ export function CountrySelector({
         type="button"
         variant="secondary"
         fullWidth
+        disabled={disabled}
         onClick={() => setOpen(!open)}
         role="combobox"
         aria-expanded={open}

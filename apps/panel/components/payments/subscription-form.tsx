@@ -7,7 +7,8 @@ import {
   type PaginatedMembers,
   type IMember,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetails
+  type IPaymentMethodDetails,
+  type ITaxDetail
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
@@ -27,13 +28,21 @@ import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/displa
 import { addDuration, localDayStartUtc, toLocalDayString } from "@workspace/shared/date";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { ORG_ROLES } from "@workspace/shared";
+import {
+  centsToUnits,
+  unitsToCents,
+  parseRateValue,
+  previewReceiptTaxes,
+  resolveFiscalProfile,
+  ORG_ROLES,
+  CurrencyFormat
+} from "@workspace/shared";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
-import { CurrencyFormat } from "@/lib/utils/value-converters";
+import { type TaxMode } from "./tax-block";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
   payment: {
@@ -44,7 +53,75 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
     paymentDate?: Date | string;
+    subtotal?: number;
+    taxTotal?: number;
+    taxDetails?: ITaxDetail[];
+    taxOverrideReason?: string;
   }
+}
+
+/**
+ * Checks whether a dynamic field value is considered empty.
+ */
+function isFieldValueEmpty(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  return typeof value === "string" && value.trim() === "";
+}
+
+/**
+ * Validates that all required fields for the selected payment method are populated.
+ */
+function validateDynamicPaymentFields(
+  config: IPaymentMethodConfig | undefined,
+  fieldValues: Record<string, any>
+): boolean {
+  if (!config) return true;
+
+  for (const field of config.fields) {
+    if (field.type === "visual") continue;
+
+    const value = fieldValues[field.id];
+    if (field.required && isFieldValueEmpty(value)) {
+      toast.error(`El campo "${field.label}" es obligatorio`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Validates tax override inputs and rates when taxMode is set to 'override'.
+ */
+function validateTaxOverrides(
+  taxMode: TaxMode,
+  reason: string,
+  rateOverrides: Record<string, string>,
+  preview: unknown
+): boolean {
+  if (taxMode !== "override") return true;
+
+  if (!reason.trim()) {
+    toast.error("Indica el motivo del ajuste manual de impuestos");
+    return false;
+  }
+
+  for (const [name, raw] of Object.entries(rateOverrides)) {
+    if (raw.trim() === "") continue;
+    try {
+      parseRateValue(raw);
+    } catch {
+      toast.error(`Tasa inválida para ${name}`);
+      return false;
+    }
+  }
+
+  if (!preview) {
+    toast.error("No se pudo calcular el desglose de impuestos");
+    return false;
+  }
+
+  return true;
 }
 
 interface SubscriptionFormProps {
@@ -85,6 +162,12 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
+
+  // Fiscal override (modo auto = el backend descompone; override = tasas
+  // manuales + motivo de auditoría, montos siempre en centavos).
+  const [taxMode, setTaxMode] = React.useState<TaxMode>("auto");
+  const [taxRateOverrides, setTaxRateOverrides] = React.useState<Record<string, string>>({});
+  const [taxOverrideReason, setTaxOverrideReason] = React.useState("");
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
@@ -164,10 +247,60 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Filter payment methods by selected currency
   const filteredPaymentMethods = React.useMemo(() => {
-    return activePaymentMethods.filter(m => 
+    return activePaymentMethods.filter(m =>
       m.currency === null || m.currency === paymentCurrency
     );
   }, [activePaymentMethods, paymentCurrency]);
+
+  // Perfil fiscal de la org emisora (defaults del país + overrides).
+  const fiscalProfile = React.useMemo(() => {
+    const countryCode = activeOrganization?.countryCode;
+    if (!countryCode) return null;
+    try {
+      return resolveFiscalProfile(countryCode, activeOrganization?.fiscalConfig);
+    } catch {
+      return null;
+    }
+  }, [activeOrganization]);
+
+  // D6: un emisor que no declaró ser contribuyente formal no detalla
+  // impuestos, así que tampoco puede ajustarlos a mano (el backend lo
+  // rechaza con 400). El modo efectivo es siempre "auto" en ese caso.
+  const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";
+
+  // Preview del desglose con la única fuente compartida. En override se
+  // aplican las tasas manuales; si alguna es inválida se muestra el auto y
+  // el submit se bloquea con toast.
+  const taxPreview = React.useMemo(() => {
+    if (!fiscalProfile) return null;
+    const totalCents = unitsToCents(finalAmount);
+    try {
+      if (effectiveTaxMode !== "override") {
+        const auto = previewReceiptTaxes(totalCents, fiscalProfile, paymentCurrency);
+        return { ...auto, lines: auto.taxDetails };
+      }
+      const taxes = fiscalProfile.taxes.map((tax) => {
+        const raw = taxRateOverrides[tax.name];
+        if (raw === undefined || raw.trim() === "") return tax;
+        return { ...tax, rate: parseRateValue(raw) };
+      });
+      const custom = previewReceiptTaxes(totalCents, { ...fiscalProfile, taxes }, paymentCurrency);
+      return { ...custom, lines: custom.taxDetails };
+    } catch {
+      return null;
+    }
+  }, [fiscalProfile, effectiveTaxMode, taxRateOverrides, finalAmount, paymentCurrency]);
+
+  const handleTaxModeChange = (mode: TaxMode) => {
+    setTaxMode(mode);
+    if (mode === "override" && fiscalProfile && Object.keys(taxRateOverrides).length === 0) {
+      setTaxRateOverrides(
+        Object.fromEntries(
+          fiscalProfile.taxes.map((tax) => [tax.name, String(Number((tax.rate * 100).toFixed(4)))]),
+        ),
+      );
+    }
+  };
 
   // Fetch Exchange Rate and Calculate Amount
   React.useEffect(() => {
@@ -189,7 +322,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       }
 
       setExchangeRate(rate);
-      setFinalAmount((selectedPlan.price * rate) / 100);
+      setFinalAmount(centsToUnits(selectedPlan.price * rate));
     };
 
     updateFinance();
@@ -235,19 +368,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
-    if (selectedPaymentConfig) {
-      for (const field of selectedPaymentConfig.fields) {
-        if (field.type === 'visual') continue;
-        const value = dynamicFieldValues[field.id];
-        const isEmpty = value === undefined || value === null || (typeof value === 'string' && value.trim() === "");
-
-        if (field.required && isEmpty) {
-          toast.error(`El campo "${field.label}" es obligatorio`);
-          return false;
-        }
-      }
+    if (!validateDynamicPaymentFields(selectedPaymentConfig, dynamicFieldValues)) {
+      return false;
     }
-    return true;
+
+    return validateTaxOverrides(effectiveTaxMode, taxOverrideReason, taxRateOverrides, taxPreview);
   };
 
   // Helper to process file uploads in dynamic fields
@@ -304,13 +429,23 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         startDate: startDate, // Raw YYYY-MM-DD string, backend will handle timezone
         endDate: endDate, // Raw YYYY-MM-DD string, backend will handle timezone
         payment: {
-          amountPaid: Math.round(finalAmount * 100),
+          amountPaid: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
           paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
           paymentMethodDetails: finalPaymentMethodDetails,
           status: paymentValidated ? 'validated' : 'processing',
           paymentDate: paymentDate, // Send the selected date string
+          // Modo auto: sin campos fiscales (el backend descompone).
+          // Override: desglose en centavos + motivo de auditoría.
+          ...(effectiveTaxMode === "override" && taxPreview
+            ? {
+              subtotal: taxPreview.subtotal,
+              taxTotal: taxPreview.taxTotal,
+              taxDetails: taxPreview.lines,
+              taxOverrideReason: taxOverrideReason.trim(),
+            }
+            : {}),
         }
       });
     } catch (err: any) {
@@ -400,7 +535,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           onAmountFocus={setAmountFocus}
           onRateChange={(val) => {
             setExchangeRate(val);
-            setFinalAmount((selectedPlan.price * val) / 100);
+            setFinalAmount(centsToUnits(selectedPlan.price * val));
           }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
@@ -416,6 +551,16 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
           disabled={isSectionDisabled}
+          taxPreview={taxPreview}
+          taxMode={taxMode}
+          onTaxModeChange={handleTaxModeChange}
+          taxRateOverrides={taxRateOverrides}
+          onTaxRateChange={(name, pct) =>
+            setTaxRateOverrides((prev) => ({ ...prev, [name]: pct }))
+          }
+          taxOverrideReason={taxOverrideReason}
+          onTaxOverrideReasonChange={setTaxOverrideReason}
+          taxEmitterIsFormal={fiscalProfile?.isFormalTaxpayer ?? false}
         />
       )}
 

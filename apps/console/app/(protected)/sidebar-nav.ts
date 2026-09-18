@@ -23,6 +23,11 @@ export const SidebarNav: SidebarNavItem[] = [
     icon: Icons.CreditCard,
   },
   {
+    label: "Comprobantes",
+    href: "/subscriptions/receipts",
+    icon: Icons.ReceiptText,
+  },
+  {
     label: "Planes",
     href: "/plans",
     icon: Icons.Package,

@@ -30,17 +30,20 @@ Este documento detalla la arquitectura de infraestructura, aprovisionamiento y e
                    ┌─────────────────────────┼─────────────────────────┐
                    │                         │                         │
                    ▼                         ▼                         ▼
-        ┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
-        │   Neon Postgres  │      │  Upstash Redis   │      │ Cloudflare Queues│
-        │ (Drizzle Database│      │  (Cache Serverless)     │ (fit-task-events)│
-        └──────────────────┘      └──────────────────┘      └────────┬─────────┘
-                                                                     │
-                                                                     ▼
-                                                         ┌───────────────────────┐
-                                                         │   apps/jobs-worker    │
-                                                         │  (Cloudflare Worker)  │
-                                                         └───────────────────────┘
+        ┌──────────────────┐      ┌──────────────────┐      ┌────────────────────────────┐
+        │   Neon Postgres  │      │  Upstash Redis   │      │     Cloudflare Queues      │
+        │ (Drizzle Database│      │  (Cache Serverless)     │ fit-task-events (emails)   │
+        └──────────────────┘      └──────────────────┘      │ fit-receipt-events (PDF)   │
+                                                            └────────────┬───────────────┘
+                                                                         │
+                                                                         ▼
+                                                             ┌───────────────────────┐
+                                                             │   apps/jobs-worker    │
+                                                             │ (2 consumers + cron)  │
+                                                             └───────────────────────┘
 ```
+
+> **Dueño único de consumers/cron = Terraform.** `jobs-worker` consume **dos** colas (`fit-task-events` y `fit-receipt-events`), cada una con su DLQ, más un **cron** de barrido. Los `.tf` (`workers.tf`) declaran los `cloudflare_queue_consumer` (×2) y el `cloudflare_workers_cron_trigger`; los `wrangler.jsonc` solo declaran **producers**. Orden: `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`).
 
 ### Componentes y Proveedores
 
@@ -228,5 +231,5 @@ Los dominios de producción y políticas CORS están unificados en [`apps/api-wo
 
 | Entorno | Dominio API | Dominios Frontend Permitidos (CORS) |
 |---------|-------------|-------------------------------------|
-| **Development** | `http://localhost:8788` | `http://localhost:3001` (panel), `http://localhost:3002` (web), `http://localhost:3003` (console) |
+| **Development** | `http://localhost:8788` | `http://localhost:3001` (panel), `http://localhost:3002` (web), `http://localhost:3000` (console) |
 | **Production** | `https://api.luisrivas.site` | `https://panel.luisrivas.site`, `https://console.luisrivas.site`, `https://luisrivas.site`, `https://*.luisrivas.site` |

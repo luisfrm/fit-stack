@@ -1,6 +1,8 @@
 # Fase 1 — DB Panel: secuencia unificada + columnas de comprobante
 
-> Depende de: Fase 0 (tipos `document_type`, formato de número). Una sola migración. Flujo estricto `generate → review → migrate`, **prohibido `db:push`** en ramas compartidas.
+> Depende de: Fase 0 (tipos `document_type`, formato de número) + Fase 0.5 (dinero gym en `bigint` centavos — ver nota abajo). Una sola migración. Flujo estricto `generate → review → migrate`, **prohibido `db:push`** en ramas compartidas.
+
+> **Nota Fase 0.5**: `membership_plan.price`, `payment.plan_snapshot_price/amount_paid/subtotal/tax_total` ya son `bigint` (migración `0011`). Las columnas nuevas de esta fase no son dinero salvo referencia; si alguna lo fuera, nace `bigint`, nunca `numeric`.
 
 ## Objetivo
 
@@ -36,14 +38,17 @@ TABLE payment ADD COLUMN
   voided_at           timestamptz,         -- cuándo se anuló
   void_reason         text;                -- motivo de anulación
 -- Índices: UNIQUE (organization_id, receipt_number) WHERE receipt_number IS NOT NULL;
--- índice (organization_id, receipt_issued_at) para reporte de huecos (Fase 5).
+-- índice (organization_id, receipt_issued_at) para reporte de huecos (Fase 5);
+-- índice PARCIAL para el barrido de PDFs pendientes (Fase 2):
+--   CREATE INDEX idx_payment_receipt_pending ON payment (receipt_issued_at)
+--   WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL;
 ```
 
 | Archivo | Cambio |
 |---|---|
 | `packages/database/src/schema.ts` | Nueva tabla `organizationDocumentSequence` + columnas en `payment` + índices de arriba. |
 | Migración generada | `pnpm db:generate` → revisar SQL a mano → `pnpm db:migrate` con aprobación explícita. |
-| `apps/api-worker/src/repositories/receipts.repository.ts` (nuevo, factory `createReceiptsRepository(db)`) | `nextDocumentNumber(orgId, type, year)`: 1) `INSERT … ON CONFLICT (org,type,year) DO NOTHING` (crea la fila del año si falta — **corrección de concurrencia**: sin esto los dos primeros comprobantes del año colisionan en el `SELECT FOR UPDATE`); 2) `SELECT last_number … FOR UPDATE` → 3) `UPDATE SET last_number = n+1` → devuelve `n+1`. Todo en `db.transaction`. Alternativa si el driver serverless no soporta `FOR UPDATE` en transacción: `UPDATE … SET last_number = last_number+1 RETURNING` (atómico sin SELECT previo, con upsert previo igual). Decidir en implementación con test de carrera. Además: `attachReceipt(paymentId, {...})` con guarda `WHERE receipt_number IS NULL` (idempotencia a nivel SQL), `markVoided(paymentId, { by, reason })` (setea flags, nunca libera número), `findByReceiptNumber(orgId, receiptNumber)`. |
+| `apps/api-worker/src/repositories/receipts.repository.ts` (nuevo, factory `createReceiptsRepository(db)`) | `nextDocumentNumber(orgId, type, year)` = **una sola sentencia atómica** (sin transacción, sin `SELECT FOR UPDATE`, funciona con el driver HTTP de Neon — Postgres garantiza atomicidad por sentencia): `INSERT INTO organization_document_sequence (organization_id, document_type, year, last_number) VALUES ($1,$2,$3,1) ON CONFLICT (organization_id, document_type, year) DO UPDATE SET last_number = organization_document_sequence.last_number + 1 RETURNING last_number`. Cubre también la carrera del primer comprobante del año (no hace falta upsert previo separado). Además: `attachReceipt(paymentId, orgId, {...})` con guarda `WHERE receipt_number IS NULL` (UPDATE condicional idempotente; si ya estaba numerado devuelve la fila existente re-leída), `markVoided(paymentId, orgId, { by, reason })` (setea flags, nunca libera número), `findByReceiptNumber(orgId, receiptNumber)` (`orgId` obligatorio en los 3 por aislamiento estricto). **Sin rollback del número**: si un paso posterior falla (render/PUT R2), el estado `receipt_number NOT NULL AND receipt_pdf_key IS NULL` = "numerado, PDF pendiente" es válido y reintentable con el mismo número (Fase 2). |
 | `apps/api-worker/src/repositories/payments.repository.ts` | Extender interfaz `IPayment` + `create`/`findById` para los nuevos campos (lectura/escritura), sin cambiar lógica de agregados. |
 
 ## Modificar
@@ -59,7 +64,7 @@ Solo `schema.ts` + `payments.repository.ts` (arriba). Ninguna ruta ni servicio e
 ## Criterios de aceptación
 
 - Migración aplica limpio en rama Neon de test; `pnpm db:check` verde.
-- Test de integración `apps/api-worker/tests/integration/receipts-sequence.test.ts`: N llamadas concurrentes a `nextDocumentNumber` misma org/año → números distintos y consecutivos, sin duplicados; segundo `attachReceipt` sobre el mismo pago devuelve el existente (no duplica); `receipt_number` único por org; pago viejo sin número sigue válido (`NULL`).
+- Test de integración `apps/api-worker/tests/integration/receipts-sequence.test.ts`: N llamadas concurrentes a `nextDocumentNumber` misma org/año → números distintos y consecutivos, sin duplicados (incluye el caso "primer comprobante del año", dos llamadas simultáneas sin fila previa); segundo `attachReceipt` sobre el mismo pago devuelve el existente (no duplica); `receipt_number` único por org; pago viejo sin número sigue válido (`NULL`).
 - Pago `voided` conserva su número (`receipt_voided=true`).
 
 ## Verificación
@@ -72,3 +77,12 @@ pnpm db:check
 pnpm --filter api-worker test:integration
 pnpm typecheck
 ```
+
+## Estado: COMPLETADA (en revisión, sin commit)
+
+- Migración `0012_bent_squadron_sinister.sql`: tabla `organization_document_sequence` (PK triple + FK cascade) + 9 columnas en `payment` + 3 índices (UNIQUE parcial, `org+issued_at`, pending). Revisada contra checklist, aplicada por el usuario, `db:check` verde.
+- `receipts.repository.ts` nuevo (factory): `nextDocumentNumber` con builder `onConflictDoUpdate` (precedente `consumeCredits`, sin SQL crudo), `attachReceipt(paymentId, orgId, ...)` opción A (re-lee el existente), `markVoided` (reason no vacío, conserva número), `findByReceiptNumber`. Validaciones con símbolos de Fase 0 (nada redefinido).
+- `payments.repository.ts`: 9 campos en `IPayment` + passthrough en `create`. Agregados intactos.
+- `receipts-sequence.test.ts`: 5/5 verde (carrera 1..N, año virgen {1,2}, attach idempotente, UNIQUE por org + NULLs, void conserva). Nota: `testQuery` devuelve `bigint` como string → `paymentId` se normaliza con `Number()`.
+- Nota de entorno: `test:db:push` falla en este sandbox (`cmd.exe` ausente para `execSync`); la rama test se sincronizó con script equivalente sin shell (misma guarda anti-producción). Sin cambios al repo por esto.
+- Spec ajustada: `orgId` obligatorio en los 3 métodos del repo; `plan.md` sin la cláusula descartada.

@@ -7,6 +7,8 @@ export * from './auth-config';
 export * from './permissions';
 export * from './features/catalog';
 export * from './content';
+export * from './documents';
+export * from './formatting';
 export * from './date';
 export * from './settings';
 export * from './defaults';

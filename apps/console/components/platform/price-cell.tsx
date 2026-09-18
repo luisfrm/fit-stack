@@ -1,7 +1,7 @@
 "use client";
 
 import { Text } from "@workspace/ui/components";
-import { formatCents, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 
 interface PriceCellProps {
   readonly isTrial: boolean;

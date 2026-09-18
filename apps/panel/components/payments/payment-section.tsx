@@ -17,8 +17,9 @@ import {
   type IPaymentMethodConfig
 } from "@/types/dashboard";
 import { sortPaymentMethodFields } from "@workspace/shared";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { ValueConverter, type CurrencyFormat, type ITaxDetail } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
+import { TaxBlock, type TaxMode } from "./tax-block";
 
 interface PaymentSectionProps {
   readonly selectedPlan: IMembershipPlan;
@@ -48,6 +49,16 @@ interface PaymentSectionProps {
   readonly paymentDate: string;
   readonly onPaymentDateChange: (value: string) => void;
   readonly disabled?: boolean;
+  // Bloque fiscal (preview calculado por el padre con `previewReceiptTaxes`).
+  readonly taxPreview: { subtotal: number; taxTotal: number; lines: ITaxDetail[] } | null;
+  readonly taxMode: TaxMode;
+  readonly onTaxModeChange: (mode: TaxMode) => void;
+  readonly taxRateOverrides: Record<string, string>;
+  readonly onTaxRateChange: (name: string, pct: string) => void;
+  readonly taxOverrideReason: string;
+  readonly onTaxOverrideReasonChange: (value: string) => void;
+  /** Declaración de contribuyente formal del emisor (gating fiscal, C2). */
+  readonly taxEmitterIsFormal: boolean;
 }
 
 export function PaymentSection({
@@ -78,6 +89,14 @@ export function PaymentSection({
   paymentDate,
   onPaymentDateChange,
   disabled,
+  taxPreview,
+  taxMode,
+  onTaxModeChange,
+  taxRateOverrides,
+  onTaxRateChange,
+  taxOverrideReason,
+  onTaxOverrideReasonChange,
+  taxEmitterIsFormal,
 }: PaymentSectionProps) {
   return (
     <Card className={cn(
@@ -171,6 +190,24 @@ export function PaymentSection({
           </div>
         </div>
       </div>
+      {taxPreview && (
+        <TaxBlock
+          currencyPaid={paymentCurrency}
+          currencyFormat={currencyFormat}
+          subtotal={taxPreview.subtotal}
+          taxTotal={taxPreview.taxTotal}
+          total={taxPreview.subtotal + taxPreview.taxTotal}
+          lines={taxPreview.lines}
+          mode={taxMode}
+          onModeChange={onTaxModeChange}
+          rateOverrides={taxRateOverrides}
+          onRateChange={onTaxRateChange}
+          reason={taxOverrideReason}
+          onReasonChange={onTaxOverrideReasonChange}
+          disabled={disabled}
+          emitterIsFormal={taxEmitterIsFormal}
+        />
+      )}
       <div className="flex items-center justify-between p-4 rounded-xl border border-dashed border-border bg-accent/5">
         <div className="flex flex-col gap-0.5">
           <Text weight="bold" size="sm">Registrar pago como validado</Text>

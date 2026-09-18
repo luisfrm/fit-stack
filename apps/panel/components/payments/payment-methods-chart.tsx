@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, SimpleChart } from "@workspace/ui";
-import { ValueConverter, type CurrencyFormat } from "@/lib/utils/value-converters";
+import { formatCents, type CurrencyFormat } from "@workspace/shared";
 import { buildMethodsData, METHODS_CHART_CONFIG } from "@/lib/charts/analytics-shapes";
 
 interface PaymentMethodsSlice {
@@ -38,7 +38,7 @@ function renderMethodsTooltip(
         {Object.entries(breakdown).map(([currency, amount]) => (
           <div key={currency} className="flex justify-between items-center text-sm">
             <span className="text-muted-foreground">{currency}</span>
-            <span className="font-mono font-medium">{ValueConverter.format(amount / 100, currency, currencyFormat)}</span>
+            <span className="font-mono font-medium">{formatCents(amount, currency, currencyFormat)}</span>
           </div>
         ))}
         {Object.keys(breakdown).length === 0 && (

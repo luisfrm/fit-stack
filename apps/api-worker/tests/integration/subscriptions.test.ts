@@ -8,7 +8,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
-import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
+import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
 import {
   createGymTenant,
   addUserToOrganization,
@@ -59,9 +59,10 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.body.planId).toBe(plan.id);
     });
 
-    it('validated payment enqueues email.payment_receipt automatically', async () => {
+    it('validated payment numbers the receipt and enqueues render (email waits for step 2)', async () => {
       const { owner, organization, member, plan } = await setupSubscriptionFixture();
       owner.client.queue.reset();
+      owner.client.receiptQueue.reset();
 
       const res = await owner.client.post('/api/subscriptions', {
         memberId: member.id,
@@ -79,10 +80,11 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(res.status, res.text).toBe(201);
 
-      const events = owner.client.queue.ofType('email.payment_receipt');
-      expect(events).toHaveLength(1);
-      expect(events[0].paymentId).toBeDefined();
-      expect(events[0].organizationId).toBe(organization.id);
+      // Paso 1: número + render encolado; el email lo encola el paso 2 (Fase 2).
+      const renders = owner.client.receiptQueue.ofType('receipt.render');
+      expect(renders).toHaveLength(1);
+      expect(renders[0].organizationId).toBe(organization.id);
+      expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
     });
 
     it('processing payment does NOT enqueue a receipt (awaits validation)', async () => {
@@ -282,6 +284,168 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.status, res.text).toBe(200);
       // The API returns the raw subscription row; cancelledAt is set to now
       expect(res.body.cancelledAt).not.toBeNull();
+    });
+  });
+
+  describe('Estado derivado (anulada vs revocada)', () => {
+    /** Crea una sub con pago `validated` y devuelve su id + el del pago. */
+    async function seedSubscription(owner: any, member: any, plan: any) {
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const row = list.body.data.find((r) => r.id === created.body.id);
+      return { subId: created.body.id as number, paymentId: row?.paymentId as number };
+    }
+
+    async function readStatus(owner: any, subId: number) {
+      const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      return res.body.data.find((r) => r.id === subId)?.status;
+    }
+
+    it('anular el cobro deja la suscripción ANULADA (`voided`), no cancelada', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+      expect(paymentId).toBeTruthy();
+      expect(await readStatus(owner, subId)).toBe('active');
+
+      const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+      });
+      expect(voided.status, voided.text).toBe(200);
+
+      // Anulada ≠ cancelada: el registro es inválido, no es una revocación.
+      expect(await readStatus(owner, subId)).toBe('voided');
+    });
+
+    it('rechazar el cobro ya no es un estado propio: `invalid` responde 400 (schema)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedSubscription(owner, member, plan);
+
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'invalid',
+      });
+
+      // `invalid`/`pending` desaparecieron del contrato: el enum solo acepta
+      // processing | validated | voided. El schema rechaza antes del servicio.
+      expect(res.status, res.text).toBe(400);
+    });
+
+    it('rechazar un cobro `processing` (`voided`) deja la suscripción ANULADA con auditoría persistida', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      // Alta con pago `processing`: no emite comprobante (queda en revisión).
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'transfer',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(created.status, created.text).toBe(201);
+
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const paymentId = list.body.data.find((r) => r.id === created.body.id)?.paymentId as number;
+      expect(paymentId).toBeTruthy();
+
+      const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: 'Comprobante ilegible',
+      });
+      expect(voided.status, voided.text).toBe(200);
+      // C6: rechazar sin comprobante emitido responde 200 y lo dice.
+      expect(voided.body).toMatchObject({
+        receiptVoided: false,
+        receiptVoidReason: 'not_issued',
+      });
+
+      // El status derivado es ANULADA (registro inválido), no cancelada.
+      expect(await readStatus(owner, created.body.id)).toBe('voided');
+
+      // La auditoría se persiste SIEMPRE al anular, haya o no comprobante.
+      const rows = await testQuery<{
+        status: string;
+        void_reason: string | null;
+        voided_at: string | null;
+        voided_by: string | null;
+        receipt_number: string | null;
+      }>(
+        `SELECT status, void_reason, voided_at, voided_by, receipt_number FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      expect(rows[0]!.status).toBe('voided');
+      expect(rows[0]!.void_reason).toBe('Comprobante ilegible');
+      expect(rows[0]!.voided_at).not.toBeNull();
+      expect(rows[0]!.voided_by).toBeTruthy();
+      expect(rows[0]!.receipt_number).toBeNull();
+    });
+
+    it('revocar el acceso deja la suscripción CANCELADA (`cancelled`)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId } = await seedSubscription(owner, member, plan);
+
+      const res = await owner.client.put(`/api/subscriptions/${subId}`, { status: 'cancelled' });
+      expect(res.status, res.text).toBe(200);
+
+      expect(await readStatus(owner, subId)).toBe('cancelled');
+    });
+
+    it('el filtro `voided` sigue al status mostrado (anulado o rechazado)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'voided' });
+
+      const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { status: 'voided', limit: '10' },
+      });
+      expect(res.status, res.text).toBe(200);
+      expect(res.body.data.map((r) => r.id)).toContain(subId);
+    });
+  });
+
+  describe('DELETE /api/subscriptions/:id', () => {
+    it('está deshabilitado: un registro financiero no se elimina', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+      });
+
+      const res = await owner.client.delete(`/api/subscriptions/${created.body.id}`);
+      expect(res.status, res.text).toBe(404);
+
+      // La suscripción sigue existiendo.
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      expect(list.body.data.map((r) => r.id)).toContain(created.body.id);
     });
   });
 

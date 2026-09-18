@@ -17,7 +17,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAuth } from "@/lib/hooks/use-auth";
-import type { CurrencyFormat } from "@/lib/utils/value-converters";
+import type { CurrencyFormat } from "@workspace/shared";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
@@ -64,6 +64,7 @@ export function PaymentsClient({
 }: PaymentsClientProps) {
   const router = useRouter();
   const { activeOrganization } = useAuth();
+  // Sin acción de borrado: un registro de pago se anula o se revoca, nunca se elimina.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;
   const currencyFormat =
@@ -142,20 +143,29 @@ export function PaymentsClient({
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handlePaymentStatusChange = async (
+    paymentId: number,
+    status: string,
+    voidReason?: string,
+  ) => {
     try {
-      await subscriptionsService.delete(id);
-      toast.success("Registro eliminado.");
-      refreshAll();
-    } catch (err) {
-      toast.error(mutationError("PaymentsClient", err, "Fallo al eliminar"));
-    }
-  };
-
-  const handlePaymentStatusChange = async (paymentId: number, status: string) => {
-    try {
-      await financeService.updatePaymentStatus(paymentId, status);
-      toast.success("Estado de pago actualizado correctamente");
+      const result = await financeService.updatePaymentStatus(paymentId, status, voidReason);
+      // C6: anular un cobro sin comprobante emitido no es un error, pero tampoco
+      // un "todo bien" genérico: el cajero tiene que saber que no se anuló nada.
+      if (status === PAYMENT_STATUSES.VOIDED) {
+        const rejected = voidReason === "Pago rechazado";
+        if (result?.receiptVoided === false) {
+          toast.success(
+            rejected
+              ? "Pago rechazado."
+              : "Pago anulado. No tenía comprobante emitido.",
+          );
+        } else {
+          toast.success(rejected ? "Pago rechazado." : "Pago anulado.");
+        }
+      } else {
+        toast.success("Estado de pago actualizado correctamente");
+      }
       refreshAll();
     } catch (err) {
       toast.error(mutationError("PaymentsClient", err, "Error al actualizar pago"));
@@ -163,10 +173,14 @@ export function PaymentsClient({
   };
 
   /** Validar/rechazar rápido desde el accionable "Por validar". */
-  const handlePendingAction = async (paymentId: number, status: string) => {
+  const handlePendingAction = async (
+    paymentId: number,
+    status: string,
+    voidReason?: string,
+  ) => {
     setPendingActionId(paymentId);
     try {
-      await financeService.updatePaymentStatus(paymentId, status);
+      await financeService.updatePaymentStatus(paymentId, status, voidReason);
       toast.success(
         status === PAYMENT_STATUSES.VALIDATED ? "Pago validado." : "Pago rechazado.",
       );
@@ -240,7 +254,7 @@ export function PaymentsClient({
           currencyFormat={currencyFormat}
           actionId={pendingActionId}
           onValidate={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VALIDATED)}
-          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.INVALID)}
+          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VOIDED, "Pago rechazado")}
         />
 
         <FilterPanel
@@ -251,7 +265,7 @@ export function PaymentsClient({
             { value: PAYMENT_STATUSES.PROCESSING, label: "Por validar" },
             { value: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer" },
             { value: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas" },
-            { value: PAYMENT_STATUSES.VOIDED, label: "Anuladas" },
+            { value: SUBSCRIPTION_STATUSES.VOIDED, label: "Anuladas" },
           ]}
           activeFilter={activeFilter}
           onFilterChange={setFilterAndNavigate}
@@ -262,7 +276,7 @@ export function PaymentsClient({
               { id: PAYMENT_STATUSES.PROCESSING, label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
               { id: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer", className: "text-destructive border-destructive/20 bg-destructive/5 hover:bg-destructive/10" },
               { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-info border-info/20 bg-info/5 hover:bg-info/10" },
-              { id: PAYMENT_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
+              { id: SUBSCRIPTION_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
             ].map((btn) => (
               <Button
                 key={btn.id}
@@ -295,9 +309,9 @@ export function PaymentsClient({
         <section>
           <SubscriptionsTable
             subscriptions={initialSubscriptions.data as ISubscription[]}
-            onDelete={handleDelete}
             onStatusChange={handleStatusChange}
             onPaymentStatusChange={handlePaymentStatusChange}
+            onSuccess={refreshAll}
             loading={false}
             pagination={{
               page: initialPage,

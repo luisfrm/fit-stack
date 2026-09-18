@@ -32,7 +32,7 @@ Cada gimnasio es una **organización independiente** dentro de FitStack. Es el p
 - **Miembros**: ficha central de cada cliente con datos, historial de suscripciones y pagos, foto y estado. Base para todo lo demás.
 - **Planes de Membresía**: tu catálogo comercial. Tú defines nombre, duración (diaria, semanal, mensual o anual), precio, moneda y descripción.
 - **Suscripciones**: vincula un miembro con un plan. Aplica vencimiento acumulativo: renovar antes de vencer suma los días restantes a la nueva fecha, no se pierde ni un día pagado.
-- **Pagos**: cada cobro queda con monto, moneda, tasa del día, método, referencia y estado (pendiente, en proceso, validado, inválido, anulado). Suscripción y pago se registran juntos de forma atómica.
+- **Pagos**: cada cobro queda con monto, moneda, tasa del día, método, referencia y estado (en proceso, validado, anulado; el rechazo es una anulación). Suscripción y pago se registran juntos.
 - **Clases**: horarios grupales como CrossFit o Yoga con capacidad y control de cupo.
 - **Entrenadores y Personal**: separa operación del negocio (Dueño, Gerente, Cajero) de quien imparte clases (Entrenador). Los entrenadores pueden tener perfil público con especialidades y biografía.
 - **Contenido Web**: editor drag-and-drop de páginas (inicio, servicios, galería, contacto, equipo) que se publican en el sitio público de tu gimnasio.

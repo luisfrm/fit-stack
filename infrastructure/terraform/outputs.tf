@@ -22,3 +22,11 @@ output "task_queue_name" {
 output "dlq_queue_name" {
   value = module.dlq_queue.name
 }
+
+output "receipt_queue_name" {
+  value = module.receipt_queue.name
+}
+
+output "receipt_dlq_queue_name" {
+  value = module.receipt_dlq_queue.name
+}

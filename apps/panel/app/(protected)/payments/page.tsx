@@ -50,10 +50,13 @@ export default async function PaymentsPage({
       },
       { next: { revalidate: 60, tags: [subsTag] } },
     ),
-    // Accionable "Por validar": top-5 con pago `processing` (mismo tag).
+    // Accionable "Por validar": top-5 con pago `processing`, SIN caché.
+    // Es una lista de trabajo (se valida desde aquí): un pago registrado por
+    // otro canal debe aparecer al recargar, no 60s después. La tabla sí puede
+    // tolerar 60s porque toda escritura de la app purga `subsTag`.
     subscriptionsService.getAll(
       { status: PAYMENT_STATUSES.PROCESSING, limit: 5 },
-      { next: { revalidate: 60, tags: [subsTag] } },
+      { cache: "no-store" },
     ),
     financeService
       .getRevenueReport(primaryCurrency)
@@ -66,6 +69,8 @@ export default async function PaymentsPage({
   const refreshPayments = async () => {
     "use server";
     updateTag(subsTag);
+    // Toda escritura de pago mueve el reporte de comprobantes.
+    updateTag(`org:${activeOrgId}:reports:receipts`);
   };
 
   return (

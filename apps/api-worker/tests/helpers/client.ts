@@ -55,12 +55,15 @@ export class TestClient {
   private readonly cookies = new Map<string, string>();
   readonly env: Record<string, unknown>;
   readonly queue: QueueSpy;
+  /** Spy de fit-receipt-events (paso 1, issue, re-encolados). */
+  readonly receiptQueue: QueueSpy;
   readonly r2: R2Spy;
 
   constructor() {
-    const { env, queue, r2 } = createTestEnv(BASE_URL);
+    const { env, queue, receiptQueue, r2 } = createTestEnv(BASE_URL);
     this.env = env;
     this.queue = queue;
+    this.receiptQueue = receiptQueue;
     this.r2 = r2;
   }
 

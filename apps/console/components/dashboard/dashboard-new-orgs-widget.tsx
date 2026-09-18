@@ -8,7 +8,7 @@ import { COUNTRIES } from "@workspace/shared/constants";
 import type { IPlatformOrganization } from "@workspace/shared/types";
 import { DASHBOARD_WIDGET_PAGE_SIZE } from "@/lib/dashboard/selectors";
 import { OrgAvatar, WidgetCard, WidgetEmpty } from "./dashboard-widget-card";
-import { formatShortDate } from "@/lib/utils/value-converters";
+import { formatShortDate } from "@workspace/shared";
 import { WidgetPagination } from "./dashboard-widget-pagination";
 
 export function NewOrgsWidget({

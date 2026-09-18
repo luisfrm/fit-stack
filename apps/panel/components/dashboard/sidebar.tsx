@@ -13,6 +13,7 @@ import {
   ArrowLeftRight,
   MessageSquare,
   Wallet,
+  ReceiptText,
 } from "lucide-react";
 
 import {
@@ -52,6 +53,7 @@ const GYM_NAV_ITEMS: GymNavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: PERMISSION_MODULES.DASHBOARD },
   { label: "Staff", href: "/staff", icon: ShieldCheck, module: PERMISSION_MODULES.STAFF },
   { label: "Pagos", href: "/payments", icon: CreditCard, module: PERMISSION_MODULES.SUBSCRIPTIONS },
+  { label: "Comprobantes", href: "/reports/receipts", icon: ReceiptText, module: PERMISSION_MODULES.REPORTS },
   { label: "Clientes", href: "/members", icon: Users, module: PERMISSION_MODULES.MEMBERS },
   { label: "Contenido", href: "/content", icon: LayoutDashboard, module: PERMISSION_MODULES.CONTENT, feature: "cms" },
   { label: "Membresías", href: "/memberships", icon: Wallet, module: PERMISSION_MODULES.PLANS },

@@ -8,6 +8,7 @@ import {
   Text
 } from "@workspace/ui/components";
 import { type IPlatformPlan } from "@workspace/shared/types";
+import { centsToUnits } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface PlatformPlanSelectorProps {
@@ -68,7 +69,7 @@ export function PlatformPlanSelector({
                 </Text>
               </div>
               <Text size="sm" variant="muted">
-                {Number(plan.price) / 100} {plan.currency}/{getPlanDurationLabel(plan)}
+                {centsToUnits(Number(plan.price))} {plan.currency}/{getPlanDurationLabel(plan)}
               </Text>
             </ToggleGroupItem>
           ))}

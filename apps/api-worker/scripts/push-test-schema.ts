@@ -11,7 +11,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -64,26 +65,91 @@ if (PROD_URL) {
 }
 
 // ── Run drizzle-kit push ────────────────────────────────────────────────────
-const databasePath = resolve(__dirname, '../../packages/database');
+// `packages/database` está en la raíz del monorepo; `__dirname` es
+// `apps/api-worker/scripts`, así que hay que subir tres niveles.
+const databasePath = resolve(__dirname, '../../../packages/database');
+
+/**
+ * Resuelve el binario real de `drizzle-kit` (`./bin.cjs`) sin depender de
+ * `node_modules/.bin` ni de `npx`.
+ *
+ * El `exports` del paquete NO expone ni `bin.cjs` ni `package.json`, y con
+ * pnpm el binario no está en la raíz: hay que partir de la entrada CJS que
+ * resuelve Node (`require.resolve('drizzle-kit')`), subir hasta el directorio
+ * del paquete y leer su campo `bin` (puede ser `string` u objeto).
+ */
+function resolveDrizzleBin(): string {
+  const databaseRequire = createRequire(resolve(databasePath, 'package.json'));
+  const entry = databaseRequire.resolve('drizzle-kit');
+
+  let packageDir = dirname(entry);
+  while (!existsSync(resolve(packageDir, 'package.json'))) {
+    const parent = dirname(packageDir);
+    if (parent === packageDir) {
+      throw new Error(
+        `No se encontró el package.json de drizzle-kit subiendo desde ${entry}.`,
+      );
+    }
+    packageDir = parent;
+  }
+
+  const packageJsonPath = resolve(packageDir, 'package.json');
+  const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
+    bin?: string | Record<string, string>;
+  };
+  const binRelative =
+    typeof pkg.bin === 'string' ? pkg.bin : pkg.bin?.['drizzle-kit'];
+
+  if (!binRelative) {
+    throw new Error(
+      `drizzle-kit no declara un bin "drizzle-kit" en ${packageJsonPath}.`,
+    );
+  }
+
+  const drizzleBin = resolve(packageDir, binRelative);
+  if (!existsSync(drizzleBin)) {
+    throw new Error(`El bin resuelto de drizzle-kit no existe: ${drizzleBin}.`);
+  }
+  return drizzleBin;
+}
+
+let drizzleBin: string;
+try {
+  drizzleBin = resolveDrizzleBin();
+} catch (err) {
+  console.error('\n❌ No se pudo resolver el binario de drizzle-kit.\n');
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+}
 
 console.log(`\n🔄 Pushing schema to TEST_DATABASE_URL...\n`);
 console.log(`   Target: ${TEST_DATABASE_URL.replace(/:([^@]+)@/, ':***@')}\n`);
 
-try {
-  const out = execSync('npx drizzle-kit push --force', {
-    cwd: databasePath,
-    env: {
-      ...process.env,
-      DATABASE_URL: TEST_DATABASE_URL,
-    },
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  console.log(out);
-  console.log('\n✅ Schema pushed successfully to test database.\n');
-} catch (err: any) {
-  console.error('\n❌ drizzle-kit push failed. Full output:\n');
-  console.error(err?.stdout ?? '');
-  console.error(err?.stderr ?? err?.message ?? err);
+// `spawn` sin shell: en Windows `execSync`/`npx` fallan con
+// `spawnSync cmd.exe ENOENT`. Ejecutamos el bin con el propio Node.
+const result = spawnSync(process.execPath, [drizzleBin, 'push', '--force'], {
+  cwd: databasePath,
+  env: {
+    ...process.env,
+    DATABASE_URL: TEST_DATABASE_URL,
+  },
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+  shell: false,
+});
+
+if (result.error) {
+  console.error('\n❌ No se pudo ejecutar drizzle-kit push:\n');
+  console.error(result.error.message);
   process.exit(1);
 }
+
+if (result.status !== 0) {
+  console.error('\n❌ drizzle-kit push failed. Full output:\n');
+  if (result.stdout) console.error(result.stdout);
+  if (result.stderr) console.error(result.stderr);
+  process.exit(result.status ?? 1);
+}
+
+if (result.stdout) console.log(result.stdout);
+console.log('\n✅ Schema pushed successfully to test database.\n');

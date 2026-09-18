@@ -40,8 +40,8 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 - **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (AI credits, current) and `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, historical) + `how/` (source of the AI Knowledge Base, end-user tone) + specs in `docs/superpowers/specs/`.
-- **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
+- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-STRUCTURE.md`, `PAYMENT_STATUSES.md`, `CHECKLIST-COMPROBANTES.md`, `FACTURATION.md`, `ORGANIZATION_RECEIPT_MODEL.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (AI credits, current) and `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, historical) + `how/` (source of the AI Knowledge Base, end-user tone).
+- **Architecture Spec**: For detailed design decisions, see [docs/ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/docs/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
 
@@ -120,7 +120,10 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
-6. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
+6. **Registro financiero inmutable**: una suscripción con su pago **nunca se elimina** — `subscriptions` no expone `delete` a ningún rol y no existe `DELETE /api/subscriptions/:id`. Si el registro está equivocado se **anula** (el cobro pasa a `voided` y la suscripción se computa `ANULADA`); si se revoca el acceso se **cancela**. Anular ≠ cancelar: `voided` = registro inválido, `cancelled` = el acceso se revocó con un cobro que sigue siendo válido.
+   - **Payment statuses unificados**: `PAYMENT_STATUSES = processing | validated | voided | refunded` (sin `pending`/`invalid`). El rechazo y la anulación comparten `voided`; el tipo se **deriva** con `getVoidKind` (`rejected` sin `receiptNumber` / `annulled` con él). Solo `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) sostienen un periodo. Al anular se persisten siempre `voided_by`/`voided_at`/`void_reason`.
+   - **Void por dominio**: en **Panel** un pago `voided` deja la suscripción **ANULADA** (anula el servicio); en **Console/SaaS** un `voided` se **ignora** en el status computado (no revoca servicio; la gracia corre desde `currentPeriodEnd` y no se acumula). Gate free tier: si está habilitado, manda; si no hay suscripción se evalúa free tier; si no, `/no-subscription`.
+7. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
 
 ---
 
@@ -137,6 +140,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
   - Service: Business logic layer.
   - Route Handler: HTTP concerns only.
 - **Worker DB Pattern**: In `api-worker` the DB client is created **per request** via `createDb(c.env.DATABASE_URL)` (`@workspace/database/factory`) — `process.env` does not exist in Workers. Repositories and services are **factory functions** that receive dependencies by parameter (`createXRepository(db)`, `createXService(repo)`).
+- **Shared repositories (conscious exception, not a general rule)**: repositories live in the app — UNLESS 2+ apps need the byte-identical implementation (criterion: same SQL, same atomicity guarantees). Only then it lives in `packages/database/src/repositories/` (today solely `receipts.repository.ts`: atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`, consumed by api-worker step 1 and jobs-worker step 2 — plus `platform-receipts.repository.ts`: the SaaS mirror, same criterion). Any other new repo stays in `apps/api-worker/src/repositories/`. This exception exists because two runtimes need identical SQL; it does not authorize moving business logic or other repos.
 
 ### 2. UI Design System & Hierarchy
 
@@ -188,6 +192,7 @@ Fit-Stack uses **Better Auth** for authentication.
 - Client MUST use `useAuth()`. It exposes `activeOrganization` (the org object, resolved by the api-worker custom session) alongside `member`. NEVER use `useSession()` directly in components.
 - For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
+- **Escritura de la sede en el panel**: la identidad de la organización (name/slug/logo/slogan/timezone/currencyFormat + legalName/taxId/address/`fiscalConfig`) se guarda con `orgProfileService.updateProfile` → **`PATCH /api/organizations/profile`** (org-scoped, `ORGANIZATION.UPDATE`). El panel **nunca** llama a `/api/platform/organizations` desde un formulario de tenant: ese endpoint exige `requirePlatformAuth` (permiso de plataforma) y un owner/manager de gym recibe **403**. `countryCode`/`primaryCurrency` son inmutables post-creación (400 `IMMUTABLE_FIELD`); cambiar el país recalcula la moneda principal y es operación de nivel plataforma.
 
 #### CORS & Allowed Origins
 
@@ -227,7 +232,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 ```
 
 - Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
-- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope.
+- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope. Un `HTTPException` que traiga su propia `Response` (`err.res`) se devuelve **tal cual**: así llegan los códigos de negocio documentados (`409 { code: 'SLUG_TAKEN' }`, `403 { code: 'FEATURE_NOT_AVAILABLE', feature }`) — los toasts se resuelven por código, nunca por texto.
 - The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
 
 #### API Route Map (api-worker)
@@ -239,15 +244,15 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
 | `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
 | `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
-| `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`)                                                                                                                                                                                                                                                                                                           |
-| `/api/payments`      | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend)                                                                                                                                                                                                                                                                                                                         |
+| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **sin DELETE** (registro financiero inmutable) |
+| `/api/payments`       | `PATCH /:id/status` accepts `processing \| validated \| voided` + optional `voidReason` (retired `pending`/`invalid` → **400**); returns the explicit void outcome (`receiptVoided` + `receiptVoidReason`). `POST /:id/send-email` (receipt resend) |
 | `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
 | `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
 | `/api/cms`           | Content pages/blocks                                                                                                                                                                                                                                                                                                                                                                 |
 | `/api/dashboard`     | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`)                                                                                                                                                                                                                                             |
 | `/api/settings`      | Gym settings (currencies, payment methods, theme)                                                                                                                                                                                                                                                                                                                                    |
-| `/api/reports`       | `GET /revenue` (multi-currency, cache 1h)                                                                                                                                                                                                                                                                                                                                            |
-| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below)                                                                                      |
+| `/api/reports`       | `GET /revenue` (multi-currency, cache 1h) · `GET /receipts` (auditoría del correlativo: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit`, cache 5 min) |
+| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) · `PATCH /profile` (identidad de sede —name/slug/logo/slogan/timezone/currencyFormat— + identidad emisora + `fiscalConfig` merge, `countryCode`/`primaryCurrency` immutable, invalidates `org:{id}:profile`) |
 | `/api/upload`        | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2)                                                                                                                                                                                                                                                                                                                    |
 | `/api/ai`            | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
@@ -255,7 +260,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 > | `/api/init` | Org bootstrap (no auth) |
 > | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
 > | `/api/platform/plans` | SaaS plan catalog (console) |
-> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) |
+> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /receipts` (auditoría del correlativo `FS-N`: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit` en UTC, cache 5 min, `subscription:list` — support reads) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
 > | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (AI quota del ciclo, cache 5 min, invalidada en grant) + `GET /:id/gym-overview` (adopción gym + portal seats, cache 5 min, staleness aceptada: writes del gym no invalidan claves platform) |
 > | `/api/platform/settings` | Platform global settings |
 > | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
@@ -310,6 +315,12 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 - **Platform seeding (`platform_setting`)**: unchanged (KV singleton, seeded in `/api/init` via `DEFAULT_PLATFORM_SETTINGS`).
 - **UI reads**: currency/format are read from the org (`session.activeOrganization` / `useAuth().activeOrganization`), never from settings. The panel Currencies page only edits `active_currencies` (primary readonly); the format is edited in Location Settings.
 
+### 11. Money Convention (integer cents)
+
+- **Golden rule**: ALL money travels and stores as **integer cents** — DB (`bigint`), API contracts (`z.number().int()`), services, tests, seeds, E2E fixtures. `exchangeRateApplied` is a rate, not money — it stays `numeric(10,4)`.
+- **Display**: ONLY via `formatCents(cents, currency, format)` from `@workspace/shared` (single source; `ValueConverter` lives there too). Inline `/ 100` for money display is PROHIBITED.
+- **Unit inputs** (forms editing "50.00"): convert at the boundary with `centsToUnits` / `unitsToCents` from `@workspace/shared`. Fiscal math (`tax-math`, `receipt-data`) operates in integer cents and rounds with `roundCents` — the only place that rounds money.
+
 ---
 
 ## Redis Caching (Upstash)
@@ -352,6 +363,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `rates:${base}`                            | 1 hr   | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`)  |
 | `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
 | `org:${orgId}:reports:revenue:12m`         | 1 hr   | Monthly revenue reports                                                                           |
+| `org:${orgId}:reports:receipts:*`          | 5 min  | Receipts audit report (invalidated on-write in issue/status/subscription writes)                  |
 | `member:role:${userId}:${orgId}`           | 1 min  | Cached Better Auth member role (custom session)                                                   |
 | `platform:settings`                        | 1 h    | SaaS-level global settings (invalidated on-write in POST /api/platform/settings)                  |
 | `platform:features`                        | 10 min | Feature catalog (console)                                                                         |
@@ -363,6 +375,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `platform:ai-usage:{orgId}`                | 5 min  | AI quota por org (invalidada en `POST /:id/ai-credits`)                                           |
 | `platform:subscriptions:invoices:{orgId}`  | 5 min  | SaaS invoices per org (invalidada on-write vía `platform:subscriptions*`)                         |
 | `platform:gym-overview:{orgId}`            | 5 min  | Adopción gym + portal por org (sin invalidación cruzada desde writes del gym)                     |
+| `platform:receipts:*`                      | 5 min  | Auditoría del correlativo `FS-N` (Console); clave por filtros, invalidada on-write en cualquier write de suscripciones/pagos (emisión/anulación) |
 | `platform:staff*`                          | 5 min  | Platform staff (SaaS admins: support/admin/owner)                                                 |
 
 ### Cache Invalidation Strategy
@@ -385,7 +398,7 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 | `email.registration_invite`  | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations)                                                                                                 |
 | `email.org_invite`           | `{ email, orgName, inviterName, inviteLink }`            | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account)                                                                                                                  |
 | `email.payment_receipt`      | `{ paymentId, organizationId }`                          | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail, payerName }`   | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal) → payer + org owners (dedupe)                                                                                                 |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal, processing, payer+owners) + paso 2 platform (PDF listo, payer desde DB u owners-only) + resend manual |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
 
@@ -401,6 +414,38 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 
 > **Rule**: never couple api-worker to synchronous email/PDF sends — always enqueue in `TASK_QUEUE` and let jobs-worker process it.
 
+> **Receipts queue (`fit-receipt-events`)**: dedicated queue, own DLQ, **single consumer = jobs-worker**. `api-worker` is only a producer (step 1 + manual issue + re-enqueues); jobs-worker consumes **two** queues (`fit-task-events` emails + `fit-receipt-events` render) and branches `queue()` by `batch.queue`. Consumer + cron are owned by **Terraform** (`cloudflare_queue_consumer` ×2 + `cloudflare_workers_cron_trigger` in `workers.tf`); `wrangler.jsonc` declares only producers. Sweep cron runs **every 10 hours in pre-sale** (`0 */10 * * *`; revert to `*/10 * * * *` with real customers — see `docs/PENDING.md`). The render lives in `apps/jobs-worker/src/receipt-pdf.tsx` (lazy `@react-pdf/renderer`) — **api-worker must never depend on `@react-pdf/renderer`**. Shared receipt data access lives in `packages/database/src/repositories/receipts.repository.ts` (see §1 exception): atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`/`markReceiptNotified`. The receipt email is gated by `markReceiptNotified` (with `clearReceiptNotified` rollback on send failure) so a transient queue error never loses the email — and that gate is exactly why the sweep can safely re-enqueue both pending states (C6).
+
+---
+
+## Payment Receipts (Panel + Console)
+
+Panel receipts are internal payment records — never fiscal invoices (see `docs/ORGANIZATION_RECEIPT_MODEL.md`). Source of truth for frozen decisions: `plan.md`; module map: `tasks/README.md`.
+
+- **Two-step emission**: step 1 assigns the number atomically (single `INSERT … ON CONFLICT DO UPDATE … RETURNING`, per-org yearly sequence `{slug}-año-n`) in the validating request; step 2 renders the PDF in `jobs-worker` (`fit-receipt-events` queue + DLQ, sweep cron 10 h pre-sale) and `PUT`s it to R2 (`receipts/<org>/<año>/<n>.pdf`, immutable, generated once).
+- **Email only from step 2**, after `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` (`rowCount === 1` gate); `markReceiptNotified` with `clearReceiptNotified` rollback on send failure.
+- **Sweep covers two states (C6)** (`sweepPendingReceiptPdfs`, `jobs-worker`): *numbered without PDF* (≥15 min — the render was lost) **and** *PDF ready but unnotified* (≥30 min — the step-2 email never left). Both are safe to re-enqueue because the notification has its own idempotent gate; a corrupt row never aborts the rest.
+- **Explicit void outcome (C6)**: `markReceiptVoided` throws `RECEIPT_NOT_ISSUED` as an **internal service contract**, but `PATCH /api/payments/:id/status` (and its Console twin) answers **200** with `receiptVoided: boolean` + `receiptVoidReason: 'not_issued'` when there was no receipt to void — the status change is never reverted and the panel/console show a differentiated toast. Never text-match; the code is the contract.
+- **Contract**: `GET /:id/receipt` → 200 ready / 202 pending / 200 `available:false,reason:pre_system` (never 409); `GET /:id/receipt/pdf` binary download; `POST /:id/issue` manual fallback (owner/manager).
+- **Document gate** forces `"Comprobante de pago"` (`HAS_FISCAL_HOMOLOGATION=false` by construction); the technical UUID is never shown (only `receiptNumber`); voided = `ANULADO`, the number is never released or reused; serial audit at `GET /api/reports/receipts` (rows + per-currency totals + `gaps[]` = `1..lastNumber` per org/year).
+- **Fiscal gating (C2, fail-closed)**: a receipt **never details taxes the emitter did not declare**. Without `fiscalConfig.isFormalTaxpayer: true` (declared with `confirmed: true` friction) the country taxes are born **off** and the receipt persists only the total (`subtotal = amountPaid`, `taxTotal = 0`, `taxDetails = []`). Enabling a tax without the declaration → **400 `TAXES_REQUIRE_FORMAL_TAXPAYER`**; conditional taxes (`basis: 'gross_first'`, e.g. IGTF VE) are born off, are never automatic, and require an explicit rate + `confirmedTaxes: ['IGTF']` → **400 `TAX_REQUIRES_CONFIRMATION`**. Validated on the **merged** config (not the incoming body) in `organizations.service` + defensive normalization in `resolveFiscalProfile`. The manual payment override can only **reduce** tax load: detailing taxes while informal → 400. `gross_first` taxes are extracted from the gross total **before** decomposing the rest (it changes the IVA base — the UI warns). Panel: `settings/organization` → Facturación; the platform emitter (FitStack) is **not** declared formal, so SaaS `FS-N` receipts also carry no breakdown (see `docs/PENDING.md` §9).
+- **Document fidelity (C3)**: the PDF/contract **omit** lines without data (tax id, address, recipient document) — never filled with placeholders (`---`); `checklistPrePdf` rejects a visible placeholder (omitting is the correct path). If `currencyPaid ≠ baseCurrency` it prints `1 {base} = {rate} {paid}` **plus** the base-currency equivalent (`amounts.baseTotal`, derived with `roundCents` from the **persisted** rate — never from an exchange API).
+- **Emitter snapshot (C1)**: step 1 persists `emitterSnapshot` (jsonb) **in the same statement as the number** — `version`, frozen `emitter` (name/legalName/taxId/taxLabel/address/countryCode/currency), the label applied by the gate, the recipient `docLabel`, the `disclaimer`, the `timezone` used to print dates and the resolved fiscal profile (`taxes[]` = name/rate/enabled). The compose reads the snapshot **first and skips live config entirely** (`resolveFiscalProfile` is not even evaluated), so `GET /:id/receipt` is reproducible after the emitter edits its profile. `NULL` = emitted before C1 → composed live (terminal, documented state); a present-but-invalid snapshot **throws** (never silently degrades).
+- **Emission traceability (C5)**: `issuedBy` (actor of the numbering request) travels from the session (`c.get('user')?.id`) through `subscriptions.service` / `payments.route` / `platform-subscriptions.*` into `attach*Receipt`. Step 2 and the sweep never number, so they never write it: an existing `issued_by` is never overwritten or invented (`NULL` = historical/automatic emission). Both reports expose `issuedBy` + `emitterName` (from the snapshot) and the CSV export includes them.
+- Shared-repo exception (§1): `packages/database/src/repositories/receipts.repository.ts` + `platform-receipts.repository.ts` — the only shared repos (two runtimes need identical SQL each).
+
+> Columns (C1/C5): `payment.emitter_snapshot` / `payment.issued_by` and their twins on `platform_subscription_payment` — migration `0016`, additive nullable, no backfill (`NULL` = pre-C1 emission).
+
+> Payment-status migration (`0017`, additive/backward-compatible): sets `platform_subscription_payment.status` default to `'processing'` and normalizes legacy data (`pending → processing`, `invalid → voided`, marking `receipt_voided`/`voided_at`/`void_reason` when a receipt existed). Applied by CI (`database-migrations.yml`) on merge. After merge, no row may carry `pending`/`invalid`.
+
+**Console (SaaS) receipts** mirror the same guarantees with one legal emitter (FitStack):
+- Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
+- Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
+- Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
+- Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed); without a number the service code is `RECEIPT_NOT_ISSUED` but the endpoint answers **200** with `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6); voiding never cancels the subscription nor reverts the cumulative period; `refunded` (reserved, no flow produces it) doesn't touch the flag and `voided` is the only annulment state (`rejected`/`annulled` is derived with `getVoidKind`).
+- Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emisor); empty = generic "FitStack" + gate Comprobante.
+- **Audit parity (C4)**: the audit of the global series lives at `GET /api/platform/subscriptions/receipts` + `/subscriptions/receipts` (console page with URL filters + CSV export up to 1000 rows), mirroring the Panel. Same `computeReceiptGaps` algorithm with an **injected strategy** (Panel: `{slug}-{año}-{seq}` annual; Console: `FS-{seq}` continuous, no year) → `gaps[]` classifies `hueco` vs `anulado` identically on both sides. Console filters run in **UTC** (platform billing convention); `year` there means the UTC year of `payment_date`, not a sequence universe. `support` reads (200); writes stay 403.
+
 ---
 
 ## Platform Subscription Status (Organization Billing)
@@ -411,8 +456,8 @@ Subscription status is **computed dynamically** via SQL CASE — NOT stored in D
 
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active", // periodEnd >= now and valid payment
-  TRIAL: "trial", // isTrial = true
+  ACTIVE: "active", // periodEnd >= now and EXISTS(validated|refunded)
+  TRIAL: "trial", // isTrial && periodEnd >= now
   PAST_DUE: "past_due", // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
   SUSPENDED: "suspended", // 15+ days overdue
@@ -420,18 +465,21 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 };
 ```
 
-**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters):
+The payment enum (`PAYMENT_STATUSES = processing | validated | voided | refunded`) and its derived helpers live in `@workspace/shared/constants`: `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) and `getVoidKind` (`voided` without `receiptNumber` → `rejected`; with → `annulled`). `pending` and `invalid` no longer exist.
+
+**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters; pure mirror `computePlatformSubscriptionStatus`, parity-tested):
 
 - `cancelledAt IS NOT NULL` → `cancelled`
 - `isTrial = true` and active period → `trial`
-- Last payment `VALIDATED`/`REFUNDED` and active period → `active`
-- Last payment `PENDING` and active period → `past_due`
-- Active period (no validated payment) → `active`
-- Overdue days ≤ 7 → `past_due`
-- Overdue days ≤ 14 → `read_only`
-- Overdue days > 14 → `suspended`
+- Active period + **`EXISTS(validated|refunded)`** (`QUALIFYING_PAYMENT_STATUSES`, never "the last payment") → `active`
+- Active period without a qualifying payment (`processing`/`voided`/none) → `past_due`
+- Grace from `currentPeriodEnd` (using `FLOOR` to match the pure helper): overdue ≤ 7 days → `past_due`; ≤ 14 → `read_only`; > 14 → `suspended`
 
-> Careful: the "last payment `VOIDED` → `cancelled`" rule applies to the gym `subscription` table (`subscriptions.repository.ts`, along with `INVALID`), **not** to `platform_subscription`.
+`computePlatformSubscriptionStatus` (pure mirror) now requires **`hasValidatedPayment: boolean`** (no longer optional). The SQL and the helper are parity-tested (`platform-subscription-status.test.ts`).
+
+A `voided` payment is **ignored**: it never revokes service; grace runs from `currentPeriodEnd` and the tiers do **not** accumulate. `processing` does not qualify either. `getLastSubscriptionStatus(organizationId)` exposes this same status + `hasValidatedPayment` for the self-service renewal guard, which blocks a re-payment **only if `currentPeriodEnd > now && hasValidatedPayment`** (a client whose only payment was voided can pay again). When the status does not grant access, the free-tier gate decides (`features.service.ts`): if `feature_flags_free_tier_enabled === 'true'` the free floor applies; otherwise the legacy gate sends the panel to `/no-subscription` (see "Features & Free Tier").
+
+> Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revocada); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 
@@ -454,7 +502,7 @@ Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/sett
   - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override for tests). `rate = 1` if currency == plan currency; provider failure → 503.
   - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
   - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
-  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now`** (only when expired).
+  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).
   - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
 - **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
 - **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).
@@ -552,7 +600,7 @@ ORG_ROLES = {
 | **Reports**       |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
 | **Members**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Staff**         | ✅ CRUD | ✅ (no delete) |       ❌       |          ❌           |   ❌    |
-| **Subscriptions** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
+| **Subscriptions** | ✅ (no delete) | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Plans**         | ✅ CRUD | ✅ (no delete) |    ✅ read     |        ✅ read        | ✅ read |
 | **Classes**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
 | **Content**       | ✅ CRUD | ✅ (no delete) |       ❌       |        ✅ read        | ✅ read |
@@ -841,6 +889,12 @@ stale data until the TTL expires. `updateTag` without `refresh()` purges
 silently without re-rendering. Panel uses the same shape
 (`members-client.tsx` + `onRefreshServer` prop).
 
+> **Listas accionables siempre frescas**: la lista "Por validar" de
+> `/payments` se pide con `cache: 'no-store'` (`payments/page.tsx`). Una lista de
+> trabajo no puede tener staleness: un pago registrado por otro canal debe
+> aparecer al recargar, no al vencer un TTL. La tabla de suscripciones sí puede
+> tolerar `revalidate: 60` + tag porque toda escritura de la app la purga.
+
 > **Next.js 16 note**: `revalidateTag(tag, profile)` now requires a `profile` (string or `CacheLifeConfig`). For server actions use `updateTag(tag)` (new in Next 16, no profile).
 
 ### Console Cache Tags
@@ -853,6 +907,7 @@ silently without re-rendering. Panel uses the same shape
 | `console:settings`  | `/api/platform/settings`                         |
 | `console:staff`     | `/api/platform/staff`                            |
 | `console:knowledge` | `/api/platform/knowledge*`                       |
+| `console:receipts`  | `/api/platform/subscriptions/receipts`           |
 
 ### RSC Pattern in `apps/console`
 
@@ -994,7 +1049,9 @@ e2e/
 
 **Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
 
-**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
+**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`): the member delete (later in LIFO) cascades it away by FK, so the cleanup is still complete and the FK warning noise is gone. The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
+
+**Setup sessions**: `panel-setup` writes **two** storage states before the `panel` project creates any context — `panel-user.json` (suite org) and `empty-org-user.json` (org `e2e-empty`, used by `empty-state.spec.ts` via `test.use`). A `test.use({ storageState })` path must exist *before* the project runs, so it can never be created in a spec's `beforeAll`.
 
 **Env vars** (optional):
 

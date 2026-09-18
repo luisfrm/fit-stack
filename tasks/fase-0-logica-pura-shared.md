@@ -25,7 +25,7 @@ Un solo motor de reglas fiscales puro y testeado: el país da el default (`COUNT
 | `packages/shared/src/documents/receipt-number.ts` | `formatPanelReceiptNumber(slug, year, seq)` → `{slug}-2026-000045` (zero-pad 6, sin `organization.id` completo) + `formatConsoleReceiptNumber(seq)` → `FS-0000001` + `parse/validate` de ambos. Año = número de 4 dígitos. |
 | `packages/shared/src/documents/receipt-data.ts` | Contrato `ReceiptData` (emisor, receptor, identificación, detalle snapshot, periodo, montos+moneda+tasa, método enmascarado, `paymentDate` vs fecha emisión, impuestos, pie legal) + `checklistPrePdf(data)` que valida el checklist: número presente, UUID ausente en campos visibles, disclaimer del emisor, tasa si moneda difiere. |
 | `packages/shared/src/documents/index.ts` | Re-exports del módulo. |
-| `packages/shared/tests/documents/*.test.ts` | Casos: gate fuerza Comprobante con 2/3 condiciones (matriz de 8); override sin reason lanza; VE con `USD` incluye IGTF y con `VES` no; CO IVA 19%; PE IGV; US sin impuestos; override org (tasa off, disclaimer custom); formato/parse de ambos números; checklist detecta UUID visible y tasa faltante; `maskReference` con valores cortos/vacíos. |
+| `packages/shared/tests/documents/*.test.ts` | Casos: gate fuerza Comprobante con 2/3 condiciones (matriz de 8); override sin reason lanza; VE con `USD` incluye IGTF y con `VES` no; CO IVA 19%; PE IGV; US sin impuestos; override org (tasa off, disclaimer custom); formato/parse de ambos números; checklist detecta UUID visible y tasa faltante; `maskReference` con valores cortos/vacíos; **trial/free de $0: base cero en moneda distinta a la del org no genera desglose de impuesto sin sentido (taxDetails vacío, taxTotal 0).** |
 
 ## Modificar
 
@@ -52,3 +52,12 @@ pnpm --filter @workspace/shared test
 pnpm typecheck
 pnpm lint
 ```
+
+## Estado: COMPLETADA
+
+- Módulo `packages/shared/src/documents/` creado: `document-label-gate`, `fiscal-profile`, `tax-math`, `money` (extra: `centsToUnits`/`unitsToCents` — el gym va en unidades mayores `numeric`, solo platform va en centavos `bigint`; verificado en `schema.ts`), `receipt-number`, `masking`, `receipt-data`, `index`. Re-exportado desde `shared/src/index.ts`.
+- `types.ts`: `IPayment` extendido con campos de recibo + re-exports `FiscalConfig`/`ReceiptData`/… (solo tipos, sin ciclo runtime).
+- `api-worker/src/lib/schemas.ts`: `taxDetailSchema` + re-export `FiscalConfigSchema` (no duplicado) + `taxOverrideSchema`. `routes/subscriptions.route.ts`: objeto `payment` de `createSubSchema` extendido con `subtotal?/taxTotal?/taxDetails?/taxOverrideReason?` (solo schema, sin lógica).
+- Decisiones aplicadas (§5 del plan): `masking.ts` nuevo; base = subtotal (`total = subtotal + taxTotal`); `checklistPrePdf` acumula `errors[]`.
+- Verificación: `shared test` 188/188 (7 archivos nuevos), `typecheck` 9/9, `lint` 0 errores (warnings pre-existentes en `can.ts`/`types.ts`, nada en `documents/`).
+- Follow-ups fuera de Fase 0: unificar `ValueConverter` duplicado (console/panel) en shared — display concern, no fiscal; sospecha de doble `/100` sobre montos gym en panel (`receipt-dialog`, `subscription-form`) a verificar en Fase 2/3 (el gym es `numeric`, no centavos).

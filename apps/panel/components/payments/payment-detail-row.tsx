@@ -7,10 +7,11 @@ import {
 import { ExternalLink } from "lucide-react";
 
 import { uploadService } from "@/lib/services/upload-service";
+import { maskReference } from "@workspace/shared";
 
 export interface ReceiptPaymentDetail {
   label: string;
-  value: string;
+  value: string | number;
   /** `file` (screenshot) o cualquier otro string (`text`, `number`, …). */
   type?: string;
 }
@@ -30,13 +31,20 @@ interface NormalizedDetail {
 }
 
 function isImageUrl(value: unknown): boolean {
-  return typeof value === "string" && (value.startsWith("http") || value.startsWith("/"));
+  if (typeof value !== "string") return false;
+  if (value.startsWith("http") || value.startsWith("/")) return true;
+  // Keys relativas sin type (p. ej. `org/capturas/abc.png`): evidencia, no secreto.
+  return value.includes("/") || /\.(png|jpe?g|webp|gif|pdf)$/i.test(value);
 }
 
 /**
  * Aplana `paymentMethodDetails` a un formato único para renderizar. Acepta
  * el formato nuevo (`IPaymentMethodDetail[]`) y el legacy (`Record<string, any>`)
  * mientras conviven las dos formas en la BD.
+ *
+ * Los valores `text`/`number` se enmascaran (`maskReference` de shared) en
+ * AMBAS formas; `file` (o URL/key de evidencia) sigue como link
+ * "VER CAPTURA" (es evidencia, no secreto).
  */
 export function normalizePaymentDetails(
   input: PaymentMethodDetailsInput,
@@ -46,25 +54,28 @@ export function normalizePaymentDetails(
     return input.map((detail, idx) => {
       // El tipo de `detail` es union (shared IPaymentMethodDetail + nuestro ReceiptPaymentDetail);
       // la coerción es segura porque solo leemos `label`, `value` y un `type` opcional.
+      // `value` puede ser `number` (schema admite `type: "number"`): String() antes de enmascarar.
       const d = detail as ReceiptPaymentDetail;
+      const isImage =
+        d.type === "file" ||
+        (d.type === undefined && isImageUrl(d.value));
       return {
         label: d.label,
-        value: d.value,
-        isImage:
-          d.type === "file" ||
-          (d.type === undefined && isImageUrl(d.value)),
+        value: isImage ? String(d.value) : maskReference(String(d.value ?? "")),
+        isImage,
         key: `${d.label}-${idx}`,
       };
     });
   }
 
   return Object.entries(input).flatMap(([key, value]) => {
-    if (!value || key === "last4") return [];
+    if (value === null || value === undefined || value === "" || key === "last4") return [];
+    const isImage = isImageUrl(value);
     return [
       {
         label: key.replaceAll("_", " ").toUpperCase(),
-        value: String(value),
-        isImage: isImageUrl(value),
+        value: isImage ? String(value) : maskReference(String(value)),
+        isImage,
         key,
       },
     ];
@@ -82,7 +93,7 @@ export function PaymentDetailRow({ detail }: PaymentDetailRowProps) {
       {detail.isImage ? (
         <Button variant="link" size="xs" asChild className="h-auto p-0 text-primary">
           <a href={uploadService.getMediaUrl(detail.value)} target="_blank" rel="noopener noreferrer">
-            VER CAPTURE <ExternalLink size={10} className="ml-1" />
+            VER CAPTURA <ExternalLink size={10} className="ml-1" />
           </a>
         </Button>
       ) : (

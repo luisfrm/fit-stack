@@ -1,0 +1,228 @@
+/* ── Documents / receipt-data — contrato del comprobante ─────────────────
+   `ReceiptData` es TODO lo que el PDF, el email y el reporte necesitan y
+   nada más: emisor congelado, receptor, detalle snapshot, periodo, montos
+   en centavos enteros, método enmascarado, impuestos y pie legal.
+   El UUID técnico (`payment.id`) NUNCA va en campos visibles: solo viaja
+   como `internalPaymentId` marcado @internal y `checklistPrePdf` lo
+   detecta si se filtra a un campo visible.
+   Funciones puras, sin I/O, edge-safe (Workers).
+   ─────────────────────────────────────────────────────────────────────── */
+
+import type { ITaxDetail } from '../types';
+import { TAX_TOTAL_TOLERANCE } from './tax-math';
+import {
+  isValidConsoleReceiptNumber,
+  isValidPanelReceiptNumber,
+} from './receipt-number';
+
+/** Tipo de documento emitido. Hoy solo `'receipt'` es efectivo (gate). */
+export type ReceiptDocumentType = 'receipt' | 'invoice';
+
+/** Emisor congelado al momento de la emisión (snapshot, no referencia viva). */
+export interface ReceiptEmitter {
+  name: string;
+  legalName?: string | null;
+  taxId?: string | null;
+  taxLabel: string;
+  address?: string | null;
+  countryCode: string;
+  /** Moneda base del emisor (para exigir tasa si el pago difiere). */
+  currency: string;
+}
+
+export interface ReceiptRecipient {
+  name: string;
+  documentId?: string | null;
+  docLabel?: string | null;
+}
+
+/** Impuesto tal como se aplicó al emitir (auditoría del cálculo, no del país). */
+export interface ReceiptSnapshotTax {
+  name: string;
+  /** Fracción 0–1 realmente aplicada. */
+  rate: number;
+  enabled: boolean;
+}
+
+/**
+ * Identidad del emisor CONGELADA en el momento de emitir (C1). Se persiste
+ * junto al número (`emitter_snapshot`) y `GET /:id/receipt` la lee tal cual:
+ * el JSON y la auditoría no cambian si el emisor edita su perfil después (el
+ * PDF en R2 ya era inmutable). Congela todo lo que hoy se derivaba en vivo:
+ * identidad, etiqueta aplicada por el gate, etiqueta del receptor, pie legal,
+ * zona horaria con la que se imprimieron las fechas y el perfil fiscal con el
+ * que se calcularon los impuestos.
+ */
+export interface ReceiptEmitterSnapshot {
+  /** Versión del shape (permite evolucionar sin romper snapshots viejos). */
+  version: 1;
+  emitter: ReceiptEmitter;
+  /** Etiqueta aplicada por `resolveDocumentLabel` al emitir. */
+  documentLabel: string;
+  /** Etiqueta del documento del receptor (`FiscalProfile.docLabel`). */
+  recipientDocLabel: string;
+  /** Pie legal aplicado (país del emisor o su `disclaimerOverride`). */
+  disclaimer: string[];
+  /** Zona horaria del emisor usada para imprimir las fechas. */
+  timezone?: string | null;
+  /** Perfil fiscal resuelto con el que se calcularon los impuestos. */
+  taxes: ReceiptSnapshotTax[];
+}
+
+export interface ReceiptDocument {
+  number: string;
+  type: ReceiptDocumentType;
+  /** Etiqueta aplicada por el gate (`resolveDocumentLabel`). */
+  label: string;
+  /** Emisión (≠ fecha del pago). ISO. */
+  issuedAt: string;
+}
+
+export interface ReceiptSale {
+  planName: string;
+  periodStart: string;
+  periodEnd: string;
+  /** Fecha en que se pagó. ISO. */
+  paymentDate: string;
+}
+
+/** Montos en centavos enteros (ver `money.ts`). */
+export interface ReceiptAmounts {
+  subtotal: number;
+  taxDetails: ITaxDetail[];
+  taxTotal: number;
+  total: number;
+  currencyPaid: string;
+  /**
+   * Moneda comercial base (la del plan). Si difiere de `currencyPaid` se
+   * exige tasa. Si se omite, el checklist usa la moneda del emisor.
+   */
+  baseCurrency?: string;
+  exchangeRateApplied?: string | null;
+  /**
+   * Equivalente del total en `baseCurrency`, congelado desde la tasa
+   * persistida (`exchangeRateApplied`) — nunca recalculado con una API de
+   * cambio. `null` si el pago ya está en la moneda base (no hay conversión
+   * que mostrar).
+   */
+  baseTotal?: number | null;
+}
+
+export interface ReceiptMethod {
+  name: string;
+  /** Detalles YA enmascarados (`maskPaymentDetails`). */
+  maskedDetails?: { label: string; value: string }[];
+}
+
+export interface ReceiptFooter {
+  disclaimer: string[];
+  generatedBy: 'Generado con FitStack';
+}
+
+export interface ReceiptData {
+  emitter: ReceiptEmitter;
+  recipient: ReceiptRecipient;
+  document: ReceiptDocument;
+  sale: ReceiptSale;
+  amounts: ReceiptAmounts;
+  method: ReceiptMethod;
+  footer: ReceiptFooter;
+  /** Zona horaria del emisor: fechas se muestran en hora local, no UTC. */
+  timezone?: string;
+  /** `true` si el comprobante fue anulado (se conserva el número). */
+  voided?: boolean;
+  /**
+   * @internal UUID técnico para trazabilidad interna. NUNCA renderizar.
+   */
+  internalPaymentId?: number | string;
+}
+
+export interface ReceiptChecklist {
+  ok: boolean;
+  errors: string[];
+}
+
+/** Detecta UUIDs técnicos filtrados a campos visibles. */
+const UUID_PATTERN =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/**
+ * Placeholder prohibido en un campo visible: si el dato no existe, la línea
+ * se OMITE (FACTURATION.md §3: "omitir línea si no existe, no inventar").
+ */
+export const MISSING_VALUE_PLACEHOLDER = '---';
+
+/** Campos visibles opcionales: `null` (omitir) es válido, el placeholder no. */
+function placeholderViolations(data: ReceiptData): string[] {
+  const optionalFields: { label: string; value: string | null | undefined }[] = [
+    { label: 'identificación fiscal del emisor', value: data.emitter.taxId },
+    { label: 'dirección del emisor', value: data.emitter.address },
+    { label: 'documento del receptor', value: data.recipient.documentId },
+  ];
+  return optionalFields
+    .filter((field) => field.value?.trim() === MISSING_VALUE_PLACEHOLDER)
+    .map(
+      (field) =>
+        `Placeholder "${MISSING_VALUE_PLACEHOLDER}" en ${field.label}: la línea debe omitirse, no rellenarse.`,
+    );
+}
+
+/**
+ * Valida el checklist pre-PDF: número presente y válido, sin UUID visible,
+ * disclaimer del emisor, tasa si la moneda difiere, y cuadre de totales.
+ * Acumula errores (no lanza): el caller decide (decisión §5.3).
+ */
+export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
+  const errors: string[] = [];
+
+  if (
+    data.document.number.trim().length === 0 ||
+    (!isValidPanelReceiptNumber(data.document.number) &&
+      !isValidConsoleReceiptNumber(data.document.number))
+  ) {
+    errors.push('Comprobante sin número correlativo válido.');
+  }
+
+  const visibleStrings: string[] = [
+    data.document.number,
+    data.document.label,
+    data.emitter.name,
+    data.emitter.legalName ?? '',
+    data.emitter.taxId ?? '',
+    data.emitter.address ?? '',
+    data.recipient.name,
+    data.recipient.documentId ?? '',
+    data.sale.planName,
+    data.method.name,
+    ...(data.method.maskedDetails ?? []).map((d) => `${d.label} ${d.value}`),
+  ];
+  if (visibleStrings.some((s) => UUID_PATTERN.test(s))) {
+    errors.push('UUID técnico visible en campos del comprobante.');
+  }
+
+  if (data.footer.disclaimer.length === 0) {
+    errors.push('Falta el disclaimer legal del emisor.');
+  }
+
+  errors.push(...placeholderViolations(data));
+
+  if (
+    data.amounts.currencyPaid !== (data.amounts.baseCurrency ?? data.emitter.currency) &&
+    (data.amounts.exchangeRateApplied ?? '').trim().length === 0
+  ) {
+    errors.push('Falta la tasa de cambio (moneda del pago ≠ moneda base del plan).');
+  }
+
+  if (
+    Math.abs(data.amounts.total - (data.amounts.subtotal + data.amounts.taxTotal)) >
+    TAX_TOTAL_TOLERANCE
+  ) {
+    errors.push('El total no cuadra con subtotal + impuestos.');
+  }
+  const linesSum = data.amounts.taxDetails.reduce((sum, line) => sum + line.amount, 0);
+  if (Math.abs(linesSum - data.amounts.taxTotal) > TAX_TOTAL_TOLERANCE) {
+    errors.push('El desglose de impuestos no cuadra con el total de impuestos.');
+  }
+
+  return { ok: errors.length === 0, errors };
+}
