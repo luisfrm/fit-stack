@@ -220,7 +220,7 @@ export const platformSubscriptionPayment = pgTable(
     paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
 
     // Estados
-    status: text('status').notNull().default('pending'),
+    status: text('status').notNull().default('processing'),
     dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
