@@ -38,7 +38,7 @@ organization_document_sequence
  └─ next_number         -- incrementado transaccionalmente
 ```
 
-Guardar el número asignado en `payment.receiptNumber`, asignado al **generar el PDF**, no al crear el pago (evita huecos si un pago se invalida antes de emitir comprobante).
+Guardar el número asignado en `payment.receiptNumber`, asignado al **generar el PDF**, no al crear el pago (evita huecos si un pago se anula (`voided`) antes de emitir comprobante).
 
 **Datos del miembro:** nombre completo, documento de identidad si existe (usar `docLabel` del país), contacto opcional.
 

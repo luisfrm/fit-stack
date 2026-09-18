@@ -1,7 +1,8 @@
-import { eq, ilike, and, or, count, desc, type Db } from '@workspace/database/factory';
+import { eq, ilike, and, or, count, desc, sql, type Db } from '@workspace/database/factory';
 import {
   organization,
   platformSubscription,
+  platformSubscriptionPayment,
   platformPlan,
   authMember,
   gymMember,
@@ -11,6 +12,7 @@ import type { IPlatformOrganization, IPlatformSubscription } from '@workspace/sh
 import {
   computePlatformSubscriptionStatus,
   PLATFORM_SUBSCRIPTION_STATUSES,
+  PAYMENT_STATUSES,
 } from '@workspace/shared/constants';
 
 export type DbOrganization = typeof organization.$inferSelect;
@@ -118,6 +120,13 @@ export function createOrganizationsRepository(db: Db) {
               planCurrency: platformPlan.currency,
               planDurationValue: platformPlan.durationValue,
               planDurationUnit: platformPlan.durationUnit,
+              // Paridad con el SQL del repo SaaS: "hay periodo pagado" es
+              // EXISTS(validated|refunded), nunca "el último pago".
+              hasValidatedPayment: sql<boolean>`EXISTS (
+                SELECT 1 FROM ${platformSubscriptionPayment} p
+                WHERE p.subscription_id = platform_subscription.id
+                  AND p.status IN (${PAYMENT_STATUSES.VALIDATED}, ${PAYMENT_STATUSES.REFUNDED})
+              )`,
             })
             .from(platformSubscription)
             .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id))
@@ -131,6 +140,7 @@ export function createOrganizationsRepository(db: Db) {
                 currentPeriodEnd: latestSub.currentPeriodEnd,
                 cancelledAt: latestSub.cancelledAt,
                 isTrial: latestSub.isTrial,
+                hasValidatedPayment: latestSub.hasValidatedPayment,
               })
             : PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
 

@@ -3,6 +3,8 @@
 > Derivado de la revisión de `plan.md`, `tasks/fase-*.md`, `docs/FACTURATION.md`, `docs/PENDING.md` y el código real (shared `documents/`, repos compartidos, paso 1, paso 2, PDF, rutas, UI, tests).
 > Estado verificado al escribir este plan: `pnpm typecheck` ✅ 9/9 · `@workspace/shared` tests ✅ 244/244.
 > **No se implementa nada hasta aprobación explícita** (AGENTS.md §7). Las migraciones requieren aprobación aparte.
+>
+> **Nota (modelo de estados unificado):** `PAYMENT_STATUSES` queda en `processing | validated | voided | refunded`. `processing` absorbe al antiguo `pending` y `voided` unifica rechazo y anulación (el tipo `rejected`/`annulled` se **deriva** con `getVoidKind`); `invalid` y `pending` se retiraron. Ver `docs/PAYMENT_STATUSES.md`.
 
 ---
 
@@ -383,7 +385,7 @@ El fallo de `prettier --check` por CRLF es **deuda preexistente** (el repo mezcl
 | Capa | Cambio |
 |---|---|
 | `shared/constants.ts` | `SUBSCRIPTION_STATUSES.VOIDED = 'voided'` con la semántica documentada (`CANCELLED` = acceso revocado con cobro válido; `VOIDED` = registro inválido). |
-| `subscriptions.repository.ts` | El status derivado pone el cobro `voided`/`invalid` **antes** de `cancelledAt` → ANULADA. `cancelledAt` sigue siendo la marca interna de "fuera de vigencia" (reportes/activos no cambian). El filtro `voided` sigue al status mostrado (`IN ARRAY [voided, invalid]`). |
+| `subscriptions.repository.ts` | El status derivado pone el cobro `voided` **antes** de `cancelledAt` → ANULADA. `cancelledAt` sigue siendo la marca interna de "fuera de vigencia" (reportes/activos no cambian). El filtro `voided` sigue al status mostrado. |
 | `shared/access-control.ts` | `subscriptions` pierde `delete` (ningún rol lo tiene: es un registro financiero). |
 | `subscriptions.route.ts` / `.service.ts` / `.repository.ts` | Fuera `DELETE /:id` y sus métodos. Anular el cobro es la vía. |
 | Panel | Badge **ANULADA** (outline) junto a **CANCELADA** (destructive); fuera la acción "Eliminar Registro", su handler y `subscriptionsService.delete`. |
@@ -393,7 +395,7 @@ El fallo de `prettier --check` por CRLF es **deuda preexistente** (el repo mezcl
 
 ### Criterios de aceptación (verificados)
 
-- ✅ Integración: cobro `voided` → status **`voided`**; cobro `invalid` → **`voided`**; `PUT status: cancelled` → **`cancelled`**.
+- ✅ Integración: cobro `voided` → status **`voided`** (rechazo y anulación comparten estado); `PUT status: cancelled` → **`cancelled`**.
 - ✅ Integración: filtro `status=voided` devuelve la suscripción anulada.
 - ✅ Integración: `DELETE /api/subscriptions/:id` → **404** y la suscripción sigue existiendo.
 - ✅ E2E panel completo: **52/52** (antes: `empty-state` 2/2 rojo y el accionable de pago pendiente rojo) y **sin** warnings `no se pudo borrar subscription`.

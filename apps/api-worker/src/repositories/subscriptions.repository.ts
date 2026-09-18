@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, or, count, ilike, inArray, gte, lte, type Db } from '@workspace/database/factory';
+import { eq, desc, and, sql, or, count, ilike, gte, lte, type Db } from '@workspace/database/factory';
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema';
 import { SubscriptionStatus, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from '@workspace/shared';
 import { OrganizationDateManager } from '../lib/date-manager';
@@ -42,7 +42,7 @@ export function createSubscriptionsRepository(db: Db) {
      */
     getSubscriptionStatusSql(now: Date) {
       return sql<SubscriptionStatus>`CASE 
-        WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.VOIDED}
+        WHEN ${payment.status} = ${PAYMENT_STATUSES.VOIDED} THEN ${SUBSCRIPTION_STATUSES.VOIDED}
         WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
         WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
         ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
@@ -52,13 +52,13 @@ export function createSubscriptionsRepository(db: Db) {
     getSubscriptionIsActiveSql(now: Date) {
       return sql<boolean>`${subscription.endDate} >= ${now} 
         AND ${subscription.cancelledAt} IS NULL 
-        AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`;
+        AND ${payment.status} <> ${PAYMENT_STATUSES.VOIDED}`;
     },
 
     getPaidAndNotRevokedCondition() {
       return and(
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
+        sql`${payment.status} <> ${PAYMENT_STATUSES.VOIDED}`
       );
     },
 
@@ -101,8 +101,9 @@ export function createSubscriptionsRepository(db: Db) {
             )!
           );
         } else if (status === SUBSCRIPTION_STATUSES.VOIDED) {
-          // El filtro "Anuladas" sigue al status mostrado: anulado o rechazado.
-          conditions.push(inArray(payment.status, [PAYMENT_STATUSES.VOIDED, PAYMENT_STATUSES.INVALID]));
+          // "Anuladas" = cobro `voided` (rechazado sin comprobante o anulado
+          // con comprobante): la distinción se deriva con `getVoidKind`.
+          conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
         }
       }
 

@@ -8,7 +8,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
-import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
+import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
 import {
   createGymTenant,
   addUserToOrganization,
@@ -332,13 +332,75 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(await readStatus(owner, subId)).toBe('voided');
     });
 
-    it('rechazar el cobro (`invalid`) también deja la suscripción anulada', async () => {
+    it('rechazar el cobro ya no es un estado propio: `invalid` responde 400 (schema)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
-      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+      const { paymentId } = await seedSubscription(owner, member, plan);
 
-      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'invalid' });
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'invalid',
+      });
 
-      expect(await readStatus(owner, subId)).toBe('voided');
+      // `invalid`/`pending` desaparecieron del contrato: el enum solo acepta
+      // processing | validated | voided. El schema rechaza antes del servicio.
+      expect(res.status, res.text).toBe(400);
+    });
+
+    it('rechazar un cobro `processing` (`voided`) deja la suscripción ANULADA con auditoría persistida', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      // Alta con pago `processing`: no emite comprobante (queda en revisión).
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'transfer',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(created.status, created.text).toBe(201);
+
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const paymentId = list.body.data.find((r) => r.id === created.body.id)?.paymentId as number;
+      expect(paymentId).toBeTruthy();
+
+      const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: 'Comprobante ilegible',
+      });
+      expect(voided.status, voided.text).toBe(200);
+      // C6: rechazar sin comprobante emitido responde 200 y lo dice.
+      expect(voided.body).toMatchObject({
+        receiptVoided: false,
+        receiptVoidReason: 'not_issued',
+      });
+
+      // El status derivado es ANULADA (registro inválido), no cancelada.
+      expect(await readStatus(owner, created.body.id)).toBe('voided');
+
+      // La auditoría se persiste SIEMPRE al anular, haya o no comprobante.
+      const rows = await testQuery<{
+        status: string;
+        void_reason: string | null;
+        voided_at: string | null;
+        voided_by: string | null;
+        receipt_number: string | null;
+      }>(
+        `SELECT status, void_reason, voided_at, voided_by, receipt_number FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      expect(rows[0]!.status).toBe('voided');
+      expect(rows[0]!.void_reason).toBe('Comprobante ilegible');
+      expect(rows[0]!.voided_at).not.toBeNull();
+      expect(rows[0]!.voided_by).toBeTruthy();
+      expect(rows[0]!.receipt_number).toBeNull();
     });
 
     it('revocar el acceso deja la suscripción CANCELADA (`cancelled`)', async () => {

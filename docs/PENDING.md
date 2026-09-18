@@ -146,6 +146,30 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Esbozo de la solución completa (claim-then-number): reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` (persistiendo ya los impuestos) **antes** de consumir la secuencia y asignar el número después. Obligaría a una rama extra de reparación en el barrido para el estado intermedio "reclamado sin número".
   - Estado: NO implementado; decisión D4 congelada (ver `tasks/correcciones-comprobantes.md`).
 
+## 17. Pagos — devoluciones (`refunded`): reservado, no implementado
+
+- [ ] **Implementar la devolución de un cobro.**
+  - `PAYMENT_STATUSES.REFUNDED` existe en el enum y `QUALIFYING_PAYMENT_STATUSES` lo trata como pago que sostiene el periodo (`validated | refunded`), pero **ningún flujo lo produce**: no hay UI ni servicio que marque un pago como `refunded` (`updatePaymentStatus` ya escribe `refunded_at` si se le pide, pero nadie lo llama con ese estado desde producto).
+  - Decidir la semántica completa antes de exponerlo: ¿revierte el periodo acumulado?, ¿emite nota de crédito o anula el comprobante?, ¿afecta el status SaaS?, ¿aplica también al Panel (`payment`) además de Console (`platform_subscription_payment`)?
+  - Hoy `refunded` **no** toca el flag ANULADO y no cancela la suscripción.
+  - Disparador: cuando se pida una devolución real o se conecte una pasarela de pago.
+
+## 18. Suscripciones — auditoría del doble periodo histórico
+
+- [ ] **Revisar las suscripciones cuyo `current_period_end` excede `start_date + Σ duración de los pagos validated`.**
+  - El bug de front-load (punto 7) pudo haber dejado `current_period_end` inflado en altas con pago `processing` que se validaron más tarde. La corrección evita nuevos casos; **no auto-corregir** los históricos.
+  - Detección (indicativa; normalizar la duración `day|week|month|year` por pago antes de sumar):
+    ```sql
+    -- periodos por delante del ciclo realmente pagado
+    SELECT s.id, s.organization_id, s.start_date, s.current_period_end
+    FROM platform_subscription s
+    WHERE s.current_period_end > (
+      s.start_date + <Σ duración normalizada de los pagos validated de s>
+    );
+    ```
+  - Revisar manualmente cada exceso (puede ser un caso legítimo) antes de tocar datos; si procede, corregir con una migración de datos aprobada, nunca por inferencia automática.
+  - Disparador: auditoría de facturación SaaS o reclamo de un gym.
+
 ---
 
 > [!NOTE]

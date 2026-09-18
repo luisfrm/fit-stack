@@ -143,13 +143,26 @@ export function PaymentsClient({
     }
   };
 
-  const handlePaymentStatusChange = async (paymentId: number, status: string) => {
+  const handlePaymentStatusChange = async (
+    paymentId: number,
+    status: string,
+    voidReason?: string,
+  ) => {
     try {
-      const result = await financeService.updatePaymentStatus(paymentId, status);
+      const result = await financeService.updatePaymentStatus(paymentId, status, voidReason);
       // C6: anular un cobro sin comprobante emitido no es un error, pero tampoco
       // un "todo bien" genérico: el cajero tiene que saber que no se anuló nada.
-      if (status === PAYMENT_STATUSES.VOIDED && result?.receiptVoided === false) {
-        toast.success("Pago anulado. No tenía comprobante emitido.");
+      if (status === PAYMENT_STATUSES.VOIDED) {
+        const rejected = voidReason === "Pago rechazado";
+        if (result?.receiptVoided === false) {
+          toast.success(
+            rejected
+              ? "Pago rechazado."
+              : "Pago anulado. No tenía comprobante emitido.",
+          );
+        } else {
+          toast.success(rejected ? "Pago rechazado." : "Pago anulado.");
+        }
       } else {
         toast.success("Estado de pago actualizado correctamente");
       }
@@ -160,10 +173,14 @@ export function PaymentsClient({
   };
 
   /** Validar/rechazar rápido desde el accionable "Por validar". */
-  const handlePendingAction = async (paymentId: number, status: string) => {
+  const handlePendingAction = async (
+    paymentId: number,
+    status: string,
+    voidReason?: string,
+  ) => {
     setPendingActionId(paymentId);
     try {
-      await financeService.updatePaymentStatus(paymentId, status);
+      await financeService.updatePaymentStatus(paymentId, status, voidReason);
       toast.success(
         status === PAYMENT_STATUSES.VALIDATED ? "Pago validado." : "Pago rechazado.",
       );
@@ -237,7 +254,7 @@ export function PaymentsClient({
           currencyFormat={currencyFormat}
           actionId={pendingActionId}
           onValidate={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VALIDATED)}
-          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.INVALID)}
+          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VOIDED, "Pago rechazado")}
         />
 
         <FilterPanel

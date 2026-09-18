@@ -272,7 +272,7 @@ export function createMembersRepository(db: Db) {
      * - `newThisMonth`: corte de mes en hora LOCAL de la org (`AT TIME ZONE`
      *   vía `dateManager`), no UTC del servidor.
      * - Suscripción gym-activa = semántica `getSubscriptionIsActiveSql`
-     *   (`endDate` vigente + no cancelada + pago NOT IN (`voided`,`invalid`)).
+     *   (`endDate` vigente + no cancelada + pago `<> voided`).
      *   Un pago `processing` SÍ cuenta como activa: el acceso aún no fue
      *   revocado, solo está pendiente de validación manual.
      * - `withPortal`: espejo exacto de `countActivePortalUsers`

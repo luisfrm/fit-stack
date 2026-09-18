@@ -16,10 +16,8 @@ import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
 const paymentStatusEnum = z.enum([
-  PAYMENT_STATUSES.PENDING,
   PAYMENT_STATUSES.PROCESSING,
   PAYMENT_STATUSES.VALIDATED,
-  PAYMENT_STATUSES.INVALID,
   PAYMENT_STATUSES.VOIDED,
   PAYMENT_STATUSES.REFUNDED,
 ]);
@@ -59,6 +57,7 @@ const registerPaymentSchema = paymentSchema;
 
 const updatePaymentStatusSchema = z.object({
   status: paymentStatusEnum,
+  voidReason: z.string().min(1).optional(),
 });
 
 const cancelSchema = z.object({

@@ -248,7 +248,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report (C4)', () => {
     const payment = await createValidatedPayment();
     const denied = await support.client.patch(
       `/api/platform/subscriptions/payments/${payment['id']}/status`,
-      { status: 'invalid' },
+      { status: 'voided' },
     );
     expect(denied.status, denied.text).toBe(403);
   });

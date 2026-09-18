@@ -120,7 +120,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
-6. **Registro financiero inmutable**: una suscripción con su pago **nunca se elimina** — `subscriptions` no expone `delete` a ningún rol y no existe `DELETE /api/subscriptions/:id`. Si el registro está equivocado se **anula** (el cobro pasa a `voided`/`invalid` y la suscripción se computa `ANULADA`); si se revoca el acceso se **cancela**. Anular ≠ cancelar: `voided` = registro inválido, `cancelled` = el acceso se revocó con un cobro que sigue siendo válido.
+6. **Registro financiero inmutable**: una suscripción con su pago **nunca se elimina** — `subscriptions` no expone `delete` a ningún rol y no existe `DELETE /api/subscriptions/:id`. Si el registro está equivocado se **anula** (el cobro pasa a `voided` y la suscripción se computa `ANULADA`); si se revoca el acceso se **cancela**. Anular ≠ cancelar: `voided` = registro inválido, `cancelled` = el acceso se revocó con un cobro que sigue siendo válido.
 7. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
 
 ---
@@ -437,7 +437,7 @@ Panel receipts are internal payment records — never fiscal invoices (see `docs
 - Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
 - Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
 - Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
-- Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed); without a number the service code is `RECEIPT_NOT_ISSUED` but the endpoint answers **200** with `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6); voiding never cancels the subscription nor reverts the cumulative period; `REFUNDED`/`INVALID` don't touch the flag.
+- Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed); without a number the service code is `RECEIPT_NOT_ISSUED` but the endpoint answers **200** with `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6); voiding never cancels the subscription nor reverts the cumulative period; `refunded` (reserved, no flow produces it) doesn't touch the flag and `voided` is the only annulment state (`rejected`/`annulled` is derived with `getVoidKind`).
 - Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emisor); empty = generic "FitStack" + gate Comprobante.
 - **Audit parity (C4)**: the audit of the global series lives at `GET /api/platform/subscriptions/receipts` + `/subscriptions/receipts` (console page with URL filters + CSV export up to 1000 rows), mirroring the Panel. Same `computeReceiptGaps` algorithm with an **injected strategy** (Panel: `{slug}-{año}-{seq}` annual; Console: `FS-{seq}` continuous, no year) → `gaps[]` classifies `hueco` vs `anulado` identically on both sides. Console filters run in **UTC** (platform billing convention); `year` there means the UTC year of `payment_date`, not a sequence universe. `support` reads (200); writes stay 403.
 
@@ -451,7 +451,7 @@ Subscription status is **computed dynamically** via SQL CASE — NOT stored in D
 
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active", // periodEnd >= now and valid payment
+  ACTIVE: "active", // periodEnd >= now and EXISTS(validated|refunded)
   TRIAL: "trial", // isTrial = true
   PAST_DUE: "past_due", // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
@@ -460,18 +460,19 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 };
 ```
 
-**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters):
+The payment enum (`PAYMENT_STATUSES = processing | validated | voided | refunded`) and its derived helpers live in `@workspace/shared/constants`: `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) and `getVoidKind` (`voided` without `receiptNumber` → `rejected`; with → `annulled`). `pending` and `invalid` no longer exist.
+
+**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters; pure mirror `computePlatformSubscriptionStatus`, parity-tested):
 
 - `cancelledAt IS NOT NULL` → `cancelled`
 - `isTrial = true` and active period → `trial`
-- Last payment `VALIDATED`/`REFUNDED` and active period → `active`
-- Last payment `PENDING` and active period → `past_due`
-- Active period (no validated payment) → `active`
-- Overdue days ≤ 7 → `past_due`
-- Overdue days ≤ 14 → `read_only`
-- Overdue days > 14 → `suspended`
+- Active period + **`EXISTS(validated|refunded)`** (`QUALIFYING_PAYMENT_STATUSES`, never "the last payment") → `active`
+- Active period without a qualifying payment → `past_due`
+- Grace from `currentPeriodEnd`: overdue ≤ 7 days → `past_due`; ≤ 14 → `read_only`; > 14 → `suspended`
 
-> Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided`/`invalid` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revocada); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
+A `voided` payment is **ignored**: it never revokes service; grace runs from `currentPeriodEnd` and the tiers do **not** accumulate. `processing` does not qualify either. `getLastSubscriptionStatus(organizationId)` exposes this same status + `hasValidatedPayment` for the self-service renewal guard. When the status does not grant access, the free-tier gate decides (`features.service.ts`): if `feature_flags_free_tier_enabled === 'true'` the free floor applies; otherwise the legacy gate sends the panel to `/no-subscription` (see "Features & Free Tier").
+
+> Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revocada); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 
@@ -494,7 +495,7 @@ Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/sett
   - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override for tests). `rate = 1` if currency == plan currency; provider failure → 503.
   - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
   - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
-  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now`** (only when expired).
+  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).
   - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
 - **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
 - **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).

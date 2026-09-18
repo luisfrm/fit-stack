@@ -291,10 +291,11 @@ export const platformSubscriptionsService = {
   async updatePaymentStatus(
     paymentId: number,
     status: PaymentStatus,
+    voidReason?: string,
   ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
     return await api<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }>(
       `${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`,
-      { method: 'PATCH', body: { status } },
+      { method: 'PATCH', body: voidReason ? { status, voidReason } : { status } },
     );
   },
 

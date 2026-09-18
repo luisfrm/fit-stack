@@ -19,7 +19,7 @@ import type {
   IPaymentMethodDetails,
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
-import { formatCents, type CurrencyFormat } from "@workspace/shared";
+import { formatCents, getVoidKind, type CurrencyFormat } from "@workspace/shared";
 import {
   Trash2,
   RefreshCw,
@@ -63,10 +63,8 @@ const STATUS_LABELS: Record<
     className?: string;
   }
 > = {
-  pending: { label: "Pendiente", variant: "outline" },
   processing: { label: "Procesando", variant: "warning" },
   validated: { label: "Validado", variant: "success" },
-  invalid: { label: "Rechazado", variant: "destructive" },
   voided: { label: "Anulado", variant: "default", className: "opacity-60" },
   refunded: {
     label: "Reembolsado",
@@ -76,11 +74,9 @@ const STATUS_LABELS: Record<
 };
 
 const STATUS_DOT: Record<PaymentStatus, string> = {
-  pending: "bg-slate-400",
   processing: "bg-orange-400",
   validated: "bg-emerald-400",
-  invalid: "bg-red-400",
-  voided: "bg-slate-600",
+  voided: "bg-red-400",
   refunded: "bg-slate-500",
 };
 
@@ -149,16 +145,31 @@ export function PlatformPaymentHistoryModal({
   const handleChangeStatus = async (
     paymentId: number,
     status: PaymentStatus,
-  ) => {    if (actionLoading) return;
+    voidReason?: string,
+  ) => {
+    if (actionLoading) return;
     setActionPaymentId(paymentId);
     try {
-      const result = await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
+      const result = await platformSubscriptionsService.updatePaymentStatus(
+        paymentId,
+        status,
+        voidReason,
+      );
       // C6: anular sin comprobante emitido no es un error, pero se dice
       // explícitamente en vez de un "marcado como voided" ambiguo.
-      if (status === PAYMENT_STATUSES.VOIDED && result?.receiptVoided === false) {
-        toast.success('Pago anulado. No tenía comprobante emitido.');
+      if (status === PAYMENT_STATUSES.VOIDED) {
+        const rejected = voidReason === 'Pago rechazado';
+        if (result?.receiptVoided === false) {
+          toast.success(
+            rejected
+              ? 'Pago rechazado.'
+              : 'Pago anulado. No tenía comprobante emitido.',
+          );
+        } else {
+          toast.success(rejected ? 'Pago rechazado.' : 'Pago anulado.');
+        }
       } else {
-        toast.success(`Pago marcado como ${status}`);
+        toast.success('Estado de pago actualizado correctamente');
       }
       await loadPayments();
       onChange?.();
@@ -290,7 +301,15 @@ export function PlatformPaymentHistoryModal({
         {!loading && (
           <div className="flex flex-col gap-2">
             {payments.map((p) => {
-              const config = STATUS_LABELS[p.status];
+              const config =
+                p.status === PAYMENT_STATUSES.VOIDED &&
+                getVoidKind(p) === "rejected"
+                  ? {
+                      label: "Rechazado",
+                      variant: "destructive" as const,
+                      className: "opacity-60",
+                    }
+                  : STATUS_LABELS[p.status];
               const expanded = expandedId === p.id;
               const snapshot = p.features_snapshot;
               const snapshotSummary = snapshot
@@ -398,11 +417,12 @@ export function PlatformPaymentHistoryModal({
                               onClick: () =>
                                 handleChangeStatus(
                                   p.id,
-                                  PAYMENT_STATUSES.INVALID,
+                                  PAYMENT_STATUSES.VOIDED,
+                                  'Pago rechazado',
                                 ),
                               show:
                                 canChangeStatus &&
-                                p.status !== PAYMENT_STATUSES.INVALID,
+                                p.status !== PAYMENT_STATUSES.VOIDED,
                             },
                             {
                               label: "Anular",
@@ -412,6 +432,7 @@ export function PlatformPaymentHistoryModal({
                                 handleChangeStatus(
                                   p.id,
                                   PAYMENT_STATUSES.VOIDED,
+                                  'Pago anulado',
                                 ),
                               show:
                                 canChangeStatus &&

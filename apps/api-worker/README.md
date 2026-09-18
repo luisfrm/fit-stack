@@ -127,8 +127,7 @@ apps/api-worker/
 | GET | `/api/subscriptions` | `subscriptions.read` | Lista suscripciones |
 | GET | `/api/subscriptions/recent` | `subscriptions.read` | Suscripciones recientes |
 | POST | `/api/subscriptions` | `subscriptions.create` | Crea suscripción (unidad atómica con pago) |
-| DELETE | `/api/subscriptions/:id` | `subscriptions.delete` | Elimina suscripción |
-| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `invalid`, `voided`) |
+| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `voided`) + `voidReason?`. Sin DELETE de suscripciones (registro financiero inmutable) |
 | POST | `/api/payments/:id/send-email` | `subscriptions.read` | Envía recibo por email (vía queue) |
 | GET | `/api/classes` | `classes.read` | Lista clases (grupos) |
 | GET | `/api/classes/:id` | `classes.read` | Detalle de clase |

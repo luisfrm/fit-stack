@@ -243,7 +243,7 @@ export function createFeaturesRepository(db: Db) {
             eq(subscription.organizationId, orgId),
             sql`${subscription.endDate} >= CURRENT_TIMESTAMP`,
             sql`${subscription.cancelledAt} IS NULL`,
-            sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`,
+            sql`${payment.status} <> ${PAYMENT_STATUSES.VOIDED}`,
           ),
         );
 

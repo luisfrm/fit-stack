@@ -5,11 +5,13 @@
 
 ## 1. Estados de una suscripción (derivados, no se guardan)
 
+> Modelo unificado: `PAYMENT_STATUSES = processing | validated | voided | refunded`; no existen `pending` ni `invalid`. `voided` es el único estado de anulación (rechazo y anulación se derivan con `getVoidKind`). Ver `docs/PAYMENT_STATUSES.md`.
+
 Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 
 | Estado | Cuándo | Badge | Significa |
 |---|---|---|---|
-| `voided` | El cobro quedó `voided` o `invalid` | **ANULADA** (outline) | El registro es **inválido**: no debió existir así |
+| `voided` | El cobro quedó `voided` | **ANULADA** (outline) | El registro es **inválido**: no debió existir así |
 | `cancelled` | `cancelled_at IS NOT NULL` y el cobro vale | **CANCELADA** (destructive) | El acceso se **revocó**; el cobro sigue siendo legítimo |
 | `expired` | `end_date < now()` | **EXPIRADA** | Venció el periodo |
 | `active` | Todo lo demás | **ACTIVA** | Vigente |
@@ -23,11 +25,10 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
   - con `validated` → el **paso 1** numera (`{slug}-año-n`) y encola el PDF; el email sale del **paso 2**.
   - con `processing` → "Por validar", sin número.
 - [x] **Aprobación** (`PATCH /api/payments/:id/status` → `validated`): numera (si aún no lo estaba) y encola el render.
-- [x] **Anulación** (`→ voided`): el comprobante se marca **ANULADO** (número y PDF intactos, nunca se reutiliza) y la suscripción pasa a **ANULADA**.
-- [x] **Rechazo** (`→ invalid`): mismo efecto sobre la suscripción.
-- [x] **Revocar / restaurar acceso** (`PUT /api/subscriptions/:id`): mueve `cancelled_at`. Si el cobro está anulado o rechazado, la acción no se ofrece (ANULADA gana sobre CANCELADA).
+- [x] **Anulación / Rechazo** (`→ voided`, estado único): si el pago ya estaba numerado, el comprobante se marca **ANULADO** (número y PDF intactos, nunca se reutiliza) y la suscripción pasa a **ANULADA**; si no tenía número, no hay comprobante que marcar y el body lo dice (`receiptVoided: false` + `receiptVoidReason: 'not_issued'`). "Rechazado" vs "anulado" se deriva con `getVoidKind`.
+- [x] **Revocar / restaurar acceso** (`PUT /api/subscriptions/:id`): mueve `cancelled_at`. Si el cobro está anulado, la acción no se ofrece (ANULADA gana sobre CANCELADA).
 - [x] **Eliminar: no existe** — sin ruta, sin permiso RBAC, sin acción en el panel, sin `subscriptionsService.delete`.
-- [x] **Acceso** (`isActive`): `end_date >= now()` **y** `cancelled_at IS NULL` **y** el cobro no es `voided`/`invalid`.
+- [x] **Acceso** (`isActive`): `end_date >= now()` **y** `cancelled_at IS NULL` **y** el cobro no es `voided`.
 
 ## 3. Fases del track de correcciones
 

@@ -186,7 +186,11 @@ export const organizationRoutes = new Hono<AppEnv>()
       if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
       if (sub.cancelledAt) return c.json({ error: 'Suscripción cancelada' }, 400);
 
-      if (sub.currentPeriodEnd > new Date()) {
+      // Bloqueo solo si hay un periodo REALMENTE pagado vigente
+      // (`hasValidatedPayment`): un cliente con periodo por delante pero sin
+      // pago calificado (p. ej. pago anulado) puede volver a pagar.
+      const { hasValidatedPayment } = await repo.getLastSubscriptionStatus(activeOrganizationId);
+      if (sub.currentPeriodEnd > new Date() && hasValidatedPayment) {
         return c.json(
           { error: 'La suscripción aún está vigente — la renovación solo está disponible al expirar' },
           409

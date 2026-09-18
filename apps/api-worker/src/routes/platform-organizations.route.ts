@@ -310,10 +310,8 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
           paymentMethod: z.string().min(1),
           paymentMethodDetails: paymentMethodDetailsSchema,
           status: z.enum([
-            PAYMENT_STATUSES.PENDING,
             PAYMENT_STATUSES.PROCESSING,
             PAYMENT_STATUSES.VALIDATED,
-            PAYMENT_STATUSES.INVALID,
             PAYMENT_STATUSES.VOIDED,
             PAYMENT_STATUSES.REFUNDED,
           ]),

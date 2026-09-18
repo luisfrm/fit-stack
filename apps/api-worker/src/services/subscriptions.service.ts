@@ -56,6 +56,8 @@ export interface ReceiptContext {
   orgSlug?: string | null;
   timezone?: string;
   by?: string;
+  /** Motivo de anulación/rechazo: se persiste en el pago y viaja al void del comprobante. */
+  voidReason?: string;
 }
 
 /**
@@ -246,7 +248,12 @@ export function createSubscriptionsService(
       opts?: ReceiptContext,
     ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
-      const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any);
+      // La auditoría de anulación se persiste siempre en el pago (haya o no
+      // número): es la única fuente de `voidedBy`/`voidedAt`/`voidReason`.
+      const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
+        voidedBy: opts?.by,
+        voidReason: opts?.voidReason,
+      });
       if (!updated) {
         throw new Error('Registro de pago no encontrado');
       }
@@ -254,7 +261,7 @@ export function createSubscriptionsService(
       // Anular/rechazar el cobro deja la suscripción fuera de vigencia
       // (`cancelledAt`) y el status derivado pasa a `voided` (ANULADA), que es
       // distinto de revocar el acceso a mano (`cancelled`).
-      if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
+      if (status === PAYMENT_STATUSES.VOIDED && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
       // Void con número emitido: conserva número + PDF y marca ANULADO.
@@ -268,7 +275,7 @@ export function createSubscriptionsService(
             orgId: organizationId,
             paymentId,
             by: opts.by,
-            reason: 'Pago anulado',
+            reason: opts.voidReason ?? 'Pago anulado',
           });
           receiptVoided = true;
         } catch (err) {
@@ -280,7 +287,7 @@ export function createSubscriptionsService(
         }
       }
 
-      // Un pago que pasa de processing/pending a validated emite su recibo
+      // Un pago que pasa de processing a validated emite su recibo
       // (el alta con status validated ya lo numera en create()).
       const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {

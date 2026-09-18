@@ -16,7 +16,8 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
-  status: z.enum(['processing', 'validated', 'invalid', 'voided']),
+  status: z.enum(['processing', 'validated', 'voided']),
+  voidReason: z.string().min(1).optional(),
 });
 
 async function resolveOrgSlug(c: Context<AppEnv>, orgId: string): Promise<string | null> {
@@ -53,7 +54,7 @@ export const paymentRoutes = new Hono<AppEnv>()
   .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
-    const { status } = c.req.valid('json');
+    const { status, voidReason } = c.req.valid('json');
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 
@@ -73,6 +74,7 @@ export const paymentRoutes = new Hono<AppEnv>()
         orgSlug: await resolveOrgSlug(c, orgId),
         timezone,
         by: c.get('user')?.id,
+        voidReason,
       },
     );
     await cache.invalidate(`org:${orgId}:subscriptions*`);

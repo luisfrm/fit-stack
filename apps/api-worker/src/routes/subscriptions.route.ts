@@ -42,7 +42,7 @@ const createSubSchema = z.object({
     exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: z.string(),
     paymentMethodDetails: paymentMethodDetailsSchema,
-    status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
+    status: z.enum(['processing', 'validated', 'voided']).optional(),
     paymentDate: z.string().optional(),
     // Desglose fiscal en centavos enteros (Fase 0: schema abierto; el
     // servicio lo calcula por defecto y solo acepta override con

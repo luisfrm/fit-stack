@@ -67,10 +67,11 @@ export const financeService = {
   async updatePaymentStatus(
     paymentId: number,
     status: string,
+    voidReason?: string,
   ): Promise<PaymentStatusResult> {
     return await api<PaymentStatusResult>(`${PAYMENTS_PATH}/${paymentId}/status`, {
       method: "PATCH",
-      body: { status },
+      body: voidReason ? { status, voidReason } : { status },
     });
   },
 
