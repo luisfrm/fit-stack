@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, or, count, ilike, gte, lte, type Db } from '@workspace/database/factory';
+import { eq, desc, and, sql, or, count, ilike, inArray, gte, lte, type Db } from '@workspace/database/factory';
 import { subscription, gymMember as members, membershipPlan, payment } from '@workspace/database/schema';
 import { SubscriptionStatus, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES } from '@workspace/shared';
 import { OrganizationDateManager } from '../lib/date-manager';
@@ -34,10 +34,16 @@ export interface PaginatedSubscriptionsResult {
 
 export function createSubscriptionsRepository(db: Db) {
   return {
+    /**
+     * Status derivado (nunca se guarda). El cobro anulado/rechazado gana sobre
+     * `cancelledAt`: si el cobro no vale, el registro está ANULADO, no revocado.
+     * `cancelledAt` sigue siendo la marca de "fuera de vigencia" (revocada O
+     * anulada) que usan los reportes y los filtros de acceso.
+     */
     getSubscriptionStatusSql(now: Date) {
       return sql<SubscriptionStatus>`CASE 
+        WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.VOIDED}
         WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
-        WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
         WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
         ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
       END`;
@@ -94,8 +100,9 @@ export function createSubscriptionsRepository(db: Db) {
               this.getPaidAndNotRevokedCondition()
             )!
           );
-        } else if (status === PAYMENT_STATUSES.VOIDED) {
-          conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
+        } else if (status === SUBSCRIPTION_STATUSES.VOIDED) {
+          // El filtro "Anuladas" sigue al status mostrado: anulado o rechazado.
+          conditions.push(inArray(payment.status, [PAYMENT_STATUSES.VOIDED, PAYMENT_STATUSES.INVALID]));
         }
       }
 
@@ -268,10 +275,6 @@ export function createSubscriptionsRepository(db: Db) {
         .where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
         .returning();
       return updated[0];
-    },
-
-    async delete(organizationId: string, id: number) {
-      await db.delete(subscription).where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)));
     },
 
     async findLatestForMember(organizationId: string, memberId: number, now: Date = new Date()) {

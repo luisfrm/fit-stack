@@ -39,9 +39,9 @@ export const subscriptionsService = {
     });
   },
 
-  async delete(id: number): Promise<void> {
-    await api(`${SUBSCRIPTIONS_PATH}/${id}`, { method: "DELETE" });
-  },
+  // Sin `delete`: un registro de pago no se elimina. Se anula el cobro
+  // (`financeService.updatePaymentStatus(id, 'voided')`) o se revoca el acceso
+  // (`updateStatus(id, 'cancelled')`).
 
   async getRecent(
     limit: number = 5,

@@ -235,6 +235,9 @@ export function createSubscriptionsService(
         throw new Error('Registro de pago no encontrado');
       }
 
+      // Anular/rechazar el cobro deja la suscripción fuera de vigencia
+      // (`cancelledAt`) y el status derivado pasa a `voided` (ANULADA), que es
+      // distinto de revocar el acceso a mano (`cancelled`).
       if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
@@ -294,9 +297,8 @@ export function createSubscriptionsService(
       return updated;
     },
 
-    async delete(organizationId: string, id: number): Promise<void> {
-      await subsRepo.delete(organizationId, id);
-    },
+    // Sin `delete`: un registro financiero (suscripción + pago) no se elimina
+    // nunca. Si está equivocado se anula, si se revoca el acceso se cancela.
   };
 }
 

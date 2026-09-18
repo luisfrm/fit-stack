@@ -64,6 +64,7 @@ export function PaymentsClient({
 }: PaymentsClientProps) {
   const router = useRouter();
   const { activeOrganization } = useAuth();
+  // Sin acción de borrado: un registro de pago se anula o se revoca, nunca se elimina.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;
   const currencyFormat =
@@ -139,16 +140,6 @@ export function PaymentsClient({
       refreshAll();
     } catch (err) {
       toast.error(mutationError("PaymentsClient", err, "Fallo al cambiar estado"));
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      await subscriptionsService.delete(id);
-      toast.success("Registro eliminado.");
-      refreshAll();
-    } catch (err) {
-      toast.error(mutationError("PaymentsClient", err, "Fallo al eliminar"));
     }
   };
 
@@ -251,7 +242,7 @@ export function PaymentsClient({
             { value: PAYMENT_STATUSES.PROCESSING, label: "Por validar" },
             { value: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer" },
             { value: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas" },
-            { value: PAYMENT_STATUSES.VOIDED, label: "Anuladas" },
+            { value: SUBSCRIPTION_STATUSES.VOIDED, label: "Anuladas" },
           ]}
           activeFilter={activeFilter}
           onFilterChange={setFilterAndNavigate}
@@ -262,7 +253,7 @@ export function PaymentsClient({
               { id: PAYMENT_STATUSES.PROCESSING, label: "Por validar", className: "text-orange-500 border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10" },
               { id: SUBSCRIPTION_STATUSES.EXPIRING, label: "Por vencer", className: "text-destructive border-destructive/20 bg-destructive/5 hover:bg-destructive/10" },
               { id: SUBSCRIPTION_STATUSES.ACTIVE, label: "Activas", className: "text-info border-info/20 bg-info/5 hover:bg-info/10" },
-              { id: PAYMENT_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
+              { id: SUBSCRIPTION_STATUSES.VOIDED, label: "Anuladas", className: "text-gray-500 border-gray-500/20 bg-gray-500/5 hover:bg-gray-500/10" },
             ].map((btn) => (
               <Button
                 key={btn.id}
@@ -295,7 +286,6 @@ export function PaymentsClient({
         <section>
           <SubscriptionsTable
             subscriptions={initialSubscriptions.data as ISubscription[]}
-            onDelete={handleDelete}
             onStatusChange={handleStatusChange}
             onPaymentStatusChange={handlePaymentStatusChange}
             onSuccess={refreshAll}

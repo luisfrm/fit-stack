@@ -287,6 +287,106 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
     });
   });
 
+  describe('Estado derivado (anulada vs revocada)', () => {
+    /** Crea una sub con pago `validated` y devuelve su id + el del pago. */
+    async function seedSubscription(owner: any, member: any, plan: any) {
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const row = list.body.data.find((r) => r.id === created.body.id);
+      return { subId: created.body.id as number, paymentId: row?.paymentId as number };
+    }
+
+    async function readStatus(owner: any, subId: number) {
+      const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      return res.body.data.find((r) => r.id === subId)?.status;
+    }
+
+    it('anular el cobro deja la suscripción ANULADA (`voided`), no cancelada', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+      expect(paymentId).toBeTruthy();
+      expect(await readStatus(owner, subId)).toBe('active');
+
+      const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+      });
+      expect(voided.status, voided.text).toBe(200);
+
+      // Anulada ≠ cancelada: el registro es inválido, no es una revocación.
+      expect(await readStatus(owner, subId)).toBe('voided');
+    });
+
+    it('rechazar el cobro (`invalid`) también deja la suscripción anulada', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+
+      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'invalid' });
+
+      expect(await readStatus(owner, subId)).toBe('voided');
+    });
+
+    it('revocar el acceso deja la suscripción CANCELADA (`cancelled`)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId } = await seedSubscription(owner, member, plan);
+
+      const res = await owner.client.put(`/api/subscriptions/${subId}`, { status: 'cancelled' });
+      expect(res.status, res.text).toBe(200);
+
+      expect(await readStatus(owner, subId)).toBe('cancelled');
+    });
+
+    it('el filtro `voided` sigue al status mostrado (anulado o rechazado)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'voided' });
+
+      const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { status: 'voided', limit: '10' },
+      });
+      expect(res.status, res.text).toBe(200);
+      expect(res.body.data.map((r) => r.id)).toContain(subId);
+    });
+  });
+
+  describe('DELETE /api/subscriptions/:id', () => {
+    it('está deshabilitado: un registro financiero no se elimina', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+      });
+
+      const res = await owner.client.delete(`/api/subscriptions/${created.body.id}`);
+      expect(res.status, res.text).toBe(404);
+
+      // La suscripción sigue existiendo.
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      expect(list.body.data.map((r) => r.id)).toContain(created.body.id);
+    });
+  });
+
   describe('Organization isolation', () => {
     it('org A cannot see org B subscriptions', async () => {
       const tenant1 = await createGymTenant('sub-iso-a');

@@ -90,7 +90,7 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Estado terminal **documentado** (no es un bug): la migración `0016` no hace backfill porque el snapshot no se puede reconstruir con fidelidad — la identidad del momento de emisión se perdió al no persistirse.
   - El PDF en R2 sí es inmutable y conserva lo emitido; lo que puede cambiar es el JSON de `GET /:id/receipt` y la fila del libro (sin `emisor`/`emitido_por`).
   - Si una auditoría exige reproducibilidad del histórico completo, la opción honesta es un **acta de conciliación** (fecha de corte + “estos comprobantes se reimprimen con la configuración vigente”) o incrustar el snapshot del PDF vía OCR: no un backfill inventado.
-- [ ] **C7 — hallazgo E2E preexistente**: `e2e/panel/subscriptions.spec.ts` (pago pendiente) falla de forma determinista por el prewarm de `/payments` + `revalidate: 60` (fixture creado por API después del prewarm). Ver el detalle y las opciones en `tasks/correcciones-comprobantes.md` → *Hallazgo abierto para C7*.
+- [x] **RESUELTO (C9)** — E2E preexistente: `e2e/panel/subscriptions.spec.ts` (pago pendiente) fallaba de forma determinista por el prewarm de `/payments` + `revalidate: 60` (fixture creado por API después del prewarm). Se aplicó la opción “la lista accionable no se cachea” (`cache: 'no-store'`). Ver `tasks/correcciones-comprobantes.md` → C9.
 
 ## 10. Comprobantes Console — universo completo de la serie en la auditoría (C4)
 
@@ -104,6 +104,16 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
 - [ ] **Disclaimer Console usa el país del org receptor como proxy hasta configurar `fitstack_country_code`.**
   - El disclaimer legal de los comprobantes de Console debería corresponder al país del **emisor** (FitStack), pero FitStack aún no tiene país propio configurado: se usa el `countryCode` del org receptor como aproximación temporal (ver `plan.md`, decisión congelada).
   - Al definir `fitstack_country_code`, cambiar el disclaimer a ese país y tachar este ítem. No dejar que el proxy sobreviva silenciosamente hasta producción.
+
+## 12. Registro financiero — atomicidad y cascada del borrado de miembro (C9)
+
+- [ ] **`create()` de suscripción + pago NO es atómico pese a la regla “Atomic Invoicing”.**
+  - `subscriptions.service.create()` inserta la **suscripción** y después el **pago** en dos sentencias independientes. Si la segunda falla (por ejemplo, un dato inválido del pago), queda una **suscripción huérfana sin pago**, y desde C9 ya no existe `DELETE /api/subscriptions/:id` que la limpie.
+  - Opciones: envolver ambos inserts en una transacción (si el driver `neon-http` la soporta vía `db.transaction`) o compensar en el mismo `catch` eliminando la fila recién insertada.
+  - Consulta de detección: `SELECT s.* FROM subscription s LEFT JOIN payment p ON p.subscription_id = s.id WHERE p.id IS NULL`.
+- [ ] **El borrado de un miembro arrastra su histórico financiero por cascada.**
+  - `payment.member_id` y `subscription.member_id` son `ON DELETE CASCADE`: borrar un miembro elimina sus pagos y suscripciones. Es hoy la única vía por la que un registro financiero desaparece (la suscripción ya no tiene DELETE) y es también de lo que depende la limpieza de E2E.
+  - Coherente con “un registro financiero no se elimina”: el miembro con pagos debería darse de **baja lógica** (desactivar) en vez de borrarse, o el borrado debería rechazarse (409) cuando tiene pagos. Requiere decidir la política del módulo Members y actualizar E2E (la limpieza pasaría al borrado de la organización).
 
 ---
 

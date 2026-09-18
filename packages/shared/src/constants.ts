@@ -69,10 +69,20 @@ export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSE
 
 /**
  * Subscription statuses for access control.
+ *
+ * `CANCELLED` y `VOIDED` NO son sinónimos:
+ * - `CANCELLED` = el acceso se revocó (decisión administrativa). El registro
+ *   es legítimo: el cobro existió y sigue siendo válido.
+ * - `VOIDED` = el registro es inválido: su cobro se anuló (`voided`) o se
+ *   rechazó (`invalid`). El correlativo del comprobante no se reutiliza.
+ *
+ * Ninguna suscripción se elimina: se anula o se revoca (mismo vocabulario que
+ * `PAYMENT_STATUSES.VOIDED` y el flag ANULADO del comprobante).
  */
 export const SUBSCRIPTION_STATUSES = {
   ACTIVE: "active",
   CANCELLED: "cancelled",
+  VOIDED: "voided",
   EXPIRED: "expired",
   EXPIRING: "expiring",
 } as const;

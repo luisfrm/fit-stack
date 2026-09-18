@@ -120,7 +120,8 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
-6. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
+6. **Registro financiero inmutable**: una suscripción con su pago **nunca se elimina** — `subscriptions` no expone `delete` a ningún rol y no existe `DELETE /api/subscriptions/:id`. Si el registro está equivocado se **anula** (el cobro pasa a `voided`/`invalid` y la suscripción se computa `ANULADA`); si se revoca el acceso se **cancela**. Anular ≠ cancelar: `voided` = registro inválido, `cancelled` = el acceso se revocó con un cobro que sigue siendo válido.
+7. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
 
 ---
 
@@ -241,7 +242,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
 | `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
 | `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
-| `/api/subscriptions` | CRUD subscriptions (payment registration enqueues `email.payment_receipt`)                                                                                                                                                                                                                                                                                                           |
+| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **sin DELETE** (registro financiero inmutable)                                                                                                                                                                                                                                                                                                           |
 | `/api/payments`      | `PATCH /:id/status`, `POST /:id/send-email` (receipt resend)                                                                                                                                                                                                                                                                                                                         |
 | `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
 | `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
@@ -469,7 +470,7 @@ PLATFORM_SUBSCRIPTION_STATUSES = {
 - Overdue days ≤ 14 → `read_only`
 - Overdue days > 14 → `suspended`
 
-> Careful: the "last payment `VOIDED` → `cancelled`" rule applies to the gym `subscription` table (`subscriptions.repository.ts`, along with `INVALID`), **not** to `platform_subscription`.
+> Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided`/`invalid` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revocada); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 
 **Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
 
@@ -590,7 +591,7 @@ ORG_ROLES = {
 | **Reports**       |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
 | **Members**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Staff**         | ✅ CRUD | ✅ (no delete) |       ❌       |          ❌           |   ❌    |
-| **Subscriptions** | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
+| **Subscriptions** | ✅ (no delete) | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Plans**         | ✅ CRUD | ✅ (no delete) |    ✅ read     |        ✅ read        | ✅ read |
 | **Classes**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
 | **Content**       | ✅ CRUD | ✅ (no delete) |       ❌       |        ✅ read        | ✅ read |
@@ -879,6 +880,12 @@ stale data until the TTL expires. `updateTag` without `refresh()` purges
 silently without re-rendering. Panel uses the same shape
 (`members-client.tsx` + `onRefreshServer` prop).
 
+> **Listas accionables siempre frescas**: la lista "Por validar" de
+> `/payments` se pide con `cache: 'no-store'` (`payments/page.tsx`). Una lista de
+> trabajo no puede tener staleness: un pago registrado por otro canal debe
+> aparecer al recargar, no al vencer un TTL. La tabla de suscripciones sí puede
+> tolerar `revalidate: 60` + tag porque toda escritura de la app la purga.
+
 > **Next.js 16 note**: `revalidateTag(tag, profile)` now requires a `profile` (string or `CacheLifeConfig`). For server actions use `updateTag(tag)` (new in Next 16, no profile).
 
 ### Console Cache Tags
@@ -1033,7 +1040,9 @@ e2e/
 
 **Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
 
-**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
+**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`): the member delete (later in LIFO) cascades it away by FK, so the cleanup is still complete and the FK warning noise is gone. The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
+
+**Setup sessions**: `panel-setup` writes **two** storage states before the `panel` project creates any context — `panel-user.json` (suite org) and `empty-org-user.json` (org `e2e-empty`, used by `empty-state.spec.ts` via `test.use`). A `test.use({ storageState })` path must exist *before* the project runs, so it can never be created in a spec's `beforeAll`.
 
 **Env vars** (optional):
 

@@ -102,6 +102,7 @@ Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-co
 | C5 — Trazabilidad de emisión (`issued_by`) | ✅ Hecha (misma migración `0016`) |
 | C6 — Barrido (2.º predicado) y contrato de anulación | ⏳ Pendiente |
 | C7 — Higiene, docs y matriz de tests | ⏳ Pendiente |
+| C9 — Estados reales (ANULADA ≠ CANCELADA) + registro no eliminable | ✅ Hecha |
 
 Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglose de impuestos (no solo la etiqueta); IGTF activable, apagado por defecto, con base `gross_first`; el snapshot del emisor se persiste en columna jsonb; *claim-then-number* queda en `docs/PENDING.md` con disparador explícito.
 
@@ -113,4 +114,6 @@ Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglo
 
 **C1 + C5 completadas** (migración `0016`, aditiva y sin backfill): el comprobante es **reproducible** (el emisor queda congelado al emitir y el compose no lee configuración viva si hay snapshot) y la emisión es **trazable** (`issued_by` del actor de sesión, nunca inventado por el paso 2 ni por el barrido). Ambos reportes exponen emisor congelado + actor y el CSV los exporta.
 
-Según el orden congelado, quedan **C6** (robustez del barrido + contrato de anulación explícito) y **C7** (higiene, docs y matriz de tests, donde ya hay un hallazgo anotado: el spec de pago pendiente del Panel falla por el prewarm + `revalidate: 60`, ver `tasks/correcciones-comprobantes.md`).
+**C9 completada** (sin migración): el status derivado distingue **ANULADA** (`voided`: el cobro se anuló o se rechazó — el registro es inválido) de **CANCELADA** (`cancelled`: el acceso se revocó con un cobro que sigue siendo válido); un registro financiero **no se elimina** (fuera `DELETE /api/subscriptions/:id`, fuera la acción del panel y el permiso), se anula. Además cerró los dos fallos de E2E: el `storageState` de la org vacía (lo escribe `panel-setup`) y el accionable de pago pendiente (lista de trabajo sin caché).
+
+Según el orden congelado, quedan **C6** (robustez del barrido + contrato de anulación explícito) y **C7** (higiene, docs y matriz de tests). El hallazgo de E2E que estaba anotado ahí quedó resuelto en C9; en `docs/PENDING.md` §12 quedan anotadas dos aristas del mismo tema: `create()` no es atómico de verdad (puede dejar una suscripción huérfana) y el borrado de un miembro arrastra su histórico financiero por cascada.
