@@ -7,7 +7,7 @@
    Factory pura: recibe `Db` por parámetro (per-request, sin process.env).
    ─────────────────────────────────────────────────────────────────────── */
 
-import { and, eq, isNull, sql, type Db } from '../factory';
+import { and, eq, isNotNull, isNull, sql, type Db } from '../factory';
 import {
   organization,
   platformDocumentSequence,
@@ -120,6 +120,44 @@ export function createPlatformReceiptsRepository(db: Db) {
         )
         .returning({ nextNumber: platformDocumentSequence.nextNumber });
       return { released: row !== undefined };
+    },
+
+    /**
+     * Estado de la secuencia global + números emitidos del universo, para la
+     * auditoría de gaps de Console. Espejo de
+     * `payments.repository.getReceiptSequenceState` (Panel) sin año ni org:
+     * `FS-N` es una serie única y continua.
+     * OJO: `next_number` guarda el ÚLTIMO número entregado (no el siguiente).
+     */
+    async getPlatformReceiptSequenceState(type: ReceiptDocumentType): Promise<{
+      lastNumber: number;
+      numbers: Array<{
+        receiptNumber: string | null;
+        receiptVoided: boolean;
+        voidedBy: string | null;
+        voidedAt: Date | null;
+        voidReason: string | null;
+      }>;
+    }> {
+      assertDocumentType(type, 'getPlatformReceiptSequenceState');
+
+      const [seq] = await db
+        .select({ nextNumber: platformDocumentSequence.nextNumber })
+        .from(platformDocumentSequence)
+        .where(eq(platformDocumentSequence.documentType, type));
+
+      const numbers = await db
+        .select({
+          receiptNumber: platformSubscriptionPayment.receiptNumber,
+          receiptVoided: platformSubscriptionPayment.receiptVoided,
+          voidedBy: platformSubscriptionPayment.voidedBy,
+          voidedAt: platformSubscriptionPayment.voidedAt,
+          voidReason: platformSubscriptionPayment.voidReason,
+        })
+        .from(platformSubscriptionPayment)
+        .where(isNotNull(platformSubscriptionPayment.receiptNumber));
+
+      return { lastNumber: seq?.nextNumber ?? 0, numbers };
     },
 
     /**

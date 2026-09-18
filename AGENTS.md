@@ -257,7 +257,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 > | `/api/init` | Org bootstrap (no auth) |
 > | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
 > | `/api/platform/plans` | SaaS plan catalog (console) |
-> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
+> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /receipts` (auditoría del correlativo `FS-N`: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit` en UTC, cache 5 min, `subscription:list` — support reads) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
 > | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (AI quota del ciclo, cache 5 min, invalidada en grant) + `GET /:id/gym-overview` (adopción gym + portal seats, cache 5 min, staleness aceptada: writes del gym no invalidan claves platform) |
 > | `/api/platform/settings` | Platform global settings |
 > | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
@@ -372,6 +372,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `platform:ai-usage:{orgId}`                | 5 min  | AI quota por org (invalidada en `POST /:id/ai-credits`)                                           |
 | `platform:subscriptions:invoices:{orgId}`  | 5 min  | SaaS invoices per org (invalidada on-write vía `platform:subscriptions*`)                         |
 | `platform:gym-overview:{orgId}`            | 5 min  | Adopción gym + portal por org (sin invalidación cruzada desde writes del gym)                     |
+| `platform:receipts:*`                      | 5 min  | Auditoría del correlativo `FS-N` (Console); clave por filtros, invalidada on-write en cualquier write de suscripciones/pagos (emisión/anulación) |
 | `platform:staff*`                          | 5 min  | Platform staff (SaaS admins: support/admin/owner)                                                 |
 
 ### Cache Invalidation Strategy
@@ -432,6 +433,7 @@ Panel receipts are internal payment records — never fiscal invoices (see `docs
 - Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
 - Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed, 409 without number); voiding never cancels the subscription nor reverts the cumulative period; `REFUNDED`/`INVALID` don't touch the flag.
 - Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emisor); empty = generic "FitStack" + gate Comprobante.
+- **Audit parity (C4)**: the audit of the global series lives at `GET /api/platform/subscriptions/receipts` + `/subscriptions/receipts` (console page with URL filters + CSV export up to 1000 rows), mirroring the Panel. Same `computeReceiptGaps` algorithm with an **injected strategy** (Panel: `{slug}-{año}-{seq}` annual; Console: `FS-{seq}` continuous, no year) → `gaps[]` classifies `hueco` vs `anulado` identically on both sides. Console filters run in **UTC** (platform billing convention); `year` there means the UTC year of `payment_date`, not a sequence universe. `support` reads (200); writes stay 403.
 
 ---
 
@@ -885,6 +887,7 @@ silently without re-rendering. Panel uses the same shape
 | `console:settings`  | `/api/platform/settings`                         |
 | `console:staff`     | `/api/platform/staff`                            |
 | `console:knowledge` | `/api/platform/knowledge*`                       |
+| `console:receipts`  | `/api/platform/subscriptions/receipts`           |
 
 ### RSC Pattern in `apps/console`
 

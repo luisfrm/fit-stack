@@ -4,8 +4,11 @@ import { z } from 'zod';
 import { requirePlatformAuth, requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
+import { createPlatformReceiptsReportRepository } from '../repositories/platform-receipts-report.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
+import { createPlatformReceiptsReportService } from '../services/platform-receipts-report.service';
+import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
@@ -66,6 +69,24 @@ const extendSchema = z.object({
   newEndDate: z.string().transform((str) => new Date(str)),
 });
 
+const receiptsReportQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD).')
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD).')
+    .optional(),
+  status: z.enum(['all', 'issued', 'pending', 'voided', 'pre_system', 'gaps']).optional(),
+  method: z.string().min(1).optional(),
+  // Año UTC de `payment_date` (la serie FS-N es continua, no lleva año).
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  // Tope alto para exportación CSV (la página usa 20; el CSV, hasta 1000).
+  limit: z.coerce.number().int().positive().max(1000).optional(),
+});
+
 function buildService(c: any) {
   const repo = createPlatformSubscriptionsRepository(c.get('db'));
   const plansRepo = createPlatformPlansRepository(c.get('db'));
@@ -82,6 +103,14 @@ async function invalidateInvoicesCache(c: any, organizationId: string) {
   await createCache(c.env).invalidateExact(
     `platform:subscriptions:invoices:${organizationId}`,
   );
+}
+
+/**
+ * Auditoría del correlativo (`GET /receipts`, C4): se invalida en cualquier
+ * write de suscripciones/pagos porque pueden emitir o anular un número.
+ */
+async function invalidateReceiptsReportCache(cache: ReturnType<typeof createCache>) {
+  await cache.invalidate('platform:receipts*');
 }
 
 export const platformSubscriptionRoutes = new Hono<AppEnv>()
@@ -148,6 +177,52 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json(revenue);
   })
 
+  // GET /api/platform/subscriptions/receipts — auditoría del correlativo
+  // global `FS-N`: filas + resumen + totales por moneda + gaps (hueco
+  // sospechoso vs anulado explicado). Espejo del reporte del Panel.
+  // Lectura: support sí (mismo contrato que la descarga de comprobantes).
+  .get('/receipts', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const parsed = receiptsReportQuerySchema.safeParse({
+      from: c.req.query('from'),
+      to: c.req.query('to'),
+      status: c.req.query('status'),
+      method: c.req.query('method'),
+      year: c.req.query('year'),
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    });
+    if (!parsed.success) {
+      return c.json(
+        { error: 'Filtros del reporte inválidos.', code: 'INVALID_REPORT_FILTERS' },
+        400,
+      );
+    }
+    const filters = parsed.data;
+
+    const cache = createCache(c.env);
+    // Key normalizada con defaults: `?status=all` y sin query comparten caché.
+    const cacheKey = `platform:receipts:${JSON.stringify({
+      from: filters.from ?? null,
+      to: filters.to ?? null,
+      status: filters.status ?? 'all',
+      method: filters.method ?? null,
+      year: filters.year ?? null,
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+    })}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const db = c.get('db');
+    const service = createPlatformReceiptsReportService(
+      createPlatformReceiptsReportRepository(db),
+      createPlatformReceiptsRepository(db),
+    );
+    const report = await service.getReceiptsReport(filters);
+    await cache.set(cacheKey, report, 300); // 5 min: invalidado on-write en emisión/anulación
+    return c.json(report);
+  })
+
   // GET /api/platform/subscriptions/by-organization/:orgId/invoices — historial SaaS de la org.
   // Va antes de /:id para que Hono no la trague como param.
   .get('/by-organization/:orgId/invoices', requirePlatformAuth(), async (c) => {
@@ -187,6 +262,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     });
 
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${data.organizationId}:subscription`);
     await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${data.organizationId}:features`);
@@ -208,6 +284,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.cancelSubscription(id, reason);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
@@ -226,6 +303,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.extendSubscriptionPeriod(id, newEndDate);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
@@ -246,6 +324,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       receipts: buildReceipts(c),
     });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
@@ -270,6 +349,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       by: c.get('user')!.id,
     });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     if (payment.organizationId) {
       await cache.invalidateExact(`org:${payment.organizationId}:subscription`);
       await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
@@ -377,6 +457,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       receipts: buildReceipts(c),
     });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
@@ -396,6 +477,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.deleteSubscription(id);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
     await cache.invalidateExact(`platform:subscriptions:invoices:${sub.organizationId}`);

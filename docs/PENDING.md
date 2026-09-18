@@ -84,6 +84,13 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Hoy no existe storage ni UI de `fiscalConfig` para el emisor plataforma, así que los comprobantes SaaS persisten `subtotal = amountPaid / taxTotal = 0 / taxDetails = []` (solo el total cobrado) y lo dicen en Console → Settings → Emisor. Es la postura conservadora correcta (nadie declaró ese IVA).
   - Para habilitarlo: `platform_setting` con el `fiscalConfig` de FitStack + toggles en `emitter-settings.tsx` (mismo patrón del Panel: declaración, tasa manual, confirmación) y cablearlo en el paso 1 SaaS y en el twin de `receipt-compose` (`platform-receipts.service.ts` + `jobs-worker`).
 
+## 10. Comprobantes Console — universo completo de la serie en la auditoría (C4)
+
+- [ ] **Cuando la serie global `FS-N` crezca (miles de comprobantes), acotar la lectura del universo de `gaps[]`.**
+  - La auditoría necesita el universo **completo** de números (cualquier ausente es un hueco), así que hoy `getPlatformReceiptSequenceState` lee todas las filas numeradas de `platform_subscription_payment` (solo 5 columnas, sin paginar). Es correcto y trivial hoy; no lo será con decenas de miles de filas.
+  - Disparador: si el reporte de Console tarda visiblemente, acotar por rango (`seq >= lastNumber - N`) o particionar la serie por año de emisión, manteniendo la semántica de hueco.
+  - Lo mismo aplica al Panel si una organización acumula muchos años en una sola serie.
+
 ## 8. Comprobantes Console — disclaimer con país proxy
 
 - [ ] **Disclaimer Console usa el país del org receptor como proxy hasta configurar `fitstack_country_code`.**

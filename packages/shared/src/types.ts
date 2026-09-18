@@ -460,7 +460,12 @@ export interface IReceiptReportRow {
   state: ReceiptReportState;
   /** `ready` | `pending` | `null` (pre_system no tiene PDF). */
   pdfStatus: 'ready' | 'pending' | null;
+  /**
+   * Receptor del comprobante: el miembro (Panel) o la organización que paga
+   * (Console, donde el emisor es FitStack).
+   */
   memberName: string;
+  /** Solo Panel; `null` en Console (el receptor es una organización). */
   memberEmail?: string | null;
   planName: string;
   /** Centavos enteros (convención Money). */

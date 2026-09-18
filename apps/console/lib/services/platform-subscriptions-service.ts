@@ -5,7 +5,9 @@ import type {
   IPlatformSubscription,
   IPlatformSubscriptionPayment,
   IPaymentMethodDetails,
+  IReceiptsReportResult,
   PaymentStatus,
+  ReceiptReportStatusFilter,
 } from "@workspace/shared/types";
 
 export type SubscriptionWithDetails = IPlatformSubscription;
@@ -67,6 +69,17 @@ export interface ChangePlanPayload {
   isTrial?: boolean;
   priceOverrideCents?: number;
   payment: PlatformPaymentPayload;
+}
+
+export interface ReceiptsReportFilters {
+  from?: string;
+  to?: string;
+  status?: ReceiptReportStatusFilter;
+  method?: string;
+  /** Año UTC de `payment_date` (la serie FS-N es continua, no lleva año). */
+  year?: number;
+  page?: number;
+  limit?: number;
 }
 
 const SUBSCRIPTIONS_PATH = "/platform/subscriptions";
@@ -278,6 +291,31 @@ export const platformSubscriptionsService = {
     await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`, {
       method: "PATCH",
       body: { status },
+    });
+  },
+
+  /* ── Auditoría del correlativo (C4) ── */
+
+  /**
+   * Reporte de comprobantes `FS-N`: filas, resumen, totales por moneda y
+   * gaps (hueco sospechoso vs anulado explicado). Espejo del Panel.
+   * `limit` admite hasta 1000 para la exportación CSV.
+   */
+  async getReceiptsReport(
+    filters: ReceiptsReportFilters = {},
+    options?: ApiFetchOptions,
+  ): Promise<IReceiptsReportResult> {
+    const query: Record<string, string | number> = {};
+    if (filters.from) query.from = filters.from;
+    if (filters.to) query.to = filters.to;
+    if (filters.status && filters.status !== "all") query.status = filters.status;
+    if (filters.method) query.method = filters.method;
+    if (filters.year) query.year = filters.year;
+    if (filters.page) query.page = filters.page;
+    if (filters.limit) query.limit = filters.limit;
+    return await api<IReceiptsReportResult>(`${SUBSCRIPTIONS_PATH}/receipts`, {
+      query,
+      ...options,
     });
   },
 

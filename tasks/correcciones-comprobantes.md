@@ -15,12 +15,12 @@
 | C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí | 🔴 Bloqueante | M |
 | C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M | ✅ Hecha |
 | C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S | ✅ Hecha |
-| C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M |
+| C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M | ✅ Hecha |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí | 🟡 Media | S |
 | C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S |
 | C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S |
 
-**C0 + C8 + C2 + C3 + C4 cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
+**C0 + C8 + C2 + C3 + C4 (✅ todas) cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
 C1 y C5 comparten una única migración (se agrupan a propósito, un solo ciclo `generate → review → migrate`).
 
 Decisiones D1–D6 **resueltas** al final del documento (sección *Decisiones congeladas*).
@@ -229,7 +229,7 @@ Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` decla
 
 ---
 
-## C4 — Auditoría espejo en Console 🟠 (sin migración)
+## C4 — Auditoría espejo en Console 🟠 (sin migración) ✅
 
 ### Problema
 
@@ -239,18 +239,26 @@ Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` decla
 
 | Archivo | Cambio |
 |---|---|
-| `packages/shared/src/documents/receipt-gaps.ts` | Generalizar con estrategia inyectada: `computeReceiptGaps({ …, format, parseToSeq })`. Los wrappers `computePanelReceiptGaps` / `computeConsoleReceiptGaps` mantienen la API actual (tests existentes verdes, firma estable). |
-| `packages/database/src/repositories/platform-receipts.repository.ts` | `getPlatformReceiptSequenceState(type)` (último `next_number` + números/pagos del universo) — espejo de `payments.repository.getReceiptSequenceState`. |
-| `apps/api-worker/src/routes/platform-subscriptions.route.ts` | `GET /api/platform/subscriptions/receipts` — filas + resumen (issued/pending/voided/pre_system) + totales por moneda + `gaps[]`; filtros `from/to/status/method/year/page/limit`; `requirePlatformAuth` (support lee, **descarga permitida**, es el contrato ya congelado para comprobantes). Cache `platform:receipts:*` (5 min) invalidada on-write en validación/anulación/emisión. |
-| `apps/console/app/(protected)/subscriptions/receipts/` | Página RSC + cliente (filtros en URL, `MAX_ITEMS=10`) con export CSV, espejo del reporte del Panel. |
-| `apps/console/components/dashboard/...` | Entrada de navegación (respetando `filterNavItemsByFeatures` y RBAC console). |
+| `packages/shared/src/documents/receipt-gaps.ts` | **Algoritmo único + estrategia inyectada** (`ReceiptGapStrategy` con `format`/`parse`). Wrappers estables: `computePanelReceiptGaps({ year, slug, lastNumber, entries })` y `computeConsoleReceiptGaps({ lastNumber, entries })`. |
+| `packages/database/src/repositories/platform-receipts.repository.ts` | `getPlatformReceiptSequenceState(type)` (último `next_number` + números del universo) — espejo de `payments.repository.getReceiptSequenceState`, sin año ni organización. |
+| `apps/api-worker/src/repositories/platform-receipts-report.repository.ts` | (nuevo) filas paginadas + conteo por estado + filas de dinero. Scope espejo (`validated OR numbered`), rango por `receipt_issued_at` (numerados) / `payment_date` (sin numerar), todo **UTC**; `year` = año UTC de `payment_date`. |
+| `apps/api-worker/src/lib/receipt-report.ts` | (nuevo) mappers puros compartidos por los DOS reportes: `asTaxDetails`, `toIsoOrNull`, `aggregateCurrencyTotals`, `classifyReceiptState`. Evita que el espejo derive. |
+| `apps/api-worker/src/services/platform-receipts-report.service.ts` | (nuevo) filas + resumen (issued/pending/voided/pre_system) + totales por moneda + `gaps[]`, mismo contrato `IReceiptsReportResult` que el Panel. |
+| `apps/api-worker/src/routes/platform-subscriptions.route.ts` | `GET /receipts` — filtros `from/to/status/method/year/page/limit` (máx. 1000 para CSV); cache `platform:receipts:*` (5 min) invalidada on-write en **cualquier** write de suscripciones/pagos (emisión o anulación). |
+| `apps/console/app/(protected)/subscriptions/receipts/` | (nuevo) página RSC + cliente: filtros en URL, paginación 20, export CSV (hasta 1000 filas), descarga del PDF por fila y bloque de auditoría de gaps. |
+| `apps/console/app/(protected)/sidebar-nav.ts` | Entrada “Comprobantes” → `/subscriptions/receipts`. |
 
-### Criterios de aceptación
+### Nota de implementación (desvío consciente del spec)
 
-- Unit (`receipt-gaps.test.ts`): la variante Console numera `FS-0000001…`, detecta hueco y anulado, y rechaza seq 0/duplicados/fuera de universo.
-- Integración: serie con 3 validados (1 anulado, 1 hueco forzado) → `gaps[]` clasifica `hueco` vs `anulado` igual que Panel.
-- Integración: `support` **lee 200** y **no escribe** 403 (contrato de comprobantes ya congelado).
-- E2E console: navegar al reporte, ver el `FS-N` sin UUID, exportar CSV.
+El spec pedía `requirePlatformAuth` para el endpoint, pero ese middleware exige el permiso `organization.create`, que `support` **no** tiene (es read-only por diseño). El contrato de comprobantes ya congelado en C3 es *“support lee / no escribe”* y el criterio de esta fase exige `support → 200`, así que la **lectura** usa `requirePlatformPermission('subscription', 'list')` (idéntico a `GET /payments/:id/receipt` y a la descarga del PDF). Las escrituras siguen en 403 para `support`.
+
+### Criterios de aceptación (verificados)
+
+- ✅ Unit `receipt-gaps.test.ts` (**16**): la variante Console numera `FS-0000001…`, detecta hueco y anulado, y rechaza seq 0/negativo/fuera de universo/duplicado/lastNumber inválido; la de Panel conserva sus 9 casos + uno nuevo de slug normalizado.
+- ✅ Integración `platform-receipts-report.test.ts` (**3**): 3 validados (1 emitido con paso 2 real, 1 anulado, 1 pendiente) + salto de secuencia forzado → `gaps[]` = 1 anulado + 5 huecos, resumen `{ issued: 1, pending: 1, voided: 1, preSystem: 0 }` y totales por moneda solo sobre emitidos no anulados.
+- ✅ Integración: filtros en **UTC** (`from/to` por día UTC — no tz de organización — y `year` = año de `payment_date`), `method`, y 400 `INVALID_REPORT_FILTERS` (status/limit/año/fecha inválidos).
+- ✅ Integración: `support` **lee 200** y **no escribe** 403.
+- ✅ E2E `e2e/console/receipts.spec.ts`: navega al reporte por el sidebar, ve el `FS-N` sin UUID y exporta el CSV (nombre y contenido verificados).
 
 ---
 
