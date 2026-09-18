@@ -1,15 +1,20 @@
 import type { PaymentsRepository } from '../repositories/payments.repository';
 import { OrganizationDateManager } from '../lib/date-manager';
 import {
-  computeReceiptGaps,
+  computePanelReceiptGaps,
   parsePanelReceiptNumber,
-  type IReceiptCurrencyTotal,
   type IReceiptReportRow,
   type IReceiptReportSummary,
   type IReceiptsReportResult,
-  type ITaxDetail,
   type ReceiptGapItem,
 } from '@workspace/shared';
+import {
+  aggregateCurrencyTotals,
+  asTaxDetails,
+  classifyReceiptState,
+  readEmitterName,
+  toIsoOrNull,
+} from '../lib/receipt-report';
 
 export interface ReceiptsReportFilters {
   from?: string;
@@ -19,23 +24,6 @@ export interface ReceiptsReportFilters {
   year?: number;
   page?: number;
   limit?: number;
-}
-
-function asTaxDetails(value: unknown): ITaxDetail[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((line) => {
-    const l = line as { name?: unknown; rate?: unknown; amount?: unknown };
-    if (typeof l.name !== 'string' || typeof l.rate !== 'number' || typeof l.amount !== 'number') {
-      return [];
-    }
-    return [{ name: l.name, rate: l.rate, amount: l.amount }];
-  });
-}
-
-function toIso(value: Date | string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-  const d = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export function createReportsService(paymentsRepo: PaymentsRepository) {
@@ -76,7 +64,7 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
       ];
     });
 
-    return computeReceiptGaps({ year, slug: orgSlug, lastNumber, entries });
+    return computePanelReceiptGaps({ year, slug: orgSlug, lastNumber, entries });
   }
 
   return {
@@ -137,13 +125,20 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
         voided: 0,
         preSystem: 0,
       };
-      // ANTI-DRIFT: esta clasificación debe mantenerse idéntica a la del
-      // mapeo de filas (abajo) y al filtro SQL `issued` del repositorio.
       for (const group of stateCounts) {
-        if (group.voided) summary.voided += group.count;
-        else if (group.noNumber) summary.preSystem += group.count;
-        else if (group.noPdf) summary.pending += group.count;
-        else summary.issued += group.count;
+        switch (classifyReceiptState(group)) {
+          case 'voided':
+            summary.voided += group.count;
+            break;
+          case 'pre_system':
+            summary.preSystem += group.count;
+            break;
+          case 'pending':
+            summary.pending += group.count;
+            break;
+          default:
+            summary.issued += group.count;
+        }
       }
 
       const mapped: IReceiptReportRow[] = rows.map((row) => {
@@ -156,7 +151,7 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
               : 'issued';
         // `payment_date` es NOT NULL: nula/inválida es corrupción visible,
         // nunca se enmascara con una fecha inventada.
-        const paymentIso = toIso(row.paymentDate);
+        const paymentIso = toIsoOrNull(row.paymentDate);
         if (!paymentIso) {
           throw new Error(
             `getReceiptsReport: paymentDate inválida en pago ${row.paymentId}.`,
@@ -179,32 +174,16 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
           paymentMethod: row.paymentMethod,
           paymentStatus: row.paymentStatus,
           paymentDate: paymentIso,
-          receiptIssuedAt: toIso(row.receiptIssuedAt),
+          receiptIssuedAt: toIsoOrNull(row.receiptIssuedAt),
           voided: row.receiptVoided,
           taxOverrideReason: row.taxOverrideReason,
           voidedBy: row.voidedBy,
-          voidedAt: toIso(row.voidedAt),
+          voidedAt: toIsoOrNull(row.voidedAt),
           voidReason: row.voidReason,
+          issuedBy: row.issuedBy,
+          emitterName: readEmitterName(row.emitterSnapshot),
         };
       });
-
-      const totalsByCurrency = new Map<string, IReceiptCurrencyTotal>();
-      for (const row of moneyRows) {
-        const currency = row.currencyPaid;
-        let bucket = totalsByCurrency.get(currency);
-        if (!bucket) {
-          bucket = { currency, subtotal: 0, taxTotal: 0, amount: 0, byTax: [] };
-          totalsByCurrency.set(currency, bucket);
-        }
-        bucket.subtotal += Number(row.subtotal ?? 0);
-        bucket.taxTotal += Number(row.taxTotal ?? 0);
-        bucket.amount += Number(row.amountPaid);
-        for (const line of asTaxDetails(row.taxDetails)) {
-          const existing = bucket.byTax.find((t) => t.name === line.name);
-          if (existing) existing.amount += line.amount;
-          else bucket.byTax.push({ name: line.name, amount: line.amount });
-        }
-      }
 
       let gaps: ReceiptGapItem[] = [];
       if (status === 'all' || status === 'gaps') {
@@ -218,7 +197,7 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
         total,
         totalPages: Math.ceil(total / limit),
         summary,
-        totals: [...totalsByCurrency.values()],
+        totals: aggregateCurrencyTotals(moneyRows),
         gaps,
       };
     },

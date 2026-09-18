@@ -74,11 +74,101 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Al pasar a clientes reales, volver a `*/10 * * * *` (recuperación ≤ 25 min). Cambio en Terraform + actualizar este ítem y los docs que citan la cadencia.
   - El flujo normal NO depende del barrido: el render se dispara al instante por el `send` del paso 1.
 
+## 9. Comprobantes — gating fiscal (C2): tasa del IGTF y emisor plataforma
+
+- [ ] **Confirmar tasa y base del IGTF con un contador antes de encenderlo en un gym real.**
+  - El IGTF nace **apagado** y **nunca automático**: activarlo exige declarar el negocio como contribuyente formal + marcar la confirmación de tasa + indicar la tasa a mano (`fiscalConfig.confirmedTaxes`). El `3%` de `COUNTRIES.VE.conditionalTaxes` es **referencia documentada**, no valor efectivo: la tasa varía por decreto (`docs/FACTURATION.md` §6).
+  - Base implementada: `basis: 'gross_first'` — el IGTF se **extrae primero** del monto cobrado y el resto se descompone tax-inclusive con el IVA (cambia la base del IVA; el UI lo advierte). Verificar con el contador que la base legal es el monto pagado en divisa.
+  - Ejemplo verificado en tests: cobrado 30,90 con IVA 16 % + IGTF 3 % → IGTF 0,93 · base 25,84 + IVA 4,13 · suma exacta 30,90.
+- [ ] **Declarar a FitStack (emisor plataforma) como contribuyente formal si se quiere desglose en los comprobantes `FS-N`.**
+  - Hoy no existe storage ni UI de `fiscalConfig` para el emisor plataforma, así que los comprobantes SaaS persisten `subtotal = amountPaid / taxTotal = 0 / taxDetails = []` (solo el total cobrado) y lo dicen en Console → Settings → Emisor. Es la postura conservadora correcta (nadie declaró ese IVA).
+  - Para habilitarlo: `platform_setting` con el `fiscalConfig` de FitStack + toggles en `emitter-settings.tsx` (mismo patrón del Panel: declaración, tasa manual, confirmación) y cablearlo en el paso 1 SaaS y en el twin de `receipt-compose` (`platform-receipts.service.ts` + `jobs-worker`).
+
+## 11. Comprobantes — comprobantes previos al snapshot del emisor (C1)
+
+- [ ] **Los pagos emitidos ANTES de C1 (`emitter_snapshot = NULL`) siguen recomponiéndose en vivo: su JSON puede divergir del PDF si el emisor edita su perfil.**
+  - Estado terminal **documentado** (no es un bug): la migración `0016` no hace backfill porque el snapshot no se puede reconstruir con fidelidad — la identidad del momento de emisión se perdió al no persistirse.
+  - El PDF en R2 sí es inmutable y conserva lo emitido; lo que puede cambiar es el JSON de `GET /:id/receipt` y la fila del libro (sin `emisor`/`emitido_por`).
+  - Si una auditoría exige reproducibilidad del histórico completo, la opción honesta es un **acta de conciliación** (fecha de corte + “estos comprobantes se reimprimen con la configuración vigente”) o incrustar el snapshot del PDF vía OCR: no un backfill inventado.
+- [x] **RESUELTO (C9)** — E2E preexistente: `e2e/panel/subscriptions.spec.ts` (pago pendiente) fallaba de forma determinista por el prewarm de `/payments` + `revalidate: 60` (fixture creado por API después del prewarm). Se aplicó la opción “la lista accionable no se cachea” (`cache: 'no-store'`). Ver `tasks/correcciones-comprobantes.md` → C9.
+
+## 10. Comprobantes Console — universo completo de la serie en la auditoría (C4)
+
+- [ ] **Cuando la serie global `FS-N` crezca (miles de comprobantes), acotar la lectura del universo de `gaps[]`.**
+  - La auditoría necesita el universo **completo** de números (cualquier ausente es un hueco), así que hoy `getPlatformReceiptSequenceState` lee todas las filas numeradas de `platform_subscription_payment` (solo 5 columnas, sin paginar). Es correcto y trivial hoy; no lo será con decenas de miles de filas.
+  - Disparador: si el reporte de Console tarda visiblemente, acotar por rango (`seq >= lastNumber - N`) o particionar la serie por año de emisión, manteniendo la semántica de hueco.
+  - Lo mismo aplica al Panel si una organización acumula muchos años en una sola serie.
+
 ## 8. Comprobantes Console — disclaimer con país proxy
 
 - [ ] **Disclaimer Console usa el país del org receptor como proxy hasta configurar `fitstack_country_code`.**
   - El disclaimer legal de los comprobantes de Console debería corresponder al país del **emisor** (FitStack), pero FitStack aún no tiene país propio configurado: se usa el `countryCode` del org receptor como aproximación temporal (ver `plan.md`, decisión congelada).
   - Al definir `fitstack_country_code`, cambiar el disclaimer a ese país y tachar este ítem. No dejar que el proxy sobreviva silenciosamente hasta producción.
+
+## 12. Registro financiero — atomicidad y cascada del borrado de miembro (C9)
+
+- [ ] **`create()` de suscripción + pago NO es atómico pese a la regla “Atomic Invoicing”.**
+  - `subscriptions.service.create()` inserta la **suscripción** y después el **pago** en dos sentencias independientes. Si la segunda falla (por ejemplo, un dato inválido del pago), queda una **suscripción huérfana sin pago**, y desde C9 ya no existe `DELETE /api/subscriptions/:id` que la limpie.
+  - Opciones: envolver ambos inserts en una transacción (si el driver `neon-http` la soporta vía `db.transaction`) o compensar en el mismo `catch` eliminando la fila recién insertada.
+  - Consulta de detección: `SELECT s.* FROM subscription s LEFT JOIN payment p ON p.subscription_id = s.id WHERE p.id IS NULL`.
+- [ ] **El borrado de un miembro arrastra su histórico financiero por cascada.**
+  - `payment.member_id` y `subscription.member_id` son `ON DELETE CASCADE`: borrar un miembro elimina sus pagos y suscripciones. Es hoy la única vía por la que un registro financiero desaparece (la suscripción ya no tiene DELETE) y es también de lo que depende la limpieza de E2E.
+  - Coherente con “un registro financiero no se elimina”: el miembro con pagos debería darse de **baja lógica** (desactivar) en vez de borrarse, o el borrado debería rechazarse (409) cuando tiene pagos. Requiere decidir la política del módulo Members y actualizar E2E (la limpieza pasaría al borrado de la organización).
+
+## 13. Console — el borrado de la suscripción SaaS puede vaciar la serie `FS-N`
+
+- [ ] **`DELETE /api/platform/subscriptions/:id` existe y borra la suscripción junto con sus pagos por cascada.**
+  - Es la asimetría consciente respecto del Panel (donde C9 eliminó el DELETE de suscripciones): en Console la suscripción es de FitStack y el borrado se usa para deshacer altas equivocadas.
+  - El problema: si esa suscripción ya tenía comprobantes `FS-N` emitidos, sus filas desaparecen del libro con sus números. La auditoría de `gaps[]` (que necesita el universo de números emitidos) las reportaría como **huecos** o, peor, el `last_number` de la secuencia quedaría por delante de las filas existentes.
+  - Opciones: (a) rechazar el borrado cuando la suscripción tiene comprobantes numerados (409 + cancelar en su lugar), (b) borrado lógico (`cancelled_at` + un flag de “archivada”), (c) conservar las filas de pago huérfanas (FK sin cascada) para no perder el correlativo.
+  - Mientras no se decida, el Panel y Console tienen reglas distintas para el mismo concepto y eso debe ser una elección explícita, no una sorpresa en una auditoría.
+
+## 14. Comprobantes — email perdido en la DLQ después de la marca de notificado (C6)
+
+- [ ] **El barrido de C6 no cubre el email que ya se encoló y agotó reintentos.**
+  - El paso 2 marca `receipt_notified_at` **antes** de encolar `email.payment_receipt` / `email.org_payment_received`, y solo la revierte si el `send()` a la cola falla. Si el mensaje ya encolado falla N veces en el handler de email y cae a la DLQ de `fit-task-events`, la marca queda puesta y el 2.º predicado del barrido (`receipt_notified_at IS NULL`) no lo ve.
+  - Recuperación hoy: **manual** — `POST /api/payments/:id/send-email` (Panel) o `POST /api/platform/subscriptions/payments/:id/resend` (Console).
+  - Opciones si se quiere automático: (a) que el handler de email limpie la marca al fallar de forma definitiva (requiere que conozca el `paymentId`/scope, hoy no lo hace), o (b) un barrido de la DLQ, que Cloudflare no expone como cola consultable (habría que persistir el fallo en DB).
+  - Disparador: si aparece un comprobante con `receipt_pdf_key` y sin email entregado en una auditoría real.
+
+## 15. Comprobantes — naming cosmético `platform_document_sequence.next_number` (C7)
+
+- [ ] **Renombrar `next_number` a `last_number` para alinear con `organization_document_sequence.last_number`.**
+  - `platform_document_sequence.next_number` guarda el **ÚLTIMO** número entregado, no el siguiente (ver `packages/database/src/repositories/platform-receipts.repository.ts`). El nombre induce a error, pero el comportamiento es el correcto.
+  - Puramente cosmético y **sí** requiere migración → no vale un ciclo propio: agrupar con la próxima migración que se genere por otro motivo.
+  - El contrato del repositorio ya expone `getPlatformReceiptSequenceState(...).lastNumber`, así que todos los consumidores hablan en términos de "último"; solo el nombre de la columna queda desalineado.
+
+## 16. Comprobantes — claim-then-number, cierre total de la carrera de correlativo (D4 / C0)
+
+- [ ] **Riesgo residual de la carrera de doble emisión: si el perdedor no es el último consumidor, su número queda irreclaimable sin renumerar (prohibido).**
+  - Contexto: C0 dejó documentado este riesgo. La compensación (`releaseLastPlatformNumber`) solo revierte cuando el perdedor sigue siendo el último consumidor; si otro pago consumió la secuencia después, el número perdido queda como hueco auditado. La guarda tardía reduce la ventana a milisegundos, pero no la cierra.
+  - Disparador explícito para implementar la solución completa: **si el reporte de huecos (`gaps[]`) muestra un hueco no explicado en producción.**
+  - Esbozo de la solución completa (claim-then-number): reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` (persistiendo ya los impuestos) **antes** de consumir la secuencia y asignar el número después. Obligaría a una rama extra de reparación en el barrido para el estado intermedio "reclamado sin número".
+  - Estado: NO implementado; decisión D4 congelada (ver `tasks/correcciones-comprobantes.md`).
+
+## 17. Pagos — devoluciones (`refunded`): reservado, no implementado
+
+- [ ] **Implementar la devolución de un cobro.**
+  - `PAYMENT_STATUSES.REFUNDED` existe en el enum y `QUALIFYING_PAYMENT_STATUSES` lo trata como pago que sostiene el periodo (`validated | refunded`), pero **ningún flujo lo produce**: no hay UI ni servicio que marque un pago como `refunded` (`updatePaymentStatus` ya escribe `refunded_at` si se le pide, pero nadie lo llama con ese estado desde producto).
+  - Decidir la semántica completa antes de exponerlo: ¿revierte el periodo acumulado?, ¿emite nota de crédito o anula el comprobante?, ¿afecta el status SaaS?, ¿aplica también al Panel (`payment`) además de Console (`platform_subscription_payment`)?
+  - Hoy `refunded` **no** toca el flag ANULADO y no cancela la suscripción.
+  - Disparador: cuando se pida una devolución real o se conecte una pasarela de pago.
+
+## 18. Suscripciones — auditoría del doble periodo histórico
+
+- [ ] **Revisar las suscripciones cuyo `current_period_end` excede `start_date + Σ duración de los pagos validated`.**
+  - El bug de front-load (punto 7) pudo haber dejado `current_period_end` inflado en altas con pago `processing` que se validaron más tarde. La corrección evita nuevos casos; **no auto-corregir** los históricos.
+  - Detección (indicativa; normalizar la duración `day|week|month|year` por pago antes de sumar):
+    ```sql
+    -- periodos por delante del ciclo realmente pagado
+    SELECT s.id, s.organization_id, s.start_date, s.current_period_end
+    FROM platform_subscription s
+    WHERE s.current_period_end > (
+      s.start_date + <Σ duración normalizada de los pagos validated de s>
+    );
+    ```
+  - Revisar manualmente cada exceso (puede ser un caso legítimo) antes de tocar datos; si procede, corregir con una migración de datos aprobada, nunca por inferencia automática.
+  - Disparador: auditoría de facturación SaaS o reclamo de un gym.
 
 ---
 

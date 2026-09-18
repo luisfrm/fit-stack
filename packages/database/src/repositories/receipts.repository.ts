@@ -21,6 +21,7 @@ import {
   MIN_RECEIPT_YEAR,
   isValidPanelReceiptNumber,
   type ReceiptDocumentType,
+  type ReceiptEmitterSnapshot,
 } from '@workspace/shared';
 
 /** Fila de `payment` tal como la devuelve Drizzle (fuente del tipo, no imports cruzados). */
@@ -46,6 +47,10 @@ export interface AttachReceiptInput {
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
+  /** Identidad del emisor congelada al emitir (C1). */
+  emitterSnapshot?: ReceiptEmitterSnapshot | null;
+  /** Actor que emite (C5). Ausente en el barrido: queda `null`, no se inventa. */
+  issuedBy?: string | null;
 }
 
 export interface MarkVoidedInput {
@@ -114,6 +119,44 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
+     * Compensación de correlativo: devuelve el último número consumido por
+     * esta entrega cuando PERDIÓ la carrera de `attachReceipt` (otra entrega
+     * concurrente ya numeró el pago, así que el número local no se persistió).
+     *
+     * Solo revierte si seguimos siendo el último consumidor
+     * (`last_number = seq`): si alguien consumió después, retroceder el
+     * contador reasignaría un número ya vivo — prohibido. En ese caso
+     * devuelve `released: false` y el número queda como hueco auditado.
+     */
+    async releaseLastNumber(
+      orgId: string,
+      type: ReceiptDocumentType,
+      year: number,
+      seq: number,
+    ): Promise<{ released: boolean }> {
+      assertOrgId(orgId, 'releaseLastNumber');
+      assertDocumentType(type, 'releaseLastNumber');
+      assertYear(year, 'releaseLastNumber');
+      if (!Number.isInteger(seq) || seq < 1) {
+        throw new Error(`releaseLastNumber: seq inválido (${String(seq)}).`);
+      }
+
+      const [row] = await db
+        .update(organizationDocumentSequence)
+        .set({ lastNumber: sql`${organizationDocumentSequence.lastNumber} - 1` })
+        .where(
+          and(
+            eq(organizationDocumentSequence.organizationId, orgId),
+            eq(organizationDocumentSequence.documentType, type),
+            eq(organizationDocumentSequence.year, year),
+            eq(organizationDocumentSequence.lastNumber, seq),
+          ),
+        )
+        .returning({ lastNumber: organizationDocumentSequence.lastNumber });
+      return { released: row !== undefined };
+    },
+
+    /**
      * Numera un pago de forma idempotente: solo escribe si aún no tiene
      * número (`WHERE receipt_number IS NULL`). Si ya estaba numerado,
      * devuelve la fila existente re-leída (el número distinto se ignora,
@@ -142,6 +185,10 @@ export function createReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
+          // C1/C5: identidad congelada + actor. Se escriben en la MISMA
+          // sentencia que el número: el comprobante nace reproducible.
+          emitterSnapshot: input.emitterSnapshot ?? null,
+          issuedBy: input.issuedBy ?? null,
         })
         .where(
           and(

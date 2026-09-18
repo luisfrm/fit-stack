@@ -10,6 +10,9 @@ import {
   isPlatformSubscriptionActive,
   isPlatformSubscriptionExpired,
   PLATFORM_SUBSCRIPTION_STATUSES,
+  PAYMENT_STATUSES,
+  QUALIFYING_PAYMENT_STATUSES,
+  getVoidKind,
   formatOrgRole,
   formatPlatformRole,
   ORG_ROLES,
@@ -20,9 +23,10 @@ import {
 describe('computePlatformSubscriptionStatus', () => {
   const now = new Date('2026-06-15T12:00:00Z');
 
-  it('returns "active" when periodEnd is in the future', () => {
+  it('returns "active" when periodEnd is in the future and there is a qualifying payment', () => {
     const result = computePlatformSubscriptionStatus({
       currentPeriodEnd: '2026-06-30',
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE);
@@ -32,48 +36,61 @@ describe('computePlatformSubscriptionStatus', () => {
     const result = computePlatformSubscriptionStatus({
       currentPeriodEnd: '2026-06-30',
       cancelledAt: '2026-06-10',
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED);
   });
 
-  it('returns "trial" when isTrial is true', () => {
+  it('returns "trial" while the trial period is still active', () => {
     const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-05-01', // expired
+      currentPeriodEnd: '2026-06-30',
       isTrial: true,
+      hasValidatedPayment: false,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL);
   });
 
-  it('returns "past_due" when 1-7 days overdue', () => {
-    // periodEnd was 3 days ago
+  it('expired trial falls into the standard grace ladder (not "trial")', () => {
     const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-06-12',
+      currentPeriodEnd: '2026-06-14', // 1 day overdue
+      isTrial: true,
+      hasValidatedPayment: false,
+      now,
+    });
+    expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
+  });
+
+  it('returns "past_due" when 1-7 days overdue', () => {
+    const result = computePlatformSubscriptionStatus({
+      currentPeriodEnd: '2026-06-12', // 3 days ago
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
   });
 
   it('returns "read_only" when 8-14 days overdue', () => {
-    // periodEnd was 10 days ago
     const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-06-05',
+      currentPeriodEnd: '2026-06-05', // 10 days ago
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY);
   });
 
   it('returns "suspended" when 15+ days overdue', () => {
-    // periodEnd was 20 days ago
     const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-05-26',
+      currentPeriodEnd: '2026-05-26', // 20 days ago
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED);
   });
 
-  it('returns "past_due" when hasValidatedPayment is false even if periodEnd is in the future', () => {
+  it('returns "past_due" when there is no qualifying payment even if periodEnd is in the future', () => {
+    // Cubre el pago `processing` y el `voided` (ninguno califica).
     const result = computePlatformSubscriptionStatus({
       currentPeriodEnd: '2026-06-30',
       hasValidatedPayment: false,
@@ -85,9 +102,94 @@ describe('computePlatformSubscriptionStatus', () => {
   it('handles Date objects (not just strings)', () => {
     const result = computePlatformSubscriptionStatus({
       currentPeriodEnd: new Date('2026-07-01'),
+      hasValidatedPayment: true,
       now,
     });
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE);
+  });
+
+  it('grace boundary at exactly 7 days is past_due and 8 is read_only', () => {
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-08', // 7 days ago
+        hasValidatedPayment: true,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-07', // 8 days ago
+        hasValidatedPayment: true,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY);
+  });
+
+  it('grace boundary at exactly 14 days is read_only and 15 is suspended', () => {
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-01', // 14 days ago
+        hasValidatedPayment: true,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY);
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-05-31', // 15 days ago
+        hasValidatedPayment: true,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED);
+  });
+
+  it('trial only holds while its period has not elapsed', () => {
+    // Mismo instante = todavía vigente (el chequeo es `end >= now`).
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-15T12:00:00.000Z',
+        isTrial: true,
+        hasValidatedPayment: false,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL);
+    // Un día vencido ya cae en la escalera de gracia, no en trial.
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-14T12:00:00.000Z',
+        isTrial: true,
+        hasValidatedPayment: false,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
+  });
+});
+
+describe('payment status helpers', () => {
+  it('PAYMENT_STATUSES is exactly processing/validated/voided/refunded (no legacy pending/invalid)', () => {
+    expect(PAYMENT_STATUSES).toEqual({
+      PROCESSING: 'processing',
+      VALIDATED: 'validated',
+      VOIDED: 'voided',
+      REFUNDED: 'refunded',
+    });
+    expect(Object.values(PAYMENT_STATUSES)).not.toContain('pending');
+    expect(Object.values(PAYMENT_STATUSES)).not.toContain('invalid');
+  });
+
+  it('qualifying statuses are exactly validated and refunded', () => {
+    expect([...QUALIFYING_PAYMENT_STATUSES]).toEqual([
+      PAYMENT_STATUSES.VALIDATED,
+      PAYMENT_STATUSES.REFUNDED,
+    ]);
+    expect(QUALIFYING_PAYMENT_STATUSES).not.toContain(PAYMENT_STATUSES.PROCESSING);
+    expect(QUALIFYING_PAYMENT_STATUSES).not.toContain(PAYMENT_STATUSES.VOIDED);
+  });
+
+  it('getVoidKind derives rejected vs annulled from the receipt number', () => {
+    expect(getVoidKind({ receiptNumber: null })).toBe('rejected');
+    expect(getVoidKind({})).toBe('rejected');
+    expect(getVoidKind({ receiptNumber: undefined })).toBe('rejected');
+    expect(getVoidKind({ receiptNumber: 'fit-stack-2026-000045' })).toBe('annulled');
   });
 });
 
@@ -107,7 +209,7 @@ describe('isPlatformSubscriptionActive', () => {
   });
 
   it('returns false for suspended', () => {
-    expect(isPlatformSubscriptionActive(PLATFORM_SUBSCRIPTION_STATUSES.SUSPLETED)).toBe(false);
+    expect(isPlatformSubscriptionActive(PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED)).toBe(false);
   });
 });
 

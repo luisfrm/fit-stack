@@ -29,8 +29,8 @@ export type FitTaskEvent =
       paymentId: number;
       organizationId: string;
       /** Usuario que registró el pago (sesión). Recibe confirmación + owners dedupe. */
-      payerEmail: string;
-      payerName: string;
+      payerEmail?: string;
+      payerName?: string;
     };
 
 export interface Env {

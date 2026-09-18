@@ -144,6 +144,8 @@ export function ReceiptsReportClient({
               "anulado",
               "motivo_anulacion",
               "motivo_override",
+              "emisor",
+              "emitido_por",
             ];
       const lines =
         status === "gaps"
@@ -174,6 +176,9 @@ export function ReceiptsReportClient({
                 row.voided ? "SI" : "NO",
                 row.voidReason ?? "",
                 row.taxOverrideReason ?? "",
+                // C1/C5: emisor congelado + actor (libro exportable).
+                row.emitterName ?? "",
+                row.issuedBy ?? "",
               ]
                 .map(toCsvCell)
                 .join(","),
@@ -242,14 +247,20 @@ export function ReceiptsReportClient({
             <Text size="xs" variant="muted" className="italic">
               Override: {row.taxOverrideReason}
             </Text>
-          )}
-          {row.voided && (
+          )}          {row.voided && (
             <Text size="xs" variant="muted" className="italic">
               Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
             </Text>
           )}
-          {!row.taxOverrideReason && !row.voided && (
-            <Text size="xs" variant="muted" className="opacity-50">—</Text>
+          {row.issuedBy && (
+            <Text size="xs" variant="muted">
+              Emitido por: {row.issuedBy}
+            </Text>
+          )}
+          {!row.taxOverrideReason && !row.voided && !row.issuedBy && (
+            <Text size="xs" variant="muted" className="opacity-50">
+              —
+            </Text>
           )}
         </div>
       ),

@@ -2,6 +2,7 @@ import type { Db } from '@workspace/database/factory';
 import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 import {
   applyTaxOverride,
+  buildEmitterSnapshot,
   buildReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
@@ -45,6 +46,12 @@ export interface AssignReceiptNumberInput {
   /** Slug de la org (del perfil/sesión): parte del número humano. */
   orgSlug?: string | null;
   taxOverride?: TaxOverrideInput | null;
+  /**
+   * Actor de sesión que emite (C5). Opcional en la firma porque el barrido
+   * re-encola sin sesión: en ese caso se persiste `NULL`, nunca un actor
+   * inventado (solo se escribe al numerar, y el barrido no numera).
+   */
+  actor?: string | null;
 }
 
 export type ReceiptState =
@@ -71,6 +78,24 @@ export function createReceiptsService(
   const receiptsRepo = createReceiptsRepository(db);
   const paymentsRepo = createPaymentsRepository(db);
   const orgsRepo = createOrganizationsRepository(db);
+
+  /**
+   * Re-encola el render si el PDF aún no existe y devuelve el estado real
+   * (`pending` si falta el PDF). Idempotente: el paso 2 hace overwrite sobre
+   * la MISMA key y su propio gate decide el email.
+   */
+  async function requeueRenderIfPdfPending(
+    paymentId: number,
+    orgId: string,
+    receiptNumber: string,
+    receiptPdfKey: string | null | undefined,
+  ): Promise<'pending' | 'ready'> {
+    if (receiptPdfKey) return 'ready';
+    await receiptQueue.send(
+      buildReceiptRenderEvent({ paymentId, organizationId: orgId, receiptNumber }),
+    );
+    return 'pending';
+  }
 
   return {
     /**
@@ -99,19 +124,13 @@ export function createReceiptsService(
 
       // Idempotencia: ya numerado → devuelve el existente sin quemar secuencia.
       if (payment.receiptNumber) {
-        if (!payment.receiptPdfKey) {
-          await receiptQueue.send(
-            buildReceiptRenderEvent({
-              paymentId,
-              organizationId: orgId,
-              receiptNumber: payment.receiptNumber,
-            }),
-          );
-        }
-        return {
-          receiptNumber: payment.receiptNumber,
-          pdfStatus: payment.receiptPdfKey ? 'ready' : 'pending',
-        };
+        const pdfStatus = await requeueRenderIfPdfPending(
+          paymentId,
+          orgId,
+          payment.receiptNumber,
+          payment.receiptPdfKey,
+        );
+        return { receiptNumber: payment.receiptNumber, pdfStatus };
       }
 
       const org = await orgsRepo.findById(orgId);
@@ -127,20 +146,35 @@ export function createReceiptsService(
         );
       }
       const year = receiptYear(input.timezone);
-      const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
-      const receiptNumber = formatPanelReceiptNumber(orgSlug, year, seq);
-      const parsed = parsePanelReceiptNumber(receiptNumber);
-      if (!parsed || parsed.year !== year || parsed.slug !== orgSlug.toLowerCase()) {
-        throw new ReceiptError(
-          500,
-          'RECEIPT_INCOHERENT',
-          'Número generado incoherente con año/slug.',
-        );
-      }
+      // Slug/año válidos ANTES de consumir la secuencia: si el formato es
+      // imposible, `formatPanelReceiptNumber` lanzaría con el número ya
+      // quemado. Se valida con seq=1 (el formato no depende del valor).
+      formatPanelReceiptNumber(orgSlug, year, 1);
 
       // Impuestos en centavos enteros. amountPaid = TOTAL cobrado (con impuestos
       // incluidos): en modo auto se descompone la base; con override se valida.
+      //
+      // ⚠️ ORDEN CRÍTICO: el perfil fiscal y la descomposición se calculan
+      // ANTES de consumir la secuencia. Un número consumido NUNCA se reutiliza,
+      // así que un fallo aquí (país desconocido, monto no entero) quemaría un
+      // correlativo y dejaría un hueco inexplicado en el reporte de auditoría.
       const profile = resolveFiscalProfile(org.countryCode, org.fiscalConfig);
+      // Identidad del emisor CONGELADA (C1): se persiste junto al número en
+      // `attachReceipt`, así que se construye ANTES de consumir la secuencia
+      // (si algo lanza aquí, no se quema ningún correlativo).
+      const emitterSnapshot = buildEmitterSnapshot(
+        {
+          name: org.name,
+          legalName: org.legalName,
+          taxId: org.taxId,
+          address: org.address,
+          countryCode: org.countryCode,
+          primaryCurrency: org.primaryCurrency,
+          timezone: org.timezone,
+          fiscalConfig: org.fiscalConfig,
+        },
+        profile,
+      );
       const amountPaid = Number(payment.amountPaid);
       let subtotal: number;
       let taxTotal: number;
@@ -160,6 +194,17 @@ export function createReceiptsService(
             400,
             'TAX_MISMATCH',
             'El desglose no cuadra con el monto cobrado.',
+          );
+        }
+        // D6: el override solo puede REDUCIR carga fiscal. Un emisor que no
+        // declaró ser contribuyente formal no puede detallar impuestos por
+        // esta vía (sería afirmar un hecho fiscal que no declaró).
+        const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
+        if (!profile.isFormalTaxpayer && overrideTotal > 0) {
+          throw new ReceiptError(
+            400,
+            'TAXES_REQUIRE_FORMAL_TAXPAYER',
+            'Para detallar impuestos primero debes declarar el negocio como contribuyente formal.',
           );
         }
         const computed = applyTaxOverride(o.subtotal, profile.taxes, {
@@ -182,6 +227,33 @@ export function createReceiptsService(
         taxDetails = computed.taxDetails;
       }
 
+      // Guarda tardía: entre la lectura del pago y este punto otra entrega
+      // concurrente pudo numerarlo. Releer evita consumir un número que ya no
+      // se va a persistir (prevenir la carrera, además de compensarla).
+      const fresh = await paymentsRepo.findById(orgId, paymentId);
+      if (fresh?.receiptNumber) {
+        const pdfStatus = await requeueRenderIfPdfPending(
+          paymentId,
+          orgId,
+          fresh.receiptNumber,
+          fresh.receiptPdfKey,
+        );
+        return { receiptNumber: fresh.receiptNumber, pdfStatus };
+      }
+
+      const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
+      const receiptNumber = formatPanelReceiptNumber(orgSlug, year, seq);
+      const parsed = parsePanelReceiptNumber(receiptNumber);
+      if (!parsed || parsed.year !== year || parsed.slug !== orgSlug.toLowerCase()) {
+        // Defensivo (slug/año ya validados): no dejar el número colgado.
+        await receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
+        throw new ReceiptError(
+          500,
+          'RECEIPT_INCOHERENT',
+          'Número generado incoherente con año/slug.',
+        );
+      }
+
       // Número AUTORITATIVO: el que attachReceipt persistió (bajo concurrencia,
       // un segundo request puede perder el WHERE receipt_number IS NULL y recibir
       // la fila existente; el evento debe llevar SIEMPRE ese número, no el local).
@@ -195,8 +267,33 @@ export function createReceiptsService(
         subtotal,
         taxTotal,
         taxDetails,
+        emitterSnapshot,
+        issuedBy: input.actor ?? null,
       });
       const persistedNumber = attached.receiptNumber ?? receiptNumber;
+
+      // Carrera perdida: otra entrega ya numeró el pago, este número local no
+      // se persistió. Compensar la secuencia si seguimos siendo el último
+      // consumidor; si no, el número es irreversible y queda como hueco.
+      //
+      // NO compensar ante una EXCEPCIÓN de `attachReceipt`: si el error llegó
+      // después de que la sentencia commiteó (respuesta perdida, timeout),
+      // devolver el número haría que se reasigne a otro pago → duplicado, que
+      // es peor que un hueco. Aquí el `persistedNumber` se leyó de la fila, así
+      // que la no-persistencia está confirmada.
+      if (persistedNumber !== receiptNumber) {
+        const { released } = await receiptsRepo.releaseLastNumber(
+          orgId,
+          'receipt',
+          year,
+          seq,
+        );
+        if (!released) {
+          console.error(
+            `receipt emission: correlativo ${receiptNumber} no persistido y no liberable (la secuencia ya avanzó).`,
+          );
+        }
+      }
 
       await receiptQueue.send(
         buildReceiptRenderEvent({
@@ -205,7 +302,10 @@ export function createReceiptsService(
           receiptNumber: persistedNumber,
         }),
       );
-      return { receiptNumber: persistedNumber, pdfStatus: 'pending' };
+      return {
+        receiptNumber: persistedNumber,
+        pdfStatus: attached.receiptPdfKey ? 'ready' : 'pending',
+      };
     },
 
     /**
@@ -277,6 +377,8 @@ export function createReceiptsService(
               endDate: composed.subscription.endDate,
             }
           : null,
+        // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
+        emitterSnapshot: composed.payment.emitterSnapshot,
       });
       return {
         available: true,

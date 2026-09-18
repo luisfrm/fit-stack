@@ -7,6 +7,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
+import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
@@ -35,8 +36,12 @@ const orgRenewSchema = z.object({
 });
 
 /**
- * Perfil fiscal org-scoped (Fase 4). `countryCode`/`primaryCurrency` son
- * inmutables desde aquí (required de creación): se rechazan con 400 si vienen.
+ * Perfil org-scoped: identidad de la sede (nombre, logo, eslogan, zona
+ * horaria, formato de moneda) + identidad emisora fiscal (Fase 4).
+ *
+ * `countryCode`/`primaryCurrency` son inmutables desde aquí (required de
+ * creación): se rechazan con 400 si vienen. Cambiar el país recalcularía la
+ * moneda principal — operación de nivel plataforma, no del tenant.
  * `confirmed` es la fricción de la declaración de contribuyente formal.
  *
  * `.passthrough()` (no `.strict()`) es deliberado: permite DETECTAR las keys
@@ -45,6 +50,12 @@ const orgRenewSchema = z.object({
  */
 const orgProfileSchema = z
   .object({
+    name: z.string().min(1, 'El nombre es requerido').optional(),
+    slug: z.string().min(1).optional(),
+    logo: z.string().nullable().optional(),
+    slogan: z.string().nullable().optional(),
+    timezone: z.string().min(1, 'La zona horaria es requerida').optional(),
+    currencyFormat: z.enum(['latam', 'usa']).optional(),
     legalName: z.string().min(1).nullable().optional(),
     taxId: z.string().min(1).nullable().optional(),
     address: z.string().min(1).nullable().optional(),
@@ -175,7 +186,11 @@ export const organizationRoutes = new Hono<AppEnv>()
       if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
       if (sub.cancelledAt) return c.json({ error: 'Suscripción cancelada' }, 400);
 
-      if (sub.currentPeriodEnd > new Date()) {
+      // Bloqueo solo si hay un periodo REALMENTE pagado vigente
+      // (`hasValidatedPayment`): un cliente con periodo por delante pero sin
+      // pago calificado (p. ej. pago anulado) puede volver a pagar.
+      const { hasValidatedPayment } = await repo.getLastSubscriptionStatus(activeOrganizationId);
+      if (sub.currentPeriodEnd > new Date() && hasValidatedPayment) {
         return c.json(
           { error: 'La suscripción aún está vigente — la renovación solo está disponible al expirar' },
           409
@@ -192,15 +207,22 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       const cache = createCache(c.env);
       try {
-        const { paymentId } = await service.renewOrgSubscription(sub.id, data);
+        // Pagador real = sesión org renovadora (el paso 1 lo persiste solo
+        // si está vacío; `processing` no numera).
+        const user = c.get('user')!;
+        const receipts = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+        const { paymentId } = await service.renewOrgSubscription(sub.id, data, {
+          receipts,
+          payer: { email: user.email, name: user.name },
+        });
         await cache.invalidate('platform:subscriptions*');
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription`);
         await cache.invalidateExact(`org:${activeOrganizationId}:subscription-status`);
         await cache.invalidateExact(`org:${activeOrganizationId}:features`);
         await cache.invalidate(`org:${activeOrganizationId}:dashboard:action-items`);
+        await cache.invalidateExact(`platform:subscriptions:invoices:${activeOrganizationId}`);
 
         // Confirmación al payer + owners de la org (el jobs-worker deduplica)
-        const user = c.get('user')!;
         if (c.env.TASK_QUEUE) {
           await c.env.TASK_QUEUE.send({
             type: 'email.org_payment_received',
@@ -224,9 +246,12 @@ export const organizationRoutes = new Hono<AppEnv>()
     }
   )
 
-  // PATCH /api/organizations/profile — identidad emisora + fiscalConfig (Fase 4).
-  // Org-scoped: owner/manager (ORGANIZATION.UPDATE). `countryCode` y
-  // `primaryCurrency` son inmutables post-creación (400 si vienen).
+  // PATCH /api/organizations/profile — identidad de la sede + identidad
+  // emisora + fiscalConfig (Fase 4). Es el endpoint que usa el panel para el
+  // formulario de organización: NUNCA se llama a `/api/platform/*` desde el
+  // panel (un owner de gym no tiene rol de plataforma → 403). Org-scoped:
+  // owner/manager (ORGANIZATION.UPDATE). `countryCode` y `primaryCurrency`
+  // son inmutables post-creación (400 si vienen).
   .patch(
     '/profile',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -278,6 +303,12 @@ export const organizationRoutes = new Hono<AppEnv>()
       // Solo los campos presentes: un body sin campos persistibles es un
       // no-op idempotente, nunca un 500 de Drizzle ("No values to set").
       const patch: Partial<NewDbOrganization> = {};
+      if (body.name !== undefined) patch.name = body.name;
+      if (body.slug !== undefined) patch.slug = body.slug;
+      if (body.logo !== undefined) patch.logo = body.logo;
+      if (body.slogan !== undefined) patch.slogan = body.slogan;
+      if (body.timezone !== undefined) patch.timezone = body.timezone;
+      if (body.currencyFormat !== undefined) patch.currencyFormat = body.currencyFormat;
       if (body.legalName !== undefined) patch.legalName = body.legalName;
       if (body.taxId !== undefined) patch.taxId = body.taxId;
       if (body.address !== undefined) patch.address = body.address;

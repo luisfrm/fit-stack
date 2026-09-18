@@ -1,7 +1,7 @@
 # Cómo crear un comprobante correcto (Console vs. Panel)
 
 > Documento de referencia interna. Última revisión: sept 2026.
-> Ver también: `responsabilidades-fitstack-org.md`, `facturacion-comprobantes.md`
+> Ver también: `docs/RESPONSABILITIES.md`, `docs/FACTURATION.md`, `docs/PAYMENT_STATUSES.md`
 
 ## Principio general (aplica a ambos niveles)
 
@@ -9,7 +9,7 @@
 2. **Todo dato mostrado en el comprobante viene de snapshots, nunca de tablas "en vivo".** Si el plan cambia después, el comprobante ya emitido no debe cambiar.
 3. **La moneda y la tasa de cambio aplicada siempre se muestran juntas** si el pago fue en una moneda distinta a la moneda principal del emisor.
 4. **El disclaimer legal del país siempre va al pie**, tomado de la config de país (`COUNTRIES[code].legalDisclaimer`), nunca hardcodeado por documento.
-5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `facturacion-comprobantes.md` §2.
+5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `docs/FACTURATION.md` §2. El campo `documentLabel` es de solo lectura y no participa del gate.
 
 ---
 
@@ -26,8 +26,10 @@ Una **única secuencia global**, porque FitStack es un solo emisor para toda la 
 ```
 platform_document_sequence
  ├─ document_type   -- 'receipt' | 'invoice'
- └─ next_number     -- incrementado transaccionalmente (SELECT ... FOR UPDATE)
+ └─ next_number     -- guarda el ÚLTIMO número entregado (sin año). El nombre es cosmético
 ```
+
+La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver `docs/PENDING.md` §15).
 
 Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin componente de org).
 
@@ -65,10 +67,14 @@ Una secuencia **por organización**, porque cada gym necesita su propia numeraci
 organization_document_sequence
  ├─ organization_id
  ├─ document_type   -- 'receipt' | 'invoice'
- └─ next_number     -- incrementado transaccionalmente, único por (organization_id, document_type)
+ ├─ year            -- año local del emisor (reinicio anual)
+ └─ last_number     -- ÚLTIMO número entregado
+ PK (organization_id, document_type, year)
 ```
 
-Formato sugerido: `{slug-del-gym}-0000001` o `{código-corto}-2026-000045` (evita usar el `organization.id` completo, es un texto largo poco legible).
+La asignación es la misma sentencia atómica `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin `SELECT … FOR UPDATE`).
+
+Formato sugerido: `{slug-del-gym}-2026-000045` (evita usar el `organization.id` completo, es un texto largo poco legible).
 
 ### Campos del comprobante
 
@@ -80,7 +86,7 @@ Formato sugerido: `{slug-del-gym}-0000001` o `{código-corto}-2026-000045` (evit
 | Detalle | `payment.planSnapshotName`, `planSnapshotPrice`, `planSnapshotCurrency` | `payment` (snapshot, no `membershipPlan` en vivo) |
 | Periodo cubierto | `subscription.startDate` → `subscription.endDate` | `subscription` |
 | Monto | `amountPaid`, `currencyPaid`, `exchangeRateApplied` | `payment` |
-| Impuestos | `subtotal`, `taxTotal`, `taxDetails` (según `organization.fiscalConfig.taxes`, solo si `enabled: true`) | `payment` + config de país/org |
+| Impuestos | `subtotal`, `taxTotal`, `taxDetails` (según `organization.fiscalConfig.taxes`; nacen apagados salvo `isFormalTaxpayer: true`) | `payment` + config de país/org |
 | Método de pago | `paymentMethod`, `paymentMethodDetails` (enmascarado) | `payment` |
 | Fechas | `paymentDate` vs fecha de emisión | `payment` |
 | Pie legal | disclaimer del país del gym (`organization.countryCode`) + "Generado con FitStack" | config de país |
@@ -104,7 +110,7 @@ En Panel, los impuestos (`taxDetails`) **sí pueden variar por comprobante**, po
 
 ## Checklist antes de generar el primer PDF real
 
-- [ ] `receiptNumber` se asigna al momento de generar el PDF, no al crear el registro de pago
+- [ ] `receiptNumber` se asigna en el paso 1, al **validar el pago** (no al crear el registro ni al generar el PDF; el PDF es el paso 2 y no numera)
 - [ ] El número nunca se reutiliza aunque el pago se anule después (usar estado `voided`, no borrar ni reciclar el número)
 - [ ] El UUID técnico no aparece en ningún lugar visible del PDF
 - [ ] El disclaimer legal corresponde al país del **emisor** (FitStack en Console, el gym en Panel), no al país del receptor si difieren

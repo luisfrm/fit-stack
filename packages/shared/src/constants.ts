@@ -57,22 +57,52 @@ export function formatPlatformRole(role?: string | null): string {
  * Payment statuses for audit and box flow.
  */
 export const PAYMENT_STATUSES = {
-  PENDING: "pending", // factura emitida, esperando pago
-  PROCESSING: "processing", // pago recibido, esperando validación
+  PROCESSING: "processing", // pago recibido, esperando revisión/validación
   VALIDATED: "validated", // pago confirmado
-  INVALID: "invalid", // pago rechazado
-  VOIDED: "voided", // anulado por el cajero
+  VOIDED: "voided", // anulado o rechazado (ver `getVoidKind`)
   REFUNDED: "refunded", // reservado (no implementado)
 } as const;
 
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
 
 /**
+ * Estados de pago que "sostienen" un periodo pagado. `processing` y `voided`
+ * NO califican. Es la fuente única para el status SaaS (`EXISTS(validated|refunded)`).
+ */
+export const QUALIFYING_PAYMENT_STATUSES = [
+  PAYMENT_STATUSES.VALIDATED,
+  PAYMENT_STATUSES.REFUNDED,
+] as const;
+
+export type VoidKind = "rejected" | "annulled";
+
+/**
+ * Distingue un rechazo de una anulación a partir del comprobante emitido.
+ * **No es un estado de DB**: `voided` es el único estado de anulación; el tipo
+ * se deriva.
+ * - sin `receiptNumber` → `rejected` (nunca fue un pago válido emitido)
+ * - con `receiptNumber` → `annulled` (existió comprobante y se anuló)
+ */
+export function getVoidKind(payment: { receiptNumber?: string | null }): VoidKind {
+  return payment.receiptNumber ? "annulled" : "rejected";
+}
+
+/**
  * Subscription statuses for access control.
+ *
+ * `CANCELLED` y `VOIDED` NO son sinónimos:
+ * - `CANCELLED` = el acceso se revocó (decisión administrativa). El registro
+ *   es legítimo: el cobro existió y sigue siendo válido.
+ * - `VOIDED` = el registro es inválido: su cobro se anuló o se rechazó
+ *   (`voided`; ver `getVoidKind`). El correlativo del comprobante no se reutiliza.
+ *
+ * Ninguna suscripción se elimina: se anula o se revoca (mismo vocabulario que
+ * `PAYMENT_STATUSES.VOIDED` y el flag ANULADO del comprobante).
  */
 export const SUBSCRIPTION_STATUSES = {
   ACTIVE: "active",
   CANCELLED: "cancelled",
+  VOIDED: "voided",
   EXPIRED: "expired",
   EXPIRING: "expiring",
 } as const;
@@ -108,12 +138,19 @@ export const PLATFORM_GRACE_PERIODS = {
 /**
  * Helpers puros para computar el status de una platform_subscription.
  * Reciben los datos crudos y devuelven el status, sin acceso a DB.
+ *
+ * Fuente única de la regla: el SQL (`platform-subscriptions.repository.ts`)
+ * debe producir el MISMO resultado (garantizado por el test de paridad).
  */
 export interface IPlatformSubscriptionStatusInput {
   currentPeriodEnd: Date | string;
   cancelledAt?: Date | string | null;
   isTrial?: boolean;
-  hasValidatedPayment?: boolean;
+  /**
+   * `EXISTS(validated|refunded)` sobre los pagos de la suscripción. `processing`
+   * y `voided` NO califican. NUNCA usar "el último pago".
+   */
+  hasValidatedPayment: boolean;
   now?: Date;
 }
 
@@ -127,12 +164,13 @@ export function computePlatformSubscriptionStatus(
       : new Date(input.currentPeriodEnd);
 
   if (input.cancelledAt) return PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
-  if (input.isTrial) return PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
+  // El trial solo mantiene el status mientras su periodo está vigente.
+  if (input.isTrial && end >= now) return PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
 
   if (end >= now) {
-    return input.hasValidatedPayment === false
-      ? PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE
-      : PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE;
+    return input.hasValidatedPayment
+      ? PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE
+      : PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE;
   }
 
   const diffMs = now.getTime() - end.getTime();

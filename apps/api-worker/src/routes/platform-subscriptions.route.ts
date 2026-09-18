@@ -1,20 +1,23 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformAuth, requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
+import { createPlatformReceiptsReportRepository } from '../repositories/platform-receipts-report.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
+import { createPlatformReceiptsService } from '../services/platform-receipts.service';
+import { createPlatformReceiptsReportService } from '../services/platform-receipts-report.service';
+import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
+import { createR2Service } from '../lib/r2';
 import { paymentMethodDetailsSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
 const paymentStatusEnum = z.enum([
-  PAYMENT_STATUSES.PENDING,
   PAYMENT_STATUSES.PROCESSING,
   PAYMENT_STATUSES.VALIDATED,
-  PAYMENT_STATUSES.INVALID,
   PAYMENT_STATUSES.VOIDED,
   PAYMENT_STATUSES.REFUNDED,
 ]);
@@ -54,6 +57,7 @@ const registerPaymentSchema = paymentSchema;
 
 const updatePaymentStatusSchema = z.object({
   status: paymentStatusEnum,
+  voidReason: z.string().min(1).optional(),
 });
 
 const cancelSchema = z.object({
@@ -64,10 +68,48 @@ const extendSchema = z.object({
   newEndDate: z.string().transform((str) => new Date(str)),
 });
 
+const receiptsReportQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD).')
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido (YYYY-MM-DD).')
+    .optional(),
+  status: z.enum(['all', 'issued', 'pending', 'voided', 'pre_system', 'gaps']).optional(),
+  method: z.string().min(1).optional(),
+  // Año UTC de `payment_date` (la serie FS-N es continua, no lleva año).
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  // Tope alto para exportación CSV (la página usa 20; el CSV, hasta 1000).
+  limit: z.coerce.number().int().positive().max(1000).optional(),
+});
+
 function buildService(c: any) {
   const repo = createPlatformSubscriptionsRepository(c.get('db'));
   const plansRepo = createPlatformPlansRepository(c.get('db'));
   return { repo, plansRepo, service: createPlatformSubscriptionsService(repo, plansRepo) };
+}
+
+/** Emisión C2: paso 1 donde el pago queda validado (sin I/O salvo DB+cola). */
+function buildReceipts(c: any) {
+  return createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+}
+
+/** La emisión afecta el historial de facturas de la org (C3 lo lee). */
+async function invalidateInvoicesCache(c: any, organizationId: string) {
+  await createCache(c.env).invalidateExact(
+    `platform:subscriptions:invoices:${organizationId}`,
+  );
+}
+
+/**
+ * Auditoría del correlativo (`GET /receipts`, C4): se invalida en cualquier
+ * write de suscripciones/pagos porque pueden emitir o anular un número.
+ */
+async function invalidateReceiptsReportCache(cache: ReturnType<typeof createCache>) {
+  await cache.invalidate('platform:receipts*');
 }
 
 export const platformSubscriptionRoutes = new Hono<AppEnv>()
@@ -134,6 +176,52 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json(revenue);
   })
 
+  // GET /api/platform/subscriptions/receipts — auditoría del correlativo
+  // global `FS-N`: filas + resumen + totales por moneda + gaps (hueco
+  // sospechoso vs anulado explicado). Espejo del reporte del Panel.
+  // Lectura: support sí (mismo contrato que la descarga de comprobantes).
+  .get('/receipts', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const parsed = receiptsReportQuerySchema.safeParse({
+      from: c.req.query('from'),
+      to: c.req.query('to'),
+      status: c.req.query('status'),
+      method: c.req.query('method'),
+      year: c.req.query('year'),
+      page: c.req.query('page'),
+      limit: c.req.query('limit'),
+    });
+    if (!parsed.success) {
+      return c.json(
+        { error: 'Filtros del reporte inválidos.', code: 'INVALID_REPORT_FILTERS' },
+        400,
+      );
+    }
+    const filters = parsed.data;
+
+    const cache = createCache(c.env);
+    // Key normalizada con defaults: `?status=all` y sin query comparten caché.
+    const cacheKey = `platform:receipts:${JSON.stringify({
+      from: filters.from ?? null,
+      to: filters.to ?? null,
+      status: filters.status ?? 'all',
+      method: filters.method ?? null,
+      year: filters.year ?? null,
+      page: filters.page ?? 1,
+      limit: filters.limit ?? 20,
+    })}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return c.json(cached);
+
+    const db = c.get('db');
+    const service = createPlatformReceiptsReportService(
+      createPlatformReceiptsReportRepository(db),
+      createPlatformReceiptsRepository(db),
+    );
+    const report = await service.getReceiptsReport(filters);
+    await cache.set(cacheKey, report, 300); // 5 min: invalidado on-write en emisión/anulación
+    return c.json(report);
+  })
+
   // GET /api/platform/subscriptions/by-organization/:orgId/invoices — historial SaaS de la org.
   // Va antes de /:id para que Hono no la trague como param.
   .get('/by-organization/:orgId/invoices', requirePlatformAuth(), async (c) => {
@@ -168,11 +256,18 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const { service } = buildService(c);
-    const result = await service.createSubscriptionWithPayment(data);
+    const result = await service.createSubscriptionWithPayment(data, {
+      receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
+    });
 
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
+    await cache.invalidateExact(`org:${data.organizationId}:subscription`);
     await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${data.organizationId}:features`);
+    await invalidateInvoicesCache(c, data.organizationId);
 
     const created = await service.getSubscriptionById(result.subscriptionId);
     return c.json(created, 201);
@@ -190,6 +285,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.cancelSubscription(id, reason);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
@@ -208,6 +304,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.extendSubscriptionPeriod(id, newEndDate);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
@@ -224,10 +321,17 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.renewSubscription(id, data);
+    const result = await service.renewSubscription(id, data, {
+      receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
+    });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
+    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await invalidateInvoicesCache(c, sub.organizationId);
 
     return c.json({ success: true, ...result });
   })
@@ -242,14 +346,98 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const payment = await service.getPaymentById(paymentId);
     if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
 
-    await service.updatePaymentStatus(paymentId, data);
+    // Guard explícito (sin `!`): `requirePlatformAuth` garantiza sesión, pero
+    // el actor del ANULADO se resuelve igual que en el resto del archivo.
+    const actor = c.get('user')?.id;
+    if (!actor) return c.json({ error: 'Sesión requerida.' }, 401);
+
+    const receipt = await service.updatePaymentStatus(paymentId, data, {
+      receipts: buildReceipts(c),
+      by: actor,
+    });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     if (payment.organizationId) {
+      await cache.invalidateExact(`org:${payment.organizationId}:subscription`);
       await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${payment.organizationId}:features`);
+      await invalidateInvoicesCache(c, payment.organizationId);
     }
 
-    return c.json({ success: true, paymentId, status: data.status });
+    // C6: el intento de anulación del comprobante viaja en el body
+    // (`receiptVoided` + `receiptVoidReason`), nunca en silencio.
+    return c.json({ success: true, paymentId, status: data.status, ...receipt });
+  })
+
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt — contrato
+  // de 3 estados, nunca 409 (espejo Panel). Lectura granular: support sí.
+  .get('/payments/:paymentId/receipt', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available) return c.json(state, 200);
+    if (state.pdfStatus === 'pending') {
+      return c.json(
+        {
+          available: true,
+          receiptNumber: state.receiptNumber,
+          pdfStatus: 'pending',
+        },
+        202,
+      );
+    }
+    return c.json({
+      available: true,
+      receiptNumber: state.receiptNumber,
+      pdfStatus: 'ready',
+      receipt: state.receipt,
+      pdfUrl: `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    });
+  })
+
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt/pdf —
+  // descarga binaria (200 bytes o 404). Lectura granular: support sí.
+  .get('/payments/:paymentId/receipt/pdf', requirePlatformPermission('subscription', 'list'), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const r2 = createR2Service(c.env);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available || state.pdfStatus !== 'ready') {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    const file = await r2.getFile(state.pdfKey);
+    if (!file) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    return new Response(file.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${state.receiptNumber}.pdf"`,
+      },
+    });
+  })
+
+  // POST /api/platform/subscriptions/payments/:paymentId/resend — reenvío
+  // manual a payer+owners (4 ramas congeladas). Solo admin/owner: support 403.
+  .post('/payments/:paymentId/resend', requirePlatformAuth(), async (c) => {
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const receiptsService = createPlatformReceiptsService(
+      c.get('db'),
+      c.env.RECEIPT_QUEUE,
+      c.env.TASK_QUEUE,
+    );
+    const result = await receiptsService.resendPlatformReceiptEmail(paymentId);
+    if (result.kind === 'presystem') {
+      return c.json({ success: true, available: false, reason: 'pre_system' }, 200);
+    }
+    if (result.kind === 'pending') {
+      return c.json({ success: true, queued: false, pdfStatus: 'pending' }, 202);
+    }
+    return c.json({ success: true, queued: true, attachment: result.attachment });
   })
 
   // GET /api/platform/subscriptions/:id/payments
@@ -274,10 +462,17 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.registerPayment(id, data);
+    const result = await service.registerPayment(id, data, {
+      receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
+    });
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
+    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await invalidateInvoicesCache(c, sub.organizationId);
 
     return c.json({ success: true, ...result }, 201);
   })
@@ -293,8 +488,10 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     await service.deleteSubscription(id);
     await cache.invalidate('platform:subscriptions*');
+    await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await cache.invalidateExact(`platform:subscriptions:invoices:${sub.organizationId}`);
 
     return c.json({ success: true });
   });

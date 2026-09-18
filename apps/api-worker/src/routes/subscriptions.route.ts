@@ -42,7 +42,7 @@ const createSubSchema = z.object({
     exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: z.string(),
     paymentMethodDetails: paymentMethodDetailsSchema,
-    status: z.enum(['processing', 'validated', 'invalid', 'voided']).optional(),
+    status: z.enum(['processing', 'validated', 'voided']).optional(),
     paymentDate: z.string().optional(),
     // Desglose fiscal en centavos enteros (Fase 0: schema abierto; el
     // servicio lo calcula por defecto y solo acepta override con
@@ -120,6 +120,8 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const newSub = await subsService.create(orgId, payload as any, timezone, {
       receipts: receiptsService,
       orgSlug,
+      // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
+      by: c.get('user')?.id,
     });
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(newSub, 201);
@@ -141,21 +143,6 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const updated = await subsService.updateStatus(orgId, id, status);
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(updated);
-  })
-
-  // DELETE /api/subscriptions/:id
-  .delete('/:id', requireOrgPermission(PM.SUBSCRIPTIONS, PA.DELETE), async (c) => {
-    const orgId = c.get('orgId')!;
-    const id = Number(c.req.param('id'));
-    const cache = createCache(c.env);
-
-    const db = c.get('db');
-    const subsRepo = createSubscriptionsRepository(db);
-    const paymentsRepo = createPaymentsRepository(db);
-    const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
-
-    await subsService.delete(orgId, id);
-    await invalidateSubscriptionDependentCaches(cache, orgId);
-    return c.json({ success: true });
   });
+// Nota: no existe DELETE /:id. Un registro financiero (suscripción + pago) no
+// se elimina nunca — se anula el cobro (`PATCH /api/payments/:id/status`).

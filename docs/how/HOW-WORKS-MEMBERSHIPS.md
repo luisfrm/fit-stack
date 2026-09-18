@@ -34,12 +34,12 @@ Cada pago queda registrado en tu historial con detalle auditable para contabilid
 
 - **Montos**: monto cobrado, moneda de cobro, tasa de cambio exacta del día si cobraste en moneda local, y su equivalente en moneda base para reportes.
 - **Comprobante**: método de pago (efectivo, transferencia, tarjeta, otro), referencia bancaria, hash o número de operación, y captura de pantalla si la adjuntas.
-- **Estados del pago**: pendiente cuando emites la factura, en proceso cuando recibes el pago y espera validación, validado cuando lo confirmas, inválido si lo rechazas y anulado si lo cancelas. El sistema evita registrar dos veces el mismo pago mientras está en proceso para no duplicar ingresos.
+- **Estados del pago**: en proceso cuando recibes el pago y espera validación, validado cuando lo confirmas y anulado cuando lo rechazas o lo cancelas (rechazar y anular son el mismo estado: el pago no cuenta). El sistema evita registrar dos veces el mismo pago mientras está en proceso para no duplicar ingresos.
 - **Fecha de pago**: queda con la fecha que seleccionas en el formulario; el backend la normaliza a tu zona horaria configurada.
 
 ## Registro atómico de suscripción y pago
 
-Suscripción y pago se registran juntos en una sola operación atómica. Esto garantiza que nunca queden desincronizados: no existen pagos sin su suscripción ni accesos sin respaldo financiero. Si el registro falla a mitad de camino, se revierte completo.
+Suscripción y pago se registran juntos en una misma operación: primero la suscripción y después el pago, en el mismo flujo. Esto garantiza que no existan accesos sin respaldo financiero en el caso normal. (Nota interna: los dos inserts todavía no están envueltos en una transacción única; el endurecimiento está registrado en `docs/PENDING.md` §12.)
 
 ## Recibos automáticos por email
 
@@ -58,6 +58,7 @@ El envío es vía cola en segundo plano, no bloquea el cobro en recepción.
 | **Activa** | Tiene acceso garantizado hasta su fecha de vencimiento | Nada, disfruta su plan |
 | **Por vencer** | Le quedan pocos días | Momento ideal para renovar; si renueva ahora los días se acumulan |
 | **Vencida** | Pasó su fecha de vencimiento sin renovar | Sin acceso hasta renovar; su historial y datos se conservan intactos |
-| **Cancelada** | Dada de baja manualmente desde el panel | Sin acceso; se puede reactivar creando una nueva suscripción |
+| **Cancelada** | Se revocó el acceso manualmente desde el panel (el cobro sigue siendo válido) | Sin acceso; se puede reactivar creando una nueva suscripción |
+| **Anulada** | El cobro se anuló o se rechazó: el registro es inválido | El registro no vale; se corrige anulando o registrando un cobro nuevo |
 
 Si preguntan cómo se calcula o se guarda la tasa de cambio de un pago en moneda local, ese detalle está en cómo funcionan las monedas y tipos de cambio. Si preguntan quién dentro del equipo puede registrar cobros, eso está en roles y permisos del personal.

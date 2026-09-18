@@ -25,6 +25,12 @@ interface TaxBlockProps {
   readonly reason: string;
   readonly onReasonChange: (value: string) => void;
   readonly disabled?: boolean;
+  /**
+   * Declaración de contribuyente formal del emisor (`resolveFiscalProfile`).
+   * `false` → el comprobante NO detalla impuestos (D1) y el ajuste manual
+   * queda deshabilitado: el override solo puede reducir carga fiscal (D6).
+   */
+  readonly emitterIsFormal: boolean;
 }
 
 /**
@@ -46,6 +52,7 @@ export function TaxBlock({
   reason,
   onReasonChange,
   disabled,
+  emitterIsFormal,
 }: TaxBlockProps) {
   const isOverride = mode === "override";
 
@@ -56,20 +63,24 @@ export function TaxBlock({
           <ReceiptText className="w-5 h-5 text-primary" />
           <Text weight="bold" uppercase size="base" as="div">Impuestos</Text>
         </div>
-        <div className="flex items-center gap-2">
-          <Text size="xs" variant="muted">Ajuste manual</Text>
-          <Switch
-            checked={isOverride}
-            disabled={disabled}
-            onCheckedChange={(value) => onModeChange(value ? "override" : "auto")}
-            aria-label="Ajuste manual de impuestos"
-          />
-        </div>
+        {emitterIsFormal && (
+          <div className="flex items-center gap-2">
+            <Text size="xs" variant="muted">Ajuste manual</Text>
+            <Switch
+              checked={isOverride}
+              disabled={disabled}
+              onCheckedChange={(value) => onModeChange(value ? "override" : "auto")}
+              aria-label="Ajuste manual de impuestos"
+            />
+          </div>
+        )}
       </div>
 
       {lines.length === 0 ? (
-        <Text size="xs" variant="muted" className="italic">
-          Sin impuestos aplicables para {currencyPaid} en este perfil fiscal.
+        <Text size="xs" variant="muted">
+          {emitterIsFormal
+            ? `Sin impuestos aplicables para ${currencyPaid}. Se registra únicamente el total pagado.`
+            : "Tu negocio no está declarado como contribuyente formal: el comprobante registra únicamente el total pagado, sin desglose de impuestos."}
         </Text>
       ) : (
         <div className="space-y-2">

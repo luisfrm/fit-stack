@@ -129,8 +129,8 @@ test.describe('Panel — Reporte de comprobantes', () => {
     await expect(page.locator('table').first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(lastName)).toHaveCount(0);
 
-    // Validar por API (el UI de pendientes está roto en este entorno —
-    // falla igual sin estos cambios; aquí se prueba la invalidación).
+    // Validar por API: aquí se prueba la invalidación del reporte, no el
+    // accionable (ese flujo lo cubre `subscriptions.spec.ts` desde la UI).
     const list = await panelApi.get<{ data?: Array<{ memberEmail?: string; paymentId?: number }> }>(
       '/api/subscriptions',
       { status: 'processing', limit: 50 },

@@ -185,9 +185,11 @@ function ReceiptPdfDocument({
 }>) {
   const { emitter, recipient, document, sale, amounts, method, footer, timezone, voided } =
     data;
-  const showRate =
-    amounts.currencyPaid !== (amounts.baseCurrency ?? emitter.currency) &&
-    amounts.exchangeRateApplied;
+  const baseCurrency = amounts.baseCurrency ?? emitter.currency;
+  // La conversión solo se muestra si el pago NO está en la moneda base y la
+  // tasa persistida existe (FACTURATION.md §3).
+  const showConversion =
+    amounts.currencyPaid !== baseCurrency && Boolean(amounts.exchangeRateApplied);
 
   return (
     <Document>
@@ -195,9 +197,12 @@ function ReceiptPdfDocument({
         <View style={styles.header}>
           <View style={styles.orgInfo}>
             <Text style={styles.orgName}>{emitter.legalName || emitter.name}</Text>
-            <Text style={styles.taxIdLabel}>
-              {emitter.taxLabel}: {emitter.taxId || '---'}
-            </Text>
+            {/* Sin identificación fiscal, la línea se omite (no se inventa). */}
+            {emitter.taxId && (
+              <Text style={styles.taxIdLabel}>
+                {emitter.taxLabel}: {emitter.taxId}
+              </Text>
+            )}
           </View>
           <View style={styles.docHeader}>
             <Text style={styles.docTitle}>{document.label.toUpperCase()}</Text>
@@ -224,13 +229,15 @@ function ReceiptPdfDocument({
 
         <View style={styles.columns}>
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Datos del Emisor</Text>
-            <View style={styles.entityRow}>
-              <Text style={styles.entityLabel}>Dirección / Sede</Text>
-              <Text style={styles.entityValue}>
-                {emitter.address || 'Dirección no especificada'}
-              </Text>
-            </View>
+            {emitter.address && (
+              <View>
+                <Text style={styles.sectionTitle}>Datos del Emisor</Text>
+                <View style={styles.entityRow}>
+                  <Text style={styles.entityLabel}>Dirección / Sede</Text>
+                  <Text style={styles.entityValue}>{emitter.address}</Text>
+                </View>
+              </View>
+            )}
           </View>
           <View style={styles.column}>
             <Text style={styles.sectionTitle}>Datos del Receptor</Text>
@@ -238,12 +245,14 @@ function ReceiptPdfDocument({
               <Text style={styles.entityLabel}>Socio / Cliente</Text>
               <Text style={styles.entityValue}>{recipient.name}</Text>
             </View>
-            <View style={styles.entityRow}>
-              <Text style={styles.entityLabel}>
-                {recipient.docLabel ?? 'Doc.'} del Socio
-              </Text>
-              <Text style={styles.entityValue}>{recipient.documentId || '---'}</Text>
-            </View>
+            {recipient.documentId && (
+              <View style={styles.entityRow}>
+                <Text style={styles.entityLabel}>
+                  {recipient.docLabel ?? 'Doc.'} del Socio
+                </Text>
+                <Text style={styles.entityValue}>{recipient.documentId}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -309,10 +318,18 @@ function ReceiptPdfDocument({
               {formatCents(amounts.total, amounts.currencyPaid, format)}
             </Text>
           </View>
-          {showRate && (
-            <Text style={styles.planSub}>
-              Tasa aplicada: {amounts.exchangeRateApplied} {amounts.currencyPaid}
-            </Text>
+          {showConversion && (
+            <View style={{ marginTop: 2 }}>
+              <Text style={styles.planSub}>
+                Tasa aplicada: 1 {baseCurrency} = {amounts.exchangeRateApplied}{' '}
+                {amounts.currencyPaid}
+              </Text>
+              {amounts.baseTotal != null && (
+                <Text style={styles.planSub}>
+                  Equivalente: {formatCents(amounts.baseTotal, baseCurrency, format)}
+                </Text>
+              )}
+            </View>
           )}
           <Text style={styles.planSub}>
             Pagado el {formatDateEs(sale.paymentDate, timezone)}

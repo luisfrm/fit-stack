@@ -1,6 +1,6 @@
 # @workspace/database
 
-Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 28 tablas del sistema y scripts de administración de base de datos.
+Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 30 tablas del sistema y scripts de administración de base de datos.
 
 ---
 
@@ -24,28 +24,31 @@ Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 2
 `user`, `session`, `account`, `verification`
 
 ### Organization & Membership
-`organization` (incluye: slogan, countryCode, timezone, taxId, legalName, address, fiscalConfig), `member` (auth_member — Better Auth plugin), `invitation`
+`organization` (incluye: slogan, countryCode, timezone, taxId, legalName, address, fiscalConfig, primaryCurrency, currencyFormat), `member` (auth_member — Better Auth plugin), `invitation`
 
 ### Platform Billing (SaaS)
-`platform_plan` (catalog with features as PlanFeatures), `platform_subscription` (org subscriptions, status computado en SQL), `platform_subscription_payment` (invoices with commercial snapshots)
+`platform_plan` (catalog with features as PlanFeatures), `platform_subscription` (org subscriptions, status computado en SQL), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (AI credits: `credits` + `bonus_credits`)
 
 ### Gym Domain
 `gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension), `coach_assignment` (coach ↔ client)
 
 ### Memberships & Payments
-`membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail)
+`membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail), `organization_document_sequence` (correlativo por org/año)
 
 ### Access Control
 `access_control_log` (every access attempt), `biometric_sync_task` (device sync queue)
+
+### AI / RAG
+`ai_knowledge_document` (org `NULL` = plataforma), `ai_knowledge_chunk` (pgvector 1024 dims + HNSW)
 
 ### Routines (Fitness)
 `exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
 
 ### CMS & Web
-`gym_class` (class schedule), `content_page`, `content_block` (blocks by type with display order)
+`gym_class` (class schedule), `content_page` (SEO: metaTitle/metaDescription), `content_block` (blocks by type with display order)
 
 ### Settings
-`platform_setting`, `gym_setting`
+`platform_setting`, `gym_setting`, `platform_document_sequence` (correlativo global `FS-N`)
 
 ---
 
@@ -67,6 +70,14 @@ pnpm db:seed        # Corre tsx src/seed.ts
 - Repositorios y servicios en **plural**: `users.service.ts`
 - **Workflow**: `generate` → `review` → `migrate`. Prohibido `db:push` en producción/compartido.
 - **Nombres de migración**: auto-generados por Drizzle Kit (`0000_name.sql`)
+- **Sin `pgEnum`**: los estados viven en `text('col')` y se validan con Zod (nunca en la capa DB).
+
+## Migraciones notables
+
+| Migración | Cambio |
+|---|---|
+| `0016` | Aditiva/nullable, sin backfill: `payment.emitter_snapshot` + `payment.issued_by` (y gemelas en `platform_subscription_payment`) |
+| `0017` | Default de `platform_subscription_payment.status` = `'processing'` + normalización `pending → processing` e `invalid → voided` (marca `receipt_voided`/`voided_at`/`void_reason` si había comprobante). Retrocompatible |
 
 ## Environment Variables
 

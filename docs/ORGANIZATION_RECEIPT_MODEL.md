@@ -31,7 +31,7 @@ La declaración `isFormalTaxpayer` es una afirmación de la propia organización
 La emisión ocurre cuando un pago queda en estado `validated`:
 
 - Alta directa con pago validado.
-- Cambio posterior de `processing`/`pending` a `validated`.
+- Cambio posterior de `processing` a `validated`.
 - Emisión manual mediante `POST /api/payments/:id/issue`.
 - Si el pago se anula después, el comprobante ya emitido se conserva y se marca **ANULADO**; el número nunca se libera ni se reutiliza.
 

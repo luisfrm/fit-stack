@@ -151,11 +151,14 @@ export async function handlePaymentReceipt(
  * Confirmación de pago de suscripción SaaS (email.org_payment_received):
  * llega al usuario que registró el pago (payer) y a los owners de la
  * organización (deduplicados). Con status `processing` el email aclara que
- * el periodo se activa al aprobar soporte.
+ * el periodo se activa al aprobar soporte. Desde C2: si el pago está
+ * numerado con PDF, adjunta los bytes de R2 tal cual (nunca regenera);
+ * numerado sin PDF → log + return (el barrido lo repara); sin número →
+ * HTML sin adjunto (solo reenvío/procesamiento).
  */
 export async function handleOrgPaymentReceived(
   env: PdfHandlerEnv,
-  payload: { paymentId: number; organizationId: string; payerEmail: string; payerName: string }
+  payload: { paymentId: number; organizationId: string; payerEmail?: string; payerName?: string }
 ) {
   const db = createDb(env.DATABASE_URL);
 
@@ -191,7 +194,17 @@ export async function handleOrgPaymentReceived(
       ),
     );
 
-  const recipients = new Set<string>([payload.payerEmail, ...ownerRows.map((r) => r.email)]);
+  const payerEmail = payload.payerEmail?.trim() || null;
+  if (!payerEmail) {
+    console.log(
+      `Platform payment ${payload.paymentId}: sin payer (payer-missing); se notifica solo a owners.`,
+    );
+  }
+  const recipients = new Set<string>(
+    [payerEmail, ...ownerRows.map((r) => r.email)].filter(
+      (e): e is string => !!e && e.trim().length > 0,
+    ),
+  );
 
   // Sin fallbacks silenciosos: timezone y currencyFormat son NOT NULL.
   if (!paymentData.org.timezone || !paymentData.org.currencyFormat) {
@@ -207,6 +220,9 @@ export async function handleOrgPaymentReceived(
     orgFormat,
   );
   const pendingReview = paymentData.payment.status === 'processing';
+  const receiptNumber = paymentData.payment.receiptNumber;
+  const receiptPdfKey = paymentData.payment.receiptPdfKey;
+  const payerName = payload.payerName?.trim() || 'El equipo de tu organización';
 
   const { subject, html } = renderOrgPaymentReceived({
     orgName: paymentData.org.name || 'tu organización',
@@ -214,13 +230,35 @@ export async function handleOrgPaymentReceived(
     amountPaid: amountFormatted,
     paymentMethod: paymentData.payment.paymentMethod,
     paymentDate: formatDate(paymentData.payment.paymentDate, paymentData.org.timezone),
-    payerName: payload.payerName,
+    payerName,
     pendingReview,
   });
 
+  // Rama A (C2) — numerado con PDF: adjunta los bytes de R2 tal cual.
+  // Rama número-sin-PDF: defensiva (el evento se encola desde el paso 2
+  // tras `completePlatformReceiptPdf`): log + return sin enviar.
+  let attachments: Array<{ filename: string; content: Uint8Array; contentType: string }> | undefined;
+  if (receiptNumber) {
+    if (!receiptPdfKey) {
+      console.error(
+        `Platform payment ${payload.paymentId}: número ${receiptNumber} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+      );
+      return;
+    }
+    const stored = await env.FILES_BUCKET.get(receiptPdfKey);
+    const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
+    if (!bytes) {
+      console.error(
+        `Platform payment ${payload.paymentId}: número ${receiptNumber} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
+      );
+      return;
+    }
+    attachments = [{ filename: `${receiptNumber}.pdf`, content: bytes, contentType: 'application/pdf' }];
+  }
+
   for (const to of recipients) {
     try {
-      await sendEmail(env, { to, subject, html });
+      await sendEmail(env, { to, subject, html, ...(attachments ? { attachments } : {}) });
     } catch (err) {
       // Un destinatario con email inválido no debe bloquear a los demás
       console.error(`Failed to send org payment email to ${to}:`, err);

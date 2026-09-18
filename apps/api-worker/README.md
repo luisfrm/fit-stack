@@ -127,8 +127,7 @@ apps/api-worker/
 | GET | `/api/subscriptions` | `subscriptions.read` | Lista suscripciones |
 | GET | `/api/subscriptions/recent` | `subscriptions.read` | Suscripciones recientes |
 | POST | `/api/subscriptions` | `subscriptions.create` | Crea suscripción (unidad atómica con pago) |
-| DELETE | `/api/subscriptions/:id` | `subscriptions.delete` | Elimina suscripción |
-| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `invalid`, `voided`) |
+| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `voided`) + `voidReason?`. Sin DELETE de suscripciones (registro financiero inmutable) |
 | POST | `/api/payments/:id/send-email` | `subscriptions.read` | Envía recibo por email (vía queue) |
 | GET | `/api/classes` | `classes.read` | Lista clases (grupos) |
 | GET | `/api/classes/:id` | `classes.read` | Detalle de clase |
@@ -232,7 +231,8 @@ apps/api-worker/
 | Binding | Tipo | Descripción |
 |---------|------|-------------|
 | `FILES_BUCKET` | R2 | Bucket de archivos (per-env: `fit-stack-files[-dev|-staging]`) |
-| `TASK_QUEUE` | Queue | Cola de tareas (emails, etc.). Per-env: `fit-task-events[-dev|-staging]` |
+| `TASK_QUEUE` | Queue | Producer de `fit-task-events[-dev|-staging]` (emails) |
+| `RECEIPT_QUEUE` | Queue | Producer de `fit-receipt-events[-dev|-staging]` (render de comprobantes PDF). Terraform es dueño del consumer/cron; el worker solo produce |
 
 > ⚠️ **Tip**: `BETTER_AUTH_URL` en dev debe apuntar a `http://localhost:8788` (el puerto de este worker; `8787` es del `jobs-worker`).
 

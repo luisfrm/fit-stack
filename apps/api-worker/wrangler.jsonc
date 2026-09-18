@@ -9,17 +9,17 @@
   "r2_buckets": [
     {
       "binding": "FILES_BUCKET",
-      "bucket_name": "fit-stack-files-dev"
+      "bucket_name": "fit-stack-files"
     }
   ],
   "queues": {
       "producers": [
         {
-          "queue": "fit-task-events-dev",
+          "queue": "fit-task-events",
           "binding": "TASK_QUEUE"
         },
         {
-          "queue": "fit-receipt-events-dev",
+          "queue": "fit-receipt-events",
           "binding": "RECEIPT_QUEUE"
         }
       ]

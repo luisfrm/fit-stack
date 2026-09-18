@@ -34,10 +34,16 @@ export interface PaginatedSubscriptionsResult {
 
 export function createSubscriptionsRepository(db: Db) {
   return {
+    /**
+     * Status derivado (nunca se guarda). El cobro anulado/rechazado gana sobre
+     * `cancelledAt`: si el cobro no vale, el registro está ANULADO, no revocado.
+     * `cancelledAt` sigue siendo la marca de "fuera de vigencia" (revocada O
+     * anulada) que usan los reportes y los filtros de acceso.
+     */
     getSubscriptionStatusSql(now: Date) {
       return sql<SubscriptionStatus>`CASE 
+        WHEN ${payment.status} = ${PAYMENT_STATUSES.VOIDED} THEN ${SUBSCRIPTION_STATUSES.VOIDED}
         WHEN ${subscription.cancelledAt} IS NOT NULL THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
-        WHEN ${payment.status} IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID}) THEN ${SUBSCRIPTION_STATUSES.CANCELLED}
         WHEN ${subscription.endDate} < ${now} THEN ${SUBSCRIPTION_STATUSES.EXPIRED}
         ELSE ${SUBSCRIPTION_STATUSES.ACTIVE}
       END`;
@@ -46,13 +52,13 @@ export function createSubscriptionsRepository(db: Db) {
     getSubscriptionIsActiveSql(now: Date) {
       return sql<boolean>`${subscription.endDate} >= ${now} 
         AND ${subscription.cancelledAt} IS NULL 
-        AND ${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`;
+        AND ${payment.status} <> ${PAYMENT_STATUSES.VOIDED}`;
     },
 
     getPaidAndNotRevokedCondition() {
       return and(
         sql`${subscription.cancelledAt} IS NULL`,
-        sql`${payment.status} NOT IN (${PAYMENT_STATUSES.VOIDED}, ${PAYMENT_STATUSES.INVALID})`
+        sql`${payment.status} <> ${PAYMENT_STATUSES.VOIDED}`
       );
     },
 
@@ -94,7 +100,9 @@ export function createSubscriptionsRepository(db: Db) {
               this.getPaidAndNotRevokedCondition()
             )!
           );
-        } else if (status === PAYMENT_STATUSES.VOIDED) {
+        } else if (status === SUBSCRIPTION_STATUSES.VOIDED) {
+          // "Anuladas" = cobro `voided` (rechazado sin comprobante o anulado
+          // con comprobante): la distinción se deriva con `getVoidKind`.
           conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
         }
       }
@@ -268,10 +276,6 @@ export function createSubscriptionsRepository(db: Db) {
         .where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
         .returning();
       return updated[0];
-    },
-
-    async delete(organizationId: string, id: number) {
-      await db.delete(subscription).where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)));
     },
 
     async findLatestForMember(organizationId: string, memberId: number, now: Date = new Date()) {

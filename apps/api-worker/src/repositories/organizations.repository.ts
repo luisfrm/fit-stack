@@ -1,15 +1,18 @@
-import { eq, ilike, and, or, count, desc, type Db } from '@workspace/database/factory';
+import { eq, ilike, and, or, count, desc, sql, type Db } from '@workspace/database/factory';
 import {
   organization,
   platformSubscription,
+  platformSubscriptionPayment,
   platformPlan,
   authMember,
   gymMember,
+  user,
 } from '@workspace/database/schema';
 import type { IPlatformOrganization, IPlatformSubscription } from '@workspace/shared/types';
 import {
   computePlatformSubscriptionStatus,
   PLATFORM_SUBSCRIPTION_STATUSES,
+  PAYMENT_STATUSES,
 } from '@workspace/shared/constants';
 
 export type DbOrganization = typeof organization.$inferSelect;
@@ -50,6 +53,23 @@ async function getMemberCounts(
 
 export function createOrganizationsRepository(db: Db) {
   return {
+    /**
+     * Emails de los owners de la org (`authMember role=owner → user.email`).
+     * Dedupe y filtrado los hace el caller (resend encola, jobs deduplica).
+     */
+    async listOwnerEmails(organizationId: string): Promise<string[]> {
+      const rows = await db
+        .select({ email: user.email })
+        .from(authMember)
+        .innerJoin(user, eq(authMember.userId, user.id))
+        .where(
+          and(
+            eq(authMember.organizationId, organizationId),
+            eq(authMember.role, 'owner'),
+          ),
+        );
+      return rows.map((r) => r.email).filter((e) => !!e && e.trim().length > 0);
+    },
     async findAll(filters: OrganizationFilter): Promise<PaginatedOrganizationsResult> {
       const { query, page = 1, limit = 10 } = filters;
       const offset = (page - 1) * limit;
@@ -100,6 +120,13 @@ export function createOrganizationsRepository(db: Db) {
               planCurrency: platformPlan.currency,
               planDurationValue: platformPlan.durationValue,
               planDurationUnit: platformPlan.durationUnit,
+              // Paridad con el SQL del repo SaaS: "hay periodo pagado" es
+              // EXISTS(validated|refunded), nunca "el último pago".
+              hasValidatedPayment: sql<boolean>`EXISTS (
+                SELECT 1 FROM ${platformSubscriptionPayment} p
+                WHERE p.subscription_id = platform_subscription.id
+                  AND p.status IN (${PAYMENT_STATUSES.VALIDATED}, ${PAYMENT_STATUSES.REFUNDED})
+              )`,
             })
             .from(platformSubscription)
             .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id))
@@ -113,6 +140,7 @@ export function createOrganizationsRepository(db: Db) {
                 currentPeriodEnd: latestSub.currentPeriodEnd,
                 cancelledAt: latestSub.cancelledAt,
                 isTrial: latestSub.isTrial,
+                hasValidatedPayment: latestSub.hasValidatedPayment,
               })
             : PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
 

@@ -263,6 +263,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [activeOrganization]);
 
+  // D6: un emisor que no declaró ser contribuyente formal no detalla
+  // impuestos, así que tampoco puede ajustarlos a mano (el backend lo
+  // rechaza con 400). El modo efectivo es siempre "auto" en ese caso.
+  const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";
+
   // Preview del desglose con la única fuente compartida. En override se
   // aplican las tasas manuales; si alguna es inválida se muestra el auto y
   // el submit se bloquea con toast.
@@ -270,7 +275,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     if (!fiscalProfile) return null;
     const totalCents = unitsToCents(finalAmount);
     try {
-      if (taxMode !== "override") {
+      if (effectiveTaxMode !== "override") {
         const auto = previewReceiptTaxes(totalCents, fiscalProfile, paymentCurrency);
         return { ...auto, lines: auto.taxDetails };
       }
@@ -284,7 +289,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     } catch {
       return null;
     }
-  }, [fiscalProfile, taxMode, taxRateOverrides, finalAmount, paymentCurrency]);
+  }, [fiscalProfile, effectiveTaxMode, taxRateOverrides, finalAmount, paymentCurrency]);
 
   const handleTaxModeChange = (mode: TaxMode) => {
     setTaxMode(mode);
@@ -367,7 +372,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
-    return validateTaxOverrides(taxMode, taxOverrideReason, taxRateOverrides, taxPreview);
+    return validateTaxOverrides(effectiveTaxMode, taxOverrideReason, taxRateOverrides, taxPreview);
   };
 
   // Helper to process file uploads in dynamic fields
@@ -433,7 +438,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           paymentDate: paymentDate, // Send the selected date string
           // Modo auto: sin campos fiscales (el backend descompone).
           // Override: desglose en centavos + motivo de auditoría.
-          ...(taxMode === "override" && taxPreview
+          ...(effectiveTaxMode === "override" && taxPreview
             ? {
               subtotal: taxPreview.subtotal,
               taxTotal: taxPreview.taxTotal,
@@ -555,6 +560,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           }
           taxOverrideReason={taxOverrideReason}
           onTaxOverrideReasonChange={setTaxOverrideReason}
+          taxEmitterIsFormal={fiscalProfile?.isFormalTaxpayer ?? false}
         />
       )}
 

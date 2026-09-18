@@ -19,7 +19,7 @@ import type {
   IPaymentMethodDetails,
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
-import { formatCents, type CurrencyFormat } from "@workspace/shared";
+import { formatCents, getVoidKind, type CurrencyFormat } from "@workspace/shared";
 import {
   Trash2,
   RefreshCw,
@@ -29,6 +29,8 @@ import {
   ChevronDown,
   Loader2,
   MoreHorizontal,
+  Download,
+  Send,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { canManageBilling } from "@/lib/platform-permissions";
@@ -61,10 +63,8 @@ const STATUS_LABELS: Record<
     className?: string;
   }
 > = {
-  pending: { label: "Pendiente", variant: "outline" },
   processing: { label: "Procesando", variant: "warning" },
   validated: { label: "Validado", variant: "success" },
-  invalid: { label: "Rechazado", variant: "destructive" },
   voided: { label: "Anulado", variant: "default", className: "opacity-60" },
   refunded: {
     label: "Reembolsado",
@@ -74,11 +74,9 @@ const STATUS_LABELS: Record<
 };
 
 const STATUS_DOT: Record<PaymentStatus, string> = {
-  pending: "bg-slate-400",
   processing: "bg-orange-400",
   validated: "bg-emerald-400",
-  invalid: "bg-red-400",
-  voided: "bg-slate-600",
+  voided: "bg-red-400",
   refunded: "bg-slate-500",
 };
 
@@ -147,12 +145,32 @@ export function PlatformPaymentHistoryModal({
   const handleChangeStatus = async (
     paymentId: number,
     status: PaymentStatus,
+    voidReason?: string,
   ) => {
     if (actionLoading) return;
     setActionPaymentId(paymentId);
     try {
-      await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
-      toast.success(`Pago marcado como ${status}`);
+      const result = await platformSubscriptionsService.updatePaymentStatus(
+        paymentId,
+        status,
+        voidReason,
+      );
+      // C6: anular sin comprobante emitido no es un error, pero se dice
+      // explícitamente en vez de un "marcado como voided" ambiguo.
+      if (status === PAYMENT_STATUSES.VOIDED) {
+        const rejected = voidReason === 'Pago rechazado';
+        if (result?.receiptVoided === false) {
+          toast.success(
+            rejected
+              ? 'Pago rechazado.'
+              : 'Pago anulado. No tenía comprobante emitido.',
+          );
+        } else {
+          toast.success(rejected ? 'Pago rechazado.' : 'Pago anulado.');
+        }
+      } else {
+        toast.success('Estado de pago actualizado correctamente');
+      }
       await loadPayments();
       onChange?.();
     } catch (err) {
@@ -161,6 +179,60 @@ export function PlatformPaymentHistoryModal({
           "PlatformPaymentHistoryModal",
           err,
           "No se pudo cambiar el estado del pago",
+        ),
+      );
+    } finally {
+      setActionPaymentId(null);
+    }
+  };
+
+  const handleDownloadReceipt = async (payment: PlatformPaymentWithSnapshot) => {
+    if (actionLoading || !payment.receiptNumber) return;
+    setActionPaymentId(payment.id);
+    try {
+      const blob = await platformSubscriptionsService.downloadReceipt(payment.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${payment.receiptNumber}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Comprobante descargado correctamente");
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "PlatformPaymentHistoryModal",
+          err,
+          "No se pudo descargar el comprobante",
+        ),
+      );
+    } finally {
+      setActionPaymentId(null);
+    }
+  };
+
+  const handleResendReceipt = async (payment: PlatformPaymentWithSnapshot) => {
+    if (actionLoading || !payment.receiptNumber) return;
+    setActionPaymentId(payment.id);
+    try {
+      const result = await platformSubscriptionsService.resendReceipt(payment.id);
+      if (result.available === false) {
+        toast.success("El pago es anterior al sistema de comprobantes");
+      } else if (result.queued === false) {
+        toast.success("El comprobante se enviará al generarse el PDF");
+      } else {
+        toast.success("Comprobante reenviado correctamente");
+      }
+      await loadPayments();
+      onChange?.();
+    } catch (err) {
+      toast.error(
+        mutationError(
+          "PlatformPaymentHistoryModal",
+          err,
+          "No se pudo reenviar el comprobante",
         ),
       );
     } finally {
@@ -229,7 +301,15 @@ export function PlatformPaymentHistoryModal({
         {!loading && (
           <div className="flex flex-col gap-2">
             {payments.map((p) => {
-              const config = STATUS_LABELS[p.status];
+              const config =
+                p.status === PAYMENT_STATUSES.VOIDED &&
+                getVoidKind(p) === "rejected"
+                  ? {
+                      label: "Rechazado",
+                      variant: "destructive" as const,
+                      className: "opacity-60",
+                    }
+                  : STATUS_LABELS[p.status];
               const expanded = expandedId === p.id;
               const snapshot = p.features_snapshot;
               const snapshotSummary = snapshot
@@ -337,11 +417,12 @@ export function PlatformPaymentHistoryModal({
                               onClick: () =>
                                 handleChangeStatus(
                                   p.id,
-                                  PAYMENT_STATUSES.INVALID,
+                                  PAYMENT_STATUSES.VOIDED,
+                                  'Pago rechazado',
                                 ),
                               show:
                                 canChangeStatus &&
-                                p.status !== PAYMENT_STATUSES.INVALID,
+                                p.status !== PAYMENT_STATUSES.VOIDED,
                             },
                             {
                               label: "Anular",
@@ -351,6 +432,7 @@ export function PlatformPaymentHistoryModal({
                                 handleChangeStatus(
                                   p.id,
                                   PAYMENT_STATUSES.VOIDED,
+                                  'Pago anulado',
                                 ),
                               show:
                                 canChangeStatus &&
@@ -408,6 +490,57 @@ export function PlatformPaymentHistoryModal({
                           </Text>
                         </div>
                       )}
+                      <div className="flex flex-col gap-1">
+                        <Text
+                          size="xs"
+                          variant="muted"
+                          className="uppercase tracking-widest font-bold opacity-60"
+                        >
+                          Comprobante
+                        </Text>
+                        {p.receiptVoided && (
+                          <Badge variant="destructive" size="sm" className="w-fit">
+                            Anulado (se conserva el número)
+                          </Badge>
+                        )}
+                        {!p.receiptNumber ? (
+                          <Text size="xs" variant="muted" className="opacity-60 italic">
+                            Anterior al sistema de comprobantes
+                          </Text>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <Text size="xs" className="tabular-nums">
+                              {p.receiptNumber}
+                            </Text>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outlined"
+                                size="sm"
+                                onClick={() => handleDownloadReceipt(p)}
+                                disabled={loading || actionLoading}
+                                data-testid={`receipt-download-${p.id}`}
+                                className="gap-1.5"
+                              >
+                                <Download size={14} />
+                                Descargar PDF
+                              </Button>
+                              {canChangeStatus && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleResendReceipt(p)}
+                                  disabled={loading || actionLoading}
+                                  data-testid={`receipt-resend-${p.id}`}
+                                  className="gap-1.5"
+                                >
+                                  <Send size={14} />
+                                  Reenviar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex items-center gap-4">
                         <Text
                           size="xs"

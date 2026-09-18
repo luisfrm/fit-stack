@@ -19,7 +19,7 @@ export interface IPayment {
   currencyPaid: string;
   exchangeRateApplied?: string | null;
 
-  status?: 'processing' | 'validated' | 'invalid' | 'voided';
+  status?: 'processing' | 'validated' | 'voided';
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
@@ -46,7 +46,7 @@ export interface ReceiptReportScope {
 
 /**
  * Scope base del reporte (Fase 5): pagos `validated` + cualquier pago con
- * número (cubre `voided` con número conservado). `processing` / `invalid`
+ * número (cubre `voided` con número conservado). `processing` / `voided`
  * sin número no son comprobantes y quedan fuera. Rango por
  * `receipt_issued_at` en numerados y por `payment_date` en sin numerar.
  */
@@ -134,14 +134,29 @@ export function createPaymentsRepository(db: Db) {
       return records as unknown as IPayment[];
     },
 
+    /**
+     * Cambia el estado del pago. Al anular (`voided`) persiste SIEMPRE la
+     * auditoría (`voidedBy`/`voidedAt`/`voidReason`), haya o no comprobante
+     * emitido: "rechazado" vs "anulado" se deriva con `getVoidKind`, no de
+     * columnas distintas. `receiptVoided` lo maneja el repo de comprobantes.
+     */
     async updateStatus(
       organizationId: string,
       id: number,
-      status: 'processing' | 'validated' | 'invalid' | 'voided'
+      status: 'processing' | 'validated' | 'voided',
+      meta?: { voidedBy?: string; voidReason?: string; voidedAt?: Date }
     ): Promise<IPayment | undefined> {
+      const update: Record<string, unknown> = { status };
+      if (status === 'voided') {
+        // COALESCE preserva la primera auditoría: un re-void idempotente no
+        // debe pisar `voidedBy`/`voidedAt`/`voidReason` con null.
+        update.voidedBy = sql`COALESCE(${payment.voidedBy}, ${meta?.voidedBy ?? null})`;
+        update.voidedAt = sql`COALESCE(${payment.voidedAt}, ${meta?.voidedAt ?? new Date()})`;
+        update.voidReason = sql`COALESCE(${payment.voidReason}, ${meta?.voidReason ?? null})`;
+      }
       const updated = await db
         .update(payment)
-        .set({ status })
+        .set(update)
         .where(and(eq(payment.id, id), eq(payment.organizationId, organizationId)))
         .returning();
       return updated[0] as unknown as IPayment | undefined;
@@ -284,6 +299,9 @@ export function createPaymentsRepository(db: Db) {
           voidedBy: payment.voidedBy,
           voidedAt: payment.voidedAt,
           voidReason: payment.voidReason,
+          // C1/C5: emisor congelado + actor, para el libro exportable.
+          emitterSnapshot: payment.emitterSnapshot,
+          issuedBy: payment.issuedBy,
         })
         .from(payment)
         // LEFT: un pago huérfano (miembro borrado) debe aparecer en filas

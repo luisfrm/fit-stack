@@ -23,7 +23,7 @@ import { ExtendSubscriptionModal } from "./extend-subscription-modal";
 import { DeleteSubscriptionModal } from "./delete-subscription-modal";
 import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
-import { formatCents } from "@workspace/shared";
+import { formatCents, PAYMENT_STATUSES } from "@workspace/shared";
 import {
   canManageBilling,
   hasActiveSubscription,
@@ -260,8 +260,7 @@ export function SubscriptionsTable({
       cell: (sub) => (
         <div className="flex flex-col gap-1">
           <SubscriptionStatusBadge status={sub.status} />
-          {(sub.latestPaymentStatus === "pending" ||
-            sub.latestPaymentStatus === "processing") && (
+          {sub.latestPaymentStatus === PAYMENT_STATUSES.PROCESSING && (
             <Badge
               variant="warning"
               size="sm"

@@ -23,6 +23,8 @@ export const AUTH_DIR = join(process.cwd(), 'e2e', '.auth');
 export const STATE_PATH = join(AUTH_DIR, 'state.json');
 export const PANEL_STATE_PATH = join(AUTH_DIR, 'panel-user.json');
 export const CONSOLE_STATE_PATH = join(AUTH_DIR, 'console-user.json');
+/** Sesión del owner de la org VACÍA (`e2e-empty`) — ver `empty-state.spec.ts`. */
+export const EMPTY_STATE_PATH = join(AUTH_DIR, 'empty-org-user.json');
 
 // ── Organización de la suite (propia, efímera: se crea y se borra) ──────────
 export const TEST_ORG = {
@@ -211,6 +213,10 @@ export const PANEL_PREWARM_ROUTES = [
   '/trainers',
   '/settings/general',
 ] as const;
+
+/** Rutas que necesita la org vacía: se precalientan con su propia sesión para
+ * que los specs de estado vacío no absorban la compilación en frío. */
+export const EMPTY_PANEL_PREWARM_ROUTES = ['/members', '/content'] as const;
 
 export const CONSOLE_PREWARM_ROUTES = [
   '/dashboard',

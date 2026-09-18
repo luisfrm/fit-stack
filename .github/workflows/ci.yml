@@ -37,6 +37,9 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Terraform ↔ wrangler name parity
+        run: pnpm check:infra-parity
+
       # Turbo detecta automáticamente qué filtrar basándose en el historial de git
       # Usamos el SHA del commit base (en PRs) o el commit anterior (en Pushes)
       - name: Run CI Tasks

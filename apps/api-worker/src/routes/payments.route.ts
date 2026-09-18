@@ -16,7 +16,8 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
-  status: z.enum(['processing', 'validated', 'invalid', 'voided']),
+  status: z.enum(['processing', 'validated', 'voided']),
+  voidReason: z.string().min(1).optional(),
 });
 
 async function resolveOrgSlug(c: Context<AppEnv>, orgId: string): Promise<string | null> {
@@ -53,7 +54,7 @@ export const paymentRoutes = new Hono<AppEnv>()
   .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
-    const { status } = c.req.valid('json');
+    const { status, voidReason } = c.req.valid('json');
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 
@@ -64,12 +65,18 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE, c.env.TASK_QUEUE);
 
-    const updated = await subsService.updatePaymentStatus(orgId, id, status, {
-      receipts: receiptsService,
-      orgSlug: await resolveOrgSlug(c, orgId),
-      timezone,
-      by: c.get('user')?.id,
-    });
+    const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
+      orgId,
+      id,
+      status,
+      {
+        receipts: receiptsService,
+        orgSlug: await resolveOrgSlug(c, orgId),
+        timezone,
+        by: c.get('user')?.id,
+        voidReason,
+      },
+    );
     await cache.invalidate(`org:${orgId}:subscriptions*`);
     await cache.invalidateExact(`org:${orgId}:payments:analytics`);
     // `withoutActiveSubscription` de members:stats depende de subs/pagos.
@@ -78,7 +85,13 @@ export const paymentRoutes = new Hono<AppEnv>()
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     await cache.invalidate(`org:${orgId}:reports:revenue*`);
     await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    return c.json(updated);
+    // C6: el intento de anulación del comprobante se informa explícitamente
+    // (200 con `receiptVoided: false` + motivo), nunca en silencio.
+    return c.json({
+      ...payment,
+      receiptVoided,
+      ...(receiptVoidReason ? { receiptVoidReason } : {}),
+    });
   })
 
   // GET /api/payments/:id/receipt — contrato de 3 estados, nunca 409.
@@ -144,6 +157,8 @@ export const paymentRoutes = new Hono<AppEnv>()
       paymentId: id,
       timezone,
       orgSlug: await resolveOrgSlug(c, orgId),
+      // C5: la emisión manual también queda con actor.
+      actor: c.get('user')?.id,
     });
     // La emisión manual mueve el correlativo: invalida el reporte.
     await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);

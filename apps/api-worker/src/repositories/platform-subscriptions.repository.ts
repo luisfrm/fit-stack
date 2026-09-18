@@ -99,43 +99,59 @@ export interface NewPlatformPaymentData {
 export function createPlatformSubscriptionsRepository(db: Db) {
   return {
     /**
-     * SQL CASE que computa el status según:
+     * `EXISTS(validated|refunded)` sobre los pagos de la suscripción. Es la
+     * fuente única de "hay periodo pagado" (nunca "el último pago"): `voided`
+     * y `processing` no califican.
+     */
+    hasValidatedPaymentSql() {
+      // Correlación cualificada explícita: Drizzle puede renderizar
+      // `${platformSubscription.id}` sin cualificar en queries sin joins, y
+      // entonces la subquery resuelve contra el `id` interno del pago.
+      return sql<boolean>`EXISTS (
+        SELECT 1 FROM platform_subscription_payment
+        WHERE platform_subscription_payment.subscription_id = platform_subscription.id
+          AND platform_subscription_payment.status IN (${PAYMENT_STATUSES.VALIDATED}, ${PAYMENT_STATUSES.REFUNDED})
+      )`;
+    },
+
+    /**
+     * SQL CASE que computa el status SaaS. Paridad exacta con
+     * `computePlatformSubscriptionStatus` (`@workspace/shared`):
      * - cancelledAt IS NOT NULL => cancelled
-     * - último pago voided/invalid => past_due
-     * - último pago processing => past_due (sin pago validado)
-     * - currentPeriodEnd >= now => active
-     * - <= 7 días overdue => past_due
-     * - <= 14 días overdue => read_only
-     * - > 14 días => suspended
+     * - isTrial y periodo vigente => trial
+     * - periodo vigente + EXISTS(validated|refunded) => active
+     * - periodo vigente sin pago calificado => past_due
+     * - vencida <= 7 días => past_due
+     * - vencida <= 14 días => read_only
+     * - vencida > 14 días => suspended
+     *
+     * `voided` se IGNORA por completo: no revoca servicio, la gracia corre
+     * desde `currentPeriodEnd` y los plazos NO se acumulan.
      */
     getSubscriptionStatusSql() {
-      // BUG FIX: anteriormente comparaba `plan_id = ${fitstackPlan.id}` con
-      // una columna incorrecta. Ahora la subquery apunta a la suscripción actual
-      // y ordena por payment_date DESC.
-      const latestPaymentStatus = sql<PaymentStatus | null>`(
-        SELECT status FROM platform_subscription_payment
-        WHERE subscription_id = ${platformSubscription.id}
-        ORDER BY payment_date DESC, created_at DESC
-        LIMIT 1
-      )`;
+      const hasValidatedPayment = this.hasValidatedPaymentSql();
 
       return sql<PlatformSubscriptionStatus>`CASE
         WHEN ${platformSubscription.cancelledAt} IS NOT NULL THEN ${PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED}::text
         WHEN ${platformSubscription.isTrial} = true AND ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.TRIAL}::text
-        WHEN ${latestPaymentStatus} IN (${PAYMENT_STATUSES.VALIDATED}, ${PAYMENT_STATUSES.REFUNDED}) AND ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE}::text
-        WHEN ${latestPaymentStatus} = ${PAYMENT_STATUSES.PENDING} AND ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
-        WHEN ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE}::text
-        WHEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - ${platformSubscription.currentPeriodEnd})) / 86400 <= ${PLATFORM_GRACE_PERIODS.PAST_DUE_DAYS} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
-        WHEN EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - ${platformSubscription.currentPeriodEnd})) / 86400 <= ${PLATFORM_GRACE_PERIODS.READ_ONLY_DAYS} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY}::text
+        WHEN ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP AND ${hasValidatedPayment} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE}::text
+        WHEN ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
+        WHEN FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - ${platformSubscription.currentPeriodEnd})) / 86400) <= ${PLATFORM_GRACE_PERIODS.PAST_DUE_DAYS} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
+        WHEN FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - ${platformSubscription.currentPeriodEnd})) / 86400) <= ${PLATFORM_GRACE_PERIODS.READ_ONLY_DAYS} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY}::text
         ELSE ${PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED}::text
       END`;
     },
 
+    /**
+     * Último pago NO anulado (para UX). `voided` se excluye: el status SaaS
+     * no depende de "el último pago" sino de que exista uno calificado.
+     */
     getLatestPaymentStatusSql() {
       return sql<PaymentStatus | null>`(
-        SELECT status FROM platform_subscription_payment
-        WHERE subscription_id = ${platformSubscription.id}
-        ORDER BY payment_date DESC, created_at DESC
+        SELECT platform_subscription_payment.status FROM platform_subscription_payment
+        WHERE platform_subscription_payment.subscription_id = platform_subscription.id
+          AND platform_subscription_payment.status <> ${PAYMENT_STATUSES.VOIDED}
+        ORDER BY platform_subscription_payment.payment_date DESC, platform_subscription_payment.created_at DESC
         LIMIT 1
       )`;
     },
@@ -143,7 +159,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     getPaymentsCountSql() {
       return sql<number>`(
         SELECT COUNT(*)::int FROM platform_subscription_payment
-        WHERE subscription_id = ${platformSubscription.id}
+        WHERE platform_subscription_payment.subscription_id = platform_subscription.id
       )`;
     },
 
@@ -342,6 +358,60 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       return (records[0] as SubscriptionWithDetails) ?? null;
     },
 
+    /**
+     * Estado del último contrato SaaS de la org con el `hasValidatedPayment`
+     * real (`EXISTS(validated|refunded)`, nunca "el último pago"). Sin
+     * suscripción => `SUSPENDED` con `subscriptionId: null`. El `status` sale
+     * del CASE para garantizar paridad con los listados; `hasValidatedPayment`
+     * queda expuesto para guards (p. ej. autoservicio de renovación).
+     */
+    async getLastSubscriptionStatus(organizationId: string): Promise<{
+      status: PlatformSubscriptionStatus;
+      subscriptionId: number | null;
+      currentPeriodEnd: Date | null;
+      isTrial: boolean;
+      cancelledAt: Date | null;
+      hasValidatedPayment: boolean;
+      latestPaymentStatus: PaymentStatus | null;
+    }> {
+      const [record] = await db
+        .select({
+          id: platformSubscription.id,
+          currentPeriodEnd: platformSubscription.currentPeriodEnd,
+          isTrial: platformSubscription.isTrial,
+          cancelledAt: platformSubscription.cancelledAt,
+          status: this.getSubscriptionStatusSql(),
+          hasValidatedPayment: this.hasValidatedPaymentSql(),
+          latestPaymentStatus: this.getLatestPaymentStatusSql(),
+        })
+        .from(platformSubscription)
+        .where(eq(platformSubscription.organizationId, organizationId))
+        .orderBy(desc(platformSubscription.createdAt))
+        .limit(1);
+
+      if (!record) {
+        return {
+          status: PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED,
+          subscriptionId: null,
+          currentPeriodEnd: null,
+          isTrial: false,
+          cancelledAt: null,
+          hasValidatedPayment: false,
+          latestPaymentStatus: null,
+        };
+      }
+
+      return {
+        status: record.status,
+        subscriptionId: record.id,
+        currentPeriodEnd: record.currentPeriodEnd,
+        isTrial: record.isTrial,
+        cancelledAt: record.cancelledAt,
+        hasValidatedPayment: record.hasValidatedPayment,
+        latestPaymentStatus: record.latestPaymentStatus,
+      };
+    },
+
     async create(data: NewPlatformSubscriptionData): Promise<{ id: number }> {
       const [created] = await db
         .insert(platformSubscription)
@@ -433,19 +503,26 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       return record ?? null;
     },
 
+    /**
+     * Cambia el estado del pago SaaS. Al anular (`voided`) persiste SIEMPRE la
+     * auditoría (`voidedBy`/`voidedAt`/`voidReason`), haya o no comprobante.
+     * `receiptVoided` lo maneja `markPlatformReceiptVoided` (repo compartido).
+     */
     async updatePaymentStatus(
       id: number,
       status: PaymentStatus,
-      paidAt?: Date | null
+      meta?: { paidAt?: Date | null; voidedBy?: string; voidReason?: string; voidedAt?: Date }
     ): Promise<void> {
       const update: Record<string, any> = { status };
       if (status === PAYMENT_STATUSES.VALIDATED) {
-        update.paidAt = paidAt ?? new Date();
-      } else if (
-        status === PAYMENT_STATUSES.VOIDED ||
-        status === PAYMENT_STATUSES.INVALID
-      ) {
+        update.paidAt = meta?.paidAt ?? new Date();
+      } else if (status === PAYMENT_STATUSES.VOIDED) {
         update.paidAt = null;
+        // COALESCE preserva la primera auditoría: un re-void idempotente no
+        // debe pisar `voidedBy`/`voidedAt`/`voidReason` con null.
+        update.voidedBy = sql`COALESCE(${platformSubscriptionPayment.voidedBy}, ${meta?.voidedBy ?? null})`;
+        update.voidedAt = sql`COALESCE(${platformSubscriptionPayment.voidedAt}, ${meta?.voidedAt ?? new Date()})`;
+        update.voidReason = sql`COALESCE(${platformSubscriptionPayment.voidReason}, ${meta?.voidReason ?? null})`;
       } else if (status === PAYMENT_STATUSES.REFUNDED) {
         update.refundedAt = new Date();
       }
@@ -462,7 +539,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         .where(
           and(
             eq(platformSubscriptionPayment.subscriptionId, subscriptionId),
-            sql`${platformSubscriptionPayment.status} IN ('pending', 'processing')`
+            eq(platformSubscriptionPayment.status, PAYMENT_STATUSES.PROCESSING)
           )
         )
         .limit(1);

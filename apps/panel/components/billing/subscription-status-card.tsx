@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Text, Badge } from "@workspace/ui/components";
 import { CalendarClock, Clock3, CreditCard, Hourglass, Info, Sparkles } from "lucide-react";
 import { OrgRenewalModal } from "./org-renewal-modal";
-import { formatCents } from "@workspace/shared";
+import { formatCents, PAYMENT_STATUSES } from "@workspace/shared";
 import type { OrgPaymentMethodsResponse, OrgSubscriptionInfo } from "@/lib/services/org-billing";
 
 interface SubscriptionStatusCardProps {
@@ -31,7 +31,7 @@ function formatAmount(cents: number, currency: string) {
   return formatCents(cents, currency);
 }
 
-const PENDING_STATUSES = new Set(["pending", "processing"]);
+const PENDING_STATUSES = new Set<string>([PAYMENT_STATUSES.PROCESSING]);
 
 export function SubscriptionStatusCard({
   subscription,

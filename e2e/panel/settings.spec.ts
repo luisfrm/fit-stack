@@ -75,6 +75,31 @@ test.describe('Panel — Settings', () => {
     await expect(reloaded.getByText('Comprobante de pago').first()).toBeVisible();
   });
 
+  test('guarda los datos generales de la sede (endpoint org-scoped)', async ({ page }) => {
+    await page.goto('/settings/organization', { waitUntil: 'domcontentloaded' });
+
+    const slogan = page.getByLabel('Eslogan / Lema');
+    await expect(slogan).toBeVisible({ timeout: 30_000 });
+
+    // El eslogan es dato propio de la sede y no lo asertan otros specs.
+    const value = `Sede E2E ${uid()}`;
+    await slogan.fill(value);
+    await page.getByRole('button', { name: 'Actualizar Sede' }).click();
+
+    // Regresión C8: el guardado general llamaba a `/api/platform/organizations`
+    // (`requirePlatformAuth`) → 403 para un owner de gym. El toast de éxito es
+    // la señal de que ahora usa el endpoint org-scoped real.
+    await expect(
+      page.getByText('Información de la sede actualizada correctamente').first(),
+    ).toBeVisible({ timeout: 20_000 });
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByLabel('Eslogan / Lema')).toHaveValue(value, { timeout: 30_000 });
+  });
+
+  // Depende de que el spec "guarda la configuración fiscal…" (arriba) haya
+  // declarado la sede como contribuyente formal: sin esa declaración el
+  // ajuste manual de impuestos ni se ofrece (C2, el override solo reduce).
   test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NUEVO PAGO' }).click();

@@ -460,7 +460,12 @@ export interface IReceiptReportRow {
   state: ReceiptReportState;
   /** `ready` | `pending` | `null` (pre_system no tiene PDF). */
   pdfStatus: 'ready' | 'pending' | null;
+  /**
+   * Receptor del comprobante: el miembro (Panel) o la organización que paga
+   * (Console, donde el emisor es FitStack).
+   */
   memberName: string;
+  /** Solo Panel; `null` en Console (el receptor es una organización). */
   memberEmail?: string | null;
   planName: string;
   /** Centavos enteros (convención Money). */
@@ -478,6 +483,10 @@ export interface IReceiptReportRow {
   voidedBy?: string | null;
   voidedAt?: string | null;
   voidReason?: string | null;
+  /** Actor que emitió (`issued_by`, C5); `null` en históricos o barrido. */
+  issuedBy?: string | null;
+  /** Emisor congelado en el snapshot (`emitter.name`, C1); `null` pre-C1. */
+  emitterName?: string | null;
 }
 
 export interface IReceiptTaxTotal {
@@ -629,6 +638,12 @@ export interface IPlatformSubscriptionPayment {
 
   // Estado
   status: PaymentStatus;
+
+  // Comprobante SaaS (C1-C3). NULL = anterior al sistema / $0 SKIP.
+  receiptNumber?: string | null;
+  receiptIssuedAt?: string | Date | null;
+  receiptPdfKey?: string | null;
+  receiptVoided?: boolean;
 }
 
 /** @deprecated usar IPlatformSubscriptionPayment */

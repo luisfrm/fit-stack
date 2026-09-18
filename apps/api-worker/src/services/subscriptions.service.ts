@@ -56,6 +56,24 @@ export interface ReceiptContext {
   orgSlug?: string | null;
   timezone?: string;
   by?: string;
+  /** Motivo de anulación/rechazo: se persiste en el pago y viaja al void del comprobante. */
+  voidReason?: string;
+}
+
+/**
+ * Resultado de `updatePaymentStatus`.
+ *
+ * `receiptVoided` es `false` cuando el nuevo status no es `voided` o cuando el
+ * pago **no tenía comprobante emitido** — y en ese segundo caso viaja
+ * `receiptVoidReason: 'not_issued'`, porque el servicio interno lanza
+ * `RECEIPT_NOT_ISSUED` pero el endpoint responde **200**: el usuario tiene que
+ * poder distinguir "se anuló el comprobante" de "no había comprobante".
+ */
+export interface PaymentStatusResult {
+  /** Fila `payment` actualizada (el route la serializa tal cual). */
+  payment: any;
+  receiptVoided: boolean;
+  receiptVoidReason?: 'not_issued';
 }
 
 export function createSubscriptionsService(
@@ -200,6 +218,7 @@ export function createSubscriptionsService(
             paymentId: createdPayment.id,
             timezone,
             orgSlug: opts.orgSlug,
+            actor: opts.by,
             taxOverride:
               p.taxTotal !== undefined && p.taxDetails !== undefined
                 ? {
@@ -227,33 +246,48 @@ export function createSubscriptionsService(
       paymentId: number,
       status: string,
       opts?: ReceiptContext,
-    ) {
+    ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
-      const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any);
+      // La auditoría de anulación se persiste siempre en el pago (haya o no
+      // número): es la única fuente de `voidedBy`/`voidedAt`/`voidReason`.
+      const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
+        voidedBy: opts?.by,
+        voidReason: opts?.voidReason,
+      });
       if (!updated) {
         throw new Error('Registro de pago no encontrado');
       }
 
-      if ((status === PAYMENT_STATUSES.VOIDED || status === PAYMENT_STATUSES.INVALID) && updated.subscriptionId) {
+      // Anular/rechazar el cobro deja la suscripción fuera de vigencia
+      // (`cancelledAt`) y el status derivado pasa a `voided` (ANULADA), que es
+      // distinto de revocar el acceso a mano (`cancelled`).
+      if (status === PAYMENT_STATUSES.VOIDED && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
       // Void con número emitido: conserva número + PDF y marca ANULADO.
+      // Sin comprobante emitido no hay nada que anular, pero el resultado se
+      // informa explícitamente (C6) en vez de tragarse el código del servicio.
+      let receiptVoided = false;
+      let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
       if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
-        await opts.receipts
-          .markReceiptVoided({
+        try {
+          await opts.receipts.markReceiptVoided({
             orgId: organizationId,
             paymentId,
             by: opts.by,
-            reason: 'Pago anulado',
-          })
-          .catch((err) => {
-            // Sin comprobante emitido no hay nada que anular (código, nunca texto).
-            if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') return;
-            throw err;
+            reason: opts.voidReason ?? 'Pago anulado',
           });
+          receiptVoided = true;
+        } catch (err) {
+          if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') {
+            receiptVoidReason = 'not_issued';
+          } else {
+            throw err;
+          }
+        }
       }
 
-      // Un pago que pasa de processing/pending a validated emite su recibo
+      // Un pago que pasa de processing a validated emite su recibo
       // (el alta con status validated ya lo numera en create()).
       const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
@@ -266,6 +300,7 @@ export function createSubscriptionsService(
             paymentId,
             timezone: opts.timezone,
             orgSlug: opts.orgSlug,
+            actor: opts.by,
           });
         } else if (taskQueue) {
           await taskQueue.send({
@@ -276,7 +311,7 @@ export function createSubscriptionsService(
         }
       }
 
-      return updated;
+      return { payment: updated, receiptVoided, receiptVoidReason };
     },
 
     async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled') {
@@ -292,9 +327,8 @@ export function createSubscriptionsService(
       return updated;
     },
 
-    async delete(organizationId: string, id: number): Promise<void> {
-      await subsRepo.delete(organizationId, id);
-    },
+    // Sin `delete`: un registro financiero (suscripción + pago) no se elimina
+    // nunca. Si está equivocado se anula, si se revoca el acceso se cancela.
   };
 }
 
