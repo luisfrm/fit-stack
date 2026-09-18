@@ -10,43 +10,8 @@ variable "cloudflare_account_id" {
 }
 
 variable "environment" {
-  description = "Logical environment name (matches Terraform workspace)"
+  description = "Logical environment name (matches Terraform workspace). El sufijo de los nombres de recursos se deriva de aquí (`main.tf`); no hay variables de nombre."
   type        = string
-}
-
-variable "api_worker_name" {
-  type    = string
-  default = ""
-}
-
-variable "jobs_worker_name" {
-  type    = string
-  default = ""
-}
-
-variable "files_bucket_name" {
-  type    = string
-  default = ""
-}
-
-variable "queue_name" {
-  type    = string
-  default = ""
-}
-
-variable "dlq_queue_name" {
-  type    = string
-  default = ""
-}
-
-variable "receipt_queue_name" {
-  type    = string
-  default = ""
-}
-
-variable "receipt_dlq_queue_name" {
-  type    = string
-  default = ""
 }
 
 variable "compatibility_date" {

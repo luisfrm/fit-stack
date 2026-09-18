@@ -74,7 +74,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [ ] **Escanear la serie**: correr la auditoría de correlativo en Panel y Console (`gaps[]` vacío o con huecos explicados por anulaciones).
 - [ ] **Vigilar §14**: revisar la DLQ de `fit-task-events` y confirmar que ningún comprobante quedó sin email entregado.
 - [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (`docs/PENDING.md` §9).
-- [ ] **Terraform**: correr `terraform apply` (environment `production`) para crear la cola `fit-receipt-events` + DLQ + consumer + cron (el action es manual).
+- [ ] **Terraform**: correr `terraform apply` (environment `production`) para crear la cola `fit-receipt-events` + DLQ + consumer + cron (el action es manual). Los nombres se derivan del ambiente (sin variables); `pnpm check:infra-parity` garantiza la paridad con los `wrangler.jsonc`.
 
 ## 7. Cómo repetir la verificación
 
