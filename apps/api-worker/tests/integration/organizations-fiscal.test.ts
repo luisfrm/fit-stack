@@ -295,7 +295,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     expect(mismatch.body).toMatchObject({ code: 'TAX_MISMATCH' });
   });
 
-  it('PE muestra IGV y US no trae impuestos', async () => {
+  it('PE formal muestra IGV; US no trae impuestos', async () => {
     async function taxedPayment(countryCode: string, amountPaid: number) {
       const tag = countryCode.toLowerCase();
       const user = await registerUser({ email: uniqueEmail(`fiscal-${tag}`) });
@@ -304,6 +304,12 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
         slug: `gym-fiscal-${tag}-${uid()}`,
       });
       await setActiveOrganization(user.client, organization.id);
+      // C2: sin declaración de contribuyente formal no hay desglose.
+      const declared = await user.client.patch('/api/organizations/profile', {
+        fiscalConfig: { isFormalTaxpayer: true },
+        confirmed: true,
+      });
+      expect(declared.status, declared.text).toBe(200);
       const { payment } = await createValidatedPayment(user.client, amountPaid);
       return payment;
     }
@@ -318,5 +324,83 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     expect(us['tax_details']).toEqual([]);
     expect(Number(us['subtotal'])).toBe(5000);
     expect(Number(us['tax_total'])).toBe(0);
+  });
+
+  /**
+   * C2 — invariante fail-closed (D6): el override solo puede REDUCIR carga
+   * fiscal. Un no-contribuyente no puede activar impuestos (ni por config ni
+   * por el override manual del pago) y un condicional exige confirmación.
+   */
+  it('activar impuestos sin declararse formal → 400 TAXES_REQUIRE_FORMAL_TAXPAYER', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-gate');
+
+    const res = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: {
+        taxes: [{ name: 'IVA', rate: 0.16, enabled: true }],
+      },
+    });
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({ code: 'TAXES_REQUIRE_FORMAL_TAXPAYER' });
+
+    // El config almacenado NO cambió (fail-closed antes de persistir).
+    const rows = await testQuery<{ fiscal_config: unknown }>(
+      `SELECT fiscal_config FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(rows[0]!.fiscal_config ?? null).toBeNull();
+  });
+
+  it('condicional activado sin confirmar → 400 TAX_REQUIRES_CONFIRMATION', async () => {
+    const { owner } = await createGymTenant('fiscal-conditional');
+
+    const declared = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: { isFormalTaxpayer: true },
+      confirmed: true,
+    });
+    expect(declared.status, declared.text).toBe(200);
+
+    const unconfirmed = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: { taxes: [{ name: 'IGTF', rate: 0.03, enabled: true }] },
+    });
+    expect(unconfirmed.status, unconfirmed.text).toBe(400);
+    expect(unconfirmed.body).toMatchObject({ code: 'TAX_REQUIRES_CONFIRMATION' });
+
+    const confirmed = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: {
+        confirmedTaxes: ['IGTF'],
+        taxes: [
+          { name: 'IVA', rate: 0.16, enabled: true },
+          { name: 'IGTF', rate: 0.03, enabled: true },
+        ],
+      },
+    });
+    expect(confirmed.status, confirmed.text).toBe(200);
+  });
+
+  it('el override manual no puede inventar impuestos si no es formal', async () => {
+    const { owner } = await createGymTenant('fiscal-override-informal');
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
+
+    const res = await owner.client.post('/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: isoDate(0),
+      endDate: isoDate(30),
+      payment: {
+        amountPaid: 10000,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        status: 'validated',
+        paymentDate: isoDate(0),
+        subtotal: 9900,
+        taxTotal: 100,
+        taxDetails: [{ name: 'IVA', rate: 0.16, amount: 100 }],
+        taxOverrideReason: 'ajuste autorizado por gerencia',
+      },
+    });
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({ code: 'TAXES_REQUIRE_FORMAL_TAXPAYER' });
   });
 });

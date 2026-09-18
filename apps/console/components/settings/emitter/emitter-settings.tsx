@@ -142,6 +142,12 @@ export function PlatformEmitterSettings({
                 Quitar país (volver a emisor genérico)
               </Button>
             )}
+            <Text className="text-xs text-foreground-dim leading-relaxed" data-testid="emitter-tax-note">
+              Los comprobantes de suscripción (FS-N) no detallan impuestos: se
+              registra únicamente el total cobrado. Para desglosarlos hay que
+              declarar a FitStack como contribuyente formal y confirmar la tasa
+              vigente con el contador.
+            </Text>
           </div>
         </Card>
       </div>

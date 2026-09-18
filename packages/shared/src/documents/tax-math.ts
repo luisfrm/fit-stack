@@ -20,6 +20,13 @@ export interface TaxInput {
   enabled: boolean;
   /** Condición sin evaluar (p. ej. `"payment_currency !== 'VES'"`). */
   condition?: string;
+  /**
+   * `'gross_first'` = se EXTRAE del total cobrado y el remanente se
+   * descomprime tax-inclusive (IGTF VE). Omitido = tax-inclusive normal.
+   */
+  basis?: 'gross_first';
+  /** Informativo: la activación exigió fricción explícita (no cambia el cálculo). */
+  requiresConfirmation?: boolean;
 }
 
 export interface ComputeTaxesOptions {
@@ -84,10 +91,18 @@ export function computeTaxes(
 }
 
 /**
- * Descomposición tax-INCLUSIVE (el total cobrado ya trae los impuestos):
- * `subtotal = round(total / (1 + Σtasas))`; las líneas se calculan sobre el
- * subtotal y el polvo de redondeo (≤1¢) va a la última para que
- * `subtotal + taxTotal === total` exacto. Base 0 → sin desglose.
+ * Descomposición tax-INCLUSIVE (el total cobrado ya trae los impuestos).
+ *
+ * Modelo: las líneas `basis: 'gross_first'` (IGTF VE) se EXTRAEN primero del
+ * total — la ley las calcula sobre el monto pagado en divisa — y el remanente
+ * se descompone tax-inclusive con las demás:
+ * `subtotal = round((total − Σgross_first) / (1 + Σtasas))`. Las líneas se
+ * calculan sobre esa base y el polvo de redondeo (≤1¢) va a la última para
+ * que `subtotal + taxTotal === total` exacto. Base 0 → sin desglose.
+ *
+ * ⚠️ Activar un impuesto `gross_first` CAMBIA la base del resto (realidad
+ * contable del IGTF, deliberado y avisado en el UI).
+ *
  * ÚNICA fuente de esta descomposición: la consumen el paso 1 de emisión
  * (`receipts.service.ts`) y el preview del panel (`previewReceiptTaxes`),
  * para que nunca diverjan.
@@ -102,12 +117,33 @@ export function computeInclusiveTaxes(
     return { subtotal: 0, taxDetails: [], taxTotal: 0, total: 0 };
   }
   const applicable = taxes.filter((t) => isTaxApplicable(t, opts?.currencyPaid));
-  const rateSum = applicable.reduce((sum, t) => sum + t.rate, 0);
-  const subtotal = roundCents(total / (1 + rateSum));
+  const grossFirst = applicable.filter((t) => t.basis === 'gross_first');
+  const inclusive = applicable.filter((t) => t.basis !== 'gross_first');
+
+  const amountByName = new Map<string, number>();
+  let remaining = total;
+  for (const tax of grossFirst) {
+    const amount = roundCents(total * tax.rate);
+    amountByName.set(tax.name, amount);
+    remaining -= amount;
+  }
+  if (remaining < 0) {
+    throw new Error(
+      'computeInclusiveTaxes: los impuestos gross_first superan el total cobrado.',
+    );
+  }
+
+  const rateSum = inclusive.reduce((sum, t) => sum + t.rate, 0);
+  const subtotal = roundCents(remaining / (1 + rateSum));
+  for (const tax of inclusive) {
+    amountByName.set(tax.name, roundCents(subtotal * tax.rate));
+  }
+
+  // Orden = el del perfil fiscal (país), no el de las categorías.
   const taxDetails: ITaxDetail[] = applicable.map((t) => ({
     name: t.name,
     rate: t.rate,
-    amount: roundCents(subtotal * t.rate),
+    amount: amountByName.get(t.name) ?? 0,
   }));
   const taxTotal = total - subtotal;
   // Polvo de redondeo (≤1¢) a la última línea: la suma cuadra exacto.

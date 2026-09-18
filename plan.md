@@ -96,7 +96,7 @@ Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-co
 | C0 — Integridad del correlativo (orden + carrera) | ✅ Hecha |
 | C8 — Guardado de organización org-scoped en Panel (D5) | ✅ Hecha |
 | C1 — Snapshot del emisor (registro inmutable) | ⏳ Pendiente (migración) |
-| C2 — Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | ⏳ Pendiente |
+| C2 — Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | ✅ Hecha |
 | C3 — Fidelidad del PDF | ⏳ Pendiente |
 | C4 — Auditoría espejo en Console (`FS-N`) | ⏳ Pendiente |
 | C5 — Trazabilidad de emisión (`issued_by`) | ⏳ Pendiente (misma migración que C1) |
@@ -109,4 +109,4 @@ Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglo
 
 ## Próximo paso inmediato
 
-**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado) + **C0 y C8** del track de correcciones. Siguiente: C1+C5 (migración) o lo que ordene el usuario.
+**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado) + **C0, C8 y C2** del track de correcciones. Siguiente: **C3** (fidelidad del PDF, sin migración) o C4; C1+C5 requieren aprobación de migración.

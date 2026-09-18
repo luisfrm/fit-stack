@@ -97,6 +97,9 @@ test.describe('Panel — Settings', () => {
     await expect(page.getByLabel('Eslogan / Lema')).toHaveValue(value, { timeout: 30_000 });
   });
 
+  // Depende de que el spec "guarda la configuración fiscal…" (arriba) haya
+  // declarado la sede como contribuyente formal: sin esa declaración el
+  // ajuste manual de impuestos ni se ofrece (C2, el override solo reduce).
   test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NUEVO PAGO' }).click();

@@ -57,6 +57,8 @@ interface PaymentSectionProps {
   readonly onTaxRateChange: (name: string, pct: string) => void;
   readonly taxOverrideReason: string;
   readonly onTaxOverrideReasonChange: (value: string) => void;
+  /** Declaración de contribuyente formal del emisor (gating fiscal, C2). */
+  readonly taxEmitterIsFormal: boolean;
 }
 
 export function PaymentSection({
@@ -94,6 +96,7 @@ export function PaymentSection({
   onTaxRateChange,
   taxOverrideReason,
   onTaxOverrideReasonChange,
+  taxEmitterIsFormal,
 }: PaymentSectionProps) {
   return (
     <Card className={cn(
@@ -202,6 +205,7 @@ export function PaymentSection({
           reason={taxOverrideReason}
           onReasonChange={onTaxOverrideReasonChange}
           disabled={disabled}
+          emitterIsFormal={taxEmitterIsFormal}
         />
       )}
       <div className="flex items-center justify-between p-4 rounded-xl border border-dashed border-border bg-accent/5">

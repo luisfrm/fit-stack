@@ -173,6 +173,17 @@ export function createReceiptsService(
             'El desglose no cuadra con el monto cobrado.',
           );
         }
+        // D6: el override solo puede REDUCIR carga fiscal. Un emisor que no
+        // declaró ser contribuyente formal no puede detallar impuestos por
+        // esta vía (sería afirmar un hecho fiscal que no declaró).
+        const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
+        if (!profile.isFormalTaxpayer && overrideTotal > 0) {
+          throw new ReceiptError(
+            400,
+            'TAXES_REQUIRE_FORMAL_TAXPAYER',
+            'Para detallar impuestos primero debes declarar el negocio como contribuyente formal.',
+          );
+        }
         const computed = applyTaxOverride(o.subtotal, profile.taxes, {
           taxTotal: o.taxTotal,
           taxDetails: o.taxDetails,

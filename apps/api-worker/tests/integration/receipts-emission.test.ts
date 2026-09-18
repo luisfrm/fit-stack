@@ -71,9 +71,27 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     client.r2.reset();
   }
 
-  /** Tenant + member + plan + validated $100.00 USD payment via HTTP. */
-  async function createValidatedPayment() {
+  /**
+   * Tenant + member + plan + validated $100.00 USD payment via HTTP.
+   * `declareFormal` deja la sede como contribuyente formal con IVA + IGTF
+   * confirmados (C2: sin declaración no hay desglose).
+   */
+  async function createValidatedPayment(declareFormal = false) {
     const { owner, organization } = await createGymTenant();
+    if (declareFormal) {
+      const fiscal = await owner.client.patch('/api/organizations/profile', {
+        fiscalConfig: {
+          isFormalTaxpayer: true,
+          confirmedTaxes: ['IGTF'],
+          taxes: [
+            { name: 'IVA', rate: 0.16, enabled: true },
+            { name: 'IGTF', rate: 0.03, enabled: true },
+          ],
+        },
+        confirmed: true,
+      });
+      expect(fiscal.status, fiscal.text).toBe(200);
+    }
     const member = await createGymMember(owner.client);
     const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
     resetSpies(owner.client);
@@ -99,20 +117,17 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     return { owner, organization, member, plan, payment: rows[0]! };
   }
 
-  it('T1 paso 1: número inmediato + receipt.render + impuestos, cero emails', async () => {
+  it('T1 paso 1: número inmediato + receipt.render + sin desglose, cero emails', async () => {
     const { owner, organization, payment } = await createValidatedPayment();
 
-    // VE + USD → IVA 16% + IGTF 3%: 10000 = 8403 + 1597 (1344 + 253).
     expect(payment['receipt_number']).toMatch(
       new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
     );
-    expect(Number(payment['subtotal'])).toBe(8403);
-    expect(Number(payment['tax_total'])).toBe(1597);
-    const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
-    expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);
-    expect(
-      details.reduce((s, d) => s + d.amount, 0),
-    ).toBe(1597);
+    // C2/D1: sede SIN declararse contribuyente formal → el comprobante no
+    // detalla impuestos (se persiste el total, nunca un IVA que no declaró).
+    expect(payment['tax_details']).toEqual([]);
+    expect(Number(payment['subtotal'])).toBe(10000);
+    expect(Number(payment['tax_total'])).toBe(0);
 
     const renders = owner.client.receiptQueue.ofType('receipt.render');
     expect(renders).toHaveLength(1);
@@ -133,6 +148,20 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       pdfStatus: 'pending',
       receiptNumber: payment['receipt_number'],
     });
+  });
+
+  it('T1b sede FORMAL: desglose IVA + IGTF con base gross_first y cuadre exacto', async () => {
+    const { payment } = await createValidatedPayment(true);
+
+    // VE + USD + IGTF confirmado: IGTF = 3 % de 10000 = 300 (se extrae
+    // primero); resto 9700 → base = round(9700 / 1.16) = 8362 · IVA = 1338.
+    const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
+    expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);
+    expect(details.find((d) => d.name === 'IGTF')?.amount).toBe(300);
+    expect(details.find((d) => d.name === 'IVA')?.amount).toBe(1338);
+    expect(Number(payment['subtotal'])).toBe(8362);
+    expect(Number(payment['tax_total'])).toBe(1638);
+    expect(Number(payment['subtotal']) + Number(payment['tax_total'])).toBe(10000);
   });
 
   it('T2 paso 2: completa PDF en R2 y encola el email (gate rowCount===1)', async () => {

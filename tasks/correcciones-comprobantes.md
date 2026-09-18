@@ -13,7 +13,7 @@
 | C0 | Integridad del correlativo (orden + carrera) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
 | C8 | Guardado de organización org-scoped en Panel (D5) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
 | C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí | 🔴 Bloqueante | M |
-| C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M |
+| C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M | ✅ Hecha |
 | C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S |
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí | 🟡 Media | S |
@@ -133,7 +133,7 @@ Riesgo añadido: ambos guardados escriben la misma fila `organization`. El merge
 
 ---
 
-## C2 — Perfil fiscal conservador 🟠 (sin migración)
+## C2 — Perfil fiscal conservador 🟠 (sin migración) ✅
 
 ### D1 (congelada) — ¿`isFormalTaxpayer` gobierna el desglose?
 
@@ -176,7 +176,22 @@ VE-only, condicional (`currencyPaid !== 'VES'`) y en la práctica sujeto a que e
 - Unit `fiscal-profile.test.ts`: no formal → todos los `countryTaxes` `enabled: false`; formal → `enabled: true`; formal + desactivación explícita → se respeta; config almacenada con impuestos activos sin ser formal → se normaliza a `false`.
 - Unit `tax-math.test.ts`: caso IGTF `gross_first` → `subtotal + taxTotal === total` exacto (3090 → 2584 + 413 + 93); sin condiciones cumplidas → sin desglose.
 - Integración: gym no formal → `taxDetails: []`, `subtotal === amountPaid`, label "Comprobante de pago"; gym formal → desglose IVA correcto. `PATCH /profile` con `enabled:true` sin ser formal → **400** `TAXES_REQUIRE_FORMAL_TAXPAYER`.
-- Preview del panel y paso 1 dan resultados idénticos (misma función compartida; sin cambios de código en el form de pago).
+- ✅ Preview del panel y paso 1 dan resultados idénticos (misma función compartida; sin cambios de código en el form de pago).
+
+### Implementación (real)
+
+- `packages/shared/src/documents/fiscal-profile.ts` → `countryTaxes` nacen `enabled: isFormalTaxpayer`; condicionales nacen `enabled: false` + `basis: 'gross_first'` + `requiresConfirmation: true`; **normalización defensiva** al final del resolver (no formal → todo apagado; condicional sin confirmar → apagado). Nuevo campo `FiscalConfigSchema.confirmedTaxes: string[]` (fricción D2 persistida) y helper puro `findFiscalWriteViolation(countryCode, config)`.
+- `packages/shared/src/documents/tax-math.ts` → `computeInclusiveTaxes` extrae primero las líneas `gross_first` (`roundCents`) y descompone el resto; lanza si el gross-first supera el total cobrado (nunca inventa números). `TaxInput` gana `basis?`/`requiresConfirmation?` (informativo).
+- `apps/api-worker/src/services/organizations.service.ts` → 400 `TAXES_REQUIRE_FORMAL_TAXPAYER` / `TAX_REQUIRES_CONFIRMATION` validando el **config fusionado** (D6) en `createOrganization` y `updateOrganization`; `mergeFiscalConfig` acumula `confirmedTaxes` (una confirmación no se pierde en un PATCH parcial).
+- `apps/api-worker/src/services/receipts.service.ts` → el override manual que detalla impuestos con `taxDetails` > 0 queda **prohibido** si el emisor no es formal (400): el override solo puede reducir carga fiscal.
+- Panel `settings/organization/page.tsx` → toggles de impuestos gated por la declaración formal (con nota "tu comprobante no detalla impuestos"), impuestos condicionales con **tasa manual + confirmación** y aviso de que cambian la base de los demás; apagar la declaración apaga y desconfirma todo.
+- Panel `payments/tax-block.tsx` + `payment-section.tsx` + `subscription-form.tsx` → `emitterIsFormal`: sin declaración formal no hay ajuste manual (el modo efectivo es `auto`) y el copy de "sin impuestos" se lee como caso normal, no como error.
+- Console `emitter-settings.tsx` → nota explícita de que los comprobantes `FS-N` no detallan impuestos (no existe storage de `fiscalConfig` para el emisor plataforma; ver `docs/PENDING.md` §9).
+- Tests: `fiscal-profile.test.ts` (32) y `tax-math.test.ts` (17) reescritos a la semántica nueva; `receipts-emission.test.ts` T1 (informal → sin desglose) + **T1b** (formal → 300 + 1338 cuadrando 10000); `organizations-fiscal.test.ts` (+3 casos de gating); `platform-receipts-emission.test.ts` T1 (SaaS sin desglose).
+
+### Cambio de comportamiento a comunicar
+
+Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` declarado emitirá **sin desglose** en su siguiente comprobante (los ya emitidos no cambian: son inmutables). Lo mismo para las suscripciones SaaS (`FS-N`). Para recuperar el desglose: Panel → Configuración de Sede → Facturación → declarar contribuyente formal (con confirmación) y, si aplica IGTF, confirmar la tasa con el contador.
 
 ---
 
@@ -300,7 +315,7 @@ C8 ──┘                └──▶ (migración aprobada) C1 + C5 ──▶
 ```
 
 - **C0 + C8** primero, en el mismo PR: C0 corrompe datos (quema correlativos en silencio) y C8 rompe el módulo de identidad de sede en producción. Ambos sin migración.
-- **C2/C3/C4** sin migración y con tests puros: paralelizables.
+- **C2/C3/C4** sin migración y con tests puros: paralelizables (C2 ✅ hecha).
 - **C1+C5** en **una sola** migración, con aprobación explícita.
 - **C6/C7** cierran huecos de auditoría y documentación.
 

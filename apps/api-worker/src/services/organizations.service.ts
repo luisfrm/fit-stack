@@ -1,7 +1,13 @@
 import { HTTPException } from 'hono/http-exception';
 import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } from '../repositories/organizations.repository';
 import type { SettingsRepository } from '../repositories/settings.repository';
-import { buildDefaultOrgSettings, primaryCurrencyForCountry, FiscalConfigSchema, StoredFiscalConfigSchema } from '@workspace/shared';
+import {
+  buildDefaultOrgSettings,
+  findFiscalWriteViolation,
+  primaryCurrencyForCountry,
+  FiscalConfigSchema,
+  StoredFiscalConfigSchema,
+} from '@workspace/shared';
 import type { FiscalConfig } from '@workspace/shared';
 
 const slugTakenError = (message: string) =>
@@ -12,6 +18,33 @@ const slugTakenError = (message: string) =>
       headers: { 'content-type': 'application/json' },
     }),
   });
+
+/**
+ * 400 explícito del invariante fiscal (D6): el override solo puede REDUCIR
+ * carga fiscal. Se valida el config FUSIONADO (un parcial entrante no conoce
+ * el `isFormalTaxpayer` almacenado) y siempre antes de persistir.
+ */
+const FISCAL_VIOLATION_MESSAGES: Record<string, string> = {
+  TAXES_REQUIRE_FORMAL_TAXPAYER:
+    'Para activar impuestos primero debes declarar el negocio como contribuyente formal.',
+  TAX_REQUIRES_CONFIRMATION:
+    'Ese impuesto es condicional: exige confirmar la tasa vigente con tu contador antes de activarlo.',
+};
+
+const fiscalViolationError = (violation: {
+  code: string;
+  taxName?: string;
+}) => {
+  const message =
+    FISCAL_VIOLATION_MESSAGES[violation.code] ?? 'Configuración fiscal inválida.';
+  return new HTTPException(400, {
+    message,
+    res: new Response(
+      JSON.stringify({ error: message, code: violation.code, tax: violation.taxName }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
+};
 
 /**
  * Base del merge: la almacenada puede venir de una versión previa con keys
@@ -33,7 +66,9 @@ function parseStoredFiscalConfig(stored: unknown): FiscalConfig {
  * Fusiona el `fiscalConfig` entrante sobre el existente (merge, no reemplazo
  * ciego): los escalares presentes reemplazan; `taxes[]` se fusiona por
  * `name` (override actualiza rate/enabled; nombres desconocidos se conservan
- * tal cual — el resolver los ignora). `null` explícito = reset a defaults.
+ * tal cual — el resolver los ignora) y `confirmedTaxes[]` se acumula (una
+ * confirmación no se pierde por un PATCH parcial de otro campo; revocarla es
+ * apagar el impuesto). `null` explícito = reset a defaults.
  */
 export function mergeFiscalConfig(
   current: unknown,
@@ -46,6 +81,11 @@ export function mergeFiscalConfig(
   if (incoming.documentLabel !== undefined) merged.documentLabel = incoming.documentLabel;
   if (incoming.disclaimerOverride !== undefined) merged.disclaimerOverride = incoming.disclaimerOverride;
   if (incoming.isFormalTaxpayer !== undefined) merged.isFormalTaxpayer = incoming.isFormalTaxpayer;
+  if (incoming.confirmedTaxes !== undefined) {
+    merged.confirmedTaxes = [
+      ...new Set([...(base.confirmedTaxes ?? []), ...incoming.confirmedTaxes]),
+    ];
+  }
 
   if (incoming.taxes !== undefined) {
     const byName = new Map((base.taxes ?? []).map((t) => [t.name, t]));
@@ -113,6 +153,14 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         updatedAt: new Date(),
       };
 
+      // Fail-closed en la creación: una org no puede nacer afirmando
+      // impuestos que su emisor no declaró.
+      const createViolation = findFiscalWriteViolation(
+        data.countryCode,
+        data.fiscalConfig as FiscalConfig | null | undefined,
+      );
+      if (createViolation) throw fiscalViolationError(createViolation);
+
       const created = await orgsRepo.create(newOrgData);
       if (!created) {
         throw new Error('Error al crear la organización');
@@ -148,8 +196,16 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       if ('fiscalConfig' in data) {
         const incoming = data.fiscalConfig as FiscalConfig | null | undefined;
         if (incoming !== undefined) {
-          (data as { fiscalConfig?: FiscalConfig | null }).fiscalConfig =
-            mergeFiscalConfig(current.fiscalConfig, incoming);
+          const merged = mergeFiscalConfig(current.fiscalConfig, incoming);
+          // Se valida el RESULTADO del merge, no el body entrante (D6).
+          // Si el mismo PATCH cambia el país, se valida contra el nuevo
+          // (los condicionales son por país).
+          const violation = findFiscalWriteViolation(
+            data.countryCode ?? current.countryCode,
+            merged,
+          );
+          if (violation) throw fiscalViolationError(violation);
+          (data as { fiscalConfig?: FiscalConfig | null }).fiscalConfig = merged;
         }
       }
 

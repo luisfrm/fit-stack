@@ -149,7 +149,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     };
   }
 
-  it('T1 paso 1: aprobar numera FS-N + impuestos, encola render, cero emails', async () => {
+  it('T1 paso 1: aprobar numera FS-N (sin desglose), encola render, cero emails', async () => {
     const paymentId = await createProcessingPayment();
     resetSpies(admin.client);
 
@@ -161,13 +161,12 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
 
     const payment = await readPayment(paymentId);
     expect(payment['receipt_number']).toMatch(/^FS-\d{7,}$/);
-    // Acoplado al default VE del helper (`createOrganization countryCode VE`):
-    // IVA 16% + IGTF 3%: 5000 = 4202 + 798 (672 + 126).
-    expect(Number(payment['subtotal'])).toBe(4202);
-    expect(Number(payment['tax_total'])).toBe(798);
-    const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
-    expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);
-    expect(details.reduce((s, d) => s + d.amount, 0)).toBe(798);
+    // C2/D1: el emisor plataforma (FitStack) no está declarado como
+    // contribuyente formal en ningún lado → el comprobante SaaS no detalla
+    // impuestos: se persiste el total cobrado, sin desglose inventado.
+    expect(payment['tax_details']).toEqual([]);
+    expect(Number(payment['subtotal'])).toBe(5000);
+    expect(Number(payment['tax_total'])).toBe(0);
 
     const renders = admin.client.receiptQueue.ofType('receipt.render');
     expect(renders).toHaveLength(1);
