@@ -262,6 +262,93 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(renders).not.toContainEqual(expect.objectContaining({ paymentId: recentId }));
   });
 
+  it('T4b barrido: PDF listo sin notificar se recupera y no re-renderiza (C6)', async () => {
+    const { owner, organization } = await createGymTenant();
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, { price: 500, currency: 'USD' });
+
+    resetSpies(owner.client);
+    const res = await owner.client.post('/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: isoDate(0),
+      endDate: isoDate(30),
+      payment: {
+        amountPaid: 500,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        status: 'validated',
+        paymentDate: isoDate(0),
+      },
+    });
+    expect(res.status, res.text).toBe(201);
+    const rows = await testQuery<{ id: number; receipt_pdf_key: string | null }>(
+      `SELECT id, receipt_pdf_key FROM payment WHERE subscription_id = $1`,
+      [res.body.id],
+    );
+    const paymentId = Number(rows[0]!.id);
+    expect(rows[0]!.receipt_pdf_key).toBeNull();
+
+    // Paso 2 completo (PDF en R2 + email encolado + marca de notificado).
+    const event = owner.client.receiptQueue.ofType('receipt.render')[0]!;
+    expect(
+      await handleReceiptRender(jobsEnv(owner.client), {
+        type: 'receipt.render',
+        scope: 'panel',
+        paymentId,
+        organizationId: organization.id,
+        receiptNumber: event['receiptNumber'] as string,
+      }),
+    ).toBe('completed');
+    const pdfKey = (
+      await testQuery<{ receipt_pdf_key: string }>(
+        `SELECT receipt_pdf_key FROM payment WHERE id = $1`,
+        [paymentId],
+      )
+    )[0]!.receipt_pdf_key;
+    expect(owner.client.r2.objects.has(pdfKey)).toBe(true);
+
+    // Simula la notificación perdida: el render quedó hecho pero el email del
+    // paso 2 nunca salió. Hasta C6 esa fila no la recuperaba nadie.
+    await testQuery(
+      `UPDATE payment SET receipt_issued_at = now() - interval '45 minutes', receipt_notified_at = NULL WHERE id = $1`,
+      [paymentId],
+    );
+    resetSpies(owner.client);
+
+    // El barrido es global (no filtra por org): puede re-encolar pendientes
+    // de otros tests, así que se aserta por presencia, no por conteo.
+    const { requeued } = await sweepPendingReceiptPdfs(sweepEnv(owner.client));
+    expect(requeued).toBeGreaterThanOrEqual(1);
+    const renders = owner.client.receiptQueue.ofType('receipt.render');
+    expect(renders).toContainEqual(expect.objectContaining({ paymentId }));
+
+    // El evento re-encolado NO re-renderiza (el PDF ya existe): si entrara al
+    // render path, repoblaría el objeto en el spy de R2 — que vaciamos a
+    // propósito para poder afirmarlo.
+    owner.client.r2.reset();
+    expect(
+      await handleReceiptRender(jobsEnv(owner.client), {
+        type: 'receipt.render',
+        scope: 'panel',
+        paymentId,
+        organizationId: organization.id,
+        receiptNumber: event['receiptNumber'] as string,
+      }),
+    ).toBe('completed');
+    expect(owner.client.r2.objects.size).toBe(0);
+    // Y sí recupera la notificación perdida.
+    expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(1);
+
+    // Segundo pase: ya notificado → ESE pago no se vuelve a encolar.
+    resetSpies(owner.client);
+    await sweepPendingReceiptPdfs(sweepEnv(owner.client));
+    expect(
+      owner.client.receiptQueue.ofType('receipt.render').map((r) => r['paymentId']),
+    ).not.toContain(paymentId);
+  });
+
   it('T5 contrato: pre_system 200 sin 409, pdf pendiente 404', async () => {
     const { owner } = await createGymTenant();
     const member = await createGymMember(owner.client);
@@ -451,6 +538,9 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       status: 'voided',
     });
     expect(patched.status).toBe(200);
+    // C6: el comprobante SÍ se anuló y el body lo dice (no un 200 mudo).
+    expect(patched.body).toMatchObject({ receiptVoided: true });
+    expect(patched.body.receiptVoidReason).toBeUndefined();
 
     const rows = await testQuery<Record<string, unknown>>(
       `SELECT receipt_number, receipt_voided, void_reason FROM payment WHERE id = $1`,
@@ -458,6 +548,49 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     );
     expect(rows[0]!['receipt_number']).toBe(receiptNumber);
     expect(rows[0]!['receipt_voided']).toBe(true);
+  });
+
+  it('T8b void sin comprobante: 200 con receiptVoided false + motivo (C6)', async () => {
+    const { owner } = await createGymTenant();
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, { price: 100, currency: 'USD' });
+    const res = await owner.client.post('/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: isoDate(0),
+      endDate: isoDate(30),
+      payment: {
+        amountPaid: 100,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        status: 'processing',
+        paymentDate: isoDate(0),
+      },
+    });
+    const rows = await testQuery<{ id: number }>(
+      `SELECT id FROM payment WHERE subscription_id = $1`,
+      [res.body.id],
+    );
+    const paymentId = Number(rows[0]!.id);
+
+    const patched = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+      status: 'voided',
+    });
+    // El status cambia igual; lo que se explicita es que NO había comprobante.
+    expect(patched.status, patched.text).toBe(200);
+    expect(patched.body).toMatchObject({
+      receiptVoided: false,
+      receiptVoidReason: 'not_issued',
+    });
+
+    const after = await testQuery<Record<string, unknown>>(
+      `SELECT status, receipt_number, receipt_voided FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(after[0]!['status']).toBe('voided');
+    expect(after[0]!['receipt_number']).toBeNull();
+    expect(after[0]!['receipt_voided']).toBe(false);
   });
 
   it('T9 sin email: emite igual; send-email 422', async () => {

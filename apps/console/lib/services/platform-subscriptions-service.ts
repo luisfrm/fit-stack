@@ -283,15 +283,19 @@ export const platformSubscriptionsService = {
 
   /**
    * Updates the status of an existing payment.
+   *
+   * Devuelve el resultado del intento de anulación del comprobante: con
+   * `voided` sin comprobante emitido, `receiptVoided` es `false` y
+   * `receiptVoidReason` es `'not_issued'` (C6).
    */
   async updatePaymentStatus(
     paymentId: number,
     status: PaymentStatus,
-  ): Promise<void> {
-    await api(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`, {
-      method: "PATCH",
-      body: { status },
-    });
+  ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
+    return await api<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }>(
+      `${SUBSCRIPTIONS_PATH}/payments/${paymentId}/status`,
+      { method: 'PATCH', body: { status } },
+    );
   },
 
   /* ── Auditoría del correlativo (C4) ── */

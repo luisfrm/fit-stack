@@ -454,11 +454,18 @@ export function createPlatformSubscriptionsService(
       return platformSubsRepo.findPaymentById(paymentId);
     },
 
+    /**
+     * Cambia el estado de un pago SaaS y devuelve el resultado del intento de
+     * anulación: el servicio interno LANZA `RECEIPT_NOT_ISSUED` cuando el pago
+     * no tiene número, pero el endpoint responde **200** con
+     * `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6): un
+     * silencio no le dice nada al operador.
+     */
     async updatePaymentStatus(
       paymentId: number,
       data: UpdatePlatformPaymentStatusPayload,
       opts?: PlatformReceiptContext
-    ): Promise<void> {
+    ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
       const payment = await platformSubsRepo.findPaymentById(paymentId);
       if (!payment) throw new Error('Pago no encontrado');
       const wasPending = payment.status !== PAYMENT_STATUSES.VALIDATED;
@@ -466,20 +473,26 @@ export function createPlatformSubscriptionsService(
       await platformSubsRepo.updatePaymentStatus(paymentId, data.status);
 
       // VOIDED con número emitido: conserva número + PDF y marca ANULADO
-      // (motivo fijo: el schema no pide motivo al usuario). Sin número no
-      // hay comprobante que anular (código, nunca texto). Solo VOIDED:
-      // REFUNDED e INVALID no tocan `receiptVoided`.
+      // (motivo fijo: el schema no pide motivo al usuario). Sin número no hay
+      // comprobante que anular, y eso se informa. Solo VOIDED: REFUNDED e
+      // INVALID no tocan `receiptVoided`.
+      let receiptVoided = false;
+      let receiptVoidReason: 'not_issued' | undefined;
       if (data.status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
-        await opts.receipts
-          .markPlatformReceiptVoided({
+        try {
+          await opts.receipts.markPlatformReceiptVoided({
             paymentId,
             by: opts.by,
             reason: 'Pago anulado',
-          })
-          .catch((err) => {
-            if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') return;
-            throw err;
           });
+          receiptVoided = true;
+        } catch (err) {
+          if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') {
+            receiptVoidReason = 'not_issued';
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Side effects según nuevo status
@@ -498,6 +511,8 @@ export function createPlatformSubscriptionsService(
           await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
         }
       }
+
+      return { receiptVoided, receiptVoidReason };
     },
 
     async getOrganizationInvoices(organizationId: string) {

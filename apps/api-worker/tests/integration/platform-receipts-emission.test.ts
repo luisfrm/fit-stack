@@ -239,6 +239,36 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     expect(renders).not.toContainEqual(expect.objectContaining({ paymentId: recentId }));
   });
 
+  it('T4b barrido: PDF listo sin notificar también se recupera (C6)', async () => {
+    const paymentId = await createProcessingPayment();
+    await approvePayment(paymentId);
+    const numbered = await testQuery<{ receipt_number: string }>(
+      `SELECT receipt_number FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    const receiptNumber = numbered[0]!.receipt_number;
+
+    // Estado simulado: PDF ya renderizado, notificación sin marcar y emisión
+    // hace 45 min → el 2.º predicado del barrido (C6) es el único que lo cubre.
+    await testQuery(
+      `UPDATE platform_subscription_payment
+         SET receipt_pdf_key = $2, receipt_notified_at = NULL,
+             receipt_issued_at = now() - interval '45 minutes'
+       WHERE id = $1`,
+      [paymentId, `platform/receipts/2026/${receiptNumber}.pdf`],
+    );
+    resetSpies(admin.client);
+
+    // Barrido global: se aserta por presencia (puede arrastrar pendientes de
+    // otros tests del archivo).
+    const { requeued } = await sweepPendingReceiptPdfs(sweepEnv(admin.client));
+    expect(requeued).toBeGreaterThanOrEqual(1);
+    const renders = admin.client.receiptQueue.ofType('receipt.render');
+    expect(renders).toContainEqual(
+      expect.objectContaining({ paymentId, scope: 'platform', receiptNumber }),
+    );
+  });
+
   it('T5 trial $0: SKIP sin quemar número (pre_system terminal)', async () => {
     resetSpies(admin.client);
     const res = await admin.client.post('/api/platform/subscriptions', {

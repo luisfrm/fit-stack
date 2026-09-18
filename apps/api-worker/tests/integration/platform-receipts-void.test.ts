@@ -3,10 +3,11 @@
  *
  * Covers: voiding a numbered payment preserves number+PDF and sets the
  * ANULADO flag (visible in `GET receipt ready` as `voided:true`); void
- * without a number → 409 `RECEIPT_NOT_ISSUED` (the status change itself
- * is NOT reverted); re-void is idempotent (audit intact); support 403
- * (inherited from `requirePlatformAuth`); void neither cancels the
- * subscription nor reverts the cumulative period.
+ * without a number → **200 with `receiptVoided:false` +
+ * `receiptVoidReason:'not_issued'`** (el status del pago sí cambia; el código
+ * `RECEIPT_NOT_ISSUED` es contrato interno del servicio, C6); re-void is
+ * idempotent (audit intact); support 403 (inherited from `requirePlatformAuth`);
+ * void neither cancels the subscription nor reverts the cumulative period.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -143,6 +144,8 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
 
     const res = await setStatus(paymentId, 'voided');
     expect(res.status, res.text).toBe(200);
+    // C6: el body confirma que el comprobante quedó ANULADO.
+    expect(res.body).toMatchObject({ receiptVoided: true });
 
     const after = await readPayment(paymentId);
     expect(after['receipt_voided']).toBe(true);
@@ -173,12 +176,16 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
     expect(receipt.body.receipt.voided).toBe(true);
   });
 
-  it('void sin número: 409 RECEIPT_NOT_ISSUED (el status cambia igual)', async () => {
+  it('void sin número: 200 con receiptVoided false + motivo (el status cambia igual)', async () => {
     const paymentId = await createProcessingPayment();
-    // Falla porque no hay comprobante; el cambio validated→voided del
-    // estado del pago NO se revierte (solo el flag no se setea).
+    // No hay comprobante que anular; el cambio de estado del pago NO se
+    // revierte y la respuesta lo dice explícitamente (C6) en vez de callarlo.
     const res = await setStatus(paymentId, 'voided');
     expect(res.status, res.text).toBe(200);
+    expect(res.body).toMatchObject({
+      receiptVoided: false,
+      receiptVoidReason: 'not_issued',
+    });
     const payment = await readPayment(paymentId);
     expect(payment['status']).toBe('voided');
     expect(payment['receipt_voided']).toBe(false);

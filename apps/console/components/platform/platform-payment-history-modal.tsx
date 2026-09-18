@@ -152,8 +152,14 @@ export function PlatformPaymentHistoryModal({
   ) => {    if (actionLoading) return;
     setActionPaymentId(paymentId);
     try {
-      await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
-      toast.success(`Pago marcado como ${status}`);
+      const result = await platformSubscriptionsService.updatePaymentStatus(paymentId, status);
+      // C6: anular sin comprobante emitido no es un error, pero se dice
+      // explícitamente en vez de un "marcado como voided" ambiguo.
+      if (status === PAYMENT_STATUSES.VOIDED && result?.receiptVoided === false) {
+        toast.success('Pago anulado. No tenía comprobante emitido.');
+      } else {
+        toast.success(`Pago marcado como ${status}`);
+      }
       await loadPayments();
       onChange?.();
     } catch (err) {

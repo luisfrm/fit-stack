@@ -64,12 +64,17 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE, c.env.TASK_QUEUE);
 
-    const updated = await subsService.updatePaymentStatus(orgId, id, status, {
-      receipts: receiptsService,
-      orgSlug: await resolveOrgSlug(c, orgId),
-      timezone,
-      by: c.get('user')?.id,
-    });
+    const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
+      orgId,
+      id,
+      status,
+      {
+        receipts: receiptsService,
+        orgSlug: await resolveOrgSlug(c, orgId),
+        timezone,
+        by: c.get('user')?.id,
+      },
+    );
     await cache.invalidate(`org:${orgId}:subscriptions*`);
     await cache.invalidateExact(`org:${orgId}:payments:analytics`);
     // `withoutActiveSubscription` de members:stats depende de subs/pagos.
@@ -78,7 +83,13 @@ export const paymentRoutes = new Hono<AppEnv>()
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     await cache.invalidate(`org:${orgId}:reports:revenue*`);
     await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    return c.json(updated);
+    // C6: el intento de anulación del comprobante se informa explícitamente
+    // (200 con `receiptVoided: false` + motivo), nunca en silencio.
+    return c.json({
+      ...payment,
+      receiptVoided,
+      ...(receiptVoidReason ? { receiptVoidReason } : {}),
+    });
   })
 
   // GET /api/payments/:id/receipt — contrato de 3 estados, nunca 409.

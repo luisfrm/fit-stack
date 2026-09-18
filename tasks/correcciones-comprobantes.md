@@ -17,7 +17,7 @@
 | C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S | ✅ Hecha |
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M | ✅ Hecha |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí (0016) | 🟡 Media | S | ✅ Hecha |
-| C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S |
+| C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S | ✅ Hecha |
 | C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S |
 | C9 | Estados reales (ANULADA ≠ CANCELADA) + registro no eliminable | Correctitud de modelo | No | 🟠 Alta | S | ✅ Hecha |
 
@@ -305,19 +305,36 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 
 ---
 
-## C6 — Robustez del barrido y contrato de anulación 🟡 (sin migración)
+## C6 — Robustez del barrido y contrato de anulación ✅ (sin migración)
 
-| Hallazgo | Cambio |
+### Problema
+
+1. **El barrido cubría la mitad del fallo.** Solo buscaba `número sin PDF`; si el PDF ya existía y el email del paso 2 no había salido (fallo de envío con rollback de la marca, o un evento perdido), esa notificación **no la recuperaba nadie**.
+2. **Un 200 mudo en la anulación.** `markReceiptVoided` lanza `RECEIPT_NOT_ISSUED` cuando el pago no tiene número (contrato interno correcto), pero el endpoint lo **tragaba** y respondía 200 sin decir nada: el operador no podía distinguir "anulé el comprobante" de "no había comprobante". `AGENTS.md` y el nombre de un test decían 409 — mintiéndose entre sí.
+3. **Higiene**: `c.get('user')!.id` en la ruta de Console, y la cadencia del cron viviendo solo en una nota de PENDING.
+
+### Cambios
+
+| Capa | Cambio |
 |---|---|
-| El barrido solo cubre `número sin PDF`; si el PDF existe y el email cayó a **DLQ**, la notificación se pierde para siempre (`receipt.handler.ts`, predicado `receipt_pdf_key IS NULL`). | Añadir 2.º predicado `receipt_pdf_key IS NOT NULL AND receipt_notified_at IS NULL AND receipt_issued_at < now() - interval '30 minutes'` (ambas tablas). Idempotente por el gate `markReceiptNotified`. |
-| `AGENTS.md` y el test afirman "409 without number", pero el servicio **traga** `RECEIPT_NOT_ISSUED` y la respuesta es **200** (`platform-receipts.service.ts` + `platform-receipts-void.test.ts`). Un silencio es peor que un error explícito. | Devolver en el body de `PATCH /payments/:id/status` un campo explícito (`receiptVoided: boolean` + `receiptVoidReason?`), que la UI muestre en toast diferenciado ("Pago anulado. No tenía comprobante emitido."). Corregir `AGENTS.md` y el nombre/assert del test. |
-| Cadencia de barrido: `0 */10 * * *` en `infrastructure/terraform/workers.tf` (pre-venta). | Convertirlo en **ítem de checklist de release** (no solo nota en PENDING): al pasar a clientes reales, `*/10 * * * *` y actualizar `plan.md`/`PENDING.md`. |
-| `c.get('user')!.id` en `platform-subscriptions.route.ts` (non-null assertion). | Usar guard explícito consistente con el resto del archivo; sin `!`. |
+| `receipt.handler.ts` (jobs-worker) | `pendingSweepQuery(table)` con **dos predicados**: (1) numerado sin PDF (≥15 min, cubierto por el índice parcial) y (2) PDF listo sin notificar (≥30 min, para no competir con un evento que aún reintenta). Una sola definición para las dos tablas; sigue siendo query local del barrido. |
+| `subscriptions.service.ts` (Panel) | `updatePaymentStatus` devuelve `{ payment, receiptVoided, receiptVoidReason? }`: el `try/catch` distingue "anulado" de `RECEIPT_NOT_ISSUED` (`not_issued`) y cualquier otro error sigue propagándose. |
+| `payments.route.ts` | El body del PATCH es `{ ...payment, receiptVoided, receiptVoidReason? }`. |
+| `platform-subscriptions.service.ts` + ruta | Mismo contrato (`{ receiptVoided, receiptVoidReason? }` sumado al body). El actor se resuelve con guard explícito (sin `!`). |
+| Panel (`finance-service` + `payments-client`) y Console (`platform-subscriptions-service` + modal de historial) | El servicio devuelve el body y la UI muestra toast diferenciado: *"Pago anulado. No tenía comprobante emitido."* |
 
-### Criterios de aceptación
+### Criterios de aceptación (verificados)
 
-- Integración: pago con PDF y `receipt_notified_at` `NULL` → el barrido re-encola y no duplica el PDF; un segundo pase no re-envía.
-- Integración: PATCH void sin número → 200 con `receiptVoided: false` y mensaje accionable en UI.
+- ✅ Integración Panel (`T4b`): pago con PDF en R2 y `receipt_notified_at` `NULL` → el barrido lo re-encola; el evento re-encolado **no re-renderiza** (el objeto de R2 sigue ausente tras vaciar el spy), **sí** recupera el email, y un segundo pase ya no lo encola.
+- ✅ Integración Console (`T4b`): mismo predicado sobre `platform_subscription_payment`, con `scope: 'platform'`.
+- ✅ Integración Panel (`T8`/`T8b`): void numerado → 200 `{ receiptVoided: true }`; void sin comprobante → 200 `{ receiptVoided: false, receiptVoidReason: 'not_issued' }` (el status del pago cambia igual; `receipt_number` sigue `NULL`).
+- ✅ Integración Console (`platform-receipts-void`): mismo par de asserts, con el nombre del test corregido (ya no dice 409).
+
+### Notas de implementación
+
+- **Índice**: el 2.º predicado no tiene índice (el parcial es `… WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL`). A escala *pre-venta* con `LIMIT 50` cada 10 h es irrelevante; si el barrido se vuelve lento, el índice a añadir es `(...) WHERE receipt_pdf_key IS NOT NULL AND receipt_notified_at IS NULL` (migración aparte, no incluida aquí por el criterio "C6 sin migración").
+- **Límite honesto**: si el email **ya encolado** en `fit-task-events` agota reintentos y cae a su DLQ, la marca de notificado ya está puesta y el barrido no lo ve. La recuperación es manual (`POST /:id/send-email` desde el Panel, `POST /payments/:id/resend` desde Console). Ver `docs/PENDING.md` §14.
+
 
 ---
 
@@ -327,7 +344,7 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 |---|---|
 | Artefactos de E2E | `.gitignore`: añadir `*.log` (los archivos ya se eliminaron, la regla evita la reincidencia). |
 | Naming cosmético | `platform_document_sequence.nextNumber` se comporta como `lastNumber`. Renombrar es cosmético y **sí** requiere migración → se agrupa con C1/C5 **si** se aprueba; si no, queda documentado (no vale un ciclo de migración por un nombre). |
-| Documentación | `plan.md` (decisiones nuevas: snapshot de emisor, gating fiscal, auditoría Console, riesgo residual de carrera), `AGENTS.md` (§1 sigue con 2 repos compartidos, route map +1 endpoint, cache key `platform:receipts:*`, columnas nuevas, semántica real de void sin número), `docs/PENDING.md` (§8 proxy de país Console sigue abierto; nuevo ítem **IGTF: base y tasa a confirmar con contador**; nuevo ítem **claim-then-number** como opción de cierre total). |
+| Documentación | `plan.md` (decisiones nuevas: snapshot de emisor, gating fiscal, auditoría Console, riesgo residual de carrera), `AGENTS.md` (§1 sigue con 2 repos compartidos, route map +1 endpoint, cache key `platform:receipts:*`, columnas nuevas, semántica real de void sin número), `docs/PENDING.md` (§8 proxy de país Console sigue abierto; ítem **IGTF: base y tasa a confirmar con contador**; ítem **claim-then-number** como opción de cierre total; §12 integridad del registro financiero; §13 borrado de la suscripción SaaS en Console). Nuevos documentos de referencia: **`docs/PAYMENT_STATUSES.md`** (semántica de los 6 estados en Panel y Console + las diferencias reales entre los dos flujos) y **`docs/CHECKLIST-COMPROBANTES.md`** (estados → flujo → fases → pendientes → verificación). |
 | Tests E2E | Añadir al spec de settings del panel el guardado del **formulario general** de organización (hoy solo se prueba "Guardar facturación") — habría detectado el 403 de D5. |
 | Unit tests faltantes | `emitterSnapshot` (inmutable vs composición viva), `issuedBy`, gating fiscal por `isFormalTaxpayer`, `baseTotal` del PDF. |
 
@@ -389,7 +406,8 @@ C8 ──┘                └──▶ C1 + C5 ──▶ C6 ──▶ C7
 - **C2/C3/C4** sin migración y con tests puros: paralelizables (C2 ✅ hecha).
 - **C1+C5** en **una sola** migración (`0016`), con aprobación explícita. ✅
 - **C9** (estados reales + registro no eliminable + los 2 fallos de E2E) es ortogonal y sin migración. ✅
-- **C6/C7** cierran huecos de auditoría y documentación. ← pendientes
+- **C6** (barrido de dos predicados + contrato de anulación explícito) sin migración. ✅
+- **C7** cierra la higiene, docs y matriz de tests. ← pendiente
 
 ## Verificación por fase
 
@@ -419,6 +437,7 @@ Verificación manual obligatoria (adjuntar al PR): PDF de gym informal sin `taxI
 
 `e2e/panel/subscriptions.spec.ts` → *“validar desde la lista quita el pendiente”* fallaba de forma determinista y **no** era regresión de C1/C5 (verificado en su momento: fallaba igual en el commit anterior con los cambios revertidos). Causa: `panel-setup` precalienta `/payments` (`PANEL_PREWARM_ROUTES`) y la página cacheaba su fetch con `next: { revalidate: 60 }`; el fixture del test se crea **después** del prewarm por API (sin invalidar el Data Cache de Next), así que la primera visita reutilizaba el render cacheado sin el pendiente. Se aplicó la opción (b): la lista accionable `processing` ya no se cachea. Ver C9.
 - [ ] El guardado de la organización en Panel funciona para owners reales (sin depender de un rol de plataforma).
-- [ ] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export.
-- [ ] Anular sin número es explícito para el usuario, no un silencio.
+- [x] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export. — C4
+- [x] Anular sin número es explícito para el usuario, no un silencio. — C6
+- [x] Un PDF listo cuya notificación se perdió vuelve a intentarse (barrido de 2 predicados). — C6
 - [ ] `AGENTS.md`, `plan.md` y `docs/PENDING.md` reflejan el estado real.

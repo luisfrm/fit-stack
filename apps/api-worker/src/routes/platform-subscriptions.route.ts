@@ -347,10 +347,14 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const payment = await service.getPaymentById(paymentId);
     if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
 
-    await service.updatePaymentStatus(paymentId, data, {
+    // Guard explícito (sin `!`): `requirePlatformAuth` garantiza sesión, pero
+    // el actor del ANULADO se resuelve igual que en el resto del archivo.
+    const actor = c.get('user')?.id;
+    if (!actor) return c.json({ error: 'Sesión requerida.' }, 401);
+
+    const receipt = await service.updatePaymentStatus(paymentId, data, {
       receipts: buildReceipts(c),
-      // `requirePlatformAuth` garantiza sesión: actor no-nulo para ANULADO.
-      by: c.get('user')!.id,
+      by: actor,
     });
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);
@@ -361,7 +365,9 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       await invalidateInvoicesCache(c, payment.organizationId);
     }
 
-    return c.json({ success: true, paymentId, status: data.status });
+    // C6: el intento de anulación del comprobante viaja en el body
+    // (`receiptVoided` + `receiptVoidReason`), nunca en silencio.
+    return c.json({ success: true, paymentId, status: data.status, ...receipt });
   })
 
   // GET /api/platform/subscriptions/payments/:paymentId/receipt — contrato

@@ -100,7 +100,7 @@ Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-co
 | C3 — Fidelidad del PDF (líneas omitidas + equivalente en moneda base) | ✅ Hecha |
 | C4 — Auditoría espejo en Console (`FS-N`) | ✅ Hecha |
 | C5 — Trazabilidad de emisión (`issued_by`) | ✅ Hecha (misma migración `0016`) |
-| C6 — Barrido (2.º predicado) y contrato de anulación | ⏳ Pendiente |
+| C6 — Barrido (2.º predicado) y contrato de anulación | ✅ Hecha |
 | C7 — Higiene, docs y matriz de tests | ⏳ Pendiente |
 | C9 — Estados reales (ANULADA ≠ CANCELADA) + registro no eliminable | ✅ Hecha |
 
@@ -116,4 +116,6 @@ Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglo
 
 **C9 completada** (sin migración): el status derivado distingue **ANULADA** (`voided`: el cobro se anuló o se rechazó — el registro es inválido) de **CANCELADA** (`cancelled`: el acceso se revocó con un cobro que sigue siendo válido); un registro financiero **no se elimina** (fuera `DELETE /api/subscriptions/:id`, fuera la acción del panel y el permiso), se anula. Además cerró los dos fallos de E2E: el `storageState` de la org vacía (lo escribe `panel-setup`) y el accionable de pago pendiente (lista de trabajo sin caché).
 
-Según el orden congelado, quedan **C6** (robustez del barrido + contrato de anulación explícito) y **C7** (higiene, docs y matriz de tests). El hallazgo de E2E que estaba anotado ahí quedó resuelto en C9; en `docs/PENDING.md` §12 quedan anotadas dos aristas del mismo tema: `create()` no es atómico de verdad (puede dejar una suscripción huérfana) y el borrado de un miembro arrastra su histórico financiero por cascada.
+**C6 completada** (sin migración): el barrido cubre sus **dos** estados de fallo (numerado sin PDF, y PDF listo sin notificar) con una única definición de query para las dos tablas, y la anulación de un pago **sin comprobante** dejó de ser un 200 mudo: el body del PATCH trae `receiptVoided` + `receiptVoidReason: 'not_issued'` y el Panel/Console lo dicen con un toast diferenciado (el código `RECEIPT_NOT_ISSUED` queda como contrato interno del servicio).
+
+Queda **C7** (higiene, docs y matriz de tests). En `docs/PENDING.md` quedan anotadas las aristas abiertas: §12 (`create()` no es atómico de verdad y el borrado de un miembro arrastra su histórico financiero) y §13 (el DELETE de la suscripción SaaS en Console puede vaciar la serie `FS-N`), más §14 (email que agota reintentos y cae a la DLQ después de la marca de notificado: recuperación manual).

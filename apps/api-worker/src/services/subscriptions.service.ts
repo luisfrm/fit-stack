@@ -58,6 +58,22 @@ export interface ReceiptContext {
   by?: string;
 }
 
+/**
+ * Resultado de `updatePaymentStatus`.
+ *
+ * `receiptVoided` es `false` cuando el nuevo status no es `voided` o cuando el
+ * pago **no tenía comprobante emitido** — y en ese segundo caso viaja
+ * `receiptVoidReason: 'not_issued'`, porque el servicio interno lanza
+ * `RECEIPT_NOT_ISSUED` pero el endpoint responde **200**: el usuario tiene que
+ * poder distinguir "se anuló el comprobante" de "no había comprobante".
+ */
+export interface PaymentStatusResult {
+  /** Fila `payment` actualizada (el route la serializa tal cual). */
+  payment: any;
+  receiptVoided: boolean;
+  receiptVoidReason?: 'not_issued';
+}
+
 export function createSubscriptionsService(
   subsRepo: SubscriptionsRepository,
   paymentsRepo: PaymentsRepository,
@@ -228,7 +244,7 @@ export function createSubscriptionsService(
       paymentId: number,
       status: string,
       opts?: ReceiptContext,
-    ) {
+    ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any);
       if (!updated) {
@@ -242,19 +258,26 @@ export function createSubscriptionsService(
         await this.cancel(organizationId, updated.subscriptionId);
       }
       // Void con número emitido: conserva número + PDF y marca ANULADO.
+      // Sin comprobante emitido no hay nada que anular, pero el resultado se
+      // informa explícitamente (C6) en vez de tragarse el código del servicio.
+      let receiptVoided = false;
+      let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
       if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
-        await opts.receipts
-          .markReceiptVoided({
+        try {
+          await opts.receipts.markReceiptVoided({
             orgId: organizationId,
             paymentId,
             by: opts.by,
             reason: 'Pago anulado',
-          })
-          .catch((err) => {
-            // Sin comprobante emitido no hay nada que anular (código, nunca texto).
-            if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') return;
-            throw err;
           });
+          receiptVoided = true;
+        } catch (err) {
+          if (err instanceof ReceiptError && err.code === 'RECEIPT_NOT_ISSUED') {
+            receiptVoidReason = 'not_issued';
+          } else {
+            throw err;
+          }
+        }
       }
 
       // Un pago que pasa de processing/pending a validated emite su recibo
@@ -281,7 +304,7 @@ export function createSubscriptionsService(
         }
       }
 
-      return updated;
+      return { payment: updated, receiptVoided, receiptVoidReason };
     },
 
     async updateStatus(organizationId: string, id: number, status: 'active' | 'cancelled') {

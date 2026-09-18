@@ -227,23 +227,46 @@ export async function handleReceiptRender(
 }
 
 /**
- * Barrido de pendientes: re-encola renders de pagos numerados sin PDF con
- * más de 15 minutos. Query LOCAL (solo jobs-worker la usa: el paso 2 ya
- * tiene su evento y api-worker nunca barre — criterio 2-apps-idéntico).
- * Idempotente con el paso 2. Una fila corrupta no aborta el resto.
+ * Pendientes de barrido — dos predicados, mismas columnas en las dos tablas:
+ *
+ * 1. **Numerado sin PDF** (≥15 min): el render se perdió. Es el caso que ya
+ *    cubría el índice parcial (`idx_payment_receipt_pending` /
+ *    `idx_psp_receipt_pending`).
+ * 2. **PDF listo pero sin notificar** (≥30 min): el render completó y el
+ *    email del paso 2 nunca salió (o su marca quedó revertida por un fallo de
+ *    envío). Sin este predicado esa notificación se perdía para siempre.
+ *
+ * Los 30 minutos del 2.º caso son deliberados: el evento original puede
+ * seguir reintentando y no queremos re-encolar en paralelo con él. Re-encolar
+ * de todos modos es seguro: la notificación tiene su propio gate idempotente
+ * (`markReceiptNotified` / `markPlatformReceiptNotified`), así que ni el PDF ni
+ * el email se duplican.
+ *
+ * Query LOCAL (solo jobs-worker la usa: el paso 2 ya tiene su evento y
+ * api-worker nunca barre — criterio 2-apps-idéntico). Una fila corrupta no
+ * aborta el resto.
  */
+function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): string {
+  return `SELECT id, organization_id, receipt_number FROM ${table}
+    WHERE receipt_number IS NOT NULL
+      AND (
+        (receipt_pdf_key IS NULL AND receipt_issued_at < now() - interval '15 minutes')
+        OR (receipt_pdf_key IS NOT NULL AND receipt_notified_at IS NULL
+            AND receipt_issued_at < now() - interval '30 minutes')
+      )
+    ORDER BY receipt_issued_at ASC LIMIT $1`;
+}
+
 export async function sweepPendingReceiptPdfs(
   env: SweepEnv,
   limit = 50,
 ): Promise<{ requeued: number }> {
   const sql = neon(env.DATABASE_URL);
-  const rows = (await sql.query(
-    `SELECT id, organization_id, receipt_number FROM payment
-     WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL
-       AND receipt_issued_at < now() - interval '15 minutes'
-     ORDER BY receipt_issued_at ASC LIMIT $1`,
-    [limit],
-  )) as Array<{ id: number; organization_id: string; receipt_number: string }>;
+  const rows = (await sql.query(pendingSweepQuery('payment'), [limit])) as Array<{
+    id: number;
+    organization_id: string;
+    receipt_number: string;
+  }>;
 
   let requeued = 0;
   for (const row of rows) {
@@ -265,10 +288,7 @@ export async function sweepPendingReceiptPdfs(
   // `idx_psp_receipt_pending`; el pagador se resuelve en el paso 2 desde
   // DB — el sweep no lo conoce y notifica solo a owners).
   const platformRows = (await sql.query(
-    `SELECT id, organization_id, receipt_number FROM platform_subscription_payment
-      WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL
-        AND receipt_issued_at < now() - interval '15 minutes'
-      ORDER BY receipt_issued_at ASC LIMIT $1`,
+    pendingSweepQuery('platform_subscription_payment'),
     [limit],
   )) as Array<{ id: number; organization_id: string; receipt_number: string }>;
 

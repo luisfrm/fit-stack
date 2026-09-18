@@ -145,8 +145,14 @@ export function PaymentsClient({
 
   const handlePaymentStatusChange = async (paymentId: number, status: string) => {
     try {
-      await financeService.updatePaymentStatus(paymentId, status);
-      toast.success("Estado de pago actualizado correctamente");
+      const result = await financeService.updatePaymentStatus(paymentId, status);
+      // C6: anular un cobro sin comprobante emitido no es un error, pero tampoco
+      // un "todo bien" genérico: el cajero tiene que saber que no se anuló nada.
+      if (status === PAYMENT_STATUSES.VOIDED && result?.receiptVoided === false) {
+        toast.success("Pago anulado. No tenía comprobante emitido.");
+      } else {
+        toast.success("Estado de pago actualizado correctamente");
+      }
       refreshAll();
     } catch (err) {
       toast.error(mutationError("PaymentsClient", err, "Error al actualizar pago"));
