@@ -259,6 +259,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const { service } = buildService(c);
     const result = await service.createSubscriptionWithPayment(data, {
       receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
     });
 
     await cache.invalidate('platform:subscriptions*');
@@ -322,6 +324,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     const result = await service.renewSubscription(id, data, {
       receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
     });
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);
@@ -455,6 +459,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
     const result = await service.registerPayment(id, data, {
       receipts: buildReceipts(c),
+      // C5: actor de sesión que emite (`issued_by`).
+      by: c.get('user')?.id,
     });
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);

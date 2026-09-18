@@ -173,6 +173,8 @@ export function ReceiptsReportClient({
               "fecha_emision",
               "anulado",
               "motivo_anulacion",
+              "emisor",
+              "emitido_por",
             ];
       const lines =
         status === "gaps"
@@ -202,6 +204,9 @@ export function ReceiptsReportClient({
                 row.receiptIssuedAt ?? "",
                 row.voided ? "SI" : "NO",
                 row.voidReason ?? "",
+                // C1/C5: emisor congelado + actor (libro exportable).
+                row.emitterName ?? "",
+                row.issuedBy ?? "",
               ]
                 .map(toCsvCell)
                 .join(","),
@@ -265,7 +270,12 @@ export function ReceiptsReportClient({
               Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
             </Text>
           )}
-          {!row.voided && (
+          {row.issuedBy && (
+            <Text size="xs" variant="muted">
+              Emitido por: {row.issuedBy}
+            </Text>
+          )}
+          {!row.voided && !row.issuedBy && (
             <Text size="xs" variant="muted" className="opacity-50">
               —
             </Text>

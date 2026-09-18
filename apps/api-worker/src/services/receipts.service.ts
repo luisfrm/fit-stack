@@ -2,6 +2,7 @@ import type { Db } from '@workspace/database/factory';
 import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 import {
   applyTaxOverride,
+  buildEmitterSnapshot,
   buildReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
@@ -45,6 +46,12 @@ export interface AssignReceiptNumberInput {
   /** Slug de la org (del perfil/sesión): parte del número humano. */
   orgSlug?: string | null;
   taxOverride?: TaxOverrideInput | null;
+  /**
+   * Actor de sesión que emite (C5). Opcional en la firma porque el barrido
+   * re-encola sin sesión: en ese caso se persiste `NULL`, nunca un actor
+   * inventado (solo se escribe al numerar, y el barrido no numera).
+   */
+  actor?: string | null;
 }
 
 export type ReceiptState =
@@ -152,6 +159,22 @@ export function createReceiptsService(
       // así que un fallo aquí (país desconocido, monto no entero) quemaría un
       // correlativo y dejaría un hueco inexplicado en el reporte de auditoría.
       const profile = resolveFiscalProfile(org.countryCode, org.fiscalConfig);
+      // Identidad del emisor CONGELADA (C1): se persiste junto al número en
+      // `attachReceipt`, así que se construye ANTES de consumir la secuencia
+      // (si algo lanza aquí, no se quema ningún correlativo).
+      const emitterSnapshot = buildEmitterSnapshot(
+        {
+          name: org.name,
+          legalName: org.legalName,
+          taxId: org.taxId,
+          address: org.address,
+          countryCode: org.countryCode,
+          primaryCurrency: org.primaryCurrency,
+          timezone: org.timezone,
+          fiscalConfig: org.fiscalConfig,
+        },
+        profile,
+      );
       const amountPaid = Number(payment.amountPaid);
       let subtotal: number;
       let taxTotal: number;
@@ -244,6 +267,8 @@ export function createReceiptsService(
         subtotal,
         taxTotal,
         taxDetails,
+        emitterSnapshot,
+        issuedBy: input.actor ?? null,
       });
       const persistedNumber = attached.receiptNumber ?? receiptNumber;
 
@@ -352,6 +377,8 @@ export function createReceiptsService(
               endDate: composed.subscription.endDate,
             }
           : null,
+        // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
+        emitterSnapshot: composed.payment.emitterSnapshot,
       });
       return {
         available: true,

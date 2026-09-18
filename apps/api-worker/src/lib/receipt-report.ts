@@ -70,6 +70,19 @@ export function aggregateCurrencyTotals(rows: ReceiptMoneyRow[]): IReceiptCurren
 }
 
 /**
+ * Nombre del emisor CONGELADO en el snapshot (C1) para la fila del reporte.
+ * Lectura TOLERANTE a propósito: el reporte LISTA (no recompone el
+ * documento), así que un snapshot ilegible deja la celda vacía en vez de
+ * tumbar el libro completo — el compose del comprobante sí falla ruidoso.
+ * `null` = emisión anterior al snapshot.
+ */
+export function readEmitterName(snapshot: unknown): string | null {
+  if (snapshot === null || snapshot === undefined) return null;
+  const name = (snapshot as { emitter?: { name?: unknown } }).emitter?.name;
+  return typeof name === 'string' && name.trim().length > 0 ? name : null;
+}
+
+/**
  * Clasificación del summary del reporte. ANTI-DRIFT: debe coincidir con el
  * mapeo de filas del servicio y con el filtro SQL `issued` del repositorio.
  */

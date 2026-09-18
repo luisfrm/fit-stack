@@ -12,16 +12,16 @@
 |---|---|---|---|---|---|---|
 | C0 | Integridad del correlativo (orden + carrera) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
 | C8 | Guardado de organización org-scoped en Panel (D5) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
-| C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí | 🔴 Bloqueante | M |
+| C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí (0016) | 🔴 Bloqueante | M | ✅ Hecha |
 | C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M | ✅ Hecha |
 | C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S | ✅ Hecha |
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M | ✅ Hecha |
-| C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí | 🟡 Media | S |
+| C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí (0016) | 🟡 Media | S | ✅ Hecha |
 | C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S |
 | C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S |
 
-**C0 + C8 + C2 + C3 + C4 (✅ todas) cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
-C1 y C5 comparten una única migración (se agrupan a propósito, un solo ciclo `generate → review → migrate`).
+**C0 + C8 + C2 + C3 + C4 cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
+**C1 + C5** (una sola migración, `0016`, aditiva y sin backfill) cierran el otro requisito duro: **comprobante reproducible + emisor identificado**.
 
 Decisiones D1–D6 **resueltas** al final del documento (sección *Decisiones congeladas*).
 
@@ -106,7 +106,7 @@ Riesgo añadido: ambos guardados escriben la misma fila `organization`. El merge
 
 ---
 
-## C1 — Snapshot del emisor 🔴 (migración única con C5)
+## C1 — Snapshot del emisor 🔴 (migración única con C5) ✅
 
 ### Problema
 
@@ -125,11 +125,31 @@ Riesgo añadido: ambos guardados escriben la misma fila `organization`. El merge
 
 **Contenido del snapshot** (congelado, nada derivable en vivo): `name`, `legalName`, `taxId`, `taxLabel`, `address`, `countryCode`, `currency`, `label` aplicada por el gate, `disclaimer[]`, `docLabel` del receptor y el perfil fiscal resuelto (`taxes[]` con `name/rate/enabled`) con el que se calcularon los impuestos.
 
-### Criterios de aceptación
+### Criterios de aceptación (verificados)
 
-- Integración: emitir → cambiar `legalName`/`taxId`/`fiscalConfig`/`countryCode` de la org → `GET /:id/receipt` devuelve **idéntico** al momento de emisión (`receipt.emitter`, `receipt.footer.disclaimer`, `receipt.document.label`).
-- Integración: pago legacy (`emitterSnapshot = NULL`) sigue componiendo en vivo sin romper (contrato de 3 estados intacto).
-- El flag ANULADO sigue siendo la **única** mutación posterior permitida (no forma parte de la identidad).
+- ✅ Integración `receipts-snapshot.test.ts`: emitir → cambiar `legalName`/`taxId`/`address`/`countryCode`/`fiscalConfig` de la org → `GET /:id/receipt` devuelve **idéntico** (`receipt.emitter`, `footer.disclaimer`, `document.label`, `recipient.docLabel`), con sanity check de que la fila viva sí cambió.
+- ✅ Integración `platform-receipts-snapshot.test.ts`: mismo contrato para el emisor FitStack (cambian `platform_setting` y el país del receptor → comprobante intacto).
+- ✅ Integración: pago legacy (`emitter_snapshot = NULL`) sigue componiendo en vivo sin romper (contrato de 3 estados intacto).
+- ✅ El flag ANULADO sigue siendo la **única** mutación posterior permitida (no forma parte de la identidad).
+
+### Implementación
+
+- Migración `0016_neat_the_twelve.sql` (aditiva, nullable, sin backfill): `payment.emitter_snapshot` jsonb + `payment.issued_by` text + las dos gemelas en `platform_subscription_payment`.
+- `packages/shared/src/documents/receipt-data.ts` → `ReceiptEmitterSnapshot` + `ReceiptSnapshotTax` (contrato del jsonb).
+- `packages/shared/src/documents/receipt-compose.ts` → `buildEmitterSnapshot` (Panel), `buildPlatformEmitterSnapshot` + `platformEmitterFromSettings` (Console), `assertEmitterSnapshot` (lectura fail-closed) y `summarizeTaxes`. Los dos compose leen el snapshot **primero** y no evalúan la configuración viva si existe.
+- Paso 1 Panel (`receipts.service.ts`) y Console (`platform-receipts.service.ts`): construyen el snapshot **antes** de consumir la secuencia y lo persisten junto al número.
+- Paso 2 (jobs-worker) y `GET /:id/receipt` de ambas apps: pasan `emitterSnapshot` al compose.
+
+### Criterios de aceptación (C5, verificados)
+
+- ✅ Integración: alta con pago validado → `issued_by` = usuario de sesión; `POST /:id/issue` idem.
+- ✅ Integración: paso 2 / re-entrega sin sesión → `issued_by` y `emitter_snapshot` **intactos** (nunca un actor inventado; el barrido solo re-encola render, no numera).
+
+### Implementación (C5)
+
+- `issuedBy` viaja por `ReceiptContext.by` / `PlatformReceiptContext.by` desde `c.get('user')?.id` en las 6 rutas que numeran (Panel: alta, `PATCH /payments/:id/status`, `POST /:id/issue`; Console: alta, renovación, alta de pago, `PATCH .../status`).
+- Repos compartidos: `attachReceipt` / `attachPlatformReceipt` aceptan `issuedBy` y lo escriben en la misma sentencia que el número.
+- Reportes Panel y Console: filas con `issuedBy` + `emitterName` (leído del snapshot) y CSV con las columnas `emisor` / `emitido_por`.
 
 ---
 
@@ -262,7 +282,7 @@ El spec pedía `requirePlatformAuth` para el endpoint, pero ese middleware exige
 
 ---
 
-## C5 — Trazabilidad de emisión 🟡 (misma migración que C1)
+## C5 — Trazabilidad de emisión 🟡 (misma migración que C1) ✅
 
 ### Problema
 
@@ -330,13 +350,13 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 ```
 C0 ──┐
      ├─▶ C2 ──▶ C3 ──┬──▶ C4
-C8 ──┘                └──▶ (migración aprobada) C1 + C5 ──▶ C6 ──▶ C7
+C8 ──┘                └──▶ C1 + C5 ──▶ C6 ──▶ C7
 ```
 
 - **C0 + C8** primero, en el mismo PR: C0 corrompe datos (quema correlativos en silencio) y C8 rompe el módulo de identidad de sede en producción. Ambos sin migración.
 - **C2/C3/C4** sin migración y con tests puros: paralelizables (C2 ✅ hecha).
-- **C1+C5** en **una sola** migración, con aprobación explícita.
-- **C6/C7** cierran huecos de auditoría y documentación.
+- **C1+C5** en **una sola** migración (`0016`), con aprobación explícita. ✅
+- **C6/C7** cierran huecos de auditoría y documentación. ← pendientes
 
 ## Verificación por fase
 
@@ -351,10 +371,19 @@ Verificación manual obligatoria (adjuntar al PR): PDF de gym informal sin `taxI
 
 ## Definición de "terminado"
 
-- [ ] Ninguna emisión fallida puede quemar un correlativo (test que lo prueba).
-- [ ] `GET /:id/receipt` es reproducible: no cambia si la org edita su perfil.
-- [ ] Ningún comprobante detalla impuestos que el emisor no declaró — fail-closed en **escritura** (400) y en **lectura** (normalización).
-- [ ] Activar IGTF es explícito: tasa manual, confirmación y aviso de impacto en la base de IVA.
+- [x] Ninguna emisión fallida puede quemar un correlativo (test que lo prueba). — C0
+- [x] `GET /:id/receipt` es reproducible: no cambia si la org edita su perfil. — C1
+- [x] Ningún comprobante detalla impuestos que el emisor no declaró — fail-closed en **escritura** (400) y en **lectura** (normalización). — C2
+- [x] Activar IGTF es explícito: tasa manual, confirmación y aviso de impacto en la base de IVA. — C2
+- [x] La auditoría de la serie existe en los DOS espejos, con emisor congelado y actor. — C4 + C1/C5
+
+### Hallazgos abiertos para C7
+
+**El sincronizador de la rama de pruebas no corre en este entorno:** `pnpm --filter api-worker test:db:push` falla con `spawnSync cmd.exe ENOENT` (el script usa `execSync`, que en el shell actual no encuentra `cmd.exe` aunque exista en `C:\Windows\System32`). Se aplicó el equivalente manual (`drizzle-kit push` con `DATABASE_URL = TEST_DATABASE_URL` y guarda previa: host de pruebas ≠ host de desarrollo). Conviene que el script no dependa de `execSync`/shell (p. ej. importar el API programático de drizzle-kit o usar `spawnSync` con `shell: false`).
+
+**E2E preexistente (no es regresión):**
+
+`e2e/panel/subscriptions.spec.ts` → *“validar desde la lista quita el pendiente”* **falla de forma determinista** y **no** es regresión de C1/C5 (verificado: falla igual en el commit anterior con los cambios revertidos). Causa: `panel-setup` precalienta `/payments` (`PANEL_PREWARM_ROUTES`) y la página cachea su fetch con `next: { revalidate: 60 }`; el fixture del test se crea **después** del prewarm por API (sin invalidar el Data Cache de Next), así que la primera visita reutiliza el render cacheado sin el pendiente. Opciones para C7: (a) sacar `/payments` del prewarm (paga compilación en frío en ese spec), (b) que la lista accionable `processing` no use `revalidate: 60` (es una cola accionable: 60 s de staleness también es un bug de UX), o (c) invalidar el tag desde el helper. Preferible (b).
 - [ ] El guardado de la organización en Panel funciona para owners reales (sin depender de un rol de plataforma).
 - [ ] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export.
 - [ ] Anular sin número es explícito para el usuario, no un silencio.

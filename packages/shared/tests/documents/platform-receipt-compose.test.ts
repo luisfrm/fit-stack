@@ -4,9 +4,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  buildPlatformEmitterSnapshot,
   buildPlatformReceiptDataFromComposed,
+  platformEmitterFromSettings,
   type PlatformComposeReceiptInput,
 } from '../../src/documents/receipt-compose';
+import { resolveFiscalProfile } from '../../src/documents/fiscal-profile';
 
 function baseInput(): PlatformComposeReceiptInput {
   return {
@@ -136,6 +139,78 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(data.sale.periodStart).toBe('2026-09-14T10:00:00.000Z');
     expect(data.sale.periodEnd).toBe('2026-09-14T10:00:00.000Z');
     expect(data.voided).toBe(true);
+  });
+
+  /* ── Snapshot del emisor (C1) ── */
+
+  it('con snapshot: editar el emisor DESPUÉS no cambia el comprobante', () => {
+    const issued = baseInput();
+    issued.emitterSnapshot = buildPlatformEmitterSnapshot(
+      {
+        receptor: issued.receptor,
+        emitter: issued.emitter,
+        currency: issued.payment.planSnapshotCurrency,
+      },
+      resolveFiscalProfile(issued.receptor.countryCode, undefined),
+    );
+    const asIssued = buildPlatformReceiptDataFromComposed(issued);
+
+    const later: PlatformComposeReceiptInput = {
+      ...issued,
+      receptor: { ...issued.receptor, countryCode: 'CO', timezone: 'America/Bogota' },
+      emitter: {
+        legalName: 'FitStack Colombia S.A.S.',
+        taxId: 'NIT-999',
+        address: 'Bogotá',
+        countryCode: 'CO',
+      },
+    };
+    const recomposed = buildPlatformReceiptDataFromComposed(later);
+
+    expect(recomposed.emitter).toEqual(asIssued.emitter);
+    expect(recomposed.footer.disclaimer).toEqual(asIssued.footer.disclaimer);
+    expect(recomposed.document.label).toBe(asIssued.document.label);
+    expect(recomposed.timezone).toBe(asIssued.timezone);
+  });
+
+  it('congela el emisor genérico cuando las keys están vacías', () => {
+    const input = baseInput();
+    const emitter = platformEmitterFromSettings({});
+    const snapshot = buildPlatformEmitterSnapshot(
+      { receptor: input.receptor, emitter, currency: 'USD' },
+      resolveFiscalProfile('VE', undefined),
+    );
+    expect(snapshot.emitter.name).toBe('FitStack');
+    expect(snapshot.emitter.countryCode).toBe('VE');
+    expect(snapshot.disclaimer).toContain('Emitido por FitStack');
+    // FitStack no es contribuyente formal: todos los impuestos congelados off.
+    expect(snapshot.taxes).toEqual([
+      { name: 'IVA', rate: 0.16, enabled: false },
+      { name: 'IGTF', rate: 0.03, enabled: false },
+    ]);
+  });
+
+  it('con snapshot no se lee el país del receptor (config viva irrelevante)', () => {
+    const input = baseInput();
+    input.emitterSnapshot = buildPlatformEmitterSnapshot(
+      {
+        receptor: input.receptor,
+        emitter: input.emitter,
+        currency: input.payment.planSnapshotCurrency,
+      },
+      resolveFiscalProfile('VE', undefined),
+    );
+    // País del receptor corrupto/desconocido: el emitido sigue componiendo.
+    input.receptor = { ...input.receptor, countryCode: 'XX' };
+    expect(buildPlatformReceiptDataFromComposed(input).emitter.countryCode).toBe('VE');
+  });
+
+  it('snapshot inválido lanza (nunca degrada a la config viva)', () => {
+    const input = baseInput();
+    input.emitterSnapshot = { version: 2, emitter: {} };
+    expect(() => buildPlatformReceiptDataFromComposed(input)).toThrow(
+      /emitter_snapshot inválido/,
+    );
   });
 
   it('lanza sin impuestos persistidos, país desconocido o fecha inválida', () => {

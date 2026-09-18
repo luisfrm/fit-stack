@@ -200,6 +200,7 @@ export function createSubscriptionsService(
             paymentId: createdPayment.id,
             timezone,
             orgSlug: opts.orgSlug,
+            actor: opts.by,
             taxOverride:
               p.taxTotal !== undefined && p.taxDetails !== undefined
                 ? {
@@ -266,6 +267,7 @@ export function createSubscriptionsService(
             paymentId,
             timezone: opts.timezone,
             orgSlug: opts.orgSlug,
+            actor: opts.by,
           });
         } else if (taskQueue) {
           await taskQueue.send({

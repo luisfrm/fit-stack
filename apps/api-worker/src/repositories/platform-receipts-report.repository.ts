@@ -158,6 +158,9 @@ export function createPlatformReceiptsReportRepository(db: Db) {
           voidedBy: platformSubscriptionPayment.voidedBy,
           voidedAt: platformSubscriptionPayment.voidedAt,
           voidReason: platformSubscriptionPayment.voidReason,
+          // C1/C5: emisor congelado + actor, para el libro exportable.
+          emitterSnapshot: platformSubscriptionPayment.emitterSnapshot,
+          issuedBy: platformSubscriptionPayment.issuedBy,
         })
         .from(platformSubscriptionPayment)
         // LEFT: un pago huérfano no debe descuadrar el reporte.

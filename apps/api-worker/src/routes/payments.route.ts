@@ -144,6 +144,8 @@ export const paymentRoutes = new Hono<AppEnv>()
       paymentId: id,
       timezone,
       orgSlug: await resolveOrgSlug(c, orgId),
+      // C5: la emisión manual también queda con actor.
+      actor: c.get('user')?.id,
     });
     // La emisión manual mueve el correlativo: invalida el reporte.
     await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);

@@ -216,7 +216,7 @@ export function createPlatformSubscriptionsService(
       // free $0 hacen SKIP dentro del servicio). Sesión console ≠ pagador:
       // no se pasa payer (queda NULL → solo owners + log).
       if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
-        await opts.receipts.assignPlatformReceiptNumber({ paymentId });
+        await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
       }
 
       return { subscriptionId, paymentId };
@@ -283,7 +283,7 @@ export function createPlatformSubscriptionsService(
         await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
         // Emisión C2 (sesión console ≠ pagador: sin payer).
         if (opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId });
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
         }
       }
 
@@ -422,7 +422,7 @@ export function createPlatformSubscriptionsService(
         }
         // Emisión C2 (sesión console ≠ pagador: sin payer).
         if (opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId });
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
         }
       }
 
@@ -495,7 +495,7 @@ export function createPlatformSubscriptionsService(
         // Emisión C2 solo en transición →validated (re-PATCH no renumera
         // por idempotencia del attach; sesión console ≠ pagador: sin payer).
         if (wasPending && opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId });
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
         }
       }
     },

@@ -483,6 +483,10 @@ export interface IReceiptReportRow {
   voidedBy?: string | null;
   voidedAt?: string | null;
   voidReason?: string | null;
+  /** Actor que emitió (`issued_by`, C5); `null` en históricos o barrido. */
+  issuedBy?: string | null;
+  /** Emisor congelado en el snapshot (`emitter.name`, C1); `null` pre-C1. */
+  emitterName?: string | null;
 }
 
 export interface IReceiptTaxTotal {

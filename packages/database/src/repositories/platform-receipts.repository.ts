@@ -18,6 +18,7 @@ import {
 import {
   isValidConsoleReceiptNumber,
   type ReceiptDocumentType,
+  type ReceiptEmitterSnapshot,
 } from '@workspace/shared';
 
 /** Filas tal como las devuelve Drizzle (fuente de los tipos). */
@@ -42,6 +43,10 @@ export interface AttachPlatformReceiptInput {
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
+  /** Identidad del emisor (FitStack) congelada al emitir (C1). */
+  emitterSnapshot?: ReceiptEmitterSnapshot | null;
+  /** Actor que emite (C5). Ausente en el barrido: queda `null`. */
+  issuedBy?: string | null;
 }
 
 export interface MarkPlatformVoidedInput {
@@ -184,6 +189,10 @@ export function createPlatformReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
+          // C1/C5: identidad congelada + actor, en la misma sentencia que el
+          // número (el comprobante nace reproducible).
+          emitterSnapshot: input.emitterSnapshot ?? null,
+          issuedBy: input.issuedBy ?? null,
         })
         .where(
           and(

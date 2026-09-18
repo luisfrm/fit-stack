@@ -284,6 +284,9 @@ export function createPaymentsRepository(db: Db) {
           voidedBy: payment.voidedBy,
           voidedAt: payment.voidedAt,
           voidReason: payment.voidReason,
+          // C1/C5: emisor congelado + actor, para el libro exportable.
+          emitterSnapshot: payment.emitterSnapshot,
+          issuedBy: payment.issuedBy,
         })
         .from(payment)
         // LEFT: un pago huérfano (miembro borrado) debe aparecer en filas

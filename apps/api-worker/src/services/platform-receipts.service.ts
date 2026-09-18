@@ -1,17 +1,20 @@
 import type { Db } from '@workspace/database/factory';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import {
+  buildPlatformEmitterSnapshot,
   buildPlatformReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
   formatConsoleReceiptNumber,
   parseConsoleReceiptNumber,
+  platformEmitterFromSettings,
   resolveFiscalProfile,
   type ITaxDetail,
   type ReceiptData,
 } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { ReceiptError } from './receipts.service';
 
 export interface AssignPlatformReceiptNumberInput {
@@ -19,6 +22,8 @@ export interface AssignPlatformReceiptNumberInput {
   /** Pagador (sesión en creación `processing`); en validación no overwrite. */
   payerEmail?: string | null;
   payerName?: string | null;
+  /** Actor de sesión que emite (C5); sin sesión queda `NULL`, nunca inventado. */
+  actor?: string | null;
 }
 
 export interface PlatformReceiptHooks {
@@ -44,7 +49,10 @@ export interface PlatformReceiptContext {
   receipts?: PlatformReceiptHooks;
   /** Actor de sesión (para `payer_*`; solo rellena si está vacío). */
   payer?: { email: string; name: string } | null;
-  /** Actor de sesión (para `voided_by`; obligatorio en rama VOIDED). */
+  /**
+   * Actor de sesión: `voided_by` en la rama VOIDED y `issued_by` al numerar
+   * (C5). Sin sesión no se inventa actor: null explícito.
+   */
   by?: string;
 }
 
@@ -52,6 +60,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
   const platformReceiptsRepo = createPlatformReceiptsRepository(db);
   const platformSubsRepo = createPlatformSubscriptionsRepository(db);
   const orgsRepo = createOrganizationsRepository(db);
+  const platformSettingsRepo = createPlatformSettingsRepository(db);
 
   /**
    * Re-encola el render si el PDF aún no existe y devuelve el estado real.
@@ -153,6 +162,24 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         return { receiptNumber: fresh.receiptNumber, pdfStatus, skipped: false };
       }
 
+      // Identidad del emisor CONGELADA (C1): FitStack (settings) + perfil del
+      // país receptor. Se persiste junto al número, así que se construye
+      // ANTES de consumir la secuencia global (nada quema un correlativo).
+      const emitterSnapshot = buildPlatformEmitterSnapshot(
+        {
+          receptor: {
+            name: org.name,
+            legalName: org.legalName,
+            taxId: org.taxId,
+            countryCode: org.countryCode,
+            timezone: org.timezone,
+          },
+          emitter: platformEmitterFromSettings(await platformSettingsRepo.getAll()),
+          currency: payment.planSnapshotCurrency,
+        },
+        profile,
+      );
+
       const seq = await platformReceiptsRepo.nextPlatformDocumentNumber('receipt');
       const receiptNumber = formatConsoleReceiptNumber(seq);
       if (parseConsoleReceiptNumber(receiptNumber) !== seq) {
@@ -184,6 +211,8 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         subtotal,
         taxTotal,
         taxDetails,
+        emitterSnapshot,
+        issuedBy: input.actor ?? null,
       });
       const persistedNumber = persisted.receiptNumber ?? receiptNumber;
 
@@ -324,12 +353,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           countryCode: organization.countryCode,
           timezone: organization.timezone,
         },
-        emitter: {
-          legalName: emitter['fitstack_legal_name'] || null,
-          taxId: emitter['fitstack_tax_id'] || null,
-          address: emitter['fitstack_address'] || null,
-          countryCode: emitter['fitstack_country_code'] || null,
-        },
+        emitter: platformEmitterFromSettings(emitter),
+        // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
+        emitterSnapshot: payment.emitterSnapshot,
       });
       return {
         available: true,

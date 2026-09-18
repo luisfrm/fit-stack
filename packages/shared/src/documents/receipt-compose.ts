@@ -9,7 +9,7 @@
    `@workspace/database`: evita ciclo shared→database).
    ─────────────────────────────────────────────────────────────────────── */
 
-import { resolveFiscalProfile } from './fiscal-profile';
+import { resolveFiscalProfile, type FiscalProfile, type ResolvedTax } from './fiscal-profile';
 import { resolveDocumentLabel } from './document-label-gate';
 import { maskPaymentDetails } from './masking';
 import { roundCents } from './tax-math';
@@ -17,7 +17,10 @@ import type { ITaxDetail, IPaymentMethodDetails } from '../types';
 import type {
   ReceiptData,
   ReceiptDocumentType,
+  ReceiptEmitter,
+  ReceiptEmitterSnapshot,
   ReceiptMethod,
+  ReceiptSnapshotTax,
 } from './receipt-data';
 
 /** Date input value (Date instance or ISO string). */
@@ -77,6 +80,11 @@ export interface ComposeReceiptInput {
   organization: ComposeOrganization;
   member: ComposeMember | null;
   subscription: ComposeSubscription | null;
+  /**
+   * Identidad congelada al emitir (C1). `null`/`undefined` = emisión
+   * anterior al snapshot: se compone EN VIVO (estado terminal documentado).
+   */
+  emitterSnapshot?: unknown;
 }
 
 /**
@@ -103,6 +111,160 @@ function toIso(value: DateInput): string {
     throw new TypeError(`buildReceiptDataFromComposed: fecha inválida (${String(value)}).`);
   }
   return d.toISOString();
+}
+
+/* ── Snapshot del emisor (C1) ──────────────────────────────────────────
+   Congela al emitir lo que antes se derivaba de filas vivas. Un snapshot
+   persistido MANDA: si existe no se lee la configuración actual (por eso
+   `GET /:id/receipt` sigue siendo idéntico tras editar el perfil).
+   ─────────────────────────────────────────────────────────────────────── */
+
+/** Resumen auditable del perfil fiscal aplicado. */
+export function summarizeTaxes(taxes: ResolvedTax[]): ReceiptSnapshotTax[] {
+  return taxes.map((t) => ({ name: t.name, rate: t.rate, enabled: t.enabled }));
+}
+
+/** Identidad del emisor del Panel (la organización del gimnasio). */
+function panelEmitterIdentity(
+  organization: ComposeOrganization,
+  profile: FiscalProfile,
+): Omit<ReceiptEmitterSnapshot, 'version' | 'taxes'> {
+  return {
+    emitter: {
+      name: organization.name,
+      legalName: organization.legalName ?? null,
+      taxId: organization.taxId ?? null,
+      taxLabel: profile.taxLabel,
+      address: organization.address ?? null,
+      countryCode: organization.countryCode,
+      currency: organization.primaryCurrency,
+    },
+    documentLabel: resolveDocumentLabel({
+      taxId: organization.taxId,
+      isFormalTaxpayer: profile.isFormalTaxpayer,
+    }),
+    recipientDocLabel: profile.docLabel,
+    disclaimer: profile.disclaimer,
+    timezone: organization.timezone ?? null,
+  };
+}
+
+/** Snapshot del emisor del Panel (la organización del gimnasio). */
+export function buildEmitterSnapshot(
+  organization: ComposeOrganization,
+  profile: FiscalProfile,
+): ReceiptEmitterSnapshot {
+  return {
+    version: 1,
+    ...panelEmitterIdentity(organization, profile),
+    taxes: summarizeTaxes(profile.taxes),
+  };
+}
+
+/** Identidad del emisor plataforma (FitStack) desde `platform_setting`. */
+export function platformEmitterFromSettings(
+  settings: Record<string, string>,
+): PlatformComposeEmitter {
+  return {
+    legalName: settings['fitstack_legal_name'] || null,
+    taxId: settings['fitstack_tax_id'] || null,
+    address: settings['fitstack_address'] || null,
+    countryCode: settings['fitstack_country_code'] || null,
+  };
+}
+
+/**
+ * Identidad del emisor plataforma: la de FitStack (settings) + el perfil
+ * fiscal del país RECEPTOR (la org no decide su IVA). Sin país propio
+ * configurado el emisor hereda el del receptor (proxy documentado, PENDING §8).
+ */
+function platformEmitterIdentity(
+  input: {
+    receptor: PlatformComposeReceptor;
+    emitter: PlatformComposeEmitter;
+    /** Moneda base congelada en el pago (`planSnapshotCurrency`). */
+    currency: string;
+  },
+  profile: FiscalProfile,
+): Omit<ReceiptEmitterSnapshot, 'version' | 'taxes'> {
+  const emitter: ReceiptEmitter = {
+    name: input.emitter.legalName?.trim() || 'FitStack',
+    legalName: input.emitter.legalName?.trim() || null,
+    taxId: input.emitter.taxId?.trim() || null,
+    taxLabel: profile.taxLabel,
+    address: input.emitter.address?.trim() || null,
+    countryCode: input.emitter.countryCode?.trim() || input.receptor.countryCode,
+    currency: input.currency,
+  };
+  return {
+    emitter,
+    // FitStack no está declarado contribuyente formal (C2): el gate aplica
+    // 'Comprobante' por construcción, nunca 'Factura'.
+    documentLabel: resolveDocumentLabel({
+      taxId: emitter.taxId ?? undefined,
+      isFormalTaxpayer: false,
+    }),
+    recipientDocLabel: profile.docLabel,
+    disclaimer: profile.disclaimer.includes('Emitido por FitStack')
+      ? profile.disclaimer
+      : [...profile.disclaimer, 'Emitido por FitStack'],
+    timezone: input.receptor.timezone,
+  };
+}
+
+/** Snapshot del emisor plataforma (FitStack). */
+export function buildPlatformEmitterSnapshot(
+  input: {
+    receptor: PlatformComposeReceptor;
+    emitter: PlatformComposeEmitter;
+    currency: string;
+  },
+  profile: FiscalProfile,
+): ReceiptEmitterSnapshot {
+  return {
+    version: 1,
+    ...platformEmitterIdentity(input, profile),
+    taxes: summarizeTaxes(profile.taxes),
+  };
+}
+
+/**
+ * Lee un `emitter_snapshot` persistido (jsonb). `null`/`undefined` devuelve
+ * `null` (emisión anterior al snapshot → el caller compone en vivo). Un valor
+ * presente pero inválido LANZA: un snapshot corrupto no puede degradar en
+ * silencio a la configuración de hoy (dejaría de ser reproducible).
+ */
+export function assertEmitterSnapshot(
+  value: unknown,
+  method: string,
+): ReceiptEmitterSnapshot | null {
+  if (value === null || value === undefined) return null;
+  const v = value as Partial<ReceiptEmitterSnapshot>;
+  const emitter = v.emitter as Partial<ReceiptEmitter> | undefined;
+  const invalid =
+    v.version !== 1 ||
+    !emitter ||
+    typeof emitter.name !== 'string' ||
+    typeof emitter.taxLabel !== 'string' ||
+    typeof emitter.countryCode !== 'string' ||
+    typeof emitter.currency !== 'string' ||
+    typeof v.documentLabel !== 'string' ||
+    typeof v.recipientDocLabel !== 'string' ||
+    !Array.isArray(v.disclaimer) ||
+    v.disclaimer.some((line) => typeof line !== 'string') ||
+    !Array.isArray(v.taxes) ||
+    v.taxes.some(
+      (t) =>
+        typeof t?.name !== 'string' ||
+        typeof t?.rate !== 'number' ||
+        typeof t?.enabled !== 'boolean',
+    );
+  if (invalid) {
+    throw new TypeError(
+      `${method}: emitter_snapshot inválido (no se puede recomponer el comprobante emitido).`,
+    );
+  }
+  return v as ReceiptEmitterSnapshot;
 }
 
 export function assertPersistedTaxDetails(value: unknown, method: string): ITaxDetail[] {
@@ -153,12 +315,14 @@ export function buildReceiptDataFromComposed(
   const taxDetails = assertPersistedTaxDetails(payment.taxDetails, 'buildReceiptDataFromComposed');
 
   const baseCurrency = payment.planSnapshotCurrency ?? organization.primaryCurrency;
-
-  const profile = resolveFiscalProfile(organization.countryCode, organization.fiscalConfig);
-  const label = resolveDocumentLabel({
-    taxId: organization.taxId,
-    isFormalTaxpayer: profile.isFormalTaxpayer,
-  });
+  // Snapshot primero: si existe, la configuración viva NO se lee (ni siquiera
+  // se resuelve el perfil fiscal) — el documento emitido es reproducible.
+  const identity =
+    assertEmitterSnapshot(input.emitterSnapshot, 'buildReceiptDataFromComposed') ??
+    buildEmitterSnapshot(
+      organization,
+      resolveFiscalProfile(organization.countryCode, organization.fiscalConfig),
+    );
 
   const masked = maskPaymentDetails(
     payment.paymentMethodDetails as
@@ -174,24 +338,16 @@ export function buildReceiptDataFromComposed(
     : 'Miembro';
 
   return {
-    emitter: {
-      name: organization.name,
-      legalName: organization.legalName ?? null,
-      taxId: organization.taxId ?? null,
-      taxLabel: profile.taxLabel,
-      address: organization.address ?? null,
-      countryCode: organization.countryCode,
-      currency: organization.primaryCurrency,
-    },
+    emitter: identity.emitter,
     recipient: {
       name: memberName,
       documentId: member?.documentId ?? null,
-      docLabel: profile.docLabel,
+      docLabel: identity.recipientDocLabel,
     },
     document: {
       number: input.receiptNumber,
       type: input.documentType,
-      label,
+      label: identity.documentLabel,
       issuedAt: toIso(input.issuedAt),
     },
     sale: {
@@ -220,10 +376,10 @@ export function buildReceiptDataFromComposed(
       maskedDetails,
     },
     footer: {
-      disclaimer: profile.disclaimer,
+      disclaimer: identity.disclaimer,
       generatedBy: 'Generado con FitStack',
     },
-    timezone: organization.timezone ?? undefined,
+    timezone: identity.timezone ?? undefined,
     voided: payment.receiptVoided ?? false,
     internalPaymentId: payment.id,
   };
@@ -284,6 +440,8 @@ export interface PlatformComposeReceiptInput {
   subscription: PlatformComposeSubscription | null;
   receptor: PlatformComposeReceptor;
   emitter: PlatformComposeEmitter;
+  /** Identidad congelada al emitir (C1); `null` = emisión previa (en vivo). */
+  emitterSnapshot?: unknown;
 }
 
 /**
@@ -308,11 +466,13 @@ export function buildPlatformReceiptDataFromComposed(
   );
 
   // Sin override de la org: FitStack define impuestos uniformes por país.
-  const profile = resolveFiscalProfile(receptor.countryCode, undefined);
-  const label = resolveDocumentLabel({
-    taxId: emitter.taxId?.trim() || undefined,
-    isFormalTaxpayer: false,
-  });
+  // Snapshot primero: si existe, la configuración viva NO se lee.
+  const identity =
+    assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
+    buildPlatformEmitterSnapshot(
+      { receptor, emitter, currency: payment.planSnapshotCurrency },
+      resolveFiscalProfile(receptor.countryCode, undefined),
+    );
 
   const masked = maskPaymentDetails(
     payment.paymentMethodDetails as
@@ -327,24 +487,16 @@ export function buildPlatformReceiptDataFromComposed(
   const periodEnd = subscription?.currentPeriodEnd ?? periodStart;
 
   return {
-    emitter: {
-      name: emitter.legalName?.trim() || 'FitStack',
-      legalName: emitter.legalName?.trim() || null,
-      taxId: emitter.taxId?.trim() || null,
-      taxLabel: profile.taxLabel,
-      address: emitter.address?.trim() || null,
-      countryCode: emitter.countryCode?.trim() || receptor.countryCode,
-      currency: payment.planSnapshotCurrency,
-    },
+    emitter: identity.emitter,
     recipient: {
       name: receptor.legalName?.trim() || receptor.name,
       documentId: receptor.taxId?.trim() || null,
-      docLabel: profile.docLabel,
+      docLabel: identity.recipientDocLabel,
     },
     document: {
       number: input.receiptNumber,
       type: 'receipt',
-      label,
+      label: identity.documentLabel,
       issuedAt: toIso(input.issuedAt),
     },
     sale: {
@@ -373,12 +525,10 @@ export function buildPlatformReceiptDataFromComposed(
       maskedDetails,
     },
     footer: {
-      disclaimer: profile.disclaimer.includes('Emitido por FitStack')
-        ? profile.disclaimer
-        : [...profile.disclaimer, 'Emitido por FitStack'],
+      disclaimer: identity.disclaimer,
       generatedBy: 'Generado con FitStack',
     },
-    timezone: receptor.timezone,
+    timezone: identity.timezone ?? undefined,
     voided: payment.voided,
     internalPaymentId: payment.id,
   };

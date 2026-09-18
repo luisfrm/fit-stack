@@ -84,6 +84,14 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Hoy no existe storage ni UI de `fiscalConfig` para el emisor plataforma, así que los comprobantes SaaS persisten `subtotal = amountPaid / taxTotal = 0 / taxDetails = []` (solo el total cobrado) y lo dicen en Console → Settings → Emisor. Es la postura conservadora correcta (nadie declaró ese IVA).
   - Para habilitarlo: `platform_setting` con el `fiscalConfig` de FitStack + toggles en `emitter-settings.tsx` (mismo patrón del Panel: declaración, tasa manual, confirmación) y cablearlo en el paso 1 SaaS y en el twin de `receipt-compose` (`platform-receipts.service.ts` + `jobs-worker`).
 
+## 11. Comprobantes — comprobantes previos al snapshot del emisor (C1)
+
+- [ ] **Los pagos emitidos ANTES de C1 (`emitter_snapshot = NULL`) siguen recomponiéndose en vivo: su JSON puede divergir del PDF si el emisor edita su perfil.**
+  - Estado terminal **documentado** (no es un bug): la migración `0016` no hace backfill porque el snapshot no se puede reconstruir con fidelidad — la identidad del momento de emisión se perdió al no persistirse.
+  - El PDF en R2 sí es inmutable y conserva lo emitido; lo que puede cambiar es el JSON de `GET /:id/receipt` y la fila del libro (sin `emisor`/`emitido_por`).
+  - Si una auditoría exige reproducibilidad del histórico completo, la opción honesta es un **acta de conciliación** (fecha de corte + “estos comprobantes se reimprimen con la configuración vigente”) o incrustar el snapshot del PDF vía OCR: no un backfill inventado.
+- [ ] **C7 — hallazgo E2E preexistente**: `e2e/panel/subscriptions.spec.ts` (pago pendiente) falla de forma determinista por el prewarm de `/payments` + `revalidate: 60` (fixture creado por API después del prewarm). Ver el detalle y las opciones en `tasks/correcciones-comprobantes.md` → *Hallazgo abierto para C7*.
+
 ## 10. Comprobantes Console — universo completo de la serie en la auditoría (C4)
 
 - [ ] **Cuando la serie global `FS-N` crezca (miles de comprobantes), acotar la lectura del universo de `gaps[]`.**

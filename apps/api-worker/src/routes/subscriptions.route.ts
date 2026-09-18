@@ -120,6 +120,8 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const newSub = await subsService.create(orgId, payload as any, timezone, {
       receipts: receiptsService,
       orgSlug,
+      // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
+      by: c.get('user')?.id,
     });
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(newSub, 201);

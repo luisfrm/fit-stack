@@ -21,6 +21,7 @@ import {
   MIN_RECEIPT_YEAR,
   isValidPanelReceiptNumber,
   type ReceiptDocumentType,
+  type ReceiptEmitterSnapshot,
 } from '@workspace/shared';
 
 /** Fila de `payment` tal como la devuelve Drizzle (fuente del tipo, no imports cruzados). */
@@ -46,6 +47,10 @@ export interface AttachReceiptInput {
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
+  /** Identidad del emisor congelada al emitir (C1). */
+  emitterSnapshot?: ReceiptEmitterSnapshot | null;
+  /** Actor que emite (C5). Ausente en el barrido: queda `null`, no se inventa. */
+  issuedBy?: string | null;
 }
 
 export interface MarkVoidedInput {
@@ -180,6 +185,10 @@ export function createReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
+          // C1/C5: identidad congelada + actor. Se escriben en la MISMA
+          // sentencia que el número: el comprobante nace reproducible.
+          emitterSnapshot: input.emitterSnapshot ?? null,
+          issuedBy: input.issuedBy ?? null,
         })
         .where(
           and(

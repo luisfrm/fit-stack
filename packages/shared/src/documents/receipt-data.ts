@@ -36,6 +36,39 @@ export interface ReceiptRecipient {
   docLabel?: string | null;
 }
 
+/** Impuesto tal como se aplicó al emitir (auditoría del cálculo, no del país). */
+export interface ReceiptSnapshotTax {
+  name: string;
+  /** Fracción 0–1 realmente aplicada. */
+  rate: number;
+  enabled: boolean;
+}
+
+/**
+ * Identidad del emisor CONGELADA en el momento de emitir (C1). Se persiste
+ * junto al número (`emitter_snapshot`) y `GET /:id/receipt` la lee tal cual:
+ * el JSON y la auditoría no cambian si el emisor edita su perfil después (el
+ * PDF en R2 ya era inmutable). Congela todo lo que hoy se derivaba en vivo:
+ * identidad, etiqueta aplicada por el gate, etiqueta del receptor, pie legal,
+ * zona horaria con la que se imprimieron las fechas y el perfil fiscal con el
+ * que se calcularon los impuestos.
+ */
+export interface ReceiptEmitterSnapshot {
+  /** Versión del shape (permite evolucionar sin romper snapshots viejos). */
+  version: 1;
+  emitter: ReceiptEmitter;
+  /** Etiqueta aplicada por `resolveDocumentLabel` al emitir. */
+  documentLabel: string;
+  /** Etiqueta del documento del receptor (`FiscalProfile.docLabel`). */
+  recipientDocLabel: string;
+  /** Pie legal aplicado (país del emisor o su `disclaimerOverride`). */
+  disclaimer: string[];
+  /** Zona horaria del emisor usada para imprimir las fechas. */
+  timezone?: string | null;
+  /** Perfil fiscal resuelto con el que se calcularon los impuestos. */
+  taxes: ReceiptSnapshotTax[];
+}
+
 export interface ReceiptDocument {
   number: string;
   type: ReceiptDocumentType;

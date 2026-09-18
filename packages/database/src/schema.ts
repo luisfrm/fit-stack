@@ -14,7 +14,7 @@ import {
   primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
-import { type PlanFeaturesV2 } from '@workspace/shared';
+import { type PlanFeaturesV2, type ReceiptEmitterSnapshot } from '@workspace/shared';
 
 // ── BETTER AUTH CORE TABLES (Must follow Better Auth naming/structure) ──
 
@@ -246,6 +246,10 @@ export const platformSubscriptionPayment = pgTable(
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
+    // Identidad del emisor CONGELADA al emitir (C1, espejo Panel).
+    emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
+    // Actor que emitió (C5, espejo Panel).
+    issuedBy: text('issued_by'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -487,6 +491,12 @@ export const payment = pgTable(
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
+    // Identidad del emisor CONGELADA al emitir (C1). NULL = emisión anterior
+    // al snapshot: se compone en vivo (estado terminal, nunca se reescribe).
+    emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
+    // Actor que emitió (C5). NULL = emisión histórica o reconstruida por el
+    // barrido (nunca se inventa un actor).
+    issuedBy: text('issued_by'),
   },
   (table) => [
     index('idx_payment_subscription_id').on(table.subscriptionId),

@@ -17,6 +17,7 @@ import {
   isReceiptRenderEvent,
   panelReceiptKey,
   parsePanelReceiptNumber,
+  platformEmitterFromSettings,
   platformReceiptKey,
   type CurrencyFormat,
   type ReceiptRenderEvent,
@@ -88,6 +89,8 @@ function buildComposeInput(
           endDate: subscription.endDate,
         }
       : null,
+    // C1: identidad congelada al emitir (NULL = emisión previa, en vivo).
+    emitterSnapshot: payment.emitterSnapshot,
   };
 }
 
@@ -327,12 +330,9 @@ function buildPlatformComposeInput(
       countryCode: organization.countryCode,
       timezone: organization.timezone,
     },
-    emitter: {
-      legalName: emitter['fitstack_legal_name'] || null,
-      taxId: emitter['fitstack_tax_id'] || null,
-      address: emitter['fitstack_address'] || null,
-      countryCode: emitter['fitstack_country_code'] || null,
-    },
+    emitter: platformEmitterFromSettings(emitter),
+    // C1: identidad congelada al emitir (NULL = emisión previa, en vivo).
+    emitterSnapshot: payment.emitterSnapshot,
   };
 }
 

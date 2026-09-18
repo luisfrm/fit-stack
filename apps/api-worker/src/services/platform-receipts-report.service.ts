@@ -25,6 +25,7 @@ import {
   aggregateCurrencyTotals,
   asTaxDetails,
   classifyReceiptState,
+  readEmitterName,
   toIsoOrNull,
 } from '../lib/receipt-report';
 
@@ -183,6 +184,8 @@ export function createPlatformReceiptsReportService(
           voidedBy: row.voidedBy,
           voidedAt: toIsoOrNull(row.voidedAt),
           voidReason: row.voidReason,
+          issuedBy: row.issuedBy,
+          emitterName: readEmitterName(row.emitterSnapshot),
         };
       });
 

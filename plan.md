@@ -95,11 +95,11 @@ Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-co
 |---|---|
 | C0 — Integridad del correlativo (orden + carrera) | ✅ Hecha |
 | C8 — Guardado de organización org-scoped en Panel (D5) | ✅ Hecha |
-| C1 — Snapshot del emisor (registro inmutable) | ⏳ Pendiente (migración) |
+| C1 — Snapshot del emisor (registro inmutable) | ✅ Hecha (migración `0016`) |
 | C2 — Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | ✅ Hecha |
 | C3 — Fidelidad del PDF (líneas omitidas + equivalente en moneda base) | ✅ Hecha |
 | C4 — Auditoría espejo en Console (`FS-N`) | ✅ Hecha |
-| C5 — Trazabilidad de emisión (`issued_by`) | ⏳ Pendiente (misma migración que C1) |
+| C5 — Trazabilidad de emisión (`issued_by`) | ✅ Hecha (misma migración `0016`) |
 | C6 — Barrido (2.º predicado) y contrato de anulación | ⏳ Pendiente |
 | C7 — Higiene, docs y matriz de tests | ⏳ Pendiente |
 
@@ -109,4 +109,8 @@ Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglo
 
 ## Próximo paso inmediato
 
-**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado) + **C0, C8, C2, C3 y C4** del track de correcciones. La auditoría del correlativo ya es simétrica (Panel anual `{slug}-{año}-{n}` y Console global `FS-N`, mismo algoritmo con estrategia inyectada y mismo reporte en ambas apps). Siguiente: **C6** (robustez del barrido + contrato de anulación explícito, sin migración); C1+C5 requieren aprobación de migración.
+**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado) + **C0, C8, C2, C3 y C4** del track de correcciones. La auditoría del correlativo ya es simétrica (Panel anual `{slug}-{año}-{n}` y Console global `FS-N`, mismo algoritmo con estrategia inyectada y mismo reporte en ambas apps).
+
+**C1 + C5 completadas** (migración `0016`, aditiva y sin backfill): el comprobante es **reproducible** (el emisor queda congelado al emitir y el compose no lee configuración viva si hay snapshot) y la emisión es **trazable** (`issued_by` del actor de sesión, nunca inventado por el paso 2 ni por el barrido). Ambos reportes exponen emisor congelado + actor y el CSV los exporta.
+
+Según el orden congelado, quedan **C6** (robustez del barrido + contrato de anulación explícito) y **C7** (higiene, docs y matriz de tests, donde ya hay un hallazgo anotado: el spec de pago pendiente del Panel falla por el prewarm + `revalidate: 60`, ver `tasks/correcciones-comprobantes.md`).
