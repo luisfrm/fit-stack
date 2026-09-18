@@ -77,4 +77,31 @@ describe('buildReceiptDataFromComposed', () => {
     input.member = null;
     expect(buildReceiptDataFromComposed(input).recipient.name).toBe('Miembro');
   });
+
+  it('baseTotal = null cuando el pago ya está en la moneda base', () => {
+    const input = validInput();
+    input.payment.currencyPaid = 'VES';
+    input.payment.planSnapshotCurrency = 'VES';
+    input.payment.exchangeRateApplied = '36.5';
+    expect(buildReceiptDataFromComposed(input).amounts.baseTotal).toBeNull();
+  });
+
+  it('baseTotal convierte con la tasa persistida (redondeo al centavo)', () => {
+    const input = validInput();
+    input.payment.amountPaid = 7300;
+    input.payment.currencyPaid = 'VES';
+    input.payment.planSnapshotCurrency = 'USD';
+    input.payment.exchangeRateApplied = '36.5';
+    const data = buildReceiptDataFromComposed(input);
+    expect(data.amounts.baseCurrency).toBe('USD');
+    expect(data.amounts.baseTotal).toBe(200);
+  });
+
+  it('sin tasa persistida no inventa equivalente (baseTotal null)', () => {
+    const input = validInput();
+    input.payment.currencyPaid = 'VES';
+    input.payment.planSnapshotCurrency = 'USD';
+    input.payment.exchangeRateApplied = null;
+    expect(buildReceiptDataFromComposed(input).amounts.baseTotal).toBeNull();
+  });
 });

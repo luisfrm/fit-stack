@@ -12,6 +12,7 @@
 import { resolveFiscalProfile } from './fiscal-profile';
 import { resolveDocumentLabel } from './document-label-gate';
 import { maskPaymentDetails } from './masking';
+import { roundCents } from './tax-math';
 import type { ITaxDetail, IPaymentMethodDetails } from '../types';
 import type {
   ReceiptData,
@@ -78,6 +79,24 @@ export interface ComposeReceiptInput {
   subscription: ComposeSubscription | null;
 }
 
+/**
+ * Equivalente del total en la moneda base, en centavos enteros. La tasa
+ * persistida se lee "1 {base} = {rate} {pagada}", así que se divide.
+ * `null` cuando no hay conversión (misma moneda o tasa ausente/inválida):
+ * el documento no muestra un equivalente inventado.
+ */
+function toBaseTotal(
+  total: number,
+  currencyPaid: string,
+  baseCurrency: string | null | undefined,
+  exchangeRateApplied: string | null | undefined,
+): number | null {
+  if (!baseCurrency || baseCurrency === currencyPaid) return null;
+  const rate = Number(exchangeRateApplied);
+  if (!Number.isFinite(rate) || rate <= 0) return null;
+  return roundCents(total / rate);
+}
+
 function toIso(value: DateInput): string {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) {
@@ -133,6 +152,8 @@ export function buildReceiptDataFromComposed(
   }
   const taxDetails = assertPersistedTaxDetails(payment.taxDetails, 'buildReceiptDataFromComposed');
 
+  const baseCurrency = payment.planSnapshotCurrency ?? organization.primaryCurrency;
+
   const profile = resolveFiscalProfile(organization.countryCode, organization.fiscalConfig);
   const label = resolveDocumentLabel({
     taxId: organization.taxId,
@@ -185,8 +206,14 @@ export function buildReceiptDataFromComposed(
       taxTotal: payment.taxTotal,
       total: payment.amountPaid,
       currencyPaid: payment.currencyPaid,
-      baseCurrency: payment.planSnapshotCurrency ?? organization.primaryCurrency,
+      baseCurrency,
       exchangeRateApplied: payment.exchangeRateApplied ?? null,
+      baseTotal: toBaseTotal(
+        payment.amountPaid,
+        payment.currencyPaid,
+        baseCurrency,
+        payment.exchangeRateApplied,
+      ),
     },
     method: {
       name: payment.paymentMethod,
@@ -334,6 +361,12 @@ export function buildPlatformReceiptDataFromComposed(
       currencyPaid: payment.currencyPaid,
       baseCurrency: payment.planSnapshotCurrency,
       exchangeRateApplied: payment.exchangeRateApplied ?? null,
+      baseTotal: toBaseTotal(
+        payment.amountPaid,
+        payment.currencyPaid,
+        payment.planSnapshotCurrency,
+        payment.exchangeRateApplied,
+      ),
     },
     method: {
       name: payment.paymentMethod,

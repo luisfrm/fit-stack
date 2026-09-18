@@ -14,7 +14,7 @@
 | C8 | Guardado de organización org-scoped en Panel (D5) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
 | C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí | 🔴 Bloqueante | M |
 | C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M | ✅ Hecha |
-| C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S |
+| C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S | ✅ Hecha |
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí | 🟡 Media | S |
 | C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S |
@@ -195,7 +195,7 @@ Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` decla
 
 ---
 
-## C3 — Fidelidad del PDF y datos del documento 🟠 (sin migración)
+## C3 — Fidelidad del PDF y datos del documento 🟠 (sin migración) ✅
 
 ### Problemas (contra `docs/FACTURATION.md` §3)
 
@@ -210,11 +210,22 @@ Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` decla
 | `packages/shared/src/documents/receipt-compose.ts` | Añadir `baseTotal` (equivalente convertido) a `ReceiptAmounts`, calculado con `roundCents` desde la tasa persistida — **nunca** recalculado a partir de APIs de cambio. |
 | `packages/shared/src/documents/receipt-data.ts` | `checklistPrePdf`: nuevo error si un campo visible requerido quedó en placeholder (`'---'`) — el placeholder deja de ser una salida válida. |
 
-### Criterios de aceptación
+### Criterios de aceptación (verificados)
 
-- Unit `receipt-data.test.ts`: checklist falla si un campo visible es `'---'`.
-- Unit `receipt-compose.test.ts`: `baseTotal` coherente con `exchangeRateApplied`; `null` cuando monedas coinciden.
-- Verificación manual: PDF de (i) gym informal sin `taxId`, (ii) pago en divisa con org de moneda base distinta. Adjuntar capturas al PR.
+- ✅ Unit `receipt-data.test.ts`: el checklist falla si un campo visible es `'---'` y **acepta** `null` (la vía correcta).
+- ✅ Unit `receipt-compose.test.ts` + `platform-receipt-compose.test.ts`: `baseTotal` coherente con `exchangeRateApplied`; `null` cuando las monedas coinciden o falta la tasa.
+- ✅ `jobs-worker/tests/receipt-pdf.test.ts`: **verificación automática del texto impreso** (infla los content streams y decodifica los runs hex de `TJ`), en lugar de capturas manuales:
+  - (i) con datos → contiene `R.I.F.: …`, `DIRECCIÓN / SEDE…` y `C.I. DEL SOCIO…`;
+  - (ii) sin datos → **no** aparece `R.I.F.`/`C.I.`/`---`;
+  - (iii) con tasa → `Tasa aplicada: 1 VES = 36.5 USD` + `Equivalente: 3,18 VES`.
+
+### Implementación
+
+- `packages/shared/src/documents/receipt-data.ts` → `ReceiptAmounts.baseTotal` (opcional, centavos enteros) + `MISSING_VALUE_PLACEHOLDER` y helper `placeholderViolations` (identificación fiscal, dirección y documento del receptor); el checklist acumula esos errores junto al resto.
+- `packages/shared/src/documents/receipt-compose.ts` → helper puro `toBaseTotal(total, currencyPaid, baseCurrency, rate)`: `null` si la moneda coincide o la tasa falta/no es válida (`roundCents(total / rate)` porque la tasa se lee "1 base = rate pagada"). Lo usan **ambos** composes (Panel y Console).
+- `apps/jobs-worker/src/receipt-pdf.tsx` → línea de `taxId` y bloque del emisor/receptor condicionales (se omite la línea, no se inventa), y bloque de conversión `1 {base} = {rate} {pagada}` + `Equivalente: {baseTotal}`. Sin cambios de estilo.
+
+**Fuera de alcance (consciente):** el diálogo del Panel (`receipt-dialog.tsx`) ya muestra la tasa con la dirección correcta (`1 {base} = {rate} {pagada}`), pero **no** el equivalente: es UI de mostrador, no el documento emitido. Si se quiere, se agrega con `amounts.baseTotal` en una línea.
 
 ---
 

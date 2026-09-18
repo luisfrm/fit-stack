@@ -100,4 +100,28 @@ describe('checklistPrePdf', () => {
     data.document.number = 'FS-0000001';
     expect(checklistPrePdf(data).ok).toBe(true);
   });
+
+  it('rechaza el placeholder "---" en un campo visible (la línea se omite)', () => {
+    const emitterTaxId = validReceipt();
+    emitterTaxId.emitter.taxId = '---';
+    const emitterResult = checklistPrePdf(emitterTaxId);
+    expect(emitterResult.ok).toBe(false);
+    expect(emitterResult.errors.some((e) => e.includes('omitirse'))).toBe(true);
+
+    const recipientDoc = validReceipt();
+    recipientDoc.recipient.documentId = '---';
+    expect(checklistPrePdf(recipientDoc).ok).toBe(false);
+
+    const noAddress = validReceipt();
+    noAddress.emitter.address = '---';
+    expect(checklistPrePdf(noAddress).ok).toBe(false);
+  });
+
+  it('acepta campos opcionales ausentes (null), que es la vía correcta', () => {
+    const data = validReceipt();
+    data.emitter.taxId = null;
+    data.emitter.address = null;
+    data.recipient.documentId = null;
+    expect(checklistPrePdf(data)).toEqual({ ok: true, errors: [] });
+  });
 });

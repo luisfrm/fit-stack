@@ -66,6 +66,13 @@ export interface ReceiptAmounts {
    */
   baseCurrency?: string;
   exchangeRateApplied?: string | null;
+  /**
+   * Equivalente del total en `baseCurrency`, congelado desde la tasa
+   * persistida (`exchangeRateApplied`) — nunca recalculado con una API de
+   * cambio. `null` si el pago ya está en la moneda base (no hay conversión
+   * que mostrar).
+   */
+  baseTotal?: number | null;
 }
 
 export interface ReceiptMethod {
@@ -107,6 +114,27 @@ const UUID_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**
+ * Placeholder prohibido en un campo visible: si el dato no existe, la línea
+ * se OMITE (FACTURATION.md §3: "omitir línea si no existe, no inventar").
+ */
+export const MISSING_VALUE_PLACEHOLDER = '---';
+
+/** Campos visibles opcionales: `null` (omitir) es válido, el placeholder no. */
+function placeholderViolations(data: ReceiptData): string[] {
+  const optionalFields: { label: string; value: string | null | undefined }[] = [
+    { label: 'identificación fiscal del emisor', value: data.emitter.taxId },
+    { label: 'dirección del emisor', value: data.emitter.address },
+    { label: 'documento del receptor', value: data.recipient.documentId },
+  ];
+  return optionalFields
+    .filter((field) => field.value?.trim() === MISSING_VALUE_PLACEHOLDER)
+    .map(
+      (field) =>
+        `Placeholder "${MISSING_VALUE_PLACEHOLDER}" en ${field.label}: la línea debe omitirse, no rellenarse.`,
+    );
+}
+
+/**
  * Valida el checklist pre-PDF: número presente y válido, sin UUID visible,
  * disclaimer del emisor, tasa si la moneda difiere, y cuadre de totales.
  * Acumula errores (no lanza): el caller decide (decisión §5.3).
@@ -142,6 +170,8 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
   if (data.footer.disclaimer.length === 0) {
     errors.push('Falta el disclaimer legal del emisor.');
   }
+
+  errors.push(...placeholderViolations(data));
 
   if (
     data.amounts.currencyPaid !== (data.amounts.baseCurrency ?? data.emitter.currency) &&

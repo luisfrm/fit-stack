@@ -99,6 +99,20 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     });
   });
 
+  it('baseTotal: null en la moneda base del plan, convertido si difiere', () => {
+    expect(
+      buildPlatformReceiptDataFromComposed(baseInput()).amounts.baseTotal,
+    ).toBeNull();
+
+    const conversion = baseInput();
+    conversion.payment.currencyPaid = 'VES';
+    conversion.payment.exchangeRateApplied = '36.5';
+    conversion.payment.amountPaid = 7300;
+    expect(
+      buildPlatformReceiptDataFromComposed(conversion).amounts.baseTotal,
+    ).toBe(200);
+  });
+
   it('trial $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {
     const input = baseInput();
     input.payment = {
