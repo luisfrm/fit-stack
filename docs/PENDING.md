@@ -115,6 +115,22 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - `payment.member_id` y `subscription.member_id` son `ON DELETE CASCADE`: borrar un miembro elimina sus pagos y suscripciones. Es hoy la única vía por la que un registro financiero desaparece (la suscripción ya no tiene DELETE) y es también de lo que depende la limpieza de E2E.
   - Coherente con “un registro financiero no se elimina”: el miembro con pagos debería darse de **baja lógica** (desactivar) en vez de borrarse, o el borrado debería rechazarse (409) cuando tiene pagos. Requiere decidir la política del módulo Members y actualizar E2E (la limpieza pasaría al borrado de la organización).
 
+## 13. Console — el borrado de la suscripción SaaS puede vaciar la serie `FS-N`
+
+- [ ] **`DELETE /api/platform/subscriptions/:id` existe y borra la suscripción junto con sus pagos por cascada.**
+  - Es la asimetría consciente respecto del Panel (donde C9 eliminó el DELETE de suscripciones): en Console la suscripción es de FitStack y el borrado se usa para deshacer altas equivocadas.
+  - El problema: si esa suscripción ya tenía comprobantes `FS-N` emitidos, sus filas desaparecen del libro con sus números. La auditoría de `gaps[]` (que necesita el universo de números emitidos) las reportaría como **huecos** o, peor, el `last_number` de la secuencia quedaría por delante de las filas existentes.
+  - Opciones: (a) rechazar el borrado cuando la suscripción tiene comprobantes numerados (409 + cancelar en su lugar), (b) borrado lógico (`cancelled_at` + un flag de “archivada”), (c) conservar las filas de pago huérfanas (FK sin cascada) para no perder el correlativo.
+  - Mientras no se decida, el Panel y Console tienen reglas distintas para el mismo concepto y eso debe ser una elección explícita, no una sorpresa en una auditoría.
+
+## 14. Comprobantes — email perdido en la DLQ después de la marca de notificado (C6)
+
+- [ ] **El barrido de C6 no cubre el email que ya se encoló y agotó reintentos.**
+  - El paso 2 marca `receipt_notified_at` **antes** de encolar `email.payment_receipt` / `email.org_payment_received`, y solo la revierte si el `send()` a la cola falla. Si el mensaje ya encolado falla N veces en el handler de email y cae a la DLQ de `fit-task-events`, la marca queda puesta y el 2.º predicado del barrido (`receipt_notified_at IS NULL`) no lo ve.
+  - Recuperación hoy: **manual** — `POST /api/payments/:id/send-email` (Panel) o `POST /api/platform/subscriptions/payments/:id/resend` (Console).
+  - Opciones si se quiere automático: (a) que el handler de email limpie la marca al fallar de forma definitiva (requiere que conozca el `paymentId`/scope, hoy no lo hace), o (b) un barrido de la DLQ, que Cloudflare no expone como cola consultable (habría que persistir el fallo en DB).
+  - Disparador: si aparece un comprobante con `receipt_pdf_key` y sin email entregado en una auditoría real.
+
 ---
 
 > [!NOTE]
