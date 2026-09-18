@@ -14,6 +14,8 @@ Esta carpeta contiene toda la infraestructura de Cloudflare como código.
 > **Dueño único de consumers/cron = Terraform.** Los `wrangler.jsonc` de los workers solo declaran `producers` (y R2), nunca `queues.consumers` ni `triggers`, para que `wrangler deploy` no compita con el estado. Los `wrangler deploy` suben el **código** (incl. el `scheduled()`); el trigger lo crea este Terraform.
 >
 > **Orden por ambiente:** `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`). El `scheduled()` debe existir en el script para que el cron haga algo.
+>
+> **⚠️ Si una cola se creó fuera de Terraform** (a mano con `wrangler`/dashboard), el primer `apply` fallará con "already exists" (409). Hay que importarla antes: `terraform import module.receipt_queue.cloudflare_queue.this <queue_id>` y lo mismo para su DLQ (`module.receipt_dlq_queue.cloudflare_queue.this`). Los `.tf` no incluyen bloques `import`.
 
 ## Modelo de ambientes
 
@@ -62,7 +64,7 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 | `RESEND_FROM_EMAIL` | Email de envío |
 | `PANEL_URL` | URL del panel de tenants (ej: `https://fitstack-panel.luisrivas.site`) |
 | `CONSOLE_URL` | URL del console SaaS (ej: `https://fitstack-console.luisrivas.site`) |
-| `EMAIL_PROVIDER` | `smtp` o `resend` (jobs-worker) |
+| `EMAIL_PROVIDER` | `resend` o `gmail` (jobs-worker) |
 | `SMTP_USER` | Usuario SMTP (si EMAIL_PROVIDER=smtp) |
 | `SMTP_PASS` | Contraseña SMTP (si EMAIL_PROVIDER=smtp) |
 | `ACCESS_CONTROL_API_KEY` | API key del Bridge (pausado — se agrega al migrar access-control al api-worker) |

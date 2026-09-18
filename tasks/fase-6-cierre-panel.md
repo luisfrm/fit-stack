@@ -1,5 +1,7 @@
 # Fase 6 — Cierre Panel: tests, E2E, docs
 
+> **📜 Documento histórico (ya ejecutado).** Los estados de pago se unificaron después (`voided` único; sin `invalid`) — ver `docs/PAYMENT_STATUSES.md`.
+
 > Depende de: Fases 0-5. Sin código de producto nuevo (salvo fixes que salgan de los tests).
 
 ## Objetivo

@@ -1,6 +1,6 @@
 # Checklist — estados de suscripción, flujo de pago y fases
 
-> Estado verificado: **2026-09-18** (C6 en `622b28e` + documentos en `46f4347`; los cambios de C7 quedan pendientes del commit del usuario).
+> Estado verificado: **2026-09-18**. Track C0–C9 cerrado; modelo de estados de pago unificado (commit `cef10c7`) + migración `0017` (commit `d1b3720`).
 > Documentos relacionados: `docs/PAYMENT_STATUSES.md` (semántica completa), `tasks/correcciones-comprobantes.md` (plan del track), `docs/PENDING.md` (pendientes).
 
 ## 1. Estados de una suscripción (derivados, no se guardan)
@@ -59,20 +59,22 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 ## 5. Verificación
 
 - [x] `pnpm typecheck` 9/9 · `pnpm lint` 0 errores (warnings preexistentes)
-- [x] Unit: shared **279** · panel **77** · console **90** · jobs-worker **17** · api-worker **26**
+- [x] Unit: shared **286** · panel **77** · console **90** · jobs-worker **17** · api-worker **26**
 - [x] Integración C9: `subscriptions` **18/18** (5 nuevas) + guards/dashboard/members-stats/reports-receipts/receipts-rbac **42/42**
 - [x] Integración C6: `receipts-emission` **13** (T4b y T8b nuevos) + `platform-receipts-emission` **8** (T4b nuevo) + `platform-receipts-void` **4** (nombre y assert corregidos) → 25/25; + `subscriptions` 18 + `receipts-integrity` 4 + `reports-receipts` 6 → **28/28**
 - [x] **E2E completo (estado C9, commit `4d5a626`): 86/86** (panel 52 + console 34), 0 warnings de borrado
 - [x] E2E de comprobantes tras C6: **7/7** (consola 3 + panel 2 + los 2 setups), incluido el clic real de "Anular"/"Marcar como Validado" en la consola
-- [x] C7 (sin migración): units de `emitterSnapshot`/`baseTotal`/gating fiscal y E2E del guardado de sede ya estaban en la suite; `.gitignore` (`*.log`) + destrackeo de los 3 logs de `spec/`, script `push-test-schema` sin shell y naming documentado.
-- [x] Commit de C6 (`622b28e`) y de la versión previa de estos documentos (`46f4347`); los cambios de C7 quedan pendientes del commit del usuario.
+- [x] C7: units de `emitterSnapshot`/`baseTotal`/gating fiscal y E2E del guardado de sede ya estaban en la suite; `.gitignore` (`*.log`), script `push-test-schema` sin shell y naming documentado.
+- [x] Modelo de estados unificado (`cef10c7`): nueva integración `platform-subscription-status.test.ts` **9/9** (paridad SQL↔helper, voided ignorado, gracia, puntos 5 y 7) + `subscriptions` **19/19** (rechazo = `voided`, `invalid` → 400). Docs sincronizadas.
 
 ## 6. Checklist de release (no es fase: es el día que entra un cliente real)
 
 - [ ] **Cadencia del barrido**: pasar el cron de `0 */10 * * *` a `*/10 * * * *` en `infrastructure/terraform/workers.tf` (hoy 10 h es un ahorro de pre-venta, no un SLA) y actualizar `plan.md` / `docs/PENDING.md` §7.
+- [ ] **Verificar la migración `0017`**: confirmar que `database-migrations.yml` la aplicó en prod y que ninguna fila conserva `pending`/`invalid` (`SELECT status, count(*) … GROUP BY status`).
 - [ ] **Escanear la serie**: correr la auditoría de correlativo en Panel y Console (`gaps[]` vacío o con huecos explicados por anulaciones).
 - [ ] **Vigilar §14**: revisar la DLQ de `fit-task-events` y confirmar que ningún comprobante quedó sin email entregado.
 - [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (`docs/PENDING.md` §9).
+- [ ] **Terraform**: correr `terraform apply` (environment `production`) para crear la cola `fit-receipt-events` + DLQ + consumer + cron (el action es manual).
 
 ## 7. Cómo repetir la verificación
 

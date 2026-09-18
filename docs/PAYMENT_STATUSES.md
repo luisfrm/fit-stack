@@ -135,3 +135,21 @@ Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en
 | Gate del free tier | `apps/api-worker/src/services/features.service.ts` |
 | Badges Panel | `apps/panel/components/payments/subscriptions-table.tsx` |
 | Badges Console | `apps/console/components/platform/platform-payment-history-modal.tsx` |
+
+## 7. Migración `0017` y notas de release
+
+La migración `packages/database/migrations/0017_crazy_brood.sql` (aditiva y retrocompatible) cierra la unificación:
+
+- Fija el default de `platform_subscription_payment.status` en `'processing'` (antes `'pending'`).
+- Normaliza datos históricos: `pending → processing` e `invalid → voided`, marcando `receipt_voided`/`voided_at`/`void_reason` cuando la fila tenía `receipt_number` (actor `voided_by` queda `NULL`). `cancelled_at` no se toca.
+- Se aplica **antes** del deploy del código nuevo (los valores viejos siguen siendo válidos para el código previo). CI (`database-migrations.yml`) la corre en merge a `master`. Tras el merge, ninguna fila debe llevar `pending`/`invalid`.
+
+**Cambios de comportamiento a comunicar:**
+
+1. `PAYMENT_STATUSES = processing | validated | voided | refunded`. `pending` e `invalid` **se retiran**: los PATCH que los envíen responden **400**.
+2. El rechazo y la anulación comparten `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`.
+3. Solo `validated | refunded` (`QUALIFYING_PAYMENT_STATUSES`) sostienen un periodo.
+4. **Console/SaaS**: un pago `voided` **se ignora** (ya no revoca servicio); una org con pago `processing` y periodo vigente pasa de `active` a **`past_due`**.
+5. **Panel**: un pago `voided` deja la suscripción **ANULADA**.
+6. `DELETE /api/subscriptions/:id` sigue **sin existir**: se anula o se cancela.
+7. `refunded` permanece reservado (sin flujo que lo produzca, `docs/PENDING.md` §17) y no enciende el flag ANULADO.

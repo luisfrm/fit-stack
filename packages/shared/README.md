@@ -19,11 +19,13 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 - `ORG_ROLES` — `OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`
 - `ORG_ROLE_LABELS` + `formatOrgRole(role)` — etiquetas en español para roles de **organización (Panel)**
 - `PLATFORM_ROLE_LABELS` + `formatPlatformRole(role)` — etiquetas en español para roles de **plataforma (Console)**: `owner`, `admin`, `support`, `user`
-- `PAYMENT_STATUSES` — `pending`, `processing`, `validated`, `invalid`, `voided`, `refunded`
-- `SUBSCRIPTION_STATUSES` — `active`, `cancelled`, `expired`, `expiring`
+- `PAYMENT_STATUSES` — `processing`, `validated`, `voided`, `refunded` (sin `pending`/`invalid`)
+- `QUALIFYING_PAYMENT_STATUSES` — `[validated, refunded]`: pagos que sostienen un periodo (`processing` y `voided` no califican)
+- `getVoidKind(payment)` — deriva `rejected` (sin `receiptNumber`) vs `annulled` (con número); el rechazo y la anulación comparten el estado `voided`
+- `SUBSCRIPTION_STATUSES` — `active`, `cancelled`, `voided`, `expired`, `expiring`
 - `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `trial`, `past_due`, `read_only`, `suspended`, `cancelled`
-- `PLATFORM_GRACE_PERIODS` + `computePlatformSubscriptionStatus()` + `isPlatformSubscriptionActive()/Expired()` — helpers puros para el status de la suscripción SaaS
-- `COUNTRIES` — 8 países preconfigurados: VE, CO, MX, AR, CL, PE, ES, US + interfaz `ICountryConfig`
+- `PLATFORM_GRACE_PERIODS` + `computePlatformSubscriptionStatus()` + `isPlatformSubscriptionActive()/Expired()` — helpers puros para el status de la suscripción SaaS (`hasValidatedPayment: boolean` es obligatorio; `trial` solo mientras `currentPeriodEnd >= now`)
+- `COUNTRIES` — 9 países preconfigurados: VE, CO, MX, AR, CL, PE, ES, US, PA + interfaz `ICountryConfig`
 
 ### `types.ts`
 
@@ -40,13 +42,13 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 
 ### `auth-config.ts`
 
-- `ORGANIZATION_ADDITIONAL_FIELDS` — campos extra de `organization` en Better Auth: `slogan`, `countryCode`, `taxId`, `legalName`, `address`, `fiscalConfig`, `timezone`, `status`
+- `ORGANIZATION_ADDITIONAL_FIELDS` — campos extra de `organization` en Better Auth: `slogan`, `countryCode`, `taxId`, `legalName`, `address`, `fiscalConfig`, `timezone`, `primaryCurrency`, `currencyFormat`
 
 ### `permissions/`
 
 | File | Contents |
 |------|----------|
-| `modules.ts` | `PERMISSION_MODULES` (11 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization, panel) + `PERMISSION_MODULE_VALUES` |
+| `modules.ts` | `PERMISSION_MODULES` (12 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization, ai, panel) + `PERMISSION_MODULE_VALUES` |
 | `actions.ts` | `PERMISSION_ACTIONS` (READ, CREATE, UPDATE, DELETE, ACCESS) |
 | `can.ts` | `can(role, module, action)`, `canAny(role, checks)`, `hasAccess` (alias de `can`) |
 | `role-assignment.ts` | `canAssignRole(actor, target)` (org) y `canAssignPlatformRole(actor, target)` (plataforma) — anti-escalation |

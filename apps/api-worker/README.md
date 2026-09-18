@@ -231,7 +231,8 @@ apps/api-worker/
 | Binding | Tipo | Descripción |
 |---------|------|-------------|
 | `FILES_BUCKET` | R2 | Bucket de archivos (per-env: `fit-stack-files[-dev|-staging]`) |
-| `TASK_QUEUE` | Queue | Cola de tareas (emails, etc.). Per-env: `fit-task-events[-dev|-staging]` |
+| `TASK_QUEUE` | Queue | Producer de `fit-task-events[-dev|-staging]` (emails) |
+| `RECEIPT_QUEUE` | Queue | Producer de `fit-receipt-events[-dev|-staging]` (render de comprobantes PDF). Terraform es dueño del consumer/cron; el worker solo produce |
 
 > ⚠️ **Tip**: `BETTER_AUTH_URL` en dev debe apuntar a `http://localhost:8788` (el puerto de este worker; `8787` es del `jobs-worker`).
 

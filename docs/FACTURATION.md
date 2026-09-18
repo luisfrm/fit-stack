@@ -1,7 +1,7 @@
 # Facturación y comprobantes — guía de referencia
 
 > Documento de referencia interna. Última revisión: sept 2026.
-> Ver también: `responsabilidades-fitstack-org.md`
+> Ver también: `docs/RESPONSABILITIES.md`, `docs/PAYMENT_STATUSES.md`
 
 ## 1. Diferencia entre comprobante y factura fiscal
 
@@ -28,17 +28,18 @@ Sin el punto 3, no ofrecer la opción en producto, aunque el gym diga estar regi
 - `address`, logo si está configurado
 
 **Identificación del documento:**
-- Etiqueta configurable: "Comprobante de pago" por defecto (nunca "Factura" salvo condición cumplida, ver §2)
-- Número correlativo **por organización**, no el ID global del pago. Usar tabla de secuencia dedicada:
+- Etiqueta resuelta por el **gate de 3 condiciones** (`taxId` + `isFormalTaxpayer: true` + homologación real conectada): "Comprobante de pago" por defecto (nunca "Factura" salvo condición cumplida, ver §2). El campo `documentLabel` es de solo lectura, no participa del gate.
+- Número correlativo **por organización**, no el ID global del pago. Tabla de secuencia dedicada:
 
 ```
 organization_document_sequence
  ├─ organization_id
  ├─ document_type      -- 'receipt' | 'invoice'
- └─ next_number         -- incrementado transaccionalmente
+ ├─ year               -- año local del emisor (reinicio anual)
+ └─ last_number        -- ÚLTIMO número entregado (el nombre `next_number` es cosmético en la gemela SaaS)
 ```
 
-Guardar el número asignado en `payment.receiptNumber`, asignado al **generar el PDF**, no al crear el pago (evita huecos si un pago se anula (`voided`) antes de emitir comprobante).
+Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 (al validar el pago)**, no al crear el registro ni al generar el PDF (evita huecos si un pago se anula sin emitir comprobante). La asignación es una única sentencia atómica `INSERT … ON CONFLICT DO UPDATE … RETURNING`, sin transacción interactiva ni `SELECT … FOR UPDATE`. El PDF es el **paso 2** (render asíncrono en `jobs-worker`), no asigna número.
 
 **Datos del miembro:** nombre completo, documento de identidad si existe (usar `docLabel` del país), contacto opcional.
 
@@ -61,7 +62,8 @@ Guardar el número asignado en `payment.receiptNumber`, asignado al **generar el
 | CL | IVA | 19% | — |
 | PE | **IGV** (no "IVA") | 18% | Corregir nombre en `countryTaxes`. Tasa compuesta (IGV + Impuesto de Promoción Municipal), total se mantiene en 18% durante recomposición gradual 2026–2029 |
 | ES | IVA | 21% | — |
-| US | — | — | **No existe VAT/IVA nacional en EE.UU.** Eliminar el valor "20%" (parece copiado del Reino Unido). Dejar `countryTaxes: []` y usar disclaimer indicando que el sales tax depende del estado |
+| US | — | — | **No existe VAT/IVA nacional en EE.UU.** Dejar `countryTaxes: []` y usar disclaimer indicando que el sales tax depende del estado |
+| PA | ITBMS | 7% | — |
 
 ## 5. Campos genéricos vs. específicos por país (schema)
 
@@ -81,8 +83,11 @@ Guardar el número asignado en `payment.receiptNumber`, asignado al **generar el
 **Condicionales especiales (no van en `countryTaxes` fijo):**
 ```ts
 conditionalTaxes: [
-  { name: "IGTF", type: "conditional", condition: "payment_currency !== primary_currency", value: null }
+  { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", basis: "gross_first", requiresConfirmation: true, value: null }
 ]
+```
+
+> El IGTF nace **apagado** y nunca es automático: activarlo exige declaración de contribuyente formal + confirmación explícita + tasa manual (`fiscalConfig.confirmedTaxes`). La base `gross_first` extrae el IGTF del total **antes** de descomponer el resto con IVA. Ver `docs/PENDING.md` §9.
 ```
 
 ## 6. Notas específicas de Venezuela

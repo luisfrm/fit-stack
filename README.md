@@ -18,9 +18,9 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 | `jobs-worker` | Cloudflare Queues | 8787 | Background jobs processor (Emails via Resend, PDFs, Notifications) |
 | `panel` | Next.js 16 (App) | 3001 | Gym admin panel (Owner/Manager/Cashier) |
 | `web` | Next.js 16 (App) | 3002 | Public marketing + CMS pages & Member portal |
-| `console` | Next.js 16 (App) | 3003 | SaaS super-admin (organizations, plans, subscriptions) |
+| `console` | Next.js 16 (App) | 3000 | SaaS super-admin (organizations, plans, subscriptions) |
 | `bridge` | Python/Flet | Desktop Kiosk | Desktop app for biometric & QR access control — ⏸ **pausado** |
-| `api` | Next.js 16 | 3000 | *(DEPRECATED)* Legacy Next.js API Routes — ⏸ **pausado, solo referencia** |
+| `api` | Next.js 16 | 3003 | *(DEPRECATED)* Legacy Next.js API Routes — ⏸ **pausado, solo referencia** |
 
 ### Packages
 
@@ -144,7 +144,9 @@ For the full deployment guide see [INFRASTRUCTURE.md](file:///c:/Users/LAPTOP/Do
 
 ## Documentation
 
-- [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md) — Detailed architecture design & system decisions
+- [docs/ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/docs/ARCHITECTURE.md) — Detailed architecture design & system decisions
 - [AGENTS.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
 - `docs/PENDING.md` — Roadmap & pending tasks
+- `docs/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
+- `docs/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
 - `docs/TIMEZONE_MANAGEMENT.md` — Timezone handling

@@ -40,8 +40,8 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 - **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-NEW-STRUCTURE.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (AI credits, current) and `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, historical) + `how/` (source of the AI Knowledge Base, end-user tone) + specs in `docs/superpowers/specs/`.
-- **Architecture Spec**: For detailed design decisions, see [ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/ARCHITECTURE.md).
+- **Docs**: `docs/` — `PENDING.md`, `FUTURE_IDEAS.md`, `TIMEZONE_MANAGEMENT.md`, `RBAC-STRUCTURE.md`, `PAYMENT_STATUSES.md`, `CHECKLIST-COMPROBANTES.md`, `FACTURATION.md`, `ORGANIZATION_RECEIPT_MODEL.md`, `CHAT_PRICING.md` + `CHAT_INFRASTRUCTURE.md` (AI credits, current) and `CHAT_IMPLEMENTATION.MD` (⏸ DEPRECATED, historical) + `how/` (source of the AI Knowledge Base, end-user tone).
+- **Architecture Spec**: For detailed design decisions, see [docs/ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/docs/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
 
@@ -121,6 +121,8 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
 6. **Registro financiero inmutable**: una suscripción con su pago **nunca se elimina** — `subscriptions` no expone `delete` a ningún rol y no existe `DELETE /api/subscriptions/:id`. Si el registro está equivocado se **anula** (el cobro pasa a `voided` y la suscripción se computa `ANULADA`); si se revoca el acceso se **cancela**. Anular ≠ cancelar: `voided` = registro inválido, `cancelled` = el acceso se revocó con un cobro que sigue siendo válido.
+   - **Payment statuses unificados**: `PAYMENT_STATUSES = processing | validated | voided | refunded` (sin `pending`/`invalid`). El rechazo y la anulación comparten `voided`; el tipo se **deriva** con `getVoidKind` (`rejected` sin `receiptNumber` / `annulled` con él). Solo `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) sostienen un periodo. Al anular se persisten siempre `voided_by`/`voided_at`/`void_reason`.
+   - **Void por dominio**: en **Panel** un pago `voided` deja la suscripción **ANULADA** (anula el servicio); en **Console/SaaS** un `voided` se **ignora** en el status computado (no revoca servicio; la gracia corre desde `currentPeriodEnd` y no se acumula). Gate free tier: si está habilitado, manda; si no hay suscripción se evalúa free tier; si no, `/no-subscription`.
 7. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
 
 ---
@@ -242,7 +244,8 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
 | `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
 | `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
-| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **sin DELETE** (registro financiero inmutable)                                                                                                                                                                                                                                                                                                           || `/api/payments`       | `PATCH /:id/status` (returns the explicit void outcome: `receiptVoided` + `receiptVoidReason`), `POST /:id/send-email` (receipt resend)                                                                                                                                                                                                                                                                                                                         |
+| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **sin DELETE** (registro financiero inmutable) |
+| `/api/payments`       | `PATCH /:id/status` accepts `processing \| validated \| voided` + optional `voidReason` (retired `pending`/`invalid` → **400**); returns the explicit void outcome (`receiptVoided` + `receiptVoidReason`). `POST /:id/send-email` (receipt resend) |
 | `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
 | `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
 | `/api/cms`           | Content pages/blocks                                                                                                                                                                                                                                                                                                                                                                 |
@@ -433,6 +436,8 @@ Panel receipts are internal payment records — never fiscal invoices (see `docs
 
 > Columns (C1/C5): `payment.emitter_snapshot` / `payment.issued_by` and their twins on `platform_subscription_payment` — migration `0016`, additive nullable, no backfill (`NULL` = pre-C1 emission).
 
+> Payment-status migration (`0017`, additive/backward-compatible): sets `platform_subscription_payment.status` default to `'processing'` and normalizes legacy data (`pending → processing`, `invalid → voided`, marking `receipt_voided`/`voided_at`/`void_reason` when a receipt existed). Applied by CI (`database-migrations.yml`) on merge. After merge, no row may carry `pending`/`invalid`.
+
 **Console (SaaS) receipts** mirror the same guarantees with one legal emitter (FitStack):
 - Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
 - Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
@@ -452,7 +457,7 @@ Subscription status is **computed dynamically** via SQL CASE — NOT stored in D
 ```ts
 PLATFORM_SUBSCRIPTION_STATUSES = {
   ACTIVE: "active", // periodEnd >= now and EXISTS(validated|refunded)
-  TRIAL: "trial", // isTrial = true
+  TRIAL: "trial", // isTrial && periodEnd >= now
   PAST_DUE: "past_due", // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
   SUSPENDED: "suspended", // 15+ days overdue
@@ -467,10 +472,12 @@ The payment enum (`PAYMENT_STATUSES = processing | validated | voided | refunded
 - `cancelledAt IS NOT NULL` → `cancelled`
 - `isTrial = true` and active period → `trial`
 - Active period + **`EXISTS(validated|refunded)`** (`QUALIFYING_PAYMENT_STATUSES`, never "the last payment") → `active`
-- Active period without a qualifying payment → `past_due`
-- Grace from `currentPeriodEnd`: overdue ≤ 7 days → `past_due`; ≤ 14 → `read_only`; > 14 → `suspended`
+- Active period without a qualifying payment (`processing`/`voided`/none) → `past_due`
+- Grace from `currentPeriodEnd` (using `FLOOR` to match the pure helper): overdue ≤ 7 days → `past_due`; ≤ 14 → `read_only`; > 14 → `suspended`
 
-A `voided` payment is **ignored**: it never revokes service; grace runs from `currentPeriodEnd` and the tiers do **not** accumulate. `processing` does not qualify either. `getLastSubscriptionStatus(organizationId)` exposes this same status + `hasValidatedPayment` for the self-service renewal guard. When the status does not grant access, the free-tier gate decides (`features.service.ts`): if `feature_flags_free_tier_enabled === 'true'` the free floor applies; otherwise the legacy gate sends the panel to `/no-subscription` (see "Features & Free Tier").
+`computePlatformSubscriptionStatus` (pure mirror) now requires **`hasValidatedPayment: boolean`** (no longer optional). The SQL and the helper are parity-tested (`platform-subscription-status.test.ts`).
+
+A `voided` payment is **ignored**: it never revokes service; grace runs from `currentPeriodEnd` and the tiers do **not** accumulate. `processing` does not qualify either. `getLastSubscriptionStatus(organizationId)` exposes this same status + `hasValidatedPayment` for the self-service renewal guard, which blocks a re-payment **only if `currentPeriodEnd > now && hasValidatedPayment`** (a client whose only payment was voided can pay again). When the status does not grant access, the free-tier gate decides (`features.service.ts`): if `feature_flags_free_tier_enabled === 'true'` the free floor applies; otherwise the legacy gate sends the panel to `/no-subscription` (see "Features & Free Tier").
 
 > Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revocada); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 

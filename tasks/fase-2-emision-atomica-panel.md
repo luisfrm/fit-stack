@@ -1,5 +1,7 @@
 # Fase 2 — Emisión Panel en dos pasos (número síncrono + PDF en cola)
 
+> **📜 Documento histórico (ya ejecutado).** Se conserva como registro de la fase. Los estados de pago mencionados (`invalid`, `voided/invalid`) quedaron **unificados en `voided`** (ver `docs/PAYMENT_STATUSES.md`).
+
 > Depende de: Fase 0 (gate, tax-math, formatos, `ReceiptData`, checklist) y Fase 1 (secuencia + columnas). Aquí nace el comprobante real.
 
 > **⚠️ Addendum de arquitectura (decisión final, reemplaza lo que diga abajo sobre ubicación):**
