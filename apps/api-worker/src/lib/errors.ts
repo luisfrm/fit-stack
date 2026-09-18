@@ -78,6 +78,13 @@ export const onError: ErrorHandler<AppEnv> = (err, c) => {
   }
 
   if (err instanceof HTTPException) {
+    // Un HTTPException puede traer su propia Response (cuerpo con código de
+    // negocio: 409 { code: 'SLUG_TAKEN' }, 403 { code: 'FEATURE_NOT_AVAILABLE' }).
+    // Se respeta TAL CUAL: el `code` es contrato del cliente (los toasts se
+    // resuelven por código, nunca por texto). Ignorarla lo borraba del body.
+    if (err.res) {
+      return err.getResponse();
+    }
     return c.json({ error: err.message }, err.status);
   }
 

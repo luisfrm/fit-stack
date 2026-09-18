@@ -8,19 +8,22 @@
 
 ## 0. Resumen ejecutivo
 
-| # | Fase | Naturaleza | Migración | Severidad | Esfuerzo |
-|---|---|---|---|---|---|
-| C0 | Integridad del correlativo (orden + carrera) | Bug | No | 🔴 Bloqueante | S |
+| # | Fase | Naturaleza | Migración | Severidad | Esfuerzo | Estado |
+|---|---|---|---|---|---|---|
+| C0 | Integridad del correlativo (orden + carrera) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
+| C8 | Guardado de organización org-scoped en Panel (D5) | Bug | No | 🔴 Bloqueante | S | ✅ Hecha |
 | C1 | Snapshot del emisor (registro inmutable) | Bug fiscal | Sí | 🔴 Bloqueante | M |
-| C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | S |
+| C2 | Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | Correctitud fiscal | No | 🟠 Alta | M |
 | C3 | Fidelidad del PDF (placeholders, equivalente en moneda base) | Correctitud | No | 🟠 Alta | S |
 | C4 | Auditoría espejo en Console (`FS-N` + export) | Hueco funcional | No | 🟠 Alta | M |
 | C5 | Trazabilidad de emisión (`issued_by`) | Auditoría | Sí | 🟡 Media | S |
 | C6 | Robustez de barrido y contrato de anulación | Robustez | No | 🟡 Media | S |
 | C7 | Higiene, docs y matriz de tests | Deuda | No | 🟡 Media | S |
 
-**C0 + C2 + C3 + C4 cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
+**C0 + C8 + C2 + C3 + C4 cierran el objetivo de "registro correcto + bases listas para homologar" sin tocar la DB.**
 C1 y C5 comparten una única migración (se agrupan a propósito, un solo ciclo `generate → review → migrate`).
+
+Decisiones D1–D6 **resueltas** al final del documento (sección *Decisiones congeladas*).
 
 Regla de siempre: `pnpm db:generate → review → migrate` con aprobación; **prohibido `db:push`**.
 
@@ -49,13 +52,57 @@ Regla de siempre: `pnpm db:generate → review → migrate` con aprobación; **p
 
 La compensación cierra el caso "el perdedor es el último consumidor". En una carrera de 2 donde **el ganador tiene el seq menor**, el número menor es irreclaimable sin renumerar (prohibido). Eso se documenta en `plan.md` como riesgo residual aceptado (probabilidad ~0 con la guarda tardía (b), que reduce la ventana a milisegundos).
 
-**Alternativa completa (requiere migración, evaluar después):** *claim-then-number* — reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` **antes** de consumir la secuencia (persistiendo ya impuestos) y asignar el número después. Elimina la carrera al 100 %; cuesta una columna nueva y una rama extra del barrido para reparar reclamaciones huérfanas.
+### Decisión D4 (congelada)
 
-### Criterios de aceptación
+Se aplica **C0 pragmático** (orden + guarda tardía + compensación) y *claim-then-number* queda **documentado en `docs/PENDING.md`** con disparador explícito: *si el reporte de huecos muestra un hueco no explicado en producción*. No se incluye en la migración de C1/C5 para mantenerla revisable y evitar un estado intermedio nuevo (`reclamado sin número`) que obligaría a una rama extra de reparación en el barrido.
 
-- Test de integración: org con `countryCode` inválido → la emisión falla 500 y `organization_document_sequence.last_number` **no cambia**; `gaps[]` del reporte queda **vacío**.
-- Test de integración: dos `assignReceiptNumber` concurrentes sobre el mismo pago → **un** número persistido, `gaps[]` vacío.
-- Tests de `receipts.repository` (unit/integración): `releaseLastNumber` no revierte si `last_number ≠ seq`.
+Referencia de la alternativa completa: reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` (persistiendo ya los impuestos) **antes** de consumir la secuencia y asignar el número después.
+
+### Criterios de aceptación (verificados)
+
+- ✅ `tests/integration/receipts-integrity.test.ts` — org con `countryCode` inválido → la emisión falla y la secuencia **no cambia**; `gaps[]` **vacío**.
+- ✅ `tests/integration/receipts-integrity.test.ts` — doble emisión concurrente del mismo pago → **un** número persistido, ambos responses devuelven el número autoritativo.
+- ✅ `receipts-integrity.test.ts` — `releaseLastNumber`/`releaseLastPlatformNumber` liberan solo si siguen siendo el último consumidor (y el número liberado se **reutiliza**).
+
+### Implementación
+
+- `packages/database/src/repositories/receipts.repository.ts` → `releaseLastNumber`.
+- `packages/database/src/repositories/platform-receipts.repository.ts` → `releaseLastPlatformNumber`.
+- `apps/api-worker/src/services/receipts.service.ts` → slug/año validados + perfil fiscal e impuestos **antes** de `nextDocumentNumber`; guarda tardía (`fresh`); helper `requeueRenderIfPdfPending`; compensación y `pdfStatus` real.
+- `apps/api-worker/src/services/platform-receipts.service.ts` → guarda tardía, compensación y `PlatformAssignResult.pdfStatus: 'pending' | 'ready'`.
+
+---
+
+## C8 — Guardado de la organización org-scoped en Panel (D5) 🔴 (sin migración)
+
+### Problema
+
+`apps/panel/lib/services/organizations-service.ts` apunta a `/platform/organizations` (`ORGANIZATIONS_PATH`), y `PATCH /platform/organizations/:id` exige `requirePlatformAuth()` (= permiso de plataforma `organization.create`, `apps/api-worker/src/lib/route-handler.ts`). El formulario **general** de `settings/organization` (`handleSave`) usa ese service → un OWNER/MANAGER de gym real recibe **403**, atrapado por el `catch` genérico ("No se pudo guardar la información"). No se detecta en dev/E2E porque la cuenta del desarrollador sí tiene rol de plataforma, y el E2E solo prueba "Guardar facturación" (que sí usa el endpoint org-scoped).
+
+Riesgo añadido: ambos guardados escriben la misma fila `organization`. El merge de `fiscalConfig` ya está bien resuelto ✅ (no hay reescritura ciega), pero el bug deja el módulo de identidad de sede roto en producción y viola AGENTS.md §5 ("platform-scoped logic lives in console-specific services").
+
+### Cambios
+
+| Archivo | Cambio |
+|---|---|
+| `apps/panel/lib/services/organizations-service.ts` | Apuntar a `/organizations/profile` (org-scoped) o retirar `update` y usar `authClient.organization.update()` (AGENTS.md §5: Better Auth es la fuente de verdad de name/logo). Cero rutas `/platform/*` desde el panel. |
+| `apps/panel/app/(protected)/settings/organization/page.tsx` | `handleSave` usa el service org-scoped; errores vía `mutationError(scope, err, "No se pudo guardar la información")` (nunca texto crudo) + `updateTag` + `router.refresh()`, igual que el bloque fiscal. |
+| `apps/api-worker/src/routes/organizations.route.ts` | Verificar que `PATCH /profile` acepta el set completo (`name`, `slug`, `logo`, `slogan`, `address`, `timezone`, `currencyFormat`) con `requireOrgPermission(ORGANIZATION, UPDATE)`; `countryCode`/`primaryCurrency` siguen inmutables (400). |
+| `e2e/panel/settings.spec.ts` | **Nuevo test**: guardar el formulario general → sin toast de error + persistencia tras `router.refresh()`. Este test habría detectado el 403. |
+
+### Criterios de aceptación (verificados)
+
+- ✅ E2E `e2e/panel/settings.spec.ts` → "guarda los datos generales de la sede (endpoint org-scoped)": toast de éxito + valor persistido tras reload.
+- ✅ Integración `organizations-fiscal.test.ts` → set general persistido (name/slogan/logo/timezone/currencyFormat/legalName/taxId/address) y slug duplicado → **409 `SLUG_TAKEN`**.
+- ✅ Grep: `organizations-service.ts` (panel) ya no expone `update` ni se usa desde el formulario; queda solo `getAll`/`getById`/`join`.
+
+### Implementación
+
+- `apps/api-worker/src/routes/organizations.route.ts` → `orgProfileSchema` acepta el set general y el handler lo aplica (sigue rechazando `countryCode`/`primaryCurrency` con 400).
+- `apps/panel/lib/services/org-profile-service.ts` → `OrgProfileInput` (general + fiscal) y único punto de escritura de `organization` en el panel.
+- `apps/panel/app/(protected)/settings/organization/page.tsx` → `handleSave` org-scoped, vacíos → `null`, `mutationError`; país **read-only** (con motivo); `taxId` deja de ser `required` (bloqueaba el submit nativo del formulario).
+- `packages/ui/src/components/country-selector.tsx` → prop `disabled` (read-only).
+- `apps/api-worker/src/lib/errors.ts` → el `onError` respeta `err.res` de un `HTTPException`: sin esto el `code: 'SLUG_TAKEN'` documentado en AGENTS.md **nunca llegaba** al cliente (bug encontrado al escribir el test de C8).
 
 ---
 
@@ -88,29 +135,48 @@ La compensación cierra el caso "el perdedor es el último consumidor". En una c
 
 ## C2 — Perfil fiscal conservador 🟠 (sin migración)
 
-### Problema
+### D1 (congelada) — ¿`isFormalTaxpayer` gobierna el desglose?
 
-`packages/shared/src/documents/fiscal-profile.ts` nace los `countryTaxes` con `enabled: true` **ignorando `isFormalTaxpayer`**. Un gym no formal emite un comprobante que **afirma** "IVA (16 %)" en el desglose. `isFormalTaxpayer` solo gobierna la etiqueta del documento. Eso es lo contrario de "no pisar la raya fiscal".
+**Sí, y no hay desglose para quien no es contribuyente formal.** Un emisor que no es contribuyente formal no puede cobrar ni declarar IVA: detallar "IVA (16 %)" en su comprobante sería **afirmar un hecho fiscal falso**, y el desglose base+impuestos es justo lo que un auditor lee como intención de documento fiscal. Cuando no es formal, el comprobante muestra **el total pagado, sin desglose ni derivados**:
 
-Además, `IGTF` se modela como tasa aditiva plana y se hardcodea `3%`, cuando `docs/FACTURATION.md` §6 dice que es variable por decreto, expresada en bolívares y **a confirmar con contador**. El reparto `total/(1+Σtasas)` da una base y unos montos legalmente distintos del cálculo real (IGTF se calcula sobre el monto pagado en divisa, no sobre la base).
+| Estado | Qué se persiste | Qué se imprime | Etiqueta |
+|---|---|---|---|
+| `isFormalTaxpayer: false` (o ausente) | `taxDetails: []`, `taxTotal: 0`, `subtotal = amountPaid` | **Solo "Total pagado"** (sin subtotal, sin líneas de impuesto) | "Comprobante de pago" |
+| `isFormalTaxpayer: true` | Desglose del país, ajustable por override | "Total pagado" + subtotal + líneas (IVA, …) | "Comprobante de pago" (el gate de 3 condiciones sigue exigiendo homologación real para "Factura") |
+
+Se persiste `subtotal = amountPaid / taxTotal = 0 / taxDetails = []` (no `NULL`) porque `buildReceiptDataFromComposed` exige esos campos y el reporte suma por moneda: así el registro queda completo y el checklist de cuadre (`total = subtotal + taxTotal`) sigue cumpliéndose sin casos especiales.
+
+**Invariante fail-closed (D6):** *activar* un impuesto exige `isFormalTaxpayer === true`; *desactivarlo* siempre se respeta. El override solo puede **reducir** carga fiscal, nunca inventarla. Cubre el caso legítimo de un contribuyente formal con actividad exenta (desactiva IVA explícitamente).
+
+### D2 (congelada) — IGTF
+
+VE-only, condicional (`currencyPaid !== 'VES'`) y en la práctica sujeto a que el gym sea sujeto pasivo especial → se apoya en el mismo `isFormalTaxpayer`. Resolución: **activable, apagado por defecto, nunca automático.**
+
+- Nace `enabled: false`; jamás se aplica sola.
+- Activarla exige **fricción explícita** (patrón `isFormalTaxpayer`): checkbox "confirmo que verifiqué la tasa vigente con mi contador" + **tasa manual obligatoria**. El `3%` de `COUNTRIES.VE.conditionalTaxes` queda como *referencia documentada*, no como valor efectivo (FACTURATION.md §6: variable por decreto).
+- **Base correcta (`basis: 'gross_first'`)**: el IGTF se **extrae primero** del monto cobrado (la ley lo calcula sobre el monto pagado en divisa) y el resto se descompone tax-inclusive con IVA. Ejemplo cobrado 30,90 con IVA 16 % + IGTF 3 %: IGTF = 0,93 · resto 29,97 → base 25,84 + IVA 4,13 · **suma exacta = 30,90** ✅. El modelo aditivo plano actual (`total/(1+Σtasas)`) reparte proporcionalmente sobre la misma base y da montos legalmente distintos: se retira.
+- ⚠️ Activar IGTF **cambia la base de IVA** de esas facturas (se extrae antes) → el UI lo advierte explícitamente.
+- Ítem obligatorio en `docs/PENDING.md`: confirmar tasa y base con contador antes de encenderla en un gym real.
 
 ### Cambios
 
 | Archivo | Cambio |
 |---|---|
-| `packages/shared/src/documents/fiscal-profile.ts` | (a) Default `enabled` de `countryTaxes` = `isFormalTaxpayer === true`. (b) **El override explícito de la org siempre gana** (semántica actual de matcheo por `name`). (c) Los `conditionalTaxes` nacen con `enabled: false` **y no son activables** hasta definir la base contable (regla: no inventar cálculo). |
-| `apps/panel/app/(protected)/settings/organization/page.tsx` | Nota explícita en el bloque fiscal: "los impuestos se detallan solo si declaras ser contribuyente formal"; los condicionales se muestran deshabilitados con el motivo. |
-| `apps/panel/components/payments/tax-block.tsx` | Ya maneja `lines.length === 0` ("Sin impuestos aplicables") ✅ — verificar copy. |
-| `apps/console/.../emitter-settings.tsx` | Mismo criterio para el emisor FitStack. |
+| `packages/shared/src/documents/fiscal-profile.ts` | (a) `countryTaxes` nacen `enabled: isFormalTaxpayer === true`. (b) Activación de cualquier impuesto requiere `isFormalTaxpayer === true`; desactivar siempre se respeta. (c) `conditionalTaxes` nacen `enabled: false` + exponen `basis: 'gross_first'` y `requiresConfirmation: true`. (d) Normalización defensiva: si la config almacenada tiene impuestos activos sin ser formal, se fuerzan a `false` (config vieja; el error visible se da en la escritura). |
+| `packages/shared/src/documents/tax-math.ts` | `computeInclusiveTaxes` aplica primero las líneas `gross_first` (extraídas del total, `roundCents`) y descompone el resto; `isTaxApplicable` mantiene el fail-closed para condiciones desconocidas. `TAX_TOTAL_TOLERANCE` sigue validando el cuadre. |
+| `packages/shared/src/types.ts` | `ResolvedTax` gana `basis?` y `requiresConfirmation?` (opcionales, sin romper consumidores). |
+| `apps/api-worker/src/routes/organizations.route.ts` + `platform-organizations.route.ts` | 400 **explícito** `TAXES_REQUIRE_FORMAL_TAXPAYER` si el **config fusionado** pide `enabled: true` sin `isFormalTaxpayer: true`. Ojo: validar el resultado del merge, no solo el body entrante (un parcial `{taxes:[…]}` no conoce el `isFormalTaxpayer` almacenado) — ver D6. |
+| Panel `settings/organization/page.tsx` + Console `emitter-settings.tsx` | Toggles de impuestos deshabilitados con nota cuando no es formal ("tus comprobantes no detallan impuestos"); IGTF con tasa manual + checkbox de confirmación + aviso de impacto en la base de IVA. |
+| `apps/panel/components/payments/tax-block.tsx` | Ajustar copy de `lines.length === 0` para que se lea como caso **normal**, no como error. |
 
-> ⚠️ **Cambio de comportamiento para orgs existentes**: un gym que hoy emite con desglose de IVA y no tiene `isFormalTaxpayer` declarado pasará a emitir sin desglose en la **siguiente** emisión (los comprobantes ya emitidos no cambian: son inmutables). Decisión D1 abajo.
+> ⚠️ **Cambio de comportamiento para orgs existentes**: un gym que hoy emite con desglose de IVA y no tiene `isFormalTaxpayer` declarado emitirá **sin desglose** en su siguiente comprobante (los ya emitidos no cambian: son inmutables). Comunicar en las notas de release.
 
 ### Criterios de aceptación
 
-- Unit (`fiscal-profile.test.ts`): `isFormalTaxpayer` ausente/false → countryTaxes `enabled: false`; `true` → `enabled: true`; override explícito `{name:'IVA', enabled:true}` con `isFormalTaxpayer:false` → **gana el override**.
-- Unit: `conditionalTaxes` (IGTF) nunca aplican por default; `isTaxApplicable` sigue fail-closed.
-- Integración: emisión de gym no formal → `taxDetails` vacío, `subtotal === total`, label `"Comprobante de pago"`.
-- El preview del panel y el paso 1 siguen dando resultados idénticos (misma función compartida) — sin cambios de código en el form.
+- Unit `fiscal-profile.test.ts`: no formal → todos los `countryTaxes` `enabled: false`; formal → `enabled: true`; formal + desactivación explícita → se respeta; config almacenada con impuestos activos sin ser formal → se normaliza a `false`.
+- Unit `tax-math.test.ts`: caso IGTF `gross_first` → `subtotal + taxTotal === total` exacto (3090 → 2584 + 413 + 93); sin condiciones cumplidas → sin desglose.
+- Integración: gym no formal → `taxDetails: []`, `subtotal === amountPaid`, label "Comprobante de pago"; gym formal → desglose IVA correcto. `PATCH /profile` con `enabled:true` sin ser formal → **400** `TAXES_REQUIRE_FORMAL_TAXPAYER`.
+- Preview del panel y paso 1 dan resultados idénticos (misma función compartida; sin cambios de código en el form de pago).
 
 ---
 
@@ -212,29 +278,31 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 
 ---
 
-## Decisiones abiertas (requieren tu confirmación)
+## Decisiones congeladas (D1–D6 resueltas)
 
-| # | Decisión | Recomendación |
+| # | Decisión | Resolución |
 |---|---|---|
-| **D1** | ¿`isFormalTaxpayer` gobierna el **desglose** de impuestos (no solo la etiqueta)? Implica cambio de comportamiento para orgs existentes sin la declaración. | **Sí** — es el único gate honesto; el flag se declara con fricción justamente para eso. |
-| **D2** | IGTF: ¿lo dejamos **no activable** hasta confirmar base/tasa con contador, o implementamos el modelo de dos bases (`base` vs `monto pagado en divisa`)? | **No activable** + documentado. No implementar matemática que aún no está validada (AGENTS.md §10: nada inventado en silencio). |
-| **D3** | Snapshot del emisor: ¿columna jsonb o *sidecar* JSON en R2 junto al PDF (cero migración)? | **Columna**: el libro/export lo necesita consultable en SQL; el sidecar obligaría a ir a R2 en cada lectura del reporte. |
-| **D4** | Carrera de correlativo: ¿C0 pragmático (sin migración) o *claim-then-number* completo? | **C0 ahora**, reevaluar *claim-then-number* cuando C1/C5 ya abran migración. |
-| **D5** | Endpoint del formulario general de organización en el Panel (`/platform/organizations` con `requirePlatformAuth` → 403 a owners reales, invisible en dev porque la cuenta del dev tiene rol de plataforma). | **Corregir**: mover el guardado a `PATCH /api/organizations/profile` (org-scoped) o `authClient.organization.update()` (AGENTS.md §5). Fuera del scope fiscal, pero vive en la misma página/fila que el bloque fiscal. |
+| **D1** | ¿`isFormalTaxpayer` gobierna el **desglose** de impuestos, no solo la etiqueta? | **Sí, y sin excepciones hacia arriba.** No formal → **sin desglose ni derivados, solo el total pagado** (afirmar un IVA que no se cobra es un hecho fiscal falso). Formal → desglose del país, ajustable a la baja. El gate de la etiqueta "Factura" sigue exigiendo las 3 condiciones. Implica cambio de comportamiento para orgs existentes sin la declaración (comunicar). |
+| **D2** | IGTF (VE, condicional, `currencyPaid ≠ VES`) | **Activable, apagado por defecto, tasa manual obligatoria + checkbox de confirmación**, base correcta `gross_first` (se extrae antes del desglose de IVA). El UI advierte que cambia la base de IVA. PENDING: confirmar tasa y base con contador antes de encenderla en un gym real. |
+| **D3** | Almacenamiento del snapshot del emisor | **Columna jsonb** en `payment` y `platform_subscription_payment`: el libro/export lo necesita consultable en SQL; el sidecar en R2 obligaría a leer storage en cada fila del reporte. |
+| **D4** | Carrera de correlativo | **C0 pragmático ahora** (orden + guarda tardía + compensación). *Claim-then-number* queda **documentado en PENDING** con disparador explícito: "si el reporte de huecos muestra un hueco no explicado en producción". No entra en la migración de C1/C5 para mantenerla revisable. |
+| **D5** | Guardado general de organización en Panel | **Se corrige** en la fase C8, en el mismo PR que C0 (ambos son bugs de producción sin migración). |
+| **D6** | Validación "impuestos requieren contribuyente formal" | **Doble punto**: 400 explícito (`TAXES_REQUIRE_FORMAL_TAXPAYER`) sobre el **config fusionado** (un parcial entrante no conoce el `isFormalTaxpayer` almacenado → no basta validar el body) + normalización defensiva en `resolveFiscalProfile` para configuración ya guardada. |
 
 ---
 
 ## Orden de ejecución
 
 ```
-C0 ──▶ C2 ──▶ C3 ──┬──▶ C4
-                    └──▶ (migración aprobada) C1 + C5 + [renombre C7] ──▶ C6 ──▶ C7
+C0 ──┐
+     ├─▶ C2 ──▶ C3 ──┬──▶ C4
+C8 ──┘                └──▶ (migración aprobada) C1 + C5 ──▶ C6 ──▶ C7
 ```
 
-- **C0** primero: es el único que corrompe datos en producción (quema números).
-- **C2/C3/C4** sin migración y con tests puros: se pueden paralelizar.
+- **C0 + C8** primero, en el mismo PR: C0 corrompe datos (quema correlativos en silencio) y C8 rompe el módulo de identidad de sede en producción. Ambos sin migración.
+- **C2/C3/C4** sin migración y con tests puros: paralelizables.
 - **C1+C5** en **una sola** migración, con aprobación explícita.
-- **C6/C7** cierran: sin ellos quedan huecos de auditoría y documentación desactualizada.
+- **C6/C7** cierran huecos de auditoría y documentación.
 
 ## Verificación por fase
 
@@ -251,7 +319,9 @@ Verificación manual obligatoria (adjuntar al PR): PDF de gym informal sin `taxI
 
 - [ ] Ninguna emisión fallida puede quemar un correlativo (test que lo prueba).
 - [ ] `GET /:id/receipt` es reproducible: no cambia si la org edita su perfil.
-- [ ] Ningún comprobante detalla impuestos que el emisor no declaró.
+- [ ] Ningún comprobante detalla impuestos que el emisor no declaró — fail-closed en **escritura** (400) y en **lectura** (normalización).
+- [ ] Activar IGTF es explícito: tasa manual, confirmación y aviso de impacto en la base de IVA.
+- [ ] El guardado de la organización en Panel funciona para owners reales (sin depender de un rol de plataforma).
 - [ ] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export.
 - [ ] Anular sin número es explícito para el usuario, no un silencio.
 - [ ] `AGENTS.md`, `plan.md` y `docs/PENDING.md` reflejan el estado real.

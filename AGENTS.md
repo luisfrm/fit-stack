@@ -189,6 +189,7 @@ Fit-Stack uses **Better Auth** for authentication.
 - Client MUST use `useAuth()`. It exposes `activeOrganization` (the org object, resolved by the api-worker custom session) alongside `member`. NEVER use `useSession()` directly in components.
 - For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
 - **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
+- **Escritura de la sede en el panel**: la identidad de la organización (name/slug/logo/slogan/timezone/currencyFormat + legalName/taxId/address/`fiscalConfig`) se guarda con `orgProfileService.updateProfile` → **`PATCH /api/organizations/profile`** (org-scoped, `ORGANIZATION.UPDATE`). El panel **nunca** llama a `/api/platform/organizations` desde un formulario de tenant: ese endpoint exige `requirePlatformAuth` (permiso de plataforma) y un owner/manager de gym recibe **403**. `countryCode`/`primaryCurrency` son inmutables post-creación (400 `IMMUTABLE_FIELD`); cambiar el país recalcula la moneda principal y es operación de nivel plataforma.
 
 #### CORS & Allowed Origins
 
@@ -228,7 +229,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 ```
 
 - Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
-- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope.
+- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope. Un `HTTPException` que traiga su propia `Response` (`err.res`) se devuelve **tal cual**: así llegan los códigos de negocio documentados (`409 { code: 'SLUG_TAKEN' }`, `403 { code: 'FEATURE_NOT_AVAILABLE', feature }`) — los toasts se resuelven por código, nunca por texto.
 - The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
 
 #### API Route Map (api-worker)
@@ -248,7 +249,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/dashboard`     | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`)                                                                                                                                                                                                                                             |
 | `/api/settings`      | Gym settings (currencies, payment methods, theme)                                                                                                                                                                                                                                                                                                                                    |
 | `/api/reports`       | `GET /revenue` (multi-currency, cache 1h) · `GET /receipts` (auditoría del correlativo: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit`, cache 5 min) |
-| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) · `PATCH /profile` (org emitter identity + `fiscalConfig` merge, `countryCode`/`primaryCurrency` immutable, invalidates `org:{id}:profile`) |
+| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) · `PATCH /profile` (identidad de sede —name/slug/logo/slogan/timezone/currencyFormat— + identidad emisora + `fiscalConfig` merge, `countryCode`/`primaryCurrency` immutable, invalidates `org:{id}:profile`) |
 | `/api/upload`        | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2)                                                                                                                                                                                                                                                                                                                    |
 | `/api/ai`            | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 

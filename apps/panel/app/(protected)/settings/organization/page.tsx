@@ -18,7 +18,6 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import { CountrySelector, toast, Title, SimpleSelect, Checkbox, Switch, ConfirmationModal } from "@workspace/ui";
 import { useAuth, usePermissions } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
-import { organizationsService } from "@/lib/services/organizations-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
 import { mutationError } from "@/lib/errors";
 import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
@@ -139,18 +138,21 @@ export default function OrganizationSettingsPage() {
         finalLogoUrl = await uploadService.uploadFile(logoFile, undefined, activeOrg!.id);
       }
 
-      // 2. Update via our Custom Platform API
-      await organizationsService.update(activeOrg!.id, {
+      // 2. Update via the ORG-SCOPED endpoint. El panel NUNCA llama a
+      //    `/api/platform/*`: un owner/manager de gym no tiene rol de
+      //    plataforma y recibiría 403 (con el formulario pareciendo guardar).
+      //    Los campos vacíos van como `null` para poder limpiarlos; el país
+      //    no se envía porque es inmutable post-creación (400 si viniera).
+      await orgProfileService.updateProfile({
         name: formData.name,
-        slug: formData.slug || undefined,
-        logo: finalLogoUrl || "",
-        countryCode: formData.countryCode,
-        taxId: formData.taxId,
-        legalName: formData.legalName,
-        address: formData.address,
+        slug: formData.slug.trim() || undefined,
+        logo: finalLogoUrl ?? null,
+        slogan: formData.slogan.trim() || null,
         timezone: formData.timezone,
-        slogan: formData.slogan || undefined,
         currencyFormat: formData.currencyFormat as "latam" | "usa",
+        legalName: formData.legalName.trim() || null,
+        taxId: formData.taxId.trim() || null,
+        address: formData.address.trim() || null,
       });
 
       toast.success("Información de la sede actualizada correctamente");
@@ -161,9 +163,10 @@ export default function OrganizationSettingsPage() {
       await refetch();
       router.refresh();
 
-    } catch (error: any) {
-      console.error("Save error:", error);
-      toast.error("No se pudo guardar la información");
+    } catch (error) {
+      toast.error(
+        mutationError("OrgSettings", error, "No se pudo guardar la información de la sede"),
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -357,16 +360,21 @@ export default function OrganizationSettingsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-0 items-start">
             <div className="space-y-6">
-              <CountrySelector
-                label="País de Operación"
-                value={formData.countryCode}
-                onChange={(code) => {
-                  const config = COUNTRY_LIST.find(c => c.code === code);
-                  handleChange("countryCode", code);
-                  if (config) handleChange("timezone", config.timezone);
-                }}
-                countries={COUNTRY_LIST}
-              />
+              {/* País inmutable post-creación: cambiarlo recalcularía la
+                  moneda principal (operación de nivel plataforma). Solo
+                  lectura aquí, con el motivo explícito. */}
+              <div className="space-y-2">
+                <CountrySelector
+                  label="País de Operación"
+                  value={formData.countryCode}
+                  onChange={() => undefined}
+                  countries={COUNTRY_LIST}
+                  disabled
+                />
+                <Text size="xs" variant="muted" className="italic opacity-70">
+                  Definido al crear la sede. Cambiarlo recalcula la moneda principal: solicítalo a soporte.
+                </Text>
+              </div>
 
               <Input
                 label="Nombre de Registro / Legal"
@@ -378,14 +386,21 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="space-y-6">
-              <Input
-                label={`Nro. Registro (${currentCountry?.taxLabel})`}
-                placeholder="J-12345678-9"
-                value={formData.taxId}
-                onChange={(e) => handleChange("taxId", e.target.value)}
-                leftIcon={<ShieldCheck className="w-4 h-4" />}
-                required
-              />
+              {/* No `required`: un emisor sin registro fiscal es válido (emite
+                  "Comprobante de pago"). Marcarlo obligatorio bloqueaba el
+                  submit nativo del formulario entero. */}
+              <div className="space-y-2">
+                <Input
+                  label={`Nro. Registro (${currentCountry?.taxLabel})`}
+                  placeholder="J-12345678-9"
+                  value={formData.taxId}
+                  onChange={(e) => handleChange("taxId", e.target.value)}
+                  leftIcon={<ShieldCheck className="w-4 h-4" />}
+                />
+                <Text size="xs" variant="muted" className="italic opacity-70">
+                  Opcional. Completa la identidad emisora en la sección Facturación.
+                </Text>
+              </div>
 
               <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
                 <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">

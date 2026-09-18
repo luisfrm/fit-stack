@@ -87,6 +87,26 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - Timezone siempre de la org (`requireOrgTimezone`), nunca UTC del servidor — aplica a año de secuencia, filtros de reporte y fechas de emisión.
 - Ningún consumidor hardcodea etiquetas/tasas de impuestos: todo default sale de `COUNTRIES[countryCode]` en `@workspace/shared`.
 
+## Track de correcciones (post-revisión)
+
+Tras la auditoría de arquitectura y fiscalidad se abrió `tasks/correcciones-comprobantes.md` (fases C0–C8, decisiones D1–D6 congeladas). No reemplaza este plan: lo corrige.
+
+| Fase | Estado |
+|---|---|
+| C0 — Integridad del correlativo (orden + carrera) | ✅ Hecha |
+| C8 — Guardado de organización org-scoped en Panel (D5) | ✅ Hecha |
+| C1 — Snapshot del emisor (registro inmutable) | ⏳ Pendiente (migración) |
+| C2 — Perfil fiscal conservador (`isFormalTaxpayer`, IGTF) | ⏳ Pendiente |
+| C3 — Fidelidad del PDF | ⏳ Pendiente |
+| C4 — Auditoría espejo en Console (`FS-N`) | ⏳ Pendiente |
+| C5 — Trazabilidad de emisión (`issued_by`) | ⏳ Pendiente (misma migración que C1) |
+| C6 — Barrido (2.º predicado) y contrato de anulación | ⏳ Pendiente |
+| C7 — Higiene, docs y matriz de tests | ⏳ Pendiente |
+
+Decisiones nuevas que aplican en adelante: `isFormalTaxpayer` gobierna el desglose de impuestos (no solo la etiqueta); IGTF activable, apagado por defecto, con base `gross_first`; el snapshot del emisor se persiste en columna jsonb; *claim-then-number* queda en `docs/PENDING.md` con disparador explícito.
+
+---
+
 ## Próximo paso inmediato
 
-**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado). Siguiente: lo que ordene el usuario.
+**Track Comprobantes completo** (Panel Fases 0–6 + Console C1–C3, commiteado y verificado) + **C0 y C8** del track de correcciones. Siguiente: C1+C5 (migración) o lo que ordene el usuario.

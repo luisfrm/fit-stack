@@ -113,6 +113,49 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     expect(res.body).toMatchObject({ code: 'IMMUTABLE_FIELD' });
   });
 
+  it('identidad de sede org-scoped: el owner guarda y persiste el set general', async () => {
+    const { owner, organization } = await createGymTenant('org-identity');
+
+    const res = await owner.client.patch('/api/organizations/profile', {
+      name: 'Sede Renombrada',
+      slogan: 'Tu mejor versión',
+      logo: 'https://cdn.example.com/logo.png',
+      timezone: 'America/Bogota',
+      currencyFormat: 'usa',
+      legalName: 'Sede Renombrada C.A.',
+      taxId: 'J-99999999-9',
+      address: 'Av. Siempre Viva 742',
+    });
+    expect(res.status, res.text).toBe(200);
+
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT name, slogan, logo, timezone, currency_format, legal_name, tax_id, address
+         FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(rows[0]).toMatchObject({
+      name: 'Sede Renombrada',
+      slogan: 'Tu mejor versión',
+      logo: 'https://cdn.example.com/logo.png',
+      timezone: 'America/Bogota',
+      currency_format: 'usa',
+      legal_name: 'Sede Renombrada C.A.',
+      tax_id: 'J-99999999-9',
+      address: 'Av. Siempre Viva 742',
+    });
+  });
+
+  it('identidad de sede: slug duplicado → 409 SLUG_TAKEN', async () => {
+    const first = await createGymTenant('org-slug-a');
+    const second = await createGymTenant('org-slug-b');
+
+    const res = await second.owner.client.patch('/api/organizations/profile', {
+      slug: first.organization.slug,
+    });
+    expect(res.status, res.text).toBe(409);
+    expect(res.body).toMatchObject({ code: 'SLUG_TAKEN' });
+  });
+
   it('formal exige confirmed solo en la transición false→true', async () => {
     const { owner } = await createGymTenant('fiscal-formal');
 

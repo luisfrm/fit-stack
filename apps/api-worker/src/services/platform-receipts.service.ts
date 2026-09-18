@@ -37,7 +37,7 @@ export interface PlatformReceiptHooks {
  */
 export type PlatformAssignResult =
   | { receiptNumber: null; pdfStatus: 'pending'; skipped: true }
-  | { receiptNumber: string; pdfStatus: 'pending'; skipped: false };
+  | { receiptNumber: string; pdfStatus: 'pending' | 'ready'; skipped: false };
 
 /** Opts de emisión para `platform-subscriptions.service` (espejo `ReceiptContext`). */
 export interface PlatformReceiptContext {
@@ -52,6 +52,29 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
   const platformReceiptsRepo = createPlatformReceiptsRepository(db);
   const platformSubsRepo = createPlatformSubscriptionsRepository(db);
   const orgsRepo = createOrganizationsRepository(db);
+
+  /**
+   * Re-encola el render si el PDF aún no existe y devuelve el estado real.
+   * Espejo de `requeueRenderIfPdfPending` (Panel): mismo evento, `scope`
+   * distinto. Idempotente — el paso 2 hace overwrite y gatea el email.
+   */
+  async function requeueRenderIfPdfPending(
+    paymentId: number,
+    orgId: string,
+    receiptNumber: string,
+    receiptPdfKey: string | null | undefined,
+  ): Promise<'pending' | 'ready'> {
+    if (receiptPdfKey) return 'ready';
+    await receiptQueue.send(
+      buildReceiptRenderEvent({
+        scope: 'platform',
+        paymentId,
+        organizationId: orgId,
+        receiptNumber,
+      }),
+    );
+    return 'pending';
+  }
 
   return {
     /**
@@ -84,17 +107,13 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
 
       // Idempotencia: ya numerado → devuelve el existente sin quemar secuencia.
       if (payment.receiptNumber) {
-        if (!payment.receiptPdfKey) {
-          await receiptQueue.send(
-            buildReceiptRenderEvent({
-              scope: 'platform',
-              paymentId,
-              organizationId: payment.organizationId,
-              receiptNumber: payment.receiptNumber,
-            }),
-          );
-        }
-        return { receiptNumber: payment.receiptNumber, pdfStatus: 'pending', skipped: false };
+        const pdfStatus = await requeueRenderIfPdfPending(
+          paymentId,
+          payment.organizationId,
+          payment.receiptNumber,
+          payment.receiptPdfKey,
+        );
+        return { receiptNumber: payment.receiptNumber, pdfStatus, skipped: false };
       }
 
       const org = await orgsRepo.findById(payment.organizationId);
@@ -121,9 +140,24 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       const taxTotal: number = computed.taxTotal;
       const taxDetails: ITaxDetail[] = computed.taxDetails;
 
+      // Guarda tardía (espejo Panel): releer antes de consumir el correlativo
+      // global evita quemar un número que otra entrega concurrente ya usó.
+      const fresh = await platformSubsRepo.findPaymentById(paymentId);
+      if (fresh?.receiptNumber) {
+        const pdfStatus = await requeueRenderIfPdfPending(
+          paymentId,
+          fresh.organizationId,
+          fresh.receiptNumber,
+          fresh.receiptPdfKey,
+        );
+        return { receiptNumber: fresh.receiptNumber, pdfStatus, skipped: false };
+      }
+
       const seq = await platformReceiptsRepo.nextPlatformDocumentNumber('receipt');
       const receiptNumber = formatConsoleReceiptNumber(seq);
       if (parseConsoleReceiptNumber(receiptNumber) !== seq) {
+        // Defensivo: no dejar el número colgado.
+        await platformReceiptsRepo.releaseLastPlatformNumber('receipt', seq);
         throw new ReceiptError(
           500,
           'RECEIPT_INCOHERENT',
@@ -151,15 +185,36 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         taxTotal,
         taxDetails,
       });
+      const persistedNumber = persisted.receiptNumber ?? receiptNumber;
+
+      // Carrera perdida: otra entrega ya numeró el pago. Compensar la
+      // secuencia global si seguimos siendo el último consumidor; si no, el
+      // número es irreversible y queda como hueco auditado.
+      if (persistedNumber !== receiptNumber) {
+        const { released } = await platformReceiptsRepo.releaseLastPlatformNumber(
+          'receipt',
+          seq,
+        );
+        if (!released) {
+          console.error(
+            `platform receipt emission: correlativo ${receiptNumber} no persistido y no liberable (la secuencia ya avanzó).`,
+          );
+        }
+      }
+
       await receiptQueue.send(
         buildReceiptRenderEvent({
           scope: 'platform',
           paymentId,
           organizationId: payment.organizationId,
-          receiptNumber: persisted.receiptNumber!,
+          receiptNumber: persistedNumber,
         }),
       );
-      return { receiptNumber: persisted.receiptNumber!, pdfStatus: 'pending', skipped: false };
+      return {
+        receiptNumber: persistedNumber,
+        pdfStatus: persisted.receiptPdfKey ? 'ready' : 'pending',
+        skipped: false,
+      };
     },
 
     /**

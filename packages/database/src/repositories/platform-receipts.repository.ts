@@ -91,6 +91,38 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
+     * Compensación del correlativo global: devuelve el último número
+     * consumido por esta entrega cuando PERDIÓ la carrera de
+     * `attachPlatformReceipt` (otra entrega ya numeró el pago).
+     *
+     * Solo revierte si seguimos siendo el último consumidor
+     * (`next_number = seq`): retroceder con consumidores posteriores
+     * reasignaría un número ya vivo — prohibido. Si no, `released: false`
+     * y el número queda como hueco auditado.
+     */
+    async releaseLastPlatformNumber(
+      type: ReceiptDocumentType,
+      seq: number,
+    ): Promise<{ released: boolean }> {
+      assertDocumentType(type, 'releaseLastPlatformNumber');
+      if (!Number.isInteger(seq) || seq < 1) {
+        throw new Error(`releaseLastPlatformNumber: seq inválido (${String(seq)}).`);
+      }
+
+      const [row] = await db
+        .update(platformDocumentSequence)
+        .set({ nextNumber: sql`${platformDocumentSequence.nextNumber} - 1` })
+        .where(
+          and(
+            eq(platformDocumentSequence.documentType, type),
+            eq(platformDocumentSequence.nextNumber, seq),
+          ),
+        )
+        .returning({ nextNumber: platformDocumentSequence.nextNumber });
+      return { released: row !== undefined };
+    },
+
+    /**
      * Numera un pago SaaS de forma idempotente: solo escribe si aún no
      * tiene número (`WHERE receipt_number IS NULL`). Si ya estaba numerado,
      * devuelve la fila existente re-leída (nunca se reenumera).

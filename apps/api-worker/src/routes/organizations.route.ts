@@ -36,8 +36,12 @@ const orgRenewSchema = z.object({
 });
 
 /**
- * Perfil fiscal org-scoped (Fase 4). `countryCode`/`primaryCurrency` son
- * inmutables desde aquí (required de creación): se rechazan con 400 si vienen.
+ * Perfil org-scoped: identidad de la sede (nombre, logo, eslogan, zona
+ * horaria, formato de moneda) + identidad emisora fiscal (Fase 4).
+ *
+ * `countryCode`/`primaryCurrency` son inmutables desde aquí (required de
+ * creación): se rechazan con 400 si vienen. Cambiar el país recalcularía la
+ * moneda principal — operación de nivel plataforma, no del tenant.
  * `confirmed` es la fricción de la declaración de contribuyente formal.
  *
  * `.passthrough()` (no `.strict()`) es deliberado: permite DETECTAR las keys
@@ -46,6 +50,12 @@ const orgRenewSchema = z.object({
  */
 const orgProfileSchema = z
   .object({
+    name: z.string().min(1, 'El nombre es requerido').optional(),
+    slug: z.string().min(1).optional(),
+    logo: z.string().nullable().optional(),
+    slogan: z.string().nullable().optional(),
+    timezone: z.string().min(1, 'La zona horaria es requerida').optional(),
+    currencyFormat: z.enum(['latam', 'usa']).optional(),
     legalName: z.string().min(1).nullable().optional(),
     taxId: z.string().min(1).nullable().optional(),
     address: z.string().min(1).nullable().optional(),
@@ -232,9 +242,12 @@ export const organizationRoutes = new Hono<AppEnv>()
     }
   )
 
-  // PATCH /api/organizations/profile — identidad emisora + fiscalConfig (Fase 4).
-  // Org-scoped: owner/manager (ORGANIZATION.UPDATE). `countryCode` y
-  // `primaryCurrency` son inmutables post-creación (400 si vienen).
+  // PATCH /api/organizations/profile — identidad de la sede + identidad
+  // emisora + fiscalConfig (Fase 4). Es el endpoint que usa el panel para el
+  // formulario de organización: NUNCA se llama a `/api/platform/*` desde el
+  // panel (un owner de gym no tiene rol de plataforma → 403). Org-scoped:
+  // owner/manager (ORGANIZATION.UPDATE). `countryCode` y `primaryCurrency`
+  // son inmutables post-creación (400 si vienen).
   .patch(
     '/profile',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -286,6 +299,12 @@ export const organizationRoutes = new Hono<AppEnv>()
       // Solo los campos presentes: un body sin campos persistibles es un
       // no-op idempotente, nunca un 500 de Drizzle ("No values to set").
       const patch: Partial<NewDbOrganization> = {};
+      if (body.name !== undefined) patch.name = body.name;
+      if (body.slug !== undefined) patch.slug = body.slug;
+      if (body.logo !== undefined) patch.logo = body.logo;
+      if (body.slogan !== undefined) patch.slogan = body.slogan;
+      if (body.timezone !== undefined) patch.timezone = body.timezone;
+      if (body.currencyFormat !== undefined) patch.currencyFormat = body.currencyFormat;
       if (body.legalName !== undefined) patch.legalName = body.legalName;
       if (body.taxId !== undefined) patch.taxId = body.taxId;
       if (body.address !== undefined) patch.address = body.address;

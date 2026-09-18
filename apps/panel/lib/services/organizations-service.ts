@@ -4,7 +4,14 @@ import type { IPlatformOrganization } from "@workspace/shared/types";
 const ORGANIZATIONS_PATH = "/platform/organizations";
 
 /**
- * Service for platform-level organization management (used by panel owner).
+ * Platform-level organization management, used from the panel ONLY to join /
+ * list organizations (org discovery at sign-in).
+ *
+ * ⚠️ NO agregar `update` aquí: `PATCH /api/platform/organizations/:id` exige
+ * `requirePlatformAuth` (permiso de plataforma `organization.create`), así que
+ * un owner/manager de gym recibe 403. La escritura de la fila `organization`
+ * desde el panel vive en `orgProfileService` (`PATCH /api/organizations/profile`,
+ * org-scoped) — ver AGENTS.md §5.
  */
 export const organizationsService = {
   async getAll(
@@ -25,16 +32,6 @@ export const organizationsService = {
       `${ORGANIZATIONS_PATH}/${id}`,
       options,
     );
-  },
-
-  async update(
-    id: string,
-    data: Partial<IPlatformOrganization>,
-  ): Promise<IPlatformOrganization> {
-    return await api<IPlatformOrganization>(`${ORGANIZATIONS_PATH}/${id}`, {
-      method: "PATCH",
-      body: data,
-    });
   },
 
   async join(id: string): Promise<void> {
