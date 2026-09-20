@@ -2,23 +2,19 @@
 
 Lista de pendientes para preparar el sistema para facturación fiscal formal multi-país, alineada con los requerimientos regulatorios locales de cada país.
 
-## 1. Preparación de Base de Datos (Estructura de Localización)
-- [ ] **Tabla `organization`**: Añadir campos legales:
-  - `country_code` (ISO 3166-1 alpha-2, ej: 'VE').
-  - `tax_id` (Campo genérico para RIF/NIT/RFC).
-  - `legal_name` (Nombre jurídico de la empresa).
-  - `fiscal_address` (Dirección fiscal completa).
-  - `fiscal_config` (JSONB para resoluciones de la DIAN o números de control SENIAT).
-- [ ] **Tabla `payment`**: Refactorizar para desglose fiscal:
-  - `subtotal` (Monto neto).
-  - `tax_total` (Suma de impuestos).
-  - `tax_details` (JSONB con desglose: IVA 16%, IGTF 3%, etc.).
-  - `exchange_rate` (Tasa de cambio aplicada al momento del pago).
-- [ ] **Tabla `gym_member`**: Añadir `fiscal_address` opcional.
+## 1. Preparación de Base de Datos (Estructura de Localización) — ✅ IMPLEMENTADO
 
-## 2. Ajustes de UI y Experiencia de Usuario
-- [ ] **Adaptación de Labels**: Cambiar etiquetas como "Cédula/RIF" dinámicamente según el `country_code` de la organización (ej: NIT para Colombia).
-- [ ] **Disclaimer Legal**: Añadir nota en pie de página de recibos/correos: *"Este documento no es factura fiscal. Exija su factura legal en el establecimiento"*.
+> Rebasado 2026-09: lo pedido aquí ya existe en el esquema y en la emisión de comprobantes.
+- [x] **Tabla `organization`**: `countryCode`, `taxId`, `legalName`, `address` + `fiscalConfig` (jsonb con la declaración de contribuyente formal y los impuestos habilitados). `timezone`, `primaryCurrency` y `currencyFormat` son `NOT NULL` sin default: obligatorios desde la creación.
+- [x] **Tabla `payment`**: `subtotal`, `taxTotal`, `taxDetails` (JSONB con desglose tipo IVA 16% / IGTF 3%) y `exchangeRateApplied`. Todo el dinero en centavos enteros; la tasa es `numeric(10,4)`.
+- [x] **Régimen fail-closed (C2)**: habilitar un impuesto sin `fiscalConfig.isFormalTaxpayer` → 400 `TAXES_REQUIRE_FORMAL_TAXPAYER`; los impuestos condicionales (`basis: 'gross_first'`, ej. IGTF VE) exigen rate explícito + `confirmedTaxes` → 400 `TAX_REQUIRES_CONFIRMATION`.
+- [ ] **Tabla `gym_member`**: `fiscal_address` opcional — sigue pendiente (el comprobante omite la línea cuando no hay dato, nunca la rellena con placeholders).
+
+## 2. Ajustes de UI y Experiencia de Usuario — ✅ IMPLEMENTADO
+
+- [x] **Adaptación de Labels**: `COUNTRY_INDEX` + `fiscalConfig.taxLabel`/`docLabel` alimentan el label del documento (RIF/NIT/RFC) desde el país de la organización, nunca desde una constante hardcodeada.
+- [x] **Disclaimer Legal**: el pie del comprobante usa el disclaimer del país (o el override de la organización) y el documento se emite como **"Comprobante de pago"** (`HAS_FISCAL_HOMOLOGATION=false` por construcción).
+- [x] **Document fidelity (C3)**: el PDF omite las líneas sin dato (nunca `---`; `checklistPrePdf` rechaza placeholders) y cuando `currencyPaid ≠ baseCurrency` imprime `1 {base} = {rate} {paid}` más el equivalente en moneda base.
 
 ## 3. Integraciones de Facturación (Fase 2)
 - [ ] **Filtro de Adaptadores**: Crear interfaz genérica de adaptadores para integrarse con PAC/PAD, Proveedores Tecnológicos u otros sistemas fiscales locales según el `country_code` de la organización.
@@ -37,11 +33,21 @@ Lista de pendientes para preparar el sistema para facturación fiscal formal mul
   - Considerar una tabla `access_rule` para lógica de horarios permitidos por fuera de la suscripción.
 
 ---
-## 5. Integridad de Base de Datos y CI/CD
-- [ ] **Flujo de Migraciones Estricto**: Implementar regla de "Generate -> Review -> Migrate" para evitar discrepancias en entornos compartidos. Prohibir `db:push` en producción.
-- [ ] **Script de Verificación (`db:check`)**: Implementar comando para validar estáticamente que el esquema coincide con el folder de migraciones.
-- [ ] **GitHub Actions (Integridad)**: Configurar workflow para ejecutar `db:check` automáticamente en cada Pull Request.
-- [ ] **GitHub Actions (Despliegue)**: Automatizar la ejecución de `db:migrate` al hacer merge a `master` para actualizar bases de datos de producción/dev sin intervención manual mediante GitHub Secrets.
+## 5. Integridad de Base de Datos y CI/CD — ✅ IMPLEMENTADO
+
+- [x] **Flujo de Migraciones Estricto**: `generate` → `review` → `migrate` (regla en `AGENTS.md`); `db:push` está prohibido fuera del prototipado local.
+- [x] **Script de Verificación (`db:check`)**: `pnpm db:check` (`drizzle-kit check`) valida esquema contra el folder de migraciones.
+- [x] **GitHub Actions (Integridad)**: `.github/workflows/database-migrations.yml` corre la verificación en cada PR.
+- [x] **GitHub Actions (Despliegue)**: las migraciones se aplican por CI al hacer merge (`database-migrations.yml`), sin intervención manual.
+- [x] **Estado**: el esquema real son **33 tablas** (`packages/database/src/schema.ts`).
+
+## 5.1. Storage — pendientes tras el corte de taxonomía
+
+La taxonomía pasó de `cms/<orgId>/…` a **`<orgId>/<folder>/…`** con corte limpio (sin compatibilidad).
+
+- [ ] **Re-subir assets existentes**: las filas que guardan keys viejas (`gym_member.imageUrl`, `organization.logo`, JSON de bloques CMS, `paymentMethodDetails` con archivos) apuntan a keys que el route público ya no sirve → se ven rotas hasta re-subirlas. En la org de demo: `pnpm seed:e2e` (o re-subir a mano desde el panel/console).
+- [ ] **Migración física opcional en R2**: si algún ambiente tiene assets que merece la pena conservar, copiar `cms/<orgId>/x` → `<orgId>/cms/x` y actualizar las referencias en DB. No se incluyó ningún script para esto (decisión: corte limpio).
+- [ ] **`paymentMethodDetails` históricos**: las capturas de pago emitidas antes del cambio viven bajo `cms/<orgId>/receipts/…`; quedan visibles solo si se re-suben (el namespace viejo ya no es alcanzable).
 
 ---
 

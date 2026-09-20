@@ -32,8 +32,8 @@ export function ImageUploader({ value, onChange, label }: Readonly<ImageUploader
     try {
       setIsUploading(true);
 
-      // Upload using standardized uploadService (uses api client)
-      const key = await uploadService.uploadFile(file, undefined, undefined, 'cms');
+      // Assets del sitio público: carpeta `cms` (es la única pública por diseño).
+      const key = await uploadService.uploadFile(file, undefined, 'cms');
 
       // Notify success and update parent with the object key
       onChange(key);

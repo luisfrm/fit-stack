@@ -134,7 +134,6 @@ export function OrgRenewalModal({
             finalDetails[field.id] = await uploadService.uploadFile(
               pending,
               customName,
-              activeOrganization.id,
               "receipts",
             );
           }

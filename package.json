@@ -19,7 +19,6 @@
     "db:pull": "pnpm --filter @workspace/database db:pull",
     "db:check": "pnpm --filter @workspace/database db:check",
     "db:studio": "pnpm --filter @workspace/database db:studio",
-    "db:seed": "pnpm --filter @workspace/database db:seed",
     "typecheck": "pnpm turbo typecheck",
     "check:infra-parity": "node infrastructure/terraform/scripts/check-name-parity.mjs",
     "repair-db": "pnpm --filter @workspace/database exec node scripts/repair-migrations.mjs",

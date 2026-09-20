@@ -145,7 +145,7 @@ export default function OrganizationSettingsPage() {
 
       // 1. Upload new logo if exists
       if (logoFile) {
-        finalLogoUrl = await uploadService.uploadFile(logoFile, undefined, activeOrg!.id);
+        finalLogoUrl = await uploadService.uploadFile(logoFile);
       }
 
       // 2. Update via the ORG-SCOPED endpoint. El panel NUNCA llama a

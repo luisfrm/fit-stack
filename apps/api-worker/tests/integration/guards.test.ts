@@ -66,14 +66,16 @@ describe.skipIf(skipReason !== null)('Guards (route-handler middlewares)', () =>
       expect(res.body.status).toBe('active');
     });
 
-    it('does not require an active org or org permissions', async () => {
+    it('lets the session through: the route (not the middleware) requires an org', async () => {
       const res = await noOrgUser.client.get('/api/upload', {
         query: { organizationId: `gym-${uid()}` },
       });
 
-      // requireAuth passed with a bare session; the handler lists R2 (empty spy).
-      expect(res.status, res.text).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      // `requireAuth` passed with a bare session — el 400 lo emite
+      // `requireOrgPermission`: `/api/upload` es org-scoped y la organización
+      // sale de la sesión (el `organizationId` del query se ignora).
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toHaveProperty('error');
     });
   });
 

@@ -1,4 +1,4 @@
-import { ofetch } from "ofetch";
+import { ofetch, type FetchContext, type FetchOptions } from "ofetch";
 import { env } from "@/lib/config/envs";
 import { formatApiErrorMessage } from "@/lib/utils/error";
 import type { ApiFetchOptions } from "./types";
@@ -38,7 +38,8 @@ export const api = ofetch.create({
 });
 
 /**
- * Fetch a binary response (e.g. a PDF blob).
+ * Fetch a binary response (e.g. a PDF blob) CON autenticación: mismo `onRequest`
+ * que `api` (cookie en server / `credentials:include` en cliente).
  * ofetch's generics don't support `responseType: "blob"` together with
  * `ApiFetchOptions<R>`, so this helper wraps the raw `ofetch` call.
  */
@@ -46,14 +47,23 @@ export async function apiBlob<T = unknown>(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<T> {
-  return (await ofetch<T>(path, {
+  return (await ofetch<T, "blob">(path, {
     baseURL: `${env.apiBaseUrl}/api`,
     retry: 1,
     timeout: 30_000,
     responseType: "blob",
     ...options,
     headers: options.headers,
-  } as Parameters<typeof ofetch<T>>[1])) as T;
+    async onRequest(context: FetchContext) {
+      if (isServer) {
+        const { cookies } = await import("next/headers");
+        const cookieStore = await cookies();
+        context.options.headers.set("cookie", cookieStore.toString());
+      } else {
+        context.options.credentials = "include";
+      }
+    },
+  } as unknown as FetchOptions<"blob">)) as unknown as T;
 }
 
 export type { ApiFetchOptions };

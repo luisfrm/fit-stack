@@ -7,7 +7,6 @@
     "./client": "./src/client.ts",
     "./factory": "./src/factory.ts",
     "./schema": "./src/schema.ts",
-    "./seed": "./src/seed.ts",
     "./constants": "./src/constants.ts",
     "./repositories/receipts": "./src/repositories/receipts.repository.ts",
     "./repositories/platform-receipts": "./src/repositories/platform-receipts.repository.ts"
@@ -19,7 +18,6 @@
     "db:check": "drizzle-kit check",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/seed.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/"
   },
@@ -39,7 +37,6 @@
     "dotenv": "^17.4.1",
     "drizzle-kit": "^0.31.9",
     "eslint": "^9.39.2",
-    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

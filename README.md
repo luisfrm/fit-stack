@@ -69,8 +69,9 @@ cp apps/bridge/.env.example apps/bridge/.env
 pnpm db:generate    # Generate migrations (requires approval)
 pnpm db:migrate     # Apply migrations
 pnpm db:check       # Verify schema consistency
-pnpm db:seed        # (optional) Seed demo data
 ```
+
+> Demo data is filled by the E2E seed (`pnpm seed:e2e`), not by a `db:seed` script.
 
 > **WARNING:** `pnpm db:push` is for local prototyping only. Never use on shared branches.
 
