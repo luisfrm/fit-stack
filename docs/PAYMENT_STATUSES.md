@@ -35,7 +35,7 @@ Los **códigos** son el mismo contrato en las dos apps, pero **no son el mismo f
 |---|---|---|---|
 | `processing` | **Pago recibido, esperando validación** | Panel: alta con el toggle "validar pago" apagado (**Por validar**). Console: autoservicio del gym (`POST /api/organizations/subscription/renew`) y registros manuales (**Procesando**) | No emite comprobante ni mueve el periodo. Bloquea registrar otro `processing` en la misma suscripción (`hasPendingPayment`) |
 | `validated` | **Pago confirmado** | Ambas | **Panel**: asigna el número de comprobante (paso 1) y encola el PDF (paso 2); el email sale del paso 2. **Console**: extiende `current_period_end` de forma **acumulativa** y asigna el `FS-N` |
-| `voided` | **Pago anulado.** Según el comprobante emitido se deriva `rejected` (sin número) o `annulled` (con número) | Ambas | Conserva **número + PDF** y marca **ANULADO** si ya estaba numerado; el número **nunca** se libera ni se reutiliza. **Panel**: además deja la suscripción **ANULADA**. **Console**: se **ignora** en el status computado; **no** cancela la suscripción ni revierte el periodo acumulado |
+| `voided` | **Pago anulado.** Según el comprobante emitido se deriva `rejected` (sin número) o `annulled` (con número) | Ambas | Conserva **número + PDF de emisión** (intactos) y, si ya estaba numerado, genera su **PDF con sello ANULADO**; el número **nunca** se libera ni se reutiliza. **Panel**: además deja la suscripción **ANULADA**. **Console**: se **ignora** en el status computado; **no** cancela la suscripción ni revierte el periodo acumulado |
 | `refunded` | **Reservado, no implementado** | Nadie hoy (el enum y `refunded_at` existen; no hay UI ni servicio que lo produzca) | Ninguno hoy; **no** toca el flag ANULADO. Cuenta como pago calificado (`QUALIFYING_PAYMENT_STATUSES`) |
 
 La respuesta de un PATCH que anula **dice qué pasó con el comprobante** (nunca un 200 mudo): `receiptVoided: true` si se marcó ANULADO, o `receiptVoided: false` + `receiptVoidReason: 'not_issued'` si el pago no tenía número. El código `RECEIPT_NOT_ISSUED` es contrato **interno** del servicio (`mark*ReceiptVoided`), no del endpoint. Ver §5.
@@ -50,7 +50,7 @@ Al anular se persisten **siempre** `voided_by` / `voided_at` / `void_reason`, ha
 |---|---|---|
 | `processing` | "Por validar": aparece en el accionable de `/payments` y no numera | "Procesando": bloquea otro pendiente; a la espera de que soporte apruebe |
 | `validated` | Numera comprobante (`{slug}-año-n`) + encola render | Suma el periodo del plan a `current_period_end` + numera `FS-N` |
-| `voided` | **ANULADO** (si había número) + suscripción **ANULADA** | **ANULADO** (si había número); el status computado **lo ignora** y la suscripción sigue su curso por periodo/gracia |
+| `voided` | **ANULADO** (si había número: PDF con sello, el de emisión deja de entregarse) + suscripción **ANULADA** | **ANULADO** (si había número); el status computado **lo ignora** y la suscripción sigue su curso por periodo/gracia |
 | `refunded` | No se usa | Reservado, sin efectos |
 
 ### 2.1 Console: `voided` no revoca servicio; mandan el periodo y la gracia
@@ -118,7 +118,8 @@ Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en
 - **Anular es explícito**: `receiptVoided` (+ `receiptVoidReason: 'not_issued'`) en el body del PATCH y toast diferenciado en Panel y Console.
 - **Un solo estado de anulación**: rechazo y anulación son `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`, no se guarda.
 - **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (`docs/PENDING.md` §17).
-- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola tanto *numerado sin PDF* como *PDF listo sin notificar*; el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver `docs/PENDING.md` §14).
+- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello* (B2); el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver `docs/PENDING.md` §14).
+- **El ANULADO es un artefacto (B2)**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
 
 ## 6. Dónde vive cada cosa
 

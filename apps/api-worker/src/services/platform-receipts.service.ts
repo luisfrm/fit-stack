@@ -266,6 +266,10 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
      * UPDATE siempre, así que el early-return vive aquí); sin número →
      * 409 (no hay comprobante que anular). `by` obligatorio (fail-closed:
      * nunca void anónimo).
+     *
+     * Encola el render del PDF ANULADO (espejo Panel): el sello lo materializa
+     * el paso 2 y hasta entonces el original no se sirve. Si el envío a la
+     * cola falla, el void ya está persistido y el barrido lo repara.
      */
     async markPlatformReceiptVoided(input: {
       paymentId: number;
@@ -279,20 +283,33 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       if (!payment) {
         throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
       }
-      if (!payment.receiptNumber) {
+      const receiptNumber = payment.receiptNumber;
+      if (!receiptNumber) {
         throw new ReceiptError(
           409,
           'RECEIPT_NOT_ISSUED',
           'El pago no tiene comprobante emitido.',
         );
       }
-      if (payment.receiptVoided) {
-        return payment;
+
+      const row = payment.receiptVoided
+        ? payment
+        : await platformReceiptsRepo.markPlatformVoided(input.paymentId, {
+            by: input.by,
+            reason: input.reason,
+          });
+
+      if (!row.receiptVoidedPdfKey) {
+        await receiptQueue.send(
+          buildReceiptRenderEvent({
+            scope: 'platform',
+            paymentId: input.paymentId,
+            organizationId: payment.organizationId,
+            receiptNumber,
+          }),
+        );
       }
-      return platformReceiptsRepo.markPlatformVoided(input.paymentId, {
-        by: input.by,
-        reason: input.reason,
-      });
+      return row;
     },
 
     /**
@@ -312,7 +329,11 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       if (!composed.payment.receiptNumber) {
         return { available: false, reason: 'pre_system' };
       }
-      if (!composed.payment.receiptPdfKey) {
+      // Espejo Panel: un comprobante anulado entrega SOLO su PDF con sello.
+      const deliverableKey = composed.payment.receiptVoided
+        ? composed.payment.receiptVoidedPdfKey
+        : composed.payment.receiptPdfKey;
+      if (!deliverableKey) {
         return {
           available: true,
           pdfStatus: 'pending',
@@ -362,7 +383,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         pdfStatus: 'ready',
         receiptNumber: composed.payment.receiptNumber,
         receipt,
-        pdfKey: composed.payment.receiptPdfKey,
+        pdfKey: deliverableKey,
       };
     },
 
@@ -400,6 +421,15 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       }
       if (!composed.payment.receiptNumber) {
         return { kind: 'presystem' };
+      }
+      // Espejo Panel: un comprobante anulado no se reenvía por email (saldría
+      // con el PDF de emisión o sin adjunto, sin forma de ver el sello).
+      if (composed.payment.receiptVoided) {
+        throw new ReceiptError(
+          409,
+          'RECEIPT_VOIDED',
+          'El comprobante está anulado: no se reenvía.',
+        );
       }
       if (composed.payment.receiptPdfKey) {
         await taskQueue.send({

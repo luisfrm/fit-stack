@@ -230,6 +230,11 @@ export const platformSubscriptionPayment = pgTable(
     receiptNumber: text('receipt_number').unique(),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
+    // PDF con el sello ANULADO (C6+). El PDF original YA NO se sirve cuando
+    // `receipt_voided` es true: el único documento descargable de un
+    // comprobante anulado es este. NULL = anulación sin render todavía
+    // (la descarga responde `pending`, nunca el original sin sello).
+    receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
     // Desglose fiscal persistido por el paso 1 (C2). El paso 2 nunca
     // recalcula: los lee (NULL = legacy/pre-C2). Centavos enteros.
     subtotal: bigint('subtotal', { mode: 'number' }),
@@ -261,6 +266,10 @@ export const platformSubscriptionPayment = pgTable(
     index('idx_psp_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
+    // Barrido de PDFs anulados pendientes: anulados sin el PDF con sello.
+    index('idx_psp_voided_pending')
+      .on(table.voidedAt)
+      .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
   ]
 );
 
@@ -467,6 +476,12 @@ export const payment = pgTable(
     planSnapshotName: text('plan_snapshot_name').notNull(),
     planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
     planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
+    // Snapshot de la duración del plan al registrar el pago: el periodo se
+    // calcula en el servidor con ESTE valor, así que editar el plan después
+    // no reescribe la semántica de un cobro histórico. NULL = fila anterior
+    // al snapshot (el cálculo cae al plan vivo, estado terminal documentado).
+    planSnapshotDurationValue: integer('plan_snapshot_duration_value'),
+    planSnapshotDurationUnit: text('plan_snapshot_duration_unit'),
 
     amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
     currencyPaid: text('currency_paid').notNull(),
@@ -489,6 +504,10 @@ export const payment = pgTable(
     documentType: text('document_type').notNull().default('receipt'),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
+    // PDF con el sello ANULADO (C6+). El original deja de servirse en cuanto
+    // `receipt_voided` es true: un comprobante anulado solo se descarga con
+    // su sello. NULL = anulación aún sin render (descarga `pending`).
+    receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
     // Marca de notificación por email: gate anti-pérdida (reintentos).
     receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
     taxOverrideReason: text('tax_override_reason'),
@@ -518,6 +537,10 @@ export const payment = pgTable(
     index('idx_payment_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
+    // Barrido de PDFs anulados pendientes: anulados sin el PDF con sello.
+    index('idx_payment_voided_pending')
+      .on(table.voidedAt)
+      .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
   ]
 );
 

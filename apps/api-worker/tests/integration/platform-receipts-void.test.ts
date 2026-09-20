@@ -2,12 +2,16 @@
  * Platform receipts void tests (follow-up C3 — ANULADO SaaS).
  *
  * Covers: voiding a numbered payment preserves number+PDF and sets the
- * ANULADO flag (visible in `GET receipt ready` as `voided:true`); void
- * without a number → **200 with `receiptVoided:false` +
+ * ANULADO flag; void without a number → **200 with `receiptVoided:false` +
  * `receiptVoidReason:'not_issued'`** (el status del pago sí cambia; el código
  * `RECEIPT_NOT_ISSUED` es contrato interno del servicio, C6); re-void is
  * idempotent (audit intact); support 403 (inherited from `requirePlatformAuth`);
  * void neither cancels the subscription nor reverts the cumulative period.
+ *
+ * B2: anular encola el render del PDF con sello y hasta que ese artefacto
+ * exista (`receipt_voided_pdf_key`) el contrato NO entrega el PDF de emisión
+ * (202 + 404): un comprobante anulado nunca viaja sin su sello. Tampoco se
+ * reenvía por email (409 `RECEIPT_VOIDED`).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -164,6 +168,48 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       new Date(subBefore[0]!.current_period_end).getTime(),
     );
 
+    // B2/paso 1-bis: el void encoló el render del artefacto con sello.
+    expect(
+      admin.client.receiptQueue
+        .ofType('receipt.render')
+        .map((m) => Number(m['paymentId'])),
+    ).toContain(paymentId);
+
+    // Y el original deja de entregarse: el anulado aún no tiene sello.
+    const pending = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt`,
+    );
+    expect(pending.status, pending.text).toBe(202);
+    expect(pending.body).toMatchObject({
+      available: true,
+      pdfStatus: 'pending',
+      receiptNumber,
+    });
+    const blockedPdf = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    );
+    expect(blockedPdf.status).toBe(404);
+
+    // Paso 2 del anulado: artefacto NUEVO, sin email, y recién ahí se entrega.
+    expect(
+      await handlePlatformReceiptRender(jobsEnv(admin.client), {
+        type: 'receipt.render',
+        scope: 'platform',
+        paymentId,
+        organizationId: tenant.organization.id,
+        receiptNumber,
+      }),
+    ).toBe('completed');
+
+    const rendered = await readPayment(paymentId);
+    const voidedKey = rendered['receipt_voided_pdf_key'] as string;
+    expect(voidedKey).toMatch(/-anulado\.pdf$/);
+    expect(voidedKey).not.toBe(before['receipt_pdf_key']);
+    // El PDF de emisión se conserva intacto (write-once).
+    expect(rendered['receipt_pdf_key']).toBe(before['receipt_pdf_key']);
+    expect(admin.client.r2.objects.has(voidedKey)).toBe(true);
+    expect(admin.client.r2.objects.has(before['receipt_pdf_key'] as string)).toBe(true);
+
     const receipt = await admin.client.get(
       `/api/platform/subscriptions/payments/${paymentId}/receipt`,
     );
@@ -174,6 +220,18 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       receiptNumber,
     });
     expect(receipt.body.receipt.voided).toBe(true);
+
+    const pdf = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    );
+    expect(pdf.status, pdf.text).toBe(200);
+
+    // Un comprobante anulado no se reenvía (saldría sin sello).
+    const resend = await admin.client.post(
+      `/api/platform/subscriptions/payments/${paymentId}/resend`,
+    );
+    expect(resend.status, resend.text).toBe(409);
+    expect(resend.body.code).toBe('RECEIPT_VOIDED');
   });
 
   it('void sin número: 200 con receiptVoided false + motivo (el status cambia igual)', async () => {

@@ -282,6 +282,32 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
+     * Completa el PDF ANULADO (espejo Panel): fija `receipt_voided_pdf_key`
+     * SOLO si aún no hay uno. Sin efecto sobre el email (`receipt_notified_at`
+     * no se toca). El PDF de emisión se conserva intacto.
+     */
+    async completePlatformVoidedReceiptPdf(
+      paymentId: number,
+      key: string,
+    ): Promise<{ completed: boolean }> {
+      assertPaymentId(paymentId, 'completePlatformVoidedReceiptPdf');
+      if (!key || key.trim().length === 0) {
+        throw new Error('completePlatformVoidedReceiptPdf: key es obligatoria.');
+      }
+      const [row] = await db
+        .update(platformSubscriptionPayment)
+        .set({ receiptVoidedPdfKey: key })
+        .where(
+          and(
+            eq(platformSubscriptionPayment.id, paymentId),
+            isNull(platformSubscriptionPayment.receiptVoidedPdfKey),
+          ),
+        )
+        .returning({ id: platformSubscriptionPayment.id });
+      return { completed: row !== undefined };
+    },
+
+    /**
      * Marca la notificación por email como hecha. Gate anti-pérdida: el
      * reintento usa `receipt_notified_at` para no re-enviar, y si el envío
      * falla el caller limpia la marca y reintenta.

@@ -164,6 +164,55 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(Number(payment['subtotal']) + Number(payment['tax_total'])).toBe(10000);
   });
 
+  it('T1c emisión por el estado PERSISTIDO: payload sin `status` también numera', async () => {
+    const { owner, organization } = await createGymTenant();
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, {
+      price: 7000,
+      currency: 'USD',
+      durationValue: 1,
+      durationUnit: 'month',
+    });
+    resetSpies(owner.client);
+
+    // `status` es opcional en el contrato y el repo lo normaliza a
+    // `validated`. Decidir la emisión por el payload (como antes) dejaba un
+    // pago VALIDADO sin número, sin render y sin email: solo reparable a mano
+    // con POST /:id/issue (el PATCH a validated no numera si ya lo estaba).
+    const res = await owner.client.post('/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: isoDate(0),
+      endDate: isoDate(30),
+      payment: {
+        amountPaid: 7000,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        paymentDate: isoDate(0),
+      },
+    });
+    expect(res.status, res.text).toBe(201);
+
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT status, receipt_number, receipt_issued_at,
+              plan_snapshot_duration_value, plan_snapshot_duration_unit
+         FROM payment WHERE subscription_id = $1`,
+      [res.body.id],
+    );
+    expect(rows[0]!['status']).toBe('validated');
+    expect(rows[0]!['receipt_number']).toMatch(
+      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+    );
+    expect(rows[0]!['receipt_issued_at']).not.toBeNull();
+    // Snapshot de la duración con la que se calculó el periodo.
+    expect(Number(rows[0]!['plan_snapshot_duration_value'])).toBe(1);
+    expect(rows[0]!['plan_snapshot_duration_unit']).toBe('month');
+
+    expect(owner.client.receiptQueue.ofType('receipt.render')).toHaveLength(1);
+    expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
+  });
+
   it('T2 paso 2: completa PDF en R2 y encola el email (gate rowCount===1)', async () => {
     const { owner, organization, payment } = await createValidatedPayment();
     const paymentId = Number(payment['id']);

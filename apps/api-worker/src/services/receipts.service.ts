@@ -311,6 +311,10 @@ export function createReceiptsService(
     /**
      * Estado del comprobante para el contrato `GET /:id/receipt`
      * (la ruta mapea a 200/202). Nunca 409: el histórico es terminal.
+     *
+     * El entregable de un comprobante ANULADO es su PDF con sello: mientras
+     * ese render no exista, el estado es `pending` y el original **no** se
+     * sirve (fail-closed: un documento anulado nunca viaja sin su sello).
      */
     async getReceiptState(orgId: string, paymentId: number): Promise<ReceiptState> {
       const composed = await receiptsRepo.getReceiptComposedData(orgId, paymentId);
@@ -320,7 +324,10 @@ export function createReceiptsService(
       if (!composed.payment.receiptNumber) {
         return { available: false, reason: 'pre_system' };
       }
-      if (!composed.payment.receiptPdfKey) {
+      const deliverableKey = composed.payment.receiptVoided
+        ? composed.payment.receiptVoidedPdfKey
+        : composed.payment.receiptPdfKey;
+      if (!deliverableKey) {
         return {
           available: true,
           pdfStatus: 'pending',
@@ -385,13 +392,19 @@ export function createReceiptsService(
         pdfStatus: 'ready',
         receiptNumber: composed.payment.receiptNumber,
         receipt,
-        pdfKey: composed.payment.receiptPdfKey,
+        pdfKey: deliverableKey,
       };
     },
 
     /**
      * Anulación con número: idempotente sin pisar auditoría;
      * sin número → 409 (no hay comprobante que anular).
+     *
+     * Además encola el render del PDF ANULADO (el sello lo materializa el
+     * paso 2, que gatea por `receipt_voided_pdf_key`): la anulación no se
+     * completa en el mundo hasta que el documento descargable lo diga.
+     * Si el envío a la cola falla, el void YA está persistido y el barrido
+     * lo repara — nunca se sirve el original mientras el sello falte.
      */
     async markReceiptVoided(input: {
       orgId: string;
@@ -406,20 +419,33 @@ export function createReceiptsService(
       if (!composed) {
         throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
       }
-      if (!composed.payment.receiptNumber) {
+      const receiptNumber = composed.payment.receiptNumber;
+      if (!receiptNumber) {
         throw new ReceiptError(
           409,
           'RECEIPT_NOT_ISSUED',
           'El pago no tiene comprobante emitido.',
         );
       }
-      if (composed.payment.receiptVoided) {
-        return composed.payment;
+
+      const row = composed.payment.receiptVoided
+        ? composed.payment
+        : await receiptsRepo.markVoided(input.paymentId, input.orgId, {
+            by: input.by,
+            reason: input.reason,
+          });
+
+      // Reintentar una anulación ya aplicada también repara un PDF perdido.
+      if (!row.receiptVoidedPdfKey) {
+        await receiptQueue.send(
+          buildReceiptRenderEvent({
+            paymentId: input.paymentId,
+            organizationId: input.orgId,
+            receiptNumber,
+          }),
+        );
       }
-      return receiptsRepo.markVoided(input.paymentId, input.orgId, {
-        by: input.by,
-        reason: input.reason,
-      });
+      return row;
     },
 
     /**
@@ -437,6 +463,17 @@ export function createReceiptsService(
       const composed = await receiptsRepo.getReceiptComposedData(orgId, paymentId);
       if (!composed) {
         throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
+      }
+      // Un comprobante anulado no se reenvía: el correo saldría con el PDF
+      // de emisión (sin sello) o sin adjunto, y el destinatario no tendría
+      // forma de saber que el cobro se anuló. Su entregable es la descarga
+      // del PDF ANULADO.
+      if (composed.payment.receiptVoided) {
+        throw new ReceiptError(
+          409,
+          'RECEIPT_VOIDED',
+          'El comprobante está anulado: no se reenvía.',
+        );
       }
       const email = composed.member?.email?.trim();
       if (!email) {

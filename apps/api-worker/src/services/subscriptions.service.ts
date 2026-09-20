@@ -202,6 +202,10 @@ export function createSubscriptionsService(
         paymentMethod: payload.payment.paymentMethod,
         paymentMethodDetails: payload.payment.paymentMethodDetails,
         status: payload.payment.status as any,
+        // Snapshot de la duración: es la que se usó para el periodo, así que
+        // editar el plan después no reescribe la semántica de este cobro.
+        planSnapshotDurationValue: plan.durationValue,
+        planSnapshotDurationUnit: plan.durationUnit,
         paymentDate: paymentDateFinal,
       });
 
@@ -210,7 +214,13 @@ export function createSubscriptionsService(
       // completar el PDF (nunca aquí). Sin receipts inyectado (tests
       // directos del servicio) se conserva el envío legacy.
       // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
-      if (createdPayment?.id && payload.payment.status === PAYMENT_STATUSES.VALIDATED) {
+      //
+      // La decisión se toma sobre la FILA PERSISTIDA, nunca sobre el payload:
+      // `payment.status` es opcional en el contrato y el repo lo normaliza a
+      // `validated`, así que leer el payload dejaba un pago validado SIN
+      // número (y sin render) que solo se reparaba a mano con /issue.
+      // Invariante: validado ⇔ numerado, sobre el estado que quedó en DB.
+      if (createdPayment?.id && createdPayment.status === PAYMENT_STATUSES.VALIDATED) {
         if (opts?.receipts) {
           const p = payload.payment;
           await opts.receipts.assignReceiptNumber({

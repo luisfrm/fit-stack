@@ -33,7 +33,7 @@ La emisión ocurre cuando un pago queda en estado `validated`:
 - Alta directa con pago validado.
 - Cambio posterior de `processing` a `validated`.
 - Emisión manual mediante `POST /api/payments/:id/issue`.
-- Si el pago se anula después, el comprobante ya emitido se conserva y se marca **ANULADO**; el número nunca se libera ni se reutiliza.
+- Si el pago se anula después, el comprobante ya emitido se conserva (write-once) y se marca **ANULADO**: se genera un PDF **nuevo** con el sello y el de emisión deja de entregarse hasta que ese artefacto exista (fail-closed). El número nunca se libera ni se reutiliza.
 
 Código: `apps/api-worker/src/services/subscriptions.service.ts:190`, `apps/api-worker/src/services/subscriptions.service.ts:256`, `packages/database/src/repositories/receipts.repository.ts:170`.
 
@@ -103,7 +103,7 @@ Cada comprobante contiene:
 - Montos en centavos enteros: subtotal, líneas de impuesto, total, moneda pagada, tasa aplicada cuando corresponde.
 - Método de pago con detalles enmascarados.
 - Disclaimer del país o override configurado por la organización.
-- Marca `ANULADO` cuando aplica.
+- Marca `ANULADO` cuando aplica: el sello vive en los bytes del PDF (`receipt_voided_pdf_key`), no solo en la UI.
 - `internalPaymentId` solo para trazabilidad interna, nunca visible.
 
 Código: `packages/shared/src/documents/receipt-compose.ts:115`, `packages/shared/src/documents/receipt-compose.ts:127`, `packages/shared/src/documents/receipt-compose.ts:152`, `packages/shared/src/documents/receipt-compose.ts:192`.

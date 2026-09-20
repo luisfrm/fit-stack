@@ -99,6 +99,16 @@ export async function handlePaymentReceipt(
   const receiptNumber = paymentRow.receiptNumber;
   const receiptPdfKey = paymentRow.receiptPdfKey;
 
+  // Anulado (defensivo): un evento en vuelo de un comprobante anulado no se
+  // envía — saldría con el PDF de emisión, sin sello. El entregable de un
+  // anulado es su descarga autenticada (`receipt_voided_pdf_key`).
+  if (paymentRow.receiptVoided) {
+    console.warn(
+      `Payment ${payload.paymentId}: comprobante ${receiptNumber ?? '—'} ANULADO; envío omitido (el entregable es el PDF con sello).`,
+    );
+    return;
+  }
+
   // Rama B — histórico pre-sistema: sin adjunto, sin error.
   if (!receiptNumber) {
     const { subject, html } = renderPaymentReceiptShort({
@@ -222,6 +232,15 @@ export async function handleOrgPaymentReceived(
   const pendingReview = paymentData.payment.status === 'processing';
   const receiptNumber = paymentData.payment.receiptNumber;
   const receiptPdfKey = paymentData.payment.receiptPdfKey;
+
+  // Anulado (defensivo, espejo Panel): nunca se envía el PDF de emisión de un
+  // comprobante anulado; su entregable es el PDF con sello.
+  if (paymentData.payment.receiptVoided) {
+    console.warn(
+      `Platform payment ${payload.paymentId}: comprobante ${receiptNumber ?? '—'} ANULADO; envío omitido (el entregable es el PDF con sello).`,
+    );
+    return;
+  }
   const payerName = payload.payerName?.trim() || 'El equipo de tu organización';
 
   const { subject, html } = renderOrgPaymentReceived({

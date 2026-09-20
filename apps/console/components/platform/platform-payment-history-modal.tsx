@@ -35,7 +35,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { canManageBilling } from "@/lib/platform-permissions";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@/lib/errors";
 import { summarizeFeatures, type PlanFeaturesV2 } from "@workspace/shared";
 import { PaymentDetailsList } from "./payment-details-list";
 
@@ -229,11 +229,13 @@ export function PlatformPaymentHistoryModal({
       onChange?.();
     } catch (err) {
       toast.error(
-        mutationError(
-          "PlatformPaymentHistoryModal",
-          err,
-          "No se pudo reenviar el comprobante",
-        ),
+        apiCode(err) === "RECEIPT_VOIDED"
+          ? "El comprobante está anulado: descárguelo con el sello ANULADO."
+          : mutationError(
+              "PlatformPaymentHistoryModal",
+              err,
+              "No se pudo reenviar el comprobante",
+            ),
       );
     } finally {
       setActionPaymentId(null);
