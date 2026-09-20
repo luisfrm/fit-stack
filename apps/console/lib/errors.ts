@@ -16,3 +16,12 @@ export function mutationError(
   console.error(`[${scope}]`, err);
   return fallback;
 }
+
+/**
+ * Código de negocio del error del API (`err.data.code`). Es la única forma
+ * permitida de dar un mensaje específico: se compara el CÓDIGO, nunca el
+ * texto del servidor (regla de toasts).
+ */
+export function apiCode(err: unknown): string | undefined {
+  return (err as { data?: { code?: string } })?.data?.code;
+}

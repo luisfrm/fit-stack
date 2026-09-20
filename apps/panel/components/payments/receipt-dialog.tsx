@@ -35,7 +35,7 @@ import {
 } from "@/lib/services/receipts-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@/lib/errors";
 import { useRouter } from "next/navigation";
 
 interface ReceiptDialogProps {
@@ -51,10 +51,6 @@ function formatDay(iso: string | Date, timeZone?: string): string {
     year: "numeric",
     ...(timeZone ? { timeZone } : {}),
   });
-}
-
-function apiCode(err: unknown): string | undefined {
-  return (err as { data?: { code?: string } })?.data?.code;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -246,6 +242,8 @@ export function ReceiptDialog({ initialData: subscription, trigger, onSuccess }:
     } catch (err) {
       if (apiCode(err) === "MEMBER_EMAIL_MISSING") {
         toast.error("Este cliente no tiene correo registrado: imprima en mostrador.");
+      } else if (apiCode(err) === "RECEIPT_VOIDED") {
+        toast.error("El comprobante está anulado: descárguelo con el sello ANULADO.");
       } else {
         toast.error(mutationError("ReceiptDialog", err, "No se pudo enviar el comprobante"));
       }
