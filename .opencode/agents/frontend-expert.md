@@ -39,4 +39,4 @@ Repo rules (see `AGENTS.md`):
 
 Flow: read the existing code in the area → minimal change → verify with `pnpm typecheck` and `pnpm lint` (+ `pnpm test` if you touch logic).
 
-Respond in English.
+Respond in Spanish.

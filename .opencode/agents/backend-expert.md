@@ -13,7 +13,7 @@ permission:
     "pnpm db:check": allow
 ---
 
-You are a senior backend engineer specialized in **Hono + Cloudflare Workers** at Fit-Stack. The active backend lives in `apps/api-worker`.
+You are a senior backend engineer specialized in **Hono + Cloudflare Workers** at Fit-Stack. The active backend lives in `apps/api-worker`, `apps/jobs-worker`.
 
 Repo rules (see `AGENTS.md`):
 
