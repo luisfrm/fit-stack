@@ -1,6 +1,6 @@
 # @workspace/database
 
-Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 30 tablas del sistema y scripts de administración de base de datos.
+Schema Drizzle ORM + cliente Neon Postgres + migraciones. Contiene las 33 tablas del sistema y scripts de administración de base de datos.
 
 ---
 
@@ -11,14 +11,13 @@ Schema Drizzle ORM + cliente Neon Postgres + seeds y migraciones. Contiene las 3
 | `@workspace/database/client` | `db` (Neon serverless) — contexto Next.js / Node |
 | `@workspace/database/factory` | `createDb(url)` → instancia Drizzle **por request** (Neon HTTP driver, ideal Cloudflare Workers) + re-export de `drizzle-orm` (`eq`, `and`, `sql`, `desc`, etc.) |
 | `@workspace/database/schema` | Todas las tablas + relaciones |
-| `@workspace/database/seed` | Script de seed (`tsx src/seed.ts`) |
 | `@workspace/database/constants` | `rbac-defaults` (valores por defecto) |
 
 > **Workers**: en `api-worker` se usa siempre `@workspace/database/factory` — el cliente se crea por request con `createDb(c.env.DATABASE_URL)` (no existe `process.env` en Workers).
 
 ---
 
-## Tablas (28)
+## Tablas (33)
 
 ### Better Auth Core
 `user`, `session`, `account`, `verification`
@@ -61,8 +60,9 @@ pnpm db:check       # Verifica consistencia schema ↔ migraciones
 pnpm db:push        # Push schema directo (SOLO local prototyping)
 pnpm db:pull        # Pull schema desde DB (SOLO local)
 pnpm db:studio      # Abre Drizzle Studio
-pnpm db:seed        # Corre tsx src/seed.ts
 ```
+
+> No existe `db:seed`: los datos de demo los llena el seed de E2E (`pnpm seed:e2e`, org `Fit Stack`/`fit-stack`).
 
 ## Convenciones
 
