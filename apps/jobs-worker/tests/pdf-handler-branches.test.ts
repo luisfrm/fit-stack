@@ -130,6 +130,20 @@ describe('handlePaymentReceipt', () => {
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
 
+  it('comprobante ANULADO → sin enviar (nunca el PDF sin sello)', async () => {
+    r2GetMock.mockResolvedValue({ arrayBuffer: async () => pdfBytes.buffer as ArrayBuffer });
+    getComposedMock.mockResolvedValue(
+      composed({ payment: { receiptVoided: true } }),
+    );
+
+    await handlePaymentReceipt(env(), { paymentId: 987654, organizationId: 'org-1' });
+
+    // El entregable de un anulado es su PDF con sello (descarga autenticada):
+    // ni siquiera se lee R2 para no adjuntar el documento vigente.
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(r2GetMock).not.toHaveBeenCalled();
+  });
+
   it('R2 inconsistente (key sin objeto) → sin enviar', async () => {
     r2GetMock.mockResolvedValue(null);
 

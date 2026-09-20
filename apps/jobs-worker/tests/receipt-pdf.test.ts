@@ -110,6 +110,25 @@ describe('renderReceiptPdfBytes', () => {
     expect(text).toContain('Juan Pérez');
   }, 60000);
 
+  it('estampa ANULADO cuando el comprobante está anulado', async () => {
+    const data = sampleReceipt();
+    data.voided = true;
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    // El sello viaja en los BYTES del documento: el PDF descargable de un
+    // comprobante anulado no puede leerse como un comprobante vigente.
+    expect(text.toUpperCase()).toContain('ANULADO');
+    // Y sigue siendo el mismo comprobante (número + emisor intactos; el
+    // emisor sale en mayúsculas por estilo del documento).
+    expect(text).toContain('fit-stack-2026-000045');
+    expect(text).toContain('FIT STACK C.A.');
+  }, 60000);
+
+  it('no estampa ANULADO en un comprobante vigente', async () => {
+    const text = extractPdfText(await renderReceiptPdfBytes(sampleReceipt(), 'latam'));
+    expect(text.toUpperCase()).not.toContain('ANULADO');
+  }, 60000);
+
   it('muestra la conversión a moneda base cuando el pago difiere', async () => {
     const data = sampleReceipt();
     data.amounts.currencyPaid = 'USD';

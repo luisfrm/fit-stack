@@ -16,9 +16,11 @@ import {
   checklistPrePdf,
   isReceiptRenderEvent,
   panelReceiptKey,
+  panelVoidedReceiptKey,
   parsePanelReceiptNumber,
   platformEmitterFromSettings,
   platformReceiptKey,
+  platformVoidedReceiptKey,
   type CurrencyFormat,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
@@ -94,11 +96,20 @@ function buildComposeInput(
   };
 }
 
+/**
+ * Variante del PDF de un comprobante. `voided` escribe el artefacto con el
+ * sello ANULADO (key propia, `receipt_voided_pdf_key`); el de emisión nunca se
+ * reescribe. Ambos se componen del MISMO estado persistido (`receipt_voided`),
+ * así que el sello no depende de lo que diga el evento.
+ */
+type RenderVariant = 'emission' | 'voided';
+
 async function renderAndStoreReceiptPdf(
   env: ReceiptHandlerEnv,
   repo: ReceiptsRepo,
   composed: ReceiptComposedData,
   persistedNumber: string,
+  variant: RenderVariant = 'emission',
 ): Promise<boolean> {
   const { payment, organization } = composed;
   if (!payment.receiptIssuedAt) {
@@ -124,7 +135,10 @@ async function renderAndStoreReceiptPdf(
     );
   }
 
-  const key = panelReceiptKey(slug, year, persistedNumber);
+  const key =
+    variant === 'voided'
+      ? panelVoidedReceiptKey(slug, year, persistedNumber)
+      : panelReceiptKey(slug, year, persistedNumber);
   // Lazy: PDF engine only loaded during PDF render path, never in emails/sweep.
   const { renderReceiptPdfBytes } = await import('../receipt-pdf');
   const bytes = await renderReceiptPdfBytes(
@@ -136,7 +150,10 @@ async function renderAndStoreReceiptPdf(
     httpMetadata: { contentType: 'application/pdf' },
   });
 
-  const { completed } = await repo.completeReceiptPdf(payment.id, organization.id, key);
+  const { completed } =
+    variant === 'voided'
+      ? await repo.completeVoidedReceiptPdf(payment.id, organization.id, key)
+      : await repo.completeReceiptPdf(payment.id, organization.id, key);
   return completed;
 }
 
@@ -194,8 +211,13 @@ export async function handleReceiptRender(
     console.warn(`receipt.render: pago ${paymentId} no encontrado en org ${orgId}, ack.`);
     return 'already-done';
   }
+  // Un comprobante anulado normalmente YA está notificado, así que la marca no
+  // puede cerrar el paso: lo que falta es el PDF con sello, que es trabajo
+  // pendiente real y no un duplicado.
+  const voidedPdfPending =
+    composed.payment.receiptVoided && !composed.payment.receiptVoidedPdfKey;
   // Already notified: work finished (avoids re-render and re-send).
-  if (composed.payment.receiptNotifiedAt) {
+  if (composed.payment.receiptNotifiedAt && !voidedPdfPending) {
     return 'already-done';
   }
   const persistedNumber = composed.payment.receiptNumber;
@@ -210,6 +232,22 @@ export async function handleReceiptRender(
   }
 
   let didWork = false;
+
+  // ANULADO: artefacto propio y terminal. No notifica (el comprobante válido
+  // ya se envió) y su único entregable es este PDF.
+  if (composed.payment.receiptVoided) {
+    if (!composed.payment.receiptVoidedPdfKey) {
+      const rendered = await renderAndStoreReceiptPdf(
+        env,
+        repo,
+        composed,
+        persistedNumber,
+        'voided',
+      );
+      didWork = rendered || didWork;
+    }
+    return didWork ? 'completed' : 'already-done';
+  }
 
   // PDF: only if it doesn't already exist (UPDATE gate prevents race conditions).
   if (!composed.payment.receiptPdfKey) {
@@ -235,6 +273,10 @@ export async function handleReceiptRender(
  * 2. **PDF listo pero sin notificar** (≥30 min): el render completó y el
  *    email del paso 2 nunca salió (o su marca quedó revertida por un fallo de
  *    envío). Sin este predicado esa notificación se perdía para siempre.
+ * 3. **Anulado sin PDF con sello** (≥15 min): el void se persistió y el render
+ *    del artefacto ANULADO se perdió. Sin este predicado el pago quedaría
+ *    anunciando un documento que ya no se sirve (fail-closed: la descarga
+ *    responde `pending` en lugar del original sin sello).
  *
  * Los 30 minutos del 2.º caso son deliberados: el evento original puede
  * seguir reintentando y no queremos re-encolar en paralelo con él. Re-encolar
@@ -253,6 +295,8 @@ function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): 
         (receipt_pdf_key IS NULL AND receipt_issued_at < now() - interval '15 minutes')
         OR (receipt_pdf_key IS NOT NULL AND receipt_notified_at IS NULL
             AND receipt_issued_at < now() - interval '30 minutes')
+        OR (receipt_voided AND receipt_voided_pdf_key IS NULL
+            AND voided_at IS NOT NULL AND voided_at < now() - interval '15 minutes')
       )
     ORDER BY receipt_issued_at ASC LIMIT $1`;
 }
@@ -361,6 +405,7 @@ async function renderAndStorePlatformReceiptPdf(
   repo: PlatformReceiptsRepo,
   composed: PlatformReceiptComposedData,
   persistedNumber: string,
+  variant: RenderVariant = 'emission',
 ): Promise<boolean> {
   const { payment, organization } = composed;
   if (!payment.receiptIssuedAt) {
@@ -382,7 +427,10 @@ async function renderAndStorePlatformReceiptPdf(
 
   // Billing platform opera en UTC (AGENTS §9): el año es UTC, no local.
   const year = payment.receiptIssuedAt.getUTCFullYear();
-  const key = platformReceiptKey(year, persistedNumber);
+  const key =
+    variant === 'voided'
+      ? platformVoidedReceiptKey(year, persistedNumber)
+      : platformReceiptKey(year, persistedNumber);
   // Lazy: PDF engine only loaded during PDF render path, never in emails/sweep.
   const { renderReceiptPdfBytes } = await import('../receipt-pdf');
   const bytes = await renderReceiptPdfBytes(
@@ -394,7 +442,10 @@ async function renderAndStorePlatformReceiptPdf(
     httpMetadata: { contentType: 'application/pdf' },
   });
 
-  const { completed } = await repo.completePlatformReceiptPdf(payment.id, key);
+  const { completed } =
+    variant === 'voided'
+      ? await repo.completePlatformVoidedReceiptPdf(payment.id, key)
+      : await repo.completePlatformReceiptPdf(payment.id, key);
   return completed;
 }
 
@@ -451,8 +502,12 @@ export async function handlePlatformReceiptRender(
     console.warn(`receipt.render: pago SaaS ${paymentId} no encontrado, ack.`);
     return 'already-done';
   }
+  // Espejo Panel: un anulado ya notificado sigue teniendo trabajo pendiente
+  // (el PDF con sello), así que la marca no puede cerrar el paso.
+  const voidedPdfPending =
+    composed.payment.receiptVoided && !composed.payment.receiptVoidedPdfKey;
   // Already notified: work finished (avoids re-render and re-send).
-  if (composed.payment.receiptNotifiedAt) {
+  if (composed.payment.receiptNotifiedAt && !voidedPdfPending) {
     return 'already-done';
   }
   const persistedNumber = composed.payment.receiptNumber;
@@ -467,6 +522,21 @@ export async function handlePlatformReceiptRender(
   }
 
   let didWork = false;
+
+  // ANULADO: artefacto propio, sin email.
+  if (composed.payment.receiptVoided) {
+    if (!composed.payment.receiptVoidedPdfKey) {
+      const rendered = await renderAndStorePlatformReceiptPdf(
+        env,
+        repo,
+        composed,
+        persistedNumber,
+        'voided',
+      );
+      didWork = rendered || didWork;
+    }
+    return didWork ? 'completed' : 'already-done';
+  }
 
   // PDF: only if it doesn't already exist (UPDATE gate prevents race conditions).
   if (!composed.payment.receiptPdfKey) {
