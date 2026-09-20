@@ -1,10 +1,10 @@
 # Correcciones del track Comprobantes — plan de ejecución
 
-> Derivado de la revisión de `plan.md`, `tasks/fase-*.md`, `docs/FACTURATION.md`, `docs/PENDING.md` y el código real (shared `documents/`, repos compartidos, paso 1, paso 2, PDF, rutas, UI, tests).
+> Derivado de la revisión de `[[plan]]`, `receipts/fase-*.md`, `[[FACTURATION]]`, `[[PENDING]]` y el código real (shared `documents/`, repos compartidos, paso 1, paso 2, PDF, rutas, UI, tests).
 > Estado verificado al escribir este plan: `pnpm typecheck` ✅ 9/9 · `@workspace/shared` tests ✅ 244/244.
 > **No se implementa nada hasta aprobación explícita** (AGENTS.md §7). Las migraciones requieren aprobación aparte.
 >
-> **Nota (modelo de estados unificado):** `PAYMENT_STATUSES` queda en `processing | validated | voided | refunded`. `processing` absorbe al antiguo `pending` y `voided` unifica rechazo y anulación (el tipo `rejected`/`annulled` se **deriva** con `getVoidKind`); `invalid` y `pending` se retiraron. Ver `docs/PAYMENT_STATUSES.md`.
+> **Nota (modelo de estados unificado):** `PAYMENT_STATUSES` queda en `processing | validated | voided | refunded`. `processing` absorbe al antiguo `pending` y `voided` unifica rechazo y anulación (el tipo `rejected`/`annulled` se **deriva** con `getVoidKind`); `invalid` y `pending` se retiraron. Ver `[[PAYMENT_STATUSES]]`.
 
 ---
 
@@ -57,7 +57,7 @@ La compensación cierra el caso "el perdedor es el último consumidor". En una c
 
 ### Decisión D4 (congelada)
 
-Se aplica **C0 pragmático** (orden + guarda tardía + compensación) y *claim-then-number* queda **documentado en `docs/PENDING.md`** con disparador explícito: *si el reporte de huecos muestra un hueco no explicado en producción*. No se incluye en la migración de C1/C5 para mantenerla revisable y evitar un estado intermedio nuevo (`reclamado sin número`) que obligaría a una rama extra de reparación en el barrido.
+Se aplica **C0 pragmático** (orden + guarda tardía + compensación) y *claim-then-number* queda **documentado en `[[PENDING]]`** con disparador explícito: *si el reporte de huecos muestra un hueco no explicado en producción*. No se incluye en la migración de C1/C5 para mantenerla revisable y evitar un estado intermedio nuevo (`reclamado sin número`) que obligaría a una rama extra de reparación en el barrido.
 
 Referencia de la alternativa completa: reclamar el pago con `UPDATE … WHERE receipt_number IS NULL RETURNING id` (persistiendo ya los impuestos) **antes** de consumir la secuencia y asignar el número después.
 
@@ -179,7 +179,7 @@ VE-only, condicional (`currencyPaid !== 'VES'`) y en la práctica sujeto a que e
 - Activarla exige **fricción explícita** (patrón `isFormalTaxpayer`): checkbox "confirmo que verifiqué la tasa vigente con mi contador" + **tasa manual obligatoria**. El `3%` de `COUNTRIES.VE.conditionalTaxes` queda como *referencia documentada*, no como valor efectivo (FACTURATION.md §6: variable por decreto).
 - **Base correcta (`basis: 'gross_first'`)**: el IGTF se **extrae primero** del monto cobrado (la ley lo calcula sobre el monto pagado en divisa) y el resto se descompone tax-inclusive con IVA. Ejemplo cobrado 30,90 con IVA 16 % + IGTF 3 %: IGTF = 0,93 · resto 29,97 → base 25,84 + IVA 4,13 · **suma exacta = 30,90** ✅. El modelo aditivo plano actual (`total/(1+Σtasas)`) reparte proporcionalmente sobre la misma base y da montos legalmente distintos: se retira.
 - ⚠️ Activar IGTF **cambia la base de IVA** de esas facturas (se extrae antes) → el UI lo advierte explícitamente.
-- Ítem obligatorio en `docs/PENDING.md`: confirmar tasa y base con contador antes de encenderla en un gym real.
+- Ítem obligatorio en `[[PENDING]]`: confirmar tasa y base con contador antes de encenderla en un gym real.
 
 ### Cambios
 
@@ -209,7 +209,7 @@ VE-only, condicional (`currencyPaid !== 'VES'`) y en la práctica sujeto a que e
 - `apps/api-worker/src/services/receipts.service.ts` → el override manual que detalla impuestos con `taxDetails` > 0 queda **prohibido** si el emisor no es formal (400): el override solo puede reducir carga fiscal.
 - Panel `settings/organization/page.tsx` → toggles de impuestos gated por la declaración formal (con nota "tu comprobante no detalla impuestos"), impuestos condicionales con **tasa manual + confirmación** y aviso de que cambian la base de los demás; apagar la declaración apaga y desconfirma todo.
 - Panel `payments/tax-block.tsx` + `payment-section.tsx` + `subscription-form.tsx` → `emitterIsFormal`: sin declaración formal no hay ajuste manual (el modo efectivo es `auto`) y el copy de "sin impuestos" se lee como caso normal, no como error.
-- Console `emitter-settings.tsx` → nota explícita de que los comprobantes `FS-N` no detallan impuestos (no existe storage de `fiscalConfig` para el emisor plataforma; ver `docs/PENDING.md` §9).
+- Console `emitter-settings.tsx` → nota explícita de que los comprobantes `FS-N` no detallan impuestos (no existe storage de `fiscalConfig` para el emisor plataforma; ver `[[PENDING]]` §9).
 - Tests: `fiscal-profile.test.ts` (32) y `tax-math.test.ts` (17) reescritos a la semántica nueva; `receipts-emission.test.ts` T1 (informal → sin desglose) + **T1b** (formal → 300 + 1338 cuadrando 10000); `organizations-fiscal.test.ts` (+3 casos de gating); `platform-receipts-emission.test.ts` T1 (SaaS sin desglose).
 
 ### Cambio de comportamiento a comunicar
@@ -220,7 +220,7 @@ Un gym que hoy emite con desglose de IVA y **no** tiene `isFormalTaxpayer` decla
 
 ## C3 — Fidelidad del PDF y datos del documento 🟠 (sin migración) ✅
 
-### Problemas (contra `docs/FACTURATION.md` §3)
+### Problemas (contra `[[FACTURATION]]` §3)
 
 1. `apps/jobs-worker/src/receipt-pdf.tsx` imprime `R.I.F.: ---` cuando falta `taxId` — §3 dice **"omitir la línea si no existe, no inventar"**. Igual para el documento del receptor.
 2. Cuando `currencyPaid ≠ primaryCurrency` se muestra solo `Tasa aplicada: {rate} {currencyPaid}` — falta el **equivalente convertido en moneda base**, y el texto de la tasa es ambiguo (el rate es "pagado por unidad base").
@@ -335,7 +335,7 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 ### Notas de implementación
 
 - **Índice**: el 2.º predicado no tiene índice (el parcial es `… WHERE receipt_number IS NOT NULL AND receipt_pdf_key IS NULL`). A escala *pre-venta* con `LIMIT 50` cada 10 h es irrelevante; si el barrido se vuelve lento, el índice a añadir es `(...) WHERE receipt_pdf_key IS NOT NULL AND receipt_notified_at IS NULL` (migración aparte, no incluida aquí por el criterio "C6 sin migración").
-- **Límite honesto**: si el email **ya encolado** en `fit-task-events` agota reintentos y cae a su DLQ, la marca de notificado ya está puesta y el barrido no lo ve. La recuperación es manual (`POST /:id/send-email` desde el Panel, `POST /payments/:id/resend` desde Console). Ver `docs/PENDING.md` §14.
+- **Límite honesto**: si el email **ya encolado** en `fit-task-events` agota reintentos y cae a su DLQ, la marca de notificado ya está puesta y el barrido no lo ve. La recuperación es manual (`POST /:id/send-email` desde el Panel, `POST /payments/:id/resend` desde Console). Ver `[[PENDING]]` §14.
 
 
 ---
@@ -357,14 +357,14 @@ Se persiste `voided_by`, pero **no quién emitió**. En el fallback manual (`POS
 - ✅ `.gitignore`: regla `*.log` + **destrackeo** de los 3 logs de `spec/` (`baseline-console-build.log`, `final-build.log`, `migration-build.log`); siguen en disco como artefactos locales.
 - ✅ `spec/baseline-console-bundle.md`: la referencia al build log pasa a marcarse como artefacto no versionado (el `.md` es la evidencia; el log era el insumo crudo).
 - ✅ `apps/api-worker/scripts/push-test-schema.ts`: `execSync` → `spawnSync` shell-less; guardas de `TEST_DATABASE_URL` y de host≠producción intactas.
-- ✅ Naming `platform_document_sequence.next_number` (se comporta como `last_number`): documentado en `packages/database/src/schema.ts` + `docs/PENDING.md` §15, **sin migración** (renombrar exigiría migración y no aporta; se agrupa si alguna vez se hace otra).
+- ✅ Naming `platform_document_sequence.next_number` (se comporta como `last_number`): documentado en `packages/database/src/schema.ts` + `[[PENDING]]` §15, **sin migración** (renombrar exigiría migración y no aporta; se agrupa si alguna vez se hace otra).
 
 ### Documentación
 
 - `plan.md`: tabla del track con C7 ✅, cierre del track y **riesgo residual de carrera** (el perdedor con `seq` menor es irreclaimable sin renumerar; la guarda tardía reduce la ventana a ~ms; disparador de *claim-then-number* documentado).
 - `AGENTS.md`: ya reflejaba el estado real (2 repos compartidos, `/receipts` en el route map, cache `platform:receipts:*`, columnas `emitter_snapshot`/`issued_by`, semántica `receiptVoided`/`not_issued`). Sin diff.
-- `docs/PENDING.md`: §15 (naming) y §16 (*claim-then-number*); §9/§12/§13/§14 ya existían.
-- `docs/CHECKLIST-COMPROBANTES.md`: C7 marcada y pendientes §15/§16 enlazados.
+- `[[PENDING]]`: §15 (naming) y §16 (*claim-then-number*); §9/§12/§13/§14 ya existían.
+- `[[CHECKLIST-COMPROBANTES]]`: C7 marcada y pendientes §15/§16 enlazados.
 
 ### Fuera de alcance
 
@@ -463,4 +463,4 @@ Verificación manual obligatoria (adjuntar al PR): PDF de gym informal sin `taxI
 - [x] Las dos series (`{slug}-año-n` y `FS-n`) tienen auditoría de huecos y export. — C4
 - [x] Anular sin número es explícito para el usuario, no un silencio. — C6
 - [x] Un PDF listo cuya notificación se perdió vuelve a intentarse (barrido de 2 predicados). — C6
-- [x] `AGENTS.md`, `plan.md` y `docs/PENDING.md` reflejan el estado real. — C7
+- [x] `AGENTS.md`, `[[plan]]` y `[[PENDING]]` reflejan el estado real. — C7

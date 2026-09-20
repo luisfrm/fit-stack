@@ -45,6 +45,9 @@ dist
 *.log
 npm-debug.log*
 
+# Obsidian (vault personal config)
+.obsidian/
+
 # Misc
 .DS_Store
 *.pem

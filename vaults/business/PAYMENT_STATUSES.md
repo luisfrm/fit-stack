@@ -2,7 +2,7 @@
 
 > Documento interno de referencia. **Ningún estado de pago se elimina: se anula.**
 > Alcance: **Panel** (organización/gym → miembro, tabla `payment`) y **Console** (FitStack → organización, tabla `platform_subscription_payment`).
-> Documentos relacionados: `docs/ORGANIZATION_RECEIPT_MODEL.md`, `docs/FACTURATION.md`, `docs/CHECKLIST-COMPROBANTES.md`.
+> Documentos relacionados: `[[ORGANIZATION_RECEIPT_MODEL]]`, `[[FACTURATION]]`, `[[CHECKLIST-COMPROBANTES]]`.
 
 ## 0. Un enum único, dos máquinas de estados
 
@@ -22,7 +22,7 @@ Reglas del modelo unificado:
 - `processing` **absorbe** al antiguo `pending`: es "pago para revisar". Ya no existe `pending` como estado de pago.
 - El rechazo y la anulación son **el mismo estado de DB: `voided`**. Ya no existe `invalid`.
 - **"Rechazado" vs "anulado" es derivado**, no un estado: `getVoidKind(payment)` (`@workspace/shared`) devuelve `rejected` cuando el pago `voided` **no** tiene `receiptNumber` y `annulled` cuando **sí** lo tiene. Un solo estado de DB + `void_reason`.
-- `REFUNDED` está **reservado**: el enum y la columna `refunded_at` existen, pero hoy **ningún flujo lo produce** (la función de devolución se implementará después). Ver `docs/PENDING.md` §17.
+- `REFUNDED` está **reservado**: el enum y la columna `refunded_at` existen, pero hoy **ningún flujo lo produce** (la función de devolución se implementará después). Ver `[[PENDING]]` §17.
 - `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) es la fuente única de "este pago sostiene un periodo pagado". `processing` y `voided` **no califican**.
 
 Los **códigos** son el mismo contrato en las dos apps, pero **no son el mismo flujo**: el efecto de un mismo código difiere (ver §2). Sobre todo `voided`, que en Panel además anula la suscripción y en Console se **ignora** en el status computado.
@@ -102,7 +102,7 @@ resto                    → active     (ACTIVA)
 4. **Anulación** — el mismo PATCH con **`voided`**: marca ANULADO si había comprobante y se **ignora** en el status computado (no cancela la suscripción). No existe `invalid`: el rechazo también es `voided`.
 5. **Registro manual** — `POST /api/platform/subscriptions/:id/payments`: alta de un pago fuera del flujo de autoservicio.
 6. **Comprobante** — `GET .../payments/:id/receipt` (contrato de 3 estados: `ready` / `pending` / `available:false`) y `/receipt/pdf`. Lectura: `subscription:list` (soporte también). Escrituras (validar, anular, reenviar): `requirePlatformAuth` (soporte **403**).
-7. **Diferencia deliberada**: `DELETE /api/platform/subscriptions/:id` **sí existe** en Console (borra la suscripción SaaS y sus pagos por cascada) — es una decisión distinta de la del Panel y arrastra el histórico de la serie `FS-N` si ya había números emitidos. Ver `docs/PENDING.md` §13.
+7. **Diferencia deliberada**: `DELETE /api/platform/subscriptions/:id` **sí existe** en Console (borra la suscripción SaaS y sus pagos por cascada) — es una decisión distinta de la del Panel y arrastra el histórico de la serie `FS-N` si ya había números emitidos. Ver `[[PENDING]]` §13.
 
 ### 4.1 Punto 7: sin doble periodo
 
@@ -117,8 +117,8 @@ Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en
 - **Un registro financiero no se elimina** (Panel): se anula.
 - **Anular es explícito**: `receiptVoided` (+ `receiptVoidReason: 'not_issued'`) en el body del PATCH y toast diferenciado en Panel y Console.
 - **Un solo estado de anulación**: rechazo y anulación son `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`, no se guarda.
-- **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (`docs/PENDING.md` §17).
-- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello* (B2); el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver `docs/PENDING.md` §14).
+- **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (`[[PENDING]]` §17).
+- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello* (B2); el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver `[[PENDING]]` §14).
 - **El ANULADO es un artefacto (B2)**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
 
 ## 6. Dónde vive cada cosa
@@ -153,4 +153,4 @@ La migración `packages/database/migrations/0017_crazy_brood.sql` (aditiva y ret
 4. **Console/SaaS**: un pago `voided` **se ignora** (ya no revoca servicio); una org con pago `processing` y periodo vigente pasa de `active` a **`past_due`**.
 5. **Panel**: un pago `voided` deja la suscripción **ANULADA**.
 6. `DELETE /api/subscriptions/:id` sigue **sin existir**: se anula o se cancela.
-7. `refunded` permanece reservado (sin flujo que lo produzca, `docs/PENDING.md` §17) y no enciende el flag ANULADO.
+7. `refunded` permanece reservado (sin flujo que lo produzca, `[[PENDING]]` §17) y no enciende el flag ANULADO.

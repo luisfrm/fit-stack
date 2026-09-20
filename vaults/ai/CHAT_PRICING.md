@@ -1,6 +1,6 @@
 # Chat — Pricing por Créditos (Fit-Stack)
 
-> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`/`TRIAL`, si no día 1 UTC. Ver también [`CHAT_INFRASTRUCTURE.md`](./CHAT_INFRASTRUCTURE.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`CHAT_IMPLEMENTATION.MD`](./CHAT_IMPLEMENTATION.MD) (⏸ DEPRECATED).
+> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`/`TRIAL`, si no día 1 UTC. Ver también [`CHAT_INFRASTRUCTURE.md`](./CHAT_INFRASTRUCTURE.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`CHAT_IMPLEMENTATION.MD`](./archive/CHAT_IMPLEMENTATION.MD) (⏸ DEPRECATED).
 
 ## Unidad y fórmula
 

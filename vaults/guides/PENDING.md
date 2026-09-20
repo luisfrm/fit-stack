@@ -61,7 +61,7 @@ La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban 
    WHERE receipt_voided AND receipt_voided_pdf_key IS NULL;
   ```
 - [ ] **Recuperación**: los recoge el **tercer predicado del barrido** (`voided_at < now() - 15 min`). Con el cron de pre-venta (`0 */10 * * *`) pueden tardar hasta 10 h; para no esperar, forzar un barrido manual (`pnpm --filter jobs-worker ...` o invocar el `scheduled` equivalente) tras el deploy.
-- [ ] **Validar** que los anulados de `docs/PAYMENT_STATUSES.md` §5 vuelven a descargar (200) y que la descarga trae el sello ANULADO.
+- [ ] **Validar** que los anulados de `[[PAYMENT_STATUSES]]` §5 vuelven a descargar (200) y que la descarga trae el sello ANULADO.
 - [ ] **Pagos validados sin número** (secuela de B1, previos al fix): listarlos y emitir con `POST /api/payments/:id/issue`:
   ```sql
   SELECT id, member_id, amount_paid, payment_date FROM payment
@@ -75,7 +75,7 @@ La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban 
 
 ## 6. Chat IA — Créditos (migración 2026-08, pendiente post-migración)
 
-> Estado real: migrado a **créditos** (`1 crédito = 1K tokens ×1.0`, `ai_credits_monthly`, `ai_usage.credits`). Fuentes vigentes: `docs/CHAT_PRICING.md` y `docs/CHAT_INFRASTRUCTURE.md`. Lo de abajo es lo que **falta**.
+> Estado real: migrado a **créditos** (`1 crédito = 1K tokens ×1.0`, `ai_credits_monthly`, `ai_usage.credits`). Fuentes vigentes: `[[CHAT_PRICING]]` y `[[CHAT_INFRASTRUCTURE]]`. Lo de abajo es lo que **falta**.
 
 - [ ] **Packs de créditos (Stripe)** — comprar créditos extra sin cambiar de plan:
   - Constantes `CREDIT_PACKS` en `packages/shared/src/ai.ts` (1.000cr/$1.20, 3.000cr/$3.00, 7.000cr/$6.50) — hoy solo documentadas, sin código.
@@ -105,7 +105,7 @@ La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban 
 ## 9. Comprobantes — gating fiscal (C2): tasa del IGTF y emisor plataforma
 
 - [ ] **Confirmar tasa y base del IGTF con un contador antes de encenderlo en un gym real.**
-  - El IGTF nace **apagado** y **nunca automático**: activarlo exige declarar el negocio como contribuyente formal + marcar la confirmación de tasa + indicar la tasa a mano (`fiscalConfig.confirmedTaxes`). El `3%` de `COUNTRIES.VE.conditionalTaxes` es **referencia documentada**, no valor efectivo: la tasa varía por decreto (`docs/FACTURATION.md` §6).
+  - El IGTF nace **apagado** y **nunca automático**: activarlo exige declarar el negocio como contribuyente formal + marcar la confirmación de tasa + indicar la tasa a mano (`fiscalConfig.confirmedTaxes`). El `3%` de `COUNTRIES.VE.conditionalTaxes` es **referencia documentada**, no valor efectivo: la tasa varía por decreto (`[[FACTURATION]]` §6).
   - Base implementada: `basis: 'gross_first'` — el IGTF se **extrae primero** del monto cobrado y el resto se descompone tax-inclusive con el IVA (cambia la base del IVA; el UI lo advierte). Verificar con el contador que la base legal es el monto pagado en divisa.
   - Ejemplo verificado en tests: cobrado 30,90 con IVA 16 % + IGTF 3 % → IGTF 0,93 · base 25,84 + IVA 4,13 · suma exacta 30,90.
 - [ ] **Declarar a FitStack (emisor plataforma) como contribuyente formal si se quiere desglose en los comprobantes `FS-N`.**

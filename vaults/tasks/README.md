@@ -4,16 +4,16 @@
 
 ## Orden recomendado
 
-1. **Fase 0** (`fase-0-logica-pura-shared.md`) — lógica pura en `packages/shared/src/documents/`. Sin dependencias. Bloquea todo.
-2. **Fase 1** (`fase-1-db-secuencias-panel.md`) — `organization_document_sequence` + columnas en `payment`. Requiere Fase 0 (tipos/formato).
-3. **Fase 2** (`fase-2-emision-atomica-panel.md`) — cola `fit-receipt-events` (producer api-worker + consumer jobs-worker) + paso 1 número síncrono + paso 2 PDF (render en jobs-worker) + barrido en jobs-worker + endpoints. Requiere Fase 0 + 1.
-4. **Fase 3** (`fase-3-email-pdf-jobs-panel.md`) — 3A jobs-worker (adjunto desde R2) + 3B panel (dialog v2). Requiere Fase 2. 3A y 3B paralelizables entre sí.
-5. **Fase 4** (`fase-4-config-fiscal-panel.md`) — settings fiscales + impuestos híbridos en el form. Requiere Fase 0. Paralelizable con Fase 3.
-6. **Fase 5** (`fase-5-gaps-auditoria.md`) — reporte + `gaps[]` + auditoría. Requiere Fase 2.
-7. **Fase 6** (`fase-6-cierre-panel.md`) — tests, E2E, docs, verificación manual. Requiere 0-5.
-8. **C1** (`fase-c1-db-console.md`) — secuencia global + keys emisor FitStack. Requiere Fase 0. Config paralelizable con Fases 1-2.
-9. **C2** (`fase-c2-emision-console.md`) — emisión SaaS automática. Requiere C1 + Fase 2 (patrón).
-10. **C3** (`fase-c3-ui-console.md`) — descarga/reenvío console + cierre. Requiere C2 + Fase 3 (R2 en jobs).
+1. **Fase 0** (`receipts/fase-0-logica-pura-shared.md`) — lógica pura en `packages/shared/src/documents/`. Sin dependencias. Bloquea todo.
+2. **Fase 1** (`receipts/fase-1-db-secuencias-panel.md`) — `organization_document_sequence` + columnas en `payment`. Requiere Fase 0 (tipos/formato).
+3. **Fase 2** (`receipts/fase-2-emision-atomica-panel.md`) — cola `fit-receipt-events` (producer api-worker + consumer jobs-worker) + paso 1 número síncrono + paso 2 PDF (render en jobs-worker) + barrido en jobs-worker + endpoints. Requiere Fase 0 + 1.
+4. **Fase 3** (`receipts/fase-3-email-pdf-jobs-panel.md`) — 3A jobs-worker (adjunto desde R2) + 3B panel (dialog v2). Requiere Fase 2. 3A y 3B paralelizables entre sí.
+5. **Fase 4** (`receipts/fase-4-config-fiscal-panel.md`) — settings fiscales + impuestos híbridos en el form. Requiere Fase 0. Paralelizable con Fase 3.
+6. **Fase 5** (`receipts/fase-5-gaps-auditoria.md`) — reporte + `gaps[]` + auditoría. Requiere Fase 2.
+7. **Fase 6** (`receipts/fase-6-cierre-panel.md`) — tests, E2E, docs, verificación manual. Requiere 0-5.
+8. **C1** (`receipts/fase-c1-db-console.md`) — secuencia global + keys emisor FitStack. Requiere Fase 0. Config paralelizable con Fases 1-2.
+9. **C2** (`receipts/fase-c2-emision-console.md`) — emisión SaaS automática. Requiere C1 + Fase 2 (patrón).
+10. **C3** (`receipts/fase-c3-ui-console.md`) — descarga/reenvío console + cierre. Requiere C2 + Fase 3 (R2 en jobs).
 
 ## Mapa de módulos por capa
 
@@ -27,9 +27,9 @@
 | `infrastructure/terraform` | `queues.tf` (cola + DLQ `fit-receipt-events{,-dlq}{env}`), `workers.tf` (producer api-worker; consumer jobs-worker + producer + cron), `main.tf` (nombres **derivados** del ambiente, sin variables de override), `variables.tf`/`outputs.tf`, `scripts/check-name-parity.mjs` (+ `pnpm check:infra-parity` en `ci.yml`) |
 | `apps/panel` | `components/payments/receipt-dialog.tsx`, `payment-detail-row.tsx`, `subscriptions-table.tsx`, `subscription-form.tsx`, `payment-section.tsx`, `tax-block.tsx` (nuevo, Fase 4), `lib/services/receipts-service.ts` (nuevo), `lib/services/org-profile-service.ts` (nuevo, Fase 4), `lib/services/emails-service.ts`, `lib/services/pdf-service.ts` (eliminado, Fase 3), `types/dashboard.ts`, `app/(protected)/settings/organization/page.tsx` (+sección fiscal, Fase 4), `app/(protected)/reports/receipts/` (página RSC + cliente, Fase 5), `app/(protected)/payments/page.tsx` (purga tag del reporte, Fase 5) |
 | `apps/console` | `app/(protected)/settings/` (+`emitter/page.tsx` UI Emisor FitStack, C1), `components/settings/emitter/emitter-settings.tsx` (nuevo, C1), `components/dashboard/settings-nav.tsx` (tab Emisor), `lib/config/platform-settings.ts` (keys `FITSTACK_*`), `lib/api/client.ts` (`apiBlob` con auth, C3), `lib/services/platform-subscriptions-service.ts` (C3: `downloadReceipt`/`resendReceipt`), `components/platform/platform-payment-history-modal.tsx` (C3: bloque Comprobante + Descargar/Reenviar), `e2e/console/settings.spec.ts` (2 tests Emisor: navegación + save/re-render/restore, C1), `e2e/console/receipts.spec.ts` (nuevo, C3) |
-| Docs | `AGENTS.md` (§1 excepción ×2 repos, route map +3 endpoints, evento payer opcional, sección Console), `docs/PENDING.md`, `plan.md`, `e2e/panel/*`, `e2e/console/*` (+`receipts.spec.ts` + kind `platformSubscription`, C3) |
+| Docs | `AGENTS.md` (§1 excepción ×2 repos, route map +3 endpoints, evento payer opcional, sección Console), `[[PENDING]]`, `[[plan]]`, `e2e/panel/*`, `e2e/console/*` (+`receipts.spec.ts` + kind `platformSubscription`, C3) |
 
-## Decisiones congeladas (de `plan.md`, no re-discutir por task)
+## Decisiones congeladas (de `[[plan]]`, no re-discutir por task)
 
 PDF fuente de verdad · R2 inmutable · paso 1 número síncrono (sentencia única) + paso 2 PDF en cola dedicada `fit-receipt-events` (DLQ; sin rollback, `pdf_key NULL` = pendiente) · **email encolado por el paso 2 tras confirmar el PDF** (job de email nunca corre sin PDF en numerados) · **entrega duplicada de cola = sin segundo PDF ni segundo email** (`UPDATE … WHERE receipt_pdf_key IS NULL` con `RETURNING` como gate) · **barrido cron en jobs-worker (pre-venta cada 10 h; 10 min con clientes reales)** (`número sin PDF` > 15 min → re-encola) cierra el hueco publicación↔fila y cubre Panel + Console · contrato `receipt` con 3 estados (ready / pending 202 / pre_system 200 `available:false`; nunca 409) · render en jobs-worker (repo+keys+evento en shared/database; `completeReceiptPdf` con `rowCount===1` como gate del email) · emisión automática al validar · impuestos híbridos con reason · reinicio anual · voided=ANULADO (único estado de anulación: `PAYMENT_STATUSES = processing \| validated \| voided \| refunded`, sin `pending`/`invalid`; rechazo/anulación se derivan con `getVoidKind`) · sin backfill · emitir≠enviar · `isFormalTaxpayer` con declaración explícita · UUID invisible · dos secuencias (global FitStack `FS-N` vs por-org `{slug}-año-n`) · keys `receipts/<org>/…` simétricas (sin prefijo `cms/`) · `featuresSnapshot` no impreso pero exportable · proxy de país Console como ítem PENDING.
 

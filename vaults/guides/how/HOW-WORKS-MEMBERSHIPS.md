@@ -39,7 +39,7 @@ Cada pago queda registrado en tu historial con detalle auditable para contabilid
 
 ## Registro atómico de suscripción y pago
 
-Suscripción y pago se registran juntos en una misma operación: primero la suscripción y después el pago, en el mismo flujo. Esto garantiza que no existan accesos sin respaldo financiero en el caso normal. (Nota interna: los dos inserts todavía no están envueltos en una transacción única; el endurecimiento está registrado en `docs/PENDING.md` §12.)
+Suscripción y pago se registran juntos en una misma operación: primero la suscripción y después el pago, en el mismo flujo. Esto garantiza que no existan accesos sin respaldo financiero en el caso normal. (Nota interna: los dos inserts todavía no están envueltos en una transacción única; el endurecimiento está registrado en `[[PENDING]]` §12.)
 
 ## Recibos automáticos por email
 

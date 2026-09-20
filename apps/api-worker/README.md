@@ -279,7 +279,8 @@ Gracias a `customSessionClient` en `@workspace/auth`, estos campos fluyen tanto 
 
 ## Deploy
 
-- **Guía completa**: [INFRASTRUCTURE.md](../../INFRASTRUCTURE.md) y [infrastructure/terraform/README.md](../../infrastructure/terraform/README.md).
+- **Guía completa**: [vaults/architecture/INFRASTRUCTURE.md](../../vaults/architecture/INFRASTRUCTURE.md) y
+                     [vaults/architecture/terraform.md](../../vaults/architecture/terraform.md).
 - **Infraestructura**: gestionada con Terraform (`infrastructure/terraform/`) — workers, R2, queues y secrets. **Nunca** ejecutar `wrangler` manualmente para deploys.
 - **Ambientes**: `dev` / `staging` / `production` definidos en `wrangler.jsonc` (nombre del worker, bucket R2 y cola por ambiente).
 - **CI/CD**: GitHub Actions (`deploy-api-worker.yml`) — push a `master` → `production`, push a `develop` → `dev`. La migración de DB se ejecuta con `database-migrations.yml`.

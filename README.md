@@ -139,15 +139,15 @@ pnpm format
 - **Local development**: `pnpm dev` (see Quick Start above). Each app reads its `.env` (templates in `.env.example`); the `api-worker` reads `.dev.vars` via Wrangler.
 - **Production**: workers and DB are deployed through the workflows above; the Next.js apps are deployed manually to Vercel with `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` configured per app. Secrets live in GitHub Environments (workers) and Vercel (frontend).
 
-For the full deployment guide see [INFRASTRUCTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/INFRASTRUCTURE.md) and [infrastructure/terraform/README.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/infrastructure/terraform/README.md).
+For the full deployment guide see [vaults/architecture/INFRASTRUCTURE.md](vaults/architecture/INFRASTRUCTURE.md) and [vaults/architecture/terraform.md](vaults/architecture/terraform.md).
 
 ---
 
 ## Documentation
 
-- [docs/ARCHITECTURE.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/docs/ARCHITECTURE.md) — Detailed architecture design & system decisions
-- [AGENTS.md](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
-- `docs/PENDING.md` — Roadmap & pending tasks
-- `docs/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
-- `docs/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
-- `docs/TIMEZONE_MANAGEMENT.md` — Timezone handling
+- [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md) — Detailed architecture design & system decisions
+- [AGENTS.md](AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
+- `vaults/guides/PENDING.md` — Roadmap & pending tasks
+- `vaults/business/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
+- `vaults/guides/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
+- `vaults/business/TIMEZONE_MANAGEMENT.md` — Timezone handling

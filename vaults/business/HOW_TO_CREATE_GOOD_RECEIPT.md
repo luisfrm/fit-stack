@@ -1,7 +1,7 @@
 # Cómo crear un comprobante correcto (Console vs. Panel)
 
 > Documento de referencia interna. Última revisión: sept 2026.
-> Ver también: `docs/RESPONSABILITIES.md`, `docs/FACTURATION.md`, `docs/PAYMENT_STATUSES.md`
+> Ver también: `[[RESPONSABILITIES]]`, `[[FACTURATION]]`, `[[PAYMENT_STATUSES]]`
 
 ## Principio general (aplica a ambos niveles)
 
@@ -9,7 +9,7 @@
 2. **Todo dato mostrado en el comprobante viene de snapshots, nunca de tablas "en vivo".** Si el plan cambia después, el comprobante ya emitido no debe cambiar.
 3. **La moneda y la tasa de cambio aplicada siempre se muestran juntas** si el pago fue en una moneda distinta a la moneda principal del emisor.
 4. **El disclaimer legal del país siempre va al pie**, tomado de la config de país (`COUNTRIES[code].legalDisclaimer`), nunca hardcodeado por documento.
-5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `docs/FACTURATION.md` §2. El campo `documentLabel` es de solo lectura y no participa del gate.
+5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `[[FACTURATION]]` §2. El campo `documentLabel` es de solo lectura y no participa del gate.
 
 ---
 
@@ -29,7 +29,7 @@ platform_document_sequence
  └─ next_number     -- guarda el ÚLTIMO número entregado (sin año). El nombre es cosmético
 ```
 
-La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver `docs/PENDING.md` §15).
+La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver `[[PENDING]]` §15).
 
 Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin componente de org).
 

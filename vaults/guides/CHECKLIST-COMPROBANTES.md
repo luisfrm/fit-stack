@@ -1,11 +1,11 @@
 # Checklist — estados de suscripción, flujo de pago y fases
 
 > Estado verificado: **2026-09-18**. Track C0–C9 cerrado; modelo de estados de pago unificado (commit `cef10c7`) + migración `0017` (commit `d1b3720`).
-> Documentos relacionados: `docs/PAYMENT_STATUSES.md` (semántica completa), `tasks/correcciones-comprobantes.md` (plan del track), `docs/PENDING.md` (pendientes).
+> Documentos relacionados: `[[PAYMENT_STATUSES]]` (semántica completa), `correcciones-comprobantes.md` (plan del track), `[[PENDING]]` (pendientes).
 
 ## 1. Estados de una suscripción (derivados, no se guardan)
 
-> Modelo unificado: `PAYMENT_STATUSES = processing | validated | voided | refunded`; no existen `pending` ni `invalid`. `voided` es el único estado de anulación (rechazo y anulación se derivan con `getVoidKind`). Ver `docs/PAYMENT_STATUSES.md`.
+> Modelo unificado: `PAYMENT_STATUSES = processing | validated | voided | refunded`; no existen `pending` ni `invalid`. `voided` es el único estado de anulación (rechazo y anulación se derivan con `getVoidKind`). Ver `[[PAYMENT_STATUSES]]`.
 
 Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 
@@ -45,7 +45,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] **B2** El PDF ANULADO es un artefacto propio (3.er predicado del barrido; el original no se sirve sin sello)
 - [x] **C7** Higiene, docs y matriz de tests
 
-## 4. Pendientes abiertos (`docs/PENDING.md`)
+## 4. Pendientes abiertos (`[[PENDING]]`)
 
 - [ ] **§12.1** `create()` no es atómico de verdad (dos inserts): un fallo del pago deja suscripción huérfana y ya no hay DELETE que la limpie.
 - [ ] **§12.2** El borrado de un **miembro** arrastra su histórico financiero por cascada — la única vía por la que un pago desaparece hoy.
@@ -71,11 +71,11 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 
 ## 6. Checklist de release (no es fase: es el día que entra un cliente real)
 
-- [ ] **Cadencia del barrido**: pasar el cron de `0 */10 * * *` a `*/10 * * * *` en `infrastructure/terraform/workers.tf` (hoy 10 h es un ahorro de pre-venta, no un SLA) y actualizar `plan.md` / `docs/PENDING.md` §7.
+- [ ] **Cadencia del barrido**: pasar el cron de `0 */10 * * *` a `*/10 * * * *` en `vaults/architecture/terraform.md` (hoy 10 h es un ahorro de pre-venta, no un SLA) y actualizar `[[plan]]` / `[[PENDING]]` §7.
 - [ ] **Verificar la migración `0017`**: confirmar que `database-migrations.yml` la aplicó en prod y que ninguna fila conserva `pending`/`invalid` (`SELECT status, count(*) … GROUP BY status`).
 - [ ] **Escanear la serie**: correr la auditoría de correlativo en Panel y Console (`gaps[]` vacío o con huecos explicados por anulaciones).
 - [ ] **Vigilar §14**: revisar la DLQ de `fit-task-events` y confirmar que ningún comprobante quedó sin email entregado.
-- [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (`docs/PENDING.md` §9).
+- [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (`[[PENDING]]` §9).
 - [ ] **Terraform**: correr `terraform apply` (environment `production`) para crear la cola `fit-receipt-events` + DLQ + consumer + cron (el action es manual). Los nombres se derivan del ambiente (sin variables); `pnpm check:infra-parity` garantiza la paridad con los `wrangler.jsonc`.
 
 ## 7. Cómo repetir la verificación

@@ -8,7 +8,7 @@ Esta carpeta contiene toda la infraestructura de Cloudflare como código.
 - **R2 Bucket** para archivos (logos, imágenes CMS, etc.).
 - **Queues** para tareas asíncronas (emails, PDFs) y su DLQ.
 - **Queue consumers** de `jobs-worker`: `fit-task-events` (emails) y `fit-receipt-events` (render de comprobantes), cada uno con su DLQ.
-- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver `docs/PENDING.md`).
+- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver `[[PENDING]]`).
 - **Secrets** de cada worker (DATABASE_URL, BETTER_AUTH_SECRET, etc.).
 
 > **Dueño único de consumers/cron = Terraform.** Los `wrangler.jsonc` de los workers solo declaran `producers` (y R2), nunca `queues.consumers` ni `triggers`, para que `wrangler deploy` no compita con el estado. Los `wrangler deploy` suben el **código** (incl. el `scheduled()`); el trigger lo crea este Terraform.

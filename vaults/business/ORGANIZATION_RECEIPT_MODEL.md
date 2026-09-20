@@ -2,7 +2,7 @@
 
 > Documento interno de referencia. Estado del producto: **sin homologación fiscal conectada**.
 > Alcance: **Panel**, relación **organización/gym → miembro**.
-> Documentos relacionados: `docs/FACTURATION.md` y `docs/RESPONSABILITIES.md`.
+> Documentos relacionados: `[[FACTURATION]]` y `[[RESPONSABILITIES]]`.
 
 ## 1. Qué significa “facturar” en FitStack
 
