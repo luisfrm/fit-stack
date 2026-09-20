@@ -11,5 +11,6 @@ export * from './documents';
 export * from './formatting';
 export * from './date';
 export * from './settings';
+export * from './storage';
 export * from './defaults';
 
