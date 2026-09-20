@@ -25,7 +25,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
   - con `validated` → el **paso 1** numera (`{slug}-año-n`) y encola el PDF; el email sale del **paso 2**.
   - con `processing` → "Por validar", sin número.
 - [x] **Aprobación** (`PATCH /api/payments/:id/status` → `validated`): numera (si aún no lo estaba) y encola el render.
-- [x] **Anulación / Rechazo** (`→ voided`, estado único): si el pago ya estaba numerado, el comprobante se marca **ANULADO** (número y PDF intactos, nunca se reutiliza) y la suscripción pasa a **ANULADA**; si no tenía número, no hay comprobante que marcar y el body lo dice (`receiptVoided: false` + `receiptVoidReason: 'not_issued'`). "Rechazado" vs "anulado" se deriva con `getVoidKind`.
+- [x] **Anulación / Rechazo** (`→ voided`, estado único): si el pago ya estaba numerado, el comprobante se marca **ANULADO** (el número y el PDF de emisión quedan intactos —write-once— y se genera el PDF **con sello**, columna `receipt_voided_pdf_key`; el original deja de entregarse mientras falte el sello) y la suscripción pasa a **ANULADA**; si no tenía número, no hay comprobante que marcar y el body lo dice (`receiptVoided: false` + `receiptVoidReason: 'not_issued'`). "Rechazado" vs "anulado" se deriva con `getVoidKind`. Un anulado no se reenvía por email (`409 RECEIPT_VOIDED`).
 - [x] **Revocar / restaurar acceso** (`PUT /api/subscriptions/:id`): mueve `cancelled_at`. Si el cobro está anulado, la acción no se ofrece (ANULADA gana sobre CANCELADA).
 - [x] **Eliminar: no existe** — sin ruta, sin permiso RBAC, sin acción en el panel, sin `subscriptionsService.delete`.
 - [x] **Acceso** (`isActive`): `end_date >= now()` **y** `cancelled_at IS NULL` **y** el cobro no es `voided`.
@@ -41,6 +41,8 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] **C5** Trazabilidad de emisión (`issued_by`) — misma `0016`
 - [x] **C9** ANULADA ≠ CANCELADA + registro no eliminable + los 2 fallos de E2E
 - [x] **C6** Robustez del barrido (2.º predicado) y contrato de anulación explícito
+- [x] **B1** La emisión se decide por el estado persistido (invariante *validado ⇔ numerado*)
+- [x] **B2** El PDF ANULADO es un artefacto propio (3.er predicado del barrido; el original no se sirve sin sello)
 - [x] **C7** Higiene, docs y matriz de tests
 
 ## 4. Pendientes abiertos (`docs/PENDING.md`)

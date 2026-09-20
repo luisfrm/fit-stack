@@ -49,6 +49,28 @@ La taxonomía pasó de `cms/<orgId>/…` a **`<orgId>/<folder>/…`** con corte 
 - [ ] **Migración física opcional en R2**: si algún ambiente tiene assets que merece la pena conservar, copiar `cms/<orgId>/x` → `<orgId>/cms/x` y actualizar las referencias en DB. No se incluyó ningún script para esto (decisión: corte limpio).
 - [ ] **`paymentMethodDetails` históricos**: las capturas de pago emitidas antes del cambio viven bajo `cms/<orgId>/receipts/…`; quedan visibles solo si se re-suben (el namespace viejo ya no es alcanzable).
 
+## 5.2. Comprobantes ANULADOS anteriores a B2 — checklist post-deploy
+
+La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban anulados tienen `receipt_voided = true` y **`receipt_voided_pdf_key` en NULL**, así que hasta que el render escriba su sello su descarga responde **`pending`** (202 / 404) — fail-closed a propósito: nunca se sirve el PDF de emisión de un anulado.
+
+- [ ] **Conteo previo al deploy** (saber a cuántos afecta):
+  ```sql
+  SELECT count(*) FROM payment
+   WHERE receipt_voided AND receipt_voided_pdf_key IS NULL;
+  SELECT count(*) FROM platform_subscription_payment
+   WHERE receipt_voided AND receipt_voided_pdf_key IS NULL;
+  ```
+- [ ] **Recuperación**: los recoge el **tercer predicado del barrido** (`voided_at < now() - 15 min`). Con el cron de pre-venta (`0 */10 * * *`) pueden tardar hasta 10 h; para no esperar, forzar un barrido manual (`pnpm --filter jobs-worker ...` o invocar el `scheduled` equivalente) tras el deploy.
+- [ ] **Validar** que los anulados de `docs/PAYMENT_STATUSES.md` §5 vuelven a descargar (200) y que la descarga trae el sello ANULADO.
+- [ ] **Pagos validados sin número** (secuela de B1, previos al fix): listarlos y emitir con `POST /api/payments/:id/issue`:
+  ```sql
+  SELECT id, member_id, amount_paid, payment_date FROM payment
+   WHERE status = 'validated' AND receipt_number IS NULL ORDER BY payment_date;
+  ```
+  En el reporte de comprobantes aparecen con la etiqueta **"Sin comprobante"** (estado `pre_system`), que es la que ve el operador.
+- [ ] **UI (mejora diferida)**: mientras el sello se genera, el diálogo del comprobante dice "PDF en preparación" sin distinguir que está anulado (el 202 no lleva el flag). Añadir `receiptVoided` al estado `pending` si el producto lo pide.
+- [ ] **Sello ANULADO**: hoy es un texto rojo en la cabecera (`receipt-pdf.tsx`); si se quiere marca de agua diagonal, es un cambio visual independiente.
+
 ---
 
 ## 6. Chat IA — Créditos (migración 2026-08, pendiente post-migración)

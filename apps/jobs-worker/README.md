@@ -51,12 +51,13 @@ La composición y el acceso a datos viven en repos compartidos de `@workspace/da
 
 ## Barrido (`scheduled`)
 
-`sweepPendingReceiptPdfs` cubre **dos** estados de fallo con una única definición por tabla:
+`sweepPendingReceiptPdfs` cubre **tres** estados de fallo con una única definición por tabla:
 
 - **Numerado sin PDF** (≥15 min): el render se perdió → re-encola.
 - **PDF listo sin notificar** (≥30 min): el email del paso 2 nunca salió → re-encola.
+- **Anulado sin PDF con sello** (≥15 min): el void se persistió pero el render del artefacto ANULADO se perdió → re-encola. Mientras falte, la descarga responde `pending`: el PDF de emisión **no** se sirve para un anulado.
 
-Ambos son seguros de re-encolar porque la notificación tiene su propio gate idempotente (`receipt_notified_at`). Una fila corrupta no aborta el resto.
+Los tres son seguros de re-encolar porque cada artefacto tiene su propio gate idempotente (`receipt_notified_at` / `receipt_voided_pdf_key`). Una fila corrupta no aborta el resto.
 
 > **Cadencia (pre-venta)**: `0 */10 * * *` (cada 10 horas) — ahorro de invocaciones sin clientes reales. Bajar a `*/10 * * * *` (cada 10 min) con clientes reales. Ver `docs/PENDING.md` §7.
 
