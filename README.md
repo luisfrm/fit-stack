@@ -147,7 +147,7 @@ For the full deployment guide see [vaults/architecture/INFRASTRUCTURE.md](vaults
 
 - [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md) — Detailed architecture design & system decisions
 - [AGENTS.md](AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
-- `vaults/guides/PENDING.md` — Roadmap & pending tasks
+- `vaults/backlog/` — Roadmap & pending tasks (por tema)
 - `vaults/business/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
 - `vaults/guides/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
 - `vaults/business/TIMEZONE_MANAGEMENT.md` — Timezone handling

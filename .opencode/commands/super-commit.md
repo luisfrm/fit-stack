@@ -9,10 +9,10 @@ Optional context for commit messages: `$ARGUMENTS`
 Rules:
 
 - First inspect the full repository state:
-    - `git status --short`
-    - `git diff --stat`
-    - `git diff`
-    - `git log --oneline -10`
+  - `git status --short`
+  - `git diff --stat`
+  - `git diff`
+  - `git log --oneline -10`
 - Identify related file groups by intent: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, or `config`.
 - Create multiple commits when there are independent changes. Do not mix unrelated changes in the same commit.
 - Use conventional commit format: `type(scope): description`. Scope examples: `api-worker`, `panel`, `console`, `web`, `database`, `shared`, `auth`, `ui`.
@@ -25,10 +25,11 @@ Rules:
 - Do not force push.
 
 Flow:
+
 1. Show the proposed commit plan with the files included in each commit.
 2. If the grouping is clear, continue. If there is real ambiguity, ask before committing.
 3. For each group:
-    - Add only the files for that group with `git add <files...>`.
-    - Create the commit with a semantic message.
+   - Add only the files for that group with `git add <files...>`.
+   - Create the commit with a semantic message.
 4. Once all commits have been created, run: `git push`
 5. When finished, summarize the commits created and the files that were pushed.

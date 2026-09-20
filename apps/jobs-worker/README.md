@@ -59,7 +59,7 @@ La composición y el acceso a datos viven en repos compartidos de `@workspace/da
 
 Los tres son seguros de re-encolar porque cada artefacto tiene su propio gate idempotente (`receipt_notified_at` / `receipt_voided_pdf_key`). Una fila corrupta no aborta el resto.
 
-> **Cadencia (pre-venta)**: `0 */10 * * *` (cada 10 horas) — ahorro de invocaciones sin clientes reales. Bajar a `*/10 * * * *` (cada 10 min) con clientes reales. Ver `docs/PENDING.md` §7.
+> **Cadencia (pre-venta)**: `0 */10 * * *` (cada 10 horas) — ahorro de invocaciones sin clientes reales. Bajar a `*/10 * * * *` (cada 10 min) con clientes reales. Ver `vaults/backlog/comprobantes.md`.
 
 ## Infraestructura (Terraform es el dueño)
 

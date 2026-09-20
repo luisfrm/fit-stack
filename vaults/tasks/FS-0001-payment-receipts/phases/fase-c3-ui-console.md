@@ -20,7 +20,7 @@ Soporte/admin descarga el comprobante SaaS y lo reenvía a payer/owners con PDF 
 | `apps/api-worker` (ruta platform-subscriptions o receipts) | `GET /api/platform/subscriptions/payments/:id/receipt` (`requirePlatformAuth` o permiso de lectura plataforma) con **el mismo contrato de 3 estados de Fase 2** (200 ready / 202 pending / 200 `available:false, reason:'pre_system'`; nunca 409) + `GET …/receipt/pdf` binario (404 sin objeto). `POST …/resend` (reenvío a payer+owners; si el PDF aún no existe → 202 `pdfStatus:'pending'` y el paso 2 hará el reenvío) o reutilizar flujo existente si lo hay. Invalidar `platform:subscriptions:invoices:{orgId}` al emitir. |
 | `apps/jobs-worker/src/handlers/pdf.handler.ts` + `templates/org-payment-received.ts` | Leer PDF de R2 por `receipt_pdf_key`, HTML corto + adjunto `FS-<n>.pdf`, loop por destinatarios con try/catch individual (patrón existente). |
 | `apps/console` (detalle suscripción/org + services) | Botón descargar (blob) + reenviar (toast + `updateTag('console:subs')` + `refresh()`). Extender `platform-subscriptions-service.ts` con `downloadReceipt(paymentId)` / `resendReceipt(paymentId)`. |
-| Docs | `AGENTS.md` (secuencia global `FS-N`, keys emisor, evento con `receiptNumber`), `docs/PENDING.md`, `plan.md` (marcar C1-C3). |
+| Docs | `AGENTS.md` (secuencia global `FS-N`, keys emisor, evento con `receiptNumber`), `vaults/backlog/fiscal.md`, `plan.md` (marcar C1-C3). |
 
 ## Criterios de aceptación
 

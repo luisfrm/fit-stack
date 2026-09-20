@@ -49,7 +49,7 @@ type RevenueRow = {
  * Service to handle financial operations: exchange rate fetching,
  * payment status mutations, and analytics/revenue aggregations.
  */
-/** Respuesta de `PATCH /payments/:id/status` (ver C6 en `docs/PAYMENT_STATUSES.md`). */
+/** Respuesta de `PATCH /payments/:id/status` (ver C6 en `vaults/business/PAYMENT_STATUSES.md`). */
 export interface PaymentStatusResult {
   receiptVoided: boolean;
   receiptVoidReason?: "not_issued";

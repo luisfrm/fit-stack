@@ -29,7 +29,8 @@
     "test:e2e:panel": "playwright test --project=panel",
     "test:e2e:console": "playwright test --project=console",
     "test:e2e:report": "playwright show-report",
-    "seed:e2e": "tsx e2e/seed.ts"
+    "seed:e2e": "tsx e2e/seed.ts",
+    "task:new": "node scripts/task-new.mjs"
   },
   "devDependencies": {
     "@neondatabase/serverless": "^1.0.2",

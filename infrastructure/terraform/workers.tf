@@ -106,7 +106,7 @@ resource "cloudflare_queue_consumer" "receipt" {
 }
 
 # Barrido cada 10 horas (pre-venta; bajar a `*/10 * * * *` con clientes reales
-# — ver docs/PENDING.md): `scheduled()` en jobs-worker re-encola renders pendientes.
+# — ver vaults/backlog/comprobantes.md): `scheduled()` en jobs-worker re-encola renders pendientes.
 resource "cloudflare_workers_cron_trigger" "jobs_sweep" {
   account_id  = var.cloudflare_account_id
   script_name = module.jobs_worker.name

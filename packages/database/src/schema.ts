@@ -291,7 +291,7 @@ export const platformDocumentSequence = pgTable('platform_document_sequence', {
   // (mismo significado que `organizationDocumentSequence.last_number`). El
   // nombre es cosmético; renombrarlo a `last_number` requiere migración y se
   // agrupará con la próxima migración que se genere por otro motivo
-  // (ver docs/PENDING.md §15).
+  // (ver vaults/backlog/comprobantes.md).
   nextNumber: integer('next_number').notNull().default(0),
 });
 

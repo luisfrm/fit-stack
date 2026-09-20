@@ -1,6 +1,6 @@
 # Correcciones del track Comprobantes — plan de ejecución
 
-> Derivado de la revisión de `[[plan]]`, `receipts/fase-*.md`, `[[FACTURATION]]`, `[[PENDING]]` y el código real (shared `documents/`, repos compartidos, paso 1, paso 2, PDF, rutas, UI, tests).
+> Derivado de la revisión de `[[plan]]`, `phases/fase-*.md`, `[[FACTURATION]]`, `[[PENDING]]` y el código real (shared `documents/`, repos compartidos, paso 1, paso 2, PDF, rutas, UI, tests).
 > Estado verificado al escribir este plan: `pnpm typecheck` ✅ 9/9 · `@workspace/shared` tests ✅ 244/244.
 > **No se implementa nada hasta aprobación explícita** (AGENTS.md §7). Las migraciones requieren aprobación aparte.
 >

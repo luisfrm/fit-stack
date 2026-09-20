@@ -4,12 +4,13 @@ agent: backend-expert
 ---
 
 Implement the following backend change in `apps/api-worker` following the layer conventions in `AGENTS.md`:
+
 - Route Handler (HTTP only) → Service (business logic) → Repository (Drizzle queries only)
 - Factory pattern: `createXRepository(db)` + `createXService(repo, ...deps)`. DB via `createDb(c.env.DATABASE_URL)`.
 - Middleware: `requireOrgPermission(module, action)` or `requirePlatformPermission()` — never manual auth boilerplate.
 - Multi-tenancy: filter every query by `organizationId` from `c.get('session')!.activeOrganizationId!`.
 - Validation: `zValidator('json', schema)` from `@hono/zod-validator`.
-- No `pgEnum` y no `.$type<...>()`: usa `text('col')` plano en Drizzle. Los valores permitidos los valida Zod en el route handler y el frontend; la DB los trata como texto puro.
+- No `pgEnum` and no `.$type<...>()`: use plain `text('col')` in Drizzle. Allowed values are validated by Zod in the route handler and the frontend; the DB treats them as plain text.
 - If a DB schema change is needed: present the migration plan before running `pnpm db:generate` / `pnpm db:migrate`.
 
 $ARGUMENTS
