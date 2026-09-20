@@ -9,6 +9,7 @@
 | ID          | Título                             | Estado  | PR  |
 | ----------- | ---------------------------------- | ------- | --- |
 | [[FS-0001]] | Payment receipts (Panel + Console) | ✅ done | —   |
+| [[FS-0002]] | Subscription integrity - compensacion y periodo servidor | draft | — |
 
 > El índice se actualiza al crear/cerrar una task.
 
