@@ -609,7 +609,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
      * corriente cuadre con el KPI.
      * Nota: si hay planes en distintas monedas, las sumas mezclan monedas
      * igual que `monthlyRevenueCents` — la normalización multi-moneda real
-     * es follow-up (ver `docs/FUTURE_IDEAS.md` §5).
+     * es follow-up (ver `vaults/guides/FUTURE_IDEAS.md` §5).
      */
     async getMonthlyRevenue(months: number): Promise<
       { month: string; totalCents: number; count: number }[]

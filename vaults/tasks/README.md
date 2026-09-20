@@ -1,41 +1,79 @@
-# Comprobantes Panel + Console — índice de tasks
+# Tasks — sistema de trabajo de Fit-Stack
 
-> Solo planificación: no se implementa código en estas tasks, solo MDs. Orden de ejecución y dependencias.
+> Esta carpeta es el **registro de requerimientos** del proyecto. Cada task es una carpeta autocontenida, se planifica con fases generadas por el LLM y se ejecuta en **un solo PR**.
 
-## Orden recomendado
+## Convención de nombres
 
-1. **Fase 0** (`receipts/fase-0-logica-pura-shared.md`) — lógica pura en `packages/shared/src/documents/`. Sin dependencias. Bloquea todo.
-2. **Fase 1** (`receipts/fase-1-db-secuencias-panel.md`) — `organization_document_sequence` + columnas en `payment`. Requiere Fase 0 (tipos/formato).
-3. **Fase 2** (`receipts/fase-2-emision-atomica-panel.md`) — cola `fit-receipt-events` (producer api-worker + consumer jobs-worker) + paso 1 número síncrono + paso 2 PDF (render en jobs-worker) + barrido en jobs-worker + endpoints. Requiere Fase 0 + 1.
-4. **Fase 3** (`receipts/fase-3-email-pdf-jobs-panel.md`) — 3A jobs-worker (adjunto desde R2) + 3B panel (dialog v2). Requiere Fase 2. 3A y 3B paralelizables entre sí.
-5. **Fase 4** (`receipts/fase-4-config-fiscal-panel.md`) — settings fiscales + impuestos híbridos en el form. Requiere Fase 0. Paralelizable con Fase 3.
-6. **Fase 5** (`receipts/fase-5-gaps-auditoria.md`) — reporte + `gaps[]` + auditoría. Requiere Fase 2.
-7. **Fase 6** (`receipts/fase-6-cierre-panel.md`) — tests, E2E, docs, verificación manual. Requiere 0-5.
-8. **C1** (`receipts/fase-c1-db-console.md`) — secuencia global + keys emisor FitStack. Requiere Fase 0. Config paralelizable con Fases 1-2.
-9. **C2** (`receipts/fase-c2-emision-console.md`) — emisión SaaS automática. Requiere C1 + Fase 2 (patrón).
-10. **C3** (`receipts/fase-c3-ui-console.md`) — descarga/reenvío console + cierre. Requiere C2 + Fase 3 (R2 en jobs).
+```
+FS-NNNN-slug-descriptivo/
+```
 
-## Mapa de módulos por capa
+- `FS` — prefijo del proyecto (Fit-Stack).
+- `NNNN` — 4 dígitos con ceros, **auto-incremental** (`FS-0001`, `FS-0002`, …). Igual que la serie de comprobantes: no se reutiliza ni se renumera.
+- `slug` — descripción corta en `kebab-case`.
 
-| Capa | Archivos que se tocan (total del proyecto) |
-|---|---|
-| `packages/shared` | `src/documents/` (nuevo: gate, fiscal-profile, tax-math, receipt-number, receipt-data, receipt-events, receipt-storage-keys, receipt-compose, receipt-gaps + `buildPlatformReceiptDataFromComposed`, C2), `src/index.ts`, `src/types.ts` (`IPlatformSubscriptionPayment` + campos comprobante opcionales, C3), `src/settings.ts` (keys emisor FitStack, C1), `tests/documents/` (+`platform-receipt-compose`, C2) |
-| `packages/database` | `src/schema.ts` (+ migraciones: Panel Fase 1 = `0012` (`0013` ajena al track); Console C1 = `0014` + C2 = `0015` columnas fiscales/notified/payer/void; C1/C5 = `0016` (`emitter_snapshot` + `issued_by`); unificación de estados = `0017` (default `processing` + normalización `pending→processing`, `invalid→voided`) ) |
-| `apps/api-worker` | `lib/schemas.ts`, `lib/r2.ts` (+put/get), `lib/route-handler.ts` (fallback fail-closed owner/admin, C3), `services/receipts.service.ts` (paso 1 + `getReceiptState` + `markReceiptVoided`, sin email/render), `services/platform-receipts.service.ts` (nuevo, C2: paso 1 SaaS + `$0` SKIP; C3: `getPlatformReceiptState` + `resendPlatformReceiptEmail`; ANULADO SaaS: `markPlatformReceiptVoided` + `by` fail-closed), `repositories/payments.repository.ts`, `repositories/platform-receipts.repository.ts` (nuevo, C1: secuencia global + attach idempotente), `repositories/organizations.repository.ts` (`listOwnerEmails`, C3), `services/subscriptions.service.ts`, `services/organizations.service.ts`, `services/reports.service.ts`, `services/platform-subscriptions.service.ts` (hooks C2: `opts` emisión + `paymentId` en retornos; ANULADO SaaS en VOIDED sin cancelar sub), `routes/payments.route.ts`, `routes/subscriptions.route.ts` (schema), `routes/organizations.route.ts` (PATCH profile + renew con payer, C2), `routes/reports.route.ts`, `routes/platform-organizations.route.ts` (schema), `routes/platform-subscriptions.route.ts` (emisión en 4 writes + `invoices:{orgId}`, C2; receipt/pdf/resend + DELETE `/:id` invalida invoices, C3), `index.ts` (producer `RECEIPT_QUEUE`; sin `queue()`), `tests/integration/platform-receipts-sequence.test.ts` (nuevo, C1), `tests/integration/platform-receipts-emission.test.ts` (nuevo, C2), `tests/integration/platform-receipts-contract.test.ts` (nuevo, C3), `tests/integration/platform-receipts-void.test.ts` (nuevo, ANULADO SaaS), `tests/helpers/db.ts` (truncate `platform_document_sequence`) |
-| `apps/jobs-worker` | `index.ts` (`queue()` ramificado por `batch.queue` + `scheduled()` del barrido + `Env`, `payerEmail?/payerName?` en `email.org_payment_received`, C2), `handlers/receipt.handler.ts` (nuevo: `handleReceiptRender` + `sweepPendingReceiptPdfs` + rama platform `handlePlatformReceiptRender` con año UTC, C2), `receipt-pdf.tsx` (nuevo: render lazy `@react-pdf/renderer`, ya dependencia), `handlers/pdf.handler.ts` (adjunto, Fase 3 + Rama A SaaS con `FS-N.pdf`, C2), `wrangler.jsonc` (producers; consumer/cron viven en Terraform) |
-| `packages/database` (repos compartidos) | `src/repositories/receipts.repository.ts` (excepción compartida: numeración atómica + `getReceiptComposedData` + `completeReceiptPdf` + `markReceiptNotified`) + `src/repositories/platform-receipts.repository.ts` (C2: mudado desde api-worker + composed/complete/notified/payer/void) |
-| `infrastructure/terraform` | `queues.tf` (cola + DLQ `fit-receipt-events{,-dlq}{env}`), `workers.tf` (producer api-worker; consumer jobs-worker + producer + cron), `main.tf` (nombres **derivados** del ambiente, sin variables de override), `variables.tf`/`outputs.tf`, `scripts/check-name-parity.mjs` (+ `pnpm check:infra-parity` en `ci.yml`) |
-| `apps/panel` | `components/payments/receipt-dialog.tsx`, `payment-detail-row.tsx`, `subscriptions-table.tsx`, `subscription-form.tsx`, `payment-section.tsx`, `tax-block.tsx` (nuevo, Fase 4), `lib/services/receipts-service.ts` (nuevo), `lib/services/org-profile-service.ts` (nuevo, Fase 4), `lib/services/emails-service.ts`, `lib/services/pdf-service.ts` (eliminado, Fase 3), `types/dashboard.ts`, `app/(protected)/settings/organization/page.tsx` (+sección fiscal, Fase 4), `app/(protected)/reports/receipts/` (página RSC + cliente, Fase 5), `app/(protected)/payments/page.tsx` (purga tag del reporte, Fase 5) |
-| `apps/console` | `app/(protected)/settings/` (+`emitter/page.tsx` UI Emisor FitStack, C1), `components/settings/emitter/emitter-settings.tsx` (nuevo, C1), `components/dashboard/settings-nav.tsx` (tab Emisor), `lib/config/platform-settings.ts` (keys `FITSTACK_*`), `lib/api/client.ts` (`apiBlob` con auth, C3), `lib/services/platform-subscriptions-service.ts` (C3: `downloadReceipt`/`resendReceipt`), `components/platform/platform-payment-history-modal.tsx` (C3: bloque Comprobante + Descargar/Reenviar), `e2e/console/settings.spec.ts` (2 tests Emisor: navegación + save/re-render/restore, C1), `e2e/console/receipts.spec.ts` (nuevo, C3) |
-| Docs | `AGENTS.md` (§1 excepción ×2 repos, route map +3 endpoints, evento payer opcional, sección Console), `[[PENDING]]`, `[[plan]]`, `e2e/panel/*`, `e2e/console/*` (+`receipts.spec.ts` + kind `platformSubscription`, C3) |
+Para crear una task nueva usa el script (asigna el siguiente número automáticamente):
 
-## Decisiones congeladas (de `[[plan]]`, no re-discutir por task)
+```bash
+pnpm task:new "Nombre de la task"
+```
 
-PDF fuente de verdad · R2 inmutable · paso 1 número síncrono (sentencia única) + paso 2 PDF en cola dedicada `fit-receipt-events` (DLQ; sin rollback, `pdf_key NULL` = pendiente) · **email encolado por el paso 2 tras confirmar el PDF** (job de email nunca corre sin PDF en numerados) · **entrega duplicada de cola = sin segundo PDF ni segundo email** (`UPDATE … WHERE receipt_pdf_key IS NULL` con `RETURNING` como gate) · **barrido cron en jobs-worker (pre-venta cada 10 h; 10 min con clientes reales)** (`número sin PDF` > 15 min → re-encola) cierra el hueco publicación↔fila y cubre Panel + Console · contrato `receipt` con 3 estados (ready / pending 202 / pre_system 200 `available:false`; nunca 409) · render en jobs-worker (repo+keys+evento en shared/database; `completeReceiptPdf` con `rowCount===1` como gate del email) · emisión automática al validar · impuestos híbridos con reason · reinicio anual · voided=ANULADO (único estado de anulación: `PAYMENT_STATUSES = processing \| validated \| voided \| refunded`, sin `pending`/`invalid`; rechazo/anulación se derivan con `getVoidKind`) · sin backfill · emitir≠enviar · `isFormalTaxpayer` con declaración explícita · UUID invisible · dos secuencias (global FitStack `FS-N` vs por-org `{slug}-año-n`) · keys `receipts/<org>/…` simétricas (sin prefijo `cms/`) · `featuresSnapshot` no impreso pero exportable · proxy de país Console como ítem PENDING.
+## Estructura de una task
 
-## Reglas de ejecución
+```
+vaults/tasks/FS-NNNN-slug/
+├── task.md          ← REQUERIMIENTO (humano): problema, criterios, alcance
+├── plan.md          ← PLAN DE EJECUCIÓN (LLM `planner`): fases, archivos, verificaciones
+└── phases/          ← detalle de implementación por fase (LLM)
+    ├── README.md    ← índice y orden de las fases
+    ├── phase-0.md
+    └── …
+```
 
-- `pnpm db:generate → review → migrate` con aprobación; prohibido `db:push`.
-- Timezone siempre de la org (`requireOrgTimezone`), nunca UTC del servidor.
-- Toasts vía `mutationError` + genérico, nunca crudo del API; post-mutación `updateTag` + `router.refresh()`.
-- Cada task cierra con `pnpm typecheck` (+ `lint`/`test`/`test:e2e` donde aplique).
+### Responsabilidades
+
+| Archivo       | Autor            | Contenido                                                                        |
+| ------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `task.md`     | Humano           | **Qué** y **por qué**. Problema, criterios de aceptación, alcance, dependencias. |
+| `plan.md`     | Agente `planner` | **Cómo**. Orden por capas, archivos a tocar, comando de verificación por fase.   |
+| `phases/*.md` | Agente `planner` | Detalle de implementación de cada fase.                                          |
+
+El requerimiento (`task.md`) **no** se reescribe cuando cambia la implementación: se actualiza el `plan.md`/fases. Si cambia el _qué_, se crea una task nueva o se anota la enmienda en `task.md`.
+
+## Frontmatter de `task.md`
+
+```yaml
+---
+id: FS-NNNN
+title: Título corto
+status: draft # draft | planning | in_progress | blocked | done | cancelled
+priority: medium # low | medium | high | critical
+created: YYYY-MM-DD
+depends_on: [] # [FS-0001, …]
+pr: null # URL del PR cuando exista
+---
+```
+
+## Flujo
+
+1. **Crear** — `pnpm task:new "<título>"` genera la carpeta con el `task.md` desde `_template/task.md`.
+2. **Requerir** — el humano completa `task.md` (problema, criterios, alcance).
+3. **Planificar** — el comando `/plan` (agente `planner`) escribe `plan.md` + `phases/`.
+4. **Implementar** — se ejecuta fase por fase en la rama `feat/FS-NNNN-slug`.
+5. **Cerrar** — 1 task = 1 PR. Al mergear, `status: done` y `pr:` apuntando al PR.
+
+### Reglas
+
+- **1 task = 1 PR.** Si un PR cubre varias tasks, documéntalo en cada `task.md` (campo `pr`).
+- Las dependencias entre tasks se declaran en `depends_on`; no se mergea una task con dependencias sin resolver.
+- Ramas: `feat/FS-NNNN-slug` (o `fix/`, `refactor/` según el tipo).
+- Los hallazgos sin dueño (bugs sueltos, deuda) van al [[backlog/README|backlog]], no abren una task por sí solos.
+- Cada `task.md` declara `aliases: ["FS-NNNN"]`, así que se enlaza por su ID: `[[FS-0001]]` (evita la colisión de muchos `task.md`).
+
+## Índice de tasks
+
+| ID          | Título                             | Estado  | PR  |
+| ----------- | ---------------------------------- | ------- | --- |
+| [[FS-0001]] | Payment receipts (Panel + Console) | ✅ done | —   |
+
+> El índice se actualiza al crear/cerrar una task.

@@ -1,9 +1,9 @@
 ---
-description: Review architecture against AGENTS.md and docs/ARCHITECTURE.md conventions
+description: Review architecture against AGENTS.md and vaults/architecture/ARCHITECTURE.md conventions
 agent: architect
 ---
 
-Review the architecture of the current changes (or the whole repo) against the conventions in `AGENTS.md` and `docs/ARCHITECTURE.md`.
+Review the architecture of the current changes (or the whole repo) against the conventions in `AGENTS.md` and `vaults/architecture/ARCHITECTURE.md`.
 
 Check: layer boundaries (Route Handler → Service → Repository), factory pattern (`createXRepository(db)` / `createXService(repo)`), multi-tenancy isolation (`organizationId` everywhere), middleware usage (`requireOrgPermission` / `requirePlatformPermission`), `@workspace/*` package boundaries, Upstash cache key conventions and invalidation strategy, and `FitTaskEvent` job contracts.
 
