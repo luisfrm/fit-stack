@@ -1,24 +1,30 @@
+import { isPublicStorageKey } from "@workspace/shared";
 import { api, type ApiFetchOptions } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
 export interface FileItem {
   key: string;
+  /** URL pública directa; `null` cuando el asset solo se entrega autenticado. */
+  url: string | null;
   size: number;
-  lastModified: string;
+  uploadedAt: string;
+  name: string;
 }
 
 /**
  * Service to handle file uploads, listing, and deletion with R2 storage.
+ *
+ * La organización la resuelve el API desde la sesión: este cliente NUNCA manda
+ * `organizationId` (pedir la carpeta de otro gimnasio es imposible desde aquí).
+ * Key resultante: `<orgId>/<folder>/<nombre>_<id>.<ext>`.
  */
 export const uploadService = {
   /**
    * Generates a presigned URL and uploads the file directly.
-   * Path format: [organizationId]/[folder]/[filename]_[shortId].[ext]
    */
   async uploadFile(
     file: File,
     customName?: string,
-    organizationId?: string,
     folder?: string,
   ): Promise<string> {
     const data = await api<{ presignedUrl: string; key: string }>(
@@ -28,7 +34,6 @@ export const uploadService = {
         body: {
           filename: file.name,
           customName: customName || undefined,
-          organizationId: organizationId || undefined,
           folder: folder || undefined,
           contentType: file.type,
         },
@@ -59,14 +64,25 @@ export const uploadService = {
     await api("/upload", { method: "DELETE", query: { key } });
   },
 
+  /**
+   * URL con la que la UI muestra un archivo.
+   *
+   * Público por diseño (`<orgId>/cms/…`, branding): URL directa de R2.
+   * Privado (avatares, logos, evidencia de pago): proxy autenticado del panel
+   * (`/api/media`), que reenvía la cookie al API — nunca una URL adivinable.
+   */
   getMediaUrl(key: string | null | undefined): string {
     if (!key) return "";
     if (key.startsWith("http")) return key;
 
-    const baseUrl = env.r2Url;
-    const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
     const cleanKey = key.startsWith("/") ? key.slice(1) : key;
 
-    return `${cleanBaseUrl}/${cleanKey}`;
+    if (isPublicStorageKey(cleanKey)) {
+      const baseUrl = env.r2Url;
+      const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+      return `${cleanBaseUrl}/${cleanKey}`;
+    }
+
+    return `/api/media?key=${encodeURIComponent(cleanKey)}`;
   },
 };
