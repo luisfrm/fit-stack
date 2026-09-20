@@ -8,7 +8,7 @@ $ARGUMENTS
 
 Steps:
 
-1. Check the index in `vaults/tasks/README.md`: if a task already covers this scope, **do not create another** (edit it or warn).
+1. Check the index in `vaults/tasks/README.md`: if a task not completed already covers this scope, **do not create another** (edit it or warn).
 2. Run `pnpm task:new "<short title>"` — it assigns the next `FS-NNNN` and creates `task.md` from `vaults/tasks/_template/task.md` (plus `phases/`).
 3. Complete `task.md`: problem, acceptance criteria, scope (table by layer) and `depends_on`. If key information is missing, **ask** before inventing it.
 4. Update the task index in `vaults/tasks/README.md`.
