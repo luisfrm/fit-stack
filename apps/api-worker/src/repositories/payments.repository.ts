@@ -13,6 +13,12 @@ export interface IPayment {
   /** Centavos enteros. */
   planSnapshotPrice: number;
   planSnapshotCurrency: string;
+  /**
+   * Duración del plan al momento del cobro (la que define el periodo).
+   * NULL en filas anteriores al snapshot: el cálculo cae al plan vivo.
+   */
+  planSnapshotDurationValue?: number | null;
+  planSnapshotDurationUnit?: string | null;
 
   /** Centavos enteros. */
   amountPaid: number;
@@ -89,6 +95,8 @@ export function createPaymentsRepository(db: Db) {
           planSnapshotName: data.planSnapshotName,
           planSnapshotPrice: data.planSnapshotPrice,
           planSnapshotCurrency: data.planSnapshotCurrency,
+          planSnapshotDurationValue: data.planSnapshotDurationValue ?? null,
+          planSnapshotDurationUnit: data.planSnapshotDurationUnit ?? null,
           amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied?.toString() ?? null,
