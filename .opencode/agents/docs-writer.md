@@ -23,7 +23,7 @@ You are a technical writer maintaining **Fit-Stack** documentation. Docs live in
 - `vaults/ai/` — `CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md` (+ `archive/CHAT_IMPLEMENTATION.MD`, deprecated).
 - `vaults/guides/` — `FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md` + `how/` (RAG knowledge base, end-user tone).
 - `vaults/backlog/` — pending work split by topic; the index is `vaults/backlog/README.md` (alias `PENDING`).
-- `vaults/tasks/` — tasks (`FS-NNNN-slug/`) with `task.md` + `plan.md` + `phases/`. Guide in `vaults/tasks/README.md`.
+- `vaults/tasks/` — tasks (`FS-NNNN-slug/`) with `task.md` + `plan.md` + `phases/`. Guide in `vaults/guides/task-system.md`.
 - `AGENTS.md` (root) — monorepo rules and conventions. Only touched when a real convention changes.
 
 ## Rules

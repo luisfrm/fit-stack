@@ -39,8 +39,8 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 - **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs** (`vaults/`, Obsidian vault): `architecture/` (`ARCHITECTURE.md`, `INFRASTRUCTURE.md`, `terraform.md`), `business/` (receipt model, payment statuses, RBAC, timezone, fiscal), `ai/` (`CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`; `archive/CHAT_IMPLEMENTATION.MD` deprecated), `guides/` (`FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md` + `how/` — AI Knowledge Base), `backlog/` (pending items by topic; index `README.md`, alias `PENDING`), `tasks/` (`FS-NNNN-slug/` with `task.md` + `plan.md` + `phases/`; guide in `README.md`).
-- **Tasks**: `vaults/tasks/FS-NNNN-slug/` — **1 task = 1 PR** (branch `feat/FS-NNNN-slug`). Create with `pnpm task:new "<title>"`; the `planner` agent generates `plan.md` + `phases/`. Link by ID (`[[FS-0001]]`). Unassigned pending items → `vaults/backlog/`.
+- **Docs** (`vaults/`, Obsidian vault): `architecture/` (`ARCHITECTURE.md`, `INFRASTRUCTURE.md`, `terraform.md`), `business/` (receipt model, payment statuses, RBAC, timezone, fiscal), `ai/` (`CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`; `archive/CHAT_IMPLEMENTATION.MD` deprecated), `guides/` (`FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md`, `task-system.md` + `how/` — AI Knowledge Base), `backlog/` (pending items by topic; index `README.md`, alias `PENDING`), `tasks/` (`FS-NNNN-slug/` with `task.md` + `plan.md` + `phases/`; index in `README.md`).
+- **Tasks**: `vaults/tasks/FS-NNNN-slug/` — **1 task = 1 PR** (branch `feat/FS-NNNN-slug`). Create with `pnpm task:new "<title>"`; the `planner` agent generates `plan.md` + `phases/`. Link by ID (`[[FS-0001]]`). Guide: `vaults/guides/task-system.md`. Unassigned pending items → `vaults/backlog/`.
 - **Architecture Spec**: For detailed design decisions, see [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
@@ -1161,7 +1161,8 @@ Use skill tool for specialized tasks:
 - `playwright.config.ts` — E2E config: projects, setup deps, webServers
 - `e2e/panel-setup.ts` / `e2e/console-setup.ts` — E2E auth setup (storageState)
 - `vaults/architecture/ARCHITECTURE.md` — architecture spec (design decisions)
-- `vaults/tasks/README.md` — guide to the task system (`FS-NNNN-slug/`)
+- `vaults/guides/task-system.md` — guide to the task system (`FS-NNNN-slug/`)
+- `vaults/tasks/README.md` — index of tasks
 - `vaults/backlog/README.md` — index of the pending-item backlog (alias `PENDING`)
 - `scripts/task-new.mjs` — `pnpm task:new "<title>"` creates the next task
 

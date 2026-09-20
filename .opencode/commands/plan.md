@@ -9,7 +9,7 @@ $ARGUMENTS
 
 Flow:
 
-1. **Locate or create the task.** If the requirement maps to an existing task (`vaults/tasks/FS-NNNN-slug/`), work on its `task.md`. If it is a new scope, create it with `pnpm task:new "<title>"` (see `vaults/tasks/README.md`).
+1. **Locate or create the task.** If the requirement maps to an existing task (`vaults/tasks/FS-NNNN-slug/`), work on its `task.md`. If it is a new scope, create it with `pnpm task:new "<title>"` (guide: `vaults/guides/task-system.md`).
 2. **Write `plan.md`** in the task folder, ordered by dependency layers:
    1. DB schema (Drizzle) → `pnpm db:generate` → review → `pnpm db:migrate`
    2. Backend: repository → service → router → types in `@workspace/shared`

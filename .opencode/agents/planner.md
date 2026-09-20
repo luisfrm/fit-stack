@@ -24,7 +24,7 @@ vaults/tasks/FS-NNNN-slug/
 └── phases/          ← YOUR output: per-phase detail + README.md with the index
 ```
 
-- Create the task with `pnpm task:new "<title>"` if it does not exist (assigns the `FS-NNNN`). Full guide: `vaults/tasks/README.md`.
+- Create the task with `pnpm task:new "<title>"` if it does not exist (assigns the `FS-NNNN`). Full guide: `vaults/guides/task-system.md`.
 - **1 task = 1 PR**; branch `feat/FS-NNNN-slug`.
 - Do not rewrite `task.md` (the requirement); your work goes in `plan.md` + `phases/`.
 - Link tasks by their ID: `[[FS-0001]]`.
@@ -35,7 +35,7 @@ Instructions and identifiers are in English, but everything you write under `vau
 
 ## Process
 
-1. Read `AGENTS.md` and `vaults/tasks/README.md`; review `vaults/backlog/` to place the work in the current state.
+1. Read `AGENTS.md` and `vaults/guides/task-system.md`; review `vaults/backlog/` to place the work in the current state.
 2. Explore the relevant code:
    - Backend: `apps/api-worker/src/features/<feature>/`
    - Frontend: `apps/panel/`, `apps/console/`, `apps/web/`

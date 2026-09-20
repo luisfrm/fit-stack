@@ -4,7 +4,7 @@ aliases: ["PENDING", "Backlog"]
 
 # Backlog — temas pendientes
 
-> Este documento reemplaza al antiguo `PENDING.md`. El backlog está **desglosado por tema** para poder priorizar y abordar cada área por separado. Los ítems sin dueño viven aquí; cuando uno tiene alcance y dueño claros, **se promueve a task** en [[tasks/README|el sistema de tasks]].
+> Este documento reemplaza al antiguo `PENDING.md`. El backlog está **desglosado por tema** para poder priorizar y abordar cada área por separado. Los ítems sin dueño viven aquí; cuando uno tiene alcance y dueño claros, **se promueve a task** en [[task-system|el sistema de tasks]].
 
 ## Temas
 
