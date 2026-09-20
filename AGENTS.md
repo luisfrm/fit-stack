@@ -8,7 +8,7 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
-pnpm test         # Full test suite (shared → api-worker → panel → console, Vitest)
+pnpm test         # Full test suite (shared → api-worker → jobs-worker → panel → console, Vitest)
 pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
 pnpm seed:e2e       # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
 pnpm format       # Format code (Prettier)
@@ -20,7 +20,6 @@ pnpm db:push      # Push schema (LOCAL ONLY — never on shared branches)
 pnpm db:pull      # Pull schema (LOCAL ONLY)
 pnpm db:check     # Verify schema consistency
 pnpm db:studio    # Open Drizzle Studio
-pnpm db:seed      # Seed demo data (tsx src/seed.ts)
 
 # Individual apps
 cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active) — port 8788
@@ -165,6 +164,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 - **Naming**: Table names are **singular** (`user`, `organization`). Repositories and Services are **plural** (`users.service.ts`).
 - **No `pgEnum`**: Use plain `text('col')` — no `.$type<...>()` annotation. The DB treats these columns as plain strings. Allowed values are validated exclusively by Zod schemas on the backend and by the frontend; they never live in the DB layer. pgEnum is strictly forbidden (breaks Drizzle migrations).
 - **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
+- **Sin transacciones interactivas (serverless)**: `api-worker` corre en Cloudflare Workers con el driver **HTTP** de Neon, donde `db.transaction()` interactivo **no existe**. La atomicidad se consigue por **sentencia única** (patrón canónico: el correlativo de comprobantes, `INSERT … ON CONFLICT DO UPDATE … RETURNING`) o por **compensación explícita** en el `catch` del service. Nunca envolver varias escrituras en una transacción ni asumir rollback automático.
 
 ### 4. Next.js Patterns & Best Practices
 
@@ -253,18 +253,19 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/settings`      | Gym settings (currencies, payment methods, theme)                                                                                                                                                                                                                                                                                                                                    |
 | `/api/reports`       | `GET /revenue` (multi-currency, cache 1h) · `GET /receipts` (auditoría del correlativo: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit`, cache 5 min) |
 | `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) · `PATCH /profile` (identidad de sede —name/slug/logo/slogan/timezone/currencyFormat— + identidad emisora + `fiscalConfig` merge, `countryCode`/`primaryCurrency` immutable, invalidates `org:{id}:profile`) |
-| `/api/upload`        | `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` (R2)                                                                                                                                                                                                                                                                                                                    |
+| `/api/upload`        | Uploads del **panel** (org de la SESIÓN): `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` con `requireOrgPermission(MEMBERS, CREATE)` + `GET /file?key=` (entrega autenticada de assets privados, `MEMBERS.READ`). Keys `<orgId>/<folder>/…`; `organizationId` **no existe** en el contrato |
 | `/api/ai`            | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
 
 > **AI Chat**: the provider is inferred from the model id (`getAiProvider` in `@workspace/shared`). Fixed OpenRouter model chain (`OPENROUTER_TEXT_MODEL_CHAIN`) with fallback to GLM in Workers AI. The first SSE event is `{"model": ...}` with the concrete model that responded. `OPENROUTER_API_KEY` optional; if missing and an OpenRouter model is requested → 503. 1 credit = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), limits `AI_CHAT_LIMITS`, monthly cycle per subscription, RAG with embeddings `@cf/baai/bge-m3` (see `docs/CHAT_PRICING.md` / `CHAT_INFRASTRUCTURE.md`). |
 > | `/api/init` | Org bootstrap (no auth) |
-> | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min), `GET /files/*` (R2) — no auth |
+> | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min) · `GET /files/*` (R2) — no auth, **allowlist**: solo `<orgId>/cms/…` y `platform/branding/…`; el resto 404 |
 > | `/api/platform/plans` | SaaS plan catalog (console) |
 > | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /receipts` (auditoría del correlativo `FS-N`: filas + resumen + totales por moneda + `gaps[]`, filtros `from/to/status/method/year/page/limit` en UTC, cache 5 min, `subscription:list` — support reads) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
 > | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (disponibilidad en vivo, 409 `{ code: 'SLUG_TAKEN' }` si está en uso) + `GET /by-slug/:slug` (detalle por slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (AI quota del ciclo, cache 5 min, invalidada en grant) + `GET /:id/gym-overview` (adopción gym + portal seats, cache 5 min, staleness aceptada: writes del gym no invalidan claves platform) |
 > | `/api/platform/settings` | Platform global settings |
 > | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
-> | `/api/platform/upload` | Org-less platform assets (branding: `platform/...`) — `POST /presigned`, `PUT /direct`, `GET /` (list), `DELETE /` — auth `requirePlatformAuth`, fixed scope `platform/` |
+> | `/api/platform/upload` | Assets de plataforma SIN organización — `POST /presigned`, `PUT /direct`, `GET /` (list), `GET /file`, `DELETE /` — auth `requirePlatformAuth`, **scope fijo `platform/branding/`** (único prefijo de plataforma público) |
+> | `/api/platform/organizations/:id/upload` | Assets de UNA organización desde el console: la org va por **path** (nunca body/query) + `assertOrganizationExists` — `POST /presigned`, `PUT /direct`, `GET /` (list), `GET /file`, `DELETE /`; keys `<orgId>/…`, `requirePlatformAuth` |
 > | `/api/platform/features` | Feature catalog (`GET /`, cache `platform:features`) |
 > | `/api/platform/knowledge` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings, no Redis cache) — `GET /:id/content` (content only, no chunks, for editing without transferring embeddings) |
 > | `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
@@ -320,6 +321,25 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 - **Golden rule**: ALL money travels and stores as **integer cents** — DB (`bigint`), API contracts (`z.number().int()`), services, tests, seeds, E2E fixtures. `exchangeRateApplied` is a rate, not money — it stays `numeric(10,4)`.
 - **Display**: ONLY via `formatCents(cents, currency, format)` from `@workspace/shared` (single source; `ValueConverter` lives there too). Inline `/ 100` for money display is PROHIBITED.
 - **Unit inputs** (forms editing "50.00"): convert at the boundary with `centsToUnits` / `unitsToCents` from `@workspace/shared`. Fiscal math (`tax-math`, `receipt-data`) operates in integer cents and rounds with `roundCents` — the only place that rounds money.
+
+---
+
+## Storage de Archivos (R2)
+
+Bucket único (`FILES_BUCKET`) con **taxonomía por prefijo**: el primer segmento de la key es la organización.
+
+| Key | Escribe | Lectura |
+| --- | --- | --- |
+| `<orgId>/cms/…` | panel (CMS) | **pública** (`/api/public/files/*`): es el sitio |
+| `<orgId>/<folder>/…` (`general`, `members`, `staff`, `trainers`, `receipts`…) | panel / console | **privada**: `/api/upload/file` (panel) · `/api/platform/organizations/:orgId/upload/file` (console) |
+| `platform/branding/…` | console | **pública** (login y correos, sin sesión) |
+| `receipts/<org>/<año>/<n>.pdf` · `platform/receipts/<año>/FS-<n>.pdf` | solo el renderer (`putFile`) | rutas autenticadas de comprobantes |
+
+- **Regla de oro**: toda key org-scoped empieza por `<orgId>/` y toda escritura/borrado valida ese prefijo contra la organización **resuelta en el servidor** (sesión en el panel, path en el console). El cliente nunca elige la organización de la carpeta.
+- **Folder saneado**: `safeFolderSegment` (`slugify`) neutraliza `../` y separadores, y la extensión se limpia (`getFileExtension`). Ninguna carpeta del cliente puede escapar del scope.
+- **Público por diseño** = `isPublicStorageKey` (`@workspace/shared`, consumido por el route público y por el `getMediaUrl` de panel/console). Sin excepciones inventadas: si un asset debe verse en el sitio público, va en `cms`.
+- **Assets privados en la UI**: `getMediaUrl` devuelve la URL pública para keys públicas y `/api/media?key=…` para las privadas (proxy Next autenticado que reenvía la cookie al API). Nunca una URL de R2 adivinable desde el navegador.
+- **Inmutabilidad estructural**: los comprobantes emitidos viven en un namespace que ninguna ruta de upload alcanza, y el branding SaaS (`platform/receipts/…`) no es alcanzable desde `/api/platform/upload` (scope fijo `platform/branding/`).
 
 ---
 
@@ -663,7 +683,7 @@ if (orgRole && !canAccessCms()) redirect("/unauthorized");
 2. **Session-based authorization** — Use `session.member.role` from Better Auth
 3. **Organization scoping** — All queries MUST filter by `organizationId`
 4. **No platform admin bypass in CMS** — Platform roles are for SaaS platform management only
-5. **Platform user upload bypass** — Users with platform roles `admin`, `owner`, or `support` can upload files to any organization without requiring org membership (`POST /api/upload/presigned`). Non-platform users still require org membership + upload permission (`MEMBERS.CREATE` or `CONTENT.CREATE`).
+5. **Uploads: dos rutas, una sola autoridad por caso** — El panel sube por `/api/upload/*` con la org de **su propia sesión** (`requireOrgPermission(MEMBERS, CREATE)`): `organizationId` no existe en el contrato, así que ningún miembro puede escribir en la carpeta de otro gimnasio. El console (que NO tiene org activa) sube por `/api/platform/organizations/:orgId/upload/*` con la org por **path** y `requirePlatformAuth` (admin/owner; `support` → 403) o por `/api/platform/upload/*` para branding. Toda key escrita/borrada debe empezar por `<orgId>/` (o `platform/branding/`); la lectura pública vive en `/api/public/files/*` y solo sirve `<orgId>/cms/…` y `platform/branding/…`.
 
 ---
 
@@ -751,7 +771,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ---
 
-## Database Schema (30 tables)
+## Database Schema (33 tables)
 
 ### Better Auth Core
 
@@ -947,7 +967,7 @@ Fit-Stack has **3 test layers**.
 Runs the Vitest suite across all packages/apps:
 
 ```bash
-pnpm test  # shared → api-worker → panel → console (Vitest)
+pnpm test  # shared → api-worker → jobs-worker → panel → console (Vitest)
 ```
 
 **What it includes:**

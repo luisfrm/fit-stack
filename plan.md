@@ -69,7 +69,7 @@ Console (C1–C3) arranca en paralelo desde Fase 0 en su parte de configuración
 - E2E Console cubre aprobar → número + reenvío pending (sin consumer no hay PDF real); descarga de bytes y adjunto idéntico se verifican en integración + manual.
 
 **Infraestructura y storage**
-- Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con `cms/<org>/receipts/` (capturas de pago, distinto propósito).
+- Storage keys simétricas y sin el prefijo confuso `cms/`: `receipts/<org>/<año>/<n>.pdf` (Panel) y `platform/receipts/<año>/FS-<n>.pdf` (Console). No colisiona con las capturas de pago del gym (prefijo distinto: `<orgId>/receipts/…`).
 - Infra de cola/cron se gestiona por Terraform + GitHub Actions (`infrastructure/terraform/queues.tf`, `workers.tf`), nunca con `wrangler` manual.
 - Migraciones de DB: flujo estricto `generate → review → migrate`; **prohibido `db:push`** en ramas compartidas.
 

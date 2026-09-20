@@ -155,10 +155,12 @@ apps/api-worker/
 | POST | `/api/settings` | `settings.update` | Upsert de settings |
 | GET | `/api/reports/revenue` | `reports.read` | Reporte de ingresos con normalización multi-moneda |
 | GET | `/api/organizations/subscription-status` | `requireAuth` | Estado de suscripción SaaS de la org (`active`, `past_due`, `read_only`, `suspended`, `cancelled`) |
-| GET | `/api/upload?folder=&organizationId=` | `requireAuth` | Lista archivos del org en R2 |
-| DELETE | `/api/upload?key=cms/orgId/...` | `requireAuth` | Elimina archivo (valida que el key pertenezca al org) |
-| PUT | `/api/upload/direct?key=...` | `requireAuth` | Upload directo del body al bucket |
-| POST | `/api/upload/presigned` | `requireAuth` | Genera presigned URL (`{ presignedUrl, key }`) |
+| GET | `/api/upload?folder=` | `members.create` | Lista archivos de la org de la **sesión** en R2 (superficie de gestión) |
+| GET | `/api/upload/file?key=<orgId>/...` | `members.read` | Entrega autenticada de un asset privado |
+| DELETE | `/api/upload?key=<orgId>/...` | `members.create` | Elimina archivo (exige prefijo `<orgId>/`) |
+| PUT | `/api/upload/direct?key=<orgId>/...` | `members.create` | Upload directo del body al bucket (exige prefijo `<orgId>/`) |
+| POST | `/api/upload/presigned` | `members.create` | Genera presigned URL (`{ presignedUrl, key }`) — key `<orgId>/<folder>/…` |
+| GET | `/api/public/files/*` | — (público) | Solo `<orgId>/cms/…` y `platform/branding/…`; el resto 404 |
 
 ### Rutas plataforma (SaaS admin — `requirePlatformAuth`, roles globales `admin`/`owner`)
 
@@ -192,6 +194,8 @@ apps/api-worker/
 | GET | `/api/platform/organizations/:id/staff` | Staff de la org (excluye `member`) |
 | POST | `/api/platform/organizations/:id/staff` | Provisiona staff/owner (crea gym_member + auth_member) |
 | POST | `/api/platform/organizations/:id/join` | Une al admin a la org como owner |
+| GET/POST/PUT/DELETE | `/api/platform/organizations/:id/upload[/presigned\|/direct\|/file]` | Assets de esa organización (la org va por **path**, no por body/query) |
+| GET/POST/PUT/DELETE | `/api/platform/upload[/presigned\|/direct\|/file]` | Branding de la plataforma (scope fijo `platform/branding/`) |
 | POST | `/api/platform/organizations/:id/staff/:memberId/resend-invite` | Reenvía invitación de staff |
 | GET | `/api/platform/settings` | Settings globales de plataforma |
 | POST | `/api/platform/settings` | Actualiza settings globales |

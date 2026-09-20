@@ -214,24 +214,22 @@ Existen dos niveles de acceso:
   ```
 * **Uso de Constantes**: Se prohíbe escribir *magic strings* arbitrarias. Todas las consultas de permisos consumen `PERMISSION_MODULES` y `PERMISSION_ACTIONS`.
 
-### 5.3. Autorización de Subida de Archivos (Upload Bypass)
+### 5.3. Autorización de Subida de Archivos (dos rutas, una autoridad por caso)
 
-La ruta `POST /api/upload/presigned` aplica una lógica de autorización dual:
+No existe un "upload bypass": cada superficie tiene su propia ruta y la organización **la resuelve el servidor**, nunca el cliente. El helper legacy `authorizeUpload` (un stub que solo comprobaba `Boolean(session && organizationId)`) fue **eliminado** de `apps/api-worker`.
 
-```ts
-const platformRole = (user as any)?.role;
-const isPlatformUser = platformRole && ['owner', 'admin', 'support'].includes(platformRole);
-const isOrgUser = Boolean((session as any).member && authorizeUpload(session, orgId));
+| Superficie | Ruta | Organización | Auth |
+| --- | --- | --- | --- |
+| Panel (gym) | `/api/upload/*` | **sesión** (`c.get('orgId')`) | `requireOrgPermission(MEMBERS, CREATE)` |
+| Console (org) | `/api/platform/organizations/:orgId/upload/*` | **path** (`:orgId` + org existente) | `requirePlatformAuth` (admin/owner; `support` → 403) |
+| Console (branding) | `/api/platform/upload/*` | sin org (scope fijo) | `requirePlatformAuth` |
+| Sitio público | `/api/public/files/*` | — | sin auth, **allowlist** |
 
-if (!isPlatformUser && !isOrgUser) {
-  return c.json({ error: 'Forbidden' }, 403);
-}
-```
-
-**Regla**:
-- **Usuarios de plataforma** (`admin`, `owner`, `support` global roles) pueden subir archivos a **cualquier organización** sin requerir membresía orgánica.
-- **Usuarios de organización** deben tener membresía en la org destino **y** pasar `authorizeUpload` (permiso `MEMBERS.CREATE` o `CONTENT.CREATE`).
-- Esto permite que super-admins suban logos, imágenes CMS, etc., a organizaciones sin necesidad de ser agregados como miembros de cada una.
+**Reglas**:
+- En el panel, `organizationId` **no existe** en el contrato: pedir la carpeta de otro gimnasio es imposible (un cliente viejo que lo envíe recibe 400).
+- El console **no tiene organización activa**, así que la org destino de un asset de gimnasio viaja por path y se valida contra la DB; el branding vive en su propio scope (`platform/branding`, el único prefijo de plataforma público).
+- Toda escritura/borrado exige que la key empiece por `<orgId>/` (o `platform/branding/`), lo que hace **estructuralmente inalcanzables** los comprobantes (`receipts/<org>/…`, `platform/receipts/…`).
+- Los assets fuera de `<orgId>/cms/…` y `platform/branding/…` se sirven solo por `/api/upload/file` y su gemelo de plataforma; el `getMediaUrl` de panel/console usa el proxy `/api/media` para ellos.
 
 ---
 
