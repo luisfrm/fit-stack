@@ -204,10 +204,3 @@ export const requireFeature = (featureId: FeatureId) =>
     c.set('orgFeatures', orgFeatures);
     await next();
   });
-
-/**
- * Helper to check upload permission (MEMBERS CREATE or CONTENT CREATE).
- */
-export function authorizeUpload(session: any, organizationId: string): boolean {
-  return Boolean(session && organizationId);
-}

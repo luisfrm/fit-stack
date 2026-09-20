@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
@@ -17,9 +17,11 @@ import { createFeaturesService } from '../services/features.service';
 import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
+import { createR2Service } from '../lib/r2';
+import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
 import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
-import { DEFAULT_ORG_STAFF_VALUES } from '@workspace/shared';
+import { DEFAULT_ORG_STAFF_VALUES, isOrgStorageKey } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const createOrgSchema = z.object({
@@ -38,6 +40,25 @@ const createOrgSchema = z.object({
   metadata: z.record(z.string(), z.any()).nullable().optional(),
   settings: z.record(z.string(), z.string()).optional(),
 });
+
+const uploadPresignedSchema = z
+  .object({
+    filename: z.string().min(1),
+    contentType: z.string().min(1),
+    folder: z.string().optional(),
+    customName: z.string().optional(),
+  })
+  .strict();
+
+/** La org destino de un upload de plataforma siempre se valida contra la DB. */
+async function assertOrganizationExists(c: Context<AppEnv>, orgId: string): Promise<void> {
+  const repo = createOrganizationsRepository(c.get('db'));
+  const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+  const org = await service.findOrganizationById(orgId);
+  if (!org) {
+    throw new HTTPException(404, { message: 'Organización no encontrada' });
+  }
+}
 
 const provisionOwnerSchema = z.object({
   firstName: z.string().min(1, 'El nombre es requerido'),
@@ -433,4 +454,104 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       message: 'Invitación reenviada exitosamente',
       ...result,
     });
-  });
+  })
+
+  // ---------------------------------------------------------------------------
+  // Assets DE LA ORGANIZACIÓN desde el console.
+  //
+  // El console no tiene organización activa en la sesión: la org destino viaja
+  // por PATH (`:id`), nunca por body/query, y cada request valida que exista +
+  // que la key caiga dentro de `<orgId>/`. Mismo contrato de keys que el panel.
+  // ---------------------------------------------------------------------------
+
+  // GET /api/platform/organizations/:id/upload?folder=
+  .get('/:id/upload', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    await assertOrganizationExists(c, orgId);
+
+    const folder = c.req.query('folder');
+    const r2Service = createR2Service(c.env);
+    return c.json(await r2Service.listFiles(orgStorageListPrefix(orgId, folder)));
+  })
+
+  // GET /api/platform/organizations/:id/upload/file?key=<orgId>/… — entrega
+  // autenticada para el console (logo de org, evidencia de pago).
+  .get('/:id/upload/file', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    const key = c.req.query('key');
+
+    await assertOrganizationExists(c, orgId);
+    if (!key) return c.json({ error: 'Key is required' }, 400);
+    if (!isOrgStorageKey(orgId, key)) {
+      return c.json({ error: 'Forbidden: No tienes permiso para ver este archivo.' }, 403);
+    }
+
+    const file = await createR2Service(c.env).getFile(key);
+    if (!file) return c.json({ error: 'Archivo no encontrado' }, 404);
+
+    return new Response(file.bytes, {
+      headers: {
+        'content-type': file.contentType,
+        'cache-control': 'private, max-age=300',
+      },
+    });
+  })
+
+  // DELETE /api/platform/organizations/:id/upload?key=<orgId>/…
+  .delete('/:id/upload', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    const key = c.req.query('key');
+
+    await assertOrganizationExists(c, orgId);
+    if (!key) return c.json({ error: 'Key is required' }, 400);
+    if (!isOrgStorageKey(orgId, key)) {
+      return c.json({ error: 'Forbidden: No tienes permiso para borrar este archivo.' }, 403);
+    }
+
+    await createR2Service(c.env).deleteFile(key);
+    return c.json({ success: true });
+  })
+
+  // PUT /api/platform/organizations/:id/upload/direct?key=<orgId>/…
+  .put('/:id/upload/direct', requirePlatformAuth(), async (c) => {
+    const orgId = c.req.param('id');
+    const key = c.req.query('key');
+
+    await assertOrganizationExists(c, orgId);
+    if (!key) return c.json({ error: 'Key is required' }, 400);
+    if (!isOrgStorageKey(orgId, key)) {
+      return c.json({ error: 'Forbidden: No tienes permiso para subir este archivo.' }, 403);
+    }
+    if (!c.env.FILES_BUCKET) {
+      return c.json({ error: 'FILES_BUCKET binding is missing' }, 500);
+    }
+
+    const contentType = c.req.header('content-type') || 'application/octet-stream';
+    const body = await c.req.arrayBuffer();
+
+    await c.env.FILES_BUCKET.put(key, body, {
+      httpMetadata: { contentType },
+    });
+
+    return c.json({ success: true, key });
+  })
+
+  // POST /api/platform/organizations/:id/upload/presigned
+  .post(
+    '/:id/upload/presigned',
+    requirePlatformAuth(),
+    zValidator('json', uploadPresignedSchema),
+    async (c) => {
+      const orgId = c.req.param('id');
+      await assertOrganizationExists(c, orgId);
+
+      const body = c.req.valid('json');
+      const uniqueKey = constructStorageKey(orgId, body.folder, body.filename, body.customName);
+      const r2Service = createR2Service(c.env);
+      const requestUrl = new URL(c.req.url);
+      const uploadBaseUrl = `${requestUrl.protocol}//${requestUrl.host}/api/platform/organizations/${orgId}/upload`;
+      const result = await r2Service.getUploadUrl(uniqueKey, uploadBaseUrl);
+
+      return c.json(result);
+    },
+  );

@@ -3,6 +3,7 @@ import { createContentPagesRepository } from '../repositories/content-pages.repo
 import { createContentBlocksRepository } from '../repositories/content-blocks.repository';
 import { createContentBlocksService } from '../services/content-blocks.service';
 import { createCache } from '../lib/cache';
+import { isPublicStorageKey } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 export const publicRoutes = new Hono<AppEnv>()
@@ -29,11 +30,19 @@ export const publicRoutes = new Hono<AppEnv>()
     return c.json(pageData);
   })
 
-  // GET /api/public/files/*
+  // GET /api/public/files/* — SOLO lo público por diseño.
+  //
+  // Allowlist: assets del sitio (`<orgId>/cms/…`) y branding de la plataforma.
+  // Todo lo demás (avatares, logos de org, evidencia de pago, comprobantes
+  // `receipts/**` y `platform/receipts/**`) responde 404 — no se revela siquiera
+  // que el objeto exista — y se entrega por las rutas autenticadas.
   .get('/files/*', async (c) => {
-    const key = c.req.path.replace('/api/public/files/', '');
+    const key = decodeURIComponent(c.req.path.replace('/api/public/files/', ''));
     if (!c.env.FILES_BUCKET) {
       return c.text('FILES_BUCKET binding is missing', 500);
+    }
+    if (!isPublicStorageKey(key)) {
+      return c.text('File not found', 404);
     }
     const object = await c.env.FILES_BUCKET.get(key);
     if (!object) {
