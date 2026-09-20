@@ -23,6 +23,8 @@
 
 ## 4. Comprobantes — gating fiscal (C2): tasa del IGTF y emisor plataforma
 
+> Base C2 (código) implementada en [[FS-0001]]: `FiscalConfigSchema`, impuestos nacidos apagados, `gross_first`, `TAXES_REQUIRE_FORMAL_TAXPAYER` / `TAX_REQUIRES_CONFIRMATION`, UI de declaración en el Panel. Abajo solo queda la acción humana.
+
 - [ ] **Confirmar tasa y base del IGTF con un contador antes de encenderlo en un gym real.**
   - El IGTF nace **apagado** y **nunca automático**: activarlo exige declarar el negocio como contribuyente formal + marcar la confirmación de tasa + indicar la tasa a mano (`fiscalConfig.confirmedTaxes`). El `3%` de `COUNTRIES.VE.conditionalTaxes` es **referencia documentada**, no valor efectivo: la tasa varía por decreto ([[FACTURATION]] §6).
   - Base implementada: `basis: 'gross_first'` — el IGTF se **extrae primero** del monto cobrado y el resto se descompone tax-inclusive con el IVA (cambia la base del IVA; el UI lo advierte). Verificar con el contador que la base legal es el monto pagado en divisa.

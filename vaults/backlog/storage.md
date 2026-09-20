@@ -5,6 +5,8 @@
 
 La taxonomía pasó de `cms/<orgId>/…` a **`<orgId>/<folder>/…`** con corte limpio (sin compatibilidad).
 
+> Taxonomía y corte limpio implementados y testeados en [[FS-0003]]. Abajo solo quedan los operativos (re-subida / migración física).
+
 ## 1. Re-subida de assets existentes
 
 - [ ] **Re-subir assets existentes**: las filas que guardan keys viejas (`gym_member.imageUrl`, `organization.logo`, JSON de bloques CMS, `paymentMethodDetails` con archivos) apuntan a keys que el route público ya no sirve → se ven rotas hasta re-subirlas. En la org de demo: `pnpm seed:e2e` (o re-subir a mano desde el panel/console).

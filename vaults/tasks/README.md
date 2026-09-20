@@ -10,6 +10,7 @@
 | ----------- | ---------------------------------- | ------- | --- |
 | [[FS-0001]] | Payment receipts (Panel + Console) | ✅ done | —   |
 | [[FS-0002]] | Subscription integrity - compensacion y periodo servidor | draft | — |
+| [[FS-0003]] | Backlog cumplido huérfano (storage R2, AI compat, front-load) | ✅ done | — |
 
 > El índice se actualiza al crear/cerrar una task.
 

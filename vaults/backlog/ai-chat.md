@@ -27,7 +27,8 @@
 
 ## 4. Compat / limpieza
 
+> Retirados y verificados en [[FS-0003]]: helpers `consumeAiMessage` y alias `daily`/`weekly` de `GET /api/ai/usage` (ya no existen en endpoints; solo queda fallback en tests viejos). Abajo lo que falta.
+
 - [ ] **Decidir cuándo retirar:**
   - Columna legacy `ai_usage.count` (mensajes) — mantener hasta confirmar que ningún dashboard la lee.
-  - Helpers `consumeAiMessage` / alias `daily`/`weekly` en `GET /api/ai/usage` — solo para tests viejos.
   - Cache `increment` de Redis (existe pero no se usa; la DB es fuente de verdad).

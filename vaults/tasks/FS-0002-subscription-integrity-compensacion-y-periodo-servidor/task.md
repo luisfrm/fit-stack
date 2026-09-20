@@ -2,7 +2,7 @@
 id: FS-0002
 aliases: ["FS-0002"]
 title: "Subscription integrity - compensacion y periodo servidor"
-status: draft # draft | planning | in_progress | blocked | done | cancelled
+status: in_progress # draft | planning | in_progress | blocked | done | cancelled
 priority: high # low | medium | high | critical
 created: 2026-09-20
 depends_on: [FS-0001] # hereda migración 0018 + snapshot de duración (rama stacked sobre fix/receipt-emission-integrity)

@@ -5,7 +5,7 @@
 
 ## 1. ANULADOS anteriores a B2 — checklist post-deploy
 
-La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban anulados tienen `receipt_voided = true` y **`receipt_voided_pdf_key` en NULL**, así que hasta que el render escriba su sello su descarga responde **`pending`** (202 / 404) — fail-closed a propósito: nunca se sirve el PDF de emisión de un anulado.
+> Migración `0018` (`receipt_voided_pdf_key` + índices parciales) aplicada en [[FS-0001]]. Abajo solo queda el checklist operativo post-deploy.
 
 - [ ] **Conteo previo al deploy** (saber a cuántos afecta):
 
@@ -47,11 +47,7 @@ La migración `0018` es aditiva y sin backfill: los comprobantes que ya estaban 
 
 ## 4. Comprobantes previos al snapshot del emisor (C1)
 
-- [ ] **Los pagos emitidos ANTES de C1 (`emitter_snapshot = NULL`) siguen recomponiéndose en vivo: su JSON puede divergir del PDF si el emisor edita su perfil.**
-  - Estado terminal **documentado** (no es un bug): la migración `0016` no hace backfill porque el snapshot no se puede reconstruir con fidelidad — la identidad del momento de emisión se perdió al no persistirse.
-  - El PDF en R2 sí es inmutable y conserva lo emitido; lo que puede cambiar es el JSON de `GET /:id/receipt` y la fila del libro (sin `emisor`/`emitido_por`).
-  - Si una auditoría exige reproducibilidad del histórico completo, la opción honesta es un **acta de conciliación** (fecha de corte + "estos comprobantes se reimprimen con la configuración vigente") o incrustar el snapshot del PDF vía OCR: **no** un backfill inventado.
-- [x] **RESUELTO (C9)** — E2E preexistente: `e2e/panel/subscriptions.spec.ts` (pago pendiente) fallaba de forma determinista por el prewarm de `/payments` + `revalidate: 60` (fixture creado por API después del prewarm). Se aplicó la opción "la lista accionable no se cachea" (`cache: 'no-store'`). Ver `correcciones-comprobantes.md` → C9.
+> Snapshot del emisor implementado en [[FS-0001]] (migración `0016`, `emitter_snapshot` + `issued_by` persistidos junto al número, compose lee snapshot primero). Los pagos con `emitter_snapshot = NULL` (pre-C1) se recomponen en vivo — estado terminal documentado, no es un bug: el PDF en R2 es inmutable; sin backfill inventado.
 
 ## 5. Email perdido en la DLQ después de la marca de notificado (C6)
 

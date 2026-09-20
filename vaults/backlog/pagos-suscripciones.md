@@ -31,8 +31,10 @@
 
 ## 4. Suscripciones — auditoría del doble periodo histórico
 
+> Fix front-load (alta `processing` no extiende hasta validar) implementado y verificado en [[FS-0003]]. Abajo solo queda la auditoría de históricos.
+
 - [ ] **Revisar las suscripciones cuyo `current_period_end` excede `start_date + Σ duración de los pagos validated`.**
-  - El bug de front-load pudo haber dejado `current_period_end` inflado en altas con pago `processing` que se validaron más tarde. La corrección evita nuevos casos; **no auto-corregir** los históricos.
+  - El bug de front-load pudo haber dejado `current_period_end` inflado en altas con pago `processing` que se validaron más tarde. La corrección (ver [[FS-0003]]) evita nuevos casos; **no auto-corregir** los históricos.
   - Detección (indicativa; normalizar la duración `day|week|month|year` por pago antes de sumar):
 
     ```sql
