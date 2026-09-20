@@ -336,6 +336,38 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
+     * Completa el PDF ANULADO: fija `receipt_voided_pdf_key` SOLO si aún no
+     * hay uno. Gate simétrico a `completeReceiptPdf`, pero sin efecto sobre
+     * el email: la anulación nunca notifica (el comprobante válido ya se
+     * envió) y `receipt_notified_at` no se toca.
+     *
+     * El original (`receipt_pdf_key`) se conserva intacto: la anulación crea
+     * un artefacto NUEVO, no reescribe el emitido.
+     */
+    async completeVoidedReceiptPdf(
+      paymentId: number,
+      orgId: string,
+      key: string,
+    ): Promise<{ completed: boolean }> {
+      assertOrgId(orgId, 'completeVoidedReceiptPdf');
+      if (!key || key.trim().length === 0) {
+        throw new Error('completeVoidedReceiptPdf: key es obligatoria.');
+      }
+      const [row] = await db
+        .update(payment)
+        .set({ receiptVoidedPdfKey: key })
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            isNull(payment.receiptVoidedPdfKey),
+          ),
+        )
+        .returning({ id: payment.id });
+      return { completed: row !== undefined };
+    },
+
+    /**
      * Marca la notificación por email como hecha. Gate anti-pérdida: el
      * reintento del mensaje usa `receipt_notified_at` para no re-enviar, y
      * si el envío falla el caller limpia la marca y reintenta.
