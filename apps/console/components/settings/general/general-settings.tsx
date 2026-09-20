@@ -70,11 +70,8 @@ export function PlatformGeneralSettings({
 
     try {
       if (pendingLogo) {
-        nextLogoKey = await uploadService.uploadPlatformFile(
-          pendingLogo,
-          "logo",
-          "branding",
-        );
+        // Branding: scope fijo `platform/branding` (el router no acepta folder).
+        nextLogoKey = await uploadService.uploadPlatformFile(pendingLogo, "logo");
       }
 
       // Best-effort cleanup of the previous asset (platform admins can delete

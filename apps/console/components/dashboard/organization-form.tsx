@@ -465,7 +465,13 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       let finalLogoUrl = formData.logo;
 
       if (isEdit && selectedFile) {
-        finalLogoUrl = await uploadService.uploadFile(selectedFile, undefined, initialData?.id);
+        // La org destino va por path: sin ella no hay upload (no se inventa una
+        // carpeta ni se cae a la sesión del console, que no tiene org activa).
+        const orgId = initialData?.id;
+        if (!orgId) {
+          throw new Error("No se pudo resolver la organización para subir el logo.");
+        }
+        finalLogoUrl = await uploadService.uploadFile(selectedFile, orgId);
       }
 
       const payload: Partial<IOrganization> = {

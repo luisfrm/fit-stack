@@ -1,43 +1,53 @@
+import { isPublicStorageKey } from "@workspace/shared";
 import { api } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
 export interface FileItem {
   key: string;
+  /** URL pública directa; `null` cuando el asset solo se entrega autenticado. */
+  url: string | null;
   size: number;
-  lastModified: string;
+  uploadedAt: string;
+  name: string;
 }
 
 /**
  * Service to handle file uploads, listing, and deletion with R2 storage.
+ *
+ * El console NO tiene organización activa en la sesión, así que la org destino
+ * de un asset de gimnasio viaja por **path** (`/platform/organizations/:orgId/upload`)
+ * y el branding vive en su propio scope (`/platform/upload`, solo `platform/branding`).
  */
 export const uploadService = {
   /**
-   * Generates a presigned URL and uploads the file directly.
-   * Path format: [organizationId]/[folder]/[filename]_[shortId].[ext]
+   * Presigned + direct upload de un asset DE UNA ORGANIZACIÓN (logo, evidencia
+   * de pago). La organización es obligatoria: no hay fallback a la sesión.
+   * Key resultante: `<orgId>/<folder>/<nombre>_<id>.<ext>`.
    */
   async uploadFile(
     file: File,
+    organizationId: string,
     customName?: string,
-    organizationId?: string,
     folder?: string,
   ): Promise<string> {
+    const base = `/platform/organizations/${organizationId}/upload`;
+
     const data = await api<{ presignedUrl: string; key: string }>(
-      "/upload/presigned",
+      `${base}/presigned`,
       {
         method: "POST",
         body: {
           filename: file.name,
           customName: customName || undefined,
-          organizationId: organizationId || undefined,
           folder: folder || undefined,
           contentType: file.type,
         },
       },
     );
 
-    await api("/upload/direct", {
+    await api(`${base}/direct`, {
       method: "PUT",
-      query: { key: data.key, organizationId: organizationId || undefined },
+      query: { key: data.key },
       body: file,
       headers: { "Content-Type": file.type },
     });
@@ -46,46 +56,31 @@ export const uploadService = {
   },
 
   /**
-   * Lists files in a specific folder (filtered by active organization).
-   * @param folder Subfolder to list (e.g., 'logos', 'coaches')
+   * Lists files of an organization's folder.
+   * @param folder Subfolder to list (e.g., 'cms', 'receipts')
    */
-  async listFiles(folder: string = ""): Promise<FileItem[]> {
-    return await api<FileItem[]>("/upload", { query: { folder } });
+  async listFiles(organizationId: string, folder: string = ""): Promise<FileItem[]> {
+    return await api<FileItem[]>(`/platform/organizations/${organizationId}/upload`, {
+      query: { folder },
+    });
   },
 
   /**
-   * Deletes a file by its full key.
-   * @param key The full key of the file (e.g., 'org123/logos/image.png')
+   * Deletes an organization asset by its full key.
+   * @param key The full key of the file (e.g., '<orgId>/receipts/image.png')
    */
-  async deleteFile(key: string): Promise<void> {
-    await api("/upload", { method: "DELETE", query: { key } });
+  async deleteFile(organizationId: string, key: string): Promise<void> {
+    await api(`/platform/organizations/${organizationId}/upload`, {
+      method: "DELETE",
+      query: { key },
+    });
   },
 
   /**
-   * Utility to get the public URL for a media file stored in R2.
-   * @param key The key of the file in the R2 bucket.
-   * @returns The full public URL.
+   * Uploads a platform-level asset (no organization context): branding.
+   * Path format: platform/branding/[filename]_[shortId].[ext]
    */
-  getMediaUrl(key: string | null | undefined): string {
-    if (!key) return "";
-    if (key.startsWith("http")) return key;
-
-    const baseUrl = env.r2Url;
-    const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-    const cleanKey = key.startsWith("/") ? key.slice(1) : key;
-
-    return `${cleanBaseUrl}/${cleanKey}`;
-  },
-
-  /**
-   * Uploads a platform-level asset (no organization context, e.g. branding).
-   * Path format: platform/[folder]/[filename]_[shortId].[ext]
-   */
-  async uploadPlatformFile(
-    file: File,
-    customName?: string,
-    folder?: string,
-  ): Promise<string> {
+  async uploadPlatformFile(file: File, customName?: string): Promise<string> {
     const data = await api<{ presignedUrl: string; key: string }>(
       "/platform/upload/presigned",
       {
@@ -93,7 +88,6 @@ export const uploadService = {
         body: {
           filename: file.name,
           customName: customName || undefined,
-          folder: folder || undefined,
           contentType: file.type,
         },
       },
@@ -109,19 +103,38 @@ export const uploadService = {
     return data.key;
   },
 
-  /**
-   * Lists platform-level assets in a specific folder.
-   * @param folder Subfolder to list (e.g., 'branding')
-   */
-  async listPlatformFiles(folder: string = ""): Promise<FileItem[]> {
-    return await api<FileItem[]>("/platform/upload", { query: { folder } });
+  /** Lists platform branding assets. */
+  async listPlatformFiles(): Promise<FileItem[]> {
+    return await api<FileItem[]>("/platform/upload");
   },
 
   /**
-   * Deletes a platform-level asset by its full key.
+   * Deletes a platform branding asset by its full key.
    * @param key The full key of the file (e.g., 'platform/branding/logo.png')
    */
   async deletePlatformFile(key: string): Promise<void> {
     await api("/platform/upload", { method: "DELETE", query: { key } });
+  },
+
+  /**
+   * URL con la que la UI muestra un archivo.
+   *
+   * Público por diseño (`<orgId>/cms/…`, branding): URL directa de R2.
+   * Privado (logos de org, evidencia de pago): proxy autenticado del console
+   * (`/api/media`), que resuelve la org desde la propia key y reenvía la cookie.
+   */
+  getMediaUrl(key: string | null | undefined): string {
+    if (!key) return "";
+    if (key.startsWith("http")) return key;
+
+    const cleanKey = key.startsWith("/") ? key.slice(1) : key;
+
+    if (isPublicStorageKey(cleanKey)) {
+      const baseUrl = env.r2Url;
+      const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+      return `${cleanBaseUrl}/${cleanKey}`;
+    }
+
+    return `/api/media?key=${encodeURIComponent(cleanKey)}`;
   },
 };

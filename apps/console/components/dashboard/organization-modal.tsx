@@ -59,7 +59,7 @@ export function OrganizationModal({
         // 2. Si hay logo, subirlo y actualizar la organización
         if (logoFile) {
           try {
-            const logoUrl = await uploadService.uploadFile(logoFile, undefined, finalOrgId);
+            const logoUrl = await uploadService.uploadFile(logoFile, finalOrgId);
             await organizationsService.update(finalOrgId, { logo: logoUrl } as any);
           } catch (uploadError) {
             console.error("Error al subir logo en creación:", uploadError);

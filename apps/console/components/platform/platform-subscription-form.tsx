@@ -315,10 +315,17 @@ export function PlatformSubscriptionForm({
           .toLowerCase()
           .replaceAll(/\s+/g, "-");
         const customName = `${orgName}_${methodName}_${timestamp}`;
+        // La org es obligatoria: el console sube assets por path, sin fallback
+        // a la sesión (el console no tiene organización activa).
+        if (!organizationId) {
+          throw new Error(
+            "Selecciona la organización antes de adjuntar el comprobante de pago.",
+          );
+        }
         finalDetails[field.id] = await uploadService.uploadFile(
           file,
+          organizationId,
           customName,
-          organizationId || undefined,
           "receipts",
         );
       }
