@@ -178,12 +178,18 @@ export function createPlatformSubscriptionsService(
       // `currentPeriodEnd = startDate` hasta que se valide (ahí el PATCH lo
       // extiende usando el snapshot). Trial/free fuerzan `validated` arriba.
       const trialDays = plan.trialDays ?? 0;
-      const currentPeriodEnd =
-        paymentStatus === PAYMENT_STATUSES.VALIDATED
-          ? isTrial && trialDays > 0
-            ? addDuration(startDate, trialDays, 'day')
-            : addDuration(startDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year")
-          : startDate;
+      let currentPeriodEnd = startDate;
+      if (paymentStatus === PAYMENT_STATUSES.VALIDATED) {
+        if (isTrial && trialDays > 0) {
+          currentPeriodEnd = addDuration(startDate, trialDays, 'day');
+        } else {
+          currentPeriodEnd = addDuration(
+            startDate,
+            plan.durationValue,
+            plan.durationUnit as 'day' | 'week' | 'month' | 'year'
+          );
+        }
+      }
 
       // 1. Crear subscription
       const newSubData: NewPlatformSubscriptionData = {

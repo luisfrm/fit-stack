@@ -33,9 +33,10 @@ Además, el periodo acumulativo (Regla 4: ningún día pagado se pierde) hoy es 
 ### B3.2 — Misma compensación en los 4 flujos SaaS
 
 - [ ] `createSubscriptionWithPayment`, renovación, cambio de plan y registro de pago aplican el mismo helper con las closures de plataforma.
-- [ ] Alta: si falla el 3.º, pago anulado; si el pago no llegó a crearse, suscripción anulada (no borrada: `platform_subscription` tiene `cancelledAt`).
-- [ ] Renovación / cambio de plan / registro de pago: pago anulado; el periodo **no se revierte** (ya se movió antes del fallo y no hay forma honesta de "devolver" el tiempo sin transacción) — se documenta explícitamente. Garantía: no queda un cobro válido sin comprobante y el reintento no cobra dos veces.
-- [ ] Tests (3): alta SaaS con fallo de emisión → pago anulado + suscripción anulada, reintento sin duplicar; renovación con fallo → pago anulado y periodo intacto.
+- [ ] Alta: si falla el 3.º, pago anulado **y la suscripción también se cancela** (no borrada: `platform_subscription` tiene `cancelledAt`). **Enmienda ratificada:** el spec original anulaba solo el pago, pero un `voided` se **ignora** en `computePlatformSubscriptionStatus`, así que el alta quedaría `past_due` con un periodo front-loadeado sin cobro que lo sostenga; cancelar la deja `cancelled` y evita el periodo fantasma (un reintento crea una segunda fila, con una sola activa).
+- [ ] Renovación / cambio de plan / registro de pago: pago anulado **y el periodo extendido se revierte** (`revertEffect` → `updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) — un write único honesto, sin transacción. Un reintento no acumula dos veces sobre el mismo cobro y el fallido no regala días.
+- [ ] Un pago compensado (`voided`) **no puede re-validarse** (`PATCH status` lo rechaza): un re-PATCH no vuelve a extender el periodo sobre un cobro anulado ni deja un `validated` sin comprobante.
+- [ ] Tests (3): alta SaaS con fallo de emisión → pago anulado + suscripción anulada, reintento sin duplicar; renovación con fallo → pago anulado y periodo revertido al valor previo; transición a validado con fallo → pago anulado + periodo revertido + re-PATCH rechazado.
 
 ### B3.3 — El periodo lo calcula el servidor (panel, solo `POST /api/subscriptions`)
 
