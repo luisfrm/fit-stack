@@ -28,7 +28,7 @@
   En el reporte de comprobantes aparecen con la etiqueta **"Sin comprobante"** (estado `pre_system`), que es la que ve el operador.
 
 - [ ] **UI (mejora diferida)**: mientras el sello se genera, el diálogo del comprobante dice "PDF en preparación" sin distinguir que está anulado (el 202 no lleva el flag). Añadir `receiptVoided` al estado `pending` si el producto lo pide.
-- [ ] **Sello ANULADO**: hoy es un texto rojo en la cabecera (`receipt-pdf.tsx`); si se quiere marca de agua diagonal, es un cambio visual independiente.
+- [ ] **Sello ANULADO**: hoy es un texto rojo en la cabecera (`receipt-pdf.ts`, motor `pdf-lib` desde [[FS-0004]]); si se quiere marca de agua diagonal, es un cambio visual independiente.
 
 ## 2. Cadencia del barrido en pre-venta
 

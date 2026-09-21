@@ -4,7 +4,7 @@
 
 ## Objetivo
 
-Aplicar el helper de fase-2 en `services/platform-subscriptions.service.ts` para que ningún flujo SaaS deje un cobro válido sin comprobante ni facture dos veces al reintentar. Semántica SaaS: el alta sin pago anula la suscripción con `cancel()` (nunca `delete()` — regla 6 y `vaults/backlog/pagos-suscripciones.md` §2); renovación/cambio/registro anulan solo el pago y **no revierten el periodo** (ya se movió antes del fallo; documentado).
+Aplicar el helper de fase-2 en `services/platform-subscriptions.service.ts` para que ningún flujo SaaS deje un cobro válido sin comprobante ni facture dos veces al reintentar. Semántica SaaS: el alta sin pago válido anula la suscripción con `cancel()` (nunca `delete()` — regla 6 y `vaults/backlog/pagos-suscripciones.md` §2) — **también en el alta con pago creado pero anulado**, porque un `voided` se ignora en `computePlatformSubscriptionStatus` y dejaría un periodo front-loadeado sin cobro (enmienda ratificada); renovación/cambio/registro anulan el pago y **revierten el periodo** al valor leído antes de extender; un pago `voided` no puede re-validarse.
 
 ## Crear
 
@@ -30,7 +30,7 @@ Closures de plataforma por sitio:
 
 - `readPayment`: `platformSubsRepo.findPaymentById(paymentId)` → `receiptNumber`.
 - `voidPayment`: `platformSubsRepo.updatePaymentStatus(paymentId, 'voided', { voidedBy: opts?.by, voidReason: 'Compensación: fallo al emitir el comprobante' })`. Sin `markPlatformReceiptVoided` adicional: sin número no hay comprobante que anular (el 200 con `receiptVoided:false` es contrato de la ruta de status, no de este flujo).
-- `cancelParent` (solo alta): `platformSubsRepo.cancel(subscriptionId, 'Compensación: fallo al emitir el comprobante')` cuando el pago no llegó a crearse. En renovación/registro/validación no hay `cancelParent`: la suscripción preexiste y el periodo movido no se revierte — el comentario en cada sitio lo declara explícitamente.
+- `cancelParent` (solo alta): `platformSubsRepo.cancel(subscriptionId, 'Compensación: fallo al emitir el comprobante')` cuando el pago no llegó a crearse, y también tras anular el pago (enmienda ratificada: un `voided` se ignora en el status SaaS y dejaría el periodo fantasma). En renovación/registro/validación no hay `cancelParent`: la suscripción preexiste y el periodo extendido se revierte con `revertEffect` (`updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) — el comentario en cada sitio lo declara. Un pago `voided` no puede re-validarse (`PATCH status` lo rechaza).
 
 Caso `committed` (relectura con número): responder éxito con `{ subscriptionId, paymentId }` / `{ newPeriodEnd, paymentId }` según el flujo, igual que fase-2. Caso `compensated`: re-lanzar el original.
 

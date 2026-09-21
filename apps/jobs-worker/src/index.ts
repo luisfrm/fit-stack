@@ -63,7 +63,18 @@ export default {
           await handleReceiptRender(env, message.body as ReceiptRenderEvent);
           message.ack();
         } catch (error) {
-          console.error(`Failed to render receipt ${message.id}:`, error);
+          // Nunca más un mensaje vacío: nombre, mensaje y causa viajan en el
+          // log para que el fallo sea accionable (FS-0004). Sin cambio de
+          // semántica: los reintentos agotados siguen yendo a la DLQ.
+          const cause = error instanceof Error ? error.cause : undefined;
+          const name = error instanceof Error ? error.name : 'UnknownError';
+          const messageText =
+            error instanceof Error ? error.message : String(error);
+          console.error(`Failed to render receipt ${message.id}:`, {
+            name,
+            message: messageText,
+            cause,
+          });
           message.retry();
         }
       }

@@ -15,7 +15,7 @@ El `queue()` de `src/index.ts` ramifica por nombre de cola (`batch.queue.startsW
 ```
 src/
 ├── index.ts                    # default export: queue() + scheduled(); Env; FitTaskEvent
-├── receipt-pdf.tsx             # render del PDF (lazy @react-pdf/renderer)
+├── receipt-pdf.ts                # render del PDF con pdf-lib (JS puro, sin WASM, compatible con workerd; lazy)
 ├── handlers/
 │   ├── email.handler.ts        # TRANSPORTE de email (Resend / Gmail SMTP)
 │   ├── pdf.handler.ts          # emails con comprobante adjunto (lee el PDF de R2)

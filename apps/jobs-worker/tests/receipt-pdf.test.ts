@@ -1,9 +1,9 @@
 /**
  * Receipt PDF render test (pure: data in → bytes out, no DB).
  *
- * Lives in jobs-worker because @react-pdf/renderer only resolves here.
- * Asserts the document is a valid PDF **and** the texto realmente impreso:
- * los campos opcionales ausentes se omiten (FACTURATION.md §3) y la
+ * Lives in jobs-worker because pdf-lib only resolves here (workerd-safe, no
+ * WASM). Asserts the document is a valid PDF **and** the texto realmente
+ * impreso: los campos opcionales ausentes se omiten (FACTURATION.md §3) y la
  * conversión a moneda base usa la tasa persistida.
  */
 import { inflateSync } from 'node:zlib';
@@ -13,9 +13,9 @@ import { renderReceiptPdfBytes } from '../src/receipt-pdf';
 
 /**
  * Texto pintado de un PDF, en orden de pintado y sin separadores: infla los
- * content streams (FlateDecode) y decodifica los runs hex de cada operador
- * `TJ` (react-pdf parte una misma línea en varios runs por kerning, así que
- * unirlos es lo que reconstruye el texto tal como se lee).
+ * content streams (FlateDecode) y decodifica el run hex de cada operador
+ * `Tj` (pdf-lib emite el texto como `<hex> Tj`, una línea por `Tj`, con bytes
+ * WinAnsi — por eso se decodifica en latin1).
  */
 function extractPdfText(bytes: Uint8Array): string {
   const raw = Buffer.from(bytes).toString('latin1');
@@ -27,10 +27,8 @@ function extractPdfText(bytes: Uint8Array): string {
     } catch {
       continue; // stream sin comprimir (no lleva texto)
     }
-    for (const operator of content.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
-      for (const hex of operator[1].matchAll(/<([0-9a-fA-F]+)>/g)) {
-        runs.push(Buffer.from(hex[1], 'hex').toString('latin1'));
-      }
+    for (const operator of content.matchAll(/<([0-9a-fA-F]+)>\s*Tj/g)) {
+      runs.push(Buffer.from(operator[1], 'hex').toString('latin1'));
     }
   }
   return runs.join('');
@@ -91,7 +89,7 @@ describe('renderReceiptPdfBytes', () => {
 
   it('imprime los datos del emisor y del receptor cuando existen', async () => {
     const text = extractPdfText(await renderReceiptPdfBytes(sampleReceipt(), 'latam'));
-    // Los rótulos salen en mayúsculas por estilo (textTransform).
+    // Los rótulos salen en mayúsculas por estilo (toUpperCase al dibujar).
     expect(text).toContain('R.I.F.: J-12345678-9');
     expect(text).toContain('DIRECCIÓN / SEDECaracas');
     expect(text).toContain('C.I. DEL SOCIOV-12345678');
@@ -139,5 +137,62 @@ describe('renderReceiptPdfBytes', () => {
     const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
     expect(text).toContain('Tasa aplicada: 1 VES = 36.5 USD');
     expect(text).toContain('Equivalente: 3,18 VES');
+  }, 60000);
+
+  it('omite la conversión cuando el pago difiere pero no hay tasa persistida', async () => {
+    const data = sampleReceipt();
+    data.amounts.currencyPaid = 'USD';
+    data.amounts.baseCurrency = 'VES';
+    data.amounts.exchangeRateApplied = null;
+    data.amounts.baseTotal = 318;
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    // Fail-closed (FACTURATION.md §3): sin tasa no se muestra conversión,
+    // aunque `baseTotal` venga informado.
+    expect(text).not.toContain('Tasa aplicada');
+    expect(text).not.toContain('Equivalente');
+  }, 60000);
+
+  it('muestra la tasa sin equivalente cuando baseTotal es null', async () => {
+    const data = sampleReceipt();
+    data.amounts.currencyPaid = 'USD';
+    data.amounts.baseCurrency = 'VES';
+    data.amounts.exchangeRateApplied = '36.5';
+    data.amounts.baseTotal = null;
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    expect(text).toContain('Tasa aplicada: 1 VES = 36.5 USD');
+    expect(text).not.toContain('Equivalente');
+  }, 60000);
+
+  it('sanitiza caracteres fuera de WinAnsi (emojis) sin romper el render', async () => {
+    const data = sampleReceipt();
+    data.recipient.name = 'Juan Pérez 🚀💪';
+    data.sale.planName = 'Plan Mensual 🏋️';
+
+    const bytes = await renderReceiptPdfBytes(data, 'latam');
+    expect(bytes.length).toBeGreaterThan(1000);
+    const text = extractPdfText(bytes);
+    expect(text).toContain('Juan Pérez');
+    expect(text).toContain('PLAN MENSUAL');
+    expect(text).not.toContain('🚀');
+  }, 60000);
+
+  it('trunca tokens irrompibles largos y envuelve el disclaimer sin perder contenido', async () => {
+    const data = sampleReceipt();
+    const longToken = `REF-${'A'.repeat(300)}`;
+    data.method.maskedDetails = [{ label: 'Referencia', value: longToken }];
+    data.footer.disclaimer = [`Aviso legal largo: ${'palabra '.repeat(40)}fin del aviso.`];
+
+    const bytes = await renderReceiptPdfBytes(data, 'latam');
+    expect(bytes.length).toBeGreaterThan(1000);
+    const text = extractPdfText(bytes);
+    // El token completo no cabe: se trunca con elipsis (página única intacta).
+    expect(text).not.toContain(longToken);
+    // El disclaimer con wrap no pierde contenido (inicio y cierre presentes).
+    expect(text).toContain('Aviso legal largo:');
+    expect(text).toContain('fin del aviso.');
+    // El documento sigue siendo el mismo comprobante.
+    expect(text).toContain('fit-stack-2026-000045');
   }, 60000);
 });

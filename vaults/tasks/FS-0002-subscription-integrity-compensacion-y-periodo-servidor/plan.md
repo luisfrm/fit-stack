@@ -13,7 +13,7 @@
 ## Decisiones congeladas (de `task.md`, no re-discutir por fase)
 
 - Los 4 flujos SaaS entran en la compensación; el motivo del override se persiste (migración 0019); el `endDate` explícito solo pide motivo si **acorta un periodo vigente**.
-- Renovación/cambio/registro SaaS con fallo: pago anulado, **periodo no revertido** (ya se movió; documentado). Garantía: ningún cobro válido sin comprobante y el reintento no cobra dos veces.
+- Renovación/cambio/registro SaaS con fallo: pago anulado y **periodo revertido** (`updatePeriodEnd(previousPeriodEnd)`, leído antes de extender); el alta con pago anulado también cancela la suscripción (un `voided` se ignora en el status SaaS). Un pago `voided` no puede re-validarse. Garantía: ningún cobro válido sin comprobante y el reintento no acumula dos veces.
 - `voided` nunca se borra (regla 6): panel anula el pago (sin cancelar además la suscripción: ANULADA ya gana sobre `cancelled`); SaaS anula el pago y, solo en el alta sin pago, anula la suscripción con `cancel()` — jamás `delete()`.
 - `NULL` en `end_date_override_reason` = periodo calculado o histórico (sin backfill).
 
