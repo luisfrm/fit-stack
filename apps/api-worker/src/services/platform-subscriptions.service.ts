@@ -16,10 +16,15 @@ import {
 } from '@workspace/shared/constants';
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 import { normalizeFeatures } from '@workspace/shared';
+import { HTTPException } from 'hono/http-exception';
 import { addDuration } from '../lib/billing-utils';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import type { PlatformReceiptContext } from './platform-receipts.service';
 import { ReceiptError } from './receipts.service';
+import {
+  COMPENSATION_VOID_REASON,
+  compensateFailedEmission,
+} from '../lib/subscription-compensation';
 
 /** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
 const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
@@ -101,6 +106,19 @@ export function createPlatformSubscriptionsService(
   plansRepo: ReturnType<typeof createPlatformPlansRepository>,
   rateProvider: ExchangeRateProvider = SAME_CURRENCY_ONLY_RATE_PROVIDER
 ) {
+  /**
+   * Closure compartida de anulación compensatoria (fase 3): los 4 sitios de
+   * emisión deben anular con el mismo motivo y la misma auditoría. Si no hay
+   * `paymentId` (el insert nunca llegó a correr) no hay nada que anular.
+   */
+  const voidPlatformPayment = (paymentId: number | null, by?: string) => async () => {
+    if (paymentId == null) return;
+    await platformSubsRepo.updatePaymentStatus(paymentId, PAYMENT_STATUSES.VOIDED, {
+      voidedBy: by,
+      voidReason: COMPENSATION_VOID_REASON,
+    });
+  };
+
   return {
     async getAllSubscriptions(
       filters: SubscriptionFilters = {}
@@ -202,38 +220,76 @@ export function createPlatformSubscriptionsService(
       };
       const { id: subscriptionId } = await platformSubsRepo.create(newSubData);
 
-      // 2. Crear pago
-      const paymentData: NewPlatformPaymentData = {
-        subscriptionId,
-        organizationId: data.organizationId,
-        planId: data.planId,
-        planSnapshotName: plan.name,
-        planSnapshotPrice: plan.price,
-        planSnapshotCurrency: plan.currency,
-        planSnapshotDurationValue: plan.durationValue,
-        planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
-        featuresSnapshot: snapshotFeatures(plan.features),
-        amountPaid: amountPaidCents,
-        currencyPaid: data.payment.currencyPaid,
-        exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-        baseAmount: data.payment.baseAmountCents ?? null,
-        paymentMethod,
-        paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
-        status: paymentStatus,
-        paymentDate: data.payment.paymentDate
-          ? new Date(data.payment.paymentDate)
-          : new Date(),
-      };
-      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
+      // Alta en 2 pasos sin red (Neon HTTP no tiene `db.transaction()`): el
+      // pago + la emisión se compensan en el `catch` delegando al helper
+      // (decisión por relectura, nunca por tipo de error). Semántica SaaS:
+      // el alta que queda sin pago válido también anula la suscripción con
+      // `cancel()` — nunca `delete()` (regla 6): un `voided` se ignora en el
+      // cómputo SaaS y dejaría un periodo front-loadeado sin cobro que lo
+      // sostenga. Trial/free $0 (`skipped:true`) = éxito, no compensan.
+      let paymentCreated = false;
+      let paymentId: number | null = null;
+      try {
+        // 2. Crear pago
+        const paymentData: NewPlatformPaymentData = {
+          subscriptionId,
+          organizationId: data.organizationId,
+          planId: data.planId,
+          planSnapshotName: plan.name,
+          planSnapshotPrice: plan.price,
+          planSnapshotCurrency: plan.currency,
+          planSnapshotDurationValue: plan.durationValue,
+          planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
+          featuresSnapshot: snapshotFeatures(plan.features),
+          amountPaid: amountPaidCents,
+          currencyPaid: data.payment.currencyPaid,
+          exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
+          baseAmount: data.payment.baseAmountCents ?? null,
+          paymentMethod,
+          paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
+          status: paymentStatus,
+          paymentDate: data.payment.paymentDate
+            ? new Date(data.payment.paymentDate)
+            : new Date(),
+        };
+        const createdPayment = await platformSubsRepo.createPayment(paymentData);
+        paymentCreated = true;
+        paymentId = createdPayment.id;
 
-      // Emisión C2: el paso 1 numera donde el pago queda validado (trial/
-      // free $0 hacen SKIP dentro del servicio). Sesión console ≠ pagador:
-      // no se pasa payer (queda NULL → solo owners + log).
-      if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
-        await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        // Emisión C2: el paso 1 numera donde el pago queda validado (trial/
+        // free $0 hacen SKIP dentro del servicio). Sesión console ≠ pagador:
+        // no se pasa payer (queda NULL → solo owners + log).
+        if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
+          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        }
+
+        return { subscriptionId, paymentId };
+      } catch (err) {
+        const outcome = await compensateFailedEmission(
+          err,
+          {
+            readPayment: async () =>
+              paymentId != null ? platformSubsRepo.findPaymentById(paymentId) : null,
+            voidPayment: voidPlatformPayment(paymentId, opts?.by),
+            cancelParent: () =>
+              platformSubsRepo.cancel(subscriptionId, COMPENSATION_VOID_REASON),
+          },
+          { paymentCreated },
+        );
+        if (outcome === 'committed' && paymentId != null) {
+          return { subscriptionId, paymentId };
+        }
+        // Compensated con pago creado: el helper ya lo anuló, pero el alta
+        // sigue sin pago válido que la sostenga → se cancela (sin pago
+        // creado ya la canceló `cancelParent`). Nunca `delete()` (regla 6,
+        // la serie `FS-N` no se vacía).
+        // `unresolved` (la relectura no pudo decidir): el alta puede ser válida
+        // — no se toca, el error original se re-lanza y el barrido reconcilia.
+        if (outcome === 'compensated' && paymentCreated) {
+          await platformSubsRepo.cancel(subscriptionId, COMPENSATION_VOID_REASON);
+        }
+        throw err;
       }
-
-      return { subscriptionId, paymentId };
     },
 
     /**
@@ -290,18 +346,46 @@ export function createPlatformSubscriptionsService(
           ? new Date(data.payment.paymentDate)
           : new Date(),
       };
-      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
+      // Crear pago + extender + emitir en un solo intento compensable: si la
+      // emisión falla, el pago se anula y el periodo movido se REVIERTE a su
+      // valor previo (`currentPeriodEnd` se leyó antes de extender, así que
+      // el write compensatorio es honesto y no necesita transacción). Sin
+      // `cancelParent`: la suscripción preexiste.
+      const previousPeriodEnd = sub.currentPeriodEnd;
+      let paymentCreated = false;
+      let paymentId: number | null = null;
+      try {
+        const createdPayment = await platformSubsRepo.createPayment(paymentData);
+        paymentCreated = true;
+        paymentId = createdPayment.id;
 
-      // Extender periodo (side effect del pago)
-      if (data.payment.status === PAYMENT_STATUSES.VALIDATED) {
-        await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
-        // Emisión C2 (sesión console ≠ pagador: sin payer).
-        if (opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+        // Extender periodo (side effect del pago)
+        if (data.payment.status === PAYMENT_STATUSES.VALIDATED) {
+          await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
+          // Emisión C2 (sesión console ≠ pagador: sin payer).
+          if (opts?.receipts) {
+            await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+          }
         }
-      }
 
-      return { newPeriodEnd, paymentId };
+        return { newPeriodEnd, paymentId };
+      } catch (err) {
+        const outcome = await compensateFailedEmission(
+          err,
+          {
+            readPayment: async () =>
+              paymentId != null ? platformSubsRepo.findPaymentById(paymentId) : null,
+            voidPayment: voidPlatformPayment(paymentId, opts?.by),
+            revertEffect: () =>
+              platformSubsRepo.updatePeriodEnd(subscriptionId, previousPeriodEnd),
+          },
+          { paymentCreated },
+        );
+        if (outcome === 'committed' && paymentId != null) {
+          return { newPeriodEnd, paymentId };
+        }
+        throw err;
+      }
     },
 
     /**
@@ -361,7 +445,18 @@ export function createPlatformSubscriptionsService(
     },
 
     /**
-     * Cambia el plan de una organización: cancela el actual y crea uno nuevo.
+     * Cambia el plan de una organización: crea la nueva suscripción y solo
+     * entonces cancela la actual.
+     *
+     * Orden deliberado (create-new-then-cancel-old): si el alta nueva falla y
+     * se compensa, la anterior sigue activa — la org nunca queda con cero
+     * suscripciones. El `cancel` de la anterior es un efecto distinto de la
+     * reversión del periodo y no lo deshace la compensación del alta.
+     *
+     * Nota: `POST /api/platform/subscriptions/change-plan` **no está montada**
+     * en el router hoy (el console la invoca pero el worker no la define); al
+     * montarla, si el `cancel` de la vieja fallara quedarían dos activas (peor:
+     * es preferible a cero y se documenta aquí).
      */
     async changePlan(
       organizationId: string,
@@ -370,19 +465,23 @@ export function createPlatformSubscriptionsService(
     ): Promise<{ subscriptionId: number }> {
       const current = await platformSubsRepo.findActiveByOrganization(organizationId);
 
-      // Cancelar suscripción actual (si existe y no está cancelada)
-      if (current && !current.cancelledAt) {
-        await platformSubsRepo.cancel(current.id, 'Plan cambiado');
-      }
-
-      // Crear nueva suscripción (reenvía opts: el hook emite si valida).
-      return this.createSubscriptionWithPayment({
+      // Crear la nueva primero (reenvía opts: el hook emite si valida y la
+      // compensación se hereda de `createSubscriptionWithPayment`). Si lanza,
+      // la anterior permanece intacta.
+      const result = await this.createSubscriptionWithPayment({
         organizationId,
         planId: data.newPlanId,
         isTrial: data.isTrial,
         priceOverrideCents: data.priceOverrideCents,
         payment: data.payment,
       }, opts);
+
+      // Solo con la nueva persistida se cancela la anterior.
+      if (current && !current.cancelledAt) {
+        await platformSubsRepo.cancel(current.id, 'Plan cambiado');
+      }
+
+      return result;
     },
 
     /**
@@ -423,24 +522,51 @@ export function createPlatformSubscriptionsService(
         paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
       };
 
-      const { id: paymentId } = await platformSubsRepo.createPayment(paymentData);
+      // Registro + extensión + emisión en un solo intento compensable: si la
+      // emisión falla, el pago se anula y el periodo movido se REVIERTE a
+      // `sub.currentPeriodEnd` (leído antes de extender). La suscripción
+      // preexiste: sin `cancelParent`.
+      const previousPeriodEnd = sub.currentPeriodEnd;
+      let paymentCreated = false;
+      let paymentId: number | null = null;
+      try {
+        const createdPayment = await platformSubsRepo.createPayment(paymentData);
+        paymentCreated = true;
+        paymentId = createdPayment.id;
 
-      // Si se valida, extender el periodo
-      if (data.status === PAYMENT_STATUSES.VALIDATED) {
-        const plan = await plansRepo.findById(sub.planId);
-        if (plan) {
-          const baseDate =
-            sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-          const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
-          await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
+        // Si se valida, extender el periodo
+        if (data.status === PAYMENT_STATUSES.VALIDATED) {
+          const plan = await plansRepo.findById(sub.planId);
+          if (plan) {
+            const baseDate =
+              sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
+            const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
+            await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
+          }
+          // Emisión C2 (sesión console ≠ pagador: sin payer).
+          if (opts?.receipts) {
+            await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+          }
         }
-        // Emisión C2 (sesión console ≠ pagador: sin payer).
-        if (opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+
+        return { paymentId };
+      } catch (err) {
+        const outcome = await compensateFailedEmission(
+          err,
+          {
+            readPayment: async () =>
+              paymentId != null ? platformSubsRepo.findPaymentById(paymentId) : null,
+            voidPayment: voidPlatformPayment(paymentId, opts?.by),
+            revertEffect: () =>
+              platformSubsRepo.updatePeriodEnd(subscriptionId, previousPeriodEnd),
+          },
+          { paymentCreated },
+        );
+        if (outcome === 'committed' && paymentId != null) {
+          return { paymentId };
         }
+        throw err;
       }
-
-      return { paymentId };
     },
 
     async cancelSubscription(id: number, reason?: string) {
@@ -483,8 +609,50 @@ export function createPlatformSubscriptionsService(
       const payment = await platformSubsRepo.findPaymentById(paymentId);
       if (!payment) throw new Error('Pago no encontrado');
       // `wasPending` = no estaba validado. Re-PATCH a `validated` no
-      // re-extiende ni renumera (idempotencia).
+      // re-extiende ni renumera (idempotencia). Solo un pago `processing`
+      // puede transicionar a `validated`: `voided` no puede re-validarse
+      // (re-extendería el periodo sobre un cobro anulado y dejaría un
+      // `validated` sin comprobante) y `refunded` tampoco (no producido hoy,
+      // pero tampoco es una transición legítima). Un re-void idempotente
+      // (`voided → voided`) sí pasa.
       const wasPending = payment.status !== PAYMENT_STATUSES.VALIDATED;
+      if (
+        data.status === PAYMENT_STATUSES.VALIDATED &&
+        wasPending &&
+        payment.status !== PAYMENT_STATUSES.PROCESSING
+      ) {
+        throw new HTTPException(409, {
+          res: new Response(
+            JSON.stringify({
+              error: 'Solo un pago en proceso puede validarse',
+              code: 'PAYMENT_NOT_REVALIDATABLE',
+            }),
+            { status: 409, headers: { 'content-type': 'application/json' } },
+          ),
+        });
+      }
+
+      // Un pago de una suscripción cancelada no se valida: persistirlo dejaría
+      // un `validated` sin número ni periodo que lo sostenga (invariante
+      // validado ⇔ numerado). Fail-closed ANTES de escribir el estado.
+      const parentSub = payment.subscriptionId
+        ? await platformSubsRepo.findById(payment.subscriptionId)
+        : null;
+      if (
+        data.status === PAYMENT_STATUSES.VALIDATED &&
+        wasPending &&
+        parentSub?.cancelledAt
+      ) {
+        throw new HTTPException(409, {
+          res: new Response(
+            JSON.stringify({
+              error: 'No se puede validar un pago de una suscripción cancelada',
+              code: 'SUBSCRIPTION_CANCELLED',
+            }),
+            { status: 409, headers: { 'content-type': 'application/json' } },
+          ),
+        });
+      }
 
       // Auditoría de anulación SIEMPRE en el pago (haya o no comprobante).
       await platformSubsRepo.updatePaymentStatus(paymentId, data.status, {
@@ -517,36 +685,61 @@ export function createPlatformSubscriptionsService(
       // Side effects según nuevo status: extender periodo SOLO en la
       // transición a validado, con la duración del SNAPSHOT del pago (no el
       // plan vivo, que pudo cambiar desde la creación). Fallback al plan vivo
-      // solo si el snapshot no trae duración.
-      if (data.status === PAYMENT_STATUSES.VALIDATED && wasPending && payment.subscriptionId) {
-        const sub = await platformSubsRepo.findById(payment.subscriptionId);
-        if (sub && !sub.cancelledAt) {
-          let duration: { value: number; unit: 'day' | 'week' | 'month' | 'year' } | null = null;
-          if (payment.planSnapshotDurationValue != null && payment.planSnapshotDurationUnit) {
+      // solo si el snapshot no trae duración. La suscripción no puede estar
+      // cancelada aquí (se rechazó arriba), así que el pago validado siempre
+      // recibe su número.
+      if (
+        data.status === PAYMENT_STATUSES.VALIDATED &&
+        wasPending &&
+        payment.subscriptionId &&
+        parentSub
+      ) {
+        const previousPeriodEnd = parentSub.currentPeriodEnd;
+        let duration: { value: number; unit: 'day' | 'week' | 'month' | 'year' } | null = null;
+        if (payment.planSnapshotDurationValue != null && payment.planSnapshotDurationUnit) {
+          duration = {
+            value: payment.planSnapshotDurationValue,
+            unit: payment.planSnapshotDurationUnit as 'day' | 'week' | 'month' | 'year',
+          };
+        } else {
+          const plan = await plansRepo.findById(payment.planId);
+          if (plan) {
             duration = {
-              value: payment.planSnapshotDurationValue,
-              unit: payment.planSnapshotDurationUnit as 'day' | 'week' | 'month' | 'year',
+              value: plan.durationValue,
+              unit: plan.durationUnit as 'day' | 'week' | 'month' | 'year',
             };
-          } else {
-            const plan = await plansRepo.findById(payment.planId);
-            if (plan) {
-              duration = {
-                value: plan.durationValue,
-                unit: plan.durationUnit as 'day' | 'week' | 'month' | 'year',
-              };
-            }
           }
-          if (duration) {
-            const baseDate =
-              sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-            const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit);
-            await platformSubsRepo.updatePeriodEnd(sub.id, newPeriodEnd);
-          }
+        }
+        if (duration) {
+          const baseDate =
+            parentSub.currentPeriodEnd > new Date() ? parentSub.currentPeriodEnd : new Date();
+          const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit);
+          await platformSubsRepo.updatePeriodEnd(parentSub.id, newPeriodEnd);
         }
         // Emisión C2 solo en transición →validated (re-PATCH no renumera
         // por idempotencia del attach; sesión console ≠ pagador: sin payer).
+        // Si falla, el pago (ya validado en DB) se anula y el periodo movido
+        // se REVIERTE a su valor previo. Sin `markPlatformReceiptVoided`:
+        // sin número no hay comprobante que anular.
         if (opts?.receipts) {
-          await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+          try {
+            await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
+          } catch (err) {
+            const outcome = await compensateFailedEmission(
+              err,
+              {
+                readPayment: () => platformSubsRepo.findPaymentById(paymentId),
+                voidPayment: voidPlatformPayment(paymentId, opts?.by),
+                revertEffect: () =>
+                  platformSubsRepo.updatePeriodEnd(parentSub.id, previousPeriodEnd),
+              },
+              { paymentCreated: true },
+            );
+            if (outcome === 'committed') {
+              return { receiptVoided, receiptVoidReason };
+            }
+            throw err;
+          }
         }
       }
 
