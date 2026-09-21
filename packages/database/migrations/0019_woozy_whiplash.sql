@@ -1,0 +1,1 @@
+ALTER TABLE "subscription" ADD COLUMN "end_date_override_reason" text;

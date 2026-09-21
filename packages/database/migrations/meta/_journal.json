@@ -134,6 +134,13 @@
       "when": 1789896092996,
       "tag": "0018_numerous_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789907510427,
+      "tag": "0019_woozy_whiplash",
+      "breakpoints": true
     }
   ]
 }

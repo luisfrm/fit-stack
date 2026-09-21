@@ -10,7 +10,7 @@ Dejar la regla escrita donde el próximo agente la encuentre y correr la matriz 
 
 | Archivo | Cambio |
 |---|---|
-| `AGENTS.md` | Nueva regla de compensación (helper por relectura, `committed` = éxito + barrido, `voided` con motivo fijo, huérfana con `cancel`, periodo SaaS no revertido, sin transacciones interactivas) + contrato del periodo servidor (`startDate?`/`endDate?`/`endDateOverrideReason?`, 422 por código, vigencia a día local) + columna 0019 en el esquema (33→34 tablas si aplica el conteo, o nota aditiva). |
+| `AGENTS.md` | Nueva regla de compensación (helper por relectura, `committed` = éxito + barrido, `voided` con motivo fijo, huérfana con `cancel`, periodo SaaS revertido al valor previo (`revertEffect`), sin transacciones interactivas) + contrato del periodo servidor (`startDate?`/`endDate?`/`endDateOverrideReason?`, 422 por código, vigencia a día local) + columna 0019 en el esquema (33→34 tablas si aplica el conteo, o nota aditiva). |
 | README del endpoint en `apps/api-worker` | Documentar el body de `POST /api/subscriptions` (opcionales, defaults, guards y códigos). Si no existe README del worker, sección equivalente donde vivan los contratos de endpoint. |
 | `vaults/backlog/pagos-suscripciones.md` §1 | Ajustar el ítem "create() no es atómico": cerrado por compensación explícita (referenciar [[FS-0002]]); mantener abierto el sub-ítem de cascada por borrado de miembro (baja lógica vs 409, con su disparador). |
 

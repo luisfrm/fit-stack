@@ -12,6 +12,7 @@ export interface ISubscriptionDTO {
   endDate: Date;
   status?: SubscriptionStatus;
   cancelledAt?: Date | null;
+  endDateOverrideReason?: string | null;
   isActive?: boolean;
   createdAt?: Date;
 }
@@ -117,6 +118,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: subscription.startDate,
           endDate: subscription.endDate,
           cancelledAt: subscription.cancelledAt,
+          endDateOverrideReason: subscription.endDateOverrideReason,
           status: this.getSubscriptionStatusSql(now).as('status'),
           isActive: this.getSubscriptionIsActiveSql(now),
           memberName: members.firstName,
@@ -179,6 +181,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: subscription.startDate,
           endDate: subscription.endDate,
           cancelledAt: subscription.cancelledAt,
+          endDateOverrideReason: subscription.endDateOverrideReason,
           status: this.getSubscriptionStatusSql(now).as('status'),
           isActive: this.getSubscriptionIsActiveSql(now),
           memberName: members.firstName,
@@ -249,6 +252,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: data.startDate,
           endDate: data.endDate,
           cancelledAt: data.cancelledAt ?? null,
+          endDateOverrideReason: data.endDateOverrideReason ?? null,
           createdAt: data.createdAt ?? new Date(),
         })
         .returning();
@@ -267,6 +271,20 @@ export function createSubscriptionsRepository(db: Db) {
         throw new Error('Suscripción no encontrada');
       }
       return updated;
+    },
+
+    /**
+     * Suscripción por id, org-scoped. Solo lo mínimo para el guard de
+     * transición de pagos (¿está fuera de vigencia?): un read completo
+     * (`findAllVisible`) sería gastar un JOIN para mirar `cancelledAt`.
+     */
+    async findById(organizationId: string, id: number) {
+      const [record] = await db
+        .select({ id: subscription.id, cancelledAt: subscription.cancelledAt })
+        .from(subscription)
+        .where(and(eq(subscription.id, id), eq(subscription.organizationId, organizationId)))
+        .limit(1);
+      return record;
     },
 
     async cancel(organizationId: string, id: number) {

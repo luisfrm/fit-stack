@@ -5,10 +5,9 @@
 
 ## 1. Atomicidad y cascada del borrado de miembro (C9)
 
-- [ ] **`create()` de suscripción + pago NO es atómico pese a la regla "Atomic Invoicing".**
-  - `subscriptions.service.create()` inserta la **suscripción** y después el **pago** en dos sentencias independientes. Si la segunda falla (por ejemplo, un dato inválido del pago), queda una **suscripción huérfana sin pago**, y desde C9 ya no existe `DELETE /api/subscriptions/:id` que la limpie.
-  - Opciones: envolver ambos inserts en una transacción (si el driver `neon-http` la soporta vía `db.transaction`) o compensar en el mismo `catch` eliminando la fila recién insertada.
-  - Consulta de detección: `SELECT s.* FROM subscription s LEFT JOIN payment p ON p.subscription_id = s.id WHERE p.id IS NULL`.
+- [x] **`create()` de suscripción + pago NO es atómico pese a la regla "Atomic Invoicing".** — ✅ RESUELTO por [[FS-0002]] (compensación explícita, sin transacciones interactivas: Neon HTTP no soporta `db.transaction()`).
+  - `subscriptions.service.create()` (gym) y los 4 sitios de `platform-subscriptions.service` (alta, pago adicional/renovación, cambio de plan vía alta, validación tardía) delegan al helper `compensateFailedEmission` (`apps/api-worker/src/lib/subscription-compensation.ts`): decisión por relectura (si el pago trae `receiptNumber` → `committed`, éxito), si no → pago anulado con motivo fijo `COMPENSATION_VOID_REASON` y huérfana cancelada con `cancel()`, nunca `delete()`. En SaaS el periodo extendido se revierte (`updatePeriodEnd(previousPeriodEnd)`) y un pago `voided` no puede re-validarse.
+  - Consulta de detección (referencia histórica): `SELECT s.* FROM subscription s LEFT JOIN payment p ON p.subscription_id = s.id WHERE p.id IS NULL`.
 - [ ] **El borrado de un miembro arrastra su histórico financiero por cascada.**
   - `payment.member_id` y `subscription.member_id` son `ON DELETE CASCADE`: borrar un miembro elimina sus pagos y suscripciones. Es hoy la única vía por la que un registro financiero desaparece (la suscripción ya no tiene DELETE) y es también de lo que depende la limpieza de E2E.
   - Coherente con "un registro financiero no se elimina": el miembro con pagos debería darse de **baja lógica** (desactivar) en vez de borrarse, o el borrado debería rechazarse (409) cuando tiene pagos. Requiere decidir la política del módulo Members y actualizar E2E (la limpieza pasaría al borrado de la organización).

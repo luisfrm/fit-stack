@@ -25,15 +25,17 @@ import {
 } from "@workspace/ui/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
-import { addDuration, localDayStartUtc, toLocalDayString } from "@workspace/shared/date";
+import { addDuration, toLocalDayString } from "@workspace/shared/date";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { apiCode } from "@/lib/errors";
 import {
   centsToUnits,
   unitsToCents,
   parseRateValue,
   previewReceiptTaxes,
   resolveFiscalProfile,
+  computeSubscriptionPeriod,
   ORG_ROLES,
   CurrencyFormat
 } from "@workspace/shared";
@@ -44,7 +46,9 @@ import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
 import { type TaxMode } from "./tax-block";
 
-interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status"> {
+interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status" | "endDate"> {
+  endDate?: string;
+  endDateOverrideReason?: string;
   payment: {
     amountPaid: number;
     currencyPaid: string;
@@ -142,11 +146,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     initialMember ?? null
   );
 
-  // Sync with initialMember if it changes (callback from creation)
+  // Sync with initialMember if it changes (callback from creation). También
+  // resetea el override del periodo: el preview editado pertenece al miembro
+  // anterior y no debe arrastrarse al nuevo (ver `resetPeriodOverride`).
   React.useEffect(() => {
     if (initialMember) {
       setSelectedMember(initialMember);
       setMemberSearch("");
+      setEndDateDirty(false);
+      setEndDateOverrideReason("");
     }
   }, [initialMember]);
   const memberId = selectedMember?.id ?? null;
@@ -183,39 +191,67 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [startDate, setStartDate] = React.useState(todayStr);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
   const [endDate, setEndDate] = React.useState(defaultEndStr);
+  // `endDate` es un preview editable: mientras el operador no lo toque
+  // (`dirty` en false) se sincroniza con la regla compartida; al enviar
+  // sin `dirty` no se manda `endDate` y el periodo lo fija el servidor.
+  const [endDateDirty, setEndDateDirty] = React.useState(false);
+  const [endDateOverrideReason, setEndDateOverrideReason] = React.useState("");
+  // El cálculo local puede discrepar del servidor (el `latestSubscription` del
+  // cliente puede estar desactualizado por caché): si el servidor responde 422
+  // `END_DATE_OVERRIDE_REASON_REQUIRED`, forzamos la aparición del motivo y
+  // refrescamos el latest del miembro para converger (#5).
+  const [serverRequiresReason, setServerRequiresReason] = React.useState(false);
 
   const [memberSearch, setMemberSearch] = React.useState("");
   const debouncedSearch = useDebounce(memberSearch, 500);
   const [searchResults, setSearchResults] = React.useState<PaginatedMembers["data"]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
 
-  // Lógica de Fecha Final Inteligente y Acumulativa
-  React.useEffect(() => {
+  // Preview de Fecha Final con la regla compartida (Regla 4: ningún día
+  // pagado se pierde). El latest sale de `selectedMember.latestSubscription`
+  // (el search ya pide `includeLatestSubscription: true`). Sin plan o sin
+  // miembro → +1 mes como antes (solo display, nunca se envía).
+  const periodPreview = React.useMemo(() => {
     const start = parseDateAsConfigTimezone(startDate, timezone);
-    if (!Number.isNaN(start.getTime()) && selectedPlan) {
-      const startOfToday = localDayStartUtc(timezone);
-
-      // Determinamos el Baseline para el cálculo acumulativo
-      // Si el socio tiene una suscripción VIGENTE, usamos suEndDate como base.
-      // Si no, usamos la fecha de inicio seleccionada (Hoy).
-      let baseline = new Date(start);
-      if (selectedMember?.latestSubscription) {
-        const currentExpiration = new Date(selectedMember.latestSubscription.endDate);
-        if (currentExpiration >= startOfToday && selectedMember.latestSubscription.status === 'active') {
-          baseline = new Date(currentExpiration);
-        }
-      }
-
-      const durationValue = selectedPlan.durationValue || 1;
-      const durationUnit = selectedPlan.durationUnit || 'month';
-
-      const endStr = toLocalDayString(timezone, addDuration(baseline, durationValue, durationUnit, timezone));
-      setEndDate(endStr);
-    } else if (!Number.isNaN(start.getTime()) && !selectedPlan) {
-      const endStr = toLocalDayString(timezone, addDuration(new Date(start), 1, 'month', timezone));
-      setEndDate(endStr);
+    if (Number.isNaN(start.getTime())) return null;
+    if (!selectedPlan) {
+      return {
+        endDate: addDuration(start, 1, "month", timezone),
+        hasActivePeriod: false,
+      };
     }
+    const rawLatest = selectedMember?.latestSubscription?.endDate;
+    const parsed = rawLatest ? new Date(rawLatest) : null;
+    return computeSubscriptionPeriod({
+      startDate: start,
+      latestEndDate: parsed && !Number.isNaN(parsed.getTime()) ? parsed : null,
+      durationValue: selectedPlan.durationValue || 1,
+      durationUnit: selectedPlan.durationUnit || "month",
+      timezone,
+    });
   }, [startDate, timezone, selectedPlan, selectedMember]);
+
+  const computedEndStr = periodPreview
+    ? toLocalDayString(timezone, periodPreview.endDate)
+    : null;
+
+  React.useEffect(() => {
+    if (!endDateDirty && computedEndStr) setEndDate(computedEndStr);
+  }, [computedEndStr, endDateDirty]);
+
+  // Acorte de un periodo vigente (comparación a día local, como el
+  // servidor: el mismo día cuenta como idempotente, no como recorte).
+  const isShorteningActivePeriod =
+    endDateDirty &&
+    periodPreview !== null &&
+    periodPreview.hasActivePeriod &&
+    endDate !== "" &&
+    computedEndStr !== null &&
+    endDate < computedEndStr;
+
+  // El campo motivo se exige si el cálculo local dice que acorta O si el
+  // servidor ya lo pidió (autoridad final, nunca el texto del error).
+  const requiresOverrideReason = isShorteningActivePeriod || serverRequiresReason;
 
   // Inicialización
   React.useEffect(() => {
@@ -399,6 +435,13 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     e.preventDefault();
     if (!validatePaymentFields()) return;
 
+    // Acortar un periodo vigente exige motivo (validación local antes del
+    // submit; si igual llega sin motivo el servidor responde 422).
+    if (requiresOverrideReason && !endDateOverrideReason.trim()) {
+      toast.error("Indica el motivo del ajuste de fecha");
+      return;
+    }
+
     setIsProcessingUploads(true);
     try {
       const finalDetails = await handleUploads();
@@ -427,7 +470,9 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         memberId: memberId!,
         planId: planId!,
         startDate: startDate, // Raw YYYY-MM-DD string, backend will handle timezone
-        endDate: endDate, // Raw YYYY-MM-DD string, backend will handle timezone
+        // Sin `dirty` no se envía `endDate`: el periodo lo fija el servidor.
+        ...(endDateDirty ? { endDate: endDate } : {}),
+        ...(requiresOverrideReason ? { endDateOverrideReason: endDateOverrideReason.trim() } : {}),
         payment: {
           amountPaid: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
@@ -450,21 +495,56 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       });
     } catch (err: any) {
       console.error("Error processing subscription payment:", err);
-      toast.error("Error al procesar el pago");
+      // Dueño ÚNICO del toast de submit: el modal (`SubscriptionModal`), que es
+      // quien mapea los códigos de negocio. Aquí solo se resuelve el estado
+      // local; toastear también duplicaría el aviso (1 acción → 1 toast).
+      if (apiCode(err) === "END_DATE_OVERRIDE_REASON_REQUIRED") {
+        // El servidor pide motivo (cálculo local desactualizado): forzamos el
+        // campo y refrescamos el latest del miembro para que el preview
+        // converja.
+        setServerRequiresReason(true);
+        if (selectedMember) {
+          const refreshed = await membersService.getMembers({
+            query: selectedMember.email,
+            role: ORG_ROLES.MEMBER,
+            includeLatestSubscription: true,
+            limit: 1,
+          });
+          const latestMember = refreshed.data.find((m) => m.id === selectedMember.id);
+          if (latestMember) setSelectedMember(latestMember);
+        }
+      }
     } finally {
       setIsProcessingUploads(false);
     }
+  };
+
+  // El preview es una edición del operador atada al miembro/plan vigente: al
+  // cambiar cualquiera de los dos, `dirty` y el motivo se resetean para no
+  // arrastrar un período editado hacia otro miembro (el servidor aceptaría
+  // libremente un `endDate` explícito en un período no vigente).
+  const resetPeriodOverride = () => {
+    setEndDateDirty(false);
+    setEndDateOverrideReason("");
+    setServerRequiresReason(false);
   };
 
   const handleSelectMember = (member: IMember) => {
     setSelectedMember(member);
     setMemberSearch("");
     setSearchResults([]);
+    resetPeriodOverride();
   };
 
   const handleClearMember = () => {
     setSelectedMember(null);
     setMemberSearch("");
+    resetPeriodOverride();
+  };
+
+  const handleSelectPlan = (id: number) => {
+    setPlanId(id);
+    resetPeriodOverride();
   };
 
   const isPendingPayment = selectedMember?.latestSubscription?.paymentStatus === "processing";
@@ -512,7 +592,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       <PlanSelector
         plans={plans}
         planId={planId}
-        onPlanSelect={setPlanId}
+        onPlanSelect={handleSelectPlan}
         disabled={isSectionDisabled}
       />
 
@@ -580,9 +660,21 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           label="Fecha Final"
           value={endDate}
           disabled={isSectionDisabled}
-          onChange={(e) => setEndDate(e.target.value)}
+          onChange={(e) => { setEndDate(e.target.value); setEndDateDirty(true); }}
         />
       </div>
+
+      {requiresOverrideReason && (
+        <Input
+          id="end-date-override-reason"
+          label="Motivo del ajuste de fecha *"
+          placeholder="Ej.: ajuste autorizado por gerencia"
+          value={endDateOverrideReason}
+          disabled={isSectionDisabled}
+          required
+          onChange={(e) => setEndDateOverrideReason(e.target.value)}
+        />
+      )}
 
       <Button
         type="submit"

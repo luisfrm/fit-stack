@@ -17,24 +17,32 @@ import {
   type GymTenant,
 } from '../helpers/auth';
 
-/** Sub window relative to today (endpoint computes against `new Date()`). */
-function subWindow(endOffsetDays: number) {
-  return { startDate: isoDate(0), endDate: isoDate(endOffsetDays) };
+/** Sub window relative to today (endpoint computes against `new Date()`).
+ *
+ * B3.3: el periodo lo calcula el servidor — `endOffsetDays: null` omite el
+ * fin explícito y el servidor lo computa desde `startDate` + duración del
+ * plan (así se siembran periodos ya vencidos: un `endDate` explícito pasado e
+ * invertido se rechaza con 422 END_DATE_BEFORE_START). */
+function subWindow(startOffsetDays: number, endOffsetDays: number | null) {
+  return {
+    startDate: isoDate(startOffsetDays),
+    ...(endOffsetDays === null ? {} : { endDate: isoDate(endOffsetDays) }),
+  };
 }
 
 async function createSubscription(
   tenant: GymTenant,
   memberId: number,
   planId: number,
-  endOffsetDays: number,
+  endOffsetDays: number | null,
   status: 'validated' | 'processing' = 'validated',
+  startOffsetDays = 0,
 ) {
-  const { startDate, endDate } = subWindow(endOffsetDays);
+  const window = subWindow(startOffsetDays, endOffsetDays);
   const res = await tenant.owner.client.post('/api/subscriptions', {
     memberId,
     planId,
-    startDate,
-    endDate,
+    ...window,
     payment: {
       amountPaid: 100,
       currencyPaid: 'USD',
@@ -86,16 +94,16 @@ describe.skipIf(skipReason !== null)('Dashboard action-items API', () => {
 
     it('returns recently expired members (last 7 days, no renewal) with negative days', async () => {
       const tenant = await createGymTenant('dash-expired');
-      const plan = await createPlan(tenant.owner.client, { name: 'Plan Vencido' });
+      const plan = await createPlan(tenant.owner.client, { name: 'Plan Vencido', durationValue: 5, durationUnit: 'day' });
 
       const expired = await createGymMember(tenant.owner.client);
       const renewed = await createGymMember(tenant.owner.client);
 
-      // Venció hace 3 días (end en el pasado) — el API no permite endDate pasado?
-      // Sí lo permite: valida solo que endDate > startDate, no contra hoy.
-      await createSubscription(tenant, expired.id, plan.id, -3);
-      // Venció y renovó: segunda sub activa → NO debe aparecer.
-      await createSubscription(tenant, renewed.id, plan.id, -5);
+      // Venció hace 3 días: inicio hace 8 + plan de 5 días → el servidor
+      // computa fin hace 3 (un endDate explícito invertido sería 422).
+      await createSubscription(tenant, expired.id, plan.id, null, 'validated', -8);
+      // Venció y renovó: primera vencida (fin hace 5) + segunda activa → NO debe aparecer.
+      await createSubscription(tenant, renewed.id, plan.id, null, 'validated', -10);
       await createSubscription(tenant, renewed.id, plan.id, 30);
 
       const res = await tenant.owner.client.get('/api/dashboard/action-items');

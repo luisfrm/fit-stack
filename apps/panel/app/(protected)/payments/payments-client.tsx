@@ -14,15 +14,14 @@ import { RevenueChart } from "@/components/payments/revenue-chart";
 import { PaymentMethodsChart } from "@/components/payments/payment-methods-chart";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus } from "@workspace/shared";
+import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus, type CurrencyFormat } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAuth } from "@/lib/hooks/use-auth";
-import type { CurrencyFormat } from "@workspace/shared";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
 import { monthCollectedTotal, perActiveSubscription } from "@/lib/payments/payment-selectors";
-import { mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@/lib/errors";
 import type { ISubscription, PaginatedSubscriptions } from "@workspace/shared/types";
 
 interface PaymentsClientProps {
@@ -47,6 +46,24 @@ interface PaymentsClientProps {
   readonly onSuccess?: () => Promise<void> | void;
 }
 
+/**
+ * Resolves a user-friendly error message for payment status updates based on API error codes.
+ */
+function resolvePaymentErrorMessage(
+  err: unknown,
+  context: string,
+  defaultMessage: string,
+): string {
+  const code = apiCode(err);
+  if (code === "PAYMENT_NOT_REVALIDATABLE") {
+    return "Solo un pago en proceso puede validarse";
+  }
+  if (code === "SUBSCRIPTION_CANCELLED") {
+    return "La suscripción está cancelada: no se puede validar este cobro";
+  }
+  return mutationError(context, err, defaultMessage);
+}
+
 export function PaymentsClient({
   initialSubscriptions,
   initialPage,
@@ -69,7 +86,7 @@ export function PaymentsClient({
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;
   const currencyFormat =
     ((activeOrganization?.currencyFormat as CurrencyFormat | undefined) ||
-    initialCurrencyFormat);
+      initialCurrencyFormat);
 
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(initialStatus);
@@ -168,7 +185,12 @@ export function PaymentsClient({
       }
       refreshAll();
     } catch (err) {
-      toast.error(mutationError("PaymentsClient", err, "Error al actualizar pago"));
+      // Códigos con significado de UX (nunca se compara el texto del
+      // servidor): el guard de la invariante validado ⇔ numerado solo acepta
+      // `processing → validated` y rechaza validar sobre una sub cancelada.
+      toast.error(
+        resolvePaymentErrorMessage(err, "PaymentsClient", "Error al actualizar pago"),
+      );
     }
   };
 
@@ -186,11 +208,58 @@ export function PaymentsClient({
       );
       refreshAll();
     } catch (err) {
-      toast.error(mutationError("PendingPaymentsList", err, "No se pudo actualizar el pago"));
+      // Mismo mapeo por código que `handlePaymentStatusChange`: el accionable
+      // "Por validar" también puede traer el pago de una sub cancelada.
+      toast.error(
+        resolvePaymentErrorMessage(err, "PendingPaymentsList", "No se pudo actualizar el pago"),
+      );
     } finally {
       setPendingActionId(null);
     }
   };
+
+  let analyticsContent: React.ReactNode = null;
+  if (analyticsLoading && !analytics) {
+    analyticsContent = (
+      <>
+        <KpiSectionSkeleton />
+        <div className="flex flex-col xl:flex-row gap-4 w-full">
+          <RevenueChartSkeleton />
+          <RevenueChartSkeleton />
+        </div>
+      </>
+    );
+  } else if (analytics) {
+    analyticsContent = (
+      <>
+        <KpiSection
+          stats={analytics.kpis}
+          activeFilter={activeFilter}
+          onFilterChange={setFilterAndNavigate}
+          currencyFormat={currencyFormat}
+          monthCollectedCents={monthCollectedCents}
+          perSubscriptionCents={perSubscriptionCents}
+          primaryCurrency={primaryCurrency}
+        />
+        <div className="flex flex-col xl:flex-row gap-4 w-full">
+          <div className="w-full xl:w-1/2">
+            <RevenueChart
+              data={analytics.chartData}
+              monthlyData={initialMonthlyReport}
+              baseCurrency={primaryCurrency}
+              currencyFormat={currencyFormat}
+            />
+          </div>
+          <div className="w-full xl:w-1/2">
+            <PaymentMethodsChart
+              data={analytics}
+              currencyFormat={currencyFormat}
+            />
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -210,43 +279,7 @@ export function PaymentsClient({
       </DashboardHeader>
 
       {/* Analytics Layer */}
-      {analyticsLoading && !analytics ? (
-        <>
-          <KpiSectionSkeleton />
-          <div className="flex flex-col xl:flex-row gap-4 w-full">
-            <RevenueChartSkeleton />
-            <RevenueChartSkeleton />
-          </div>
-        </>
-      ) : analytics ? (
-        <>
-          <KpiSection
-            stats={analytics.kpis}
-            activeFilter={activeFilter}
-            onFilterChange={setFilterAndNavigate}
-            currencyFormat={currencyFormat}
-            monthCollectedCents={monthCollectedCents}
-            perSubscriptionCents={perSubscriptionCents}
-            primaryCurrency={primaryCurrency}
-          />
-          <div className="flex flex-col xl:flex-row gap-4 w-full">
-            <div className="w-full xl:w-1/2">
-              <RevenueChart
-                data={analytics.chartData}
-                monthlyData={initialMonthlyReport}
-                baseCurrency={primaryCurrency}
-                currencyFormat={currencyFormat}
-              />
-            </div>
-            <div className="w-full xl:w-1/2">
-              <PaymentMethodsChart
-                data={analytics}
-                currencyFormat={currencyFormat}
-              />
-            </div>
-          </div>
-        </>
-      ) : null}
+      {analyticsContent}
 
       <div className="flex flex-col gap-4">
         <PendingPaymentsList

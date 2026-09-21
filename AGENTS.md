@@ -118,7 +118,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both configurable dynamically in **Settings**.
 2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
 3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
-4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days.
+4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days. The period is **server-computed** (`POST /api/subscriptions`): `startDate?` defaults to today in the org timezone, `endDate?` defaults to `computeSubscriptionPeriod` (`@workspace/shared` — baseline = `max(latestEndDate, startDate)` on local-day validity, tz-aware `addDuration`); an explicit `endDate` before `startDate` → **422 `END_DATE_BEFORE_START`**, shortening an active period without `endDateOverrideReason` → **422 `END_DATE_OVERRIDE_REASON_REQUIRED`** (persisted in `subscription.end_date_override_reason`, migration `0019`, nullable). The panel sends no `endDate` unless the operator edits the preview (dirty flag).
 5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
 6. **Immutable financial record**: a subscription with its payment is **never deleted** — `subscriptions` does not expose `delete` to any role and there is no `DELETE /api/subscriptions/:id`. If the record is wrong it is **voided** (the charge becomes `voided` and the subscription is computed as `ANULADA`); if access is revoked it is **cancelled**. Void ≠ cancel: `voided` = invalid record, `cancelled` = access was revoked with a charge that is still valid.
    - **Unified payment statuses**: `PAYMENT_STATUSES = processing | validated | voided | refunded` (without `pending`/`invalid`). Rejection and voiding share `voided`; the kind is **derived** with `getVoidKind` (`rejected` without `receiptNumber` / `annulled` with it). Only `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) sustain a period. When voiding, `voided_by`/`voided_at`/`void_reason` are always persisted.
@@ -166,6 +166,7 @@ A Python/Flet desktop application running locally at the gym entrance. Communica
 - **No `pgEnum`**: Use plain `text('col')` — no `.$type<...>()` annotation. The DB treats these columns as plain strings. Allowed values are validated exclusively by Zod schemas on the backend and by the frontend; they never live in the DB layer. pgEnum is strictly forbidden (breaks Drizzle migrations).
 - **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
 - **No interactive transactions (serverless)**: `api-worker` runs on Cloudflare Workers with Neon's **HTTP** driver, where interactive `db.transaction()` **does not exist**. Atomicity is achieved with a **single statement** (canonical pattern: the receipt sequence, `INSERT … ON CONFLICT DO UPDATE … RETURNING`) or with **explicit compensation** in the service's `catch`. Never wrap multiple writes in a transaction nor assume automatic rollback.
+- **Explicit creation compensation (FS-0002)**: since there are no transactions, `subscriptions.service.create()` (gym) and the 4 sites in `platform-subscriptions.service` (creation, renewal, additional payment via `registerPayment`, late validation in `PATCH status`) delegate to the `compensateFailedEmission` helper (`apps/api-worker/src/lib/subscription-compensation.ts`) in the `catch`. The decision is **by re-read, never by error type** (up to 3 bounded retries to ride out a Neon HTTP blip): if the persisted payment carries `receiptNumber` → `committed` (success, not re-thrown; the sweep recovers the pending render); if the re-read stays unresolved after the retries → `unresolved` (**fail-closed real**: nothing is voided/reverted/cancelled — voiding a possibly-numbered receipt would serve/email an unsealed ANULADO — the original error is re-thrown and the sweep reconciles); otherwise → the payment is voided with the fixed reason `COMPENSATION_VOID_REASON` (`voided_by`/`void_reason` always persisted). In the gym flow the voided payment already computes as `ANULADA`, so the subscription is **not** additionally cancelled; only when `paymentsRepo.create` never ran is the orphan **cancelled with `cancel()` — never `delete()`** (rule 6; the `FS-N` series is not emptied). In SaaS, where the period is extended BEFORE emission, the `catch` also **reverts the period** (`revertEffect` → `updatePeriodEnd(previousPeriodEnd)`, read before extending: an honest single write, no transaction) **only if the void actually succeeded** (otherwise the charge is still valid and the days paid must be kept); a SaaS creation whose payment was created-but-voided **also cancels the subscription** (a `voided` payment is ignored by `computePlatformSubscriptionStatus`, so it would leave a front-loaded period with no charge backing it) — this cancel fires only on `outcome === 'compensated'`, never on `unresolved`; and a `voided` payment **cannot be re-validated** — `PATCH status` → **409 `PAYMENT_NOT_REVALIDATABLE`** (and **409 `SUBSCRIPTION_CANCELLED`** when the parent subscription is cancelled) so a re-PATCH neither extends again over a voided charge nor leaves a `validated` without a receipt. Trial/free $0 (`skipped`) = success, they do not compensate. If the compensation write fails, it is logged and the **original error** is re-thrown (never masked by the compensation one). Successful mutations invalidate dependent caches in a `finally`, so the compensated-failure path invalidates too.
 
 ### 4. Next.js Patterns & Best Practices
 
@@ -245,8 +246,8 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 | `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
 | `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
 | `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
-| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **no DELETE** (immutable financial record) |
-| `/api/payments`       | `PATCH /:id/status` accepts `processing \| validated \| voided` + optional `voidReason` (retired `pending`/`invalid` → **400**); returns the explicit void outcome (`receiptVoided` + `receiptVoidReason`). `POST /:id/send-email` (receipt resend) |
+| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **no DELETE** (immutable financial record) · `POST /` with the server-computed period (`startDate?`/`endDate?`/`endDateOverrideReason?`, 422 by code — contract in `apps/api-worker/README.md`) |
+| `/api/payments`       | `PATCH /:id/status` accepts `processing \| validated \| voided` + optional `voidReason` (retired `pending`/`invalid` → **400**); returns the explicit void outcome (`receiptVoided` + `receiptVoidReason`). `→ validated` only from `processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**, and never over a cancelled subscription → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (mirror of the console guard — invariant *validado ⇔ numerado*). `POST /:id/send-email` (receipt resend) |
 | `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
 | `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
 | `/api/cms`           | Content pages/blocks                                                                                                                                                                                                                                                                                                                                                                 |
@@ -463,6 +464,8 @@ Panel receipts are internal payment records — never fiscal invoices (see `vaul
 
 > Payment-status migration (`0017`, additive/backward-compatible): sets `platform_subscription_payment.status` default to `'processing'` and normalizes legacy data (`pending → processing`, `invalid → voided`, marking `receipt_voided`/`voided_at`/`void_reason` when a receipt existed). Applied by CI (`database-migrations.yml`) on merge. After merge, no row may carry `pending`/`invalid`.
 
+> Column `0019` (FS-0002, additive nullable, no backfill): `subscription.end_date_override_reason` (motivo exigido al acortar un periodo vigente, `NULL` en el resto de casos). Pendiente de aplicar — se aplica por CI (`database-migrations.yml`) al hacer merge; no correr `db:migrate` manual. Solo añade una columna: el conteo de tablas sigue en **33**.
+
 **Console (SaaS) receipts** mirror the same guarantees with one legal emitter (FitStack):
 - Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
 - Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
@@ -506,7 +509,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 > Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revoked); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 
-**Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
+**Validation flow** (`apps/panel/app/(protected)/layout.tsx`):
 
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
@@ -516,7 +519,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 **Dynamic gate pages** (`/no-subscription`, `/unauthorized` in panel and console) — Server Components with `force-dynamic` that check the session on every request: no session → `redirect('/login')`; valid access (active subscription or allowed role) → `redirect('/dashboard')`; only without access they render. Prevents getting stuck after logout or refresh.
 
-- **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
+- **Note**: The `/no-subscription` page is OUTSIDE the `(protected)` layout to prevent infinite redirect loops.
 
 ### Self-service renewal (phase 2 — org pays from the panel)
 
@@ -552,7 +555,7 @@ Extension rules: every new feature is born `defaultEnabled: false` (additive); `
 
 ### Free Tier (free floor)
 
-- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/dashboard/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
+- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
 - **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
 - **Resolution rule** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).
@@ -798,7 +801,7 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ### Memberships & Payments
 
-`membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail)
+`membership_plan` (gym product catalog), `subscription` (member ↔ plan, + `end_date_override_reason` nullable — migration `0019`), `payment` (financial audit trail)
 
 ### Access Control
 
@@ -914,6 +917,20 @@ stale data until the TTL expires. `updateTag` without `refresh()` purges
 silently without re-rendering. Panel uses the same shape
 (`members-client.tsx` + `onRefreshServer` prop).
 
+> **Client-only pages (no RSC parent to own the action)**: the purge travels
+> through a shared `"use server"` module instead — reference:
+> `apps/panel/lib/actions/settings.ts` (`invalidateSettingsCache`), consumed by
+> the `useSettings` hook of the panel `settings/*` pages. It derives the tag from
+> the **session on the server** (`sessionService.getSession()`, i.e.
+> `session?.session?.activeOrganizationId`), never from a value the client sends,
+> and the caller `await`s it before `router.refresh()`.
+>
+> This is not optional: **`updateTag` is server-only**, so a client component
+> that imports `next/cache` breaks (the settings save failed silently that way).
+> Before adding a purge, check where the consumer lives: RSC → inline `"use
+> server"` action passed as a prop; client-only page → shared action module.
+> When in doubt, grep for `next/cache` in a client file — it must never appear.
+
 > **Actionable lists always fresh**: the "To validate" list in
 > `/payments` is requested with `cache: 'no-store'` (`payments/page.tsx`). A work
 > list cannot have staleness: a payment recorded through another channel must
@@ -987,8 +1004,9 @@ pnpm test  # shared → api-worker → jobs-worker → panel → console (Vitest
   - **Hard guards**: refuses to run if `TEST_DATABASE_URL` points to the same host+db as `DATABASE_URL`; without `TEST_DATABASE_URL` the whole suite is skipped with `describe.skipIf` (CI included).
   - **Determinism**: `fileParallelism: false` (one shared branch), `TRUNCATE ... RESTART IDENTITY CASCADE` between files (`tests/helpers/db.ts`), Redis intentionally absent (no-op cache).
   - **Recording spies** for R2 and Queues (`tests/helpers/env.ts`) — can assert enqueued events (e.g. `email.payment_receipt`).
-  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it.
+  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it. **Watch the day helpers**: `isoDate(n)` derives the **UTC** day while `localDay(n, tz)` derives the **org-local** day; they diverge between 20:00-24:00 in America/Caracas (UTC-4), so use `localDay` whenever the assertion is about the local-day contract.
   - **Auth guards** (`tests/integration/guards.test.ts`): cover the 3 middlewares of `route-handler.ts` — `requireAuth` (401 without session; lets a valid session without org through, 200 with `admin`), `requireOrgPermission` (401, **400 without active org**, role matrix: positive owner/manager/cashier settings, member/coach plans/classes read; negative coach settings, cashier staff, coach classes.create even with update, member subscriptions) and `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** in settings/orgs/staff, user 403, 401).
+  - **Financial invariants** (`subscriptions.test.ts` — period + payment-transition guards, `subscriptions-period.test.ts`, `subscriptions-compensation.test.ts`, `platform-subscriptions-compensation.test.ts`, `receipts-*.test.ts`): pin the rules that must not regress — *validated ⇔ numbered*, server-computed period, compensated creation (no double charge, no access without a charge), the ANULADO artifact. Touch subscriptions, payments or receipts → run these first.
   - **Schema sync**: `pnpm --filter api-worker test:db:push` (drizzle-kit push against the test branch, never production).
 
 > **panel/console have no integration tests** — their tests are unit only (`tests/unit/`). api-worker is the only one with an integration suite.
@@ -1146,7 +1164,7 @@ Use skill tool for specialized tasks:
 
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
-- `packages/database/src/schema.ts` — Full DB schema (30 tables)
+- `packages/database/src/schema.ts` — Full DB schema (33 tables)
 - `packages/shared/src/access-control.ts` — RBAC statements + roles (single source of truth)
 - `apps/api-worker/src/index.ts` — Hono app: middleware, mounts, healthcheck
 - `apps/api-worker/src/lib/auth.ts` — Better Auth server config (per-request factory)

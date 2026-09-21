@@ -174,12 +174,20 @@ export function PlatformPaymentHistoryModal({
       await loadPayments();
       onChange?.();
     } catch (err) {
+      // Errores con significado de UX: se mapean por CÓDIGO (nunca por el
+      // texto del servidor). El servidor solo acepta `processing → validated`
+      // y rechaza validar sobre una suscripción cancelada.
+      const code = apiCode(err);
       toast.error(
-        mutationError(
-          "PlatformPaymentHistoryModal",
-          err,
-          "No se pudo cambiar el estado del pago",
-        ),
+        code === "PAYMENT_NOT_REVALIDATABLE"
+          ? "Solo un pago en proceso puede validarse"
+          : code === "SUBSCRIPTION_CANCELLED"
+            ? "La suscripción está cancelada: no se puede validar este cobro"
+            : mutationError(
+                "PlatformPaymentHistoryModal",
+                err,
+                "No se pudo cambiar el estado del pago",
+              ),
       );
     } finally {
       setActionPaymentId(null);
@@ -408,9 +416,12 @@ export function PlatformPaymentHistoryModal({
                                   p.id,
                                   PAYMENT_STATUSES.VALIDATED,
                                 ),
+                              // Solo `processing → validated` es una transición
+                              // válida (un `voided`/`refunded` responde 409):
+                              // no se ofrece una acción que el servidor rechaza.
                               show:
                                 canChangeStatus &&
-                                p.status !== PAYMENT_STATUSES.VALIDATED,
+                                p.status === PAYMENT_STATUSES.PROCESSING,
                             },
                             {
                               label: "Marcar como Rechazado",

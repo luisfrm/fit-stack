@@ -256,18 +256,23 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const { service } = buildService(c);
-    const result = await service.createSubscriptionWithPayment(data, {
-      receipts: buildReceipts(c),
-      // C5: actor de sesión que emite (`issued_by`).
-      by: c.get('user')?.id,
-    });
-
-    await cache.invalidate('platform:subscriptions*');
-    await invalidateReceiptsReportCache(cache);
-    await cache.invalidateExact(`org:${data.organizationId}:subscription`);
-    await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
+    // El fallo compensado re-lanza tras mutar (pago anulado / periodo revertido
+    // / alta cancelada): las invalidaciones corren igual en el `finally`.
+    let result;
+    try {
+      result = await service.createSubscriptionWithPayment(data, {
+        receipts: buildReceipts(c),
+        // C5: actor de sesión que emite (`issued_by`).
+        by: c.get('user')?.id,
+      });
+    } finally {
+      await cache.invalidate('platform:subscriptions*');
+      await invalidateReceiptsReportCache(cache);
+      await cache.invalidateExact(`org:${data.organizationId}:subscription`);
+      await cache.invalidateExact(`org:${data.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${data.organizationId}:features`);
-    await invalidateInvoicesCache(c, data.organizationId);
+      await invalidateInvoicesCache(c, data.organizationId);
+    }
 
     const created = await service.getSubscriptionById(result.subscriptionId);
     return c.json(created, 201);
@@ -321,17 +326,21 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.renewSubscription(id, data, {
-      receipts: buildReceipts(c),
-      // C5: actor de sesión que emite (`issued_by`).
-      by: c.get('user')?.id,
-    });
-    await cache.invalidate('platform:subscriptions*');
-    await invalidateReceiptsReportCache(cache);
-    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
-    await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+    let result;
+    try {
+      result = await service.renewSubscription(id, data, {
+        receipts: buildReceipts(c),
+        // C5: actor de sesión que emite (`issued_by`).
+        by: c.get('user')?.id,
+      });
+    } finally {
+      await cache.invalidate('platform:subscriptions*');
+      await invalidateReceiptsReportCache(cache);
+      await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
+      await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
-    await invalidateInvoicesCache(c, sub.organizationId);
+      await invalidateInvoicesCache(c, sub.organizationId);
+    }
 
     return c.json({ success: true, ...result });
   })
@@ -351,17 +360,21 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const actor = c.get('user')?.id;
     if (!actor) return c.json({ error: 'Sesión requerida.' }, 401);
 
-    const receipt = await service.updatePaymentStatus(paymentId, data, {
-      receipts: buildReceipts(c),
-      by: actor,
-    });
-    await cache.invalidate('platform:subscriptions*');
-    await invalidateReceiptsReportCache(cache);
-    if (payment.organizationId) {
-      await cache.invalidateExact(`org:${payment.organizationId}:subscription`);
-      await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
-      await cache.invalidateExact(`org:${payment.organizationId}:features`);
-      await invalidateInvoicesCache(c, payment.organizationId);
+    let receipt;
+    try {
+      receipt = await service.updatePaymentStatus(paymentId, data, {
+        receipts: buildReceipts(c),
+        by: actor,
+      });
+    } finally {
+      await cache.invalidate('platform:subscriptions*');
+      await invalidateReceiptsReportCache(cache);
+      if (payment.organizationId) {
+        await cache.invalidateExact(`org:${payment.organizationId}:subscription`);
+        await cache.invalidateExact(`org:${payment.organizationId}:subscription-status`);
+        await cache.invalidateExact(`org:${payment.organizationId}:features`);
+        await invalidateInvoicesCache(c, payment.organizationId);
+      }
     }
 
     // C6: el intento de anulación del comprobante viaja en el body
@@ -462,17 +475,21 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
-    const result = await service.registerPayment(id, data, {
-      receipts: buildReceipts(c),
-      // C5: actor de sesión que emite (`issued_by`).
-      by: c.get('user')?.id,
-    });
-    await cache.invalidate('platform:subscriptions*');
-    await invalidateReceiptsReportCache(cache);
-    await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
-    await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
+    let result;
+    try {
+      result = await service.registerPayment(id, data, {
+        receipts: buildReceipts(c),
+        // C5: actor de sesión que emite (`issued_by`).
+        by: c.get('user')?.id,
+      });
+    } finally {
+      await cache.invalidate('platform:subscriptions*');
+      await invalidateReceiptsReportCache(cache);
+      await cache.invalidateExact(`org:${sub.organizationId}:subscription`);
+      await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
       await cache.invalidateExact(`org:${sub.organizationId}:features`);
-    await invalidateInvoicesCache(c, sub.organizationId);
+      await invalidateInvoicesCache(c, sub.organizationId);
+    }
 
     return c.json({ success: true, ...result }, 201);
   })

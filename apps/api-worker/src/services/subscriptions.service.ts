@@ -1,15 +1,26 @@
-import type { SubscriptionsRepository, ISubscriptionDTO, SubscriptionsFilter } from '../repositories/subscriptions.repository';
+import type { SubscriptionsRepository, ISubscriptionDTO } from '../repositories/subscriptions.repository';
 import type { PaymentsRepository } from '../repositories/payments.repository';
 import type { PlansRepository } from '../repositories/plans.repository';
 import type { MembersRepository } from '../repositories/members.repository';
 import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
-import { PAYMENT_STATUSES, type IPaymentMethodDetails, type ITaxDetail } from '@workspace/shared';
+import { COMPENSATION_VOID_REASON, compensateFailedEmission } from '../lib/subscription-compensation';
+import {
+  PAYMENT_STATUSES,
+  computeSubscriptionPeriod,
+  toLocalDayString,
+  type IPaymentMethodDetails,
+  type ITaxDetail,
+} from '@workspace/shared';
 import { ReceiptError } from './receipts.service';
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
-export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId'> {
+export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId' | 'startDate' | 'endDate' | 'status' | 'cancelledAt' | 'isActive' | 'createdAt'> {
+  /** 'YYYY-MM-DD' local, ISO con `T` o Date. Ausente = hoy local (lo resuelve el servidor). */
+  startDate?: string | Date;
+  /** Explícito solo para periodo a medida o idempotente; acortar vigente exige motivo. */
+  endDate?: string | Date;
   payment: {
     amountPaid: number;
     currencyPaid: string;
@@ -74,6 +85,45 @@ export interface PaymentStatusResult {
   payment: any;
   receiptVoided: boolean;
   receiptVoidReason?: 'not_issued';
+}
+
+/**
+ * Error de negocio con `res` propio, mismo patrón que `409 { code: 'SLUG_TAKEN' }`:
+ * el `code` es el contrato que las apps mapean a toast (nunca el texto libre).
+ */
+const businessError = (
+  status: 409 | 422,
+  code:
+    | 'END_DATE_BEFORE_START'
+    | 'END_DATE_OVERRIDE_REASON_REQUIRED'
+    | 'PAYMENT_NOT_REVALIDATABLE'
+    | 'SUBSCRIPTION_CANCELLED',
+  message: string,
+) =>
+  new HTTPException(status, {
+    message,
+    res: new Response(JSON.stringify({ error: message, code }), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
+
+/**
+ * Resuelve una fecha del contrato a instante UTC. Ausente/vacía = hoy local;
+ * `'YYYY-MM-DD'` → medianoche local; ISO con `T` (o Date) → instante tal cual.
+ */
+function parseSubscriptionDate(
+  value: string | Date | undefined | null,
+  dateManager: OrganizationDateManager,
+): Date {
+  if (value === undefined || value === null) {
+    return dateManager.parseLocalToUtc(dateManager.getTodayLocalString());
+  }
+  if (value instanceof Date) return value;
+  if (value.trim() === '') {
+    return dateManager.parseLocalToUtc(dateManager.getTodayLocalString());
+  }
+  return !value.includes('T') ? dateManager.parseLocalToUtc(value) : new Date(value);
 }
 
 export function createSubscriptionsService(
@@ -156,23 +206,82 @@ export function createSubscriptionsService(
 
       const dateManager = new OrganizationDateManager(timezone);
 
-      const startStr = payload.startDate as unknown as string;
-      const startDate =
-        typeof startStr === 'string' && !startStr.includes('T')
-          ? dateManager.parseLocalToUtc(startStr)
-          : new Date(payload.startDate);
+      // B3.3 (FS-0002 fase 4): el periodo lo calcula el servidor (Regla 4).
+      // 1. `startDate` por defecto = hoy local. 2. `plan` + `latest` ya
+      // cargados arriba (el guard `processing` sigue primero, intacto).
+      const startDate = parseSubscriptionDate(payload.startDate, dateManager);
+      if (Number.isNaN(startDate.getTime())) {
+        throw new HTTPException(400, { message: 'Fecha de inicio inválida' });
+      }
 
-      const endStr = payload.endDate as unknown as string;
-      const endDate =
-        typeof endStr === 'string' && !endStr.includes('T')
-          ? dateManager.parseLocalToUtc(endStr)
-          : new Date(payload.endDate);
+      // 3. Periodo calculado desde el baseline acumulativo (fase-1, día local).
+      const computed = computeSubscriptionPeriod({
+        startDate,
+        latestEndDate: latest?.endDate ?? null,
+        durationValue: plan.durationValue,
+        durationUnit: plan.durationUnit,
+        timezone,
+      });
 
+      // 4-5. `endDate` explícito: `endDate < startDate` se rechaza; acortar un
+      // periodo vigente exige motivo (comparación a día local: el mismo día
+      // cuenta como idempotente, no como recorte). Idempotente o periodo nuevo
+      // a medida → libre, motivo NULL. Sin `endDate` → manda el cálculo.
+      let endDate: Date;
+      let endDateOverrideReason: string | null = null;
+      if (
+        payload.endDate !== undefined &&
+        payload.endDate !== null &&
+        !(typeof payload.endDate === 'string' && payload.endDate.trim() === '')
+      ) {
+        const explicitEnd = parseSubscriptionDate(payload.endDate, dateManager);
+        if (Number.isNaN(explicitEnd.getTime())) {
+          throw new HTTPException(400, { message: 'Fecha de fin inválida' });
+        }
+        // Comparación a día local (coherente con el recorte de abajo): un
+        // `startDate` instante + `endDate` 'YYYY-MM-DD' del mismo día local no
+        // debe rechazarse por orden de instantes.
+        if (toLocalDayString(timezone, explicitEnd) < toLocalDayString(timezone, startDate)) {
+          throw businessError(
+            422,
+            'END_DATE_BEFORE_START',
+            'La fecha de fin no puede ser anterior a la fecha de inicio',
+          );
+        }
+        if (
+          computed.hasActivePeriod &&
+          toLocalDayString(timezone, explicitEnd) < toLocalDayString(timezone, computed.endDate)
+        ) {
+          const reason =
+            typeof payload.endDateOverrideReason === 'string'
+              ? payload.endDateOverrideReason.trim()
+              : '';
+          if (!reason) {
+            throw businessError(
+              422,
+              'END_DATE_OVERRIDE_REASON_REQUIRED',
+              'Acortar un periodo vigente exige indicar el motivo',
+            );
+          }
+          endDate = explicitEnd;
+          endDateOverrideReason = reason;
+        } else {
+          endDate = explicitEnd;
+          endDateOverrideReason = null;
+        }
+      } else {
+        endDate = computed.endDate;
+        endDateOverrideReason = null;
+      }
+
+      // 6. Persistir con el motivo (columna 0019) y seguir con pago + emisión
+      // + compensación de fase-2 sin cambios.
       const subscription = await subsRepo.create(organizationId, {
         memberId: payload.memberId,
         planId: payload.planId,
         startDate: startDate,
         endDate: endDate,
+        endDateOverrideReason,
       });
 
       if (!subscription?.id) {
@@ -190,62 +299,89 @@ export function createSubscriptionsService(
         paymentDateFinal = new Date();
       }
 
-      const createdPayment = await paymentsRepo.create(organizationId, {
-        memberId: payload.memberId,
-        subscriptionId: subscription.id,
-        planSnapshotName: plan.name,
-        planSnapshotPrice: plan.price,
-        planSnapshotCurrency: plan.currency,
-        amountPaid: payload.payment.amountPaid,
-        currencyPaid: payload.payment.currencyPaid,
-        exchangeRateApplied: payload.payment.exchangeRateApplied,
-        paymentMethod: payload.payment.paymentMethod,
-        paymentMethodDetails: payload.payment.paymentMethodDetails,
-        status: payload.payment.status as any,
-        // Snapshot de la duración: es la que se usó para el periodo, así que
-        // editar el plan después no reescribe la semántica de este cobro.
-        planSnapshotDurationValue: plan.durationValue,
-        planSnapshotDurationUnit: plan.durationUnit,
-        paymentDate: paymentDateFinal,
-      });
+      // Alta en 3 pasos sin red (Neon HTTP no tiene `db.transaction()`):
+      // el pago + la emisión se compensan en el `catch` delegando al helper
+      // (decisión por relectura, nunca por tipo de error).
+      let paymentCreated = false;
+      let paymentId: number | null = null;
+      try {
+        const createdPayment = await paymentsRepo.create(organizationId, {
+          memberId: payload.memberId,
+          subscriptionId: subscription.id,
+          planSnapshotName: plan.name,
+          planSnapshotPrice: plan.price,
+          planSnapshotCurrency: plan.currency,
+          amountPaid: payload.payment.amountPaid,
+          currencyPaid: payload.payment.currencyPaid,
+          exchangeRateApplied: payload.payment.exchangeRateApplied,
+          paymentMethod: payload.payment.paymentMethod,
+          paymentMethodDetails: payload.payment.paymentMethodDetails,
+          status: payload.payment.status as any,
+          // Snapshot de la duración: es la que se usó para el periodo, así que
+          // editar el plan después no reescribe la semántica de este cobro.
+          planSnapshotDurationValue: plan.durationValue,
+          planSnapshotDurationUnit: plan.durationUnit,
+          paymentDate: paymentDateFinal,
+        });
+        paymentCreated = true;
+        paymentId = createdPayment?.id ?? null;
 
-      // Emisión automática al registrar un pago validado: el paso 1 asigna
-      // el número y encola el render. El email lo encola el paso 2 al
-      // completar el PDF (nunca aquí). Sin receipts inyectado (tests
-      // directos del servicio) se conserva el envío legacy.
-      // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
-      //
-      // La decisión se toma sobre la FILA PERSISTIDA, nunca sobre el payload:
-      // `payment.status` es opcional en el contrato y el repo lo normaliza a
-      // `validated`, así que leer el payload dejaba un pago validado SIN
-      // número (y sin render) que solo se reparaba a mano con /issue.
-      // Invariante: validado ⇔ numerado, sobre el estado que quedó en DB.
-      if (createdPayment?.id && createdPayment.status === PAYMENT_STATUSES.VALIDATED) {
-        if (opts?.receipts) {
-          const p = payload.payment;
-          await opts.receipts.assignReceiptNumber({
-            orgId: organizationId,
-            paymentId: createdPayment.id,
-            timezone,
-            orgSlug: opts.orgSlug,
-            actor: opts.by,
-            taxOverride:
-              p.taxTotal !== undefined && p.taxDetails !== undefined
-                ? {
+        // Emisión automática al registrar un pago validado: el paso 1 asigna
+        // el número y encola el render. El email lo encola el paso 2 al
+        // completar el PDF (nunca aquí). Sin receipts inyectado (tests
+        // directos del servicio) se conserva el envío legacy.
+        // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
+        //
+        // La decisión se toma sobre la FILA PERSISTIDA, nunca sobre el payload:
+        // `payment.status` es opcional en el contrato y el repo lo normaliza a
+        // `validated`, así que leer el payload dejaba un pago validado SIN
+        // número (y sin render) que solo se reparaba a mano con /issue.
+        // Invariante: validado ⇔ numerado, sobre el estado que quedó en DB.
+        if (createdPayment?.id && createdPayment.status === PAYMENT_STATUSES.VALIDATED) {
+          if (opts?.receipts) {
+            const p = payload.payment;
+            await opts.receipts.assignReceiptNumber({
+              orgId: organizationId,
+              paymentId: createdPayment.id,
+              timezone,
+              orgSlug: opts.orgSlug,
+              actor: opts.by,
+              taxOverride:
+                p.taxTotal !== undefined && p.taxDetails !== undefined
+                  ? {
                     subtotal: p.subtotal ?? p.amountPaid,
                     taxTotal: p.taxTotal,
                     taxDetails: p.taxDetails,
                     taxOverrideReason: p.taxOverrideReason ?? '',
                   }
-                : null,
-          });
-        } else if (taskQueue) {
-          await taskQueue.send({
-            type: 'email.payment_receipt',
-            paymentId: createdPayment.id,
-            organizationId,
-          });
+                  : null,
+            });
+          } else if (taskQueue) {
+            await taskQueue.send({
+              type: 'email.payment_receipt',
+              paymentId: createdPayment.id,
+              organizationId,
+            });
+          }
         }
+      } catch (err) {
+        const outcome = await compensateFailedEmission(
+          err,
+          {
+            readPayment: async () => paymentId != null ? paymentsRepo.findById(organizationId, paymentId) : null,
+            voidPayment: () =>
+              paymentsRepo.updateStatus(organizationId, paymentId as number, 'voided', {
+                // `undefined` → el repo persiste NULL (misma auditoría que
+                // `opts?.by ?? null` de la espec: sin actor, NULL).
+                voidedBy: opts?.by,
+                voidReason: COMPENSATION_VOID_REASON,
+              }),
+            cancelParent: () => subsRepo.cancel(organizationId, subscription.id),
+          },
+          { paymentCreated },
+        );
+        if (outcome === 'committed') return subscription;
+        throw err;
       }
 
       return subscription;
@@ -258,6 +394,33 @@ export function createSubscriptionsService(
       opts?: ReceiptContext,
     ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
+
+      // Espejo del guard de Console (invariante validado ⇔ numerado): se
+      // rechaza ANTES de escribir un `validated` que nacería sin número ni
+      // periodo que lo sostenga. Solo un pago `processing` puede validarse —
+      // un `voided` no vuelve atrás (su suscripción ya quedó cancelada por el
+      // propio void) — y nunca sobre una suscripción cancelada.
+      const wasPending = previous != null && previous.status !== PAYMENT_STATUSES.VALIDATED;
+      if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
+        if (previous!.status !== PAYMENT_STATUSES.PROCESSING) {
+          throw businessError(
+            409,
+            'PAYMENT_NOT_REVALIDATABLE',
+            'Solo un pago en proceso puede validarse',
+          );
+        }
+        if (previous!.subscriptionId) {
+          const parentSub = await subsRepo.findById(organizationId, previous!.subscriptionId);
+          if (parentSub?.cancelledAt) {
+            throw businessError(
+              409,
+              'SUBSCRIPTION_CANCELLED',
+              'No se puede validar un pago de una suscripción cancelada',
+            );
+          }
+        }
+      }
+
       // La auditoría de anulación se persiste siempre en el pago (haya o no
       // número): es la única fuente de `voidedBy`/`voidedAt`/`voidReason`.
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
@@ -299,7 +462,6 @@ export function createSubscriptionsService(
 
       // Un pago que pasa de processing a validated emite su recibo
       // (el alta con status validated ya lo numera en create()).
-      const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
         if (opts?.receipts) {
           if (!opts.timezone) {

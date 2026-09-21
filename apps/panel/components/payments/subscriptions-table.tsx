@@ -232,7 +232,13 @@ const getColumns = (
                   {
                     label: "Validar Pago",
                     icon: <CheckCircle2 size={14} />,
-                    show: sub.paymentStatus === 'processing',
+                    // El servidor solo valida `processing` y rechaza validar
+                    // sobre una suscripción fuera de vigencia (409 por código)
+                    // — no se ofrece una acción que va a fallar.
+                    show:
+                      sub.paymentStatus === 'processing' &&
+                      sub.status !== SUBSCRIPTION_STATUSES.CANCELLED &&
+                      sub.status !== SUBSCRIPTION_STATUSES.VOIDED,
                     onClick: () => sub.paymentId && onPaymentStatusChange(sub.paymentId, 'validated')
                   },
                   {

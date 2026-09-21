@@ -16,7 +16,7 @@ Aplicar el helper de fase-2 en `services/platform-subscriptions.service.ts` para
 
 | Archivo | Cambio |
 |---|---|
-| `apps/api-worker/src/services/platform-subscriptions.service.ts` | Envolver la emisión en los 4 sitios con `assignPlatformReceiptNumber` — alta (`createSubscriptionWithPayment`, ~227), renovación (`renewSubscription`, ~294), registro (`registerPayment`, ~433) y transición a validado (`updatePaymentStatus`, ~543) — con closures de plataforma. `changePlan` hereda vía `createSubscriptionWithPayment` (su `cancel` previo de la anterior no se revierte: documentar en el comentario). `renewOrgSubscription` es `processing` y no emite: sin compensación (solo `setPayerIfMissing`, que no falla el cobro). |
+| `apps/api-worker/src/services/platform-subscriptions.service.ts` | Envolver la emisión en los 4 sitios con `assignPlatformReceiptNumber` — alta (`createSubscriptionWithPayment`, ~227), renovación (`renewSubscription`, ~294), registro (`registerPayment`, ~433) y transición a validado (`updatePaymentStatus`, ~543) — con closures de plataforma. `changePlan` hereda vía `createSubscriptionWithPayment` (el `cancel` previo de la suscripción anterior — un efecto distinto de la reversión del periodo — sí se mantiene; documentar en el comentario). `renewOrgSubscription` es `processing` y no emite: sin compensación (solo `setPayerIfMissing`, que no falla el cobro). |
 
 ## No tocar
 
@@ -36,7 +36,7 @@ Caso `committed` (relectura con número): responder éxito con `{ subscriptionId
 
 ## Criterio de done
 
-- Tests (3): (a) alta SaaS con fallo de emisión inducido → pago `voided` con motivo + suscripción `cancelledAt` no nulo, sin número `FS-N` consumido; reintento → sin duplicar (una sola suscripción activa + un solo cobro válido); (b) renovación con fallo → pago `voided` y `currentPeriodEnd` intacto (igual al calculado antes del fallo); (c) `registerPayment` o transición con fallo → pago `voided`, periodo y suscripción sin revertir, reintento limpio.
+- Tests (3): (a) alta SaaS con fallo de emisión inducido → pago `voided` con motivo + suscripción `cancelledAt` no nulo, sin número `FS-N` consumido; reintento → sin duplicar (una sola suscripción activa + un solo cobro válido); (b) renovación con fallo → pago `voided` y periodo revertido al valor previo (`currentPeriodEnd` igual al leído antes de extender); (c) `registerPayment` o transición con fallo → pago `voided`, periodo revertido al valor previo, reintento limpio (y `voided → validated` rechazado con 409).
 - Garantía visible en cada test: ningún cobro `validated|refunded` sin `receiptNumber` (salvo trial/free `$0`, que quedan `pre_system` por diseño).
 
 ## Verificación
