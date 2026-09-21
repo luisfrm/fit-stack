@@ -394,6 +394,33 @@ export function createSubscriptionsService(
       opts?: ReceiptContext,
     ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
+
+      // Espejo del guard de Console (invariante validado ⇔ numerado): se
+      // rechaza ANTES de escribir un `validated` que nacería sin número ni
+      // periodo que lo sostenga. Solo un pago `processing` puede validarse —
+      // un `voided` no vuelve atrás (su suscripción ya quedó cancelada por el
+      // propio void) — y nunca sobre una suscripción cancelada.
+      const wasPending = previous != null && previous.status !== PAYMENT_STATUSES.VALIDATED;
+      if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
+        if (previous!.status !== PAYMENT_STATUSES.PROCESSING) {
+          throw businessError(
+            409,
+            'PAYMENT_NOT_REVALIDATABLE',
+            'Solo un pago en proceso puede validarse',
+          );
+        }
+        if (previous!.subscriptionId) {
+          const parentSub = await subsRepo.findById(organizationId, previous!.subscriptionId);
+          if (parentSub?.cancelledAt) {
+            throw businessError(
+              409,
+              'SUBSCRIPTION_CANCELLED',
+              'No se puede validar un pago de una suscripción cancelada',
+            );
+          }
+        }
+      }
+
       // La auditoría de anulación se persiste siempre en el pago (haya o no
       // número): es la única fuente de `voidedBy`/`voidedAt`/`voidReason`.
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
@@ -435,7 +462,6 @@ export function createSubscriptionsService(
 
       // Un pago que pasa de processing a validated emite su recibo
       // (el alta con status validated ya lo numera en create()).
-      const wasPending = previous && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
         if (opts?.receipts) {
           if (!opts.timezone) {

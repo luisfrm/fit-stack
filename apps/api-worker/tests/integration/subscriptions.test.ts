@@ -427,6 +427,113 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
     });
   });
 
+  describe('Guards de transición de pago (invariante validado ⇔ numerado)', () => {
+    /**
+     * Alta con el status de pago indicado. Devuelve el `paymentId` resuelto
+     * desde el listado (el POST responde la suscripción, no el pago).
+     */
+    async function seedWithPaymentStatus(
+      owner: any,
+      member: any,
+      plan: any,
+      status: 'processing' | 'validated',
+    ) {
+      const created = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'transfer',
+          paymentMethodDetails: [],
+          status,
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(created.status, created.text).toBe(201);
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const row = list.body.data.find((r) => r.id === created.body.id);
+      return { subId: created.body.id as number, paymentId: row?.paymentId as number };
+    }
+
+    async function readPayment(paymentId: number) {
+      const rows = await testQuery<{ status: string; receipt_number: string | null }>(
+        `SELECT status, receipt_number FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      return rows[0]!;
+    }
+
+    it('un pago `voided` no se re-valida (409) y conserva su anulación', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'validated');
+
+      const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: 'Cobro anulado',
+      });
+      expect(voided.status, voided.text).toBe(200);
+
+      // Re-validar dejaría un `validated` sin periodo que lo sostenga (el void
+      // ya canceló la suscripción): se rechaza por CÓDIGO, antes de escribir.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'validated',
+      });
+      expect(res.status, res.text).toBe(409);
+      expect(res.body).toMatchObject({ code: 'PAYMENT_NOT_REVALIDATABLE' });
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('voided');
+      expect(after.receipt_number).toBeNull();
+    });
+
+    it('no valida el pago `processing` de una suscripción revocada (409)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
+
+      const revoked = await owner.client.put(`/api/subscriptions/${subId}`, {
+        status: 'cancelled',
+      });
+      expect(revoked.status, revoked.text).toBe(200);
+
+      // Sin el guard quedaría un `validated` numerado sobre un periodo
+      // revocado: incoherencia silenciosa. Fail-closed ANTES del write.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'validated',
+      });
+      expect(res.status, res.text).toBe(409);
+      expect(res.body).toMatchObject({ code: 'SUBSCRIPTION_CANCELLED' });
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('processing');
+      expect(after.receipt_number).toBeNull();
+    });
+
+    it('`processing → validated` sigue funcionando y numera una sola vez', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
+
+      const first = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'validated',
+      });
+      expect(first.status, first.text).toBe(200);
+      // Numeración per-org anual: `{slug}-{año}-{secuencia}`.
+      const numbered = (await readPayment(paymentId)).receipt_number;
+      expect(numbered).toMatch(/\d{4}-\d+$/);
+
+      // Re-PATCH idempotente: no re-numera ni revienta (no es una transición).
+      const second = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'validated',
+      });
+      expect(second.status, second.text).toBe(200);
+      expect((await readPayment(paymentId)).receipt_number).toBe(numbered);
+    });
+  });
+
   describe('DELETE /api/subscriptions/:id', () => {
     it('está deshabilitado: un registro financiero no se elimina', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
