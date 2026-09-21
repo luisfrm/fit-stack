@@ -509,7 +509,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 > Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revoked); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
 
-**Validation flow** (`apps/panel/app/dashboard/layout.tsx`):
+**Validation flow** (`apps/panel/app/(protected)/layout.tsx`):
 
 - `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
 - `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
@@ -519,7 +519,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 **Dynamic gate pages** (`/no-subscription`, `/unauthorized` in panel and console) — Server Components with `force-dynamic` that check the session on every request: no session → `redirect('/login')`; valid access (active subscription or allowed role) → `redirect('/dashboard')`; only without access they render. Prevents getting stuck after logout or refresh.
 
-- **Note**: The `/no-subscription` page is OUTSIDE `/dashboard` layout to prevent infinite redirect loops.
+- **Note**: The `/no-subscription` page is OUTSIDE the `(protected)` layout to prevent infinite redirect loops.
 
 ### Self-service renewal (phase 2 — org pays from the panel)
 
@@ -555,7 +555,7 @@ Extension rules: every new feature is born `defaultEnabled: false` (additive); `
 
 ### Free Tier (free floor)
 
-- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/dashboard/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
+- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
 - **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
 - **Resolution rule** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).
@@ -917,6 +917,20 @@ stale data until the TTL expires. `updateTag` without `refresh()` purges
 silently without re-rendering. Panel uses the same shape
 (`members-client.tsx` + `onRefreshServer` prop).
 
+> **Client-only pages (no RSC parent to own the action)**: the purge travels
+> through a shared `"use server"` module instead — reference:
+> `apps/panel/lib/actions/settings.ts` (`invalidateSettingsCache`), consumed by
+> the `useSettings` hook of the panel `settings/*` pages. It derives the tag from
+> the **session on the server** (`sessionService.getSession()`, i.e.
+> `session?.session?.activeOrganizationId`), never from a value the client sends,
+> and the caller `await`s it before `router.refresh()`.
+>
+> This is not optional: **`updateTag` is server-only**, so a client component
+> that imports `next/cache` breaks (the settings save failed silently that way).
+> Before adding a purge, check where the consumer lives: RSC → inline `"use
+> server"` action passed as a prop; client-only page → shared action module.
+> When in doubt, grep for `next/cache` in a client file — it must never appear.
+
 > **Actionable lists always fresh**: the "To validate" list in
 > `/payments` is requested with `cache: 'no-store'` (`payments/page.tsx`). A work
 > list cannot have staleness: a payment recorded through another channel must
@@ -990,8 +1004,9 @@ pnpm test  # shared → api-worker → jobs-worker → panel → console (Vitest
   - **Hard guards**: refuses to run if `TEST_DATABASE_URL` points to the same host+db as `DATABASE_URL`; without `TEST_DATABASE_URL` the whole suite is skipped with `describe.skipIf` (CI included).
   - **Determinism**: `fileParallelism: false` (one shared branch), `TRUNCATE ... RESTART IDENTITY CASCADE` between files (`tests/helpers/db.ts`), Redis intentionally absent (no-op cache).
   - **Recording spies** for R2 and Queues (`tests/helpers/env.ts`) — can assert enqueued events (e.g. `email.payment_receipt`).
-  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it.
+  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it. **Watch the day helpers**: `isoDate(n)` derives the **UTC** day while `localDay(n, tz)` derives the **org-local** day; they diverge between 20:00-24:00 in America/Caracas (UTC-4), so use `localDay` whenever the assertion is about the local-day contract.
   - **Auth guards** (`tests/integration/guards.test.ts`): cover the 3 middlewares of `route-handler.ts` — `requireAuth` (401 without session; lets a valid session without org through, 200 with `admin`), `requireOrgPermission` (401, **400 without active org**, role matrix: positive owner/manager/cashier settings, member/coach plans/classes read; negative coach settings, cashier staff, coach classes.create even with update, member subscriptions) and `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** in settings/orgs/staff, user 403, 401).
+  - **Financial invariants** (`subscriptions.test.ts` — period + payment-transition guards, `subscriptions-period.test.ts`, `subscriptions-compensation.test.ts`, `platform-subscriptions-compensation.test.ts`, `receipts-*.test.ts`): pin the rules that must not regress — *validated ⇔ numbered*, server-computed period, compensated creation (no double charge, no access without a charge), the ANULADO artifact. Touch subscriptions, payments or receipts → run these first.
   - **Schema sync**: `pnpm --filter api-worker test:db:push` (drizzle-kit push against the test branch, never production).
 
 > **panel/console have no integration tests** — their tests are unit only (`tests/unit/`). api-worker is the only one with an integration suite.
@@ -1149,7 +1164,7 @@ Use skill tool for specialized tasks:
 
 - `apps/*/package.json` — App-specific scripts
 - `packages/*/package.json` — Package dependencies
-- `packages/database/src/schema.ts` — Full DB schema (30 tables)
+- `packages/database/src/schema.ts` — Full DB schema (33 tables)
 - `packages/shared/src/access-control.ts` — RBAC statements + roles (single source of truth)
 - `apps/api-worker/src/index.ts` — Hono app: middleware, mounts, healthcheck
 - `apps/api-worker/src/lib/auth.ts` — Better Auth server config (per-request factory)
