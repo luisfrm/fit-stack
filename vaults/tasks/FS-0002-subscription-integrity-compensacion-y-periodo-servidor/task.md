@@ -2,7 +2,7 @@
 id: FS-0002
 aliases: ["FS-0002"]
 title: "Subscription integrity - compensacion y periodo servidor"
-status: in_progress # draft | planning | in_progress | blocked | done | cancelled
+status: done # draft | planning | in_progress | blocked | done | cancelled
 priority: high # low | medium | high | critical
 created: 2026-09-20
 depends_on: [FS-0001] # hereda migración 0018 + snapshot de duración (rama stacked sobre fix/receipt-emission-integrity)
@@ -23,39 +23,39 @@ Además, el periodo acumulativo (Regla 4: ningún día pagado se pierde) hoy es 
 
 ### B3.1 — Compensación en el alta del panel
 
-- [ ] Si `assignReceiptNumber` falla **después** del commit del número (relectura muestra `receiptNumber` persistido), **no se compensa**: se responde éxito (el predicado 1 del barrido re-encola el render en ≤15 min). Re-lanzar aquí provocaría el doble cobro que se evita.
-- [ ] Si el pago quedó creado sin número, se **anula** (`voided` con `voidedBy`/`voidReason` = "Compensación: fallo al emitir el comprobante"), nunca se borra (regla 6). Al estar `voided` no da acceso ni cuenta como cobro; no se cancela además la suscripción (el status derivado `voided`/ANULADA ya gana sobre `cancelled`).
-- [ ] Si el pago no llegó a crearse, se **cancela** la suscripción huérfana (`subsRepo.cancel`).
-- [ ] La decisión se toma por **relectura** (`findById` tras el `catch`), nunca por el tipo de error. El error original se re-lanza para que `onError` traduzca el código (`lib/errors.ts:92` → `{error, code}` + status).
-- [ ] El reintento queda limpio: el pago compensado es `voided` (no `processing`), el guard de duplicados no bloquea y la segunda intentona crea exactamente 1 periodo correcto.
-- [ ] Tests de integración (3): fallo inducido con país fiscal inválido → sin 201, pago `voided` con motivo, sin número, sin hueco en la secuencia ni filas nuevas en el reporte de comprobantes; reintento posterior → exactamente 1 suscripción válida y 1 cobro; fallo en `payment.insert` simulado → suscripción cancelada, sin pago huérfano.
+- [x] Si `assignReceiptNumber` falla **después** del commit del número (relectura muestra `receiptNumber` persistido), **no se compensa**: se responde éxito (el predicado 1 del barrido re-encola el render en ≤15 min). Re-lanzar aquí provocaría el doble cobro que se evita.
+- [x] Si el pago quedó creado sin número, se **anula** (`voided` con `voidedBy`/`voidReason` = "Compensación: fallo al emitir el comprobante"), nunca se borra (regla 6). Al estar `voided` no da acceso ni cuenta como cobro; no se cancela además la suscripción (el status derivado `voided`/ANULADA ya gana sobre `cancelled`).
+- [x] Si el pago no llegó a crearse, se **cancela** la suscripción huérfana (`subsRepo.cancel`).
+- [x] La decisión se toma por **relectura** (`findById` tras el `catch`), nunca por el tipo de error. El error original se re-lanza para que `onError` traduzca el código (`lib/errors.ts:92` → `{error, code}` + status).
+- [x] El reintento queda limpio: el pago compensado es `voided` (no `processing`), el guard de duplicados no bloquea y la segunda intentona crea exactamente 1 periodo correcto.
+- [x] Tests de integración (3): fallo inducido con país fiscal inválido → sin 201, pago `voided` con motivo, sin número, sin hueco en la secuencia ni filas nuevas en el reporte de comprobantes; reintento posterior → exactamente 1 suscripción válida y 1 cobro; fallo en `payment.insert` simulado → suscripción cancelada, sin pago huérfano.
 
 ### B3.2 — Misma compensación en los 4 flujos SaaS
 
-- [ ] `createSubscriptionWithPayment`, renovación, cambio de plan y registro de pago aplican el mismo helper con las closures de plataforma.
-- [ ] Alta: si falla el 3.º, pago anulado **y la suscripción también se cancela** (no borrada: `platform_subscription` tiene `cancelledAt`). **Enmienda ratificada:** el spec original anulaba solo el pago, pero un `voided` se **ignora** en `computePlatformSubscriptionStatus`, así que el alta quedaría `past_due` con un periodo front-loadeado sin cobro que lo sostenga; cancelar la deja `cancelled` y evita el periodo fantasma (un reintento crea una segunda fila, con una sola activa).
-- [ ] Renovación / cambio de plan / registro de pago: pago anulado **y el periodo extendido se revierte** (`revertEffect` → `updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) — un write único honesto, sin transacción. Un reintento no acumula dos veces sobre el mismo cobro y el fallido no regala días.
-- [ ] Un pago compensado (`voided`) **no puede re-validarse** (`PATCH status` lo rechaza): un re-PATCH no vuelve a extender el periodo sobre un cobro anulado ni deja un `validated` sin comprobante.
-- [ ] Tests (3): alta SaaS con fallo de emisión → pago anulado + suscripción anulada, reintento sin duplicar; renovación con fallo → pago anulado y periodo revertido al valor previo; transición a validado con fallo → pago anulado + periodo revertido + re-PATCH rechazado.
+- [x] `createSubscriptionWithPayment`, renovación, cambio de plan y registro de pago aplican el mismo helper con las closures de plataforma.
+- [x] Alta: si falla el 3.º, pago anulado **y la suscripción también se cancela** (no borrada: `platform_subscription` tiene `cancelledAt`). **Enmienda ratificada:** el spec original anulaba solo el pago, pero un `voided` se **ignora** en `computePlatformSubscriptionStatus`, así que el alta quedaría `past_due` con un periodo front-loadeado sin cobro que lo sostenga; cancelar la deja `cancelled` y evita el periodo fantasma (un reintento crea una segunda fila, con una sola activa).
+- [x] Renovación / cambio de plan / registro de pago: pago anulado **y el periodo extendido se revierte** (`revertEffect` → `updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) — un write único honesto, sin transacción. Un reintento no acumula dos veces sobre el mismo cobro y el fallido no regala días.
+- [x] Un pago compensado (`voided`) **no puede re-validarse** (`PATCH status` lo rechaza): un re-PATCH no vuelve a extender el periodo sobre un cobro anulado ni deja un `validated` sin comprobante.
+- [x] Tests (3): alta SaaS con fallo de emisión → pago anulado + suscripción anulada, reintento sin duplicar; renovación con fallo → pago anulado y periodo revertido al valor previo; transición a validado con fallo → pago anulado + periodo revertido + re-PATCH rechazado.
 
 ### B3.3 — El periodo lo calcula el servidor (panel, solo `POST /api/subscriptions`)
 
-- [ ] `startDate` pasa a opcional → default hoy local (`toLocalDayString(tz)`); `endDate` pasa a opcional → default calculado por el servidor.
-- [ ] Sin `endDate`: el servidor calcula `addDuration(baseline, plan.durationValue, plan.durationUnit, tz)` con `baseline = (última vigente) ? max(latest.endDate, startDate) : startDate`, donde "vigente" es a **día local** (`latest.endDate >= inicio del día local`), no al instante.
-- [ ] Con `endDate` igual al calculado: se acepta (idempotente, sin motivo).
-- [ ] Con `endDate` menor habiendo periodo vigente: `422 END_DATE_OVERRIDE_REASON_REQUIRED` salvo que venga `endDateOverrideReason` → se acepta y el motivo se persiste en `subscription.end_date_override_reason`.
-- [ ] Con `endDate` sin periodo vigente: se acepta libre (periodo nuevo a medida es legítimo, no hay días que perder).
-- [ ] Guard nuevo: `endDate < startDate` → `422 END_DATE_BEFORE_START`.
-- [ ] Función pura nueva en `@workspace/shared` (`computeSubscriptionPeriod`), consumida por el servidor y por el preview del panel (que deja de reimplementar la regla inline). Tests unitarios sin DB, estilo `date.ts`.
-- [ ] Migración **0019** (aditiva, nullable): `subscription.end_date_override_reason`, sin backfill (`NULL` = periodo calculado o histórico).
-- [ ] Frontend (mismo PR): el panel deja de mandar `endDate` por defecto; el preview usa el helper compartido; si el operador edita la fecha y acorta el periodo vigente aparece el campo motivo (obligatorio); toasts por código (`END_DATE_OVERRIDE_REASON_REQUIRED` / `END_DATE_BEFORE_START`) mapeados con `apiCode`.
-- [ ] Compatibilidad: los llamadores que hoy mandan `endDate` de periodo nuevo (12 suites de integración, `e2e/seed.ts`, specs E2E) siguen funcionando sin cambios.
-- [ ] Tests de integración (6): sin fechas → periodo = inicio + duración (mensual/semanal/diaria); renovación sobre periodo vigente → acumula desde `latest.endDate`; periodo vencido → no acumula (`baseline = startDate`); `endDate` que acorta sin motivo → 422 con código; con motivo → 201 y motivo persistido; `endDate < startDate` → 422.
-- [ ] Revisar (no dar por bueno): tests acumulativos de `subscriptions.test.ts` (probablemente codifican el cálculo del cliente) y el E2E de renovación del panel.
+- [x] `startDate` pasa a opcional → default hoy local (`toLocalDayString(tz)`); `endDate` pasa a opcional → default calculado por el servidor.
+- [x] Sin `endDate`: el servidor calcula `addDuration(baseline, plan.durationValue, plan.durationUnit, tz)` con `baseline = (última vigente) ? max(latest.endDate, startDate) : startDate`, donde "vigente" es a **día local** (`latest.endDate >= inicio del día local`), no al instante.
+- [x] Con `endDate` igual al calculado: se acepta (idempotente, sin motivo).
+- [x] Con `endDate` menor habiendo periodo vigente: `422 END_DATE_OVERRIDE_REASON_REQUIRED` salvo que venga `endDateOverrideReason` → se acepta y el motivo se persiste en `subscription.end_date_override_reason`.
+- [x] Con `endDate` sin periodo vigente: se acepta libre (periodo nuevo a medida es legítimo, no hay días que perder).
+- [x] Guard nuevo: `endDate < startDate` → `422 END_DATE_BEFORE_START`.
+- [x] Función pura nueva en `@workspace/shared` (`computeSubscriptionPeriod`), consumida por el servidor y por el preview del panel (que deja de reimplementar la regla inline). Tests unitarios sin DB, estilo `date.ts`.
+- [x] Migración **0019** (aditiva, nullable): `subscription.end_date_override_reason`, sin backfill (`NULL` = periodo calculado o histórico).
+- [x] Frontend (mismo PR): el panel deja de mandar `endDate` por defecto; el preview usa el helper compartido; si el operador edita la fecha y acorta el periodo vigente aparece el campo motivo (obligatorio); toasts por código (`END_DATE_OVERRIDE_REASON_REQUIRED` / `END_DATE_BEFORE_START`) mapeados con `apiCode`.
+- [x] Compatibilidad: los llamadores que hoy mandan `endDate` de periodo nuevo (12 suites de integración, `e2e/seed.ts`, specs E2E) siguen funcionando sin cambios.
+- [x] Tests de integración (6): sin fechas → periodo = inicio + duración (mensual/semanal/diaria); renovación sobre periodo vigente → acumula desde `latest.endDate`; periodo vencido → no acumula (`baseline = startDate`); `endDate` que acorta sin motivo → 422 con código; con motivo → 201 y motivo persistido; `endDate < startDate` → 422.
+- [x] Revisar (no dar por bueno): tests acumulativos de `subscriptions.test.ts` (probablemente codifican el cálculo del cliente) y el E2E de renovación del panel.
 
 ### Verificación global
 
-- [ ] `pnpm typecheck` (9/9) · `pnpm lint` (0 errores) · unitarios shared/panel/console/jobs-worker · integración: `subscriptions`, nuevas suites de compensación y periodo, `receipts-*`, `platform-receipts-*`, `dashboard`, `members-stats`, `org-billing` · E2E del flujo de renovación del panel.
+- [x] `pnpm typecheck` (9/9) · `pnpm lint` (0 errores) · unitarios shared/panel/console/jobs-worker · integración: `subscriptions`, nuevas suites de compensación y periodo, `receipts-*`, `platform-receipts-*`, `dashboard`, `members-stats`, `org-billing` · E2E del flujo de renovación del panel.
 
 ## Alcance
 
@@ -71,7 +71,7 @@ Además, el periodo acumulativo (Regla 4: ningún día pagado se pierde) hoy es 
 ## Fuera de alcance
 
 - Fila accionable de "validados sin comprobante" y flag `receiptVoided` en estado `pending` (diferidos de B1/B2).
-- Datos históricos: el checklist de `docs/PENDING.md §5.2` (conteo + reparación con `/issue`) es operación, no código.
+- Datos históricos: el checklist de reparación de comprobantes históricos (`vaults/backlog/comprobantes.md`, antes `docs/PENDING.md §5.2`; conteo + reparación con `/issue`) es operación, no código.
 - Transacciones interactivas: siguen descartadas por el driver HTTP de Neon; la regla queda documentada.
 
 ## Notas
@@ -104,3 +104,30 @@ Además, el periodo acumulativo (Regla 4: ningún día pagado se pierde) hoy es 
 ## Plan de ejecución
 
 > Generado por el agente `planner` en `plan.md`; el detalle por fase vive en `phases/`.
+
+## Correcciones post-review (fase 8)
+
+> Auditoría del `reviewer` sobre el change set sin commitear: 2 defectos **bloqueantes** del helper de compensación + 4 follow-ups. Corregidos en esta misma task/PR. Detalle en `phases/fase-8-correcciones-review.md`.
+
+- [x] **#1 (bloqueante)** relectura fallida → reintento acotado y, si persiste, `'unresolved'` sin anular/revertir (fail-closed real).
+- [x] **#1b** el alta SaaS cancela solo con `outcome === 'compensated'`, nunca con `'unresolved'`.
+- [x] **#2 (bloqueante)** `revertEffect` solo si la anulación del pago tuvo éxito.
+- [x] **#3** `changePlan` crea la nueva antes de cancelar la vieja + comentario exacto.
+- [x] **#4** invalidación de caché en `finally` en las 5 rutas.
+- [x] **#5** el panel fuerza el campo motivo por `apiCode` 422 y refresca el `latestSubscription`.
+- [x] **#7** `accumulated` coherente con la rama que elige el `baseline`.
+- [x] **#6** tests U1–U3 (unit) + integración (g)/(h)/(i)/(d).
+- [x] **NITs** `voidPlatformPayment` sin cast, `Omit` del payload, AGENTS/README alineados.
+- [x] Verificación global en verde (typecheck 9/9 · lint 0 · unit · integración · `db:check` · E2E panel 53/53).
+
+## Correcciones post-review 2 (fase 9)
+
+> Segunda auditoría del change set sin commitear: los guards nuevos del backend dejaban UIs con acciones muertas y el PATCH del panel quedaba asimétrico (agujero real por API). Detalle en `phases/fase-9-alineacion-ui-guards.md`.
+
+- [x] **F1** console: "Marcar como Validado" solo con `processing` + toasts por código (`PAYMENT_NOT_REVALIDATABLE` / `SUBSCRIPTION_CANCELLED`).
+- [x] **F2** panel: dueño único del toast de submit (el modal); el form conserva solo la resolución de estado.
+- [x] **F3 (A)** panel: guards espejo en `PATCH /api/payments/:id/status` (409 por código, fail-closed antes del write) + `subsRepo.findById` mínimo + `businessError(status, code, message)`.
+- [x] **F3-UI** panel: "Validar Pago" oculto con la sub revocada/anulada + códigos mapeados en los 2 sitios que validan un pago.
+- [x] **Tests** describe nuevo en `subscriptions.test.ts` (voided → 409; processing de sub revocada → 409; `processing → validated` numera una sola vez).
+- [x] **Docs** `AGENTS.md` (fila `/api/payments`) + README de api-worker (PATCH del panel) + índice de fases.
+- [ ] Verificación: `pnpm typecheck` 9/9 · `pnpm lint` · unitarios; integración/E2E a cargo del usuario (no se corren en esta fase).
