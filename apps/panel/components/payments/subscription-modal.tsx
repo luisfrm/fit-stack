@@ -6,6 +6,7 @@ import { SubscriptionForm } from "./subscription-form";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { MemberForm } from "../members/member-form";
 import { membersService } from "@/lib/services/members-service";
+import { apiCode, mutationError } from "@/lib/errors";
 import { IMember } from "@/types/dashboard";
 
 interface SubscriptionModalProps {
@@ -65,8 +66,17 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onO
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Error creating subscription:", error);
-      toast.error("Fallo al registrar la suscripción");
+      const code = apiCode(error);
+      if (code === "END_DATE_OVERRIDE_REASON_REQUIRED") {
+        toast.error("El periodo vigente se acorta: indica el motivo del ajuste");
+        // Re-lanza para que el form active el campo motivo y refresque el
+        // latest del miembro (el form es quien posee ese estado).
+        throw error;
+      } else if (code === "END_DATE_BEFORE_START") {
+        toast.error("La fecha final no puede ser anterior a la de inicio");
+      } else {
+        toast.error(mutationError("SubscriptionModal", error, "Fallo al registrar la suscripción"));
+      }
     } finally {
       setIsLoading(false);
     }
