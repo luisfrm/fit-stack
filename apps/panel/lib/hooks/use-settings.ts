@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { updateTag } from "next/cache";
 import { settingsService } from "@/lib/services/settings-service";
+import { invalidateSettingsCache } from "@/lib/actions/settings";
 import { mutationError } from "@/lib/errors";
-import { useAuth } from "@/lib/hooks/use-auth";
 import { toast } from "@workspace/ui";
 
 export const SETTINGS_KEYS = {
@@ -52,17 +51,6 @@ function writeCache(data: Record<string, string>) {
   }
 }
 
-function clearCache() {
-  memoryCache = null;
-  pendingSettingsPromise = null;
-  if (typeof window === "undefined") return;
-  try {
-    sessionStorage.removeItem(SETTINGS_CACHE_KEY);
-  } catch {
-    // ignore
-  }
-}
-
 /**
  * Shared fetcher that deduplicates concurrent in-flight network requests for organization settings.
  */
@@ -95,8 +83,6 @@ function fetchSettingsShared(): Promise<Record<string, string>> {
  */
 export function useSettings() {
   const router = useRouter();
-  const { activeOrganization } = useAuth();
-  const activeOrgId = activeOrganization?.id;
   const [settings, setSettings] = React.useState<Record<string, string>>(
     () => readCache()?.data ?? EMPTY_SETTINGS,
   );
@@ -141,8 +127,9 @@ export function useSettings() {
         setSettings(updated);
         writeCache(updated);
         // Invalida el data cache de Next (RSC con tags org:{orgId}:settings)
-        // para que router.refresh() traiga los ajustes frescos.
-        if (activeOrgId) updateTag(`org:${activeOrgId}:settings`);
+        // antes de refrescar: la purga es server-only, así que viaja por el
+        // server action. Sin ella, refresh() relee la entrada cacheada.
+        await invalidateSettingsCache();
         toast.success("Ajustes actualizados correctamente");
         router.refresh();
       } catch (error) {
@@ -153,36 +140,8 @@ export function useSettings() {
         setIsUpdating(false);
       }
     },
-    [router, activeOrgId],
+    [router],
   );
 
   return { settings, isLoading, isUpdating, updateSettings };
-}
-
-/**
- * Hook for mutating settings from a client component that already
- * has settings loaded as props (e.g. via a parent Server Component).
- */
-export function useSettingsMutation() {
-  const router = useRouter();
-  const { activeOrganization } = useAuth();
-  const activeOrgId = activeOrganization?.id;
-
-  return React.useCallback(
-    async (settings: Record<string, string>) => {
-      try {
-        await settingsService.update(settings);
-        clearCache();
-        // Invalida el data cache de Next (RSC con tags org:{orgId}:settings)
-        // para que router.refresh() traiga los ajustes frescos.
-        if (activeOrgId) updateTag(`org:${activeOrgId}:settings`);
-        toast.success("Ajustes actualizados correctamente");
-        router.refresh();
-    } catch (error) {
-      // El mensaje del API nunca se muestra al usuario — solo consola.
-      toast.error(mutationError("useSettingsMutation", error, "Error al actualizar los ajustes"));        throw error;
-      }
-    },
-    [router, activeOrgId],
-  );
 }
