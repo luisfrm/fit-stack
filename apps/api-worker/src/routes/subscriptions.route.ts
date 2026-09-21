@@ -33,8 +33,12 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
 const createSubSchema = z.object({
   memberId: z.number().int().positive(),
   planId: z.number().int().positive(),
-  startDate: z.string(),
-  endDate: z.string(),
+  // B3.3 (FS-0002 fase 4): el periodo lo calcula el servidor. `startDate` y
+  // `endDate` son opcionales; el `trim().length > 0` del motivo se exige en el
+  // servicio (no en zod) para devolver el código 422 propio.
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  endDateOverrideReason: z.string().optional(),
   payment: z.object({
     // Todo dinero en centavos enteros (convención Money, ver AGENTS.md).
     amountPaid: z.number().int().positive(),
@@ -117,13 +121,19 @@ export const subscriptionRoutes = new Hono<AppEnv>()
       (await createOrganizationsRepository(db).findById(orgId))?.slug ??
       null;
 
-    const newSub = await subsService.create(orgId, payload as any, timezone, {
-      receipts: receiptsService,
-      orgSlug,
-      // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
-      by: c.get('user')?.id,
-    });
-    await invalidateSubscriptionDependentCaches(cache, orgId);
+    let newSub;
+    try {
+      newSub = await subsService.create(orgId, payload as any, timezone, {
+        receipts: receiptsService,
+        orgSlug,
+        // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
+        by: c.get('user')?.id,
+      });
+    } finally {
+      // En el fallo compensado el servicio re-lanza tras mutar (pago anulado /
+      // huérfana cancelada): la caché se invalida igual (FS-0002, #4).
+      await invalidateSubscriptionDependentCaches(cache, orgId);
+    }
     return c.json(newSub, 201);
   })
 

@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient, type TestClient } from './client';
 import { setUserPlatformRole, testQuery } from './db';
-import { ORG_ROLES } from '@workspace/shared';
+import { ORG_ROLES, addLocalDays, toLocalDayString } from '@workspace/shared';
 
 /** Short unique suffix so records never collide across runs. */
 export function uid(prefix = ''): string {
@@ -212,9 +212,18 @@ export async function createGymMember(
   return res.body;
 }
 
-/** ISO `YYYY-MM-DD` helper for building subscription windows. */
+/** ISO `YYYY-MM-DD` helper for building subscription windows (UTC day). */
 export function isoDate(offsetDays = 0, from: Date = new Date()): string {
   const d = new Date(from);
   d.setUTCDate(d.getUTCDate() + offsetDays);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Local-day `YYYY-MM-DD` for a given timezone — for assertions where the
+ * org-local day (not the UTC day) is the contract. `isoDate` derives the UTC
+ * day, which diverges between 20:00-24:00 America/Caracas (UTC-4).
+ */
+export function localDay(offsetDays = 0, timezone: string, from: Date = new Date()): string {
+  return addLocalDays(timezone, toLocalDayString(timezone, from), offsetDays);
 }

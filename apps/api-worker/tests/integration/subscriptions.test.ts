@@ -236,7 +236,8 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         memberId: member.id,
         planId: plan.id,
         startDate: isoDate(31),
-        endDate: isoDate(61),
+        // B3.3: el fin lo calcula el servidor; el endDate de cliente
+        // (isoDate(61)) contradice la autoridad y se rechazaría con 422.
         payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 

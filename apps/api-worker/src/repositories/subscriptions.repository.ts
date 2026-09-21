@@ -12,6 +12,7 @@ export interface ISubscriptionDTO {
   endDate: Date;
   status?: SubscriptionStatus;
   cancelledAt?: Date | null;
+  endDateOverrideReason?: string | null;
   isActive?: boolean;
   createdAt?: Date;
 }
@@ -117,6 +118,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: subscription.startDate,
           endDate: subscription.endDate,
           cancelledAt: subscription.cancelledAt,
+          endDateOverrideReason: subscription.endDateOverrideReason,
           status: this.getSubscriptionStatusSql(now).as('status'),
           isActive: this.getSubscriptionIsActiveSql(now),
           memberName: members.firstName,
@@ -179,6 +181,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: subscription.startDate,
           endDate: subscription.endDate,
           cancelledAt: subscription.cancelledAt,
+          endDateOverrideReason: subscription.endDateOverrideReason,
           status: this.getSubscriptionStatusSql(now).as('status'),
           isActive: this.getSubscriptionIsActiveSql(now),
           memberName: members.firstName,
@@ -249,6 +252,7 @@ export function createSubscriptionsRepository(db: Db) {
           startDate: data.startDate,
           endDate: data.endDate,
           cancelledAt: data.cancelledAt ?? null,
+          endDateOverrideReason: data.endDateOverrideReason ?? null,
           createdAt: data.createdAt ?? new Date(),
         })
         .returning();
