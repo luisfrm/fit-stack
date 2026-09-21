@@ -495,10 +495,13 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       });
     } catch (err: any) {
       console.error("Error processing subscription payment:", err);
+      // Dueño ÚNICO del toast de submit: el modal (`SubscriptionModal`), que es
+      // quien mapea los códigos de negocio. Aquí solo se resuelve el estado
+      // local; toastear también duplicaría el aviso (1 acción → 1 toast).
       if (apiCode(err) === "END_DATE_OVERRIDE_REASON_REQUIRED") {
         // El servidor pide motivo (cálculo local desactualizado): forzamos el
         // campo y refrescamos el latest del miembro para que el preview
-        // converja. El toast ya lo mostró quien maneja el submit.
+        // converja.
         setServerRequiresReason(true);
         if (selectedMember) {
           const refreshed = await membersService.getMembers({
@@ -510,8 +513,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           const latestMember = refreshed.data.find((m) => m.id === selectedMember.id);
           if (latestMember) setSelectedMember(latestMember);
         }
-      } else {
-        toast.error("Error al procesar el pago");
       }
     } finally {
       setIsProcessingUploads(false);
