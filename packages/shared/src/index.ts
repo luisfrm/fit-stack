@@ -10,6 +10,7 @@ export * from './content';
 export * from './documents';
 export * from './formatting';
 export * from './date';
+export * from './subscription-period';
 export * from './settings';
 export * from './storage';
 export * from './defaults';
