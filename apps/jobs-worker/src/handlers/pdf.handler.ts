@@ -54,7 +54,7 @@ export async function handlePaymentReceipt(
     payload.paymentId,
   );
 
-  if (!composed || !composed.member) {
+  if (!composed?.member) {
     console.error(`Payment ${payload.paymentId} not found for email receipt`);
     return;
   }
@@ -157,6 +157,39 @@ export async function handlePaymentReceipt(
   );
 }
 
+type PdfAttachment = { filename: string; content: Uint8Array; contentType: string };
+
+/**
+ * Resolves the PDF attachment for an org payment email.
+ * Returns `null` when no receipt number exists (no-number path = no attachment).
+ * Returns `undefined` when the caller should abort (PDF not yet ready).
+ * Returns the attachment array when the PDF is available in R2.
+ */
+async function resolveOrgReceiptAttachment(
+  env: PdfHandlerEnv,
+  paymentId: number,
+  receiptNumber: string | null | undefined,
+  receiptPdfKey: string | null | undefined,
+): Promise<PdfAttachment[] | null | undefined> {
+  if (!receiptNumber) return null; // No-number path: send without attachment.
+
+  if (!receiptPdfKey) {
+    console.error(
+      `Platform payment ${paymentId}: número ${receiptNumber} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+    );
+    return undefined; // Signal: abort send.
+  }
+  const stored = await env.FILES_BUCKET.get(receiptPdfKey);
+  const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
+  if (!bytes) {
+    console.error(
+      `Platform payment ${paymentId}: número ${receiptNumber} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
+    );
+    return undefined; // Signal: abort send.
+  }
+  return [{ filename: `${receiptNumber}.pdf`, content: bytes, contentType: 'application/pdf' }];
+}
+
 /**
  * Confirmación de pago de suscripción SaaS (email.org_payment_received):
  * llega al usuario que registró el pago (payer) y a los owners de la
@@ -253,33 +286,15 @@ export async function handleOrgPaymentReceived(
     pendingReview,
   });
 
-  // Rama A (C2) — numerado con PDF: adjunta los bytes de R2 tal cual.
-  // Rama número-sin-PDF: defensiva (el evento se encola desde el paso 2
-  // tras `completePlatformReceiptPdf`): log + return sin enviar.
-  let attachments: Array<{ filename: string; content: Uint8Array; contentType: string }> | undefined;
-  if (receiptNumber) {
-    if (!receiptPdfKey) {
-      console.error(
-        `Platform payment ${payload.paymentId}: número ${receiptNumber} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
-      );
-      return;
-    }
-    const stored = await env.FILES_BUCKET.get(receiptPdfKey);
-    const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
-    if (!bytes) {
-      console.error(
-        `Platform payment ${payload.paymentId}: número ${receiptNumber} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
-      );
-      return;
-    }
-    attachments = [{ filename: `${receiptNumber}.pdf`, content: bytes, contentType: 'application/pdf' }];
-  }
+  // Rama A (C2): resolve attachment; undefined = abort (PDF not yet ready).
+  const attachments = await resolveOrgReceiptAttachment(env, payload.paymentId, receiptNumber, receiptPdfKey);
+  if (attachments === undefined) return;
 
   for (const to of recipients) {
     try {
       await sendEmail(env, { to, subject, html, ...(attachments ? { attachments } : {}) });
     } catch (err) {
-      // Un destinatario con email inválido no debe bloquear a los demás
+      // A recipient with an invalid email must not block the rest.
       console.error(`Failed to send org payment email to ${to}:`, err);
     }
   }

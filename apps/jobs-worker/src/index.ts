@@ -49,6 +49,85 @@ export interface Env {
   RECEIPT_QUEUE: Queue;
 }
 
+/**
+ * Processes a single batch of receipt render events from fit-receipt-events.
+ * Acks on success, retries on failure with a structured error log (FS-0004).
+ */
+async function processReceiptBatch(
+  batch: MessageBatch<ReceiptRenderEvent>,
+  env: Env,
+): Promise<void> {
+  console.log(`[jobs-worker] receipt render batch — ${batch.messages.length} message(s)`);
+  for (const message of batch.messages) {
+    const event = message.body;
+    console.log(
+      `[jobs-worker] receipt.render — paymentId=${event.paymentId} scope=${event.scope} receiptNumber=${event.receiptNumber} attempt=${message.attempts}`,
+    );
+    try {
+      const outcome = await handleReceiptRender(env, event);
+      console.log(`[jobs-worker] receipt.render — outcome="${outcome}" paymentId=${event.paymentId}`);
+      message.ack();
+    } catch (error) {
+      // Never emit an empty error: name, message and cause travel in the
+      // log so the failure is actionable (FS-0004). No semantic change:
+      // exhausted retries still go to the DLQ.
+      const cause = error instanceof Error ? error.cause : undefined;
+      const name = error instanceof Error ? error.name : 'UnknownError';
+      const messageText = error instanceof Error ? error.message : String(error);
+      console.error(`[jobs-worker] receipt.render FAILED — paymentId=${event.paymentId} attempt=${message.attempts}`, {
+        name,
+        message: messageText,
+        cause,
+      });
+      message.retry();
+    }
+  }
+}
+
+/**
+ * Processes a single batch of task events from fit-task-events.
+ * Routes by event type, acks on success, retries on failure.
+ */
+async function processTaskBatch(
+  batch: MessageBatch<FitTaskEvent>,
+  env: Env,
+): Promise<void> {
+  console.log(`[jobs-worker] task event batch — ${batch.messages.length} message(s)`);
+  for (const message of batch.messages) {
+    const event = message.body;
+    console.log(`[jobs-worker] processing task event type="${event.type}" attempt=${message.attempts}`);
+    try {
+      switch (event.type) {
+        case 'email.registration_invite':
+          await handleRegistrationInvite(env, event);
+          break;
+        case 'email.org_invite':
+          await handleOrgInvite(env, event);
+          break;
+        case 'email.payment_receipt':
+          console.log(
+            `[jobs-worker] email.payment_receipt — paymentId=${event.paymentId} org=${event.organizationId}`,
+          );
+          await handlePaymentReceipt(env, event);
+          break;
+        case 'email.org_payment_received':
+          console.log(
+            `[jobs-worker] email.org_payment_received — paymentId=${event.paymentId} org=${event.organizationId}`,
+          );
+          await handleOrgPaymentReceived(env, event);
+          break;
+        default:
+          console.warn(`[jobs-worker] unknown event type: ${(event as any).type}`);
+      }
+      console.log(`[jobs-worker] task event done — type="${event.type}"`);
+      message.ack();
+    } catch (error) {
+      console.error(`[jobs-worker] task event FAILED — type="${(event as any).type}" attempt=${message.attempts}:`, error);
+      message.retry();
+    }
+  }
+}
+
 export default {
   async queue(
     batch: MessageBatch<FitTaskEvent | ReceiptRenderEvent>,
@@ -58,74 +137,11 @@ export default {
     console.log(`[jobs-worker] queue() triggered — queue="${batch.queue}" messages=${batch.messages.length}`);
 
     // fit-receipt-events has its own consumer path (one queue = one consumer;
-    // this worker consumes TWO distinct queues). Branches by queue name,
-    // not by event type.
+    // this worker consumes TWO distinct queues). Branch by queue name, not event type.
     if (batch.queue.startsWith('fit-receipt-events')) {
-      console.log(`[jobs-worker] receipt render batch — ${batch.messages.length} message(s)`);
-      for (const message of batch.messages) {
-        const event = message.body as ReceiptRenderEvent;
-        console.log(
-          `[jobs-worker] receipt.render — paymentId=${event.paymentId} scope=${event.scope} receiptNumber=${event.receiptNumber} attempt=${message.attempts}`,
-        );
-        try {
-          const outcome = await handleReceiptRender(env, event);
-          console.log(`[jobs-worker] receipt.render — outcome="${outcome}" paymentId=${event.paymentId}`);
-          message.ack();
-        } catch (error) {
-          // Never emit an empty error: name, message and cause travel in the
-          // log so the failure is actionable (FS-0004). No semantic change:
-          // exhausted retries still go to the DLQ.
-          const cause = error instanceof Error ? error.cause : undefined;
-          const name = error instanceof Error ? error.name : 'UnknownError';
-          const messageText =
-            error instanceof Error ? error.message : String(error);
-          console.error(`[jobs-worker] receipt.render FAILED — paymentId=${event.paymentId} attempt=${message.attempts}`, {
-            name,
-            message: messageText,
-            cause,
-          });
-          message.retry();
-        }
-      }
-      return;
+      return processReceiptBatch(batch as MessageBatch<ReceiptRenderEvent>, env);
     }
-
-    // fit-task-events: email events routed by type.
-    console.log(`[jobs-worker] task event batch — ${batch.messages.length} message(s)`);
-    for (const message of batch.messages) {
-      const event = message.body as FitTaskEvent;
-      console.log(`[jobs-worker] processing task event type="${event.type}" attempt=${message.attempts}`);
-      try {
-        switch (event.type) {
-          case 'email.registration_invite':
-            await handleRegistrationInvite(env, event);
-            break;
-          case 'email.org_invite':
-            await handleOrgInvite(env, event);
-            break;
-          case 'email.payment_receipt':
-            console.log(
-              `[jobs-worker] email.payment_receipt — paymentId=${event.paymentId} org=${event.organizationId}`,
-            );
-            await handlePaymentReceipt(env, event);
-            break;
-          case 'email.org_payment_received':
-            console.log(
-              `[jobs-worker] email.org_payment_received — paymentId=${event.paymentId} org=${event.organizationId}`,
-            );
-            await handleOrgPaymentReceived(env, event);
-            break;
-          default:
-            console.warn(`[jobs-worker] unknown event type: ${(event as any).type}`);
-        }
-
-        console.log(`[jobs-worker] task event done — type="${event.type}"`);
-        message.ack();
-      } catch (error) {
-        console.error(`[jobs-worker] task event FAILED — type="${(event as any).type}" attempt=${message.attempts}:`, error);
-        message.retry();
-      }
-    }
+    return processTaskBatch(batch as MessageBatch<FitTaskEvent>, env);
   },
 
   /**

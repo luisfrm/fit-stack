@@ -66,8 +66,50 @@ export type ReceiptState =
   | { available: false; reason: 'pre_system' };
 
 function receiptYear(timezone: string): number {
-  // Año LOCAL del emisor (un pago a las 11pm en VE cae en el mismo día/año local).
+  // Local year of the emitter (a payment at 11pm in VE falls in the same local day/year).
   return Number(toLocalDayString(timezone, new Date()).slice(0, 4));
+}
+
+/**
+ * Resolves the tax breakdown for a receipt.
+ * Either validates and applies the caller-supplied override, or
+ * computes the breakdown automatically from the inclusive-tax profile.
+ */
+function resolveTaxBreakdown(
+  amountPaid: number,
+  profile: ReturnType<typeof resolveFiscalProfile>,
+  currencyPaid: string,
+  taxOverride?: TaxOverrideInput | null,
+): { subtotal: number; taxTotal: number; taxDetails: ITaxDetail[]; taxOverrideReason: string | null } {
+  if (!taxOverride) {
+    // Auto decomposition: single source of truth in shared, same as panel preview.
+    const computed = computeInclusiveTaxes(amountPaid, profile.taxes, { currencyPaid });
+    return { ...computed, taxOverrideReason: null };
+  }
+
+  const o = taxOverride;
+  if (!o.taxOverrideReason || o.taxOverrideReason.trim().length === 0) {
+    throw new ReceiptError(400, 'TAX_OVERRIDE_REASON_REQUIRED', 'El override de impuestos exige motivo.');
+  }
+  if (Math.abs(o.subtotal + o.taxTotal - amountPaid) > 1) {
+    throw new ReceiptError(400, 'TAX_MISMATCH', 'El desglose no cuadra con el monto cobrado.');
+  }
+  // D6: the override can only REDUCE tax burden. A non-formal taxpayer cannot
+  // detail taxes via this path (it would assert a fiscal fact they never declared).
+  const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
+  if (!profile.isFormalTaxpayer && overrideTotal > 0) {
+    throw new ReceiptError(
+      400,
+      'TAXES_REQUIRE_FORMAL_TAXPAYER',
+      'Para detallar impuestos primero debes declarar el negocio como contribuyente formal.',
+    );
+  }
+  const computed = applyTaxOverride(o.subtotal, profile.taxes, {
+    taxTotal: o.taxTotal,
+    taxDetails: o.taxDetails,
+    taxOverrideReason: o.taxOverrideReason,
+  });
+  return { ...computed, taxOverrideReason: o.taxOverrideReason };
 }
 
 export function createReceiptsService(
@@ -180,56 +222,13 @@ export function createReceiptsService(
         profile,
       );
       const amountPaid = Number(payment.amountPaid);
-      let subtotal: number;
-      let taxTotal: number;
-      let taxDetails: ITaxDetail[];
-      let taxOverrideReason: string | null = null;
-      if (input.taxOverride) {
-        const o = input.taxOverride;
-        if (!o.taxOverrideReason || o.taxOverrideReason.trim().length === 0) {
-          throw new ReceiptError(
-            400,
-            'TAX_OVERRIDE_REASON_REQUIRED',
-            'El override de impuestos exige motivo.',
-          );
-        }
-        if (Math.abs(o.subtotal + o.taxTotal - amountPaid) > 1) {
-          throw new ReceiptError(
-            400,
-            'TAX_MISMATCH',
-            'El desglose no cuadra con el monto cobrado.',
-          );
-        }
-        // D6: el override solo puede REDUCIR carga fiscal. Un emisor que no
-        // declaró ser contribuyente formal no puede detallar impuestos por
-        // esta vía (sería afirmar un hecho fiscal que no declaró).
-        const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
-        if (!profile.isFormalTaxpayer && overrideTotal > 0) {
-          throw new ReceiptError(
-            400,
-            'TAXES_REQUIRE_FORMAL_TAXPAYER',
-            'Para detallar impuestos primero debes declarar el negocio como contribuyente formal.',
-          );
-        }
-        const computed = applyTaxOverride(o.subtotal, profile.taxes, {
-          taxTotal: o.taxTotal,
-          taxDetails: o.taxDetails,
-          taxOverrideReason: o.taxOverrideReason,
-        });
-        subtotal = computed.subtotal;
-        taxTotal = computed.taxTotal;
-        taxDetails = computed.taxDetails;
-        taxOverrideReason = o.taxOverrideReason;
-      } else {
-        // Descomposición tax-inclusive: fuente única en shared
-        // (`computeInclusiveTaxes`), la misma que previsualiza el panel.
-        const computed = computeInclusiveTaxes(amountPaid, profile.taxes, {
-          currencyPaid: payment.currencyPaid,
-        });
-        subtotal = computed.subtotal;
-        taxTotal = computed.taxTotal;
-        taxDetails = computed.taxDetails;
-      }
+      // Tax breakdown: validate + compute via helper to keep this function flat.
+      const { subtotal, taxTotal, taxDetails, taxOverrideReason } = resolveTaxBreakdown(
+        amountPaid,
+        profile,
+        payment.currencyPaid,
+        input.taxOverride,
+      );
 
       // Guarda tardía: entre la lectura del pago y este punto otra entrega
       // concurrente pudo numerarlo. Releer evita consumir un número que ya no

@@ -137,7 +137,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       // país. País desconocido → error visible con código, nunca default.
       let profile: ReturnType<typeof resolveFiscalProfile>;
       try {
-        profile = resolveFiscalProfile(org.countryCode, undefined);
+        profile = resolveFiscalProfile(org.countryCode);
       } catch {
         throw new ReceiptError(
           500,
@@ -303,9 +303,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       const row = payment.receiptVoided
         ? payment
         : await platformReceiptsRepo.markPlatformVoided(input.paymentId, {
-            by: input.by,
-            reason: input.reason,
-          });
+          by: input.by,
+          reason: input.reason,
+        });
 
       if (!row.receiptVoidedPdfKey) {
         console.log(
@@ -374,9 +374,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         },
         subscription: subscription
           ? {
-              startDate: subscription.startDate,
-              currentPeriodEnd: subscription.currentPeriodEnd,
-            }
+            startDate: subscription.startDate,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+          }
           : null,
         receptor: {
           name: organization.name,
