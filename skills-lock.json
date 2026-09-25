@@ -6,6 +6,12 @@
       "sourceType": "autoskills-registry",
       "computedHash": "0d59bc23f61ba03b850aa3b81392044c5c7fa3662a5f61b98490b20b0f14a56a"
     },
+    "cloudflare-queues": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare-queues/skills/cloudflare-queues/SKILL.md",
+      "computedHash": "e6d0d74b3512a5cd67477e8cacd6996495d484acc239745df2d331a7ca5bdcc4"
+    },
     "copywriting": {
       "source": "coreyhaines31/marketingskills",
       "sourceType": "github",
