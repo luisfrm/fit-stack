@@ -15,6 +15,24 @@
         "queue": "fit-receipt-events",
         "binding": "RECEIPT_QUEUE"
       }
+    ],
+    "consumers": [
+      {
+        // Lightweight email events — small batches are fine.
+        "queue": "fit-task-events",
+        "max_batch_size": 5,
+        "max_batch_timeout": 10,
+        "max_retries": 3,
+        "dead_letter_queue": "fit-task-events-dlq"
+      },
+      {
+        // Heavy PDF render — one at a time to avoid CPU limit breaches.
+        "queue": "fit-receipt-events",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "fit-receipt-events-dlq"
+      }
     ]
   },
 
@@ -42,6 +60,22 @@
             "queue": "fit-receipt-events-dev",
             "binding": "RECEIPT_QUEUE"
           }
+        ],
+        "consumers": [
+          {
+            "queue": "fit-task-events-dev",
+            "max_batch_size": 5,
+            "max_batch_timeout": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-dev-dlq"
+          },
+          {
+            "queue": "fit-receipt-events-dev",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-receipt-events-dev-dlq"
+          }
         ]
       },
       "r2_buckets": [
@@ -63,6 +97,22 @@
             "queue": "fit-receipt-events-staging",
             "binding": "RECEIPT_QUEUE"
           }
+        ],
+        "consumers": [
+          {
+            "queue": "fit-task-events-staging",
+            "max_batch_size": 5,
+            "max_batch_timeout": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-staging-dlq"
+          },
+          {
+            "queue": "fit-receipt-events-staging",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-receipt-events-staging-dlq"
+          }
         ]
       },
       "r2_buckets": [
@@ -83,6 +133,22 @@
           {
             "queue": "fit-receipt-events",
             "binding": "RECEIPT_QUEUE"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "fit-task-events",
+            "max_batch_size": 5,
+            "max_batch_timeout": 10,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-task-events-dlq"
+          },
+          {
+            "queue": "fit-receipt-events",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "dead_letter_queue": "fit-receipt-events-dlq"
           }
         ]
       },

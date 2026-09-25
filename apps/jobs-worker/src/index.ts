@@ -54,23 +54,32 @@ export default {
     batch: MessageBatch<FitTaskEvent | ReceiptRenderEvent>,
     env: Env,
   ): Promise<void> {
-    // fit-receipt-events tiene su propio consumer path (una cola = un consumer;
-    // este worker consume DOS colas distintas). Se ramifica por nombre de cola,
-    // no por tipo de evento.
+    // Log every batch entry so the pipeline is always traceable.
+    console.log(`[jobs-worker] queue() triggered — queue="${batch.queue}" messages=${batch.messages.length}`);
+
+    // fit-receipt-events has its own consumer path (one queue = one consumer;
+    // this worker consumes TWO distinct queues). Branches by queue name,
+    // not by event type.
     if (batch.queue.startsWith('fit-receipt-events')) {
+      console.log(`[jobs-worker] receipt render batch — ${batch.messages.length} message(s)`);
       for (const message of batch.messages) {
+        const event = message.body as ReceiptRenderEvent;
+        console.log(
+          `[jobs-worker] receipt.render — paymentId=${event.paymentId} scope=${event.scope} receiptNumber=${event.receiptNumber} attempt=${message.attempts}`,
+        );
         try {
-          await handleReceiptRender(env, message.body as ReceiptRenderEvent);
+          const outcome = await handleReceiptRender(env, event);
+          console.log(`[jobs-worker] receipt.render — outcome="${outcome}" paymentId=${event.paymentId}`);
           message.ack();
         } catch (error) {
-          // Nunca más un mensaje vacío: nombre, mensaje y causa viajan en el
-          // log para que el fallo sea accionable (FS-0004). Sin cambio de
-          // semántica: los reintentos agotados siguen yendo a la DLQ.
+          // Never emit an empty error: name, message and cause travel in the
+          // log so the failure is actionable (FS-0004). No semantic change:
+          // exhausted retries still go to the DLQ.
           const cause = error instanceof Error ? error.cause : undefined;
           const name = error instanceof Error ? error.name : 'UnknownError';
           const messageText =
             error instanceof Error ? error.message : String(error);
-          console.error(`Failed to render receipt ${message.id}:`, {
+          console.error(`[jobs-worker] receipt.render FAILED — paymentId=${event.paymentId} attempt=${message.attempts}`, {
             name,
             message: messageText,
             cause,
@@ -80,11 +89,13 @@ export default {
       }
       return;
     }
-    for (const message of batch.messages) {
-      try {
-        const event = message.body as FitTaskEvent;
-        console.log(`Processing queue event: ${event.type}`);
 
+    // fit-task-events: email events routed by type.
+    console.log(`[jobs-worker] task event batch — ${batch.messages.length} message(s)`);
+    for (const message of batch.messages) {
+      const event = message.body as FitTaskEvent;
+      console.log(`[jobs-worker] processing task event type="${event.type}" attempt=${message.attempts}`);
+      try {
         switch (event.type) {
           case 'email.registration_invite':
             await handleRegistrationInvite(env, event);
@@ -93,36 +104,46 @@ export default {
             await handleOrgInvite(env, event);
             break;
           case 'email.payment_receipt':
+            console.log(
+              `[jobs-worker] email.payment_receipt — paymentId=${event.paymentId} org=${event.organizationId}`,
+            );
             await handlePaymentReceipt(env, event);
             break;
           case 'email.org_payment_received':
+            console.log(
+              `[jobs-worker] email.org_payment_received — paymentId=${event.paymentId} org=${event.organizationId}`,
+            );
             await handleOrgPaymentReceived(env, event);
             break;
           default:
-            console.warn(`Unknown queue event type: ${(event as any).type}`);
+            console.warn(`[jobs-worker] unknown event type: ${(event as any).type}`);
         }
 
+        console.log(`[jobs-worker] task event done — type="${event.type}"`);
         message.ack();
       } catch (error) {
-        console.error(`Failed to process message ${message.id}:`, error);
+        console.error(`[jobs-worker] task event FAILED — type="${(event as any).type}" attempt=${message.attempts}:`, error);
         message.retry();
       }
     }
   },
 
   /**
-   * Barrido (cron en Terraform, pre-venta cada 10 h): re-encola renders de
-   * pagos numerados sin PDF. Cierra el hueco "número asignado pero evento
-   * nunca llegó a la cola". Idempotente con el paso 2.
+   * Sweep (cron in Terraform, pre-sale every 10h): re-queues renders for
+   * numbered payments without a PDF. Closes the gap "number assigned but
+   * event never reached the queue". Idempotent with step 2.
    */
   async scheduled(
     _event: ScheduledEvent,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
+    console.log('[jobs-worker] scheduled sweep starting...');
     const { requeued } = await sweepPendingReceiptPdfs(env);
     if (requeued > 0) {
-      console.log(`receipt sweep: ${requeued} renders re-encolados.`);
+      console.log(`[jobs-worker] receipt sweep: ${requeued} render(s) re-queued.`);
+    } else {
+      console.log('[jobs-worker] receipt sweep: nothing pending.');
     }
   },
 };

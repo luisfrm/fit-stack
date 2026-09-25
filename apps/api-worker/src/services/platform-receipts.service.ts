@@ -74,6 +74,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
     receiptPdfKey: string | null | undefined,
   ): Promise<'pending' | 'ready'> {
     if (receiptPdfKey) return 'ready';
+    console.log(
+      `[api-worker] platform-receipts: re-queuing render — paymentId=${paymentId} receiptNumber=${receiptNumber} org=${orgId}`,
+    );
     await receiptQueue.send(
       buildReceiptRenderEvent({
         scope: 'platform',
@@ -82,6 +85,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         receiptNumber,
       }),
     );
+    console.log(`[api-worker] platform-receipts: render re-queued — paymentId=${paymentId}`);
     return 'pending';
   }
 
@@ -231,6 +235,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         }
       }
 
+      console.log(
+        `[api-worker] platform-receipts: queuing render — paymentId=${paymentId} receiptNumber=${persistedNumber} org=${payment.organizationId}`,
+      );
       await receiptQueue.send(
         buildReceiptRenderEvent({
           scope: 'platform',
@@ -239,6 +246,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           receiptNumber: persistedNumber,
         }),
       );
+      console.log(`[api-worker] platform-receipts: render queued — paymentId=${paymentId} receiptNumber=${persistedNumber}`);
       return {
         receiptNumber: persistedNumber,
         pdfStatus: persisted.receiptPdfKey ? 'ready' : 'pending',
@@ -300,6 +308,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           });
 
       if (!row.receiptVoidedPdfKey) {
+        console.log(
+          `[api-worker] platform-receipts: queuing voided render — paymentId=${input.paymentId} receiptNumber=${receiptNumber}`,
+        );
         await receiptQueue.send(
           buildReceiptRenderEvent({
             scope: 'platform',
@@ -442,6 +453,10 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         });
         return { kind: 'queued', attachment: true };
       }
+      // PDF not yet rendered — re-queue render so step 2 sends the email.
+      console.log(
+        `[api-worker] platform-receipts: PDF missing, re-queuing render for email — paymentId=${paymentId} receiptNumber=${composed.payment.receiptNumber}`,
+      );
       await receiptQueue.send(
         buildReceiptRenderEvent({
           scope: 'platform',

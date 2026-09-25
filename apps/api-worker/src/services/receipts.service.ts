@@ -55,13 +55,13 @@ export interface AssignReceiptNumberInput {
 }
 
 export type ReceiptState =
-      | {
-          available: true;
-          pdfStatus: 'ready';
-          receiptNumber: string;
-          receipt: ReceiptData;
-          pdfKey: string;
-        }
+  | {
+    available: true;
+    pdfStatus: 'ready';
+    receiptNumber: string;
+    receipt: ReceiptData;
+    pdfKey: string;
+  }
   | { available: true; pdfStatus: 'pending'; receiptNumber: string }
   | { available: false; reason: 'pre_system' };
 
@@ -91,9 +91,13 @@ export function createReceiptsService(
     receiptPdfKey: string | null | undefined,
   ): Promise<'pending' | 'ready'> {
     if (receiptPdfKey) return 'ready';
+    console.log(
+      `[api-worker] receipts: re-queuing render — paymentId=${paymentId} receiptNumber=${receiptNumber} org=${orgId}`,
+    );
     await receiptQueue.send(
       buildReceiptRenderEvent({ paymentId, organizationId: orgId, receiptNumber }),
     );
+    console.log(`[api-worker] receipts: render re-queued — paymentId=${paymentId}`);
     return 'pending';
   }
 
@@ -244,7 +248,7 @@ export function createReceiptsService(
       const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
       const receiptNumber = formatPanelReceiptNumber(orgSlug, year, seq);
       const parsed = parsePanelReceiptNumber(receiptNumber);
-      if (!parsed || parsed.year !== year || parsed.slug !== orgSlug.toLowerCase()) {
+      if (parsed?.year !== year || parsed.slug !== orgSlug.toLowerCase()) {
         // Defensivo (slug/año ya validados): no dejar el número colgado.
         await receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
         throw new ReceiptError(
@@ -295,6 +299,9 @@ export function createReceiptsService(
         }
       }
 
+      console.log(
+        `[api-worker] receipts: queuing render — paymentId=${paymentId} receiptNumber=${persistedNumber} org=${orgId}`,
+      );
       await receiptQueue.send(
         buildReceiptRenderEvent({
           paymentId,
@@ -302,6 +309,7 @@ export function createReceiptsService(
           receiptNumber: persistedNumber,
         }),
       );
+      console.log(`[api-worker] receipts: render queued — paymentId=${paymentId} receiptNumber=${persistedNumber}`);
       return {
         receiptNumber: persistedNumber,
         pdfStatus: attached.receiptPdfKey ? 'ready' : 'pending',
@@ -373,16 +381,16 @@ export function createReceiptsService(
         },
         member: composed.member
           ? {
-              firstName: composed.member.firstName,
-              lastName: composed.member.lastName,
-              documentId: composed.member.documentId,
-            }
+            firstName: composed.member.firstName,
+            lastName: composed.member.lastName,
+            documentId: composed.member.documentId,
+          }
           : null,
         subscription: composed.subscription
           ? {
-              startDate: composed.subscription.startDate,
-              endDate: composed.subscription.endDate,
-            }
+            startDate: composed.subscription.startDate,
+            endDate: composed.subscription.endDate,
+          }
           : null,
         // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
         emitterSnapshot: composed.payment.emitterSnapshot,
@@ -431,12 +439,15 @@ export function createReceiptsService(
       const row = composed.payment.receiptVoided
         ? composed.payment
         : await receiptsRepo.markVoided(input.paymentId, input.orgId, {
-            by: input.by,
-            reason: input.reason,
-          });
+          by: input.by,
+          reason: input.reason,
+        });
 
-      // Reintentar una anulación ya aplicada también repara un PDF perdido.
+      // Retrying a previously applied void also repairs a lost PDF.
       if (!row.receiptVoidedPdfKey) {
+        console.log(
+          `[api-worker] receipts: queuing voided render — paymentId=${input.paymentId} receiptNumber=${receiptNumber}`,
+        );
         await receiptQueue.send(
           buildReceiptRenderEvent({
             paymentId: input.paymentId,
@@ -487,6 +498,7 @@ export function createReceiptsService(
         throw new ReceiptError(500, 'QUEUE_MISSING', 'Cola de emails no disponible.');
       }
       if (!composed.payment.receiptNumber) {
+        console.log(`[api-worker] receipts: queuing email (no number) — paymentId=${paymentId}`);
         await taskQueue.send({
           type: 'email.payment_receipt',
           paymentId,
@@ -495,6 +507,7 @@ export function createReceiptsService(
         return { kind: 'queued', attachment: false };
       }
       if (composed.payment.receiptPdfKey) {
+        console.log(`[api-worker] receipts: queuing email (with PDF) — paymentId=${paymentId}`);
         await taskQueue.send({
           type: 'email.payment_receipt',
           paymentId,
@@ -502,6 +515,10 @@ export function createReceiptsService(
         });
         return { kind: 'queued', attachment: true };
       }
+      // PDF not yet rendered — re-queue render so step 2 sends the email.
+      console.log(
+        `[api-worker] receipts: PDF missing, re-queuing render for email — paymentId=${paymentId} receiptNumber=${composed.payment.receiptNumber}`,
+      );
       await receiptQueue.send(
         buildReceiptRenderEvent({
           paymentId,
