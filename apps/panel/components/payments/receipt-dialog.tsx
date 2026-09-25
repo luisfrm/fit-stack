@@ -53,7 +53,7 @@ function formatDay(iso: string | Date, timeZone?: string): string {
   });
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
   return (
     <div className="flex justify-between items-center gap-4">
       <Text className="label-text">{label}</Text>
@@ -62,7 +62,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function ReadyBody({ receipt, currencyFormat, timezone }: { receipt: ReceiptData; currencyFormat: CurrencyFormat; timezone: string }) {
+function ReadyBody({ receipt, currencyFormat, timezone }: Readonly<{ receipt: ReceiptData; currencyFormat: CurrencyFormat; timezone: string }>) {
   const tz = timezone;
   const showRate =
     !!receipt.amounts.baseCurrency &&
