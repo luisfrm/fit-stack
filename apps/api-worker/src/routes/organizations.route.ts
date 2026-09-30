@@ -10,7 +10,7 @@ import { createPlatformSubscriptionsService } from '../services/platform-subscri
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
@@ -29,7 +29,7 @@ const CURRENCY_FORMAT_KEY = 'currency_format';
  * tasas — el backend los dicta (snapshot del plan + provider de tasas).
  */
 const orgRenewSchema = z.object({
-  paymentMethod: z.string().min(1),
+  paymentMethod: paymentMethodSchema,
   currencyPaid: z.string().min(1),
   paymentMethodDetails: paymentMethodDetailsSchema,
   paymentDate: z.string().optional(),
@@ -65,6 +65,52 @@ const orgProfileSchema = z
   .passthrough();
 
 const FORBIDDEN_PROFILE_KEYS = ['countryCode', 'primaryCurrency'] as const;
+
+type OrgProfileInput = z.infer<typeof orgProfileSchema>;
+
+type ProfileScalarKey = Extract<keyof typeof orgProfileSchema.shape, keyof NewDbOrganization>;
+
+const PROFILE_SCALAR_KEYS: readonly ProfileScalarKey[] = [
+  'name',
+  'slug',
+  'logo',
+  'slogan',
+  'timezone',
+  'currencyFormat',
+  'legalName',
+  'taxId',
+  'address',
+] as const;
+
+/**
+ * Checks whether transitioning to formal taxpayer requires explicit user confirmation.
+ */
+function requiresFormalTaxpayerConfirmation(
+  body: OrgProfileInput,
+  currentFiscalConfig: unknown,
+): boolean {
+  const wantsFormal = body.fiscalConfig?.isFormalTaxpayer === true;
+  const wasFormal =
+    (currentFiscalConfig as { isFormalTaxpayer?: boolean } | null)?.isFormalTaxpayer === true;
+
+  return wantsFormal && !wasFormal && body.confirmed !== true;
+}
+
+/**
+ * Builds the organization patch object containing only defined incoming fields.
+ */
+function buildOrganizationPatch(body: OrgProfileInput): Partial<NewDbOrganization> {
+  const patch: Partial<NewDbOrganization> = {};
+  for (const key of PROFILE_SCALAR_KEYS) {
+    if (body[key] !== undefined) {
+      (patch as Record<string, unknown>)[key] = body[key];
+    }
+  }
+  if (body.fiscalConfig !== undefined) {
+    patch.fiscalConfig = body.fiscalConfig;
+  }
+  return patch;
+}
 
 function parseJsonArray(raw: string | undefined, fallback: string[]): string[] {
   if (!raw) return fallback;
@@ -283,14 +329,9 @@ export const organizationRoutes = new Hono<AppEnv>()
       const current = await service.findOrganizationById(orgId);
       if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
 
-      const incomingFiscal = body.fiscalConfig;
-      const wantsFormal = incomingFiscal?.isFormalTaxpayer === true;
-      const wasFormal =
-        current.fiscalConfig != null &&
-        (current.fiscalConfig as { isFormalTaxpayer?: boolean }).isFormalTaxpayer === true;
       // Fricción intencional SOLO en la transición false→true: declaración
       // explícita + confirmación (nunca un toggle cosmético).
-      if (wantsFormal && !wasFormal && body.confirmed !== true) {
+      if (requiresFormalTaxpayerConfirmation(body, current.fiscalConfig)) {
         return c.json(
           {
             error: 'Confirma la declaración de contribuyente formal para continuar.',
@@ -302,17 +343,7 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       // Solo los campos presentes: un body sin campos persistibles es un
       // no-op idempotente, nunca un 500 de Drizzle ("No values to set").
-      const patch: Partial<NewDbOrganization> = {};
-      if (body.name !== undefined) patch.name = body.name;
-      if (body.slug !== undefined) patch.slug = body.slug;
-      if (body.logo !== undefined) patch.logo = body.logo;
-      if (body.slogan !== undefined) patch.slogan = body.slogan;
-      if (body.timezone !== undefined) patch.timezone = body.timezone;
-      if (body.currencyFormat !== undefined) patch.currencyFormat = body.currencyFormat;
-      if (body.legalName !== undefined) patch.legalName = body.legalName;
-      if (body.taxId !== undefined) patch.taxId = body.taxId;
-      if (body.address !== undefined) patch.address = body.address;
-      if (incomingFiscal !== undefined) patch.fiscalConfig = incomingFiscal;
+      const patch = buildOrganizationPatch(body);
       if (Object.keys(patch).length === 0) return c.json(current);
 
       const updated = await service.updateOrganization(orgId, patch);

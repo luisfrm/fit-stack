@@ -1,5 +1,18 @@
 import { z } from 'zod';
-import { FiscalConfigSchema } from '@workspace/shared';
+import { UUID_PATTERN } from '@workspace/shared';
+
+/**
+ * Canonical paymentMethod schema.
+ * Rejects technical UUIDs and empty strings to prevent leaking internal IDs into receipts and invoices.
+ */
+export const paymentMethodSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(
+    (v) => !UUID_PATTERN.test(v),
+    { message: 'El método de pago no puede contener un identificador técnico (UUID).' },
+  );
 
 /**
  * Schema canónico de `paymentMethodDetails` — el contrato de escritura es un
@@ -30,7 +43,7 @@ export const taxDetailSchema = z.object({
 });
 
 /** Contrato fiscal de la org — re-export del de shared, no duplicado. */
-export { FiscalConfigSchema };
+
 
 /**
  * Override manual de impuestos con auditoría: exige motivo no vacío.
@@ -42,3 +55,5 @@ export const taxOverrideSchema = z.object({
   taxDetails: z.array(taxDetailSchema),
   taxOverrideReason: z.string().trim().min(1),
 });
+
+export { FiscalConfigSchema } from '@workspace/shared';

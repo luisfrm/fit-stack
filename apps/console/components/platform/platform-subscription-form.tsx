@@ -364,6 +364,17 @@ export function PlatformSubscriptionForm({
         return;
       }
 
+      if (paymentMethodId !== "other" && !selectedPaymentConfig) {
+        toast.error(
+          "El método de pago seleccionado ya no está disponible. Recarga la página.",
+        );
+        return;
+      }
+      if (paymentMethodId === "other" && !paymentDetails.trim()) {
+        toast.error("Especifica el método de pago");
+        return;
+      }
+
       const finalDetails = await handleUploads();
 
       let finalPaymentMethodDetails: IPaymentMethodDetails | undefined;
@@ -395,7 +406,10 @@ export function PlatformSubscriptionForm({
           currencyPaid: paymentCurrency,
           exchangeRateApplied:
             exchangeRate === 1 ? undefined : String(exchangeRate),
-          paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
+          paymentMethod:
+            paymentMethodId === "other"
+              ? paymentDetails.trim()
+              : selectedPaymentConfig!.name,
           paymentMethodDetails: finalPaymentMethodDetails,
           status: paymentValidated
             ? PAYMENT_STATUSES.VALIDATED

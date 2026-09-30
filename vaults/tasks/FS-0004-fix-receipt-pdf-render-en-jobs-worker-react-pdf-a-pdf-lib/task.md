@@ -2,11 +2,11 @@
 id: FS-0004
 aliases: ["FS-0004"]
 title: "Fix receipt PDF render en jobs-worker (react-pdf a pdf-lib)"
-status: in_progress # draft | planning | in_progress | blocked | done | cancelled
+status: done # draft | planning | in_progress | blocked | done | cancelled
 priority: critical # low | medium | high | critical
 created: 2026-09-20
 depends_on: [FS-0001] # hereda el contrato de comprobantes (numeración, R2, checklistPrePdf); no reescribe fases cerradas
-pr: null # URL del PR cuando exista
+pr: "#22" # URL del PR cuando exista
 ---
 
 # FS-0004 — Fix receipt PDF render en jobs-worker (react-pdf a pdf-lib)

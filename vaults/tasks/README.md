@@ -11,7 +11,8 @@
 | [[FS-0001]] | Payment receipts (Panel + Console) | ✅ done | —   |
 | [[FS-0002]] | Subscription integrity - compensacion y periodo servidor | ✅ done | — |
 | [[FS-0003]] | Backlog cumplido huérfano (storage R2, AI compat, front-load) | ✅ done | — |
-| [[FS-0004]] | Fix receipt PDF render en jobs-worker (react-pdf a pdf-lib) | in_progress | — |
+| [[FS-0004]] | Fix receipt PDF render en jobs-worker (react-pdf a pdf-lib) | ✅ done | #22 |
+| [[FS-0005]] | Fix jobs-worker queue pipeline y error pre-PDF comprobantes | in_progress | — |
 
 > El índice se actualiza al crear/cerrar una task.
 

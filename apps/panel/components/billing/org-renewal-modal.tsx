@@ -92,6 +92,10 @@ export function OrgRenewalModal({
       toast.error("Selecciona un método de pago");
       return false;
     }
+    if (!selectedPaymentConfig) {
+      toast.error("El método de pago seleccionado ya no está disponible. Recarga la página.");
+      return false;
+    }
     if (!paymentDate) {
       toast.error("Selecciona la fecha de operación");
       return false;
@@ -112,7 +116,7 @@ export function OrgRenewalModal({
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    if (!validate() || !selectedPaymentConfig) return;
     if (!activeOrganization) {
       toast.error("No se pudo determinar la organización activa");
       return;
@@ -152,7 +156,7 @@ export function OrgRenewalModal({
       }
 
       await renewOrgSubscription({
-        paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
+        paymentMethod: selectedPaymentConfig.name,
         currencyPaid: paymentCurrency,
         paymentMethodDetails: finalPaymentMethodDetails,
         paymentDate,

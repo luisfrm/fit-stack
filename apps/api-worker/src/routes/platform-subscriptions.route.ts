@@ -11,7 +11,7 @@ import { createPlatformReceiptsReportService } from '../services/platform-receip
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
-import { paymentMethodDetailsSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
@@ -27,7 +27,7 @@ const paymentSchema = z.object({
   currencyPaid: z.string().min(1),
   exchangeRateApplied: z.string().optional(),
   baseAmountCents: z.number().int().nonnegative().optional(),
-  paymentMethod: z.string().min(1),
+  paymentMethod: paymentMethodSchema,
   paymentMethodDetails: paymentMethodDetailsSchema,
   status: paymentStatusEnum,
   paymentDate: z.string().optional(),
@@ -284,7 +284,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const { reason } = c.req.valid('json');
     const cache = createCache(c.env);
 
-    const { service, repo } = buildService(c);
+    const { service } = buildService(c);
     const sub = await service.getSubscriptionById(id);
     if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
 
@@ -292,7 +292,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
-      await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, id });
   })
@@ -311,7 +311,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
-      await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await cache.invalidateExact(`org:${sub.organizationId}:features`);
 
     return c.json({ success: true, newEndDate });
   })
@@ -507,7 +507,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     await cache.invalidate('platform:subscriptions*');
     await invalidateReceiptsReportCache(cache);
     await cache.invalidateExact(`org:${sub.organizationId}:subscription-status`);
-      await cache.invalidateExact(`org:${sub.organizationId}:features`);
+    await cache.invalidateExact(`org:${sub.organizationId}:features`);
     await cache.invalidateExact(`platform:subscriptions:invoices:${sub.organizationId}`);
 
     return c.json({ success: true });

@@ -11,7 +11,7 @@ import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createCache, type Cache } from '../lib/cache';
-import { paymentMethodDetailsSchema, taxDetailSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -44,7 +44,7 @@ const createSubSchema = z.object({
     amountPaid: z.number().int().positive(),
     currencyPaid: z.string(),
     exchangeRateApplied: z.string().nullable().optional(),
-    paymentMethod: z.string(),
+    paymentMethod: paymentMethodSchema,
     paymentMethodDetails: paymentMethodDetailsSchema,
     status: z.enum(['processing', 'validated', 'voided']).optional(),
     paymentDate: z.string().optional(),
