@@ -128,6 +128,37 @@ function validateTaxOverrides(
   return true;
 }
 
+/**
+ * Maps dynamic or freeform payment details into structured IPaymentMethodDetails.
+ */
+function buildPaymentMethodDetails(
+  selectedPaymentConfig: IPaymentMethodConfig | undefined,
+  finalDetails: Record<string, any>,
+  paymentDetails: string
+): IPaymentMethodDetails | undefined {
+  if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
+    return selectedPaymentConfig.fields
+      .filter((field) => field.type !== "visual" && finalDetails[field.id] !== undefined)
+      .map((field) => ({
+        label: field.label,
+        value: finalDetails[field.id],
+        type: field.type === "visual" ? "text" : field.type,
+      }));
+  }
+
+  if (paymentDetails) {
+    return [
+      {
+        label: "Nota / Referencia",
+        value: paymentDetails,
+        type: "text",
+      },
+    ];
+  }
+
+  return undefined;
+}
+
 interface SubscriptionFormProps {
   readonly onSubmit: (data: SubscriptionSubmitData) => Promise<void>;
   readonly isLoading?: boolean;
@@ -404,6 +435,16 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
+    if (paymentMethodId !== "other" && !selectedPaymentConfig) {
+      toast.error("El método de pago seleccionado ya no está disponible. Recarga la página.");
+      return false;
+    }
+
+    if (paymentMethodId === "other" && !paymentDetails.trim()) {
+      toast.error("Especifica el método de pago");
+      return false;
+    }
+
     if (!validateDynamicPaymentFields(selectedPaymentConfig, dynamicFieldValues)) {
       return false;
     }
@@ -431,6 +472,70 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     return finalDetails;
   };
 
+  const buildSubmitPayload = (
+    finalPaymentMethodDetails: IPaymentMethodDetails | undefined
+  ): SubscriptionSubmitData => {
+    const paymentMethod =
+      paymentMethodId === "other"
+        ? paymentDetails.trim()
+        : selectedPaymentConfig!.name;
+
+    const payload: SubscriptionSubmitData = {
+      memberId: memberId!,
+      planId: planId!,
+      startDate,
+      payment: {
+        amountPaid: unitsToCents(finalAmount),
+        currencyPaid: paymentCurrency,
+        exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
+        paymentMethod,
+        paymentMethodDetails: finalPaymentMethodDetails,
+        status: paymentValidated ? "validated" : "processing",
+        paymentDate,
+      },
+    };
+
+    if (endDateDirty) {
+      payload.endDate = endDate;
+    }
+    if (requiresOverrideReason) {
+      payload.endDateOverrideReason = endDateOverrideReason.trim();
+    }
+    if (effectiveTaxMode === "override" && taxPreview) {
+      payload.payment.subtotal = taxPreview.subtotal;
+      payload.payment.taxTotal = taxPreview.taxTotal;
+      payload.payment.taxDetails = taxPreview.lines;
+      payload.payment.taxOverrideReason = taxOverrideReason.trim();
+    }
+
+    return payload;
+  };
+
+  const handleSubmissionError = async (err: unknown) => {
+    console.error("Error processing subscription payment:", err);
+    // Dueño ÚNICO del toast de submit: el modal (`SubscriptionModal`), que es
+    // quien mapea los códigos de negocio. Aquí solo se resuelve el estado
+    // local; toastear también duplicaría el aviso (1 acción → 1 toast).
+    if (apiCode(err) !== "END_DATE_OVERRIDE_REASON_REQUIRED") return;
+
+    // El servidor pide motivo (cálculo local desactualizado): forzamos el
+    // campo y refrescamos el latest del miembro para que el preview
+    // converja.
+    setServerRequiresReason(true);
+    if (!selectedMember) return;
+
+    const refreshed = await membersService.getMembers({
+      query: selectedMember.email,
+      role: ORG_ROLES.MEMBER,
+      includeLatestSubscription: true,
+      limit: 1,
+    });
+    const latestMember = refreshed.data.find((m) => m.id === selectedMember.id);
+    if (latestMember) {
+      setSelectedMember(latestMember);
+    }
+  };
+
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!validatePaymentFields()) return;
@@ -445,75 +550,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     setIsProcessingUploads(true);
     try {
       const finalDetails = await handleUploads();
-
-      let finalPaymentMethodDetails: IPaymentMethodDetails | undefined = undefined;
-
-      if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
-        // Map field IDs to human-readable labels for self-descriptive data
-        // (visual fields are instructions, never persisted as payment details)
-        finalPaymentMethodDetails = selectedPaymentConfig.fields
-          .filter(field => field.type !== 'visual' && finalDetails[field.id] !== undefined)
-          .map(field => ({
-            label: field.label,
-            value: finalDetails[field.id],
-            type: field.type === 'visual' ? 'text' : field.type
-          }));
-      } else if (paymentDetails) {
-        finalPaymentMethodDetails = [{
-          label: "Nota / Referencia",
-          value: paymentDetails,
-          type: "text"
-        }];
-      }
-
-      await onSubmit({
-        memberId: memberId!,
-        planId: planId!,
-        startDate: startDate, // Raw YYYY-MM-DD string, backend will handle timezone
-        // Sin `dirty` no se envía `endDate`: el periodo lo fija el servidor.
-        ...(endDateDirty ? { endDate: endDate } : {}),
-        ...(requiresOverrideReason ? { endDateOverrideReason: endDateOverrideReason.trim() } : {}),
-        payment: {
-          amountPaid: unitsToCents(finalAmount),
-          currencyPaid: paymentCurrency,
-          exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
-          paymentMethod: selectedPaymentConfig?.name || paymentMethodId,
-          paymentMethodDetails: finalPaymentMethodDetails,
-          status: paymentValidated ? 'validated' : 'processing',
-          paymentDate: paymentDate, // Send the selected date string
-          // Modo auto: sin campos fiscales (el backend descompone).
-          // Override: desglose en centavos + motivo de auditoría.
-          ...(effectiveTaxMode === "override" && taxPreview
-            ? {
-              subtotal: taxPreview.subtotal,
-              taxTotal: taxPreview.taxTotal,
-              taxDetails: taxPreview.lines,
-              taxOverrideReason: taxOverrideReason.trim(),
-            }
-            : {}),
-        }
-      });
-    } catch (err: any) {
-      console.error("Error processing subscription payment:", err);
-      // Dueño ÚNICO del toast de submit: el modal (`SubscriptionModal`), que es
-      // quien mapea los códigos de negocio. Aquí solo se resuelve el estado
-      // local; toastear también duplicaría el aviso (1 acción → 1 toast).
-      if (apiCode(err) === "END_DATE_OVERRIDE_REASON_REQUIRED") {
-        // El servidor pide motivo (cálculo local desactualizado): forzamos el
-        // campo y refrescamos el latest del miembro para que el preview
-        // converja.
-        setServerRequiresReason(true);
-        if (selectedMember) {
-          const refreshed = await membersService.getMembers({
-            query: selectedMember.email,
-            role: ORG_ROLES.MEMBER,
-            includeLatestSubscription: true,
-            limit: 1,
-          });
-          const latestMember = refreshed.data.find((m) => m.id === selectedMember.id);
-          if (latestMember) setSelectedMember(latestMember);
-        }
-      }
+      const finalPaymentMethodDetails = buildPaymentMethodDetails(
+        selectedPaymentConfig,
+        finalDetails,
+        paymentDetails
+      );
+      const payload = buildSubmitPayload(finalPaymentMethodDetails);
+      await onSubmit(payload);
+    } catch (err: unknown) {
+      await handleSubmissionError(err);
     } finally {
       setIsProcessingUploads(false);
     }

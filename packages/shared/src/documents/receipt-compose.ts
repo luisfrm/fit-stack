@@ -288,13 +288,29 @@ export function assertPersistedTaxDetails(value: unknown, method: string): ITaxD
   });
 }
 
-/** Detalles enmascarados al contrato `ReceiptMethod` (nada crudo visible). */
+/**
+ * Converts a detail field value to string safely, avoiding '[object Object]' for non-primitives.
+ */
+function toDetailString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
+/**
+ * Maps masked payment details to the `ReceiptMethod` contract.
+ * Excludes `file` items (storage paths/attachments are internal and should not appear in receipt text/PDF).
+ */
 export function toReceiptMaskedDetails(masked: unknown): ReceiptMethod['maskedDetails'] {
   if (!Array.isArray(masked)) return undefined;
-  return masked.map((item) => {
-    const it = item as { label?: unknown; value?: unknown };
-    return { label: String(it.label ?? ''), value: String(it.value ?? '') };
-  });
+  const visible = (masked as { type?: unknown; label?: unknown; value?: unknown }[]).filter(
+    (item) => item && typeof item === 'object' && item.type !== 'file',
+  );
+  if (visible.length === 0) return undefined;
+  return visible.map((it) => ({
+    label: toDetailString(it.label),
+    value: toDetailString(it.value),
+  }));
 }
 
 /**
@@ -471,7 +487,7 @@ export function buildPlatformReceiptDataFromComposed(
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(
       { receptor, emitter, currency: payment.planSnapshotCurrency },
-      resolveFiscalProfile(receptor.countryCode, undefined),
+      resolveFiscalProfile(receptor.countryCode),
     );
 
   const masked = maskPaymentDetails(

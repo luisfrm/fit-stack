@@ -19,7 +19,7 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
 import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
-import { paymentMethodDetailsSchema, FiscalConfigSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import { DEFAULT_ORG_STAFF_VALUES, isOrgStorageKey } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
@@ -328,7 +328,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
           currencyPaid: z.string().min(1),
           exchangeRateApplied: z.string().optional(),
           baseAmountCents: z.number().int().nonnegative().optional(),
-          paymentMethod: z.string().min(1),
+          paymentMethod: paymentMethodSchema,
           paymentMethodDetails: paymentMethodDetailsSchema,
           status: z.enum([
             PAYMENT_STATUSES.PROCESSING,

@@ -1,5 +1,5 @@
 /* ── Documents / receipt-data — contrato del comprobante ─────────────────
-   `ReceiptData` es TODO lo que el PDF, el email y el reporte necesitan y
+   `ReceiptData` es CADA COSA que el PDF, el email y el reporte necesitan y
    nada más: emisor congelado, receptor, detalle snapshot, periodo, montos
    en centavos enteros, método enmascarado, impuestos y pie legal.
    El UUID técnico (`payment.id`) NUNCA va en campos visibles: solo viaja
@@ -142,8 +142,8 @@ export interface ReceiptChecklist {
   errors: string[];
 }
 
-/** Detecta UUIDs técnicos filtrados a campos visibles. */
-const UUID_PATTERN =
+/** Detects leaked technical UUIDs into visible receipt fields. */
+export const UUID_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**

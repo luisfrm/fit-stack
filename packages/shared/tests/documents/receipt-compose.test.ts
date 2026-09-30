@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildEmitterSnapshot,
   buildReceiptDataFromComposed,
+  toReceiptMaskedDetails,
   type ComposeReceiptInput,
 } from '../../src/documents/receipt-compose';
 import { checklistPrePdf } from '../../src/documents/receipt-data';
@@ -178,5 +179,69 @@ describe('buildReceiptDataFromComposed', () => {
     const input = validInput();
     input.emitterSnapshot = { version: 1, emitter: { name: 'X' } };
     expect(() => buildReceiptDataFromComposed(input)).toThrow(/emitter_snapshot inválido/);
+  });
+
+  it('passes checklistPrePdf with production payment 4 data (R2 file path excluded from receipt)', () => {
+    const input = validInput();
+    input.payment.id = 4;
+    input.payment.paymentMethod = 'Binance';
+    input.payment.planSnapshotName = 'Standard';
+    input.payment.paymentMethodDetails = [
+      {
+        type: 'text',
+        label: 'Correo/Binance Id/Usuario remitente',
+        value: 'luisfrm_@outlook.com',
+      },
+      {
+        type: 'file',
+        label: 'Recibo',
+        value:
+          'cdab3d7b-b519-4f2d-bff1-e49c4af5ff8b/receipts/luis-rivas_binance_573810_9b775753.png',
+      },
+    ];
+    const data = buildReceiptDataFromComposed(input);
+    expect(data.method.name).toBe('Binance');
+    // Only the non-file field is included in maskedDetails; file path is omitted from receipt
+    expect(data.method.maskedDetails).toEqual([
+      {
+        label: 'Correo/Binance Id/Usuario remitente',
+        value: 'luis••••••••••••••om',
+      },
+    ]);
+    expect(checklistPrePdf(data)).toEqual({ ok: true, errors: [] });
+  });
+});
+
+describe('toReceiptMaskedDetails', () => {
+  it('excludes items with type file (storage attachments)', () => {
+    const input = [
+      { type: 'text', label: 'Referencia', value: '1234••••••12' },
+      {
+        type: 'file',
+        label: 'Recibo',
+        value: 'cdab3d7b-b519-4f2d-bff1-e49c4af5ff8b/receipts/doc.png',
+      },
+    ];
+    expect(toReceiptMaskedDetails(input)).toEqual([
+      { label: 'Referencia', value: '1234••••••12' },
+    ]);
+  });
+
+  it('returns undefined if all items are file attachments', () => {
+    const input = [
+      {
+        type: 'file',
+        label: 'Recibo',
+        value: 'cdab3d7b-b519-4f2d-bff1-e49c4af5ff8b/receipts/doc.png',
+      },
+    ];
+    expect(toReceiptMaskedDetails(input)).toBeUndefined();
+  });
+
+  it('preserves legacy items without type', () => {
+    const input = [{ label: 'Nota', value: 'Pago verificado' }];
+    expect(toReceiptMaskedDetails(input)).toEqual([
+      { label: 'Nota', value: 'Pago verificado' },
+    ]);
   });
 });
