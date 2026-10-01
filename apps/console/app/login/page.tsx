@@ -47,7 +47,7 @@ export default function LoginPage() {
     }
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
@@ -72,12 +72,12 @@ export default function LoginPage() {
       localStorage.removeItem("remember_password");
     }
 
-    setIsLoading(false);
+    // Keep loading state active during redirect transition
     router.replace(returnTo ?? '/dashboard');
   };
 
-  if (isPending) {
-    return <SplashScreen message="Verificando sesión..." />;
+  if (isPending || session) {
+    return <SplashScreen message={session ? "Redirigiendo al panel..." : "Verificando sesión..."} />;
   }
 
   return (
