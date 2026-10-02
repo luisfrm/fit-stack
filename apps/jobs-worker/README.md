@@ -61,10 +61,11 @@ Los tres son seguros de re-encolar porque cada artefacto tiene su propio gate id
 
 > **Cadencia (pre-venta)**: `0 */10 * * *` (cada 10 horas) — ahorro de invocaciones sin clientes reales. Bajar a `*/10 * * * *` (cada 10 min) con clientes reales. Ver `vaults/backlog/comprobantes.md`.
 
-## Infraestructura (Terraform es el dueño)
+## Infraestructura (settings espejados Terraform ↔ wrangler)
 
-- **Producers**: declarados en `wrangler.jsonc` (`TASK_QUEUE` + `RECEIPT_QUEUE`). El deploy (`deploy-jobs-worker.yml`) sube el código.
-- **Consumers (×2) + cron**: declarados **solo** en Terraform (`infrastructure/terraform/workers.tf`: `cloudflare_queue_consumer.receipt` / `.task` + `cloudflare_workers_cron_trigger.jobs_sweep`). Los `wrangler.jsonc` **no** declaran `queues.consumers` ni `triggers` para no competir con el estado de Terraform.
+- **Producers**: declarados en `wrangler.jsonc` (`TASK_QUEUE` + `RECEIPT_QUEUE`) — son bindings del worker, el código los usa. El deploy (`deploy-jobs-worker.yml`) sube el código.
+- **Consumers (×2)**: declarados **en ambos** lados — Terraform (`infrastructure/terraform/workers.tf`: `cloudflare_queue_consumer.receipt` / `.task`) y `wrangler.jsonc` (bloque raíz + cada env) — con **los mismos valores**. El deploy hace upsert del consumer, así que gana el último escritor: si los números difieren, el recurso vivo cambia en silencio. `pnpm check:infra-parity` compara nombres + settings (`max_batch_timeout` s == `max_wait_time_ms` ms). El bloque raíz es el que consume `wrangler dev` local.
+- **Cron**: declarado **solo** en Terraform (`cloudflare_workers_cron_trigger.jobs_sweep`); el `wrangler.jsonc` no declara `triggers`.
 - **Orden**: `terraform apply` + `wrangler deploy jobs-worker`.
 
 ## Env vars
