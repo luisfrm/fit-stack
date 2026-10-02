@@ -43,7 +43,7 @@ Este documento detalla la arquitectura de infraestructura, aprovisionamiento y e
                                                              └───────────────────────┘
 ```
 
-> **Dueño único de consumers/cron = Terraform.** `jobs-worker` consume **dos** colas (`fit-task-events` y `fit-receipt-events`), cada una con su DLQ, más un **cron** de barrido. Los `.tf` (`workers.tf`) declaran los `cloudflare_queue_consumer` (×2) y el `cloudflare_workers_cron_trigger`; los `wrangler.jsonc` solo declaran **producers**. Orden: `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`).
+> **Consumers: settings espejados. Cron: dueño único Terraform.** `jobs-worker` consume **dos** colas (`fit-task-events` y `fit-receipt-events`), cada una con su DLQ, más un **cron** de barrido. Los consumers están declarados **en ambos** lados — `workers.tf` (`cloudflare_queue_consumer` ×2) y `apps/jobs-worker/wrangler.jsonc` (bloque raíz + cada env) — con los **mismos valores**: el deploy hace upsert del consumer, así que el número es el contrato, no la propiedad. `pnpm check:infra-parity` compara nombres y settings (`max_batch_timeout` s == `max_wait_time_ms` ms). El **cron** sí es Terraform-only (`cloudflare_workers_cron_trigger`; el wrangler no declara `triggers`). Orden: `terraform apply` (crea colas/consumers/cron) + `wrangler deploy jobs-worker` (sube el código con `scheduled()`).
 
 ### Componentes y Proveedores
 

@@ -87,10 +87,18 @@ module "jobs_worker" {
 }
 
 # Consumer de fit-receipt-events en jobs-worker (una cola = un consumer).
-# Terraform es el DUEÑO ÚNICO de consumers/cron en cloud; el wrangler.jsonc de
-# jobs-worker NO declara `queues.consumers` ni `triggers` (solo producers) para
-# que `wrangler deploy` no compita con el estado. `wrangler dev` local no
-# necesita consumer/cron declarados para funcionar.
+#
+# REGLA (espejo, no dueño único): este consumer también está declarado en
+# `apps/jobs-worker/wrangler.jsonc` (bloque raíz + cada env) y con los MISMOS
+# valores. `wrangler deploy` hace upsert del consumer en cada deploy, así que
+# gana el último escritor: si los números difieren, el recurso vivo cambia en
+# silencio. Con los valores espejados el resultado es idéntico sin importar
+# quién escriba. El guard es `scripts/check-name-parity.mjs` (CI): compara los
+# bloques del wrangler entre sí y contra estos settings — `max_batch_timeout`
+# (segundos) del wrangler == `max_wait_time_ms` (milisegundos) de acá.
+#
+# `batch_size = 1`: un render de PDF pesado por invocación, para que un mensaje
+# malo no arrastre el lote completo al reintento.
 resource "cloudflare_queue_consumer" "receipt" {
   account_id  = var.cloudflare_account_id
   queue_id    = module.receipt_queue.id
@@ -98,8 +106,9 @@ resource "cloudflare_queue_consumer" "receipt" {
   type        = "worker"
 
   settings = {
-    batch_size  = 10
-    max_retries = 3
+    batch_size       = 1
+    max_wait_time_ms = 5000
+    max_retries      = 3
   }
 
   dead_letter_queue = module.receipt_dlq_queue.name
@@ -117,8 +126,9 @@ resource "cloudflare_workers_cron_trigger" "jobs_sweep" {
   ]
 }
 
-# Consumer de fit-task-events (emails) en jobs-worker. Terraform es dueño único
-# de consumers/cron; el wrangler.jsonc de jobs-worker solo declara producers.
+# Consumer de fit-task-events (emails) en jobs-worker. Misma regla de espejo que
+# el consumer de receipts: `settings` debe ser idéntico al bloque raíz y a cada
+# env de `apps/jobs-worker/wrangler.jsonc` (guard: `scripts/check-name-parity.mjs`).
 resource "cloudflare_queue_consumer" "task" {
   account_id  = var.cloudflare_account_id
   queue_id    = module.task_queue.id
@@ -126,8 +136,9 @@ resource "cloudflare_queue_consumer" "task" {
   type        = "worker"
 
   settings = {
-    batch_size  = 10
-    max_retries = 3
+    batch_size       = 5
+    max_wait_time_ms = 10000
+    max_retries      = 3
   }
 
   dead_letter_queue = module.dlq_queue.name
