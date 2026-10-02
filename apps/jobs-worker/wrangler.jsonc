@@ -65,14 +65,14 @@
             "max_batch_size": 5,
             "max_batch_timeout": 10,
             "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-dev-dlq"
+            "dead_letter_queue": "fit-task-events-dlq-dev"
           },
           {
             "queue": "fit-receipt-events-dev",
             "max_batch_size": 1,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "dead_letter_queue": "fit-receipt-events-dev-dlq"
+            "dead_letter_queue": "fit-receipt-events-dlq-dev"
           }
         ]
       },
@@ -102,14 +102,14 @@
             "max_batch_size": 5,
             "max_batch_timeout": 10,
             "max_retries": 3,
-            "dead_letter_queue": "fit-task-events-staging-dlq"
+            "dead_letter_queue": "fit-task-events-dlq-staging"
           },
           {
             "queue": "fit-receipt-events-staging",
             "max_batch_size": 1,
             "max_batch_timeout": 5,
             "max_retries": 3,
-            "dead_letter_queue": "fit-receipt-events-staging-dlq"
+            "dead_letter_queue": "fit-receipt-events-dlq-staging"
           }
         ]
       },
