@@ -5,6 +5,11 @@
             "url": "https://mcp.better-auth.com/mcp",
             "type": "remote",
             "enabled": true
+        },
+        "linear": {
+            "type": "remote",
+            "url": "https://mcp.linear.app/mcp",
+            "enabled": true
         }
     },
 }

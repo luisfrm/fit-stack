@@ -1,8 +1,8 @@
-# Tasks — índice
+# Tasks — índice (⏸ DEPRECATED)
 
-> Registro de requerimientos del proyecto. **Guía del sistema: [[task-system]]** (flujo, formato y reglas).
+> **Este índice es historial de lectura.** El trabajo planificado se sigue ahora en **Linear** (team `Rivas Digital`): **1 issue = 1 PR**, y el agente `planner` escribe el plan completo en la descripción del issue. No se crean tasks nuevas aquí, no se ejecuta `pnpm task:new` y no se editan las existentes. Ver **Task Tracking (Linear)** en `AGENTS.md` y la nota de deprecación en [[task-system]].
 >
-> Para crear una task nueva: `pnpm task:new "<título>"` — asigna el siguiente `FS-NNNN` y genera `task.md` + `phases/`.
+> Las tareas que quedaron abiertas (FS-0005, FS-0006) deben replantearse como issues en Linear antes de continuar.
 
 ## Índice de tasks
 

@@ -1,6 +1,14 @@
-# Sistema de tasks (FS-NNNN)
+# Sistema de tasks (FS-NNNN) — ⏸ DEPRECATED
 
-> Guía canónica del sistema de trabajo por tasks de Fit-Stack. El **índice** de tasks vive en `vaults/tasks/README.md`; esta guía explica el **flujo** y el **formato**.
+> **Este sistema está deprecado.** El seguimiento del trabajo planificado vive ahora en **Linear** (team `Rivas Digital`, MCP `linear`): **1 issue = 1 PR**, y el agente `planner` escribe la especificación completa en la descripción del issue. No se crean carpetas `FS-NNNN`, no se ejecuta `pnpm task:new` y no existen fases.
+>
+> - Flujo actual: `/task "<requerimiento>"` y `/plan "<requerimiento | RD-NNN>"` → `planner` → issue en Linear. Ver la sección **Task Tracking (Linear)** de `AGENTS.md`.
+> - Convención de ramas: `<type>/RD-<número>-<resumen-kebab>` (`Feature → feat`, `Bug → fix`, `Improvement → chore`).
+> - `vaults/tasks/FS-NNNN-*/` se conserva **solo como historial de lectura**: no se crea, edita ni borra nada ahí. Este documento queda como registro del flujo anterior.
+
+## (Histórico) Qué es una task
+
+Una **task** es el registro de un **requerimiento** con alcance y dueño claros, que se entrega en **un solo PR**. Cada task es una carpeta autocontenida: el requerimiento lo escribe el humano; el plan y las fases los genera el agente `planner`.
 
 ## Qué es una task
 

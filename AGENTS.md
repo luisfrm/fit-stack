@@ -39,11 +39,28 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 - **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
 - **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs** (`vaults/`, Obsidian vault): `architecture/` (`ARCHITECTURE.md`, `INFRASTRUCTURE.md`, `terraform.md`), `business/` (receipt model, payment statuses, RBAC, timezone, fiscal), `ai/` (`CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`; `archive/CHAT_IMPLEMENTATION.MD` deprecated), `guides/` (`FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md`, `task-system.md` + `how/` — AI Knowledge Base), `backlog/` (pending items by topic; index `README.md`, alias `PENDING`), `tasks/` (`FS-NNNN-slug/` with `task.md` + `plan.md` + `phases/`; index in `README.md`).
-- **Tasks**: `vaults/tasks/FS-NNNN-slug/` — **1 task = 1 PR** (branch `feat/FS-NNNN-slug`). Create with `pnpm task:new "<title>"`; the `planner` agent generates `plan.md` + `phases/`. Link by ID (`[[FS-0001]]`). Guide: `vaults/guides/task-system.md`. Unassigned pending items → `vaults/backlog/`.
+- **Docs** (`vaults/`, Obsidian vault): `architecture/` (`ARCHITECTURE.md`, `INFRASTRUCTURE.md`, `terraform.md`), `business/` (receipt model, payment statuses, RBAC, timezone, fiscal), `ai/` (`CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`; `archive/CHAT_IMPLEMENTATION.MD` deprecated), `guides/` (`FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md`, `task-system.md` **deprecated** + `how/` — AI Knowledge Base), `backlog/` (pending items by topic; index `README.md`, alias `PENDING`), `tasks/` (**⏸ DEPRECATED** — historical `FS-NNNN-slug/` folders, read-only).
+- **Tasks → Linear**: planned work is tracked in **Linear** (team `Rivas Digital`, MCP `linear`). **1 issue = 1 PR**; branch `<type>/RD-<number>-<kebab-brief-summary>`. The `planner` agent writes the whole spec into the issue description. The local `vaults/tasks/` system is deprecated history: never create or edit `FS-NNNN` folders, never run `pnpm task:new`. See [Task Tracking (Linear)](#task-tracking-linear). Unowned pending ideas → `vaults/backlog/` until they have an owner and a scope.
 - **Architecture Spec**: For detailed design decisions, see [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md).
 
 - **Bridge is Python** — not part of Turbo, managed separately with `uv`
+
+---
+
+## Task Tracking (Linear)
+
+**Linear is the single source of truth for planned work.** The local `vaults/tasks/` system (`FS-NNNN`, `task.md`, `plan.md`, `phases/`) is **deprecated**: those folders are read-only history, `pnpm task:new` is not used anymore, and no agent may create or edit them. The guide `vaults/guides/task-system.md` is kept only as a record of the old flow.
+
+- **Workspace/team**: `Rivas Digital` (`6630fb5f-e79c-42de-8867-49da2a325e10`), accessed through the `linear` MCP server (`.opencode` → `opencode.json`). Its tools are only reachable from the `execute` runtime as `tools["linear"].<tool>(…)` — e.g. `tools["linear"].save_issue({ team, title, description, priority, state, labels })`, `get_issue`, `list_issues`, `save_comment`.
+- **1 issue = 1 PR = 1 coherent unit of work.** The DB change, backend, frontend, tests and docs that make one behaviour work end to end land together.
+- **No phases, no sub-issues per layer.** The issue description holds the whole spec; the layers are its ordered sections. Split into **sibling issues** (linked with `blocks`/`blockedBy`) only when one PR would be unreviewable — a decision gate, an independent subsystem, or a risky refactor that must land apart from the feature. Never split by architectural layer.
+- **Issue lifecycle = workflow**: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done` (plus `Canceled`, `Duplicate`). A rejected PR sends the **same** issue back to `In Progress` and a new PR is opened — never a duplicate issue.
+- **Labels**: `Feature`, `Bug`, `Improvement`. The label determines the branch prefix: `Feature → feat`, `Bug → fix`, `Improvement → chore` (`refactor` when purely structural, `docs` when documentation-only). Do **not** use the `Backlog` label — the state covers it.
+- **Branch**: `<type>/RD-<number>-<kebab-brief-summary>` (lowercase, ≤ 60 chars after the prefix), recorded in the issue's `## Git` section. PR title: `<type>(<scope>): <summary> (RD-<number>)`. Semantic prefixes stay on branches and commits; the `RD-` id is what makes branch → PR → issue traceable.
+- **Description template** (English): `## Problem` · `## Scope` (In/Out) · `## Implementation plan` (ordered by layer — DB, Shared, Backend, Frontend, Cache, Jobs, Tests, Docs — only the layers actually touched, each with **verified** file paths) · `## Acceptance criteria` (verifiable checklist) · `## Verification` (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm --filter api-worker test:integration` when contracts/payments/receipts change, plus manual steps) · `## Risks & notes` (migrations needing approval, multi-tenancy/permission/money consequences, `⏸ PAUSED` areas) · `## Git`.
+- **Language**: Linear content (titles, descriptions, branch names, comments) is **English**, so prose matches the paths, symbols and commands it cites. The chat response to the user is in **Spanish**.
+- **Commands**: `/task "<requirement>"` captures a requirement as a new issue; `/plan "<requirement or RD-NNN>"` plans it (or re-plans an existing issue). Both delegate to the `planner` subagent.
+- **Unowned work** (findings, loose bugs, ideas with no owner or scope) stays in `vaults/backlog/` and does not become an issue on its own.
 
 ---
 
@@ -279,7 +296,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
 - **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `mutationError(scope, err, "<generic action message>")` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(...)`, e.g. "Could not save the plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
-- **Implementation Plans**: Write in **Spanish**. Always ask for explicit approval before implementing.
+- **Implementation Plans**: a plan is a **Linear issue**, written in **English** (see [Task Tracking (Linear)](#task-tracking-linear)); the chat response about it is in **Spanish**. Always ask for explicit approval before implementing.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
@@ -1110,7 +1127,7 @@ e2e/
 
 - **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
 - **Tests**: `pnpm test` runs the full suite (shared → api-worker → panel → console, Vitest). api-worker integration tests talk real HTTP to the Hono app against a Neon branch (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`); without that variable they're skipped with a clear message, and they never run against the production database (hard guards). CI runs them on PRs (`ci.yml` job `test`).
-- **Implementation plans**: Always use Spanish, ask for explicit approval before implementing
+- **Implementation plans**: they are **Linear issues written in English** (1 issue = 1 PR); ask for explicit approval before implementing. The chat response is in Spanish. See [Task Tracking (Linear)](#task-tracking-linear)
 - **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
 - **Keep AGENTS.md updated** — After any structural change, update AGENTS.md to reflect it. When in doubt, update it.
 
@@ -1130,7 +1147,7 @@ e2e/
 - New queue event types or email/PDF flows in jobs-worker
 - New E2E specs, helpers, or Playwright config changes
 - Changes to the vault (`vaults/`) structure or new docs
-- Changes to the task system (`vaults/tasks/`, `pnpm task:new`) or the backlog (`vaults/backlog/`)
+- Changes to task tracking (the Linear workflow in [Task Tracking (Linear)](#task-tracking-linear), labels, branch convention, the `planner` agent) or to the backlog (`vaults/backlog/`)
 
 ---
 
