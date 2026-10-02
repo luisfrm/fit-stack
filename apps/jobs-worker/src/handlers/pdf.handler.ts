@@ -276,6 +276,18 @@ export async function handleOrgPaymentReceived(
   }
   const payerName = payload.payerName?.trim() || 'El equipo de tu organización';
 
+  // CTA target-based: el URL lo decide QUIÉN es el destinatario, nunca el
+  // template. Hoy todos los destinatarios son staff (payer + owners) → panel.
+  // Extensión futura (app de portal para member/trainer): su target será
+  // `env.PORTAL_URL` + un caso `target: 'portal'` en el contrato de invitación
+  // (`RegistrationInviteData.target`). Sin binding ni fallback hasta entonces.
+  const panelUrl = env.PANEL_URL?.trim();
+  if (!panelUrl) {
+    throw new Error(
+      `Platform payment ${payload.paymentId}: PANEL_URL ausente; no se puede construir el CTA "Ir al Panel" (sin fallback a localhost).`,
+    );
+  }
+
   const { subject, html } = renderOrgPaymentReceived({
     orgName: paymentData.org.name || 'tu organización',
     planName: paymentData.payment.planSnapshotName,
@@ -284,6 +296,7 @@ export async function handleOrgPaymentReceived(
     paymentDate: formatDate(paymentData.payment.paymentDate, paymentData.org.timezone),
     payerName,
     pendingReview,
+    panelUrl,
   });
 
   // Rama A (C2): resolve attachment; undefined = abort (PDF not yet ready).
