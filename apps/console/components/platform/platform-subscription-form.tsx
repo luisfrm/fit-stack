@@ -333,6 +333,29 @@ export function PlatformSubscriptionForm({
     return finalDetails;
   };
 
+  /** Resolves the structured payment method details from dynamic fields or free-text fallback. */
+  const resolvePaymentMethodDetails = (
+    finalDetails: Record<string, any>,
+  ): IPaymentMethodDetails | undefined => {
+    if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
+      // visual fields are instructions, never persisted as payment details
+      return selectedPaymentConfig.fields
+        .filter(
+          (field) =>
+            field.type !== "visual" && finalDetails[field.id] !== undefined,
+        )
+        .map((field) => ({
+          label: field.label,
+          value: finalDetails[field.id],
+          type: field.type === "visual" ? "text" : field.type,
+        }));
+    }
+    if (paymentDetails) {
+      return [{ label: "Nota / Referencia", value: paymentDetails, type: "text" }];
+    }
+    return undefined;
+  };
+
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!organizationId) {
@@ -377,24 +400,7 @@ export function PlatformSubscriptionForm({
 
       const finalDetails = await handleUploads();
 
-      let finalPaymentMethodDetails: IPaymentMethodDetails | undefined;
-      if (selectedPaymentConfig && Object.keys(finalDetails).length > 0) {
-        // visual fields are instructions, never persisted as payment details
-        finalPaymentMethodDetails = selectedPaymentConfig.fields
-          .filter(
-            (field) =>
-              field.type !== "visual" && finalDetails[field.id] !== undefined,
-          )
-          .map((field) => ({
-            label: field.label,
-            value: finalDetails[field.id],
-            type: field.type === "visual" ? "text" : field.type,
-          }));
-      } else if (paymentDetails) {
-        finalPaymentMethodDetails = [
-          { label: "Nota / Referencia", value: paymentDetails, type: "text" },
-        ];
-      }
+      const finalPaymentMethodDetails = resolvePaymentMethodDetails(finalDetails);
 
       await onSubmit({
         organizationId,
@@ -483,12 +489,12 @@ export function PlatformSubscriptionForm({
           />
           <label
             htmlFor="is-trial"
-            className="text-sm font-medium cursor-pointer flex-1"
+            className="flex-1 cursor-pointer"
           >
-            Iniciar como prueba
-            <span className="block text-xs text-muted-foreground font-normal">
+            <div className="text-sm font-medium">Iniciar como prueba</div>
+            <div className="text-xs text-muted-foreground font-normal">
               {selectedPlan.trialDays} días gratis antes del primer cobro
-            </span>
+            </div>
           </label>
         </div>
       )}
