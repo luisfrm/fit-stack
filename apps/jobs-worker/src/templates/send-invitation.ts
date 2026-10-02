@@ -1,4 +1,4 @@
-import { renderDarkShell, type RenderedEmail } from './layout';
+import { renderDarkShell, escapeHtml, type RenderedEmail } from './layout';
 
 export interface RegistrationInviteData {
   email: string;
@@ -15,7 +15,9 @@ export interface RegistrationInviteData {
  */
 export function renderRegistrationInvite(data: RegistrationInviteData): RenderedEmail {
   const target = data.target === 'console' ? 'console' : 'panel';
-  const inviteLink = `${data.baseUrl}/register?token=${data.token}`;
+  // `baseUrl` (env) y `token` (server) se escapan antes de componer el link:
+  // el resultado viaja en el `href`.
+  const inviteLink = `${escapeHtml(data.baseUrl)}/register?token=${escapeHtml(data.token)}`;
 
   const appName = target === 'console' ? 'FitStack Console' : 'FitStack Panel';
   const title = target === 'console' ? 'Invitación de Administración' : 'Invitación al Equipo';
