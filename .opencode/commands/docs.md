@@ -18,9 +18,9 @@ Evaluate the state of the documentation and update it. Work in **two phases**:
 - `vaults/architecture/INFRASTRUCTURE.md` / `terraform.md` — if infrastructure changed.
 - `vaults/ai/` — if chat / credits / RAG changed.
 - `vaults/guides/FUTURE_IDEAS.md` — future ideas.
-- `vaults/tasks/FS-NNNN-*/plan.md` — if a task advanced (do not rewrite closed `task.md`).
+- Linear issues — if an issue advanced, update its description (comment on the closed ones instead of rewriting them).
 - `AGENTS.md` — only if a real convention changed.
 
-**Output language**: your response is in English, but everything written under `vaults/` must be in **Spanish** (vault prose); keep paths, code identifiers and frontmatter keys in English. Use **wiki-links** `[[…]]` inside the vault; never mark as done what is not; paused → `⏸ PAUSADO`. Report the drift found before editing.
+**Output language**: your response is in English, but everything written under `vaults/` must be in **Spanish** (vault prose); keep paths, code identifiers and frontmatter keys in English. Linear content (issue titles, descriptions, comments, documents) is written in **English**. Use **wiki-links** `[[…]]` inside the vault; never mark as done what is not; paused → `⏸ PAUSADO`. Report the drift found before editing.
 
 Additional context: $ARGUMENTS

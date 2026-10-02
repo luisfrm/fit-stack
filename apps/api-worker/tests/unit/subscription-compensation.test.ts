@@ -1,5 +1,5 @@
 /**
- * Unit tests for lib/subscription-compensation.ts (FS-0002)
+ * Unit tests for lib/subscription-compensation.ts (RD-94)
  *
  * Pure orchestration over closures: no DB, no HTTP. The decision is by
  * RE-READ of the persisted payment, never by the error type — the branches

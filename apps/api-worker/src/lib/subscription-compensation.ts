@@ -1,6 +1,6 @@
 /**
  * Compensación explícita del alta cuando falla la emisión del comprobante
- * (FS-0002, fase 2 — B3.1 panel, reutilizable en SaaS fase 3).
+ * (RD-94). Nacido en el alta del panel, reutilizado en los 4 flujos SaaS.
  *
  * Sin transacciones interactivas (driver HTTP de Neon): el servicio commitea
  * en 3 pasos (`subsRepo.create` → `paymentsRepo.create` → paso 1) y compensa

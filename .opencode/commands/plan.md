@@ -14,4 +14,4 @@ Flow:
 3. **Metadata**: team `Rivas Digital`, state `Backlog`, a priority with a reason, and one label — `Feature` (`feat/`), `Bug` (`fix/`) or `Improvement` (`chore/`).
 4. **Branch**: `<type>/RD-<number>-<kebab-brief-summary>`, recorded in the `## Git` section.
 
-Rules: **1 issue = 1 PR**. A rejected PR sends the same issue back to `In Progress`; never open a duplicate issue. There are no phases and no sub-issues per layer. The local `vaults/tasks/` system (`FS-NNNN`, `plan.md`, `phases/`) is deprecated — never write there. Respect `AGENTS.md` (3-layer separation, no `pgEnum`, factory pattern, `ofetch`, `useAuth()`, money in integer cents). Ask before assuming anything material.
+Rules: **1 issue = 1 PR**. A rejected PR sends the same issue back to `In Progress`; never open a duplicate issue. There are no phases and no sub-issues per layer. The local `vaults/tasks/` system and `pnpm task:new` no longer exist — work is referenced by its Linear id. Respect `AGENTS.md` (3-layer separation, no `pgEnum`, factory pattern, `ofetch`, `useAuth()`, money in integer cents). Ask before assuming anything material.

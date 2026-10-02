@@ -14,4 +14,4 @@ Steps:
 4. **Hand planning to the `planner` agent** (same as `/plan`) to complete `## Implementation plan`, `## Acceptance criteria`, `## Verification`, `## Risks & notes` and `## Git` in that same issue.
 5. **Report** the identifier, the URL and the branch name.
 
-Rules: **1 issue = 1 PR**, branch `<type>/RD-<number>-<kebab-brief-summary>`. No phases, no sub-issues per layer. The local `vaults/tasks/` system (`FS-NNNN`, `plan.md`, `phases/`) is deprecated — never write there; unowned pending ideas stay in `vaults/backlog/` until they have an owner and a scope. Linear content is written in **English**; the chat response is in **Spanish**.
+Rules: **1 issue = 1 PR**, branch `<type>/RD-<number>-<kebab-brief-summary>`. No phases, no sub-issues per layer. The local `vaults/tasks/` system and `pnpm task:new` no longer exist; unowned pending ideas stay in `vaults/backlog/` until they have an owner and a scope. Linear content is written in **English**; the chat response is in **Spanish**.

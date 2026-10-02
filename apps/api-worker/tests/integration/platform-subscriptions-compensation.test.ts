@@ -1,5 +1,5 @@
 /**
- * Compensación SaaS cuando falla la emisión (FS-0002, fase 3 — B3.2).
+ * Compensación SaaS cuando falla la emisión (RD-94).
  *
  * Los 4 flujos SaaS commitean sin red (Neon HTTP no tiene `db.transaction()`):
  * el `catch` compensa por relectura con el helper de fase-2. Semántica SaaS:

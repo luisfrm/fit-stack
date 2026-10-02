@@ -1,5 +1,5 @@
 /**
- * Compensación del alta del panel cuando falla la emisión (FS-0002, fase 2).
+ * Compensación del alta del panel cuando falla la emisión (RD-94).
  *
  * El alta commitea en 3 pasos sin red (`subsRepo.create` →
  * `paymentsRepo.create` → paso 1). Sin transacciones interactivas (driver
@@ -212,7 +212,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
   });
 
   it('(d) alta exitosa con la invalidación en finally → 201 intacto (sin regresión de C2)', async () => {
-    // C2 (FS-0002 #4) envolvió `servicio + invalidación` en try/finally: en el
+    // C2 (RD-94) envolvió `servicio + invalidación` en try/finally: en el
     // camino feliz el resultado no debe alterarse (la invalidación corre igual,
     // Redis es no-op en tests, pero el 201 y el cuerpo deben ser los de antes).
     const { owner, organization } = await createGymTenant('comp-d');

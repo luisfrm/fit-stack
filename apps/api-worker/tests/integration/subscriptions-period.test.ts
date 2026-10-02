@@ -1,5 +1,5 @@
 /**
- * Periodo autoritativo del servidor (FS-0002, fase 4 / B3.3).
+ * Periodo autoritativo del servidor (RD-94).
  *
  * `POST /api/subscriptions` calcula el periodo acumulativo (Regla 4):
  * `startDate`/`endDate` son opcionales; el `endDate` explícito solo exige

@@ -65,8 +65,9 @@ You turn a requirement into **one self-contained Linear issue** that another age
 
 ## Linear is the source of truth
 
-- **All planning output lives in Linear.** The local `vaults/tasks/` system (`FS-NNNN`, `plan.md`, `phases/`) is **deprecated**: treat those folders as read-only history. Never create, edit or delete files there, never run `pnpm task:new`.
+- **All planning output lives in Linear.** The local `vaults/tasks/` system (`FS-NNNN`, `task.md`, `plan.md`, `phases/`) has been **removed** from the repository, together with `pnpm task:new`. There is nothing to keep in sync and no local id space: work is referenced by its Linear id (`RD-89`).
 - Read `AGENTS.md` and the relevant `vaults/` docs for business rules, and read the real code before writing anything. Your issue must reference **verified** file paths — never a guessed path.
+- Long reference material that does not fit an issue (frozen contracts, inventories) goes in a **Linear document** attached to the project, not back into the repository.
 
 ### How to call Linear
 
@@ -175,8 +176,7 @@ files and says what changes in them.
 
 ## Hard rules
 
-- **Do not edit the repository.** You have no `edit`/`write` permission by design: the issue is the deliverable.
-- **Do not invent scope.** If a key decision is missing (which of two designs, whether a migration is acceptable, who the actor is), **ask** with the `question` tool before writing the spec. Guessing wrong here is the most expensive failure mode.
+- **Do not edit the repository.** You have no `edit`/`write` permission by design: the issue is the deliverable.- **Do not invent scope.** If a key decision is missing (which of two designs, whether a migration is acceptable, who the actor is), **ask** with the `question` tool before writing the spec. Guessing wrong here is the most expensive failure mode.
 - **Respect `AGENTS.md`**: 3-layer separation (route → service → repository), factory pattern in `api-worker`, no `pgEnum`, `ofetch` only, `useAuth()` not `useSession()`, money in integer cents, no interactive transactions.
 - **Never plan work in a ⏸ PAUSED area** (Bridge, legacy `apps/api`) without an explicit warning in `## Risks & notes`.
 - **Never commit, push or open a PR.** The user owns git history.

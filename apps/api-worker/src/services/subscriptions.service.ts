@@ -206,7 +206,7 @@ export function createSubscriptionsService(
 
       const dateManager = new OrganizationDateManager(timezone);
 
-      // B3.3 (FS-0002 fase 4): el periodo lo calcula el servidor (Regla 4).
+      // (RD-94) el periodo lo calcula el servidor (Regla 4).
       // 1. `startDate` por defecto = hoy local. 2. `plan` + `latest` ya
       // cargados arriba (el guard `processing` sigue primero, intacto).
       const startDate = parseSubscriptionDate(payload.startDate, dateManager);

@@ -33,7 +33,7 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
 const createSubSchema = z.object({
   memberId: z.number().int().positive(),
   planId: z.number().int().positive(),
-  // B3.3 (FS-0002 fase 4): el periodo lo calcula el servidor. `startDate` y
+  // (RD-94) el periodo lo calcula el servidor. `startDate` y
   // `endDate` son opcionales; el `trim().length > 0` del motivo se exige en el
   // servicio (no en zod) para devolver el código 422 propio.
   startDate: z.string().optional(),
@@ -131,7 +131,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
       });
     } finally {
       // En el fallo compensado el servicio re-lanza tras mutar (pago anulado /
-      // huérfana cancelada): la caché se invalida igual (FS-0002, #4).
+      // huérfana cancelada): la caché se invalida igual (RD-94).
       await invalidateSubscriptionDependentCaches(cache, orgId);
     }
     return c.json(newSub, 201);
