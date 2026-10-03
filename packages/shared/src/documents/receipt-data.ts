@@ -183,6 +183,12 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
     errors.push('Comprobante sin número correlativo válido.');
   }
 
+  // Solo campos GENERADOS POR EL SISTEMA: el checklist caza fugas técnicas
+  // (un id interno impreso donde va un dato del documento). Los detalles que
+  // escribe el operador (`method.maskedDetails`) quedan FUERA a propósito:
+  // juzgar su texto es trabajo de la validación de escritura
+  // (`paymentMethodSchema`), no del render — una referencia bancaria con forma
+  // de UUID no puede dejar el comprobante sin PDF y sin email para siempre.
   const visibleStrings: string[] = [
     data.document.number,
     data.document.label,
@@ -194,7 +200,6 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
     data.recipient.documentId ?? '',
     data.sale.planName,
     data.method.name,
-    ...(data.method.maskedDetails ?? []).map((d) => `${d.label} ${d.value}`),
   ];
   if (visibleStrings.some((s) => UUID_PATTERN.test(s))) {
     errors.push('UUID técnico visible en campos del comprobante.');
