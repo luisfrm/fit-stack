@@ -76,7 +76,10 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
    * `declareFormal` deja la sede como contribuyente formal con IVA + IGTF
    * confirmados (C2: sin declaración no hay desglose).
    */
-  async function createValidatedPayment(declareFormal = false) {
+  async function createValidatedPayment(
+    declareFormal = false,
+    paymentMethodDetails: unknown[] = [],
+  ) {
     const { owner, organization } = await createGymTenant();
     if (declareFormal) {
       const fiscal = await owner.client.patch('/api/organizations/profile', {
@@ -104,7 +107,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
         amountPaid: 10000,
         currencyPaid: 'USD',
         paymentMethod: 'cash',
-        paymentMethodDetails: [],
+        paymentMethodDetails,
         status: 'validated',
         paymentDate: isoDate(0),
       },
@@ -211,6 +214,27 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
 
     expect(owner.client.receiptQueue.ofType('receipt.render')).toHaveLength(1);
     expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
+  });
+
+  it('T1d referencia del operador con forma de UUID: emite igual (checklist no la juzga)', async () => {
+    // Una referencia bancaria puede coincidir con `8-4-4-4-12` hex. El
+    // checklist caza fugas técnicas del SISTEMA, no el texto del operador: si
+    // la escanea, el render lanza, el mensaje muere en la DLQ y el comprobante
+    // queda sin PDF y sin email para siempre (el sweep lo re-encola cada 10 h).
+    const { owner, organization, payment } = await createValidatedPayment(false, [
+      { type: 'text', label: 'Referencia', value: '3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b' },
+    ]);
+
+    expect(payment['receipt_number']).toMatch(
+      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+    );
+    const renders = owner.client.receiptQueue.ofType('receipt.render');
+    expect(renders).toHaveLength(1);
+    expect(renders[0]).toMatchObject({
+      scope: 'panel',
+      paymentId: Number(payment['id']),
+      receiptNumber: payment['receipt_number'],
+    });
   });
 
   it('T2 paso 2: completa PDF en R2 y encola el email (gate rowCount===1)', async () => {
