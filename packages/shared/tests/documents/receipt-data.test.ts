@@ -51,6 +51,8 @@ function validReceipt(): ReceiptData {
   };
 }
 
+const UUID = '3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b';
+
 describe('checklistPrePdf', () => {
   it('caso feliz → ok', () => {
     expect(checklistPrePdf(validReceipt())).toEqual({ ok: true, errors: [] });
@@ -62,6 +64,46 @@ describe('checklistPrePdf', () => {
     const result = checklistPrePdf(data);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.includes('UUID'))).toBe(true);
+  });
+
+  it('acepta un UUID en los detalles del operador (no es un campo del sistema)', () => {
+    const data = validReceipt();
+    data.method.maskedDetails = [{ label: 'Referencia', value: UUID }];
+    expect(checklistPrePdf(data)).toEqual({ ok: true, errors: [] });
+  });
+
+  it('sigue rechazando un UUID en cada campo del sistema', () => {
+    const mutations: ((d: ReceiptData) => void)[] = [
+      (d) => {
+        d.document.number = `fit-stack-2026-000045-${UUID}`;
+      },
+      (d) => {
+        d.emitter.taxId = UUID;
+      },
+      (d) => {
+        d.emitter.address = UUID;
+      },
+      (d) => {
+        d.recipient.documentId = UUID;
+      },
+      (d) => {
+        d.recipient.name = `Juan ${UUID}`;
+      },
+      (d) => {
+        d.sale.planName = `Plan ${UUID}`;
+      },
+      (d) => {
+        d.method.name = `Pago ${UUID}`;
+      },
+    ];
+
+    for (const mutate of mutations) {
+      const data = validReceipt();
+      mutate(data);
+      expect(checklistPrePdf(data).errors).toContain(
+        'UUID técnico visible en campos del comprobante.',
+      );
+    }
   });
 
   it('exige tasa si la moneda difiere de la del emisor', () => {
