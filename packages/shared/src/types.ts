@@ -422,6 +422,9 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any>;
 
+  /** Estado del pago (alineado con `IPlatformSubscriptionPayment.status`). */
+  status: PaymentStatus;
+
   // Invoice Details (Optional/Internal)
   subtotal?: number;
   taxTotal?: number;
