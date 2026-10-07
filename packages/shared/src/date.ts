@@ -179,10 +179,18 @@ export function addDuration(
   base: Date,
   value: number,
   unit: DurationUnit,
-  timezone?: string | null,
+  timezone: string,
 ): Date {
-  const tz = resolveOrgTimezone(timezone);
-  const tzDate = new TZDate(base.getTime(), tz as never);
+  // tz REQUERIDA y explícita: sin fallback silencioso a `America/Caracas`
+  // (regla §10). `'UTC'` es un valor válido — lo que no se admite es omitirla
+  // y que el default decida por nosotros (fue justo lo que motivó la copia UTC
+  // de `billing-utils.ts`, hoy eliminada).
+  if (!timezone?.trim()) {
+    throw new Error(
+      'addDuration: timezone es obligatoria (usa "UTC" para billing de plataforma).',
+    );
+  }
+  const tzDate = new TZDate(base.getTime(), timezone as never);
   let result: Date = tzDate;
   switch (unit) {
     case 'day':

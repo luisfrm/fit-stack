@@ -10,14 +10,12 @@ import { createPlatformPlansRepository } from '../repositories/platform-plans.re
 import {
   PLATFORM_SUBSCRIPTION_STATUSES,
   PAYMENT_STATUSES,
-  computePlatformSubscriptionStatus,
   type PlatformSubscriptionStatus,
   type PaymentStatus,
 } from '@workspace/shared/constants';
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
-import { normalizeFeatures } from '@workspace/shared';
+import { normalizeFeatures, addDuration } from '@workspace/shared';
 import { HTTPException } from 'hono/http-exception';
-import { addDuration } from '../lib/billing-utils';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import type { PlatformReceiptContext } from './platform-receipts.service';
 import { ReceiptError } from './receipts.service';
@@ -199,12 +197,13 @@ export function createPlatformSubscriptionsService(
       let currentPeriodEnd = startDate;
       if (paymentStatus === PAYMENT_STATUSES.VALIDATED) {
         if (isTrial && trialDays > 0) {
-          currentPeriodEnd = addDuration(startDate, trialDays, 'day');
+          currentPeriodEnd = addDuration(startDate, trialDays, 'day', 'UTC');
         } else {
           currentPeriodEnd = addDuration(
             startDate,
             plan.durationValue,
-            plan.durationUnit as 'day' | 'week' | 'month' | 'year'
+            plan.durationUnit as 'day' | 'week' | 'month' | 'year',
+            'UTC'
           );
         }
       }
@@ -317,13 +316,10 @@ export function createPlatformSubscriptionsService(
       // Extensión acumulativa: usar currentPeriodEnd si está vigente, sino now
       const baseDate =
         sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-      const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
+      const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year", 'UTC');
 
       // Crear pago
-      const amountPaidCents =
-        data.payment.amountPaidCents === 0
-          ? 0
-          : data.payment.amountPaidCents ?? plan.price;
+      const amountPaidCents = data.payment.amountPaidCents ?? plan.price;
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -540,7 +536,7 @@ export function createPlatformSubscriptionsService(
           if (plan) {
             const baseDate =
               sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-            const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year");
+            const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year", 'UTC');
             await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
           }
           // Emisión C2 (sesión console ≠ pagador: sin payer).
@@ -713,7 +709,7 @@ export function createPlatformSubscriptionsService(
         if (duration) {
           const baseDate =
             parentSub.currentPeriodEnd > new Date() ? parentSub.currentPeriodEnd : new Date();
-          const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit);
+          const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit, 'UTC');
           await platformSubsRepo.updatePeriodEnd(parentSub.id, newPeriodEnd);
         }
         // Emisión C2 solo en transición →validated (re-PATCH no renumera
@@ -748,23 +744,6 @@ export function createPlatformSubscriptionsService(
 
     async getOrganizationInvoices(organizationId: string) {
       return platformSubsRepo.getOrganizationInvoices(organizationId);
-    },
-
-    /**
-     * Helper: status computado a partir de un subscription row.
-     */
-    computeStatus(sub: {
-      currentPeriodEnd: Date;
-      cancelledAt?: Date | null;
-      isTrial?: boolean;
-      hasValidatedPayment: boolean;
-    }): PlatformSubscriptionStatus {
-      return computePlatformSubscriptionStatus({
-        currentPeriodEnd: sub.currentPeriodEnd,
-        cancelledAt: sub.cancelledAt,
-        isTrial: sub.isTrial,
-        hasValidatedPayment: sub.hasValidatedPayment,
-      });
     },
   };
 }

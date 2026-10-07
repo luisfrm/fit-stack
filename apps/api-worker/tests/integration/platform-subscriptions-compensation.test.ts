@@ -23,7 +23,7 @@ import {
   isoDate,
   type AuthedUser,
 } from '../helpers/auth';
-import { addDuration } from '../../src/lib/billing-utils';
+import { addDuration } from '@workspace/shared';
 import { COMPENSATION_VOID_REASON } from '../../src/lib/subscription-compensation';
 
 const PRICE_CENTS = 5000;
@@ -257,7 +257,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
 
     // Un solo periodo extra por un solo pago: el fallido no regala días.
     const periodFinal = new Date((await readSubs(orgId))[0]!.current_period_end);
-    expect(periodFinal.getTime()).toBe(addDuration(periodBefore, 1, 'month').getTime());
+    expect(periodFinal.getTime()).toBe(addDuration(periodBefore, 1, 'month', 'UTC').getTime());
   });
 
   it('(c) transición a validado con fallo → pago voided, periodo revertido; re-PATCH no re-extiende', async () => {
