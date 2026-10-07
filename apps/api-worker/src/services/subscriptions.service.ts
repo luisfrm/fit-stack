@@ -1,5 +1,5 @@
 import type { SubscriptionsRepository, ISubscriptionDTO } from '../repositories/subscriptions.repository';
-import type { PaymentsRepository } from '../repositories/payments.repository';
+import type { PaymentsRepository, IPayment } from '../repositories/payments.repository';
 import type { PlansRepository } from '../repositories/plans.repository';
 import type { MembersRepository } from '../repositories/members.repository';
 import { HTTPException } from 'hono/http-exception';
@@ -82,7 +82,7 @@ export interface ReceiptContext {
  */
 export interface PaymentStatusResult {
   /** Fila `payment` actualizada (el route la serializa tal cual). */
-  payment: any;
+  payment: IPayment;
   receiptVoided: boolean;
   receiptVoidReason?: 'not_issued';
 }
@@ -130,8 +130,7 @@ export function createSubscriptionsService(
   subsRepo: SubscriptionsRepository,
   paymentsRepo: PaymentsRepository,
   plansRepo: PlansRepository,
-  membersRepo: MembersRepository,
-  taskQueue?: Queue
+  membersRepo: MembersRepository
 ) {
   return {
     async getAllPaginated(organizationId: string, filters: any) {
@@ -154,19 +153,6 @@ export function createSubscriptionsService(
           paymentDate: r.paymentDate?.toISOString(),
         })),
       };
-    },
-
-    async getAllVisible(organizationId: string) {
-      const utcNow = new Date();
-      const records = await subsRepo.findAllVisible(organizationId, utcNow);
-
-      return records.map((r: any) => ({
-        ...r,
-        memberName: `${r.memberName} ${r.memberLastName}`,
-        startDate: r.startDate.toISOString(),
-        endDate: r.endDate.toISOString(),
-        paymentDate: r.paymentDate?.toISOString(),
-      }));
     },
 
     async getRecent(organizationId: string, limit: number) {
@@ -328,8 +314,7 @@ export function createSubscriptionsService(
 
         // Emisión automática al registrar un pago validado: el paso 1 asigna
         // el número y encola el render. El email lo encola el paso 2 al
-        // completar el PDF (nunca aquí). Sin receipts inyectado (tests
-        // directos del servicio) se conserva el envío legacy.
+        // completar el PDF (nunca aquí).
         // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
         //
         // La decisión se toma sobre la FILA PERSISTIDA, nunca sobre el payload:
@@ -338,31 +323,31 @@ export function createSubscriptionsService(
         // número (y sin render) que solo se reparaba a mano con /issue.
         // Invariante: validado ⇔ numerado, sobre el estado que quedó en DB.
         if (createdPayment?.id && createdPayment.status === PAYMENT_STATUSES.VALIDATED) {
-          if (opts?.receipts) {
-            const p = payload.payment;
-            await opts.receipts.assignReceiptNumber({
-              orgId: organizationId,
-              paymentId: createdPayment.id,
-              timezone,
-              orgSlug: opts.orgSlug,
-              actor: opts.by,
-              taxOverride:
-                p.taxTotal !== undefined && p.taxDetails !== undefined
-                  ? {
-                    subtotal: p.subtotal ?? p.amountPaid,
-                    taxTotal: p.taxTotal,
-                    taxDetails: p.taxDetails,
-                    taxOverrideReason: p.taxOverrideReason ?? '',
-                  }
-                  : null,
-            });
-          } else if (taskQueue) {
-            await taskQueue.send({
-              type: 'email.payment_receipt',
-              paymentId: createdPayment.id,
-              organizationId,
-            });
+          // Sin `receipts` no hay emisión: es un error de wiring, no un caso
+          // normal. Antes existía una rama legacy que mandaba el email desde
+          // aquí sin numerar el comprobante (violaba validado ⇔ numerado).
+          if (!opts?.receipts) {
+            throw new Error(
+              'subscriptions.create: opts.receipts es requerido para emitir el comprobante.',
+            );
           }
+          const p = payload.payment;
+          await opts.receipts.assignReceiptNumber({
+            orgId: organizationId,
+            paymentId: createdPayment.id,
+            timezone,
+            orgSlug: opts.orgSlug,
+            actor: opts.by,
+            taxOverride:
+              p.taxTotal !== undefined && p.taxDetails !== undefined
+                ? {
+                  subtotal: p.subtotal ?? p.amountPaid,
+                  taxTotal: p.taxTotal,
+                  taxDetails: p.taxDetails,
+                  taxOverrideReason: p.taxOverrideReason ?? '',
+                }
+                : null,
+          });
         }
       } catch (err) {
         const outcome = await compensateFailedEmission(
@@ -463,24 +448,23 @@ export function createSubscriptionsService(
       // Un pago que pasa de processing a validated emite su recibo
       // (el alta con status validated ya lo numera en create()).
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
-        if (opts?.receipts) {
-          if (!opts.timezone) {
-            throw new Error('updatePaymentStatus: timezone es obligatoria para numerar.');
-          }
-          await opts.receipts.assignReceiptNumber({
-            orgId: organizationId,
-            paymentId,
-            timezone: opts.timezone,
-            orgSlug: opts.orgSlug,
-            actor: opts.by,
-          });
-        } else if (taskQueue) {
-          await taskQueue.send({
-            type: 'email.payment_receipt',
-            paymentId,
-            organizationId,
-          });
+        // Sin `receipts` no hay emisión (mismo criterio que create()): un
+        // servicio ausente es un error de wiring, no un caso normal.
+        if (!opts?.receipts) {
+          throw new Error(
+            'updatePaymentStatus: opts.receipts es requerido para emitir el comprobante.',
+          );
         }
+        if (!opts.timezone) {
+          throw new Error('updatePaymentStatus: timezone es obligatoria para numerar.');
+        }
+        await opts.receipts.assignReceiptNumber({
+          orgId: organizationId,
+          paymentId,
+          timezone: opts.timezone,
+          orgSlug: opts.orgSlug,
+          actor: opts.by,
+        });
       }
 
       return { payment: updated, receiptVoided, receiptVoidReason };

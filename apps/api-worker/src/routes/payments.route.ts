@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
@@ -7,25 +7,18 @@ import { createSubscriptionsRepository } from '../repositories/subscriptions.rep
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
-import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
 import { createFinanceService } from '../services/finance.service';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
+import { resolveOrgSlug } from '../lib/org-slug';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
   status: z.enum(['processing', 'validated', 'voided']),
   voidReason: z.string().min(1).optional(),
 });
-
-async function resolveOrgSlug(c: Context<AppEnv>, orgId: string): Promise<string | null> {
-  const fromSession = c.get('org')?.slug as string | null | undefined;
-  if (fromSession) return fromSession;
-  const org = await createOrganizationsRepository(c.get('db')).findById(orgId);
-  return org?.slug ?? null;
-}
 
 export const paymentRoutes = new Hono<AppEnv>()
   // GET /api/payments/analytics
@@ -62,7 +55,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE, c.env.TASK_QUEUE);
 
     const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(

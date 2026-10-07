@@ -9,8 +9,8 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
-import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createCache, type Cache } from '../lib/cache';
+import { resolveOrgSlug } from '../lib/org-slug';
 import { paymentMethodDetailsSchema, paymentMethodSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
@@ -80,7 +80,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
 
     const result = await subsService.getAllPaginated(orgId, { query, status, page, limit });
     await cache.set(cacheKey, result, 300);
@@ -96,7 +96,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
 
     const recent = await subsService.getRecent(orgId, limit);
     return c.json(recent);
@@ -114,12 +114,9 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE);
-    const orgSlug =
-      c.get('org')?.slug ??
-      (await createOrganizationsRepository(db).findById(orgId))?.slug ??
-      null;
+    const orgSlug = await resolveOrgSlug(c, orgId);
 
     let newSub;
     try {
@@ -148,7 +145,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db), c.env.TASK_QUEUE);
+    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
 
     const updated = await subsService.updateStatus(orgId, id, status);
     await invalidateSubscriptionDependentCaches(cache, orgId);
