@@ -53,8 +53,6 @@ const changePlanSchema = z.object({
   payment: paymentSchema,
 });
 
-const registerPaymentSchema = paymentSchema;
-
 const updatePaymentStatusSchema = z.object({
   status: paymentStatusEnum,
   voidReason: z.string().min(1).optional(),
@@ -466,7 +464,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions/:id/payments
-  .post('/:id/payments', requirePlatformAuth(), zValidator('json', registerPaymentSchema), async (c) => {
+  .post('/:id/payments', requirePlatformAuth(), zValidator('json', paymentSchema), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);

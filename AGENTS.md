@@ -333,7 +333,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
   - **Org creation (console → `/api/platform/organizations`)**: `timezone` is `required` in `createOrgSchema`, validated in `organizations.service.createOrganization`, and `required: true` in `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). The `organization.timezone` schema is `notNull` **without default** (DB).
 - **SQL vs JS**: **aggregation** by local day/month (reports, daily revenue) is done **in SQL** with `AT TIME ZONE`. The JS util resolves the **input** (local day boundaries as UTC `Date` for the `WHERE gte/lte`) and the **display**; it doesn't replace Postgres.
 - **UI** (panel/console): local "today" is obtained with `toLocalDayString(orgTimezone)`; parsing `'YYYY-MM-DD'` with `parseDateAsConfigTimezone(dateStr, tz)` (alias of `parseLocalToUtc`). Wall-clock helpers (`formatTime`/`formatTimeRange`) live in `apps/{panel,console}/lib/config/display.ts`, which re-exports the tz helpers from `@workspace/shared`.
-- **`billing-utils.ts`** (api-worker) is **platform** (SaaS) billing and operates in UTC — it's not mixed with org tz.
+- **Platform (SaaS) billing operates in UTC**: it calls the shared `addDuration(…, 'UTC')` **explicitly** — never mixed with the org tz. The old `billing-utils.ts` UTC copy was deleted; `addDuration` now requires the tz (no silent `America/Caracas` fallback).
 
 ### 10. Explicit Configuration Without Silent Fallbacks (Seeding)
 

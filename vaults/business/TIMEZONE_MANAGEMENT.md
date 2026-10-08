@@ -59,7 +59,7 @@ Toda la lógica de fecha/zona horaria en JS se centraliza en **`packages/shared/
 - **`localDayStartUtc` / `localDayEndUtc` / `localDayRange`** → límites del día local como `Date` UTC (para los `WHERE gte/lte`).
 - **`localMonthStartUtc`** → inicio del mes local.
 - **`getTimezoneOffset(tz?, date?)`** → offset `'+hh:mm'` (reemplaza el parser manual con `Intl.DateTimeFormat(...).timeZoneName`).
-- **`addDuration(base, value, unit, tz?)`** → suma duraciones operando en la tz (maneja DST y fines de mes).
+- **`addDuration(base, value, unit, tz)`** → suma duraciones operando en la tz (**requerida**: sin fallback silencioso a `America/Caracas`; `'UTC'` es un valor válido para billing de plataforma). Maneja DST y fines de mes.
 
 **Regla importante — SQL vs JS:** la **agregación** por día/mes local en reportes sigue en SQL
 (`AT TIME ZONE`). La util JS resuelve la **entrada** (instantes UTC de los límites de día local) y el **display**;

@@ -172,49 +172,6 @@ export function createSubscriptionsRepository(db: Db) {
       };
     },
 
-    async findAllVisible(organizationId: string, now: Date = new Date()) {
-      return db
-        .select({
-          id: subscription.id,
-          memberId: subscription.memberId,
-          planId: subscription.planId,
-          startDate: subscription.startDate,
-          endDate: subscription.endDate,
-          cancelledAt: subscription.cancelledAt,
-          endDateOverrideReason: subscription.endDateOverrideReason,
-          status: this.getSubscriptionStatusSql(now).as('status'),
-          isActive: this.getSubscriptionIsActiveSql(now),
-          memberName: members.firstName,
-          memberLastName: members.lastName,
-          memberEmail: members.email,
-          memberImage: members.imageUrl,
-          memberDocumentId: members.documentId,
-          memberAddress: members.address,
-          planName: membershipPlan.name,
-          planSnapshotName: payment.planSnapshotName,
-          planSnapshotPrice: payment.planSnapshotPrice,
-          planSnapshotCurrency: payment.planSnapshotCurrency,
-          paymentId: payment.id,
-          amountPaid: payment.amountPaid,
-          currencyPaid: payment.currencyPaid,
-          paymentMethod: payment.paymentMethod,
-          paymentMethodDetails: payment.paymentMethodDetails,
-          exchangeRateApplied: payment.exchangeRateApplied,
-          paymentStatus: payment.status,
-          paymentDate: payment.paymentDate,
-          receiptNumber: payment.receiptNumber,
-          receiptIssuedAt: payment.receiptIssuedAt,
-          documentType: payment.documentType,
-          receiptVoided: payment.receiptVoided,
-        })
-        .from(subscription)
-        .innerJoin(members, eq(subscription.memberId, members.id))
-        .innerJoin(membershipPlan, eq(subscription.planId, membershipPlan.id))
-        .leftJoin(payment, eq(subscription.id, payment.subscriptionId))
-        .where(eq(subscription.organizationId, organizationId))
-        .orderBy(desc(payment.id), desc(subscription.id));
-    },
-
     async findRecent(organizationId: string, limit: number) {
       return db
         .select({
@@ -275,8 +232,8 @@ export function createSubscriptionsRepository(db: Db) {
 
     /**
      * Suscripción por id, org-scoped. Solo lo mínimo para el guard de
-     * transición de pagos (¿está fuera de vigencia?): un read completo
-     * (`findAllVisible`) sería gastar un JOIN para mirar `cancelledAt`.
+     * transición de pagos (¿está fuera de vigencia?): un read completo sería
+     * gastar un JOIN para mirar `cancelledAt`.
      */
     async findById(organizationId: string, id: number) {
       const [record] = await db
