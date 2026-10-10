@@ -4,7 +4,7 @@ API REST primaria de Fit-Stack. Hono sobre Cloudflare Workers con autenticación
 
 **Puerto (dev):** 8788
 **Entry point:** `src/index.ts`
-**Despliegue:** Cloudflare Workers vía Terraform + GitHub Actions (nunca `wrangler` manual — ver [AGENTS.md](../../AGENTS.md#infrastructure--deployment-terraform--github-actions))
+**Despliegue:** Cloudflare Workers vía Terraform + GitHub Actions (nunca `wrangler` manual - ver [AGENTS.md](../../AGENTS.md#infrastructure--deployment))
 
 ---
 
@@ -273,7 +273,7 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 
 `src/lib/cache.ts` — wrapper con `get`, `set`, `invalidate` (SCAN por patrón) e `invalidateExact`. Todos los métodos degradan con `null` si Redis no está configurado o falla (nunca bloquean el request).
 
-Patrones principales (referencia completa en [AGENTS.md](../../AGENTS.md#cache-key-conventions)):
+Patrones principales (referencia completa en [vaults/architecture/cache.md](../../vaults/architecture/cache.md)):
 
 | Patrón | TTL | Uso |
 |--------|-----|-----|
