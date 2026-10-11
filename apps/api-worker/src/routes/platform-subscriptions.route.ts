@@ -47,6 +47,7 @@ const renewSchema = z.object({
 });
 
 const changePlanSchema = z.object({
+  organizationId: z.string().min(1),
   newPlanId: z.number().int().positive(),
   isTrial: z.boolean().default(false),
   priceOverrideCents: z.number().int().nonnegative().optional(),
@@ -341,6 +342,37 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     }
 
     return c.json({ success: true, ...result });
+  })
+
+  // POST /api/platform/subscriptions/change-plan — create-new-then-cancel-old:
+  // the new subscription (and its receipt, when the payment validates) must be
+  // persisted before the previous one is cancelled. The Console caller sends
+  // `{ organizationId, newPlanId, isTrial?, priceOverrideCents?, payment }`.
+  .post('/change-plan', requirePlatformAuth(), zValidator('json', changePlanSchema), async (c) => {
+    const { organizationId, ...data } = c.req.valid('json');
+    const cache = createCache(c.env);
+
+    const { service } = buildService(c);
+    // A compensated failure re-throws after mutating (voided payment / cancelled
+    // new subscription): cache invalidations still run in the `finally`.
+    let result;
+    try {
+      result = await service.changePlan(organizationId, data, {
+        receipts: buildReceipts(c),
+        // C5: session actor that issues (`issued_by`).
+        by: c.get('user')?.id,
+      });
+    } finally {
+      await cache.invalidate('platform:subscriptions*');
+      await invalidateReceiptsReportCache(cache);
+      await cache.invalidateExact(`org:${organizationId}:subscription`);
+      await cache.invalidateExact(`org:${organizationId}:subscription-status`);
+      await cache.invalidateExact(`org:${organizationId}:features`);
+      await invalidateInvoicesCache(c, organizationId);
+    }
+
+    const created = await service.getSubscriptionById(result.subscriptionId);
+    return c.json(created, 201);
   })
 
   // PATCH /api/platform/subscriptions/payments/:paymentId/status

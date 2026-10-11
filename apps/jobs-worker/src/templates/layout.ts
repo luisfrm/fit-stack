@@ -5,7 +5,7 @@
  *  - `dark`: fondo negro, botón blanco — invitaciones (panel/console/org).
  *  - `light`: estilo comprobante con header amarillo — recibos de pago.
  *
- * Los templates (`send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`,
+ * Los templates (`send-invitation.ts`, `org-invite.ts`, `payment-receipt-short.ts`,
  * `org-payment-received.ts`) solo componen contenido; aquí vive el markup
  * compartido. Handler = transporte, template = HTML, nunca al revés.
  */

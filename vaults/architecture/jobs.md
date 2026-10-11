@@ -22,7 +22,7 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 **Templates** (`apps/jobs-worker/src/templates/`) — the HTML lives here, never in the handlers:
 
 - `layout.ts` — base shells: `renderDarkShell` (invitations, dark background) and `renderLightShell` (receipts, yellow-receipt style) + `escapeHtml`.
-- `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
+- `send-invitation.ts`, `org-invite.ts`, `payment-receipt-short.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
 
 **Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
 

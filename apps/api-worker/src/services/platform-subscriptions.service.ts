@@ -170,11 +170,6 @@ export function createPlatformSubscriptionsService(
       const startDate = parseStartDate(data.startDate);
       const isTrial = data.isTrial ?? false;
 
-      // Free plan: validar precio 0
-      if (!isTrial && plan.price === 0) {
-        // Para planes free, forzar status=validated
-      }
-
       // Si es trial o free, forzar status=validated con paymentMethod='trial'|'free'
       let paymentStatus = data.payment.status;
       let paymentMethod = data.payment.paymentMethod;
@@ -449,10 +444,9 @@ export function createPlatformSubscriptionsService(
      * suscripciones. El `cancel` de la anterior es un efecto distinto de la
      * reversión del periodo y no lo deshace la compensación del alta.
      *
-     * Nota: `POST /api/platform/subscriptions/change-plan` **no está montada**
-     * en el router hoy (el console la invoca pero el worker no la define); al
-     * montarla, si el `cancel` de la vieja fallara quedarían dos activas (peor:
-     * es preferible a cero y se documenta aquí).
+     * Note: mounted at `POST /api/platform/subscriptions/change-plan`. If the
+     * `cancel` of the old subscription fails, two actives remain (preferable
+     * to zero; documented here).
      */
     async changePlan(
       organizationId: string,

@@ -83,8 +83,10 @@ export function readEmitterName(snapshot: unknown): string | null {
 }
 
 /**
- * Clasificación del summary del reporte. ANTI-DRIFT: debe coincidir con el
- * mapeo de filas del servicio y con el filtro SQL `issued` del repositorio.
+ * Receipt-state classification used by both reports (Panel and Console).
+ * ANTI-DRIFT: must match the row mapping of both services and the `issued`
+ * SQL filter of both report repositories — the parity with the SQL expression
+ * is pinned by `tests/unit/receipt-report.test.ts`.
  */
 export function classifyReceiptState(group: {
   voided: boolean;

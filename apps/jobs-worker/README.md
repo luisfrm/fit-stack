@@ -24,7 +24,6 @@ src/
     ├── layout.ts               # renderDarkShell / renderLightShell + escapeHtml
     ├── send-invitation.ts
     ├── org-invite.ts
-    ├── payment-receipt.ts
     ├── payment-receipt-short.ts
     └── org-payment-received.ts
 ```
