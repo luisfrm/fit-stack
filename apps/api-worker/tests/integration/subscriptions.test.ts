@@ -15,6 +15,7 @@ import {
   createGymMember,
   createPlan,
   isoDate,
+  type AuthedUser,
 } from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
 
@@ -83,7 +84,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       // Paso 1: número + render encolado; el email lo encola el paso 2 (Fase 2).
       const renders = owner.client.receiptQueue.ofType('receipt.render');
       expect(renders).toHaveLength(1);
-      expect(renders[0].organizationId).toBe(organization.id);
+      expect(renders[0]!.organizationId).toBe(organization.id);
       expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
     });
 
@@ -290,7 +291,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
 
   describe('Estado derivado (anulada vs revocada)', () => {
     /** Crea una sub con pago `validated` y devuelve su id + el del pago. */
-    async function seedSubscription(owner: any, member: any, plan: any) {
+    async function seedSubscription(owner: AuthedUser, member: any, plan: any) {
       const created = await owner.client.post('/api/subscriptions', {
         memberId: member.id,
         planId: plan.id,
@@ -311,7 +312,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       return { subId: created.body.id as number, paymentId: row?.paymentId as number };
     }
 
-    async function readStatus(owner: any, subId: number) {
+    async function readStatus(owner: AuthedUser, subId: number) {
       const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
         query: { limit: '10' },
       });
@@ -433,7 +434,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
      * desde el listado (el POST responde la suscripción, no el pago).
      */
     async function seedWithPaymentStatus(
-      owner: any,
+      owner: AuthedUser,
       member: any,
       plan: any,
       status: 'processing' | 'validated',
@@ -470,7 +471,9 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
 
     it('un pago `voided` no se re-valida (409) y conserva su anulación', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
-      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'validated');
+      // Rejected from `processing`: a voided charge WITHOUT a number is the
+      // real scenario (re-validating used to number it over a cancelled sub).
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
 
       const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'voided',
