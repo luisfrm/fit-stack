@@ -22,7 +22,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 ## 2. Flujo del pago, paso a paso
 
 - [x] **Alta** (`POST /api/subscriptions`): suscripción + pago.
-  - con `validated` → el **paso 1** numera (`{slug}-año-n`) y encola el PDF; el email sale del **paso 2**.
+  - con `validated` → el **paso 1** numera (`{año}-n`) y encola el PDF; el email sale del **paso 2**.
   - con `processing` → "Por validar", sin número.
 - [x] **Aprobación** (`PATCH /api/payments/:id/status` → `validated`): numera (si aún no lo estaba) y encola el render.
 - [x] **Anulación / Rechazo** (`→ voided`, estado único): si el pago ya estaba numerado, el comprobante se marca **ANULADO** (el número y el PDF de emisión quedan intactos —write-once— y se genera el PDF **con sello**, columna `receipt_voided_pdf_key`; el original deja de entregarse mientras falte el sello) y la suscripción pasa a **ANULADA**; si no tenía número, no hay comprobante que marcar y el body lo dice (`receiptVoided: false` + `receiptVoidReason: 'not_issued'`). "Rechazado" vs "anulado" se deriva con `getVoidKind`. Un anulado no se reenvía por email (`409 RECEIPT_VOIDED`).

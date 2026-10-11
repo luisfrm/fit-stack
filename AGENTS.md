@@ -47,7 +47,7 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 **Linear is the single source of truth for planned work.** The old local system (`vaults/tasks/FS-NNNN/`, `pnpm task:new`, `vaults/guides/task-system.md`) was **removed**: no local id space, nothing to keep in sync.
 
-- **No local id space.** Reference work by its Linear id (`RD-89`). Never invent an `FS-NNNN` id, never reintroduce a task folder. **Long reference material goes to a Linear document.** **Code comments cite Linear ids** (`// (RD-94) …`) — never ids that no longer resolve. ⚠️ `FS-0000001` is **not** a task id: it is the SaaS receipt number from `formatConsoleReceiptNumber`. Never "migrate" it.
+- **No local id space.** Reference work by its Linear id (`RD-89`). Never invent an `FS-NNNN` id, never reintroduce a task folder. **Long reference material goes to a Linear document.** **No task ids in the codebase** — not in comments, not in tests: the id lives in Linear and in the commit message. ⚠️ `FS-0000001` is **not** a task id: it is the SaaS receipt number from `formatConsoleReceiptNumber`. Never "migrate" it.
 - **Workspace**: `Rivas Digital` (`6630fb5f-e79c-42de-8867-49da2a325e10`) via the `linear` MCP server, reachable from `execute` as `tools["linear"].<tool>(…)`.
 - **One issue, one coherent scope — no fixed relation to PRs.** Split into **sub-issues** only when there are **distinct hallazgos** or it is **too large** (judge by reviewability). The DB change, backend, frontend, tests and docs that make **one behaviour** work end to end belong together.
 - **Split rule**: the **parent is the container** (problem, context, state, sub-issue list); each **sub-issue** (`parentId`) is a self-contained spec. Link issues with `blocks` / `blockedBy` / `relatedTo` whenever a real dependency or shared area exists, **within or across parents**; the parent carries no relations. **Never split by architectural layer**, **never create phases**.
@@ -99,7 +99,7 @@ All components from `@workspace/ui`, predefined variants (no ad-hoc Tailwind wit
 
 ### 3. Database Integrity & ORM
 
-Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **RD-94**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`).
+Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`).
 
 ### 4. Next.js Patterns & Best Practices
 
@@ -152,7 +152,7 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 | SaaS billing / grace / renewal | [`business/platform-billing.md`](vaults/business/platform-billing.md) — status computed in SQL (not stored); `voided` ignored in Console; free-tier gate else `/no-subscription` |
 | Feature flags / free tier / AI credits | [`business/features-and-free-tier.md`](vaults/business/features-and-free-tier.md) — new features `defaultEnabled:false`; downgrade = hide; `403 FEATURE_NOT_AVAILABLE`/`FEATURE_LIMIT_REACHED`; `429 AI_QUOTA_EXCEEDED` |
 | Roles / permissions / anti-escalation | [`business/rbac.md`](vaults/business/rbac.md) — never trust client checks; all queries filter `organizationId`; no platform-admin bypass in CMS; uploads = two routes, one authority |
-| Subscription rules / RD-94 | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
+| Subscription rules / compensation | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
 | Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
 | API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE; `/api/access-control/*` not mounted |
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
