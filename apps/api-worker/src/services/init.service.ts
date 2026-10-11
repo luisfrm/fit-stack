@@ -32,8 +32,8 @@ export function createInitService(initRepo: InitRepository, platformSettingsRepo
 
       await initRepo.updateUserRole(newUser.user.id, 'owner');
 
-      // Sembrar settings de plataforma (currency, formato, proveedor IA, etc.)
-      // para que el console no caiga en fallbacks silenciosos (`|| "USD"`).
+      // Seed platform settings (currency, format, AI provider, etc.)
+      // so console does not fall back to silent defaults (`|| "USD"`).
       for (const [key, value] of Object.entries(DEFAULT_PLATFORM_SETTINGS)) {
         await platformSettingsRepo.upsert(key, value);
       }

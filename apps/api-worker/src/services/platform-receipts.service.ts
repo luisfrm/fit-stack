@@ -29,10 +29,10 @@ import {
 
 export interface AssignPlatformReceiptNumberInput {
   paymentId: number;
-  /** Pagador (sesión en creación `processing`); en validación no overwrite. */
+  /** Payer (session during `processing` creation); no overwrite on validation. */
   payerEmail?: string | null;
   payerName?: string | null;
-  /** Actor de sesión que emite (C5); sin sesión queda `NULL`, nunca inventado. */
+  /** Session actor emitting receipt (C5); without session defaults to `NULL`, never fabricated. */
   actor?: string | null;
 }
 
@@ -47,21 +47,21 @@ export interface PlatformReceiptHooks {
 }
 
 /**
- * Resultado del paso 1. `skipped:true + receiptNumber:null` = sin documento
- * (trial/free $0): NO hay nada que esperar, no es un "pending".
+ * Step 1 result. `skipped:true + receiptNumber:null` = no document
+ * ($0 trial/free): NOTHING to wait for, not a "pending".
  */
 export type PlatformAssignResult =
   | { receiptNumber: null; pdfStatus: 'pending'; skipped: true }
   | { receiptNumber: string; pdfStatus: 'pending' | 'ready'; skipped: false };
 
-/** Opts de emisión para `platform-subscriptions.service` (espejo `ReceiptContext`). */
+/** Issuance options for `platform-subscriptions.service` (mirrors `ReceiptContext`). */
 export interface PlatformReceiptContext {
   receipts?: PlatformReceiptHooks;
-  /** Actor de sesión (para `payer_*`; solo rellena si está vacío). */
+  /** Session actor (for `payer_*`; only fills if empty). */
   payer?: { email: string; name: string } | null;
   /**
-   * Actor de sesión: `voided_by` en la rama VOIDED y `issued_by` al numerar
-   * (C5). Sin sesión no se inventa actor: null explícito.
+   * Session actor: `voided_by` in VOIDED branch and `issued_by` on numbering
+   * (C5). Without session no actor is fabricated: explicit null.
    */
   by?: string;
 }
@@ -229,11 +229,11 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
 
   return {
     /**
-     * Paso 1 (síncrono, sin I/O externo salvo DB+cola): valida, calcula
-     * impuestos en centavos, asigna el número global (atómico), lo persiste
-     * y encola `receipt.render` con `scope:'platform'`. NUNCA encola email
-     * (lo hace el paso 2). Trial/free $0 → SKIP (no queman la serie).
-     * La secuencia compartida vive en `receipt-issue.core.ts`.
+     * Step 1 (synchronous, no external I/O except DB+queue): validates, computes
+     * tax in cents, assigns global number (atomic), persists it,
+     * and enqueues `receipt.render` with `scope:'platform'`. NEVER enqueues email
+     * (done in step 2). Trial/free $0 -> SKIP (does not burn sequence).
+     * The shared sequence lives in `receipt-issue.core.ts`.
      */
     async assignPlatformReceiptNumber(
       input: AssignPlatformReceiptNumberInput,
@@ -242,8 +242,8 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
     },
 
     /**
-     * Persiste el pagador solo si está vacío (creación `processing` con
-     * sesión org renovadora). Nunca sobrescribe (SET ... WHERE NULL).
+     * Persists payer only if empty (`processing` creation with
+     * renewing org session). Never overwrites (SET ... WHERE NULL).
      */
     async setPayerIfMissing(
       paymentId: number,
@@ -257,14 +257,13 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
     },
 
     /**
-     * Anulación con número: idempotente sin pisar auditoría (el repo hace
-     * UPDATE siempre, así que el early-return vive aquí); sin número → 409
-     * (no hay comprobante que anular). `by` obligatorio (fail-closed: nunca
-     * void anónimo).
+     * Void with number: idempotent without overwriting audit trail (repo always
+     * does UPDATE, so early-return lives here); without number → 409
+     * (no receipt to void). `by` is mandatory (fail-closed: never anonymous void).
      *
-     * Encola el render del PDF ANULADO (espejo Panel): el sello lo materializa
-     * el paso 2 y hasta entonces el original no se sirve. Si el envío a la
-     * cola falla, el void ya está persistido y el barrido lo repara.
+     * Enqueues VOIDED PDF render (mirrors Panel): void stamp is materialized by
+     * step 2 and until then the original PDF is not served. If queue dispatch fails,
+     * the void is already persisted and sweep job repairs it.
      */
     async markPlatformReceiptVoided(input: {
       paymentId: number;
@@ -311,9 +310,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
     },
 
     /**
-     * Estado del comprobante SaaS (contrato 3 estados, nunca 409; espejo
-     * `getReceiptState` de Panel). Compone con el mapper shared de filas:
-     * el mismo camino que el consumer de jobs-worker (precedente Panel).
+     * SaaS receipt state (3-state contract, never 409; mirrors
+     * `getReceiptState` in Panel). Composes with shared row mapper:
+     * same path as the jobs-worker consumer (Panel precedent).
      */
     async getPlatformReceiptState(paymentId: number): Promise<
       | { available: true; pdfStatus: 'ready'; receiptNumber: string; receipt: ReceiptData; pdfKey: string }
@@ -327,7 +326,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       if (!composed.payment.receiptNumber) {
         return { available: false, reason: 'pre_system' };
       }
-      // Espejo Panel: un comprobante anulado entrega SOLO su PDF con sello.
+      // Panel mirror: a voided receipt delivers ONLY its void-stamped PDF.
       const deliverableKey = composed.payment.receiptVoided
         ? composed.payment.receiptVoidedPdfKey
         : composed.payment.receiptPdfKey;
@@ -351,10 +350,10 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
     },
 
     /**
-     * Reenvío manual (4 ramas congeladas): sin destinatarios → 422;
-     * pre_system → `presystem` (sin encolar: terminal, nunca 409);
-     * numerado sin PDF → `pending` (re-encola render, el paso 2 avisa);
-     * ready → encola `email.org_payment_received` con payer de DB.
+     * Manual resend (4 frozen branches): no recipients -> 422;
+     * pre_system -> `presystem` (without enqueuing: terminal, never 409);
+     * numbered without PDF -> `pending` (re-enqueues render, step 2 notifies);
+     * ready -> enqueues `email.org_payment_received` with DB payer.
      */
     async resendPlatformReceiptEmail(
       paymentId: number,
@@ -385,8 +384,8 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
       if (!composed.payment.receiptNumber) {
         return { kind: 'presystem' };
       }
-      // Espejo Panel: un comprobante anulado no se reenvía por email (saldría
-      // con el PDF de emisión o sin adjunto, sin forma de ver el sello).
+      // Panel mirror: a voided receipt is not resent by email (would be sent
+      // with the emission PDF or without attachment, without showing the void seal).
       if (composed.payment.receiptVoided) {
         throw new ReceiptError(
           409,

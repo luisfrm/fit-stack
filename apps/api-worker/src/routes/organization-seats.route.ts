@@ -9,7 +9,7 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 /**
- * GET /api/organizations/seats — cupos del portal de miembros de la org activa.
+ * GET /api/organizations/seats - portal seats for active org members.
  */
 export const organizationSeatsRoutes = new Hono<AppEnv>()
   .get('/', requireAuth(), requireOrg(), async (c) => {

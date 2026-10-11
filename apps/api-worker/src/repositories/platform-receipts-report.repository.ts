@@ -1,12 +1,12 @@
 /* ── Platform receipts report repository (api-worker) ───────────────────
-   Consultas del reporte de comprobantes SaaS (auditoría de la serie `FS-N`).
-   Espejo de las de Panel en `payments.repository.ts` (Fase 5), con dos
-   diferencias deliberadas:
-   - Sin `organizationId`: el emisor es FitStack, la serie es global.
-   - Fechas siempre en UTC: la facturación de plataforma corre en UTC
-     (no usa la tz de la organización).
-   La clasificación por estado vive en el servicio; aquí solo se filtra por
-   SQL lo expresable.
+   SaaS receipt report queries (audit of the `FS-N` series).
+   Mirrors the Panel queries in `payments.repository.ts` (Phase 5), with two
+   deliberate differences:
+   - No `organizationId`: the issuer is FitStack, the series is global.
+   - Dates always in UTC: platform billing runs in UTC
+     (does not use organization timezone).
+   Status classification lives in the service; here we only SQL-filter
+   what is expressible.
    ─────────────────────────────────────────────────────────────────────── */
 
 import {
@@ -28,8 +28,8 @@ export interface PlatformReceiptReportScope {
   toUtc?: Date;
   method?: string;
   /**
-   * Año UTC de `payment_date`. La serie `FS-N` es continua y no lleva año,
-   * así que este filtro es por fecha de pago, no por universo de correlativo.
+   * UTC year of `payment_date`. The `FS-N` series is continuous and does not carry a year,
+   * so this filter is by payment date, not by correlative sequence universe.
    */
   year?: number;
 }
@@ -42,10 +42,10 @@ export type PlatformReceiptReportState =
   | 'pre_system';
 
 /**
- * Scope base: pagos validados + cualquier pago con número (cubre un
- * `voided` que conserva su número). `pending`/`processing` sin número no son
- * comprobantes y quedan fuera. Rango por `receipt_issued_at` en numerados y
- * por `payment_date` en sin numerar.
+ * Base scope: validated payments + any payment with a number (covers a
+ * `voided` payment that preserved its number). `pending`/`processing` without a number
+ * are not receipts and are excluded. Date range by `receipt_issued_at` for numbered receipts and
+ * by `payment_date` for unnumbered.
  */
 function reportScope(filters: PlatformReceiptReportScope) {
   const conds = [
@@ -107,8 +107,8 @@ export function createPlatformReceiptsReportRepository(db: Db) {
       const conds = [reportScope(filters.scope)];
 
       switch (filters.state) {
-        // Emitido = numerado, no anulado Y con PDF. `pending` es su
-        // complemento: numerado sin PDF.
+        // Issued = numbered, not voided AND with PDF. `pending` is its
+        // complement: numbered without PDF.
         case 'issued':
           conds.push(
             and(
@@ -158,12 +158,12 @@ export function createPlatformReceiptsReportRepository(db: Db) {
           voidedBy: platformSubscriptionPayment.voidedBy,
           voidedAt: platformSubscriptionPayment.voidedAt,
           voidReason: platformSubscriptionPayment.voidReason,
-          // C1/C5: emisor congelado + actor, para el libro exportable.
+          // C1/C5: frozen issuer + actor, for exportable ledger.
           emitterSnapshot: platformSubscriptionPayment.emitterSnapshot,
           issuedBy: platformSubscriptionPayment.issuedBy,
         })
         .from(platformSubscriptionPayment)
-        // LEFT: un pago huérfano no debe descuadrar el reporte.
+        // LEFT: an orphan payment must not throw off the report.
         .leftJoin(organization, eq(platformSubscriptionPayment.organizationId, organization.id))
         .where(where)
         .orderBy(

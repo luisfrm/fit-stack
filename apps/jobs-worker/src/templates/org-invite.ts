@@ -8,9 +8,9 @@ export interface OrgInviteData {
 }
 
 /**
- * Invitación a un miembro con cuenta a una organización (hook Better Auth).
- * `orgName`/`inviterName` son input de operador y `inviteLink` viaja en el
- * `href`: todo se escapa.
+ * Invitation for an existing account member to an organization (Better Auth hook).
+ * `orgName`/`inviterName` are operator inputs and `inviteLink` travels in
+ * `href`: all are escaped.
  */
 export function renderOrgInvite(data: OrgInviteData): RenderedEmail {
   const orgName = escapeHtml(data.orgName);

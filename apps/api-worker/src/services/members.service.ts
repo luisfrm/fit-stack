@@ -21,6 +21,47 @@ export function createMembersService(
   tokenService: TokenService,
   taskQueue?: Queue
 ) {
+  const sendMemberInvitation = async (
+    newMember: { id: number; email: string },
+    organizationId: string,
+    role: string | null | undefined,
+    ctx?: { auth: Auth; headers: Headers }
+  ) => {
+    const existingUser = await usersRepo.findByEmail(newMember.email);
+
+    if (existingUser) {
+      const isAlreadyMember = await membersRepo.findAuthMember(existingUser.id, organizationId);
+      if (isAlreadyMember) {
+        await membersRepo.update(organizationId, newMember.id, { userId: existingUser.id });
+      } else if (ctx) {
+        try {
+          await (ctx.auth.api as any).createInvitation({
+            headers: ctx.headers,
+            body: {
+              email: newMember.email,
+              role: role as any,
+              organizationId,
+              resend: true,
+            },
+          });
+        } catch (inviteError: any) {
+          console.error('Failed to create Better Auth invitation:', inviteError);
+        }
+      }
+      return;
+    }
+
+    const token = await tokenService.signInviteToken(organizationId, newMember.id, newMember.email);
+    if (taskQueue) {
+      await taskQueue.send({
+        type: 'email.registration_invite',
+        email: newMember.email,
+        token,
+        target: 'panel',
+      });
+    }
+  };
+
   return {
     async getAllMembers(filters: MembersFilter) {
       if (!filters.organizationId) throw new Error('organizationId is required');
@@ -28,8 +69,8 @@ export function createMembersService(
     },
 
     /**
-     * KPIs de clientes. `timezone` es obligatorio y sin default (AGENTS §9):
-     * viene del middleware `requireOrgTimezone()` (sesión, nunca query param).
+     * Customer KPIs. `timezone` is required without default (AGENTS §9):
+     * comes from `requireOrgTimezone()` middleware (session, never query param).
      */
     async getMemberStats(organizationId: string, timezone: string) {
       if (!organizationId) throw new Error('organizationId is required');
@@ -59,7 +100,7 @@ export function createMembersService(
       sendInvite: boolean,
       ctx?: { auth: Auth; headers: Headers }
     ) {
-      // Defaults explícitos por spread (`sendInvite` no es columna: se omite del insert).
+      // Explicit defaults via spread (`sendInvite` is not a column: omitted from insert).
       const { sendInvite: _flag, ...memberFields } = { ...DEFAULT_MEMBER_VALUES, ...data };
       const sanitizedData = sanitizeMemberData(memberFields);
       const existing = await membersRepo.findByEmail(organizationId, sanitizedData.email);
@@ -79,39 +120,12 @@ export function createMembersService(
       }
 
       if (sendInvite) {
-        const existingUser = await usersRepo.findByEmail(sanitizedData.email);
-
-        if (existingUser) {
-          const isAlreadyMember = await membersRepo.findAuthMember(existingUser.id, organizationId);
-
-          if (isAlreadyMember) {
-            await membersRepo.update(organizationId, newMember.id, { userId: existingUser.id });
-          } else if (ctx) {
-            try {
-              await (ctx.auth.api as any).createInvitation({
-                headers: ctx.headers,
-                body: {
-                  email: sanitizedData.email,
-                  role: sanitizedData.role as any,
-                  organizationId,
-                  resend: true,
-                },
-              });
-            } catch (inviteError: any) {
-              console.error('Failed to create Better Auth invitation:', inviteError);
-            }
-          }
-        } else {
-          const token = await tokenService.signInviteToken(organizationId, newMember.id, newMember.email);
-          if (taskQueue) {
-            await taskQueue.send({
-              type: 'email.registration_invite',
-              email: newMember.email,
-              token,
-              target: 'panel',
-            });
-          }
-        }
+        await sendMemberInvitation(
+          newMember,
+          organizationId,
+          sanitizedData.role,
+          ctx
+        );
       }
 
       return newMember;

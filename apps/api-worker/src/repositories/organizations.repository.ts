@@ -54,8 +54,8 @@ async function getMemberCounts(
 export function createOrganizationsRepository(db: Db) {
   return {
     /**
-     * Emails de los owners de la org (`authMember role=owner → user.email`).
-     * Dedupe y filtrado los hace el caller (resend encola, jobs deduplica).
+     * Emails of org owners (`authMember role=owner -> user.email`).
+     * Deduplication and filtering is performed by caller (resend enqueues, jobs deduplicates).
      */
     async listOwnerEmails(organizationId: string): Promise<string[]> {
       const rows = await db
@@ -120,8 +120,8 @@ export function createOrganizationsRepository(db: Db) {
               planCurrency: platformPlan.currency,
               planDurationValue: platformPlan.durationValue,
               planDurationUnit: platformPlan.durationUnit,
-              // Paridad con el SQL del repo SaaS: "hay periodo pagado" es
-              // EXISTS(validated|refunded), nunca "el último pago".
+              // Parity with SaaS repo SQL: "paid period exists" is
+              // EXISTS(validated|refunded), never "the last payment".
               hasValidatedPayment: sql<boolean>`EXISTS (
                 SELECT 1 FROM ${platformSubscriptionPayment} p
                 WHERE p.subscription_id = platform_subscription.id
@@ -134,7 +134,7 @@ export function createOrganizationsRepository(db: Db) {
             .orderBy(desc(platformSubscription.createdAt))
             .limit(1);
 
-          // Computar status (no se guarda en DB)
+          // Compute status (not persisted in DB)
           const computedStatus = latestSub
             ? computePlatformSubscriptionStatus({
                 currentPeriodEnd: latestSub.currentPeriodEnd,

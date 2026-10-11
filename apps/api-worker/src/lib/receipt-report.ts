@@ -1,7 +1,7 @@
 /* ── Receipt report helpers (api-worker) ────────────────────────────────
-   Mapeos puros compartidos por los DOS reportes de comprobantes (Panel y
-   Console). Viven aquí para que el espejo no derive: la clasificación y los
-   totales deben ser idénticos en ambos lados.
+   Pure mappings shared across BOTH receipt reports (Panel and Console).
+   Live here to prevent drift: classification and totals must be
+   identical on both sides.
    ─────────────────────────────────────────────────────────────────────── */
 
 import type {
@@ -10,7 +10,7 @@ import type {
   ITaxDetail,
 } from '@workspace/shared';
 
-/** Fila de dinero mínima que ambos reportes exponen por moneda. */
+/** Minimal monetary row exposed by both reports per currency. */
 export interface ReceiptMoneyRow {
   subtotal: number | null;
   taxTotal: number | null;
@@ -20,9 +20,9 @@ export interface ReceiptMoneyRow {
 }
 
 /**
- * Guard sobre dato persistido: `tax_details` es jsonb, así que se normaliza
- * lo que tenga la forma esperada y se descarta el resto (nunca se inventan
- * importes). Centavos enteros.
+ * Guard over persisted data: `tax_details` is jsonb, so rows matching
+ * expected format are normalized and the rest discarded (never invented).
+ * Integer cents.
  */
 export function asTaxDetails(value: unknown): ITaxDetail[] {
   if (!Array.isArray(value)) return [];
@@ -35,7 +35,7 @@ export function asTaxDetails(value: unknown): ITaxDetail[] {
   });
 }
 
-/** ISO 8601 o `null`. Una fecha presente pero inválida es corrupción visible. */
+/** ISO 8601 or `null`. An invalid date string is considered corrupted. */
 export function toIsoOrNull(value: Date | string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const d = value instanceof Date ? value : new Date(value);
@@ -43,8 +43,8 @@ export function toIsoOrNull(value: Date | string | null | undefined): string | n
 }
 
 /**
- * Totales por moneda del universo emitido-no-anulado. Nunca sumas mixtas:
- * una entrada por moneda, con el desglose de impuestos por nombre.
+ * Currency totals for issued-and-not-voided universe. Never mixed sums:
+ * one entry per currency, with tax breakdown by name.
  */
 export function aggregateCurrencyTotals(rows: ReceiptMoneyRow[]): IReceiptCurrencyTotal[] {
   const byCurrency = new Map<string, IReceiptCurrencyTotal>();
@@ -70,11 +70,10 @@ export function aggregateCurrencyTotals(rows: ReceiptMoneyRow[]): IReceiptCurren
 }
 
 /**
- * Nombre del emisor CONGELADO en el snapshot (C1) para la fila del reporte.
- * Lectura TOLERANTE a propósito: el reporte LISTA (no recompone el
- * documento), así que un snapshot ilegible deja la celda vacía en vez de
- * tumbar el libro completo — el compose del comprobante sí falla ruidoso.
- * `null` = emisión anterior al snapshot.
+ * Emitter name FROZEN in snapshot (C1) for report row.
+ * Intentionally TOLERANT reading: report LISTS (does not recompose document),
+ * so unreadable snapshot leaves cell empty rather than failing the whole report.
+ * `null` = issuance prior to snapshot introduction.
  */
 export function readEmitterName(snapshot: unknown): string | null {
   if (snapshot === null || snapshot === undefined) return null;

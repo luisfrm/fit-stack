@@ -3,7 +3,7 @@ import type { SubscriptionsRepository } from '../repositories/subscriptions.repo
 import { OrganizationDateManager } from '../lib/date-manager';
 import type { IDashboardActionItem } from '@workspace/shared';
 
-/** Fila que retorna el repositorio (expiring / recently expired). */
+/** Row returned by repository (expiring / recently expired). */
 interface ActionItemRow {
   memberId: number;
   firstName: string;
@@ -33,8 +33,8 @@ export function createDashboardService(
     },
 
     /**
-     * Listas accionables del dashboard: próximos a vencer (≤7 días) y
-     * vencidos recientemente (últimos 7 días, sin renovar).
+     * Actionable dashboard lists: expiring soon (≤7 days) and
+     * recently expired (past 7 days, unrenewed).
      */
     async getActionItems(
       organizationId: string,
@@ -45,7 +45,7 @@ export function createDashboardService(
       }
 
       const MS_PER_DAY = 86_400_000;
-      // El driver puede retornar MAX(end_date) como string o Date según el tipo de la expresión.
+      // Driver may return MAX(end_date) as string or Date depending on expression type.
       const toDate = (value: Date | string): Date => (value instanceof Date ? value : new Date(value));
       const toDays = (endDate: Date): number =>
         Math.floor((endDate.getTime() - now.getTime()) / MS_PER_DAY);
@@ -60,7 +60,7 @@ export function createDashboardService(
           email: row.email,
           planName: row.planName,
           endDate: endDate.toISOString(),
-          // Positivo = vence en N días; negativo = venció hace N días.
+          // Positive = expires in N days; negative = expired N days ago.
           days: toDays(endDate),
         };
       };

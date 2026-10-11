@@ -18,15 +18,15 @@ import type { NewDbOrganization } from '../repositories/organizations.repository
 import type { AppEnv } from '../lib/env';
 
 /**
- * Keys de platform_setting (single source en apps/console/lib/config/platform-settings.ts).
+ * platform_setting keys (single source in apps/console/lib/config/platform-settings.ts).
  */
 const ACTIVE_PAYMENT_METHODS_KEY = 'active_payment_methods';
 const ACTIVE_CURRENCIES_KEY = 'active_currencies';
 const CURRENCY_FORMAT_KEY = 'currency_format';
 
 /**
- * Payload mínimo de la renovación autoservicio: NUNCA contiene montos ni
- * tasas — el backend los dicta (snapshot del plan + provider de tasas).
+ * Minimal payload for self-service renewal: NEVER contains amounts or
+ * rates - backend dictates them (plan snapshot + exchange rate provider).
  */
 const orgRenewSchema = z.object({
   paymentMethod: paymentMethodSchema,
@@ -36,17 +36,17 @@ const orgRenewSchema = z.object({
 });
 
 /**
- * Perfil org-scoped: identidad de la sede (nombre, logo, eslogan, zona
- * horaria, formato de moneda) + identidad emisora fiscal (Fase 4).
+ * Org-scoped profile: branch identity (name, logo, slogan, timezone,
+ * currency format) + fiscal issuing identity (Phase 4).
  *
- * `countryCode`/`primaryCurrency` son inmutables desde aquí (required de
- * creación): se rechazan con 400 si vienen. Cambiar el país recalcularía la
- * moneda principal — operación de nivel plataforma, no del tenant.
- * `confirmed` es la fricción de la declaración de contribuyente formal.
+ * `countryCode`/`primaryCurrency` are immutable from here (required at
+ * creation): rejected with 400 if provided. Changing country would recalculate
+ * primary currency - platform-level operation, not tenant.
+ * `confirmed` provides friction for formal taxpayer declaration.
  *
- * `.passthrough()` (no `.strict()`) es deliberado: permite DETECTAR las keys
- * prohibidas para responder 400 explícito. El handler solo reenvía campos
- * conocidos, así que lo demás no se persiste (sin mass-assignment).
+ * `.passthrough()` (not `.strict()`) is deliberate: allows DETECTING prohibited
+ * keys to return an explicit 400. Handler only forwards known fields, so
+ * extra data is not persisted (no mass-assignment).
  */
 const orgProfileSchema = z
   .object({
@@ -158,7 +158,7 @@ export const organizationRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/organizations/subscription
-  // Suscripción SaaS activa de la org con detalles del plan (precio, vencimiento, status).
+  // Active SaaS subscription of org with plan details (price, expiry, status).
   .get('/subscription', requireAuth(), requireOrg(), async (c) => {
     const activeOrganizationId = c.get('orgId')!;
 
@@ -177,7 +177,7 @@ export const organizationRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/organizations/payment-methods
-  // Métodos de pago de plataforma expuestos a la org (form de renovación autoservicio).
+  // Platform payment methods exposed to org (self-service renewal form).
   .get('/payment-methods', requireAuth(), requireOrg(), async (c) => {
     const activeOrganizationId = c.get('orgId')!;
 
@@ -203,17 +203,17 @@ export const organizationRoutes = new Hono<AppEnv>()
       activeCurrencies: parseJsonArray(settings[ACTIVE_CURRENCIES_KEY], ['USD', 'VES']),
       currencyFormat: settings[CURRENCY_FORMAT_KEY] ?? 'latam',
     };
-    // Dato de baja frecuencia: cambia solo cuando soporte edita platform settings
-    // (la escritura invalida org:*:payment-methods). TTL 1h = red de seguridad.
+    // Low frequency data: changes only when support edits platform settings
+    // (write invalidates org:*:payment-methods). TTL 1h = safety net.
     await cache.set(cacheKey, data, 3600);
 
     return c.json(data);
   })
 
   // POST /api/organizations/subscription/renew
-  // Renovación autoservicio: solo al expirar, sin pagos pendientes, no cancelada.
-  // El pago se registra como `processing` (revisión de soporte en console) y
-  // NO extiende el periodo hasta que soporte lo valide.
+  // Self-service renewal: only on expiry, no pending payments, not cancelled.
+  // Payment is registered as `processing` (support review in console) and
+  // does NOT extend period until support validates it.
   .post(
     '/subscription/renew',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -232,9 +232,9 @@ export const organizationRoutes = new Hono<AppEnv>()
       if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);
       if (sub.cancelledAt) return c.json({ error: 'Suscripción cancelada' }, 400);
 
-      // Bloqueo solo si hay un periodo REALMENTE pagado vigente
-      // (`hasValidatedPayment`): un cliente con periodo por delante pero sin
-      // pago calificado (p. ej. pago anulado) puede volver a pagar.
+      // Block only if there is a TRULY paid active period
+      // (`hasValidatedPayment`): a client with period ahead but without
+      // qualifying payment (e.g. voided payment) can pay again.
       const { hasValidatedPayment } = await repo.getLastSubscriptionStatus(activeOrganizationId);
       if (sub.currentPeriodEnd > new Date() && hasValidatedPayment) {
         return c.json(
@@ -253,8 +253,8 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       const cache = createCache(c.env);
       try {
-        // Pagador real = sesión org renovadora (el paso 1 lo persiste solo
-        // si está vacío; `processing` no numera).
+        // Real payer = renewing org session (step 1 persists it only
+        // if empty; `processing` does not number).
         const user = c.get('user')!;
         const receipts = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
         const { paymentId } = await service.renewOrgSubscription(sub.id, data, {
@@ -268,7 +268,7 @@ export const organizationRoutes = new Hono<AppEnv>()
         await cache.invalidate(`org:${activeOrganizationId}:dashboard:action-items`);
         await cache.invalidateExact(`platform:subscriptions:invoices:${activeOrganizationId}`);
 
-        // Confirmación al payer + owners de la org (el jobs-worker deduplica)
+        // Confirmation to payer + org owners (jobs-worker deduplicates)
         if (c.env.TASK_QUEUE) {
           await c.env.TASK_QUEUE.send({
             type: 'email.org_payment_received',
@@ -292,12 +292,12 @@ export const organizationRoutes = new Hono<AppEnv>()
     }
   )
 
-  // PATCH /api/organizations/profile — identidad de la sede + identidad
-  // emisora + fiscalConfig (Fase 4). Es el endpoint que usa el panel para el
-  // formulario de organización: NUNCA se llama a `/api/platform/*` desde el
-  // panel (un owner de gym no tiene rol de plataforma → 403). Org-scoped:
-  // owner/manager (ORGANIZATION.UPDATE). `countryCode` y `primaryCurrency`
-  // son inmutables post-creación (400 si vienen).
+  // PATCH /api/organizations/profile - branch identity + issuer
+  // identity + fiscalConfig (Phase 4). Endpoint used by panel for
+  // organization form: NEVER call `/api/platform/*` from panel
+  // (gym owner does not have platform role -> 403). Org-scoped:
+  // owner/manager (ORGANIZATION.UPDATE). `countryCode` and `primaryCurrency`
+  // are immutable post-creation (400 if passed).
   .patch(
     '/profile',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -306,8 +306,8 @@ export const organizationRoutes = new Hono<AppEnv>()
       const orgId = c.get('orgId')!;
       const body = c.req.valid('json');
 
-      // El schema es `.passthrough()` para poder detectar las keys prohibidas
-      // (un `.strict()` las strippearía en silencio).
+      // Schema is `.passthrough()` to detect prohibited keys
+      // (`.strict()` would strip them silently).
       const forbidden = FORBIDDEN_PROFILE_KEYS.filter((key) => key in body);
       if (forbidden.length > 0) {
         return c.json(
@@ -329,8 +329,8 @@ export const organizationRoutes = new Hono<AppEnv>()
       const current = await service.findOrganizationById(orgId);
       if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
 
-      // Fricción intencional SOLO en la transición false→true: declaración
-      // explícita + confirmación (nunca un toggle cosmético).
+      // Intentional friction ONLY on false->true transition: explicit
+      // declaration + confirmation (never a cosmetic toggle).
       if (requiresFormalTaxpayerConfirmation(body, current.fiscalConfig)) {
         return c.json(
           {
@@ -341,15 +341,15 @@ export const organizationRoutes = new Hono<AppEnv>()
         );
       }
 
-      // Solo los campos presentes: un body sin campos persistibles es un
-      // no-op idempotente, nunca un 500 de Drizzle ("No values to set").
+      // Only present fields: body without persistable fields is an
+      // idempotent no-op, never a Drizzle 500 ("No values to set").
       const patch = buildOrganizationPatch(body);
       if (Object.keys(patch).length === 0) return c.json(current);
 
       const updated = await service.updateOrganization(orgId, patch);
 
-      // El perfil de la sesión se cachea 5 min: invalidar para que el cambio
-      // se refleje en `useAuth().activeOrganization` sin esperar el TTL.
+      // Session profile is cached for 5 min: invalidate so changes
+      // reflect in `useAuth().activeOrganization` without waiting for TTL.
       const cache = createCache(c.env);
       await cache.invalidateExact(`org:${orgId}:profile`);
 

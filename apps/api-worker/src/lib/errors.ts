@@ -15,8 +15,8 @@ function toStatusCode(n: number): ContentfulStatusCode {
 }
 
 /**
- * Saca el `cause` profundo de un error (Node.js anida las causas en cadenas
- * vía `AggregateError` o errores con un `cause` propio).
+ * Extracts the deep `cause` of an error (Node.js chains causes
+ * via `AggregateError` or errors with their own `cause`).
  */
 function getDeepCause(err: unknown, depth = 0): unknown {
   if (depth > 5) return null;
@@ -27,14 +27,14 @@ function getDeepCause(err: unknown, depth = 0): unknown {
 }
 
 /**
- * Drizzle envuelve errores de Neon/Postgres en `DrizzleQueryError` con un
- * `cause` que tiene el SQLSTATE (`code`), `detail`, `hint`, etc. Esos datos
- * son la causa real del fallo y casi siempre más útiles que el `message` de
- * Drizzle (que es "Failed query: <sql>" + params, enorme y truncado en UI).
+ * Drizzle wraps Neon/Postgres errors in `DrizzleQueryError` with a
+ * `cause` containing the SQLSTATE (`code`), `detail`, `hint`, etc.
+ * Those properties are the real root cause and much more useful than
+ * Drizzle's `message` (which is "Failed query: <sql>" + params, huge and truncated in UI).
  *
- * Solo clasificamos como error de DB cuando la causa tiene pinta de venir de
- * Postgres — SQLSTATE (`code` 5 caracteres alfanuméricos) o un nombre de
- * clase conocido. Si no, no se trata como error de DB.
+ * We only classify as a DB error when the cause appears to come from
+ * Postgres — SQLSTATE (`code` 5 alphanumeric chars) or a known error class name.
+ * Otherwise, it is not treated as a DB error.
  */
 function unwrapDbError(err: unknown): {
   code?: string;
@@ -50,7 +50,7 @@ function unwrapDbError(err: unknown): {
   const hint = typeof e.hint === 'string' ? e.hint : undefined;
   const message = typeof e.message === 'string' ? e.message : undefined;
   const name = typeof e.name === 'string' ? e.name : undefined;
-  // SQLSTATE Postgres: 5 caracteres alfanuméricos (ej. 22000, 23505, 42P01).
+  // Postgres SQLSTATE: 5 alphanumeric characters (e.g., 22000, 23505, 42P01).
   const looksLikeSqlState = !!code && /^[0-9A-Z]{5}$/.test(code);
   const knownDbName =
     name === 'NeonDbError' || name === 'DrizzleQueryError' || name === 'PostgresError';
@@ -78,17 +78,17 @@ export const onError: ErrorHandler<AppEnv> = (err, c) => {
   }
 
   if (err instanceof HTTPException) {
-    // Un HTTPException puede traer su propia Response (cuerpo con código de
-    // negocio: 409 { code: 'SLUG_TAKEN' }, 403 { code: 'FEATURE_NOT_AVAILABLE' }).
-    // Se respeta TAL CUAL: el `code` es contrato del cliente (los toasts se
-    // resuelven por código, nunca por texto). Ignorarla lo borraba del body.
+    // An HTTPException can contain its own Response (body with business code:
+    // 409 { code: 'SLUG_TAKEN' }, 403 { code: 'FEATURE_NOT_AVAILABLE' }).
+    // It is preserved AS-IS: the `code` is a client contract (toasts are resolved
+    // by code, never text). Ignoring it would wipe it from the body.
     if (err.res) {
       return err.getResponse();
     }
     return c.json({ error: err.message }, err.status);
   }
 
-  // Errores de negocio de comprobantes: código explícito para el cliente.
+  // Business errors from receipts: explicit error code for the client.
   if (err instanceof ReceiptError) {
     return c.json({ error: err.message, code: err.code }, err.status);
   }

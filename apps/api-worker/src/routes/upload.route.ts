@@ -12,14 +12,14 @@ import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
 import type { AppEnv } from '../lib/env';
 
 /**
- * Uploads del PANEL — org-scoped.
+ * PANEL Uploads - org-scoped.
  *
- * La organización sale SIEMPRE de la sesión (`c.get('orgId')`, resuelto por
- * `requireOrgPermission`): `organizationId` no existe en este contrato, así que
- * ningún cliente puede pedir la carpeta de otro gimnasio. Las claves viven bajo
- * `<orgId>/<folder>/…` y todo escritura/borrado exige ese prefijo.
+ * The organization ALWAYS comes from the session (`c.get('orgId')`, resolved by
+ * `requireOrgPermission`): `organizationId` does not exist in this contract, so
+ * no client can request another gym's folder. Keys live under
+ * `<orgId>/<folder>/…` and all writes/deletes require that prefix.
  *
- * Los comprobantes emitidos (`receipts/<org>/…`) no son alcanzables desde aquí.
+ * Issued receipts (`receipts/<org>/…`) are not reachable from here.
  */
 const presignedSchema = z
   .object({
@@ -41,8 +41,8 @@ export const uploadRoutes = new Hono<AppEnv>()
     return c.json(files);
   })
 
-  // GET /api/upload/file?key=<orgId>/... — entrega autenticada (avatares, logos,
-  // evidencia de pago). Estos assets NO son públicos: se sirven por aquí.
+  // GET /api/upload/file?key=<orgId>/... - authenticated delivery (avatars, logos,
+  // payment proof). These assets are NOT public: served through here.
   .get('/file', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const key = c.req.query('key');

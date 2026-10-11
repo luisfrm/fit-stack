@@ -5,18 +5,18 @@ export interface RegistrationInviteData {
   token: string;
   target?: 'panel' | 'console';
   role?: string;
-  /** Base URLs resueltas por el handler (env.PANEL_URL / env.CONSOLE_URL). */
+  /** Base URLs resolved by handler (env.PANEL_URL / env.CONSOLE_URL). */
   baseUrl: string;
 }
 
 /**
- * Invitación a registrarse (panel o console): el destinatario activa su
- * cuenta y configura contraseña vía token.
+ * Registration invitation (panel or console): recipient activates their
+ * account and configures password via token.
  */
 export function renderRegistrationInvite(data: RegistrationInviteData): RenderedEmail {
   const target = data.target === 'console' ? 'console' : 'panel';
-  // `baseUrl` (env) y `token` (server) se escapan antes de componer el link:
-  // el resultado viaja en el `href`.
+  // `baseUrl` (env) and `token` (server) are escaped before composing link:
+  // result travels in `href`.
   const inviteLink = `${escapeHtml(data.baseUrl)}/register?token=${escapeHtml(data.token)}`;
 
   const appName = target === 'console' ? 'FitStack Console' : 'FitStack Panel';

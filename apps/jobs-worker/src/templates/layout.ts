@@ -1,31 +1,31 @@
 /**
- * Shells base de HTML para todos los emails de Fit-Stack.
+ * Base HTML shells for all Fit-Stack emails.
  *
- * Dos temas:
- *  - `dark`: fondo negro, botón blanco — invitaciones (panel/console/org).
- *  - `light`: estilo comprobante con header amarillo — recibos de pago.
+ * Two themes:
+ *  - `dark`: black background, white button — invitations (panel/console/org).
+ *  - `light`: receipt style with yellow header — payment receipts.
  *
- * Los templates (`send-invitation.ts`, `org-invite.ts`, `payment-receipt-short.ts`,
- * `org-payment-received.ts`) solo componen contenido; aquí vive el markup
- * compartido. Handler = transporte, template = HTML, nunca al revés.
+ * Templates (`send-invitation.ts`, `org-invite.ts`, `payment-receipt-short.ts`,
+ * `org-payment-received.ts`) compose content; shared markup lives here.
+ * Handler = transport, template = HTML, never the reverse.
  */
 
 export interface DarkShellData {
   title: string;
-  /** Párrafos del cuerpo (HTML simple permitido: <strong>, <br>). */
+  /** Body paragraphs (simple HTML allowed: <strong>, <br>). */
   paragraphs: string[];
   buttonLabel: string;
   buttonUrl: string;
-  /** Nota pequeña bajo el botón (p. ej. validez del enlace). */
+  /** Small note under the button (e.g. link validity duration). */
   note?: string;
 }
 
 export interface LightShellData {
   headerTitle: string;
   headerSubtitle: string;
-  /** HTML del cuerpo (filas de items, totales, etc.) — lo compone el template. */
+  /** Body HTML (item rows, totals, etc.) — composed by template. */
   bodyHtml: string;
-  /** Nombre en el footer (p. ej. nombre del gym o Fit-Stack). */
+  /** Footer name (e.g. gym name or Fit-Stack). */
   footerName: string;
 }
 
@@ -38,7 +38,7 @@ function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-/** Escapa texto interpolado en templates — export para uso puntual. */
+/** Escapes interpolated text in templates. */
 export { escapeHtml };
 
 const BASE_STYLES = `

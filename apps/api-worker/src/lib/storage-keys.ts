@@ -1,31 +1,30 @@
 /**
- * Construcción de storage keys de R2 (worker).
+ * R2 storage key construction (worker).
  *
- * La taxonomía `<orgId>/<folder>/…` y la política de "público" viven en
- * `@workspace/shared/storage` porque también las consumen panel y console; aquí
- * está lo que solo usa el worker: saneado y construcción de la key.
+ * Taxonomy `<orgId>/<folder>/…` and the "public" policy live in
+ * `@workspace/shared/storage` because they are consumed by panel and console;
+ * this file contains worker-specific logic: key sanitization and construction.
  *
- * El namespace de comprobantes emitidos (`receipts/<org>/<año>/<n>.pdf` y
- * `platform/receipts/<año>/FS-<n>.pdf`) NO se construye aquí: es determinista, lo
- * escribe el renderer (`putFile`) y solo se lee por las rutas autenticadas de
- * comprobantes. Las rutas de upload jamás pueden alcanzarlo (su guard exige
- * `key.startsWith('<orgId>/')`).
+ * The issued receipts namespace (`receipts/<org>/<year>/<n>.pdf` and
+ * `platform/receipts/<year>/FS-<n>.pdf`) is NOT constructed here: it is deterministic,
+ * written by the renderer (`putFile`), and read exclusively through authenticated receipt routes.
+ * Upload routes can never target it (guard enforces `key.startsWith('<orgId>/')`).
  */
 import { orgStoragePrefix } from '@workspace/shared';
 
 /**
- * `scope` de la key: el `orgId` (assets de la organización) o `PLATFORM_SCOPE`.
- * La política de prefijo/allowlist pública vive en `@workspace/shared/storage`.
+ * Key `scope`: `orgId` (organization assets) or `PLATFORM_SCOPE`.
+ * Prefix policy and public allowlist live in `@workspace/shared/storage`.
  */
 
-/** Carpeta por defecto: no genera segmento (el archivo vive en la raíz del scope). */
+/** Default folder: generates no extra path segment (file lives at scope root). */
 export const DEFAULT_FOLDER = 'general';
 
 export function getFileExtension(filename: string): string {
   const lastDotIndex = filename.lastIndexOf('.');
   if (lastDotIndex === -1) return 'bin';
-  // El nombre lo controla el cliente: se limpia para que nunca pueda introducir
-  // separadores ni alterar la key (`png/../x` no es una extensión válida).
+  // Filename is client-controlled: sanitized so it cannot introduce path separators
+  // or alter the key (`png/../x` is not a valid extension).
   const clean = filename
     .slice(lastDotIndex + 1)
     .toLowerCase()
@@ -45,9 +44,9 @@ export function slugify(text: string): string {
 }
 
 /**
- * Segmento de carpeta saneado (`''` cuando no aplica). `slugify` neutraliza
- * `../`, `/` y cualquier separador, así que una carpeta del cliente nunca puede
- * escapar del prefijo de la organización.
+ * Sanitized folder segment (`''` when not applicable). `slugify` neutralizes
+ * `../`, `/`, and any separator, so client-supplied folder names cannot
+ * escape the organization prefix.
  */
 export function safeFolderSegment(folder?: string): string {
   if (!folder) return '';
@@ -56,7 +55,7 @@ export function safeFolderSegment(folder?: string): string {
   return slug;
 }
 
-/** Prefijo de listado (organización completa o una carpeta concreta). */
+/** Listing prefix (entire organization or a specific folder). */
 export function orgStorageListPrefix(orgId: string, folder?: string): string {
   const segment = safeFolderSegment(folder);
   return segment ? `${orgId}/${segment}/` : orgStoragePrefix(orgId);
@@ -64,7 +63,7 @@ export function orgStorageListPrefix(orgId: string, folder?: string): string {
 
 /**
  * Builds a storage key for R2.
- * `scope` es el `orgId` (assets de la organización) o `PLATFORM_SCOPE`.
+ * `scope` is `orgId` (organization assets) or `PLATFORM_SCOPE`.
  */
 export function constructStorageKey(
   scope: string,

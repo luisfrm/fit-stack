@@ -1,11 +1,11 @@
 /* ── Platform receipts report service (api-worker) ──────────────────────
-   Espejo del reporte de comprobantes del Panel (`reports.service.ts`) para
-   la serie global `FS-N`: filas + resumen + totales por moneda + gaps
-   (hueco sospechoso vs anulado explicado).
-   Diferencias deliberadas:
-   - Sin organización en el scope: el emisor es FitStack (una sola serie).
-   - Fechas en UTC (facturación de plataforma), nunca la tz de una org.
-   - `year` filtra por año UTC de `payment_date` (la serie no tiene año).
+   Mirrors the Panel receipt report (`reports.service.ts`) for
+   the global `FS-N` series: rows + summary + totals by currency + gaps
+   (suspicious gap vs explained void).
+   Deliberate differences:
+   - No organization in scope: issuer is FitStack (single series).
+   - Dates in UTC (platform billing), never organization timezone.
+   - `year` filters by UTC year of `payment_date` (series has no year).
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { PlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
@@ -39,20 +39,20 @@ export interface PlatformReceiptsReportFilters {
   limit?: number;
 }
 
-/** Inicio del día UTC (`YYYY-MM-DD`). Fecha inválida → error visible. */
+/** Start of UTC day (`YYYY-MM-DD`). Invalid date → visible error. */
 function utcDayStart(date: string): Date {
   const parsed = new Date(`${date}T00:00:00.000Z`);
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`getPlatformReceiptsReport: fecha inválida (${date}).`);
+    throw new TypeError(`getPlatformReceiptsReport: fecha inválida (${date}).`);
   }
   return parsed;
 }
 
-/** Fin del día UTC (`YYYY-MM-DD`), inclusivo. */
+/** End of UTC day (`YYYY-MM-DD`), inclusive. */
 function utcDayEnd(date: string): Date {
   const parsed = new Date(`${date}T23:59:59.999Z`);
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`getPlatformReceiptsReport: fecha inválida (${date}).`);
+    throw new TypeError(`getPlatformReceiptsReport: fecha inválida (${date}).`);
   }
   return parsed;
 }
@@ -62,8 +62,8 @@ export function createPlatformReceiptsReportService(
   receiptsRepo: PlatformReceiptsRepository,
 ) {
   /**
-   * Gaps de la serie global. Función local (no método con `this`) para que
-   * siga funcionando desestructurada. Lanza ante correlativo roto.
+   * Gaps in global series. Local function (not method with `this`) so it
+   * works when destructured. Throws on broken sequence.
    */
   async function getReceiptGaps(): Promise<ReceiptGapItem[]> {
     const { lastNumber, numbers } = await receiptsRepo.getPlatformReceiptSequenceState(
@@ -99,7 +99,7 @@ export function createPlatformReceiptsReportService(
     ): Promise<IReceiptsReportResult> {
       const status = filters.status ?? 'all';
       const page = Math.max(1, Math.floor(filters.page ?? 1));
-      // Tope 1000 = exportación CSV (la página usa 20). Ver ruta.
+      // Cap at 1000 = CSV export (UI uses 20). See route.
       const limit = Math.min(1000, Math.max(1, Math.floor(filters.limit ?? 20)));
 
       const scope = {
@@ -113,11 +113,11 @@ export function createPlatformReceiptsReportService(
         status === 'gaps'
           ? Promise.resolve({ rows: [], total: 0 })
           : reportRepo.findReportRows({
-              scope,
-              state: status as PlatformReceiptReportState,
-              page,
-              limit,
-            }),
+            scope,
+            state: status as PlatformReceiptReportState,
+            page,
+            limit,
+          }),
         reportRepo.countReceiptStates(scope),
         reportRepo.findReceiptMoneyRows(scope),
       ]);
@@ -145,15 +145,19 @@ export function createPlatformReceiptsReportService(
       }
 
       const mapped: IReceiptReportRow[] = rows.map((row) => {
-        const state = row.receiptVoided
-          ? 'voided'
-          : row.receiptNumber === null
-            ? 'pre_system'
-            : row.receiptPdfKey === null
-              ? 'pending'
-              : 'issued';
-        // `payment_date` es NOT NULL: nula/inválida es corrupción visible,
-        // nunca se enmascara con una fecha inventada.
+        const state = classifyReceiptState({
+          voided: row.receiptVoided,
+          noNumber: row.receiptNumber === null,
+          noPdf: row.receiptPdfKey === null,
+        });
+        let pdfStatus: 'ready' | 'pending' | null = null;
+        if (row.receiptPdfKey) {
+          pdfStatus = 'ready';
+        } else if (state === 'pending') {
+          pdfStatus = 'pending';
+        }
+        // `payment_date` is NOT NULL: null/invalid is visible data corruption,
+        // never masked with a fabricated date.
         const paymentIso = toIsoOrNull(row.paymentDate);
         if (!paymentIso) {
           throw new Error(
@@ -164,8 +168,8 @@ export function createPlatformReceiptsReportService(
           paymentId: Number(row.paymentId),
           receiptNumber: row.receiptNumber,
           state,
-          pdfStatus: row.receiptPdfKey ? 'ready' : state === 'pending' ? 'pending' : null,
-          // Receptor SaaS: la organización que paga (Panel: el miembro).
+          pdfStatus,
+          // SaaS recipient: the paying organization (Panel: the member).
           memberName: row.organizationName?.trim() || 'Organización',
           memberEmail: null,
           planName: row.planSnapshotName?.trim() || 'Plan',
@@ -179,7 +183,7 @@ export function createPlatformReceiptsReportService(
           paymentDate: paymentIso,
           receiptIssuedAt: toIsoOrNull(row.receiptIssuedAt),
           voided: row.receiptVoided,
-          // El emisor es FitStack: no hay override fiscal por comprobante.
+          // Issuer is FitStack: no fiscal override per receipt.
           taxOverrideReason: null,
           voidedBy: row.voidedBy,
           voidedAt: toIsoOrNull(row.voidedAt),

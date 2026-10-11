@@ -9,7 +9,6 @@ import {
   AI_CHAT_LIMITS,
   WORKERS_AI_EMBEDDING_DIMS,
   WORKERS_AI_EMBEDDING_MODEL,
-  creditsFromUsage,
   getAiProvider,
   type IAiChatMessage,
 } from '@workspace/shared';
@@ -25,7 +24,7 @@ export interface AiChatOptions {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
-  /** Si es tool, permite maxToolOutputTokens. */
+  /** If tool, allows maxToolOutputTokens. */
   isTool?: boolean;
 }
 
@@ -43,7 +42,7 @@ export interface AiChatStream {
   stream: AsyncGenerator<AiChatDelta, void, void>;
   /** Resolves to the actual model that answered (before the first delta). */
   model: Promise<string>;
-  /** Resolves to usage del provider (si reporta include_usage). */
+  /** Resolves to provider usage (if reporting include_usage). */
   usage: Promise<AiChatUsage | null>;
 }
 
@@ -67,7 +66,7 @@ function buildChatBody(
       max_tokens: clampMaxTokens(maxTokens, isTool),
     },
     { signal },
-  ) as unknown as AsyncIterable<Record<string, unknown>>;
+  );
 }
 
 interface WorkersAiRunResponse {
@@ -82,22 +81,22 @@ interface WorkersAiRunResponse {
 export function createAIService(env: Env) {
   return {
     /**
-     * Embeddings vía Workers AI (bge-m3, WORKERS_AI_EMBEDDING_DIMS dims). Siempre
-     * Workers AI, independiente del provider de chat configurado.
+     * Embeddings via Workers AI (bge-m3, WORKERS_AI_EMBEDDING_DIMS dims). Always
+     * Workers AI, independent of configured chat provider.
      *
-     * Usa el endpoint nativo `/ai/run/@cf/baai/bge-m3` (no el OpenAI-compatible
-     * `/v1/embeddings`) porque el OpenAI-compatible actualmente devuelve un
-     * vector de 256 dims en lugar de los 1024 documentados, lo que rompe la
-     * columna `vector(1024)` de `ai_knowledge_chunk`. El endpoint nativo
-     * respeta la dimensión real del modelo.
+     * Uses native endpoint `/ai/run/@cf/baai/bge-m3` (not OpenAI-compatible
+     * `/v1/embeddings`) because OpenAI-compatible currently returns a
+     * 256-dim vector instead of documented 1024 dims, breaking
+     * column `vector(1024)` in `ai_knowledge_chunk`. Native endpoint
+     * honors true model dimensionality.
      */
     async embed(texts: string[]): Promise<number[][]> {
       if (texts.length === 0) return [];
       if (!env.CLOUDFLARE_AI_API_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) {
         throw new Error('Workers AI no configurado: faltan credenciales de embedding');
       }
-      // Cloudflare rechaza inputs vacíos con 400. Filtrarlos aquí evita un
-      // fallo de toda la creación de un documento por un chunk en blanco.
+      // Cloudflare rejects empty inputs with 400. Filtering here avoids
+      // failing whole document creation because of a blank chunk.
       const nonEmpty = texts.map((t) => t.trim()).filter((t) => t.length > 0);
       if (nonEmpty.length === 0) return [];
       const url = `${workersAiRunUrl(env.CLOUDFLARE_ACCOUNT_ID)}/${WORKERS_AI_EMBEDDING_MODEL}`;
@@ -130,10 +129,10 @@ export function createAIService(env: Env) {
         if (vec.length !== WORKERS_AI_EMBEDDING_DIMS) {
           throw new Error(
             `Embedding dimensión inesperada (índice ${i}): ` +
-              `recibido ${vec.length}, esperado ${WORKERS_AI_EMBEDDING_DIMS} ` +
-              `(modelo ${WORKERS_AI_EMBEDDING_MODEL}). ` +
-              'Si el modelo cambió de dimensión, actualiza WORKERS_AI_EMBEDDING_DIMS ' +
-              'y la columna embedding de ai_knowledge_chunk.',
+            `recibido ${vec.length}, esperado ${WORKERS_AI_EMBEDDING_DIMS} ` +
+            `(modelo ${WORKERS_AI_EMBEDDING_MODEL}). ` +
+            'Si el modelo cambió de dimensión, actualiza WORKERS_AI_EMBEDDING_DIMS ' +
+            'y la columna embedding de ai_knowledge_chunk.',
           );
         }
       });
@@ -142,8 +141,8 @@ export function createAIService(env: Env) {
 
     /**
      * Streams a chat completion token by token via the OpenAI SDK.
-     * Acumula usage si el provider lo reporta (stream_options.include_usage).
-     * El route debe settlementar créditos con usage.total_tokens.
+     * Accumulates usage if provider reports it (stream_options.include_usage).
+     * Route must settle credits with usage.total_tokens.
      */
     streamChat(options: AiChatOptions): AiChatStream {
       const provider = getAiProvider(options.model);
@@ -157,9 +156,9 @@ export function createAIService(env: Env) {
 }
 
 /**
- * Normaliza la respuesta del endpoint nativo de Workers AI a un `number[][]`.
- * El shape habitual es `{ data: number[][] }` (batch x dims), pero algunas
- * variantes o modelos exponen un `number[]` cuando el input es un único string.
+ * Normalizes Workers AI native endpoint response to `number[][]`.
+ * The standard shape is `{ data: number[][] }` (batch x dims), but some
+ * variants or models expose `number[]` when input is a single string.
  */
 function extractEmbeddings(raw: unknown, expectedCount: number): number[][] {
   if (raw === undefined || raw === null) {

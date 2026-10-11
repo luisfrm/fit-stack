@@ -2,8 +2,11 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth, requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
-import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
-import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
+import {
+  PERMISSION_MODULES as PM,
+  PERMISSION_ACTIONS as PA,
+  DEFAULT_MEMBER_VALUES
+} from '@workspace/shared';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
@@ -72,10 +75,10 @@ export const memberRoutes = new Hono<AppEnv>()
     return c.json(result);
   })
 
-  // GET /api/members/stats — ANTES de /:id (si no, "stats" caería en el param).
+  // GET /api/members/stats - BEFORE /:id (otherwise "stats" would match param).
   .get('/stats', requireOrgPermission(PM.MEMBERS, PA.READ), requireOrgTimezone(), async (c) => {
     const orgId = c.get('orgId')!;
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:members:stats`;
@@ -167,7 +170,7 @@ export const memberRoutes = new Hono<AppEnv>()
         return c.json({ error: 'Este miembro ya está vinculado a otra cuenta' }, 400);
       }
 
-      // Guard de cupos del portal al vincular cuenta (solo clientes 'member')
+      // Portal seat guard when linking account (only 'member' clients)
       if (member.role === 'member') {
         const cache = createCache(c.env);
         const featuresService = createFeaturesService(
@@ -232,7 +235,7 @@ export const memberRoutes = new Hono<AppEnv>()
     const auth = c.get('auth');
     const cache = createCache(c.env);
 
-    // Guard de cupos del portal: solo invitaciones de clientes (role member)
+    // Portal seat guard: only client invitations (role member)
     if (sendInvite && data.role === 'member') {
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
@@ -265,7 +268,7 @@ export const memberRoutes = new Hono<AppEnv>()
 
     await cache.invalidate(`org:${orgId}:members:*`);
     await cache.invalidateExact(`org:${orgId}:members:stats`);
-    // Un member nuevo/cambiado afecta KPIs y action-items del dashboard
+    // A new/changed member affects dashboard KPIs and action-items
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     return c.json(newMember, 201);

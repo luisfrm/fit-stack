@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, CheckCircle2 } from "lucide-react";
-import { BadgeDollarSign } from "lucide-react";
+import { Search, CheckCircle2, BadgeDollarSign } from "lucide-react";
 import { Button } from "./button";
 import { Input } from "./input";
 import { Text } from "./text";

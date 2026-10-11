@@ -9,7 +9,7 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 /**
- * Features + límites resueltos de la org activa (consumido por el gate del panel).
+ * Features + resolved limits of active org (consumed by panel gate).
  */
 export const organizationFeaturesRoutes = new Hono<AppEnv>()
   .get('/', requireAuth(), requireOrg(), async (c) => {

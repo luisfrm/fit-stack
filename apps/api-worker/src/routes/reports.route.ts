@@ -21,7 +21,7 @@ const receiptsReportQuerySchema = z.object({
   method: z.string().min(1).optional(),
   year: z.coerce.number().int().min(2000).max(2100).optional(),
   page: z.coerce.number().int().positive().optional(),
-  // Tope alto para exportación CSV (la página usa 20; el CSV, hasta 1000).
+  // High upper bound for CSV export (page uses 20; CSV up to 1000).
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
@@ -29,7 +29,7 @@ export const reportRoutes = new Hono<AppEnv>()
   // GET /api/reports/revenue
   .get('/revenue', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
     const orgId = c.get('orgId')!;
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
     const monthsCount = Number(c.req.query('monthsCount') || '12');
 
@@ -46,11 +46,11 @@ export const reportRoutes = new Hono<AppEnv>()
     return c.json(revenue);
   })
 
-  // GET /api/reports/receipts — auditoría del correlativo: filas + resumen
-  // + totales por moneda + gaps[] (hueco sospechoso vs anulado explicado).
+  // GET /api/reports/receipts - sequence audit: rows + summary
+  // + totals by currency + gaps[] (suspicious gap vs explained void).
   .get('/receipts', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
     const orgId = c.get('orgId')!;
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
 
     const parsed = receiptsReportQuerySchema.safeParse({
@@ -71,7 +71,7 @@ export const reportRoutes = new Hono<AppEnv>()
     const filters = parsed.data;
 
     const cache = createCache(c.env);
-    // Key normalizada con defaults: `?status=all` y sin query comparten caché.
+    // Normalized key with defaults: `?status=all` and no query share cache.
     const cacheKey = `org:${orgId}:reports:receipts:${JSON.stringify({
       from: filters.from ?? null,
       to: filters.to ?? null,

@@ -30,12 +30,12 @@ export const publicRoutes = new Hono<AppEnv>()
     return c.json(pageData);
   })
 
-  // GET /api/public/files/* — SOLO lo público por diseño.
+  // GET /api/public/files/* - ONLY public assets by design.
   //
-  // Allowlist: assets del sitio (`<orgId>/cms/…`) y branding de la plataforma.
-  // Todo lo demás (avatares, logos de org, evidencia de pago, comprobantes
-  // `receipts/**` y `platform/receipts/**`) responde 404 — no se revela siquiera
-  // que el objeto exista — y se entrega por las rutas autenticadas.
+  // Allowlist: site assets (`<orgId>/cms/…`) and platform branding.
+  // Everything else (avatars, org logos, payment proof, receipts
+  // `receipts/**` and `platform/receipts/**`) returns 404 - does not even reveal
+  // that the object exists - and is served via authenticated routes.
   .get('/files/*', async (c) => {
     const key = decodeURIComponent(c.req.path.replace('/api/public/files/', ''));
     if (!c.env.FILES_BUCKET) {

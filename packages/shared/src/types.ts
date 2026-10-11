@@ -2,8 +2,9 @@ import { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus } from '@
 import type { PlatformRole } from './access-control';
 import type { PlanFeaturesV2 } from './features/catalog';
 import type { ReceiptGapItem } from './documents/receipt-gaps';
+import type { DurationUnit } from './date';
 
-export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus };
+export type { SubscriptionStatus, PaymentStatus, PlatformSubscriptionStatus, DurationUnit };
 
 /**
  * Standard interface for Better Auth errors.
@@ -267,7 +268,7 @@ export interface IMembershipPlan {
   price: number; // in cents
   currency: string;
   durationValue: number;
-  durationUnit: 'day' | 'week' | 'month' | 'year';
+  durationUnit: DurationUnit;
   features: string[] | null;
   isPopular: boolean;
   isActive: boolean;
@@ -569,7 +570,7 @@ export interface IPlatformPlan {
   price: number; // in cents
   currency: string;
   durationValue: number;
-  durationUnit: 'day' | 'week' | 'month' | 'year';
+  durationUnit: DurationUnit;
   features: PlanFeaturesV2 | null;
   isActive: boolean;
   trialDays: number; // 0 = no trial
@@ -598,7 +599,7 @@ export interface IPlatformSubscription {
   planPrice?: number;
   planCurrency?: string;
   planDurationValue?: number;
-  planDurationUnit?: 'day' | 'week' | 'month' | 'year';
+  planDurationUnit?: DurationUnit;
   organizationName?: string;
   latestPaymentStatus?: PaymentStatus;
   paymentsCount?: number;
@@ -615,7 +616,7 @@ export interface IPlatformSubscriptionPayment {
   planSnapshotPrice: number; // integer cents
   planSnapshotCurrency: string;
   planSnapshotDurationValue: number;
-  planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
+  planSnapshotDurationUnit: DurationUnit;
   /** Plan features snapshot at time of payment (to compare against current plan) */
   featuresSnapshot?: PlanFeaturesV2 | null;
 

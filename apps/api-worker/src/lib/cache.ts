@@ -57,8 +57,8 @@ export function createCache(env: Partial<Env>) {
     },
 
     /**
-     * INCR atómico con TTL (solo si la clave es nueva). Usado por el
-     * rate-limit de IA: la DB (ai_usage) es la fuente de verdad; Redis es caché.
+     * Atomic INCR with TTL (only if key is new). Used by AI rate-limiting:
+     * DB (ai_usage) is the single source of truth; Redis acts as cache.
      */
     async increment(key: string, ttlSeconds?: number): Promise<number | null> {
       if (!redis) return null;

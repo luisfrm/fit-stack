@@ -33,8 +33,8 @@ export function createR2Service(env: Env) {
         const filename = keyParts.at(-1) || object.key;
         return {
           key: object.key,
-          // Solo los assets públicos tienen URL directa; el resto se entrega
-          // por la ruta autenticada (la UI compone la URL con `getMediaUrl`).
+          // Only public assets have direct URLs; the rest are served
+          // via authenticated routes (the UI composes the URL with `getMediaUrl`).
           url: isPublicStorageKey(object.key) ? `${publicDomain}/${object.key}` : null,
           size: object.size,
           uploadedAt: object.uploaded.toISOString(),

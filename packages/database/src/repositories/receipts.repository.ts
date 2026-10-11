@@ -1,10 +1,10 @@
 /* ── Receipts repository (SHARED) ────────────────────────────────────────
-   Conscious exception to AGENTS.md §1: all receipt data access
-   (reading and writing) lives here because TWO runtimes (api-worker step 1 +
-   endpoints, jobs-worker step 2 + sweep) require IDENTICAL
-   implementations — the atomic statement and WHERE conditions are the core
-   guarantee against duplicates. No other repo is moved (see AGENTS.md).
-   Pure factory: receives `Db` parameter (per-request, without process.env).
+   Excepción consciente a AGENTS.md §1: todo acceso a datos de comprobantes
+   (lectura y escritura) vive aquí porque DOS runtimes (api-worker paso 1 +
+   endpoints, jobs-worker paso 2 + barrido) necesitan la implementación
+   IDÉNTICA — la sentencia atómica y las condiciones WHERE son el corazón de
+   la garantía de no-duplicados. Ningún otro repo se mueve (ver AGENTS.md).
+   Factory pura: recibe `Db` por parámetro (per-request, sin process.env).
    ─────────────────────────────────────────────────────────────────────── */
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -24,13 +24,13 @@ import {
   type ReceiptEmitterSnapshot,
 } from '@workspace/shared';
 
-/** Row of `payment` as returned by Drizzle (source of type, no cross-imports). */
+/** Fila de `payment` tal como la devuelve Drizzle (fuente del tipo, no imports cruzados). */
 export type DbPayment = typeof payment.$inferSelect;
 export type DbOrganization = typeof organization.$inferSelect;
 export type DbGymMember = typeof gymMember.$inferSelect;
 export type DbSubscription = typeof subscription.$inferSelect;
 
-/** Raw rows for `buildReceiptDataFromComposed` (shared, pure). */
+/** Filas crudas para `buildReceiptDataFromComposed` (shared, puro). */
 export interface ReceiptComposedData {
   payment: DbPayment;
   organization: DbOrganization;
@@ -43,39 +43,39 @@ export interface AttachReceiptInput {
   documentType: ReceiptDocumentType;
   receiptIssuedAt: Date;
   taxOverrideReason?: string | null;
-  /** Integer cents; step 1 always persists them alongside the number. */
+  /** Centavos enteros; el paso 1 siempre los persiste junto al número. */
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
-  /** Emitter identity frozen upon issuance (C1). */
+  /** Identidad del emisor congelada al emitir (C1). */
   emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Issuing actor (C5). Missing during sweep: remains `null`, never fabricated. */
+  /** Actor que emite (C5). Ausente en el barrido: queda `null`, no se inventa. */
   issuedBy?: string | null;
 }
 
 export interface MarkVoidedInput {
-  /** Voiding actor (user.id). */
+  /** Actor (user.id) que anula. */
   by: string;
-  /** Non-empty reason (audit log). */
+  /** Motivo no vacío (auditoría). */
   reason: string;
 }
 
 function assertOrgId(orgId: string, method: string): void {
   if (!orgId || orgId.trim().length === 0) {
-    throw new Error(`${method}: orgId is required (strict isolation).`);
+    throw new Error(`${method}: orgId es obligatorio (aislamiento estricto).`);
   }
 }
 
 function assertDocumentType(type: ReceiptDocumentType, method: string): void {
   if (type !== 'receipt' && type !== 'invoice') {
-    throw new Error(`${method}: invalid document_type (${String(type)}).`);
+    throw new Error(`${method}: document_type inválido (${String(type)}).`);
   }
 }
 
 function assertYear(year: number, method: string): void {
   if (!Number.isInteger(year) || year < MIN_RECEIPT_YEAR || year > MAX_RECEIPT_YEAR) {
     throw new Error(
-      `${method}: invalid year (${String(year)}). Allowed range ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
+      `${method}: año inválido (${String(year)}). Rango ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
     );
   }
 }
@@ -83,11 +83,11 @@ function assertYear(year: number, method: string): void {
 export function createReceiptsRepository(db: Db) {
   return {
     /**
-     * Allocates the next correlative number with a SINGLE atomic statement
-     * (INSERT ... ON CONFLICT DO UPDATE ... RETURNING). Without interactive
-     * transactions (Neon HTTP driver), without SELECT FOR UPDATE. Covers
-     * race condition on first receipt of the year/emitter without prior row.
-     * Never rolls back an allocated number.
+     * Asigna el siguiente número correlativo con UNA sola sentencia atómica
+     * (INSERT ... ON CONFLICT DO UPDATE ... RETURNING). Sin transacciones
+     * interactivas (driver HTTP de Neon), sin SELECT FOR UPDATE. Cubre la
+     * carrera del primer comprobante del año/emisor sin fila previa.
+     * Nunca hay rollback de un número ya asignado.
      */
     async nextDocumentNumber(
       orgId: string,
@@ -110,23 +110,23 @@ export function createReceiptsRepository(db: Db) {
           set: { lastNumber: sql`${organizationDocumentSequence.lastNumber} + 1` },
         })
         .returning({ lastNumber: organizationDocumentSequence.lastNumber });
-      // INSERT ... RETURNING always returns a row (created or updated).
-      // No silent fallback: fabricating 1 would duplicate correlative numbers.
+      // El INSERT ... RETURNING siempre devuelve fila (creada o actualizada).
+      // Sin fallback silencioso: un 1 inventado duplicaría correlativos.
       if (!row) {
-        throw new Error('nextDocumentNumber: INSERT ... RETURNING did not return a row.');
+        throw new Error('nextDocumentNumber: INSERT ... RETURNING no devolvió fila.');
       }
       return row.lastNumber;
     },
 
     /**
-     * Correlative compensation: returns the last number consumed by
-     * this execution when it LOST the race in `attachReceipt` (another concurrent
-     * execution already numbered the payment, so local number was not persisted).
+     * Compensación de correlativo: devuelve el último número consumido por
+     * esta entrega cuando PERDIÓ la carrera de `attachReceipt` (otra entrega
+     * concurrente ya numeró el pago, así que el número local no se persistió).
      *
-     * Only reverts if we are still the latest consumer
-     * (`last_number = seq`): if another execution consumed after, decrementing the
-     * counter would reassign a live number — prohibited. In that case
-     * returns `released: false` and the number remains as an audited gap.
+     * Solo revierte si seguimos siendo el último consumidor
+     * (`last_number = seq`): si alguien consumió después, retroceder el
+     * contador reasignaría un número ya vivo — prohibido. En ese caso
+     * devuelve `released: false` y el número queda como hueco auditado.
      */
     async releaseLastNumber(
       orgId: string,
@@ -138,7 +138,7 @@ export function createReceiptsRepository(db: Db) {
       assertDocumentType(type, 'releaseLastNumber');
       assertYear(year, 'releaseLastNumber');
       if (!Number.isInteger(seq) || seq < 1) {
-        throw new Error(`releaseLastNumber: invalid seq (${String(seq)}).`);
+        throw new Error(`releaseLastNumber: seq inválido (${String(seq)}).`);
       }
 
       const [row] = await db
@@ -157,10 +157,10 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Numbers a payment idempotently: only writes if it doesn't
-     * have a number yet (`WHERE receipt_number IS NULL`). If already numbered,
-     * returns the re-read existing row (different number is ignored,
-     * never duplicated or renumbered).
+     * Numera un pago de forma idempotente: solo escribe si aún no tiene
+     * número (`WHERE receipt_number IS NULL`). Si ya estaba numerado,
+     * devuelve la fila existente re-leída (el número distinto se ignora,
+     * nunca se duplica ni se reenumera).
      */
     async attachReceipt(
       paymentId: number,
@@ -171,7 +171,7 @@ export function createReceiptsRepository(db: Db) {
       assertDocumentType(input.documentType, 'attachReceipt');
       if (!isValidPanelReceiptNumber(input.receiptNumber)) {
         throw new Error(
-          `attachReceipt: invalid receipt_number format (${input.receiptNumber}).`,
+          `attachReceipt: receipt_number con formato inválido (${input.receiptNumber}).`,
         );
       }
 
@@ -185,8 +185,8 @@ export function createReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
-          // C1/C5: frozen identity + actor. Written in the SAME
-          // statement as the number: receipt is reproducible upon birth.
+          // C1/C5: identidad congelada + actor. Se escriben en la MISMA
+          // sentencia que el número: el comprobante nace reproducible.
           emitterSnapshot: input.emitterSnapshot ?? null,
           issuedBy: input.issuedBy ?? null,
         })
@@ -205,14 +205,14 @@ export function createReceiptsRepository(db: Db) {
         .from(payment)
         .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)));
       if (!existing) {
-        throw new Error(`attachReceipt: payment ${paymentId} not found in organization.`);
+        throw new Error(`attachReceipt: pago ${paymentId} no encontrado en la organización.`);
       }
       return existing;
     },
 
     /**
-     * Marks a receipt as VOIDED. Preserves number and PDF;
-     * never releases or reuses the number (frozen decision).
+     * Marca un comprobante como ANULADO. Conserva el número y el PDF;
+     * nunca libera ni reusa el número (decisión congelada).
      */
     async markVoided(
       paymentId: number,
@@ -221,10 +221,10 @@ export function createReceiptsRepository(db: Db) {
     ): Promise<DbPayment> {
       assertOrgId(orgId, 'markVoided');
       if (!input.by || input.by.trim().length === 0) {
-        throw new Error('markVoided: by (actor) is required.');
+        throw new Error('markVoided: by (actor) es obligatorio.');
       }
       if (!input.reason || input.reason.trim().length === 0) {
-        throw new Error('markVoided: non-empty reason is required.');
+        throw new Error('markVoided: reason no vacío es obligatorio.');
       }
 
       const [row] = await db
@@ -238,12 +238,12 @@ export function createReceiptsRepository(db: Db) {
         .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)))
         .returning();
       if (!row) {
-        throw new Error(`markVoided: payment ${paymentId} not found in organization.`);
+        throw new Error(`markVoided: pago ${paymentId} no encontrado en la organización.`);
       }
       return row;
     },
 
-    /** Finds a payment by human correlative number (org-scoped). */
+    /** Busca un pago por su número correlativo humano (scoped por org). */
     async findByReceiptNumber(
       orgId: string,
       receiptNumber: string,
@@ -259,11 +259,11 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Loads raw rows to compose `ReceiptData`
-     * (`buildReceiptDataFromComposed`, shared pure). 4 simple sequential selects,
-     * all org-scoped. Read-only: does not calculate taxes, does not resolve gates,
-     * does not mask. Returns `undefined` if payment does not belong to org
-     * (caller maps to 404).
+     * Carga las filas crudas para componer `ReceiptData`
+     * (`buildReceiptDataFromComposed`, shared puro). 4 selects secuenciales
+     * simples, todos scoped por org. Solo carga: no calcula impuestos, no
+     * resuelve gate, no enmascara. `undefined` si el pago no es de la org
+     * (el caller mapea a 404).
      */
     async getReceiptComposedData(
       orgId: string,
@@ -306,11 +306,11 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Completes PDF: sets `receipt_pdf_key` ONLY if not already present
-     * (`WHERE receipt_pdf_key IS NULL RETURNING`). Email gate:
-     * `completed === true` indicates THIS delivery completed the PDF
-     * (enqueue email); `false` = another delivery already did (silent,
-     * no second email). Never use `attachReceipt` as gate.
+     * Completa el PDF: fija `receipt_pdf_key` SOLO si aún no hay uno
+     * (`WHERE receipt_pdf_key IS NULL RETURNING`). EL gate del email:
+     * `completed === true` significa que ESTA entrega completó el PDF
+     * (encolar email); `false` = otra entrega ya lo hizo (silencio, sin
+     * segundo email). Nunca usar `attachReceipt` como gate.
      */
     async completeReceiptPdf(
       paymentId: number,
@@ -319,7 +319,7 @@ export function createReceiptsRepository(db: Db) {
     ): Promise<{ completed: boolean }> {
       assertOrgId(orgId, 'completeReceiptPdf');
       if (!key || key.trim().length === 0) {
-        throw new Error('completeReceiptPdf: key is required.');
+        throw new Error('completeReceiptPdf: key es obligatoria.');
       }
       const [row] = await db
         .update(payment)
@@ -336,13 +336,13 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Completes VOIDED PDF: sets `receipt_voided_pdf_key` ONLY if not
-     * already present. Symmetric gate to `completeReceiptPdf`, but with no
-     * effect on email: voiding never notifies (valid receipt was already sent)
-     * and `receipt_notified_at` is untouched.
+     * Completa el PDF ANULADO: fija `receipt_voided_pdf_key` SOLO si aún no
+     * hay uno. Gate simétrico a `completeReceiptPdf`, pero sin efecto sobre
+     * el email: la anulación nunca notifica (el comprobante válido ya se
+     * envió) y `receipt_notified_at` no se toca.
      *
-     * Original (`receipt_pdf_key`) remains intact: voiding creates a
-     * NEW artifact, never overwriting the issued one.
+     * El original (`receipt_pdf_key`) se conserva intacto: la anulación crea
+     * un artefacto NUEVO, no reescribe el emitido.
      */
     async completeVoidedReceiptPdf(
       paymentId: number,
@@ -351,7 +351,7 @@ export function createReceiptsRepository(db: Db) {
     ): Promise<{ completed: boolean }> {
       assertOrgId(orgId, 'completeVoidedReceiptPdf');
       if (!key || key.trim().length === 0) {
-        throw new Error('completeVoidedReceiptPdf: key is required.');
+        throw new Error('completeVoidedReceiptPdf: key es obligatoria.');
       }
       const [row] = await db
         .update(payment)
@@ -368,9 +368,9 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Marks email notification as delivered. Anti-loss gate: retries
-     * check `receipt_notified_at` to avoid resending, and if delivery
-     * fails the caller resets the flag and retries.
+     * Marca la notificación por email como hecha. Gate anti-pérdida: el
+     * reintento del mensaje usa `receipt_notified_at` para no re-enviar, y
+     * si el envío falla el caller limpia la marca y reintenta.
      */
     async markReceiptNotified(
       paymentId: number,
@@ -391,7 +391,7 @@ export function createReceiptsRepository(db: Db) {
       return { completed: row !== undefined };
     },
 
-    /** Resets notification flag (best-effort) if delivery failed. */
+    /** Revierte la marca de notificación (best-effort) si el envío falló. */
     async clearReceiptNotified(paymentId: number, orgId: string): Promise<void> {
       assertOrgId(orgId, 'clearReceiptNotified');
       await db

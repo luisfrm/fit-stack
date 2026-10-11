@@ -13,10 +13,10 @@ import {
 } from '@workspace/shared';
 
 /* ── Receipt PDF render (pdf-lib, workerd-safe) ──────────────────────────
-   Motor de render del comprobante con `pdf-lib` (JS puro, sin WASM): cabe
-   en UNA sola página A4 con todo el contenido del documento. Todo texto de
-   usuario se sanitiza al charset WinAnsi de la fuente embebida; sin dato la
-   línea se OMITE (jamás el placeholder `---`, lo prohíbe `checklistPrePdf`).
+   Receipt rendering engine using `pdf-lib` (pure JS, no WASM): fits onto
+   a SINGLE A4 page with all document content. All user text is sanitized to
+   the embedded font's WinAnsi charset; without data the line is OMITTED (never
+   placeholder `---`, prohibited by `checklistPrePdf`).
    ─────────────────────────────────────────────────────────────────────── */
 
 const PAGE_WIDTH = 595.28;
@@ -33,7 +33,7 @@ const LIGHT_RULE = rgb(0.94, 0.94, 0.94);
 const VOID_RED = rgb(0.725, 0.11, 0.11);
 
 function formatDateEs(iso: string, timezone: string | undefined): string {
-  // Fecha en hora LOCAL del emisor (un pago a las 23h cae en el mismo día).
+  // Date in LOCAL time of emitter (a payment at 23:00 falls on the same day).
   return new Intl.DateTimeFormat('es-ES', {
     day: '2-digit',
     month: 'long',
@@ -52,7 +52,7 @@ interface RenderCtx {
 
 type Align = 'left' | 'right' | 'center';
 
-/** Conserva solo los code points que la fuente puede representar (WinAnsi). */
+/** Retains only code points supported by the embedded font (WinAnsi). */
 function sanitize(text: string, supported: Set<number>): string {
   let out = '';
   for (const ch of text) {
@@ -66,7 +66,7 @@ function measure(font: PDFFont, size: number, text: string): number {
   return font.widthOfTextAtSize(text, size);
 }
 
-/** Trunca un token irrompible con elipsis para garantizar la página única. */
+/** Truncates an unbreakable token with ellipsis to guarantee single-page budget. */
 function truncateToken(
   token: string,
   font: PDFFont,
@@ -88,7 +88,7 @@ function truncateToken(
   return sanitize(out + ELLIPSIS, supported);
 }
 
-/** Envuelve un texto en líneas que caben en `maxWidth`. */
+/** Wraps text into lines that fit within `maxWidth`. */
 function wrapLines(
   text: string,
   font: PDFFont,
@@ -99,19 +99,27 @@ function wrapLines(
   const clean = sanitize(text, supported);
   if (clean.length === 0) return [];
   if (measure(font, size, clean) <= maxWidth) return [clean];
+
   const lines: string[] = [];
   let current = '';
+
+  const pushCurrent = () => {
+    if (current.length > 0) {
+      lines.push(current);
+      current = '';
+    }
+  };
+
   for (const word of clean.split(' ')) {
     if (word.length === 0) continue;
+
     const wordWidth = measure(font, size, word);
     if (wordWidth > maxWidth) {
-      if (current.length > 0) {
-        lines.push(current);
-        current = '';
-      }
+      pushCurrent();
       lines.push(truncateToken(word, font, size, maxWidth, supported));
       continue;
     }
+
     const candidate = current.length > 0 ? `${current} ${word}` : word;
     if (measure(font, size, candidate) <= maxWidth) {
       current = candidate;
@@ -120,7 +128,8 @@ function wrapLines(
       current = word;
     }
   }
-  if (current.length > 0) lines.push(current);
+
+  pushCurrent();
   return lines;
 }
 
@@ -131,13 +140,13 @@ interface LineOpts {
   align?: Align;
   x?: number;
   maxWidth?: number;
-  /** Espacio bajo la línea (default: 30 % del tamaño). */
+  /** Space below line (default: 30% of font size). */
   gapAfter?: number;
 }
 
 /**
- * Dibuja un texto (con wrap) y avanza el cursor. Si ya no hay espacio
- * vertical, la línea se descarta: el documento siempre es una sola página.
+ * Draws text (with wrapping) and advances the y-cursor. If vertical space
+ * is exhausted, the line is omitted: document is strictly single-page.
  */
 function drawLine(ctx: RenderCtx, text: string, opts: LineOpts): void {
   const font = opts.font ?? ctx.regular;
@@ -150,12 +159,12 @@ function drawLine(ctx: RenderCtx, text: string, opts: LineOpts): void {
     const lineHeight = opts.size * 1.4;
     if (ctx.y - lineHeight < BOTTOM_LIMIT) return;
     const width = measure(font, opts.size, line);
-    const x =
-      align === 'right'
-        ? x0 + maxWidth - width
-        : align === 'center'
-          ? x0 + (maxWidth - width) / 2
-          : x0;
+    let x = x0;
+    if (align === 'right') {
+      x = x0 + maxWidth - width;
+    } else if (align === 'center') {
+      x = x0 + (maxWidth - width) / 2;
+    }
     ctx.page.drawText(line, { x, y: ctx.y - lineHeight, size: opts.size, font, color });
     ctx.y -= lineHeight + gapAfter;
   }
@@ -183,9 +192,8 @@ function spacer(ctx: RenderCtx, points: number): void {
 }
 
 /**
- * Renderiza el PDF del comprobante. Usado SOLO por el consumer del paso 2
- * (`handleReceiptRender`), nunca en un request. Import lazy del motor para
- * no engordar el bundle del path de emails.
+ * Renders receipt PDF bytes. Used SOLELY by step 2 consumer (`handleReceiptRender`),
+ * never in synchronous HTTP requests.
  */
 export async function renderReceiptPdfBytes(
   data: ReceiptData,
@@ -194,8 +202,8 @@ export async function renderReceiptPdfBytes(
   const { emitter, recipient, document, sale, amounts, method, footer, timezone, voided } =
     data;
   const baseCurrency = amounts.baseCurrency ?? emitter.currency;
-  // La conversión solo se muestra si el pago NO está en la moneda base y la
-  // tasa persistida existe (FACTURATION.md §3).
+  // Conversion is displayed only if payment currency is not base currency
+  // and exchange rate was persisted (FACTURATION.md §3).
   const showConversion =
     amounts.currencyPaid !== baseCurrency && Boolean(amounts.exchangeRateApplied);
 
@@ -209,7 +217,7 @@ export async function renderReceiptPdfBytes(
   const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   const ctx: RenderCtx = { page, regular, bold, supported, y: PAGE_HEIGHT - MARGIN };
 
-  /* Cabecera: emisor a la izquierda, documento a la derecha. */
+  /* Header: emitter on the left, document on the right. */
   const headerTop = ctx.y;
   drawLine(ctx, (emitter.legalName || emitter.name).toUpperCase(), {
     size: 14,
@@ -217,7 +225,7 @@ export async function renderReceiptPdfBytes(
     maxWidth: CONTENT_WIDTH * 0.58,
     gapAfter: 2,
   });
-  /* Sin identificación fiscal, la línea se omite (no se inventa). */
+  /* Without tax identification, line is omitted (do not invent). */
   if (emitter.taxId) {
     drawLine(ctx, `${emitter.taxLabel}: ${emitter.taxId}`, {
       size: 8,
@@ -259,7 +267,7 @@ export async function renderReceiptPdfBytes(
     spacer(ctx, 16);
   }
 
-  /* Columnas emisor / receptor. */
+  /* Emitter / recipient columns. */
   const columnsTop = ctx.y;
   const gutter = 40;
   const colWidth = (CONTENT_WIDTH - gutter) / 2;
@@ -339,7 +347,7 @@ export async function renderReceiptPdfBytes(
     spacer(ctx, 20);
   }
 
-  /* Tabla: descripción / total (rótulos en la misma fila). */
+  /* Table: description / total (labels in same row). */
   const tableHeaderTop = ctx.y;
   drawLine(ctx, 'Descripción'.toUpperCase(), {
     size: 7,
@@ -390,7 +398,7 @@ export async function renderReceiptPdfBytes(
   spacer(ctx, 30);
   drawRule(ctx, { gapBefore: 0, gapAfter: 15 });
 
-  /* Totales (alineados a la derecha). */
+  /* Totals (right aligned). */
   const right = { align: 'right' } as const;
   drawLine(ctx, `Subtotal: ${formatCents(amounts.subtotal, amounts.currencyPaid, format)}`, {
     size: 10,
@@ -436,7 +444,7 @@ export async function renderReceiptPdfBytes(
     ...right,
   });
 
-  /* Pie legal. */
+  /* Legal footer. */
   spacer(ctx, 60);
   for (const line of footer.disclaimer) {
     drawLine(ctx, line, { size: 7, color: FAINT, align: 'center', gapAfter: 4 });

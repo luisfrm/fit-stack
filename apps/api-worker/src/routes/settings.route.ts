@@ -26,8 +26,8 @@ export const settingsRoutes = new Hono<AppEnv>()
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
 
     const allSettings = await settingsService.getAll(orgId);
-    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
-    // ocurre on-write en POST /api/settings.
+    // Low frequency data: TTL is safety net; actual invalidation
+    // occurs on-write in POST /api/settings.
     await cache.set(cacheKey, allSettings, 3600);
     return c.json(allSettings);
   })
@@ -51,7 +51,7 @@ export const settingsRoutes = new Hono<AppEnv>()
     const body = c.req.valid('json');
     const cache = createCache(c.env);
 
-    // primary_currency/currency_format son columnas de `organization`, no settings.
+    // primary_currency/currency_format are columns of `organization`, not settings.
     if ('primary_currency' in body || 'currency_format' in body) {
       return c.json(
         { error: 'primary_currency y currency_format se gestionan en la organización, no en settings' },

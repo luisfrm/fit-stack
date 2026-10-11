@@ -31,9 +31,9 @@ export interface QuotaUsage {
 
 export interface AiQuotaResult {
   monthly: QuotaUsage;
-  /** null = ilimitado (limit 0). JSON-safe (Infinity → null). */
+  /** null = unlimited (limit 0). JSON-safe (Infinity → null). */
   remaining: number | null;
-  /** true si la feature ai_chat no está habilitada en el plan */
+  /** true if ai_chat feature is not enabled in plan */
   disabled: boolean;
   periodStart: Date;
 }
@@ -50,7 +50,7 @@ export interface GymOverviewResult {
   portal: SeatsResult;
 }
 
-/** Aplana los límites de todas las features habilitadas a un Record plano. */
+/** Flattens limits of all enabled features to a flat Record. */
 function flattenLimits(features: PlanFeaturesV2): Record<string, number> {
   const limits: Record<string, number> = {};
   for (const value of Object.values(features)) {
@@ -71,8 +71,8 @@ export function createFeaturesService(
   cache: Cache
 ) {
   /**
-   * Features del free tier configurado en platform_setting (`feature_flags_free_tier`).
-   * null = free tier NO habilitado → legacy gate.
+   * Features for configured free tier in platform_setting (`feature_flags_free_tier`).
+   * null = free tier NOT enabled -> legacy gate.
    */
   async function getConfiguredFreeTier(): Promise<PlanFeaturesV2 | null> {
     const enabled = await platformSettingsRepo.findByKey(FREE_TIER_ENABLED_KEY);
@@ -87,7 +87,7 @@ export function createFeaturesService(
     }
   }
 
-  /** Periodo mensual: ciclo de suscripción si hay sub activa, si no calendario. */
+  /** Monthly period: subscription cycle if active sub exists, else calendar. */
   async function getCreditPeriodStart(orgId: string): Promise<Date> {
     const sub = await subsRepo.findActiveByOrganization(orgId);
     if (sub) {
@@ -97,7 +97,7 @@ export function createFeaturesService(
         status === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
       if (isActiveBilling) {
         const plan = await plansRepo.findById(sub.planId);
-        // Si el plan no existe, fallback a mes calendario
+        // If plan not found, fallback to calendar month
         if (plan) {
           return startOfSubscriptionPeriod(
             sub.currentPeriodEnd as unknown as Date,
@@ -140,11 +140,9 @@ export function createFeaturesService(
         features = freeTier;
         isFreeTier = true;
       }
-    } else {
-      if (freeTier) {
-        features = freeTier;
-        isFreeTier = true;
-      }
+    } else if (freeTier) {
+      features = freeTier;
+      isFreeTier = true;
     }
 
     const data: OrgFeaturesResult = {
@@ -210,7 +208,7 @@ export function createFeaturesService(
       if (quota.monthly.limit > 0 && quota.monthly.used + estimatedCredits > quota.monthly.limit) {
         return { allowed: false, quota };
       }
-      // No consume todavía: se descuenta en settleAiCredits post-stream
+      // Does not consume yet: deducted in settleAiCredits post-stream
       return { allowed: true, quota };
     },
 
@@ -219,7 +217,7 @@ export function createFeaturesService(
       if (quota.disabled || actualCredits <= 0) return quota;
       const limit = quota.monthly.limit;
       await featuresRepo.incrementCredits(orgId, periodStart, actualCredits);
-      // Si excede (race), el próximo request quedará en 429; no hacemos rollback mid-stream
+      // If it exceeds (race), next request will get 429; no mid-stream rollback
       const used = quota.monthly.used + actualCredits;
       return {
         monthly: { used, limit },
@@ -233,7 +231,7 @@ export function createFeaturesService(
       const quota = await getAiQuota(orgId);
       if (quota.disabled || granted <= 0) return quota;
       await featuresRepo.grantBonusCredits(orgId, quota.periodStart, granted);
-      // Re-leer para reflejar bonus en límite efectivo
+      // Re-read to reflect bonus in effective limit
       return getAiQuota(orgId);
     },
 

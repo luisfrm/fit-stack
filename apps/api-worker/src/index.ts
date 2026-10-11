@@ -60,8 +60,8 @@ app.use('*', async (c, next) => {
   if (session) {
     c.set('session', session.session);
     c.set('user', session.user);
-    // El objeto completo de la org activa (timezone, branding, etc.) viene como
-    // campo hermano del registro de sesión, NO dentro de `session.session`.
+    // The complete active org object (timezone, branding, etc.) is a sibling
+    // field on the session record, NOT inside `session.session`.
     c.set('org', (session as any)?.activeOrganization ?? null);
   }
 
@@ -101,11 +101,11 @@ app.route('/api/platform/upload', platformUploadRoutes);
 app.route('/api/platform/knowledge', platformKnowledgeRoutes);
 app.route('/api/platform/features', platformFeaturesRoutes);
 
-// Features de la org activa: resolución + cupos del portal (panel)
+// Active org features: resolution + portal limits (panel)
 app.route('/api/organizations/features', organizationFeaturesRoutes);
 app.route('/api/organizations/seats', organizationSeatsRoutes);
 
-// Cuotas IA de la org activa (dentro del prefijo /api/ai)
+// Active org AI quota (under /api/ai prefix)
 app.route('/api/ai/usage', aiUsageRoutes);
 
 export default app;

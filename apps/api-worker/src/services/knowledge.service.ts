@@ -62,7 +62,7 @@ export function createKnowledgeService(repo: KnowledgeRepository, aiService: AIS
       const needsReembed = partial.content !== undefined && partial.content !== current.content;
       let newChunks: Awaited<ReturnType<typeof embedChunks>> | null = null;
       if (needsReembed) {
-        // Embeber primero: si falla, no se persiste ningún cambio de metadatos
+        // Embed first: if this fails, no metadata change is persisted
         newChunks = await embedChunks(splitIntoChunks(partial.content!));
       }
       await repo.update(id, partial);
@@ -77,7 +77,7 @@ export function createKnowledgeService(repo: KnowledgeRepository, aiService: AIS
       return { success: true as const };
     },
 
-    /** Recuperación para el chat. Nunca lanza: fallo de RAG no debe romper el chat. */
+    /** Retrieval for chat. Never throws: RAG failure must not break chat. */
     async searchForChat(query: string, organizationId: string | null): Promise<string> {
       try {
         const trimmed = query.trim().slice(0, RAG_CONFIG.chunkSizeChars * 2);

@@ -1,24 +1,24 @@
 import { escapeHtml, renderLightShell, type RenderedEmail } from './layout';
 
 export interface PaymentReceiptShortData {
-  /** Número correlativo humano (nunca `payment.id`). Ausente = histórico pre-sistema. */
+  /** Human correlative number (never `payment.id`). Absent = historical pre-system. */
   receiptNumber?: string | null;
   memberName: string;
   planName: string;
-  /** Ya formateado, p. ej. "50,00 USD". */
+  /** Preformatted, e.g. "50,00 USD". */
   amountPaid: string;
   paymentMethod: string;
-  /** Ya formateado, p. ej. "05 de septiembre de 2026". */
+  /** Preformatted, e.g. "05 de septiembre de 2026". */
   paymentDate: string;
   orgName: string;
-  /** `true` cuando el PDF va adjunto (el PDF es la fuente de verdad). */
+  /** `true` when PDF is attached (PDF is single source of truth). */
   hasAttachment: boolean;
 }
 
 /**
- * Notificación corta de comprobante: el cuerpo resume la operación y el
- * PDF adjunto es la fuente de verdad (nunca se regenera aquí).
- * El UUID técnico (`payment.id`) NUNCA aparece: solo el número correlativo.
+ * Short receipt notification: body summarizes transaction and
+ * attached PDF is single source of truth (never regenerated here).
+ * Technical UUID (`payment.id`) NEVER appears: only correlative receipt number.
  */
 export function renderPaymentReceiptShort(data: PaymentReceiptShortData): RenderedEmail {
   const memberName = escapeHtml(data.memberName);
@@ -29,8 +29,7 @@ export function renderPaymentReceiptShort(data: PaymentReceiptShortData): Render
   const orgName = escapeHtml(data.orgName || 'Fit-Stack');
   const receiptNumber = data.receiptNumber ? escapeHtml(data.receiptNumber) : null;
 
-  // El subject es texto plano (sin markup: no hay vector XSS); el HTML
-  // usa las versiones escapadas.
+  // Subject is plain text (no markup: no XSS vector); HTML uses escaped versions.
   const subject = receiptNumber
     ? `Comprobante ${data.receiptNumber} — ${data.orgName}`
     : `Comprobante de pago — ${data.orgName}`;

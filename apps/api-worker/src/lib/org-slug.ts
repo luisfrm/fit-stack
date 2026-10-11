@@ -3,9 +3,8 @@ import type { AppEnv } from './env';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 
 /**
- * Slug de la organización activa: el de la sesión si está, y si no un lookup
- * org-scoped. Una sola implementación para todos los routes — antes vivía en
- * `payments.route.ts` y estaba copiada inline en `subscriptions.route.ts`.
+ * Active organization slug: session slug if present, otherwise an org-scoped
+ * lookup. Single implementation across all routes.
  */
 export async function resolveOrgSlug(
   c: Context<AppEnv>,

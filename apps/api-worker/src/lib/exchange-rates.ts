@@ -11,10 +11,10 @@ interface ExchangeRatesResponse {
 const DEFAULT_URL = 'https://open.er-api.com/v6/latest';
 
 /**
- * Provider server-side de tasas de cambio (open.er-api.com, mismo proveedor
- * que usa el frontend). La tasa de la renovación org-scoped la calcula el
- * backend — NUNCA se acepta del body — y se cachea en Redis (`rates:{base}`, 1h).
- * `EXCHANGE_API_URL` permite apuntar a un mock en tests.
+ * Server-side exchange rates provider (open.er-api.com, same provider
+ * used by frontend). Exchange rates for renewals are calculated by backend —
+ * NEVER accepted from request body — and cached in Redis (`rates:{base}`, 1h).
+ * `EXCHANGE_API_URL` allows pointing to mock in tests.
  */
 export function createExchangeRateProvider(env: Env) {
   const cache = createCache(env);
@@ -22,9 +22,9 @@ export function createExchangeRateProvider(env: Env) {
 
   return {
     /**
-     * Cuántas unidades de `target` valen 1 unidad de `base`.
-     * rate = 1 si base === target (sin llamada externa).
-     * Lanza si la API externa falla o no conoce la moneda.
+     * How many units of `target` equal 1 unit of `base`.
+     * rate = 1 if base === target (no external call).
+     * Throws if external API fails or does not support currency.
      */
     async getRate(base: string, target: string): Promise<number> {
       if (base === target) return 1;
@@ -34,7 +34,7 @@ export function createExchangeRateProvider(env: Env) {
       let rates = cached;
       if (!rates) {
         const data = await ofetch<ExchangeRatesResponse>(`${baseUrl}/${base}`);
-        if (!data || data.result !== 'success' || !data.rates) {
+        if (data?.result !== 'success' || !data.rates) {
           throw new Error('Exchange rate API unavailable');
         }
         rates = data.rates;

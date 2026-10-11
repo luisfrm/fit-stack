@@ -29,7 +29,7 @@ export function createChatRepository(env: Partial<Env>) {
       try {
         const raw = await redis.get<ChatConversation[]>(chatKey(orgId, userId));
         if (!raw) return [];
-        // Upstash puede devolver string si se guardó como JSON; manejar ambos
+        // Upstash may return string if saved as JSON; handle both
         const parsed = typeof raw === 'string' ? (JSON.parse(raw) as ChatConversation[]) : raw;
         if (!Array.isArray(parsed)) return [];
         return parsed;
@@ -42,13 +42,13 @@ export function createChatRepository(env: Partial<Env>) {
     async save(orgId: string, userId: string, conversations: ChatConversation[]): Promise<void> {
       if (!redis) return;
       try {
-        // Cap: 10 mensajes por conversación + 20 conversaciones
+        // Cap: 10 messages per conversation + 20 conversations
         const trimmed = conversations.slice(-CHAT_MAX_CONVERSATIONS).map((c) => ({
           ...c,
           messages: c.messages.slice(-CHAT_MAX_STORED),
           updatedAt: new Date().toISOString(),
         }));
-        // Sin TTL (persistencia); Upstash set sin ex
+        // No TTL (persistence); Upstash set without ex
         await redis.set(chatKey(orgId, userId), trimmed as unknown as string);
       } catch (e) {
         console.error('[chat redis] save error', e);

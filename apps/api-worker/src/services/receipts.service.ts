@@ -41,13 +41,13 @@ export interface TaxOverrideInput {
 export interface AssignReceiptNumberInput {
   orgId: string;
   paymentId: number;
-  /** Zona horaria de la org (de `requireOrgTimezone()`): define el año local. */
+  /** Org timezone (from `requireOrgTimezone()`): defines local year. */
   timezone: string;
   taxOverride?: TaxOverrideInput | null;
   /**
-   * Actor de sesión que emite (C5). Opcional en la firma porque el barrido
-   * re-encola sin sesión: en ese caso se persiste `NULL`, nunca un actor
-   * inventado (solo se escribe al numerar, y el barrido no numera).
+   * Session actor emitting receipt (C5). Optional in signature because sweep
+   * re-enqueues without session: in that case `NULL` is persisted, never a
+   * fabricated actor (only written when numbering, and sweep does not number).
    */
   actor?: string | null;
 }
@@ -236,10 +236,10 @@ export function createReceiptsService(
 
   return {
     /**
-     * Paso 1 (síncrono, sin I/O externo salvo DB+cola): valida, calcula
-     * impuestos en centavos, asigna el número (atómico), lo persiste y
-     * encola `receipt.render`. NUNCA encola email (lo hace el paso 2).
-     * La secuencia compartida vive en `receipt-issue.core.ts`.
+     * Step 1 (synchronous, no external I/O except DB+queue): validates, calculates
+     * taxes in integer cents, assigns number (atomic), persists, and
+     * enqueues `receipt.render`. NEVER enqueues email (done by step 2).
+     * Shared sequence lives in `receipt-issue.core.ts`.
      */
     async assignReceiptNumber(
       input: AssignReceiptNumberInput,
@@ -258,12 +258,12 @@ export function createReceiptsService(
     },
 
     /**
-     * Estado del comprobante para el contrato `GET /:id/receipt`
-     * (la ruta mapea a 200/202). Nunca 409: el histórico es terminal.
+     * Receipt status for `GET /:id/receipt` contract
+     * (route maps to 200/202). Never 409: historical is terminal.
      *
-     * El entregable de un comprobante ANULADO es su PDF con sello: mientras
-     * ese render no exista, el estado es `pending` y el original **no** se
-     * sirve (fail-closed: un documento anulado nunca viaja sin su sello).
+     * The deliverable for a VOIDED receipt is its stamped PDF: until that
+     * render exists, status is `pending` and the original is **not** served
+     * (fail-closed: a voided document never travels without its stamp).
      */
     async getReceiptState(orgId: string, paymentId: number): Promise<ReceiptState> {
       const composed = await receiptsRepo.getReceiptComposedData(orgId, paymentId);
@@ -296,14 +296,14 @@ export function createReceiptsService(
     },
 
     /**
-     * Anulación con número: idempotente sin pisar auditoría;
-     * sin número → 409 (no hay comprobante que anular).
+     * Void with number: idempotent without overwriting audit trail;
+     * without number → 409 (no receipt to void).
      *
-     * Además encola el render del PDF ANULADO (el sello lo materializa el
-     * paso 2, que gatea por `receipt_voided_pdf_key`): la anulación no se
-     * completa en el mundo hasta que el documento descargable lo diga.
-     * Si el envío a la cola falla, el void YA está persistido y el barrido
-     * lo repara — nunca se sirve el original mientras el sello falte.
+     * Also enqueues render of VOIDED PDF (stamp is materialized by
+     * step 2, gated by `receipt_voided_pdf_key`): void is not
+     * complete until downloadable document reflects it.
+     * If queue dispatch fails, void is ALREADY persisted and sweep
+     * repairs it — original is never served while stamp is missing.
      */
     async markReceiptVoided(input: {
       orgId: string;
@@ -351,9 +351,9 @@ export function createReceiptsService(
     },
 
     /**
-     * Reenvío manual (4 ramas): sin email → 422; histórico → email sin
-     * adjunto; numerado con PDF → email; numerado sin PDF → re-encola render
-     * (idempotente) y el paso 2 encolará el email al completar.
+     * Manual resend (4 branches): no email → 422; historical → email without
+     * attachment; numbered with PDF → email; numbered without PDF → re-enqueues render
+     * (idempotent) and step 2 will enqueue email upon completion.
      */
     async sendReceiptEmail(
       orgId: string,
@@ -366,10 +366,10 @@ export function createReceiptsService(
       if (!composed) {
         throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
       }
-      // Un comprobante anulado no se reenvía: el correo saldría con el PDF
-      // de emisión (sin sello) o sin adjunto, y el destinatario no tendría
-      // forma de saber que el cobro se anuló. Su entregable es la descarga
-      // del PDF ANULADO.
+      // A voided receipt is never resent: email would go out with emission
+      // PDF (without stamp) or without attachment, and recipient would have
+      // no way of knowing payment was voided. Its deliverable is downloading
+      // the VOIDED PDF.
       if (composed.payment.receiptVoided) {
         throw new ReceiptError(
           409,

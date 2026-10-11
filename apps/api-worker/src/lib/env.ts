@@ -34,13 +34,13 @@ export type Env = {
   // OpenRouter (free models via `openrouter/free`)
   OPENROUTER_API_KEY?: string;
 
-  // Exchange rates (server-side provider para renovación org-scoped)
+  // Exchange rates (server-side provider for org-scoped renewal)
   EXCHANGE_API_URL?: string;
 
   // Cloudflare Bindings
   FILES_BUCKET: R2Bucket;
   TASK_QUEUE: Queue;
-  /** Producer de fit-receipt-events (paso 1 + issue + re-encolados). */
+  /** Producer of fit-receipt-events (step 1 + issue + re-enqueuing). */
   RECEIPT_QUEUE: Queue;
 };
 
@@ -59,13 +59,13 @@ export type AppVariables = {
   db: Db;
   session?: Session;
   user?: SessionUser;
-  /** Id de la org activa (set por `requireOrg`/`requireOrgPermission`). */
+  /** Active org ID (set by `requireOrg`/`requireOrgPermission`). */
   orgId?: string;
-  /** Objeto de la org activa (set en el middleware global; la sesión-solo-registro no lo trae). */
+  /** Active org object (set in global middleware; registration-only session does not have it). */
   org?: IOrganization | null;
-  /** Zona horaria de la org activa (set por `requireOrgTimezone`). */
+  /** Active org timezone (set by `requireOrgTimezone`). */
   orgTimezone?: string;
-  /** Features resueltas de la org activa (set por `requireFeature`) */
+  /** Resolved features for the active org (set by `requireFeature`) */
   orgFeatures?: {
     features: Record<string, { enabled: boolean; limits?: Record<string, number> }>;
     limits: Record<string, number>;

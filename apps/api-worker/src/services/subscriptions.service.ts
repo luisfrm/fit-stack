@@ -17,9 +17,9 @@ import { ReceiptError } from './receipts.service';
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
 export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' | 'organizationId' | 'startDate' | 'endDate' | 'status' | 'cancelledAt' | 'isActive' | 'createdAt'> {
-  /** 'YYYY-MM-DD' local, ISO con `T` o Date. Ausente = hoy local (lo resuelve el servidor). */
+  /** 'YYYY-MM-DD' local, ISO with `T` or Date. Absent = local today (resolved by server). */
   startDate?: string | Date;
-  /** Explícito solo para periodo a medida o idempotente; acortar vigente exige motivo. */
+  /** Explicit only for custom period or idempotent; shortening active requires reason. */
   endDate?: string | Date;
   payment: {
     amountPaid: number;
@@ -37,8 +37,8 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
 }
 
 /**
- * Hooks de comprobantes (paso 1 + void). Estructural para no acoplar
- * servicios: lo implementa `createReceiptsService`.
+ * Receipt hooks (step 1 + void). Structural to avoid coupling
+ * services: implemented by `createReceiptsService`.
  */
 export interface ReceiptHooks {
   assignReceiptNumber(input: {
@@ -65,29 +65,29 @@ export interface ReceiptContext {
   receipts?: ReceiptHooks;
   timezone?: string;
   by?: string;
-  /** Motivo de anulación/rechazo: se persiste en el pago y viaja al void del comprobante. */
+  /** Void/rejection reason: persisted in payment and passed to receipt void. */
   voidReason?: string;
 }
 
 /**
- * Resultado de `updatePaymentStatus`.
+ * Result of `updatePaymentStatus`.
  *
- * `receiptVoided` es `false` cuando el nuevo status no es `voided` o cuando el
- * pago **no tenía comprobante emitido** — y en ese segundo caso viaja
- * `receiptVoidReason: 'not_issued'`, porque el servicio interno lanza
- * `RECEIPT_NOT_ISSUED` pero el endpoint responde **200**: el usuario tiene que
- * poder distinguir "se anuló el comprobante" de "no había comprobante".
+ * `receiptVoided` is `false` when new status is not `voided` or when payment
+ * **had no issued receipt** — and in that second case carries
+ * `receiptVoidReason: 'not_issued'`, because internal service throws
+ * `RECEIPT_NOT_ISSUED` but endpoint responds with **200**: user needs to
+ * distinguish "receipt was voided" from "no receipt existed".
  */
 export interface PaymentStatusResult {
-  /** Fila `payment` actualizada (el route la serializa tal cual). */
+  /** Updated `payment` row (route serializes it as-is). */
   payment: IPayment;
   receiptVoided: boolean;
   receiptVoidReason?: 'not_issued';
 }
 
 /**
- * Error de negocio con `res` propio, mismo patrón que `409 { code: 'SLUG_TAKEN' }`:
- * el `code` es el contrato que las apps mapean a toast (nunca el texto libre).
+ * Business error with own `res`, same pattern as `409 { code: 'SLUG_TAKEN' }`:
+ * the `code` is the contract that apps map to toasts (never arbitrary text).
  */
 const businessError = (
   status: 409 | 422,
@@ -123,8 +123,8 @@ function parseContractDate(
 }
 
 /**
- * Resuelve una fecha del contrato a instante UTC. Ausente/vacía = hoy local;
- * `'YYYY-MM-DD'` → medianoche local; ISO con `T` (o Date) → instante tal cual.
+ * Resolves contract date to UTC instant. Absent/empty = local today;
+ * `'YYYY-MM-DD'` → local midnight; ISO with `T` (or Date) → instant as-is.
  */
 function parseSubscriptionDate(
   value: string | Date | undefined | null,
@@ -221,7 +221,7 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'Fecha de inicio inválida' });
       }
 
-      // 3. Periodo calculado desde el baseline acumulativo (fase-1, día local).
+      // 3. Period calculated from cumulative baseline (Phase 1, local day).
       const computed = computeSubscriptionPeriod({
         startDate,
         latestEndDate: latest?.endDate ?? null,
@@ -230,10 +230,10 @@ export function createSubscriptionsService(
         timezone,
       });
 
-      // 4-5. `endDate` explícito: `endDate < startDate` se rechaza; acortar un
-      // periodo vigente exige motivo (comparación a día local: el mismo día
-      // cuenta como idempotente, no como recorte). Idempotente o periodo nuevo
-      // a medida → libre, motivo NULL. Sin `endDate` → manda el cálculo.
+      // 4-5. Explicit `endDate`: `endDate < startDate` is rejected; shortening
+      // active period requires reason (local day comparison: same day
+      // counts as idempotent, not shortening). Idempotent or custom new period
+      // → free, NULL reason. Without `endDate` → calculation governs.
       let endDate: Date;
       let endDateOverrideReason: string | null = null;
       if (
@@ -245,9 +245,9 @@ export function createSubscriptionsService(
         if (Number.isNaN(explicitEnd.getTime())) {
           throw new HTTPException(400, { message: 'Fecha de fin inválida' });
         }
-        // Comparación a día local (coherente con el recorte de abajo): un
-        // `startDate` instante + `endDate` 'YYYY-MM-DD' del mismo día local no
-        // debe rechazarse por orden de instantes.
+        // Local day comparison (consistent with shortening below): an instant
+        // `startDate` + 'YYYY-MM-DD' `endDate` of same local day must not
+        // be rejected due to instant sub-second order.
         if (toLocalDayString(timezone, explicitEnd) < toLocalDayString(timezone, startDate)) {
           throw businessError(
             422,
@@ -288,8 +288,8 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'Fecha de pago inválida' });
       }
 
-      // 6. Persistir con el motivo (columna 0019) y seguir con pago + emisión
-      // + compensación de fase-2 sin cambios.
+      // 6. Persist with reason (column 0019) and proceed with payment + issuance
+      // + phase-2 compensation without changes.
       const subscription = await subsRepo.create(organizationId, {
         memberId: payload.memberId,
         planId: payload.planId,
@@ -302,9 +302,9 @@ export function createSubscriptionsService(
         throw new Error('Error al generar el registro de suscripción');
       }
 
-      // Alta en 3 pasos sin red (Neon HTTP no tiene `db.transaction()`):
-      // el pago + la emisión se compensan en el `catch` delegando al helper
-      // (decisión por relectura, nunca por tipo de error).
+      // 3-step registration without network transactions (Neon HTTP has no `db.transaction()`):
+      // payment + issuance are compensated in `catch` delegating to helper
+      // (decision made by re-reading, never by error type).
       let paymentCreated = false;
       let paymentId: number | null = null;
       try {
@@ -320,8 +320,8 @@ export function createSubscriptionsService(
           paymentMethod: payload.payment.paymentMethod,
           paymentMethodDetails: payload.payment.paymentMethodDetails,
           status: payload.payment.status as any,
-          // Snapshot de la duración: es la que se usó para el periodo, así que
-          // editar el plan después no reescribe la semántica de este cobro.
+          // Duration snapshot: this was used for the period, so
+          // editing the plan later won't rewrite payment semantics.
           planSnapshotDurationValue: plan.durationValue,
           planSnapshotDurationUnit: plan.durationUnit,
           paymentDate: paymentDateFinal,
@@ -329,20 +329,20 @@ export function createSubscriptionsService(
         paymentCreated = true;
         paymentId = createdPayment?.id ?? null;
 
-        // Emisión automática al registrar un pago validado: el paso 1 asigna
-        // el número y encola el render. El email lo encola el paso 2 al
-        // completar el PDF (nunca aquí).
-        // (Los processing esperan la aprobación en PATCH /payments/:id/status.)
+        // Automatic issuance upon registering validated payment: step 1 assigns
+        // number and enqueues render. Email is enqueued by step 2 upon
+        // completing PDF (never here).
+        // (Processing payments wait for approval via PATCH /payments/:id/status.)
         //
-        // La decisión se toma sobre la FILA PERSISTIDA, nunca sobre el payload:
-        // `payment.status` es opcional en el contrato y el repo lo normaliza a
-        // `validated`, así que leer el payload dejaba un pago validado SIN
-        // número (y sin render) que solo se reparaba a mano con /issue.
-        // Invariante: validado ⇔ numerado, sobre el estado que quedó en DB.
+        // Decision is made against PERSISTED ROW, never against payload:
+        // `payment.status` is optional in contract and repo normalizes to
+        // `validated`, so reading payload left a validated payment WITHOUT
+        // number (and without render) that could only be manually fixed via /issue.
+        // Invariant: validated ⇔ numbered, based on DB state.
         if (createdPayment?.id && createdPayment.status === PAYMENT_STATUSES.VALIDATED) {
-          // Sin `receipts` no hay emisión: es un error de wiring, no un caso
-          // normal. Antes existía una rama legacy que mandaba el email desde
-          // aquí sin numerar el comprobante (violaba validado ⇔ numerado).
+          // Without `receipts` there is no issuance: wiring error, not normal
+          // case. Previously a legacy branch sent email from here without numbering
+          // (violating validated ⇔ numbered).
           if (!opts?.receipts) {
             throw new Error(
               'subscriptions.create: opts.receipts es requerido para emitir el comprobante.',
@@ -372,8 +372,8 @@ export function createSubscriptionsService(
             readPayment: async () => paymentId != null ? paymentsRepo.findById(organizationId, paymentId) : null,
             voidPayment: () =>
               paymentsRepo.updateStatus(organizationId, paymentId as number, 'voided', {
-                // `undefined` → el repo persiste NULL (misma auditoría que
-                // `opts?.by ?? null` de la espec: sin actor, NULL).
+                // `undefined` -> repo persists NULL (same audit trail as
+                // `opts?.by ?? null` from spec: without actor, NULL).
                 voidedBy: opts?.by,
                 voidReason: COMPENSATION_VOID_REASON,
               }),
@@ -396,11 +396,11 @@ export function createSubscriptionsService(
     ): Promise<PaymentStatusResult> {
       const previous = await paymentsRepo.findById(organizationId, paymentId);
 
-      // Espejo del guard de Console (invariante validado ⇔ numerado): se
-      // rechaza ANTES de escribir un `validated` que nacería sin número ni
-      // periodo que lo sostenga. Solo un pago `processing` puede validarse —
-      // un `voided` no vuelve atrás (su suscripción ya quedó cancelada por el
-      // propio void) — y nunca sobre una suscripción cancelada.
+      // Mirrors Console guard (validated ⇔ numbered invariant): rejected
+      // BEFORE writing a `validated` payment that would lack number or
+      // backing period. Only a `processing` payment can be validated —
+      // a `voided` cannot be undone (its subscription is already cancelled by
+      // the void) — and never on a cancelled subscription.
       const wasPending = previous != null && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
         if (previous!.status !== PAYMENT_STATUSES.PROCESSING) {
@@ -422,8 +422,8 @@ export function createSubscriptionsService(
         }
       }
 
-      // La auditoría de anulación se persiste siempre en el pago (haya o no
-      // número): es la única fuente de `voidedBy`/`voidedAt`/`voidReason`.
+      // Void audit ALWAYS persisted in payment (whether receipt exists or not):
+      // single source of truth for `voidedBy`/`voidedAt`/`voidReason`.
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
         voidedBy: opts?.by,
         voidReason: opts?.voidReason,
@@ -432,15 +432,15 @@ export function createSubscriptionsService(
         throw new Error('Registro de pago no encontrado');
       }
 
-      // Anular/rechazar el cobro deja la suscripción fuera de vigencia
-      // (`cancelledAt`) y el status derivado pasa a `voided` (ANULADA), que es
-      // distinto de revocar el acceso a mano (`cancelled`).
+      // Voiding/rejecting payment leaves subscription out-of-validity
+      // (`cancelledAt`) and derived status becomes `voided` (VOIDED), which is
+      // distinct from manual access revocation (`cancelled`).
       if (status === PAYMENT_STATUSES.VOIDED && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
-      // Void con número emitido: conserva número + PDF y marca ANULADO.
-      // Sin comprobante emitido no hay nada que anular, pero el resultado se
-      // informa explícitamente (C6) en vez de tragarse el código del servicio.
+      // Void with issued number: preserves number + PDF and marks VOIDED.
+      // Without issued receipt there is nothing to void, but the result is
+      // reported explicitly (C6) rather than swallowing internal error code.
       let receiptVoided = false;
       let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
       if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
@@ -461,11 +461,11 @@ export function createSubscriptionsService(
         }
       }
 
-      // Un pago que pasa de processing a validated emite su recibo
-      // (el alta con status validated ya lo numera en create()).
+      // A payment transitioning from processing to validated issues its receipt
+      // (registration with validated status already numbers in create()).
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
-        // Sin `receipts` no hay emisión (mismo criterio que create()): un
-        // servicio ausente es un error de wiring, no un caso normal.
+        // Without `receipts` there is no issuance (same rationale as create()):
+        // missing service is a wiring error, not normal case.
         if (!opts?.receipts) {
           throw new Error(
             'updatePaymentStatus: opts.receipts es requerido para emitir el comprobante.',
@@ -498,8 +498,8 @@ export function createSubscriptionsService(
       return updated;
     },
 
-    // Sin `delete`: un registro financiero (suscripción + pago) no se elimina
-    // nunca. Si está equivocado se anula, si se revoca el acceso se cancela.
+    // No `delete`: a financial record (subscription + payment) is never deleted.
+    // If mistake, voided; if access revoked, cancelled.
   };
 }
 

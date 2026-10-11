@@ -28,8 +28,8 @@ export interface ReceiptsReportFilters {
 
 export function createReportsService(paymentsRepo: PaymentsRepository) {
   /**
-   * Gaps del correlativo anual. Función local (no método con `this`) para
-   * que siga funcionando desestructurada. Lanza ante correlativo roto.
+   * Annual sequence gaps. Local function (not method with `this`) so it
+   * works when destructured. Throws on broken sequence.
    */
   async function getReceiptGaps(
     organizationId: string,
@@ -86,8 +86,8 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
     },
 
     /**
-     * Reporte de comprobantes (Fase 5). Lee impuestos persistidos, nunca
-     * recalcula. Totales solo sobre emitidos no anulados, por moneda.
+     * Receipt report (Phase 5). Reads persisted taxes, never
+     * recalculates. Totals only over issued non-voided, by currency.
      */
     async getReceiptsReport(
       organizationId: string,
@@ -96,14 +96,14 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
       filters: ReceiptsReportFilters,
     ): Promise<IReceiptsReportResult> {
       const dateManager = new OrganizationDateManager(timezone);
-      // `parseLocalToUtc` lanza con fecha inválida: error visible, sin default.
+      // `parseLocalToUtc` throws on invalid date: visible error, no default.
       const fromUtc = filters.from ? dateManager.getStartOfDayUtc(filters.from) : undefined;
       const toUtc = filters.to ? dateManager.getEndOfDayUtc(filters.to) : undefined;
       const year =
         filters.year ?? Number(dateManager.getTodayLocalString().slice(0, 4));
       const status = filters.status ?? 'all';
       const page = Math.max(1, Math.floor(filters.page ?? 1));
-      // Tope 1000 = exportación CSV (la página usa 20). Ver ruta.
+      // Cap at 1000 = CSV export (UI uses 20). See route.
       const limit = Math.min(1000, Math.max(1, Math.floor(filters.limit ?? 20)));
 
       const scope = { fromUtc, toUtc, method: filters.method };
@@ -151,8 +151,8 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
             : row.receiptPdfKey === null
               ? 'pending'
               : 'issued';
-        // `payment_date` es NOT NULL: nula/inválida es corrupción visible,
-        // nunca se enmascara con una fecha inventada.
+        // `payment_date` is NOT NULL: null/invalid is visible data corruption,
+        // never masked with a fabricated date.
         const paymentIso = toIsoOrNull(row.paymentDate);
         if (!paymentIso) {
           throw new Error(

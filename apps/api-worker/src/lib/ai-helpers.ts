@@ -83,8 +83,8 @@ export async function assembleRagPrompt(
 
   const finalMessages: IAiChatMessage[] = [
     { role: 'system' as const, content: systemPrompt },
-    // Historial acotado a maxHistoryMessages - 1 para que el system prompt
-    // nunca se pierda en el slice de buildChatBody (solo se envían estos).
+    // History bounded to maxHistoryMessages - 1 so the system prompt
+    // is never dropped in the buildChatBody slice (only these are sent).
     ...messages.slice(-(AI_CHAT_LIMITS.maxHistoryMessages - 1)),
   ];
 

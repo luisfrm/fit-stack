@@ -5,7 +5,6 @@ import {
   buildDefaultOrgSettings,
   findFiscalWriteViolation,
   primaryCurrencyForCountry,
-  FiscalConfigSchema,
   StoredFiscalConfigSchema,
 } from '@workspace/shared';
 import type { FiscalConfig } from '@workspace/shared';
@@ -20,9 +19,9 @@ const slugTakenError = (message: string) =>
   });
 
 /**
- * 400 explícito del invariante fiscal (D6): el override solo puede REDUCIR
- * carga fiscal. Se valida el config FUSIONADO (un parcial entrante no conoce
- * el `isFormalTaxpayer` almacenado) y siempre antes de persistir.
+ * Explicit 400 for fiscal invariant (D6): override can only REDUCE
+ * fiscal burden. Validates the MERGED config (an incoming partial does not know
+ * the stored `isFormalTaxpayer`) and always before persisting.
  */
 const FISCAL_VIOLATION_MESSAGES: Record<string, string> = {
   TAXES_REQUIRE_FORMAL_TAXPAYER:
@@ -47,28 +46,27 @@ const fiscalViolationError = (violation: {
 };
 
 /**
- * Base del merge: la almacenada puede venir de una versión previa con keys
- * extra (cuando el schema era laxo) o de un campo futuro. Se parsea con un
- * schema tolerante (`.strip()`, no el `.strict()`) para NO perder `taxes`,
- * `disclaimerOverride` ni `isFormalTaxpayer` por una key desconocida.
+ * Merge baseline: stored config may originate from an earlier version with
+ * extra keys (when schema was lax) or from a future field. Parsed with a
+ * tolerant schema (`.strip()`, not `.strict()`) so as NOT to lose `taxes`,
+ * `disclaimerOverride`, or `isFormalTaxpayer` on an unknown key.
  */
 function parseStoredFiscalConfig(stored: unknown): FiscalConfig {
   if (stored == null) return {};
   const parsed = StoredFiscalConfigSchema.safeParse(stored);
   if (!parsed.success) {
-    console.error('fiscalConfig almacenada inválida, se ignora como base del merge.');
+    console.error('Stored fiscalConfig invalid, ignored as merge base.');
     return {};
   }
   return parsed.data;
 }
 
 /**
- * Fusiona el `fiscalConfig` entrante sobre el existente (merge, no reemplazo
- * ciego): los escalares presentes reemplazan; `taxes[]` se fusiona por
- * `name` (override actualiza rate/enabled; nombres desconocidos se conservan
- * tal cual — el resolver los ignora) y `confirmedTaxes[]` se acumula (una
- * confirmación no se pierde por un PATCH parcial de otro campo; revocarla es
- * apagar el impuesto). `null` explícito = reset a defaults.
+ * Merges incoming `fiscalConfig` over existing (merge, not blind replace):
+ * present scalars replace; `taxes[]` merges by `name` (override updates rate/enabled;
+ * unknown names preserved as-is — resolver ignores them) and `confirmedTaxes[]` accumulates
+ * (a confirmation is not lost on a partial PATCH of another field; revoking it means turning
+ * off the tax). Explicit `null` = reset to defaults.
  */
 export function mergeFiscalConfig(
   current: unknown,
@@ -117,18 +115,18 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       return orgsRepo.findById(id);
     },
 
-    /** Resolve una organización por su slug. `null` si no existe. */
+    /** Resolves an organization by slug. `null` if it does not exist. */
     async findOrganizationBySlug(slug: string, opts?: { includeMemberCount?: boolean }) {
       return orgsRepo.findBySlug(slug, opts);
     },
 
     async createOrganization(data: Omit<NewDbOrganization, 'id'> & { currencyFormat?: 'latam' | 'usa'; settings?: Record<string, string> }) {
       if (!data.name) throw new Error('El nombre de la organización es requerido');
-      // Obligatorios desde la creación, sin defaults silenciosos en lectura.
-      if (!data.timezone || !data.timezone.trim()) {
+      // Required from creation time, no silent defaults on read.
+      if (!data.timezone?.trim()) {
         throw new Error('La zona horaria es requerida');
       }
-      if (!data.countryCode || !data.countryCode.trim()) {
+      if (!data.countryCode?.trim()) {
         throw new Error('El país de operación es requerido');
       }
 
@@ -139,8 +137,8 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         throw slugTakenError('El slug o subdominio ya está en uso por otra organización');
       }
 
-      // Todo lo obligatorio va en el mismo insert: la moneda deriva del país,
-      // el formato viene explícito (o 'latam' como default de escritura).
+      // Everything required goes into the same insert: currency derives from country,
+      // format is explicit (or 'latam' as write default).
       const { currencyFormat, settings, ...rest } = data;
       const primaryCurrency = primaryCurrencyForCountry(data.countryCode);
       const newOrgData: NewDbOrganization = {
@@ -153,8 +151,8 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         updatedAt: new Date(),
       };
 
-      // Fail-closed en la creación: una org no puede nacer afirmando
-      // impuestos que su emisor no declaró.
+      // Fail-closed on creation: an org cannot be born asserting
+      // taxes that its issuer never declared.
       const createViolation = findFiscalWriteViolation(
         data.countryCode,
         data.fiscalConfig as FiscalConfig | null | undefined,
@@ -166,7 +164,7 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         throw new Error('Error al crear la organización');
       }
 
-      // Solo lo extensible se siembra en gym_setting ({...defaults, ...rest}).
+      // Only extensible settings seeded in gym_setting ({...defaults, ...rest}).
       const defaults = { ...buildDefaultOrgSettings(data.countryCode), ...settings };
       for (const [key, value] of Object.entries(defaults)) {
         await settingsRepo.upsert(created.id, key, value);
@@ -185,21 +183,20 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         }
       }
 
-      // Cambiar de país recalcula la moneda principal (bloqueada al país).
+      // Changing country recalculates primary currency (locked to country).
       if (data.countryCode) {
         (data as Partial<NewDbOrganization>).primaryCurrency = primaryCurrencyForCountry(data.countryCode);
       }
 
-      // `fiscalConfig` (jsonb) se fusiona sobre la almacenada, nunca se
-      // reemplaza a ciegas: un PATCH parcial de `taxes[]` no debe borrar
-      // `disclaimerOverride` ni `isFormalTaxpayer`.
+      // `fiscalConfig` (jsonb) merges over stored, never blind replacement:
+      // partial PATCH of `taxes[]` must not drop `disclaimerOverride` or `isFormalTaxpayer`.
       if ('fiscalConfig' in data) {
         const incoming = data.fiscalConfig as FiscalConfig | null | undefined;
         if (incoming !== undefined) {
           const merged = mergeFiscalConfig(current.fiscalConfig, incoming);
-          // Se valida el RESULTADO del merge, no el body entrante (D6).
-          // Si el mismo PATCH cambia el país, se valida contra el nuevo
-          // (los condicionales son por país).
+          // Validates RESULT of merge, not incoming body (D6).
+          // If the same PATCH changes country, validates against the new country
+          // (conditionals are country-scoped).
           const violation = findFiscalWriteViolation(
             data.countryCode ?? current.countryCode,
             merged,

@@ -24,8 +24,8 @@ export type FitTaskEvent =
       paymentId: number;
       organizationId: string;
       /**
-       * Número correlativo (hint de display; la verdad vive en DB).
-       * Opcional = compat con eventos en vuelo sin el campo.
+       * Correlative number (display hint; source of truth lives in DB).
+       * Optional = backward compatibility with in-flight events missing the field.
        */
       receiptNumber?: string;
     }
@@ -33,7 +33,7 @@ export type FitTaskEvent =
       type: 'email.org_payment_received';
       paymentId: number;
       organizationId: string;
-      /** Usuario que registró el pago (sesión). Recibe confirmación + owners dedupe. */
+      /** User who registered the payment (session). Receives confirmation + owners dedupe. */
       payerEmail?: string;
       payerName?: string;
     };
@@ -48,9 +48,9 @@ export interface Env {
   PANEL_URL?: string;
   CONSOLE_URL?: string;
   FILES_BUCKET: R2Bucket;
-  /** Producer de fit-task-events (el paso 2 encola aquí el email gateado). */
+  /** Producer for fit-task-events (step 2 enqueues gated emails here). */
   TASK_QUEUE: Queue;
-  /** Producer de fit-receipt-events (solo el barrido re-encola). */
+  /** Producer for fit-receipt-events (sweep re-enqueues here). */
   RECEIPT_QUEUE: Queue;
 }
 

@@ -269,9 +269,6 @@
     font-size: 0.875rem;
     line-height: 1.6;
   }
-  .chat-markdown pre {
-    overflow-x: auto;
-  }
   .chat-markdown code {
     overflow-wrap: break-word;
   }
@@ -336,6 +333,7 @@
     font-family: ui-monospace, monospace;
   }
   .chat-markdown pre {
+    overflow-x: auto;
     background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: 0.75rem;

@@ -16,8 +16,8 @@ const featureValueSchema = z.object({
 });
 
 /**
- * Features validadas contra el catálogo: IDs desconocidos → 400.
- * (El catálogo es la fuente de verdad en código; la DB solo persiste valores.)
+ * Features validated against catalog: unknown IDs -> 400.
+ * (Catalog is the source of truth in code; DB only persists values.)
  */
 const featuresSchema = z
   .record(z.string(), featureValueSchema)
@@ -50,8 +50,8 @@ export const platformPlanRoutes = new Hono<AppEnv>()
     const service = createPlatformPlansService(repo);
 
     const plans = await service.getAllPlans();
-    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
-    // ocurre on-write en POST/PUT/PATCH/DELETE de esta misma ruta.
+    // Low frequency data: TTL is safety net; actual invalidation
+    // occurs on-write in POST/PUT/PATCH/DELETE of this same route.
     await cache.set(cacheKey, plans, 3600);
     return c.json(plans);
   })
@@ -113,7 +113,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
     return c.json(updatedPlan);
   })
 
-  // PATCH /api/platform/plans/:id (alias de PUT, por compatibilidad de clientes)
+  // PATCH /api/platform/plans/:id (PUT alias for client compatibility)
   .patch('/:id', requirePlatformAuth(), zValidator('json', platformPlanSchema.partial()), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');

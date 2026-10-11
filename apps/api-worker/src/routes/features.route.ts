@@ -9,8 +9,8 @@ import {
 import type { AppEnv } from '../lib/env';
 
 /**
- * GET /api/platform/features — catálogo de features para el form de planes de console.
- * Montado en `/api/platform/features` (patrón de mounts por prefijo del repo).
+ * GET /api/platform/features - features catalog for console plan form.
+ * Mounted at `/api/platform/features` (mount pattern by repo prefix).
  */
 export const platformFeaturesRoutes = new Hono<AppEnv>()
   .get('/', requirePlatformAuth(), async (c) => {

@@ -3,29 +3,28 @@ import { renderDarkShell, escapeHtml, type RenderedEmail } from './layout';
 export interface OrgPaymentReceivedData {
   orgName: string;
   planName: string;
-  /** Ya formateado, p. ej. "50,00 USD". */
+  /** Preformatted, e.g. "50,00 USD". */
   amountPaid: string;
   paymentMethod: string;
-  /** Ya formateado, p. ej. "05 de septiembre de 2026". */
+  /** Preformatted, e.g. "05 de septiembre de 2026". */
   paymentDate: string;
   payerName: string;
-  /** true = el pago requiere revisión de soporte (status processing). */
+  /** true = payment requires support review (processing status). */
   pendingReview: boolean;
   /**
-   * URL del CTA ("Ir al Panel"). La resuelve el handler según quién es el
-   * destinatario — nunca el template. Requerida, sin default (regla §10:
-   * prohibido el fallback silencioso).
+   * CTA URL ("Go to Panel"). Resolved by handler based on recipient —
+   * never template. Required without default (§10: no silent fallback).
    */
   panelUrl: string;
 }
 
 /**
- * Confirmación de pago de suscripción SaaS (renovación autoservicio):
- * llega al usuario que registró el pago y a los owners de la org.
- * En estado `processing` aclara que el periodo se activa tras la
- * aprobación de soporte; en estado final agradecerá la renovación.
+ * SaaS subscription payment confirmation (self-service renewal):
+ * delivered to user who registered payment and org owners.
+ * Under `processing` status clarifies period activates upon support
+ * approval; under final status acknowledges renewal.
  *
- * Todo valor interpolado es input de operador/usuario: se escapa.
+ * All interpolated values are operator/user inputs: escaped.
  */
 export function renderOrgPaymentReceived(data: OrgPaymentReceivedData): RenderedEmail {
   const orgName = escapeHtml(data.orgName);

@@ -10,17 +10,17 @@ export interface IPayment {
   subscriptionId?: number | null;
 
   planSnapshotName: string;
-  /** Centavos enteros. */
+  /** Integer cents. */
   planSnapshotPrice: number;
   planSnapshotCurrency: string;
   /**
-   * Duración del plan al momento del cobro (la que define el periodo).
-   * NULL en filas anteriores al snapshot: el cálculo cae al plan vivo.
+   * Plan duration at time of payment (defines the period).
+   * NULL in rows created prior to snapshot: calculation falls back to live plan.
    */
   planSnapshotDurationValue?: number | null;
   planSnapshotDurationUnit?: string | null;
 
-  /** Centavos enteros. */
+  /** Integer cents. */
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
@@ -29,7 +29,7 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
-  // Correlative receipt (Fase 1). NULL = anterior al sistema (pre_system).
+  // Correlative receipt (Phase 1). NULL = prior to system (pre_system).
   receiptNumber?: string | null;
   documentType?: 'receipt' | 'invoice';
   receiptIssuedAt?: Date | null;
@@ -51,10 +51,10 @@ export interface ReceiptReportScope {
 }
 
 /**
- * Scope base del reporte (Fase 5): pagos `validated` + cualquier pago con
- * número (cubre `voided` con número conservado). `processing` / `voided`
- * sin número no son comprobantes y quedan fuera. Rango por
- * `receipt_issued_at` en numerados y por `payment_date` en sin numerar.
+ * Base report scope (Phase 5): `validated` payments + any payment with a
+ * receipt number (covers `voided` with preserved number). `processing` / `voided`
+ * without number are not receipts and are excluded. Date range by
+ * `receipt_issued_at` for numbered receipts and `payment_date` for unnumbered.
  */
 function receiptReportScope(organizationId: string, filters: ReceiptReportScope) {
   const conds = [
@@ -143,10 +143,10 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Cambia el estado del pago. Al anular (`voided`) persiste SIEMPRE la
-     * auditoría (`voidedBy`/`voidedAt`/`voidReason`), haya o no comprobante
-     * emitido: "rechazado" vs "anulado" se deriva con `getVoidKind`, no de
-     * columnas distintas. `receiptVoided` lo maneja el repo de comprobantes.
+     * Updates payment status. When voiding (`voided`), ALWAYS persists
+     * audit fields (`voidedBy`/`voidedAt`/`voidReason`), whether or not a receipt
+     * was issued: "rejected" vs "voided" is derived via `getVoidKind`, not from
+     * separate columns. `receiptVoided` is handled by the receipts repository.
      */
     async updateStatus(
       organizationId: string,
@@ -156,8 +156,8 @@ export function createPaymentsRepository(db: Db) {
     ): Promise<IPayment | undefined> {
       const update: Record<string, unknown> = { status };
       if (status === 'voided') {
-        // COALESCE preserva la primera auditoría: un re-void idempotente no
-        // debe pisar `voidedBy`/`voidedAt`/`voidReason` con null.
+        // COALESCE preserves initial audit info: an idempotent re-void must
+        // not overwrite `voidedBy`/`voidedAt`/`voidReason` with null.
         update.voidedBy = sql`COALESCE(${payment.voidedBy}, ${meta?.voidedBy ?? null})`;
         update.voidedAt = sql`COALESCE(${payment.voidedAt}, ${meta?.voidedAt ?? new Date()})`;
         update.voidReason = sql`COALESCE(${payment.voidReason}, ${meta?.voidReason ?? null})`;
@@ -238,9 +238,9 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Reporte de comprobantes (Fase 5). La clasificación por estado vive en
-     * el servicio; aquí solo se filtra por SQL lo expresable (estado pedido,
-     * método, rango) sobre el scope base compartido.
+     * Receipt report (Phase 5). Status classification lives in
+     * the service; here we only SQL-filter what is expressible (requested status,
+     * method, date range) over the shared base scope.
      */
     async findReceiptReportRows(
       organizationId: string,
@@ -253,8 +253,8 @@ export function createPaymentsRepository(db: Db) {
       const conds = [receiptReportScope(organizationId, filters)];
 
       switch (filters.state ?? 'all') {
-        // Emitido = numerado, no anulado Y con PDF (pendiente es subconjunto
-        // propio: numerado sin PDF). El summary usa la misma regla.
+        // Issued = numbered, not voided AND with PDF (pending is proper
+        // subset: numbered without PDF). Summary uses the same rule.
         case 'issued':
           conds.push(
             and(
@@ -307,13 +307,13 @@ export function createPaymentsRepository(db: Db) {
           voidedBy: payment.voidedBy,
           voidedAt: payment.voidedAt,
           voidReason: payment.voidReason,
-          // C1/C5: emisor congelado + actor, para el libro exportable.
+          // C1/C5: frozen issuer + actor, for exportable ledger.
           emitterSnapshot: payment.emitterSnapshot,
           issuedBy: payment.issuedBy,
         })
         .from(payment)
-        // LEFT: un pago huérfano (miembro borrado) debe aparecer en filas
-        // igual que en summary/totales, no descuadrar el reporte.
+        // LEFT: an orphan payment (deleted member) must appear in rows
+        // just like in summary/totals, without throwing off the report.
         .leftJoin(gymMember, eq(payment.memberId, gymMember.id))
         .where(where)
         .orderBy(sql`${payment.receiptIssuedAt} DESC NULLS LAST`, desc(payment.id))
@@ -329,8 +329,8 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Columnas de dinero del universo de emitidos no anulados (sin paginar)
-     * para agregar totales por moneda en el servicio. Solo lectura.
+     * Money columns from the issued non-voided scope (unpaginated)
+     * to aggregate totals by currency in the service. Read-only.
      */
     async findReceiptMoneyRows(organizationId: string, filters: ReceiptReportScope) {
       const where = and(
@@ -352,9 +352,9 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Conteo por estado en una sola query (para el summary, sobre el mismo
-     * scope que las filas). La etiqueta final la pone el servicio con la
-     * misma regla que clasifica las filas.
+     * Count by state in a single query (for summary, over the same
+     * scope as the rows). Final label is assigned by the service using the
+     * same rule that classifies rows.
      */
     async countReceiptStates(organizationId: string, filters: ReceiptReportScope) {
       return db
@@ -374,8 +374,8 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Estado de la secuencia anual + números emitidos del año (para gaps).
-     * El parse/validación vive en el servicio (helper puro de shared).
+     * Annual sequence state + issued numbers of the year (for gaps).
+     * Parsing/validation lives in the service (pure helper from shared).
      */
     async getReceiptSequenceState(organizationId: string, year: number, slug: string) {      const [seq] = await db
         .select({ lastNumber: organizationDocumentSequence.lastNumber })
@@ -387,6 +387,10 @@ export function createPaymentsRepository(db: Db) {
             eq(organizationDocumentSequence.year, year),
           ),
         );
+
+      const escapedSlug = slug
+        .toLowerCase()
+        .replaceAll(/[%_\\]/g, (c) => `\\${c}`);
 
       const numbers = await db
         .select({
@@ -406,10 +410,7 @@ export function createPaymentsRepository(db: Db) {
             // and `%_\` are escaped so the LIKE never alters the gaps universe.
             or(
               like(payment.receiptNumber, `${year}-%`),
-              like(
-                payment.receiptNumber,
-                `${slug.toLowerCase().replaceAll(/[%_\\]/g, (c) => `\\${c}`)}-${year}-%`,
-              ),
+              like(payment.receiptNumber, `${escapedSlug}-${year}-%`),
             ),
           ),
         );

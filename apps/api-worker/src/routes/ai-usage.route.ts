@@ -9,7 +9,7 @@ import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
 /**
- * GET /api/ai/usage — créditos IA del ciclo (usado/límite mensual).
+ * GET /api/ai/usage - AI credits for cycle (used/monthly limit).
  */
 export const aiUsageRoutes = new Hono<AppEnv>()
   .get('/', requireAuth(), requireOrg(), async (c) => {

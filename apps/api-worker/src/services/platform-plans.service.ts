@@ -57,8 +57,8 @@ export function createPlatformPlansService(platformPlansRepo: PlatformPlansRepos
     },
 
     /**
-     * Normaliza features contra el catálogo: descarta IDs desconocidos,
-     * aplica defaults y garantiza `panel` siempre habilitado.
+     * Normalizes features against the catalog: drops unknown IDs,
+     * applies defaults, and guarantees `panel` is always enabled.
      */
     normalizeFeatures(features: PlanFeaturesV2 | null | undefined) {
       return normalizeFeatures(features ?? {});

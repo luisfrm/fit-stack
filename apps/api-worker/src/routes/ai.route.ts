@@ -60,7 +60,7 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ data: AI_MODELS });
   })
 
-  // ── Historial de chat (Redis, sin DB) — cap CHAT_MAX_STORED por conversación ──
+  // ── Chat history (Redis, without DB) — cap CHAT_MAX_STORED per conversation ──
   .get('/conversations', requireOrgPermission(PM.AI, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const userId = c.get('user')!.id;
@@ -81,7 +81,7 @@ export const aiRoutes = new Hono<AppEnv>()
       messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
       updatedAt: body.updatedAt,
     };
-    // Valida que el id de la ruta coincida con el del body si viene
+    // Validate that route ID matches body ID if provided
     if (body.id !== conversation.id) {
       return c.json({ error: 'ID de conversación no coincide' }, 400);
     }
@@ -108,7 +108,7 @@ export const aiRoutes = new Hono<AppEnv>()
       const body = c.req.valid('json');
       const { messages, temperature, maxTokens } = body;
 
-      // 1. Validación de límites de input
+      // 1. Input limit validation
       for (const m of messages) {
         const cap =
           m.role === 'user' ? AI_CHAT_LIMITS.maxUserMessageChars : AI_CHAT_LIMITS.maxHistoryMessageChars;
@@ -140,9 +140,9 @@ export const aiRoutes = new Hono<AppEnv>()
         );
       }
 
-      // 3. Features + cuota pre-flight — ANTES del RAG: no gastar embeddings +
-      // pgvector si la cuota ya está agotada. consumeAiCredits no reserva nada;
-      // el estimate sin chars del RAG se corrige en el settle con el usage real.
+      // 3. Features + quota pre-flight — BEFORE RAG: do not spend embeddings +
+      // pgvector if quota is already depleted. consumeAiCredits does not reserve anything;
+      // estimate without RAG chars is corrected during settle with real usage.
       const orgId = c.get('orgId')!;
       const featuresService = createFeaturesService(
         createPlatformSubscriptionsRepository(c.get('db')),
@@ -153,7 +153,7 @@ export const aiRoutes = new Hono<AppEnv>()
       );
       const aiService = createAIService(c.env);
 
-      // Incluye cota superior del RAG (maxContextChars) para que el pre-flight nunca subestime
+      // Includes upper bound of RAG (maxContextChars) so pre-flight never underestimates
       const estimated = estimateCreditsFromMessages(
         messages.slice(-(AI_CHAT_LIMITS.maxHistoryMessages - 1)),
         maxTokens ?? AI_CHAT_LIMITS.maxOutputTokens,
@@ -175,7 +175,7 @@ export const aiRoutes = new Hono<AppEnv>()
         );
       }
 
-      // 4. RAG prompt assembly (solo si hay cuota)
+      // 4. RAG prompt assembly (only if quota allows)
       const knowledgeService = createKnowledgeService(
         createKnowledgeRepository(c.get('db')),
         aiService,
@@ -210,9 +210,9 @@ export const aiRoutes = new Hono<AppEnv>()
       let active = first;
       let usageEmitted = false;
 
-      // Model name: se resuelve con el PRIMER evento del stream ganador (post
-      // fallback) y no al crear la response — evita reportar el modelo que
-      // falló pre-start.
+      // Model name: resolves on the FIRST event of winning stream (post
+      // fallback) and not when creating response - avoids reporting model that
+      // failed pre-start.
       let resolveModelName!: (model: string) => void;
       const modelNamePromise = new Promise<string>((resolve) => {
         resolveModelName = resolve;
@@ -285,7 +285,7 @@ export const aiRoutes = new Hono<AppEnv>()
         }
       })();
 
-      // 6. Resolve model name (may come from fallback) — ya emitido por el stream ganador
+      // 6. Resolve model name (may come from fallback) - already emitted by winning stream
       return new Response(toSSEStream(wrappedStream, modelNamePromise) as unknown as BodyInit, {
         status: 200,
         headers: {

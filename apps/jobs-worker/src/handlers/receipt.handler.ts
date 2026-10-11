@@ -56,28 +56,24 @@ export async function handlePlatformReceiptRender(
 }
 
 /**
- * Pendientes de barrido — dos predicados, mismas columnas en las dos tablas:
+ * Sweep pending records — three predicates, same columns across both tables:
  *
- * 1. **Numerado sin PDF** (≥15 min): el render se perdió. Es el caso que ya
- *    cubría el índice parcial (`idx_payment_receipt_pending` /
- *    `idx_psp_receipt_pending`).
- * 2. **PDF listo pero sin notificar** (≥30 min): el render completó y el
- *    email del paso 2 nunca salió (o su marca quedó revertida por un fallo de
- *    envío). Sin este predicado esa notificación se perdía para siempre.
- * 3. **Anulado sin PDF con sello** (≥15 min): el void se persistió y el render
- *    del artefacto ANULADO se perdió. Sin este predicado el pago quedaría
- *    anunciando un documento que ya no se sirve (fail-closed: la descarga
- *    responde `pending` en lugar del original sin sello).
+ * 1. **Numbered without PDF** (≥15 min): render job was lost. Covered
+ *    by partial index (`idx_payment_receipt_pending` / `idx_psp_receipt_pending`).
+ * 2. **PDF ready but unnotified** (≥30 min): render completed but step 2
+ *    email failed to send (or was cleared on delivery failure). Without this
+ *    predicate the notification would be lost permanently.
+ * 3. **Voided without sealed PDF** (≥15 min): void was persisted but sealed
+ *    ANULADO render was lost. Without this predicate the payment would keep
+ *    referencing a document that is no longer served (fail-closed).
  *
- * Los 30 minutos del 2.º caso son deliberados: el evento original puede
- * seguir reintentando y no queremos re-encolar en paralelo con él. Re-encolar
- * de todos modos es seguro: la notificación tiene su propio gate idempotente
- * (`markReceiptNotified` / `markPlatformReceiptNotified`), así que ni el PDF ni
- * el email se duplican.
+ * The 30-minute delay for predicate 2 is deliberate: the original event may
+ * still be retrying and we avoid parallel re-queueing. Re-queueing is safe
+ * regardless: notifications have their own idempotent gate
+ * (`markReceiptNotified` / `markPlatformReceiptNotified`).
  *
- * Query LOCAL (solo jobs-worker la usa: el paso 2 ya tiene su evento y
- * api-worker nunca barre — criterio 2-apps-idéntico). Una fila corrupta no
- * aborta el resto.
+ * LOCAL query (used only by jobs-worker: step 2 already has its event and
+ * api-worker never sweeps). A corrupted row does not abort the batch.
  */
 function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): string {
   return `SELECT id, organization_id, receipt_number FROM ${table}
@@ -119,9 +115,9 @@ export async function sweepPendingReceiptPdfs(
     }
   }
 
-  // C2: mismo mecanismo para el emisor FitStack (usa el índice parcial
-  // `idx_psp_receipt_pending`; el pagador se resuelve en el paso 2 desde
-  // DB — el sweep no lo conoce y notifica solo a owners).
+  // C2: same mechanism for FitStack emitter (uses partial index
+  // `idx_psp_receipt_pending`; payer is resolved in step 2 from
+  // DB — sweep does not know payer and notifies only owners).
   const platformRows = (await sql.query(
     pendingSweepQuery('platform_subscription_payment'),
     [limit],

@@ -111,8 +111,8 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
       if (err instanceof APIError) {
         throw new HTTPException(err.statusCode === 401 ? 401 : 403, { message: err.message });
       }
-      // Fallback fail-closed: si la evaluación de Better Auth falla, solo el
-      // staff pleno (owner/admin) pasa; el resto (incluido support) recibe 403.
+      // Fail-closed fallback: if Better Auth check fails, only full
+      // platform staff (owner/admin) passes; the rest receives 403.
       if ((user as any).role !== 'admin' && (user as any).role !== 'owner') {
         throw new HTTPException(403, { message: 'Forbidden: Requires platform admin' });
       }
@@ -125,16 +125,16 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
 export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
 
 /**
- * Resuelve la zona horaria de la organización activa desde la sesión y la deja
- * en `c.get('orgTimezone')` (tipado). Es OBLIGATORIA: si la org no la tiene,
- * lanza 500 — nunca se usa un fallback silencioso que asigne una tz incorrecta.
- * Componer DESPUÉS de `requireOrgPermission`/`requireAuth` (necesita la sesión).
+ * Resolves active organization timezone from session and stores it
+ * in `c.get('orgTimezone')` (typed). It is MANDATORY: if missing, throws 500 —
+ * never uses a silent fallback assigning an incorrect tz.
+ * Compose AFTER `requireOrgPermission`/`requireAuth` (requires session).
  */
 export const requireOrgTimezone = () =>
   createMiddleware<AppEnv>(async (c, next) => {
     const org = c.get('org');
     const timezone = org?.timezone;
-    if (!timezone || !timezone.trim()) {
+    if (!timezone?.trim()) {
       throw new HTTPException(500, {
         message: 'La organización no tiene una zona horaria configurada',
       });
@@ -144,9 +144,9 @@ export const requireOrgTimezone = () =>
   });
 
 /**
- * Garantiza una org activa y la deja en `c.get('orgId')` (tipado).
- * Útil para rutas org-scoped sin chequeo de permiso (p. ej. upload).
- * Componer DESPUÉS de `requireAuth`.
+ * Ensures an active organization and sets it in `c.get('orgId')` (typed).
+ * Useful for org-scoped routes without permission checks (e.g. upload).
+ * Compose AFTER `requireAuth`.
  */
 export const requireOrg = () =>
   createMiddleware<AppEnv>(async (c, next) => {
@@ -159,7 +159,7 @@ export const requireOrg = () =>
   });
 
 /**
- * Construye el service de features para el contexto de la request.
+ * Constructs features service for the request context.
  */
 function buildFeaturesService(c: Context<AppEnv>) {
   const db = c.get('db');
@@ -172,9 +172,9 @@ function buildFeaturesService(c: Context<AppEnv>) {
 }
 
 /**
- * Feature-guard: verifica que el plan activo de la org incluya la feature.
- * Se compone DESPUÉS de `requireOrgPermission` (RBAC = rol; features = contratado).
- * Sin la feature → 403 { error, code: 'FEATURE_NOT_AVAILABLE', feature }.
+ * Feature guard: verifies active plan includes the feature.
+ * Compose AFTER `requireOrgPermission` (RBAC = role; features = contracted).
+ * Missing feature → 403 { error, code: 'FEATURE_NOT_AVAILABLE', feature }.
  */
 export const requireFeature = (featureId: FeatureId) =>
   createMiddleware<AppEnv>(async (c, next) => {

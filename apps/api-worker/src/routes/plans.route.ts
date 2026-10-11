@@ -10,7 +10,7 @@ import type { AppEnv } from '../lib/env';
 
 const planSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  // Precio en centavos enteros (convención Money, ver AGENTS.md).
+  // Price in integer cents (Money convention, see AGENTS.md).
   price: z.number().int().nonnegative(),
   currency: z.string().min(1, 'La moneda es requerida'),
   durationValue: z.number().int().positive(),
@@ -36,8 +36,8 @@ export const planRoutes = new Hono<AppEnv>()
     const plansService = createPlansService(plansRepo);
 
     const plans = await plansService.getAll(orgId, { includeStats });
-    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
-    // ocurre on-write en POST/PUT/DELETE de esta misma ruta.
+    // Low frequency data: TTL is safety net; actual invalidation
+    // occurs on-write in POST/PUT/DELETE of this same route.
     await cache.set(cacheKey, plans, 3600);
     return c.json(plans);
   })
@@ -45,7 +45,7 @@ export const planRoutes = new Hono<AppEnv>()
   // GET /api/plans/summary
   .get('/summary', requireOrgPermission(PM.PLANS, PA.READ), requireOrgTimezone(), async (c) => {
     const orgId = c.get('orgId')!;
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
 
     const plansRepo = createPlansRepository(c.get('db'));

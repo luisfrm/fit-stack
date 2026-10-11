@@ -8,10 +8,10 @@ import {
 import {
   PLATFORM_SUBSCRIPTION_STATUSES,
   type PlatformSubscriptionStatus,
+  type PaymentStatus,
   PAYMENT_STATUSES,
   PLATFORM_GRACE_PERIODS,
 } from '@workspace/shared/constants';
-import type { PaymentStatus } from '@workspace/shared/constants';
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 
 export interface SubscriptionFilters {
@@ -36,21 +36,21 @@ export interface SubscriptionWithDetails {
   cancelledAt: Date | null;
   cancellationReason: string | null;
   createdAt: Date;
-  /** Status computado (no se guarda) */
+  /** Computed status (not stored in DB) */
   status: PlatformSubscriptionStatus;
-  /** Status del último pago (para lógica de UX) */
+  /** Status of latest payment (for UX logic) */
   latestPaymentStatus: PaymentStatus | null;
 
   // Joined fields
   organizationName: string;
   organizationSlug: string | null;
   planName: string;
-  /** precio del plan en centavos */
+  /** plan price in integer cents */
   planPrice: number;
   planCurrency: string;
   planDurationValue: number;
   planDurationUnit: 'day' | 'week' | 'month' | 'year';
-  /** Features del plan al momento de la consulta (para snapshots de pago) */
+  /** Plan features at query time (for payment snapshots) */
   planFeatures: PlanFeaturesV2 | null;
   paymentsCount: number;
 }
@@ -67,7 +67,7 @@ export interface NewPlatformSubscriptionData {
   organizationId: string;
   planId: number;
   startDate?: Date;
-  /** Si no se provee, se calcula con la duración del plan */
+  /** If omitted, computed from plan duration */
   currentPeriodEnd?: Date;
   isTrial?: boolean;
   priceOverride?: number | null;
@@ -82,7 +82,7 @@ export interface NewPlatformPaymentData {
   planSnapshotCurrency: string;
   planSnapshotDurationValue: number;
   planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
-  /** Snapshot de features del plan al momento del pago (comparar vs el plan hoy) */
+  /** Snapshot of plan features at payment time (compare vs plan today) */
   featuresSnapshot?: PlanFeaturesV2 | null;
   amountPaid: number;
   currencyPaid: string;
@@ -99,14 +99,13 @@ export interface NewPlatformPaymentData {
 export function createPlatformSubscriptionsRepository(db: Db) {
   return {
     /**
-     * `EXISTS(validated|refunded)` sobre los pagos de la suscripción. Es la
-     * fuente única de "hay periodo pagado" (nunca "el último pago"): `voided`
-     * y `processing` no califican.
+     * `EXISTS(validated|refunded)` on subscription payments.
+     * Single source of truth for "has a paid period" (never "the latest payment"):
+     * `voided` and `processing` do not qualify.
      */
     hasValidatedPaymentSql() {
-      // Correlación cualificada explícita: Drizzle puede renderizar
-      // `${platformSubscription.id}` sin cualificar en queries sin joins, y
-      // entonces la subquery resuelve contra el `id` interno del pago.
+      // Explicit qualified correlation: Drizzle may render `${platformSubscription.id}`
+      // unqualified in joinless queries, resolving against inner payment `id`.
       return sql<boolean>`EXISTS (
         SELECT 1 FROM platform_subscription_payment
         WHERE platform_subscription_payment.subscription_id = platform_subscription.id
@@ -115,18 +114,18 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * SQL CASE que computa el status SaaS. Paridad exacta con
+     * SQL CASE computing SaaS status. Exact parity with
      * `computePlatformSubscriptionStatus` (`@workspace/shared`):
      * - cancelledAt IS NOT NULL => cancelled
-     * - isTrial y periodo vigente => trial
-     * - periodo vigente + EXISTS(validated|refunded) => active
-     * - periodo vigente sin pago calificado => past_due
-     * - vencida <= 7 días => past_due
-     * - vencida <= 14 días => read_only
-     * - vencida > 14 días => suspended
+     * - isTrial and active period => trial
+     * - active period + EXISTS(validated|refunded) => active
+     * - active period without qualifying payment => past_due
+     * - expired <= 7 days => past_due
+     * - expired <= 14 days => read_only
+     * - expired > 14 days => suspended
      *
-     * `voided` se IGNORA por completo: no revoca servicio, la gracia corre
-     * desde `currentPeriodEnd` y los plazos NO se acumulan.
+     * `voided` is IGNORED entirely: does not revoke service, grace period
+     * runs from `currentPeriodEnd` and periods do NOT accumulate.
      */
     getSubscriptionStatusSql() {
       const hasValidatedPayment = this.hasValidatedPaymentSql();
@@ -143,8 +142,8 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Último pago NO anulado (para UX). `voided` se excluye: el status SaaS
-     * no depende de "el último pago" sino de que exista uno calificado.
+     * Latest non-voided payment (for UX). `voided` is excluded: SaaS status
+     * does not depend on "the latest payment" but on whether a qualifying one exists.
      */
     getLatestPaymentStatusSql() {
       return sql<PaymentStatus | null>`(
@@ -359,11 +358,11 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Estado del último contrato SaaS de la org con el `hasValidatedPayment`
-     * real (`EXISTS(validated|refunded)`, nunca "el último pago"). Sin
-     * suscripción => `SUSPENDED` con `subscriptionId: null`. El `status` sale
-     * del CASE para garantizar paridad con los listados; `hasValidatedPayment`
-     * queda expuesto para guards (p. ej. autoservicio de renovación).
+     * Status of organization's latest SaaS contract with real `hasValidatedPayment`
+     * (`EXISTS(validated|refunded)`, never "the latest payment"). Without
+     * subscription => `SUSPENDED` with `subscriptionId: null`. `status` is produced
+     * by CASE statement to ensure parity with listings; `hasValidatedPayment`
+     * is exposed for guards (e.g., renewal self-service).
      */
     async getLastSubscriptionStatus(organizationId: string): Promise<{
       status: PlatformSubscriptionStatus;
@@ -504,9 +503,9 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Cambia el estado del pago SaaS. Al anular (`voided`) persiste SIEMPRE la
-     * auditoría (`voidedBy`/`voidedAt`/`voidReason`), haya o no comprobante.
-     * `receiptVoided` lo maneja `markPlatformReceiptVoided` (repo compartido).
+     * Updates SaaS payment status. When voiding (`voided`), ALWAYS persists
+     * audit fields (`voidedBy`/`voidedAt`/`voidReason`), whether or not a receipt exists.
+     * `receiptVoided` is handled by `markPlatformReceiptVoided` (shared repo).
      */
     async updatePaymentStatus(
       id: number,
@@ -518,8 +517,8 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         update.paidAt = meta?.paidAt ?? new Date();
       } else if (status === PAYMENT_STATUSES.VOIDED) {
         update.paidAt = null;
-        // COALESCE preserva la primera auditoría: un re-void idempotente no
-        // debe pisar `voidedBy`/`voidedAt`/`voidReason` con null.
+        // COALESCE preserves initial audit info: an idempotent re-void must
+        // not overwrite `voidedBy`/`voidedAt`/`voidReason` with null.
         update.voidedBy = sql`COALESCE(${platformSubscriptionPayment.voidedBy}, ${meta?.voidedBy ?? null})`;
         update.voidedAt = sql`COALESCE(${platformSubscriptionPayment.voidedAt}, ${meta?.voidedAt ?? new Date()})`;
         update.voidReason = sql`COALESCE(${platformSubscriptionPayment.voidReason}, ${meta?.voidReason ?? null})`;
@@ -603,13 +602,12 @@ export function createPlatformSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Serie mensual de revenue SaaS en UTC (solo pagos `validated`).
-     * Usa la misma fórmula que `getStats().monthlyRevenueCents`
-     * (`COALESCE(baseAmount, amountPaid)`) para que el bucket del mes
-     * corriente cuadre con el KPI.
-     * Nota: si hay planes en distintas monedas, las sumas mezclan monedas
-     * igual que `monthlyRevenueCents` — la normalización multi-moneda real
-     * es follow-up (ver `vaults/guides/FUTURE_IDEAS.md` §5).
+     * Monthly SaaS revenue series in UTC (`validated` payments only).
+     * Uses same formula as `getStats().monthlyRevenueCents`
+     * (`COALESCE(baseAmount, amountPaid)`) so current month bucket matches KPI.
+     * Note: if plans are in different currencies, sums aggregate currencies
+     * just like `monthlyRevenueCents` — true multi-currency normalization
+     * is a follow-up (see `vaults/guides/FUTURE_IDEAS.md` §5).
      */
     async getMonthlyRevenue(months: number): Promise<
       { month: string; totalCents: number; count: number }[]

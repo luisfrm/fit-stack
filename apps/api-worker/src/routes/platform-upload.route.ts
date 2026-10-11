@@ -12,16 +12,15 @@ import {
 import type { AppEnv } from '../lib/env';
 
 /**
- * Assets de plataforma SIN organización (console): exactamente el scope
- * `platform/branding/` (logo de FitStack en login/correos). Es el único prefijo
- * de plataforma servido públicamente.
+ * Platform assets WITHOUT organization (console): exactly the scope
+ * `platform/branding/` (FitStack logo in login/emails). It is the only
+ * platform prefix served publicly.
  *
- * Los comprobantes SaaS (`platform/receipts/…`) viven en el mismo bucket pero
- * fuera de este scope: este router no puede listarlos, sobrescribirlos ni
- * borrarlos.
+ * SaaS receipts (`platform/receipts/…`) live in the same bucket but
+ * outside this scope: this router cannot list, overwrite or delete them.
  *
- * Los assets de UNA organización desde el console se gestionan en
- * `/api/platform/organizations/:orgId/upload/*` (la org va por path).
+ * Assets of AN organization from console are managed in
+ * `/api/platform/organizations/:orgId/upload/*` (org specified by path).
  */
 const presignedSchema = z.object({
   filename: z.string().min(1),
@@ -37,8 +36,8 @@ export const platformUploadRoutes = new Hono<AppEnv>()
     return c.json(files);
   })
 
-  // GET /api/platform/upload/file?key=platform/branding/... — entrega autenticada
-  // (el branding también es público, esto es para previews con sesión).
+  // GET /api/platform/upload/file?key=platform/branding/... - authenticated delivery
+  // (branding is also public, this is for previews with session).
   .get('/file', requirePlatformAuth(), async (c) => {
     const key = c.req.query('key');
 

@@ -17,7 +17,7 @@ export const dashboardRoutes = new Hono<AppEnv>()
       return c.json({ error: 'Parameter today (YYYY-MM-DD) is required' }, 400);
     }
 
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
     const cacheKey = `org:${orgId}:dashboard:stats:${today}`;
@@ -36,7 +36,7 @@ export const dashboardRoutes = new Hono<AppEnv>()
     return c.json(stats);
   })
 
-  // GET /api/dashboard/action-items — listas accionables (próximos a vencer / vencidos recientemente)
+  // GET /api/dashboard/action-items - actionable lists (expiring soon / recently expired)
   .get('/action-items', requireOrgPermission(PM.DASHBOARD, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const cache = createCache(c.env);

@@ -15,10 +15,10 @@ export const paymentMethodSchema = z
   );
 
 /**
- * Schema canónico de `paymentMethodDetails` — el contrato de escritura es un
- * array de items auto-descriptivos ({ label, value, type }) tal como lo envían
- * panel y console (ver `IPaymentMethodDetails` en @workspace/shared).
- * Usado por /api/subscriptions y las rutas de suscripción de /api/platform.
+ * Canonical `paymentMethodDetails` schema — the write contract is an
+ * array of self-descriptive items ({ label, value, type }) as sent by
+ * panel and console (see `IPaymentMethodDetails` in @workspace/shared).
+ * Used by /api/subscriptions and /api/platform subscription routes.
  */
 export const paymentMethodDetailsSchema = z
   .array(
@@ -32,9 +32,9 @@ export const paymentMethodDetailsSchema = z
   .optional();
 
 /**
- * Línea de impuesto persistida en el pago. `rate` es fracción 0–1 y los
- * montos son centavos enteros (ver `money.ts` en `@workspace/shared`).
- * Única fuente de verdad para PDF y reportes.
+ * Tax line persisted in the payment. `rate` is a fraction 0–1 and amounts
+ * are integer cents (see `money.ts` in `@workspace/shared`).
+ * Single source of truth for PDF and reports.
  */
 export const taxDetailSchema = z.object({
   name: z.string().min(1),
@@ -42,13 +42,13 @@ export const taxDetailSchema = z.object({
   amount: z.number().int().min(0),
 });
 
-/** Contrato fiscal de la org — re-export del de shared, no duplicado. */
+/** Org fiscal contract — re-export from shared, not duplicated. */
 
 
 /**
- * Override manual de impuestos con auditoría: exige motivo no vacío.
- * Montos en centavos enteros. El servicio valida además que Σ líneas ≈
- * taxTotal (ver `applyTaxOverride`).
+ * Manual tax override with audit trail: requires non-empty reason.
+ * Amounts in integer cents. The service also validates that Σ lines ≈
+ * taxTotal (see `applyTaxOverride`).
  */
 export const taxOverrideSchema = z.object({
   taxTotal: z.number().int().min(0),

@@ -54,7 +54,7 @@ export function createKnowledgeRepository(db: Db) {
         )
         .orderBy(desc(aiKnowledgeDocument.updatedAt));
       if (rows.length === 0) return [];
-      // Conteo acotado a los docs listados (evita escanear toda la tabla)
+      // Count scoped to listed docs (avoids full table scan)
       const docIds = rows.map((r) => r.id);
       const counts = await db
         .select({
@@ -132,11 +132,11 @@ export function createKnowledgeRepository(db: Db) {
     },
 
     /**
-     * Reemplaza los chunks de un documento. Sin transacción: neon-http (driver
-     * HTTP de Neon para Workers) no soporta transacciones interactivas. El
-     * orden delete→insert es aceptable: service.create borra el doc completo si
-     * el re-embed falla; en update lo peor es un doc sin chunks hasta el
-     * próximo guardado con contenido.
+     * Replaces document chunks. No transaction: neon-http (Neon HTTP driver
+     * for Workers) does not support interactive transactions. The delete→insert
+     * order is acceptable: service.create deletes the entire document if
+     * re-embedding fails; in update the worst case is a doc without chunks until
+     * the next save with content.
      */
     async replaceChunks(documentId: string, chunks: KnowledgeChunkInput[]): Promise<void> {
       await db.delete(aiKnowledgeChunk).where(eq(aiKnowledgeChunk.documentId, documentId));
@@ -154,8 +154,8 @@ export function createKnowledgeRepository(db: Db) {
     },
 
     /**
-     * Recuperación RAG. El aislamiento multi-tenant vive aquí:
-     * plataforma (org IS NULL) + documentos de la org de la sesión.
+     * RAG retrieval. Multi-tenant isolation lives here:
+     * platform (org IS NULL) + session org documents.
      */
     async searchSimilar(params: {
       queryEmbedding: number[];

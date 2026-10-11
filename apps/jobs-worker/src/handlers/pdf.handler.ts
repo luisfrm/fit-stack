@@ -18,7 +18,7 @@ export interface PdfHandlerEnv extends EmailHandlerEnv {
 }
 
 function formatDate(date: Date, timezone: string): string {
-  // Siempre en la TZ de la org emisora (UTC del runtime partiría días).
+  // Always in the emitter org's timezone (runtime UTC would split days).
   return new Date(date).toLocaleDateString('es-ES', {
     day: '2-digit',
     month: 'long',
@@ -46,9 +46,9 @@ export async function handlePaymentReceipt(
   payload: { paymentId: number; organizationId: string; receiptNumber?: string }
 ) {
   const db = createDb(env.DATABASE_URL);
-  // Lectura org-scoped por construcción (filtra pago + miembro por org;
-  // `undefined` también cuando el pago es de otra org). El `receiptNumber?`
-  // del evento es solo hint de observabilidad: la verdad vive en DB.
+  // Org-scoped read by construction (filters payment + member by org;
+  // `undefined` if payment belongs to another org). `receiptNumber?` on the
+  // event is only an observability hint: source of truth is in DB.
   const composed = await createReceiptsRepository(db).getReceiptComposedData(
     payload.organizationId,
     payload.paymentId,
@@ -63,22 +63,22 @@ export async function handlePaymentReceipt(
   const email = member.email?.trim();
   if (!email) {
     console.warn(
-      `Payment ${payload.paymentId}: miembro sin correo, emisión intacta, envío omitido.`,
+      `Payment ${payload.paymentId}: member without email, issuance intact, delivery skipped.`,
     );
     return;
   }
 
-  // Sin fallbacks silenciosos: timezone y currencyFormat son NOT NULL.
+  // No silent fallbacks: timezone and currencyFormat are NOT NULL.
   if (!org.timezone || !org.currencyFormat) {
     console.error(
-      `Payment ${payload.paymentId}: org sin timezone/formato, envío omitido (mala config, no asumir).`,
+      `Payment ${payload.paymentId}: org missing timezone/format, delivery skipped (misconfiguration, do not assume).`,
     );
     return;
   }
   const orgFormat = org.currencyFormat as CurrencyFormat;
 
-  // Montos en centavos enteros (convención Money): display vía formatCents
-  // con el formato de la org emisora.
+  // Amounts in integer cents (Money convention): display via formatCents
+  // with emitter org's format.
   const amountFormatted = formatCents(
     Number(paymentRow.amountPaid),
     paymentRow.currencyPaid,
@@ -104,7 +104,7 @@ export async function handlePaymentReceipt(
   // voided receipt is its sealed download (`receipt_voided_pdf_key`).
   if (paymentRow.receiptVoided) {
     console.warn(
-      `Payment ${payload.paymentId}: comprobante ${receiptNumber ?? '—'} ANULADO; envío omitido (el entregable es el PDF con sello).`,
+      `Payment ${payload.paymentId}: receipt ${receiptNumber ?? '—'} VOIDED; send omitted (deliverable is stamped PDF).`,
     );
     return;
   }
@@ -181,13 +181,11 @@ async function resolveReceiptAttachment(
 }
 
 /**
- * Confirmación de pago de suscripción SaaS (email.org_payment_received):
- * llega al usuario que registró el pago (payer) y a los owners de la
- * organización (deduplicados). Con status `processing` el email aclara que
- * el periodo se activa al aprobar soporte. Desde C2: si el pago está
- * numerado con PDF, adjunta los bytes de R2 tal cual (nunca regenera);
- * numerado sin PDF → log + return (el barrido lo repara); sin número →
- * HTML sin adjunto (solo reenvío/procesamiento).
+ * SaaS subscription payment confirmation (email.org_payment_received):
+ * delivered to user who registered payment (payer) and org owners (deduplicated).
+ * With status `processing` email clarifies period activates upon support approval.
+ * From C2: if payment is numbered with PDF, attaches R2 bytes as-is (never regenerates);
+ * numbered without PDF → log + return (sweep repairs); without number → HTML without attachment.
  */
 export async function handleOrgPaymentReceived(
   env: PdfHandlerEnv,
@@ -215,7 +213,7 @@ export async function handleOrgPaymentReceived(
     return;
   }
 
-  // Emails de los owners de la org (auth_member role=owner → user.email)
+  // Org owners emails (auth_member role=owner → user.email)
   const ownerRows = await db
     .select({ email: user.email })
     .from(authMember)
@@ -239,10 +237,10 @@ export async function handleOrgPaymentReceived(
     ),
   );
 
-  // Sin fallbacks silenciosos: timezone y currencyFormat son NOT NULL.
+  // No silent fallbacks: timezone and currencyFormat are NOT NULL.
   if (!paymentData.org.timezone || !paymentData.org.currencyFormat) {
     console.error(
-      `Platform payment ${payload.paymentId}: org sin timezone/formato, envío omitido (mala config, no asumir).`,
+      `Platform payment ${payload.paymentId}: org missing timezone/format, delivery skipped (misconfiguration, do not assume).`,
     );
     return;
   }
@@ -256,21 +254,20 @@ export async function handleOrgPaymentReceived(
   const receiptNumber = paymentData.payment.receiptNumber;
   const receiptPdfKey = paymentData.payment.receiptPdfKey;
 
-  // Anulado (defensivo, espejo Panel): nunca se envía el PDF de emisión de un
-  // comprobante anulado; su entregable es el PDF con sello.
+  // Voided (defensive, mirrors Panel): never send issuance PDF of voided
+  // receipt; deliverable is stamped PDF.
   if (paymentData.payment.receiptVoided) {
     console.warn(
-      `Platform payment ${payload.paymentId}: comprobante ${receiptNumber ?? '—'} ANULADO; envío omitido (el entregable es el PDF con sello).`,
+      `Platform payment ${payload.paymentId}: receipt ${receiptNumber ?? '—'} VOIDED; delivery skipped (deliverable is stamped PDF).`,
     );
     return;
   }
   const payerName = payload.payerName?.trim() || 'El equipo de tu organización';
 
-  // CTA target-based: el URL lo decide QUIÉN es el destinatario, nunca el
-  // template. Hoy todos los destinatarios son staff (payer + owners) → panel.
-  // Extensión futura (app de portal para member/trainer): su target será
-  // `env.PORTAL_URL` + un caso `target: 'portal'` en el contrato de invitación
-  // (`RegistrationInviteData.target`). Sin binding ni fallback hasta entonces.
+  // Target-based CTA: URL decided by WHO recipient is, never template.
+  // Today all recipients are staff (payer + owners) → panel.
+  // Future extension (portal app for member/trainer): target will be
+  // `env.PORTAL_URL` + `target: 'portal'` in invite contract.
   const panelUrl = env.PANEL_URL?.trim();
   if (!panelUrl) {
     throw new Error(

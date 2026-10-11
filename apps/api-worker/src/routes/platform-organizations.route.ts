@@ -30,7 +30,7 @@ const createOrgSchema = z.object({
   logo: z.string().nullable().optional(),
   slogan: z.string().nullable().optional(),
   countryCode: z.string().min(1, 'El país de operación es requerido'),
-  // La zona horaria es OBLIGATORIA desde la creación (no hay default silencioso).
+  // Timezone is REQUIRED from creation (no silent default).
   timezone: z.string().min(1, 'La zona horaria es requerida'),
   currencyFormat: z.enum(['latam', 'usa']).optional(),
   taxId: z.string().nullable().optional(),
@@ -99,7 +99,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     return c.json(result);
   })
 
-  // GET /api/platform/organizations/check-slug — disponibilidad en vivo del slug
+  // GET /api/platform/organizations/check-slug - live availability of slug
   .get(
     '/check-slug',
     requirePlatformAuth(),
@@ -204,7 +204,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     return c.json({ success: true });
   })
 
-  // POST /api/platform/organizations/:id/ai-credits — grant manual de créditos IA (tests / top-up)
+  // POST /api/platform/organizations/:id/ai-credits - manual grant of AI credits (tests / top-up)
   .post(
     '/:id/ai-credits',
     requirePlatformAuth(),
@@ -228,7 +228,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       );
       const quota = await featuresService.grantAiBonus(orgId, credits);
 
-      // Bonus no está en cache de features, pero invalidamos por si la UI lo deriva de ahí
+      // Bonus is not in features cache, but invalidate in case UI derives it from there
       await cache.invalidateExact(`org:${orgId}:features`);
       await cache.invalidateExact(`platform:ai-usage:${orgId}`);
 
@@ -242,7 +242,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     },
   )
 
-  // GET /api/platform/organizations/:id/ai-usage — lectura de cuota IA por org (console)
+  // GET /api/platform/organizations/:id/ai-usage - read AI quota by org (console)
   .get('/:id/ai-usage', requirePlatformAuth(), async (c) => {
     const orgId = c.req.param('id');
     const cache = createCache(c.env);
@@ -274,8 +274,8 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     return c.json(payload);
   })
 
-  // GET /api/platform/organizations/:id/gym-overview — adopción gym + portal (console).
-  // Staleness aceptada (5 min): los writes del gym no invalidan claves platform.
+  // GET /api/platform/organizations/:id/gym-overview - gym + portal adoption (console).
+  // Accepted staleness (5 min): gym writes do not invalidate platform keys.
   .get('/:id/gym-overview', requirePlatformAuth(), async (c) => {
     const orgId = c.req.param('id');
     const cache = createCache(c.env);
@@ -457,11 +457,11 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // ---------------------------------------------------------------------------
-  // Assets DE LA ORGANIZACIÓN desde el console.
+  // Assets OF THE ORGANIZATION from console.
   //
-  // El console no tiene organización activa en la sesión: la org destino viaja
-  // por PATH (`:id`), nunca por body/query, y cada request valida que exista +
-  // que la key caiga dentro de `<orgId>/`. Mismo contrato de keys que el panel.
+  // Console has no active organization in session: target org is passed
+  // via PATH (`:id`), never via body/query, and each request validates existence +
+  // that key falls inside `<orgId>/`. Same key contract as panel.
   // ---------------------------------------------------------------------------
 
   // GET /api/platform/organizations/:id/upload?folder=
@@ -474,8 +474,8 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     return c.json(await r2Service.listFiles(orgStorageListPrefix(orgId, folder)));
   })
 
-  // GET /api/platform/organizations/:id/upload/file?key=<orgId>/… — entrega
-  // autenticada para el console (logo de org, evidencia de pago).
+  // GET /api/platform/organizations/:id/upload/file?key=<orgId>/… - authenticated
+  // delivery for console (org logo, payment proof).
   .get('/:id/upload/file', requirePlatformAuth(), async (c) => {
     const orgId = c.req.param('id');
     const key = c.req.query('key');

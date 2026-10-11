@@ -70,10 +70,10 @@ const receiptsReportQuerySchema = z.object({
     .optional(),
   status: z.enum(['all', 'issued', 'pending', 'voided', 'pre_system', 'gaps']).optional(),
   method: z.string().min(1).optional(),
-  // Año UTC de `payment_date` (la serie FS-N es continua, no lleva año).
+  // UTC year of `payment_date` (the FS-N series is continuous, does not contain year).
   year: z.coerce.number().int().min(2000).max(2100).optional(),
   page: z.coerce.number().int().positive().optional(),
-  // Tope alto para exportación CSV (la página usa 20; el CSV, hasta 1000).
+  // High upper bound for CSV export (page uses 20; CSV up to 1000).
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
@@ -83,12 +83,12 @@ function buildService(c: any) {
   return { repo, plansRepo, service: createPlatformSubscriptionsService(repo, plansRepo) };
 }
 
-/** Emisión C2: paso 1 donde el pago queda validado (sin I/O salvo DB+cola). */
+/** Emission C2: step 1 where payment is validated (no I/O except DB+queue). */
 function buildReceipts(c: any) {
   return createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
 }
 
-/** La emisión afecta el historial de facturas de la org (C3 lo lee). */
+/** Emission affects the org invoices history (C3 reads it). */
 async function invalidateInvoicesCache(c: any, organizationId: string) {
   await createCache(c.env).invalidateExact(
     `platform:subscriptions:invoices:${organizationId}`,
@@ -96,8 +96,8 @@ async function invalidateInvoicesCache(c: any, organizationId: string) {
 }
 
 /**
- * Auditoría del correlativo (`GET /receipts`, C4): se invalida en cualquier
- * write de suscripciones/pagos porque pueden emitir o anular un número.
+ * Audit sequence (`GET /receipts`, C4): invalidated on any
+ * write of subscriptions/payments because they can issue or void a number.
  */
 async function invalidateReceiptsReportCache(cache: ReturnType<typeof createCache>) {
   await cache.invalidate('platform:receipts*');
@@ -149,8 +149,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json(stats);
   })
 
-  // GET /api/platform/subscriptions/revenue?months=12 — serie mensual SaaS en UTC.
-  // Va antes de /:id para que Hono no la trague como param.
+  // GET /api/platform/subscriptions/revenue?months=12 - monthly SaaS series in UTC.
+  // Precedes /:id so Hono does not capture it as a param.
   .get('/revenue', requirePlatformAuth(), async (c) => {
     const raw = Number(c.req.query('months') || '12');
     const months = Math.min(24, Math.max(1, Number.isFinite(raw) ? Math.floor(raw) : 12));
@@ -167,10 +167,10 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     return c.json(revenue);
   })
 
-  // GET /api/platform/subscriptions/receipts — auditoría del correlativo
-  // global `FS-N`: filas + resumen + totales por moneda + gaps (hueco
-  // sospechoso vs anulado explicado). Espejo del reporte del Panel.
-  // Lectura: support sí (mismo contrato que la descarga de comprobantes).
+  // GET /api/platform/subscriptions/receipts - audit of global correlative
+  // `FS-N`: rows + summary + totals by currency + gaps (suspicious gap
+  // vs explained void). Panel report mirror.
+  // Read: support allowed (same contract as receipt download).
   .get('/receipts', requirePlatformPermission('subscription', 'list'), async (c) => {
     const parsed = receiptsReportQuerySchema.safeParse({
       from: c.req.query('from'),
@@ -190,7 +190,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const filters = parsed.data;
 
     const cache = createCache(c.env);
-    // Key normalizada con defaults: `?status=all` y sin query comparten caché.
+    // Normalized key with defaults: `?status=all` and no query share cache.
     const cacheKey = `platform:receipts:${JSON.stringify({
       from: filters.from ?? null,
       to: filters.to ?? null,
@@ -209,12 +209,12 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       createPlatformReceiptsRepository(db),
     );
     const report = await service.getReceiptsReport(filters);
-    await cache.set(cacheKey, report, 300); // 5 min: invalidado on-write en emisión/anulación
+    await cache.set(cacheKey, report, 300); // 5 min: invalidated on-write on issuance/voiding
     return c.json(report);
   })
 
-  // GET /api/platform/subscriptions/by-organization/:orgId/invoices — historial SaaS de la org.
-  // Va antes de /:id para que Hono no la trague como param.
+  // GET /api/platform/subscriptions/by-organization/:orgId/invoices - SaaS history of org.
+  // Precedes /:id so Hono does not capture it as a param.
   .get('/by-organization/:orgId/invoices', requirePlatformAuth(), async (c) => {
     const orgId = c.req.param('orgId');
 
@@ -247,13 +247,13 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const cache = createCache(c.env);
 
     const { service } = buildService(c);
-    // El fallo compensado re-lanza tras mutar (pago anulado / periodo revertido
-    // / alta cancelada): las invalidaciones corren igual en el `finally`.
+    // Compensated failure re-throws after mutating (payment voided / period reverted
+    // / registration cancelled): invalidations run anyway in `finally`.
     let result;
     try {
       result = await service.createSubscriptionWithPayment(data, {
         receipts: buildReceipts(c),
-        // C5: actor de sesión que emite (`issued_by`).
+        // C5: session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
@@ -321,7 +321,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     try {
       result = await service.renewSubscription(id, data, {
         receipts: buildReceipts(c),
-        // C5: actor de sesión que emite (`issued_by`).
+        // C5: session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
@@ -346,8 +346,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const payment = await service.getPaymentById(paymentId);
     if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
 
-    // Guard explícito (sin `!`): `requirePlatformAuth` garantiza sesión, pero
-    // el actor del ANULADO se resuelve igual que en el resto del archivo.
+    // Explicit guard (no `!`): `requirePlatformAuth` guarantees session, but
+    // the VOID actor is resolved same as the rest of the file.
     const actor = c.get('user')?.id;
     if (!actor) return c.json({ error: 'Sesión requerida.' }, 401);
 
@@ -368,13 +368,13 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       }
     }
 
-    // C6: el intento de anulación del comprobante viaja en el body
-    // (`receiptVoided` + `receiptVoidReason`), nunca en silencio.
+    // C6: receipt voiding attempt travels in response body
+    // (`receiptVoided` + `receiptVoidReason`), never silently.
     return c.json({ success: true, paymentId, status: data.status, ...receipt });
   })
 
-  // GET /api/platform/subscriptions/payments/:paymentId/receipt — contrato
-  // de 3 estados, nunca 409 (espejo Panel). Lectura granular: support sí.
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt - 3-state contract,
+  // never 409 (Panel mirror). Granular read: support allowed.
   .get('/payments/:paymentId/receipt', requirePlatformPermission('subscription', 'list'), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
 
@@ -400,8 +400,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     });
   })
 
-  // GET /api/platform/subscriptions/payments/:paymentId/receipt/pdf —
-  // descarga binaria (200 bytes o 404). Lectura granular: support sí.
+  // GET /api/platform/subscriptions/payments/:paymentId/receipt/pdf -
+  // binary download (200 bytes or 404). Granular read: support allowed.
   .get('/payments/:paymentId/receipt/pdf', requirePlatformPermission('subscription', 'list'), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
 
@@ -424,8 +424,8 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     });
   })
 
-  // POST /api/platform/subscriptions/payments/:paymentId/resend — reenvío
-  // manual a payer+owners (4 ramas congeladas). Solo admin/owner: support 403.
+  // POST /api/platform/subscriptions/payments/:paymentId/resend - manual resend
+  // to payer+owners (4 frozen branches). Admin/owner only: support 403.
   .post('/payments/:paymentId/resend', requirePlatformAuth(), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
 

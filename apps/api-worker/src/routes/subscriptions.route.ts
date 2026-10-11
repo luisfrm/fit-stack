@@ -14,14 +14,14 @@ import { paymentMethodDetailsSchema, paymentMethodSchema, taxDetailSchema } from
 import type { AppEnv } from '../lib/env';
 
 /**
- * Toda escritura de suscripción crea/actualiza un pago y mueve el periodo:
- * invalida en bloque todo lo que depende de subscriptions + payments.
+ * Every subscription write creates/updates a payment and moves the period:
+ * invalidates all caches dependent on subscriptions + payments in bulk.
  */
 async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string): Promise<void> {
   await cache.invalidate(`org:${orgId}:subscriptions*`);
   await cache.invalidateExact(`org:${orgId}:subscription-status`);
   await cache.invalidateExact(`org:${orgId}:payments:analytics`);
-  // `withoutActiveSubscription` de members:stats depende de subs/pagos.
+  // `withoutActiveSubscription` from members:stats depends on subs/payments.
   await cache.invalidateExact(`org:${orgId}:members:stats`);
   await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
   await cache.invalidate(`org:${orgId}:dashboard:action-items`);
@@ -39,7 +39,7 @@ const createSubSchema = z.object({
   endDate: z.string().optional(),
   endDateOverrideReason: z.string().optional(),
   payment: z.object({
-    // Todo dinero en centavos enteros (convención Money, ver AGENTS.md).
+    // All money in integer cents (Money convention, see AGENTS.md).
     amountPaid: z.number().int().positive(),
     currencyPaid: z.string(),
     exchangeRateApplied: z.string().nullable().optional(),
@@ -47,9 +47,9 @@ const createSubSchema = z.object({
     paymentMethodDetails: paymentMethodDetailsSchema,
     status: z.enum(['processing', 'validated', 'voided']).optional(),
     paymentDate: z.string().optional(),
-    // Desglose fiscal en centavos enteros (Fase 0: schema abierto; el
-    // servicio lo calcula por defecto y solo acepta override con
-    // taxOverrideReason en Fase 2).
+    // Fiscal breakdown in integer cents (Phase 0: open schema;
+    // service calculates it by default and only accepts override with
+    // taxOverrideReason in Phase 2).
     subtotal: z.number().int().positive().optional(),
     taxTotal: z.number().int().min(0).optional(),
     taxDetails: z.array(taxDetailSchema).optional(),
@@ -105,7 +105,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
   .post('/', requireOrgPermission(PM.SUBSCRIPTIONS, PA.CREATE), requireOrgTimezone(), zValidator('json', createSubSchema), async (c) => {
     const orgId = c.get('orgId')!;
     const payload = c.req.valid('json');
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 
@@ -120,7 +120,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     try {
       newSub = await subsService.create(orgId, payload as any, timezone, {
         receipts: receiptsService,
-        // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
+        // C5: session actor emitting receipt (recorded in `issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
@@ -148,5 +148,5 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     await invalidateSubscriptionDependentCaches(cache, orgId);
     return c.json(updated);
   });
-// Nota: no existe DELETE /:id. Un registro financiero (suscripción + pago) no
-// se elimina nunca — se anula el cobro (`PATCH /api/payments/:id/status`).
+// Note: DELETE /:id does not exist. A financial record (subscription + payment) is
+// never deleted - the payment is voided (`PATCH /api/payments/:id/status`).

@@ -36,10 +36,10 @@ export interface PaginatedSubscriptionsResult {
 export function createSubscriptionsRepository(db: Db) {
   return {
     /**
-     * Status derivado (nunca se guarda). El cobro anulado/rechazado gana sobre
-     * `cancelledAt`: si el cobro no vale, el registro está ANULADO, no revocado.
-     * `cancelledAt` sigue siendo la marca de "fuera de vigencia" (revocada O
-     * anulada) que usan los reportes y los filtros de acceso.
+     * Derived status (never persisted in DB). Voided/rejected payment takes precedence over
+     * `cancelledAt`: if payment is invalid, record is VOIDED, not cancelled.
+     * `cancelledAt` remains the marker for out-of-validity (revoked OR
+     * voided) used by reports and access filters.
      */
     getSubscriptionStatusSql(now: Date) {
       return sql<SubscriptionStatus>`CASE 
@@ -102,8 +102,8 @@ export function createSubscriptionsRepository(db: Db) {
             )!
           );
         } else if (status === SUBSCRIPTION_STATUSES.VOIDED) {
-          // "Anuladas" = cobro `voided` (rechazado sin comprobante o anulado
-          // con comprobante): la distinción se deriva con `getVoidKind`.
+          // "Voided" = `voided` payment (rejected without receipt or voided
+          // with receipt): distinction is derived with `getVoidKind`.
           conditions.push(eq(payment.status, PAYMENT_STATUSES.VOIDED));
         }
       }
@@ -231,9 +231,9 @@ export function createSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Suscripción por id, org-scoped. Solo lo mínimo para el guard de
-     * transición de pagos (¿está fuera de vigencia?): un read completo sería
-     * gastar un JOIN para mirar `cancelledAt`.
+     * Subscription by id, org-scoped. Minimal data for payment transition
+     * guard (is it out-of-validity?): a full read would waste a JOIN
+     * just to check `cancelledAt`.
      */
     async findById(organizationId: string, id: number) {
       const [record] = await db
@@ -409,8 +409,8 @@ export function createSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Miembros cuya última sub validada vence en ≤ `days` días (aún activa).
-     * Un miembro por fila: la fila es su sub vigente (end_date = MAX por member).
+     * Members whose latest validated sub expires in ≤ `days` days (still active).
+     * One member per row: row is their active sub (end_date = MAX per member).
      */
     async getExpiringSoonMembers(organizationId: string, now: Date, days: number = 7, limit: number = 10) {
       const limitDate = new Date(now);
@@ -435,7 +435,7 @@ export function createSubscriptionsRepository(db: Db) {
             eq(subscription.organizationId, organizationId),
             sql`${subscription.cancelledAt} IS NULL`,
             eq(payment.status, 'validated'),
-            // Solo la sub vigente del member (MAX global, sin renew posterior)
+            // Only active sub of member (global MAX, no subsequent renew)
             sql`${subscription.endDate} = (
               SELECT MAX(s2.end_date) FROM subscription s2
               INNER JOIN payment p2 ON p2.subscription_id = s2.id
@@ -454,8 +454,8 @@ export function createSubscriptionsRepository(db: Db) {
     },
 
     /**
-     * Miembros cuya última sub validada expiró en los últimos `days` días y no renovaron
-     * (su MAX(end_date) ya quedó en el pasado → ninguna sub vigente posterior).
+     * Members whose latest validated sub expired in the past `days` days and did not renew
+     * (their MAX(end_date) is in the past → no subsequent active sub).
      */
     async getRecentlyExpiredMembers(organizationId: string, now: Date, days: number = 7, limit: number = 10) {
       const sinceDate = new Date(now);
@@ -480,7 +480,7 @@ export function createSubscriptionsRepository(db: Db) {
             eq(subscription.organizationId, organizationId),
             sql`${subscription.cancelledAt} IS NULL`,
             eq(payment.status, 'validated'),
-            // Solo la última sub del member (MAX global, sin renew posterior)
+            // Only latest sub of member (global MAX, no subsequent renew)
             sql`${subscription.endDate} = (
               SELECT MAX(s2.end_date) FROM subscription s2
               INNER JOIN payment p2 ON p2.subscription_id = s2.id

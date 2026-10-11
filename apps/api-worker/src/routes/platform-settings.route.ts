@@ -24,8 +24,8 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
 
     const settings = await settingsService.getAll(null);
-    // Dato de baja frecuencia: el TTL es red de seguridad; la invalidación real
-    // ocurre on-write en POST /api/platform/settings.
+    // Low frequency data: TTL is safety net; actual invalidation
+    // occurs on-write in POST /api/platform/settings.
     await cache.set(cacheKey, settings, 3600);
     return c.json(settings);
   })
@@ -42,10 +42,10 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
     await settingsService.updateAll(null, body);
     await cache.invalidateExact('platform:settings');
     await cache.invalidateExact('ai:provider:default');
-    // El free tier (feature_flags_free_tier) afecta el resolver de features de TODAS las orgs
+    // Free tier (feature_flags_free_tier) affects features resolver of ALL orgs
     await cache.invalidate('org:*:features');
-    // Métodos de pago de plataforma expuestos a las orgs (GET /api/organizations/payment-methods):
-    // cambiar active_payment_methods / active_currencies debe reflejarse de inmediato en los forms de pago.
+    // Platform payment methods exposed to orgs (GET /api/organizations/payment-methods):
+    // changing active_payment_methods / active_currencies must immediately reflect on payment forms.
     await cache.invalidate('org:*:payment-methods');
     return c.json({ success: true });
   });

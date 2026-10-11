@@ -20,8 +20,8 @@ export interface EmailAttachment {
 }
 
 /**
- * Transporte de email (Resend / Gmail SMTP). El HTML lo componen los
- * templates en `src/templates/` — este handler SOLO envía.
+ * Email transport (Resend / Gmail SMTP). HTML is composed by
+ * templates in `src/templates/` — this handler ONLY sends emails.
  */
 export async function sendEmail(
   env: EmailHandlerEnv,

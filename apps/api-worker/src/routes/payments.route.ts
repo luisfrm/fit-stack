@@ -29,7 +29,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
 
-    // La tz es obligatoria (validada por el middleware `requireOrgTimezone`).
+    // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
 
     const db = c.get('db');
@@ -70,14 +70,14 @@ export const paymentRoutes = new Hono<AppEnv>()
     );
     await cache.invalidate(`org:${orgId}:subscriptions*`);
     await cache.invalidateExact(`org:${orgId}:payments:analytics`);
-    // `withoutActiveSubscription` de members:stats depende de subs/pagos.
+    // `withoutActiveSubscription` from members:stats depends on subs/payments.
     await cache.invalidateExact(`org:${orgId}:members:stats`);
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     await cache.invalidate(`org:${orgId}:reports:revenue*`);
     await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    // C6: el intento de anulación del comprobante se informa explícitamente
-    // (200 con `receiptVoided: false` + motivo), nunca en silencio.
+    // C6: receipt voiding attempt is reported explicitly
+    // (200 with `receiptVoided: false` + reason), never silently.
     return c.json({
       ...payment,
       receiptVoided,
@@ -85,7 +85,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     });
   })
 
-  // GET /api/payments/:id/receipt — contrato de 3 estados, nunca 409.
+  // GET /api/payments/:id/receipt - 3-state contract, never 409.
   .get('/:id/receipt', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
@@ -112,7 +112,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     });
   })
 
-  // GET /api/payments/:id/receipt/pdf — descarga binaria (200 bytes o 404).
+  // GET /api/payments/:id/receipt/pdf - binary download (200 bytes or 404).
   .get('/:id/receipt/pdf', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
@@ -136,7 +136,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     });
   })
 
-  // POST /api/payments/:id/issue — fallback manual, responde sin esperar el PDF.
+  // POST /api/payments/:id/issue - manual fallback, responds without waiting for PDF.
   .post('/:id/issue', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
@@ -147,15 +147,15 @@ export const paymentRoutes = new Hono<AppEnv>()
       orgId,
       paymentId: id,
       timezone,
-      // C5: la emisión manual también queda con actor.
+      // C5: manual emission also keeps actor audit trail.
       actor: c.get('user')?.id,
     });
-    // La emisión manual mueve el correlativo: invalida el reporte.
+    // Manual emission advances sequence: invalidates report cache.
     await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);
     return c.json(result);
   })
 
-  // POST /api/payments/:id/send-email — 4 ramas resueltas en el servicio.
+  // POST /api/payments/:id/send-email - 4 branches resolved in service.
   .post('/:id/send-email', requireOrgPermission(PM.SUBSCRIPTIONS, PA.READ), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));

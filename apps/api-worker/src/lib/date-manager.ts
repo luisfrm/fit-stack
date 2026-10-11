@@ -11,10 +11,10 @@ import {
  * Contextual class that manages all Date and Timezone logic for a specific organization.
  * Abstracts away PostgreSQL AT TIME ZONE logic and local date parsing.
  *
- * La parte de JS (parseo de fechas locales y límites de día/mes) delega en la util
- * compartida `@workspace/shared` (`date.ts`, basada en `@date-fns/tz`), garantizando
- * que un pago a las 11pm de Venezuela caiga en el mismo día local.
- * La parte SQL (AT TIME ZONE) se mantiene aquí.
+ * JavaScript date manipulation (local date parsing, day/month boundaries) delegates
+ * to shared `@workspace/shared` utilities (`date.ts`, based on `@date-fns/tz`), ensuring
+ * that an 11pm payment in Venezuela falls into the exact local day.
+ * SQL logic (AT TIME ZONE) is maintained here.
  */
 export class OrganizationDateManager {
   constructor(public readonly timezone: string) {}

@@ -2,19 +2,19 @@ import { eq, and, sql, type Db } from '@workspace/database/factory';
 import { gymMember, invitation, aiUsage, subscription, payment } from '@workspace/database/schema';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
-// Período mensual por ciclo de suscripción (o calendario si no hay sub).
+// Monthly period by subscription cycle (or calendar if no subscription exists).
 export interface AiCreditPeriod {
   periodStart: Date;
 }
 
-/** Inicio del mes calendario en UTC (para orgs sin suscripción). */
+/** Start of calendar month in UTC (for orgs without subscription). */
 export function startOfMonthUtc(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 }
 
 /**
- * Inicio del ciclo de facturación de la suscripción.
- * currentPeriodEnd es el fin del ciclo actual (start + duration).
+ * Start of subscription billing cycle.
+ * currentPeriodEnd is the end of current cycle (start + duration).
  */
 export function startOfSubscriptionPeriod(
   currentPeriodEnd: Date,
@@ -44,7 +44,7 @@ export function startOfSubscriptionPeriod(
 
 export function createFeaturesRepository(db: Db) {
   return {
-    // ── Créditos IA (1 crédito = 1K tokens, x1.0) ──
+    // ── AI Credits (1 credit = 1K tokens, x1.0) ──
     async getMonthlyCredits(orgId: string, periodStart: Date): Promise<number> {
       const [row] = await db
         .select({ credits: aiUsage.credits })
@@ -96,9 +96,9 @@ export function createFeaturesRepository(db: Db) {
     },
 
     /**
-     * Incremento atómico de créditos del ciclo (INSERT ... ON CONFLICT DO UPDATE).
-     * Con cap: falla si credits + delta > limit (0 = ilimitado → sin cap).
-     * Devuelve { credits, capped }.
+     * Atomic increment of cycle credits (INSERT ... ON CONFLICT DO UPDATE).
+     * With cap: fails if credits + delta > limit (0 = unlimited → no cap).
+     * Returns { credits, capped }.
      */
     async consumeCredits(
       orgId: string,
@@ -127,7 +127,7 @@ export function createFeaturesRepository(db: Db) {
 
         const credits = row?.credits ?? delta;
         if (credits > limit) {
-          // Rollback parcial: resta delta (no hay transacción, pero el overshoot es acotado por el pre-flight)
+          // Partial rollback: subtract delta (no transaction, but overshoot is bounded by pre-flight check)
           await db
             .update(aiUsage)
             .set({ credits: sql`${aiUsage.credits} - ${delta}`, updatedAt: new Date() })
@@ -185,7 +185,7 @@ export function createFeaturesRepository(db: Db) {
       return row?.credits ?? delta;
     },
 
-    // Legado: mantener compat con tests viejos que leen count (no usado en producción)
+    // Legacy: maintain compatibility with older tests reading count (not used in production)
     async getLegacyCounts(orgId: string, periodStart: Date): Promise<number> {
       const [row] = await db
         .select({ count: aiUsage.count })
@@ -201,7 +201,7 @@ export function createFeaturesRepository(db: Db) {
     },
 
     /**
-     * Miembros activos con cuenta vinculada (userId) — cupos usados del portal.
+     * Active members with linked accounts (userId) — portal seat usage.
      */
     async countActivePortalUsers(orgId: string): Promise<number> {
       const [row] = await db
@@ -219,9 +219,9 @@ export function createFeaturesRepository(db: Db) {
     },
 
     /**
-     * Adopción del gym: miembros registrados (rol member) y cuántos tienen
-     * al menos una suscripción gym activa (endDate vigente, no cancelada,
-     * pago no anulado/rechazado). Base del % fuera del Member Platform.
+     * Gym adoption: registered members (role member) and how many have
+     * at least one active gym subscription (valid endDate, not cancelled,
+     * payment not voided/rejected). Base for the % outside Member Platform.
      */
     async getGymAdoption(orgId: string): Promise<{
       totalMembers: number;
@@ -254,7 +254,7 @@ export function createFeaturesRepository(db: Db) {
     },
 
     /**
-     * Invitaciones pendientes del portal (Better Auth invitation, status pending).
+     * Pending portal invitations (Better Auth invitation, status pending).
      */
     async countPendingInvitations(orgId: string): Promise<number> {
       const [row] = await db

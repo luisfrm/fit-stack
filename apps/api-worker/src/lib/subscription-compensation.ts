@@ -2,15 +2,14 @@
  * Explicit compensation for a creation whose receipt emission failed.
  * Born in the panel creation flow, reused by the 4 SaaS flows.
  *
- * Sin transacciones interactivas (driver HTTP de Neon): el servicio commitea
- * en 3 pasos (`subsRepo.create` → `paymentsRepo.create` → paso 1) y compensa
- * en el `catch` delegando aquí. La decisión es **por relectura**, nunca por
- * tipo de error: si el número quedó persistido, el alta es un éxito
- * (`'committed'`); si no, se anula el pago o se cancela la huérfana
- * (`'compensated'` + el servicio re-lanza el original para que `onError`
- * traduzca el código).
+ * Without interactive transactions (Neon HTTP driver): the service commits
+ * in 3 steps (`subsRepo.create` → `paymentsRepo.create` → step 1) and compensates
+ * in the `catch` block delegating here. The decision is **by re-reading**, never by
+ * error type: if the receipt number was persisted, creation is committed
+ * (`'committed'`); if not, the payment is voided or the orphan subscription is cancelled
+ * (`'compensated'` + service re-throws original error for `onError` to format code).
  *
- * Sin dependencias de repos concretos (solo closures): el caller cablea
+ * Free of concrete repo dependencies (via closures only): caller connects
  * `paymentsRepo.findById` / `paymentsRepo.updateStatus` / `subsRepo.cancel`.
  */
 export type CompensationOutcome = 'committed' | 'compensated' | 'unresolved';
@@ -20,12 +19,11 @@ export interface CompensationClosures {
   voidPayment: () => Promise<unknown>;
   cancelParent?: () => Promise<unknown>;
   /**
-   * Revierte un efecto ya persistido del intento fallido (p. ej. el
-   * `currentPeriodEnd` extendido en SaaS). Corre solo cuando la anulación del
-   * pago fue **efectiva**, nunca en `committed` (si el comprobante se emitió el
-   * alta es válida) ni en `unresolved` (no se decidió nada). Si la anulación
-   * falla el cobro sigue válido y el efecto debe conservarse: reverir el
-   * periodo dejaría un cobro sin servicio (Regla 4).
+   * Reverts an already-persisted effect of the failed attempt (e.g. extended
+   * `currentPeriodEnd` in SaaS). Runs only when payment voiding was **effective**,
+   * never on `'committed'` (if receipt was issued, creation is valid) nor on
+   * `'unresolved'`. If voiding fails, payment remains valid and effect must be preserved:
+   * reverting period would leave a charge without service (Rule 4).
    */
   revertEffect?: () => Promise<unknown>;
 }
@@ -35,17 +33,15 @@ export interface CompensationOptions {
 }
 
 /**
- * Motivo fijo de la anulación compensatoria. Se persiste en
- * `voided_by`/`void_reason` del pago (auditoría de anulación): el pago queda
- * `voided` — no da acceso, no cuenta como cobro y **no bloquea el reintento**
- * (el guard solo frena `processing`).
+ * Fixed reason for compensatory voiding. Persisted in `voided_by`/`void_reason`
+ * of the payment: payment becomes `voided` — grants no access, does not count as revenue,
+ * and **does not block retry** (guard only blocks `processing`).
  */
 export const COMPENSATION_VOID_REASON = 'Compensación: fallo al emitir el comprobante';
 
 /**
- * Reintentos acotados de la relectura. Un blip del driver HTTP de Neon es
- * transitorio: un puñado de intentos cortos evita decidir sobre una lectura
- * fallida.
+ * Bounded re-read attempts. A Neon HTTP driver blip is transient: a few
+ * short attempts avoid deciding over a failed read.
  */
 const READ_ATTEMPTS = 3;
 const READ_BACKOFF_MS = [50, 150];
@@ -77,12 +73,10 @@ export async function compensateFailedEmission(
     try {
       persisted = await readPaymentWithRetry(closures.readPayment);
     } catch (readError) {
-      // La relectura falló tras los reintentos (blip persistente): NO se puede
-      // saber si el número quedó persistido, y anular a ciegas destruiría un
-      // comprobante legítimamente emitido (y, en SaaS, revertiría el periodo).
-      // Fail-closed real: no se toca nada; el servicio re-lanza el original y
-      // el barrido (predicado 1) recupera el render si el número sí commiteó.
-      // Se deja marcador de reconciliación para operación.
+      // Re-read failed after retries (persistent blip): cannot know whether
+      // receipt number committed, and blindly voiding would destroy a legitimately
+      // issued receipt (and revert SaaS period). Real fail-closed: touch nothing;
+      // service re-throws original and sweep (predicate 1) recovers render if committed.
       console.error('[subscription-compensation] relectura no resuelta: no se compensa', {
         readError,
         originalError,
@@ -90,15 +84,11 @@ export async function compensateFailedEmission(
       return 'unresolved';
     }
     if (persisted?.receiptNumber) {
-      // El número se commiteó antes del fallo (o un reintento idempotente lo
-      // completó): no se compensa ni se re-lanza. Re-lanzar aquí provocaría
-      // el doble cobro que se evita. El render pendiente lo recupera el
-      // predicado 1 del barrido (≤15 min).
+      // Receipt number committed before failure (or idempotent retry completed it):
+      // do not compensate or re-throw. Sweep predicate 1 recovers pending render (≤15 min).
       return 'committed';
     }
-    // La anulación manda: el revert del periodo solo corre si el pago quedó
-    // efectivamente anulado (si no, el cobro sigue válido y el efecto se
-    // conserva).
+    // Voiding governs: period revert only runs if payment was effectively voided.
     const voided = await compensate(originalError, 'void', closures.voidPayment);
     if (voided) {
       await compensate(originalError, 'revert', closures.revertEffect);
@@ -106,20 +96,18 @@ export async function compensateFailedEmission(
     return 'compensated';
   }
 
-  // Falló `paymentsRepo.create`: la suscripción quedó huérfana sin pago.
-  // Se cancela, nunca se borra (regla 6: registro financiero inmutable).
+  // `paymentsRepo.create` failed: subscription was orphaned without payment.
+  // Cancel, never delete (rule 6: immutable financial record).
   await compensate(originalError, 'cancel', closures.cancelParent);
   return 'compensated';
 }
 
 /**
- * Ejecuta la compensación sin enmascarar el error original: si la propia
- * escritura compensatoria falla, se registra y el servicio re-lanza el error
- * de emisión (el `code` del contrato), nunca el de la compensación.
+ * Executes compensation without masking the original error: if the compensatory
+ * write itself fails, it is logged and the service re-throws the emission error.
  *
- * Devuelve `true` si la escritura se ejecutó y no lanzó. Un cierre ausente
- * devuelve `true` (no había nada que deshacer). El revert del periodo se gatea
- * con este resultado para no dejar un cobro válido sin servicio.
+ * Returns `true` if write executed without throwing. An absent closure returns `true`.
+ * Period revert is gated by this result to avoid leaving a valid charge without service.
  */
 async function compensate(
   originalError: unknown,
@@ -132,11 +120,11 @@ async function compensate(
     return true;
   } catch (compensationError) {
     const label = {
-      void: 'la anulación del pago',
-      cancel: 'el cancel de la huérfana',
-      revert: 'la reversión del efecto',
+      void: 'payment voiding',
+      cancel: 'orphan cancellation',
+      revert: 'effect reversion',
     }[action];
-    console.error(`[subscription-compensation] falló ${label}`, {
+    console.error(`[subscription-compensation] failed ${label}`, {
       compensationError,
       originalError,
     });

@@ -23,7 +23,7 @@ export interface MembersFilter {
   role?: OrgRole;
   excludeRole?: OrgRole;
   isActive?: boolean;
-  /** Solo miembros CON (true) o SIN (false) suscripción gym-activa. */
+  /** Only members WITH (true) or WITHOUT (false) active gym subscription. */
   hasActiveSubscription?: boolean;
   page?: number;
   limit?: number;
@@ -72,8 +72,8 @@ export function createMembersRepository(db: Db) {
         conditions.push(ne(gymMember.role, excludeRole));
       }
 
-      // Filtro por suscripción gym-activa (misma semántica que
-      // `getSubscriptionIsActiveSql`: `processing` cuenta como activa).
+      // Filter by active gym subscription (same semantics as
+      // `getSubscriptionIsActiveSql`: `processing` counts as active).
       if (hasActiveSubscription !== undefined) {
         const activeSubExists = sql`EXISTS (
           SELECT 1 FROM ${subscription}
@@ -266,16 +266,16 @@ export function createMembersRepository(db: Db) {
     },
 
     /**
-     * KPIs de clientes (`GET /api/members/stats`).
+     * Customer KPIs (`GET /api/members/stats`).
      *
-     * Población: `gym_member` con `role = 'member'` de la org.
-     * - `newThisMonth`: corte de mes en hora LOCAL de la org (`AT TIME ZONE`
-     *   vía `dateManager`), no UTC del servidor.
-     * - Suscripción gym-activa = semántica `getSubscriptionIsActiveSql`
-     *   (`endDate` vigente + no cancelada + pago `<> voided`).
-     *   Un pago `processing` SÍ cuenta como activa: el acceso aún no fue
-     *   revocado, solo está pendiente de validación manual.
-     * - `withPortal`: espejo exacto de `countActivePortalUsers`
+     * Population: `gym_member` with `role = 'member'` for the org.
+     * - `newThisMonth`: month boundary in org LOCAL time (`AT TIME ZONE`
+     *   via `dateManager`), not server UTC.
+     * - Active gym subscription = semantics of `getSubscriptionIsActiveSql`
+     *   (`endDate` in range + not cancelled + payment `<> voided`).
+     *   A `processing` payment DOES count as active: physical access is not
+     *   revoked yet, only pending manual validation.
+     * - `withPortal`: exact mirror of `countActivePortalUsers`
      *   (`userId NOT NULL + isActive + role member`).
      */
     async getMemberStats(organizationId: string, dateManager: OrganizationDateManager, now: Date = new Date()) {
@@ -294,7 +294,7 @@ export function createMembersRepository(db: Db) {
         .from(gymMember)
         .where(memberScope);
 
-      // Miembros con al menos una suscripción gym-activa (subconsulta anti-join).
+      // Members with at least one active gym subscription (anti-join subquery).
       const activeSubs = db
         .select({ memberId: subscription.memberId })
         .from(subscription)
@@ -349,9 +349,9 @@ export function createMembersRepository(db: Db) {
     },
 
     /**
-     * Altas por mes local ('YYYY-MM'). Ventana de 6 meses calendario
-     * (agregado SQL con `AT TIME ZONE` vía `dateManager`); los meses sin
-     * altas no generan bucket (el frontend rellena los huecos con 0).
+     * Signups per local month ('YYYY-MM'). 6 calendar months window
+     * (SQL aggregation with `AT TIME ZONE` via `dateManager`); months without
+     * signups do not yield a bucket (frontend fills gaps with 0).
      */
     async getMemberGrowth(organizationId: string, dateManager: OrganizationDateManager) {
       const windowStart = dateManager.getStartOfMonthUtc(5);
@@ -374,9 +374,9 @@ export function createMembersRepository(db: Db) {
     },
 
     /**
-     * Próximos cumpleaños (top 5, solo `role = 'member'` con fecha).
-     * La columna es `date` sin tz: se ordena por MM-DD con vuelta de año
-     * (los que ya pasaron este año van al final).
+     * Upcoming birthdays (top 5, only `role = 'member'` with birthday set).
+     * The column is `date` without tz: ordered by MM-DD with year wrap-around
+     * (those that already passed this year appear at the end).
      */
     async getUpcomingBirthdays(organizationId: string, dateManager: OrganizationDateManager, limit = 5) {
       const todayMonthDay = dateManager.getTodayLocalString().slice(5);
