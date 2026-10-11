@@ -1,12 +1,12 @@
-/* ── Documents / receipt-compose — builder puro de ReceiptData ───────────
-   Convierte filas crudas (`getReceiptComposedData`) en el contrato
-   `ReceiptData`. Puro, sin I/O, edge-safe: lo llaman api-worker
-   (`GET /:id/receipt`) y jobs-worker (`handleReceiptRender`) con el MISMO
-   resultado — ninguna de las dos apps implementa el compose por su cuenta.
-   Reglas: impuestos LEÍDOS del pago (nunca recalculados), emisor congelado
-   en snapshots, `paymentMethodDetails` enmascarado, UUID solo como
-   `internalPaymentId`. Interfaz estructural mínima (NO importa runtime de
-   `@workspace/database`: evita ciclo shared→database).
+/* ── Documents / receipt-compose — pure ReceiptData builder ───────────────
+   Converts raw rows (`getReceiptComposedData`) into the `ReceiptData`
+   contract. Pure, no I/O, edge-safe: invoked by api-worker
+   (`GET /:id/receipt`) and jobs-worker (`handleReceiptRender`) with the SAME
+   result — neither app implements compose separately.
+   Rules: taxes READ from payment (never recalculated), issuer frozen
+   in snapshots, `paymentMethodDetails` masked, UUID only as
+   `internalPaymentId`. Minimal structural interface (NO runtime import of
+   `@workspace/database`: avoids circular shared→database dependency).
    ─────────────────────────────────────────────────────────────────────── */
 
 import { resolveFiscalProfile, type FiscalProfile, type ResolvedTax } from './fiscal-profile';
@@ -30,7 +30,7 @@ export type DateInput = Date | string;
 /** Nullable date input for optional temporal fields. */
 export type NullableDate = DateInput | null;
 
-/** Fila de pago con lo necesario para componer (centavos enteros). */
+/** Payment row with fields necessary for composing (integer cents). */
 export interface ComposePayment {
   id: number;
   amountPaid: number;
@@ -46,7 +46,7 @@ export interface ComposePayment {
   documentType?: string | null;
   receiptIssuedAt?: NullableDate;
   receiptVoided?: boolean | null;
-  /** Snapshot congelado al registrar el pago (fuente del nombre del plan). */
+  /** Snapshot frozen upon payment registration (source of plan name). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
 }
@@ -82,17 +82,17 @@ export interface ComposeReceiptInput {
   member: ComposeMember | null;
   subscription: ComposeSubscription | null;
   /**
-   * Identidad congelada al emitir (C1). `null`/`undefined` = emisión
-   * anterior al snapshot: se compone EN VIVO (estado terminal documentado).
+   * Issuer identity frozen upon issuance (C1). `null`/`undefined` = issuance
+   * prior to snapshot: composed LIVE (documented terminal state).
    */
   emitterSnapshot?: unknown;
 }
 
 /**
- * Equivalente del total en la moneda base, en centavos enteros. La tasa
- * persistida se lee "1 {base} = {rate} {pagada}", así que se divide.
- * `null` cuando no hay conversión (misma moneda o tasa ausente/inválida):
- * el documento no muestra un equivalente inventado.
+ * Base currency equivalent total, in integer cents. Persisted rate
+ * reads "1 {base} = {rate} {paid}", so it is divided.
+ * `null` when there is no conversion (same currency or absent/invalid rate):
+ * document does not show an invented equivalent.
  */
 function toBaseTotal(
   total: number,
@@ -114,18 +114,18 @@ function toIso(value: DateInput, method: string): string {
   return d.toISOString();
 }
 
-/* ── Snapshot del emisor (C1) ──────────────────────────────────────────
-   Congela al emitir lo que antes se derivaba de filas vivas. Un snapshot
-   persistido MANDA: si existe no se lee la configuración actual (por eso
-   `GET /:id/receipt` sigue siendo idéntico tras editar el perfil).
+/* ── Issuer Snapshot (C1) ─────────────────────────────────────────────
+   Freezes upon issuance what was previously derived from live rows.
+   A persisted snapshot GOVERNS: if it exists, current configuration is
+   not read (which is why `GET /:id/receipt` stays identical after profile edits).
    ─────────────────────────────────────────────────────────────────────── */
 
-/** Resumen auditable del perfil fiscal aplicado. */
+/** Auditable summary of applied fiscal profile. */
 export function summarizeTaxes(taxes: ResolvedTax[]): ReceiptSnapshotTax[] {
   return taxes.map((t) => ({ name: t.name, rate: t.rate, enabled: t.enabled }));
 }
 
-/** Identidad del emisor del Panel (la organización del gimnasio). */
+/** Panel issuer identity (gym organization). */
 function panelEmitterIdentity(
   organization: ComposeOrganization,
   profile: FiscalProfile,
@@ -150,7 +150,7 @@ function panelEmitterIdentity(
   };
 }
 
-/** Snapshot del emisor del Panel (la organización del gimnasio). */
+/** Panel issuer snapshot (gym organization). */
 export function buildEmitterSnapshot(
   organization: ComposeOrganization,
   profile: FiscalProfile,
@@ -162,7 +162,7 @@ export function buildEmitterSnapshot(
   };
 }
 
-/** Identidad del emisor plataforma (FitStack) desde `platform_setting`. */
+/** Platform issuer identity (FitStack) from `platform_setting`. */
 export function platformEmitterFromSettings(
   settings: Record<string, string>,
 ): PlatformComposeEmitter {
@@ -175,15 +175,15 @@ export function platformEmitterFromSettings(
 }
 
 /**
- * Identidad del emisor plataforma: la de FitStack (settings) + el perfil
- * fiscal del país RECEPTOR (la org no decide su IVA). Sin país propio
- * configurado el emisor hereda el del receptor (proxy documentado, PENDING §8).
+ * Platform issuer identity: FitStack settings + fiscal profile of
+ * RECIPIENT country (org does not decide its VAT). Without configured country,
+ * issuer inherits recipient's (documented proxy, PENDING §8).
  */
 function platformEmitterIdentity(
   input: {
     receptor: PlatformComposeReceptor;
     emitter: PlatformComposeEmitter;
-    /** Moneda base congelada en el pago (`planSnapshotCurrency`). */
+    /** Base currency frozen in payment (`planSnapshotCurrency`). */
     currency: string;
   },
   profile: FiscalProfile,
@@ -199,8 +199,8 @@ function platformEmitterIdentity(
   };
   return {
     emitter,
-    // FitStack no está declarado contribuyente formal (C2): el gate aplica
-    // 'Comprobante' por construcción, nunca 'Factura'.
+    // FitStack is not declared formal taxpayer (C2): gate enforces
+    // 'Comprobante de pago' by construction, never 'Factura'.
     documentLabel: resolveDocumentLabel({
       taxId: emitter.taxId ?? undefined,
       isFormalTaxpayer: false,
@@ -213,7 +213,7 @@ function platformEmitterIdentity(
   };
 }
 
-/** Snapshot del emisor plataforma (FitStack). */
+/** Platform issuer snapshot (FitStack). */
 export function buildPlatformEmitterSnapshot(
   input: {
     receptor: PlatformComposeReceptor;
@@ -230,10 +230,10 @@ export function buildPlatformEmitterSnapshot(
 }
 
 /**
- * Lee un `emitter_snapshot` persistido (jsonb). `null`/`undefined` devuelve
- * `null` (emisión anterior al snapshot → el caller compone en vivo). Un valor
- * presente pero inválido LANZA: un snapshot corrupto no puede degradar en
- * silencio a la configuración de hoy (dejaría de ser reproducible).
+ * Reads persisted `emitter_snapshot` (jsonb). `null`/`undefined` returns
+ * `null` (issuance prior to snapshot → caller composes live). A present
+ * but invalid value THROWS: corrupt snapshot must not silently degrade to
+ * today's config (it would cease being reproducible).
  */
 export function assertEmitterSnapshot(
   value: unknown,
@@ -420,13 +420,12 @@ export function assembleReceiptData(input: ReceiptAssemblyInput): ReceiptData {
 }
 
 /**
- * Arma `ReceiptData` desde filas crudas (emisor Panel: la organización del
- * gimnasio). Valida impuestos persistidos y snapshot, resuelve las
- * diferencias del issuer (destinatario = miembro, período = suscripción,
- * moneda base = snapshot del plan u org, `type` = document_type) y delega
- * el ensamblaje al core único (`assembleReceiptData`). Lanza si faltan los
- * impuestos persistidos o fechas inválidas. NO valida el checklist (lo
- * hace el caller con `checklistPrePdf` y decide).
+ * Assembles `ReceiptData` from raw rows (Panel issuer: gym organization).
+ * Validates persisted taxes and snapshot, resolves issuer differences
+ * (recipient = member, period = subscription, base currency = plan/org snapshot,
+ * `type` = document_type) and delegates assembling to core (`assembleReceiptData`).
+ * Throws if persisted taxes are missing or invalid dates. Does NOT validate checklist
+ * (caller handles with `checklistPrePdf`).
  */
 export function buildReceiptDataFromComposed(
   input: ComposeReceiptInput,
@@ -440,8 +439,8 @@ export function buildReceiptDataFromComposed(
   }
   const taxDetails = assertPersistedTaxDetails(payment.taxDetails, 'buildReceiptDataFromComposed');
 
-  // Snapshot primero: si existe, la configuración viva NO se lee (ni siquiera
-  // se resuelve el perfil fiscal) — el documento emitido es reproducible.
+  // Snapshot first: if present, live configuration is NOT read (fiscal
+  // profile is not even resolved) — issued document is reproducible.
   const identity =
     assertEmitterSnapshot(input.emitterSnapshot, 'buildReceiptDataFromComposed') ??
     buildEmitterSnapshot(
@@ -490,16 +489,16 @@ export function buildReceiptDataFromComposed(
   });
 }
 
-/* ── Comprobante SaaS (Console, C2) ────────────────────────────────────
-   Emisor = FitStack (keys `platform_setting`, C1); receptor = la org.
-   Perfil fiscal e impuestos desde el país del receptor SIN override (la
-   org no decide su IVA); país desconocido → error visible. Emisor sin
-   país configurado usa el país receptor como proxy (PENDING §8).
-   Puro, sin I/O, edge-safe. Interfaz estructural mínima (sin imports de
-   `@workspace/database`: evita ciclo shared→database).
+/* ── SaaS receipt (Console, C2) ────────────────────────────────────
+   Issuer = FitStack (`platform_setting` keys, C1); recipient = org.
+   Fiscal profile and taxes from recipient country WITHOUT override (the
+   org does not decide its VAT); unknown country → visible error. Issuer without
+   configured country uses recipient country as proxy (PENDING §8).
+   Pure, no I/O, edge-safe. Minimal structural interface (no imports of
+   `@workspace/database`: avoids circular shared→database dependency).
    ─────────────────────────────────────────────────────────────────────── */
 
-/** Pago SaaS con lo necesario para componer (centavos enteros). */
+/** SaaS payment with fields necessary for composing (integer cents). */
 export interface PlatformComposePayment {
   id: number;
   amountPaid: number;
@@ -521,7 +520,7 @@ export interface PlatformComposeSubscription {
   currentPeriodEnd?: NullableDate;
 }
 
-/** Organización receptora (columnas `organization`, todas NOT NULL). */
+/** Recipient organization (`organization` columns, all NOT NULL). */
 export interface PlatformComposeReceptor {
   name: string;
   legalName?: string | null;
@@ -530,7 +529,7 @@ export interface PlatformComposeReceptor {
   timezone: string;
 }
 
-/** Emisor FitStack (`platform_setting`, C1; todo opcional). */
+/** FitStack issuer (`platform_setting`, C1; all optional). */
 export interface PlatformComposeEmitter {
   legalName?: string | null;
   taxId?: string | null;
@@ -545,19 +544,17 @@ export interface PlatformComposeReceiptInput {
   subscription: PlatformComposeSubscription | null;
   receptor: PlatformComposeReceptor;
   emitter: PlatformComposeEmitter;
-  /** Identidad congelada al emitir (C1); `null` = emisión previa (en vivo). */
+  /** Frozen identity upon issuance (C1); `null` = prior issuance (live). */
   emitterSnapshot?: unknown;
 }
 
 /**
- * Arma `ReceiptData` SaaS desde filas crudas (emisor FitStack, receptor la
- * org). Impuestos LEÍDOS del pago (nunca recalculados); `type` siempre
- * `'receipt'` (invoice bloqueado por construcción,
- * `HAS_FISCAL_HOMOLOGATION=false`). Resuelve las diferencias del issuer
- * (destinatario = org, período = startDate/currentPeriodEnd, moneda base =
- * snapshot del plan) y delega el ensamblaje al core único
- * (`assembleReceiptData`). Lanza si faltan impuestos persistidos o fechas
- * inválidas.
+ * Assembles SaaS `ReceiptData` from raw rows (FitStack issuer, recipient org).
+ * Taxes READ from payment (never recalculated); `type` always `'receipt'`
+ * (invoice blocked by construction, `HAS_FISCAL_HOMOLOGATION=false`). Resolves
+ * issuer differences (recipient = org, period = startDate/currentPeriodEnd,
+ * base currency = plan snapshot) and delegates assembling to core (`assembleReceiptData`).
+ * Throws if persisted taxes are missing or dates are invalid.
  */
 export function buildPlatformReceiptDataFromComposed(
   input: PlatformComposeReceiptInput,
@@ -574,8 +571,8 @@ export function buildPlatformReceiptDataFromComposed(
     'buildPlatformReceiptDataFromComposed',
   );
 
-  // Sin override de la org: FitStack define impuestos uniformes por país.
-  // Snapshot primero: si existe, la configuración viva NO se lee.
+  // No org override: FitStack defines uniform taxes per country.
+  // Snapshot first: if present, live configuration is NOT read.
   const identity =
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(

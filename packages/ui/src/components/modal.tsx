@@ -7,7 +7,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useIsMobile } from "@workspace/ui/hooks/use-is-mobile";
 
 /* ─────────────────────────────────────────────
-	 Context
+   Context
 ───────────────────────────────────────────── */
 interface ResponsiveModalContextValue {
   open: boolean;
@@ -27,7 +27,7 @@ function useResponsiveModal() {
 }
 
 /* ─────────────────────────────────────────────
-	 Root
+   Root
 ───────────────────────────────────────────── */
 interface ResponsiveModalProps {
   open?: boolean;
@@ -41,7 +41,7 @@ function ResponsiveModal({
   defaultOpen = false,
   onOpenChange,
   children,
-}: ResponsiveModalProps) {
+}: Readonly<ResponsiveModalProps>) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(defaultOpen);
   const isMobile = useIsMobile();
 
@@ -54,10 +54,13 @@ function ResponsiveModal({
     [onOpenChange]
   );
 
+  const contextValue = React.useMemo(
+    () => ({ open: isOpen, onOpenChange: handleOpenChange, isMobile }),
+    [isOpen, handleOpenChange, isMobile]
+  );
+
   return (
-    <ResponsiveModalContext.Provider
-      value={{ open: isOpen, onOpenChange: handleOpenChange, isMobile }}
-    >
+    <ResponsiveModalContext.Provider value={contextValue}>
       <DialogPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
         {children}
       </DialogPrimitive.Root>
@@ -66,14 +69,14 @@ function ResponsiveModal({
 }
 
 /* ─────────────────────────────────────────────
-	 Trigger / Close (re-exports)
+   Trigger / Close (re-exports)
 ───────────────────────────────────────────── */
 const ResponsiveModalTrigger = DialogPrimitive.Trigger;
 const ResponsiveModalClose = DialogPrimitive.Close;
 
 /* ─────────────────────────────────────────────
-	 Content — swaps between bottom sheet (mobile)
-	 and centered modal (desktop)
+   Content — swaps between bottom sheet (mobile)
+   and centered modal (desktop)
 ───────────────────────────────────────────── */
 const CLOSE_THRESHOLD = 120; // px of drag distance to close (mobile)
 
@@ -104,7 +107,7 @@ function ResponsiveModalContent({
   bodyClassName,
   footer,
   desktopMaxWidth = "max-w-md",
-}: ResponsiveModalContentProps) {
+}: Readonly<ResponsiveModalContentProps>) {
   const { isMobile, onOpenChange } = useResponsiveModal();
 
   /* ── drag-to-close state (mobile only) ── */
@@ -269,7 +272,7 @@ function ResponsiveModalContent({
 }
 
 /* ─────────────────────────────────────────────
-	 Shared Header
+   Shared Header
 ───────────────────────────────────────────── */
 interface ModalHeaderProps {
   icon?: React.ReactNode;
@@ -277,7 +280,7 @@ interface ModalHeaderProps {
   subtitle?: React.ReactNode;
 }
 
-function ModalHeader({ icon, title, subtitle }: ModalHeaderProps) {
+function ModalHeader({ icon, title, subtitle }: Readonly<ModalHeaderProps>) {
   return (
     <div className="flex-shrink-0 px-5 md:px-6 pt-4 pb-3 border-b border-border">
       {/* Title row: [icon + title] ... [X] */}
@@ -318,8 +321,8 @@ function ModalHeader({ icon, title, subtitle }: ModalHeaderProps) {
 }
 
 /* ─────────────────────────────────────────────
-	 Legacy `Modal` — misma API de siempre,
-	 ahora con comportamiento responsive
+   Legacy `Modal` — misma API de siempre,
+   ahora con comportamiento responsive
 ───────────────────────────────────────────── */
 const MODAL_SIZES = {
   sm: "sm:max-w-sm",      // 384px
@@ -417,7 +420,7 @@ export function Modal({
 }
 
 /* ─────────────────────────────────────────────
-	 Exports
+   Exports
 ───────────────────────────────────────────── */
 export {
   ResponsiveModal,

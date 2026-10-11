@@ -1,7 +1,7 @@
 /**
- * System prompts del chat IA.
- * El servidor compone: `${PANEL_SYSTEM_PROMPT}\n\n[Contexto]\n${contextoRAG}`.
- * El cliente nunca envía mensajes role=system.
+ * AI chat system prompts.
+ * The server composes: `${PANEL_SYSTEM_PROMPT}\n\n[Context]\n${ragContext}`.
+ * The client never sends role=system messages.
  */
 
 export const PANEL_SYSTEM_PROMPT = `Eres el asistente oficial de FitStack, la plataforma de gestión para gimnasios y estudios de fitness de Latinoamérica. Atiendes a administradores y dueños de gimnasios dentro del panel de FitStack.

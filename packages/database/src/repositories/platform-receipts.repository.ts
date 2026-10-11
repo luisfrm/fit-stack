@@ -1,10 +1,10 @@
 /* ── Platform receipts repository (SHARED) ───────────────────────────────
-   Excepción consciente a AGENTS.md §1: todo acceso a datos de comprobantes
-   SaaS vive aquí porque DOS runtimes (api-worker paso 1, jobs-worker paso 2
-   + barrido) necesitan la implementación IDÉNTICA — la sentencia atómica y
-   las condiciones WHERE son el corazón de la garantía de no-duplicados.
-   Mudado desde api-worker en C2 (precedente: addendum Fase 1 `77a7d8b`).
-   Factory pura: recibe `Db` por parámetro (per-request, sin process.env).
+   Conscious exception to AGENTS.md §1: all SaaS receipt data access
+   lives here because TWO runtimes (api-worker step 1, jobs-worker step 2
+   + sweep) require IDENTICAL implementations — the atomic statement and
+   WHERE conditions are the core guarantee against duplicates.
+   Moved from api-worker in C2 (precedent: Phase 1 addendum `77a7d8b`).
+   Pure factory: receives `Db` parameter (per-request, without process.env).
    ─────────────────────────────────────────────────────────────────────── */
 
 import { and, eq, isNotNull, isNull, sql, type Db } from '../factory';
@@ -21,60 +21,60 @@ import {
   type ReceiptEmitterSnapshot,
 } from '@workspace/shared';
 
-/** Filas tal como las devuelve Drizzle (fuente de los tipos). */
+/** Rows as returned by Drizzle (source of types). */
 export type DbPlatformPayment = typeof platformSubscriptionPayment.$inferSelect;
 export type DbPlatformSubscription = typeof platformSubscription.$inferSelect;
 export type DbPlatformOrganization = typeof organization.$inferSelect;
 
-/** Datos crudos para el compose del comprobante SaaS (shared, puro). */
+/** Raw data for SaaS receipt compose (shared, pure). */
 export interface PlatformReceiptComposedData {
   payment: DbPlatformPayment;
   subscription: DbPlatformSubscription | null;
   organization: DbPlatformOrganization;
-  /** `platform_setting` completo (keys emisor FitStack, C1). */
+  /** Full `platform_setting` map (FitStack emitter keys, C1). */
   emitter: Record<string, string>;
 }
 
 export interface AttachPlatformReceiptInput {
-  /** `FS-0000001` (formato Console, valida Fase 0). */
+  /** `FS-0000001` (Console format, validated Phase 0). */
   receiptNumber: string;
   receiptIssuedAt: Date;
-  /** Centavos enteros; el paso 1 siempre los persiste junto al número. */
+  /** Integer cents; step 1 always persists them alongside the number. */
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
-  /** Identidad del emisor (FitStack) congelada al emitir (C1). */
+  /** Emitter identity (FitStack) frozen upon issuance (C1). */
   emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Actor que emite (C5). Ausente en el barrido: queda `null`. */
+  /** Issuing actor (C5). Missing during sweep: remains `null`. */
   issuedBy?: string | null;
 }
 
 export interface MarkPlatformVoidedInput {
-  /** Actor (user.id) que anula. */
+  /** Voiding actor (user.id). */
   by: string;
-  /** Motivo no vacío (auditoría). */
+  /** Non-empty reason (audit log). */
   reason: string;
 }
 
 function assertPaymentId(paymentId: number, method: string): void {
   if (!Number.isInteger(paymentId) || paymentId < 1) {
-    throw new Error(`${method}: paymentId inválido (${String(paymentId)}).`);
+    throw new Error(`${method}: invalid paymentId (${String(paymentId)}).`);
   }
 }
 
 function assertDocumentType(type: ReceiptDocumentType, method: string): void {
   if (type !== 'receipt' && type !== 'invoice') {
-    throw new Error(`${method}: document_type inválido (${String(type)}). Sin pgEnum.`);
+    throw new Error(`${method}: invalid document_type (${String(type)}). No pgEnum.`);
   }
 }
 
 export function createPlatformReceiptsRepository(db: Db) {
   return {
     /**
-     * Siguiente número global con UNA sola sentencia atómica
-     * (INSERT ... ON CONFLICT DO UPDATE ... RETURNING). Sin transacciones
-     * interactivas (driver HTTP de Neon), sin SELECT FOR UPDATE. Cubre la
-     * carrera del primer comprobante sin fila previa. Nunca hay rollback.
+     * Next global sequence number with a SINGLE atomic statement
+     * (INSERT ... ON CONFLICT DO UPDATE ... RETURNING). Without interactive
+     * transactions (Neon HTTP driver), without SELECT FOR UPDATE. Covers
+     * race condition on first receipt without prior row. Never rolls back.
      */
     async nextPlatformDocumentNumber(type: ReceiptDocumentType): Promise<number> {
       assertDocumentType(type, 'nextPlatformDocumentNumber');
@@ -87,23 +87,23 @@ export function createPlatformReceiptsRepository(db: Db) {
           set: { nextNumber: sql`${platformDocumentSequence.nextNumber} + 1` },
         })
         .returning({ nextNumber: platformDocumentSequence.nextNumber });
-      // El INSERT ... RETURNING siempre devuelve fila (creada o actualizada).
-      // Sin fallback silencioso: un 1 inventado duplicaría correlativos.
+      // INSERT ... RETURNING always returns a row (created or updated).
+      // No silent fallback: fabricating 1 would duplicate correlative numbers.
       if (!row) {
-        throw new Error('nextPlatformDocumentNumber: INSERT ... RETURNING no devolvió fila.');
+        throw new Error('nextPlatformDocumentNumber: INSERT ... RETURNING did not return a row.');
       }
       return row.nextNumber;
     },
 
     /**
-     * Compensación del correlativo global: devuelve el último número
-     * consumido por esta entrega cuando PERDIÓ la carrera de
-     * `attachPlatformReceipt` (otra entrega ya numeró el pago).
+     * Global correlative compensation: rolls back the last number
+     * consumed by this execution when it LOST the race in
+     * `attachPlatformReceipt` (another execution already numbered the payment).
      *
-     * Solo revierte si seguimos siendo el último consumidor
-     * (`next_number = seq`): retroceder con consumidores posteriores
-     * reasignaría un número ya vivo — prohibido. Si no, `released: false`
-     * y el número queda como hueco auditado.
+     * Only reverts if we are still the latest consumer
+     * (`next_number = seq`): decrementing with newer consumers would
+     * reassign a live number — prohibited. Otherwise `released: false`
+     * and the number remains as an audited gap.
      */
     async releaseLastPlatformNumber(
       type: ReceiptDocumentType,
@@ -111,7 +111,7 @@ export function createPlatformReceiptsRepository(db: Db) {
     ): Promise<{ released: boolean }> {
       assertDocumentType(type, 'releaseLastPlatformNumber');
       if (!Number.isInteger(seq) || seq < 1) {
-        throw new Error(`releaseLastPlatformNumber: seq inválido (${String(seq)}).`);
+        throw new Error(`releaseLastPlatformNumber: invalid seq (${String(seq)}).`);
       }
 
       const [row] = await db
@@ -128,11 +128,10 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Estado de la secuencia global + números emitidos del universo, para la
-     * auditoría de gaps de Console. Espejo de
-     * `payments.repository.getReceiptSequenceState` (Panel) sin año ni org:
-     * `FS-N` es una serie única y continua.
-     * OJO: `next_number` guarda el ÚLTIMO número entregado (no el siguiente).
+     * Global sequence status + issued numbers in the universe, for Console
+     * gap audits. Mirrors `payments.repository.getReceiptSequenceState` (Panel)
+     * without year or org: `FS-N` is a single continuous sequence.
+     * NOTE: `next_number` stores the LAST allocated number (not the next one).
      */
     async getPlatformReceiptSequenceState(type: ReceiptDocumentType): Promise<{
       lastNumber: number;
@@ -166,9 +165,9 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Numera un pago SaaS de forma idempotente: solo escribe si aún no
-     * tiene número (`WHERE receipt_number IS NULL`). Si ya estaba numerado,
-     * devuelve la fila existente re-leída (nunca se reenumera).
+     * Numbers a SaaS payment idempotently: only writes if it doesn't
+     * have a number yet (`WHERE receipt_number IS NULL`). If already numbered,
+     * returns the re-read existing row (never renumbered).
      */
     async attachPlatformReceipt(
       paymentId: number,
@@ -177,7 +176,7 @@ export function createPlatformReceiptsRepository(db: Db) {
       assertPaymentId(paymentId, 'attachPlatformReceipt');
       if (typeof input.receiptNumber !== 'string' || !isValidConsoleReceiptNumber(input.receiptNumber)) {
         throw new Error(
-          `attachPlatformReceipt: receipt_number con formato inválido (${String(input.receiptNumber)}).`,
+          `attachPlatformReceipt: invalid receipt_number format (${String(input.receiptNumber)}).`,
         );
       }
 
@@ -189,8 +188,8 @@ export function createPlatformReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
-          // C1/C5: identidad congelada + actor, en la misma sentencia que el
-          // número (el comprobante nace reproducible).
+          // C1/C5: frozen identity + actor, in the same statement as
+          // the number (receipt is reproducible upon birth).
           emitterSnapshot: input.emitterSnapshot ?? null,
           issuedBy: input.issuedBy ?? null,
         })
@@ -209,15 +208,15 @@ export function createPlatformReceiptsRepository(db: Db) {
         .from(platformSubscriptionPayment)
         .where(eq(platformSubscriptionPayment.id, paymentId));
       if (!existing) {
-        throw new Error(`attachPlatformReceipt: pago ${paymentId} no existe.`);
+        throw new Error(`attachPlatformReceipt: payment ${paymentId} does not exist.`);
       }
       return existing;
     },
 
     /**
-     * Lee todo lo que el paso 2 necesita en una sola pasada: pago +
-     * suscripción + organización receptora + settings del emisor FitStack.
-     * `null` si el pago no existe (el consumer hace ack, no retry).
+     * Reads everything required by step 2 in a single query: payment +
+     * subscription + recipient organization + FitStack emitter settings.
+     * `null` if payment does not exist (consumer acks, no retry).
      */
     async getPlatformReceiptComposedData(
       paymentId: number,
@@ -256,9 +255,9 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Completa el PDF: fija `receipt_pdf_key` SOLO si aún no hay uno
-     * (`WHERE receipt_pdf_key IS NULL RETURNING`). EL gate del email:
-     * `completed === true` significa que ESTA entrega completó el PDF.
+     * Completes PDF: sets `receipt_pdf_key` ONLY if not already present
+     * (`WHERE receipt_pdf_key IS NULL RETURNING`). Email gate:
+     * `completed === true` indicates THIS delivery finished the PDF.
      */
     async completePlatformReceiptPdf(
       paymentId: number,
@@ -266,7 +265,7 @@ export function createPlatformReceiptsRepository(db: Db) {
     ): Promise<{ completed: boolean }> {
       assertPaymentId(paymentId, 'completePlatformReceiptPdf');
       if (!key || key.trim().length === 0) {
-        throw new Error('completePlatformReceiptPdf: key es obligatoria.');
+        throw new Error('completePlatformReceiptPdf: key is required.');
       }
       const [row] = await db
         .update(platformSubscriptionPayment)
@@ -282,9 +281,9 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Completa el PDF ANULADO (espejo Panel): fija `receipt_voided_pdf_key`
-     * SOLO si aún no hay uno. Sin efecto sobre el email (`receipt_notified_at`
-     * no se toca). El PDF de emisión se conserva intacto.
+     * Completes VOIDED PDF (Panel mirror): sets `receipt_voided_pdf_key`
+     * ONLY if not already present. No effect on email (`receipt_notified_at`
+     * is untouched). The issued PDF remains intact.
      */
     async completePlatformVoidedReceiptPdf(
       paymentId: number,
@@ -292,7 +291,7 @@ export function createPlatformReceiptsRepository(db: Db) {
     ): Promise<{ completed: boolean }> {
       assertPaymentId(paymentId, 'completePlatformVoidedReceiptPdf');
       if (!key || key.trim().length === 0) {
-        throw new Error('completePlatformVoidedReceiptPdf: key es obligatoria.');
+        throw new Error('completePlatformVoidedReceiptPdf: key is required.');
       }
       const [row] = await db
         .update(platformSubscriptionPayment)
@@ -308,9 +307,9 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Marca la notificación por email como hecha. Gate anti-pérdida: el
-     * reintento usa `receipt_notified_at` para no re-enviar, y si el envío
-     * falla el caller limpia la marca y reintenta.
+     * Marks email notification as delivered. Anti-loss gate: retries
+     * check `receipt_notified_at` to avoid resending, and if delivery
+     * fails the caller resets the flag and retries.
      */
     async markPlatformReceiptNotified(paymentId: number): Promise<{ completed: boolean }> {
       assertPaymentId(paymentId, 'markPlatformReceiptNotified');
@@ -327,7 +326,7 @@ export function createPlatformReceiptsRepository(db: Db) {
       return { completed: row !== undefined };
     },
 
-    /** Revierte la marca de notificación (best-effort) si el envío falló. */
+    /** Resets notification flag (best-effort) if delivery failed. */
     async clearPlatformReceiptNotified(paymentId: number): Promise<void> {
       assertPaymentId(paymentId, 'clearPlatformReceiptNotified');
       await db
@@ -337,9 +336,9 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Fija el pagador SOLO si está vacío (`WHERE payer_email IS NULL`):
-     * la sesión de validación (soporte) nunca sobrescribe al pagador real
-     * registrado en la creación `processing`. Sin PII cross-org.
+     * Sets payer ONLY if missing (`WHERE payer_email IS NULL`):
+     * validation session (support) never overwrites real payer
+     * recorded during `processing` creation. Avoids cross-org PII leakage.
      */
     async setPlatformPayerIfMissing(
       paymentId: number,
@@ -360,8 +359,8 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Marca un comprobante SaaS como ANULADO. Conserva el número y el PDF;
-     * nunca libera ni reusa el número (decisión congelada, espejo Panel).
+     * Marks a SaaS receipt as VOIDED. Preserves number and PDF;
+     * never releases or reuses the number (frozen decision, Panel mirror).
      */
     async markPlatformVoided(
       paymentId: number,
@@ -369,10 +368,10 @@ export function createPlatformReceiptsRepository(db: Db) {
     ): Promise<DbPlatformPayment> {
       assertPaymentId(paymentId, 'markPlatformVoided');
       if (!input.by || input.by.trim().length === 0) {
-        throw new Error('markPlatformVoided: by (actor) es obligatorio.');
+        throw new Error('markPlatformVoided: by (actor) is required.');
       }
       if (!input.reason || input.reason.trim().length === 0) {
-        throw new Error('markPlatformVoided: reason no vacío es obligatorio.');
+        throw new Error('markPlatformVoided: non-empty reason is required.');
       }
 
       const [row] = await db
@@ -386,7 +385,7 @@ export function createPlatformReceiptsRepository(db: Db) {
         .where(eq(platformSubscriptionPayment.id, paymentId))
         .returning();
       if (!row) {
-        throw new Error(`markPlatformVoided: pago ${paymentId} no existe.`);
+        throw new Error(`markPlatformVoided: payment ${paymentId} does not exist.`);
       }
       return row;
     },

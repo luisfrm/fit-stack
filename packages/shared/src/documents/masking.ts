@@ -1,8 +1,8 @@
-/* ── Documents / masking — enmascarado de referencias sensibles ─────────
-   Las referencias de pago (hashes bancarios, números de operación) son
-   datos sensibles: se muestran parciales en UI, impresión y email.
-   Los adjuntos `file` NO se tocan (siguen como link "VER CAPTURA").
-   Funciones puras, sin I/O, edge-safe (Workers).
+/* ── Documents / masking — masking of sensitive payment references ───────
+   Payment references (bank hashes, operation/transaction numbers) are
+   sensitive data: partially displayed in UI, printed PDFs, and emails.
+   File attachments are NOT altered (they remain as links).
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { IPaymentMethodDetails } from '../types';
@@ -11,10 +11,10 @@ const MASK_CHAR = '•';
 const MIN_MASKABLE_LENGTH = 7;
 
 /**
- * Enmascara una referencia: conserva los primeros 4 y últimos 2
- * caracteres visibles (`123456789012` → `1234••••••12`).
- * Valores cortos (< 7) se ocultan por completo; vacío/null → `""`.
- * Nunca lanza.
+ * Masks a reference: preserves the first 4 and last 2
+ * visible characters (`123456789012` → `1234••••••12`).
+ * Short values (< 7) are completely obscured; empty/null → `""`.
+ * Never throws.
  */
 export function maskReference(value: string | null | undefined): string {
   if (value === null || value === undefined) return '';
@@ -25,9 +25,9 @@ export function maskReference(value: string | null | undefined): string {
 }
 
 /**
- * Enmascara un `paymentMethodDetails` canónico: `text`/`number` se
- * enmascaran, `file` se conserva íntegro (es un link, no un secreto).
- * Tolerante a filas legacy con forma de objeto (las devuelve intactas).
+ * Masks canonical `paymentMethodDetails`: `text`/`number` fields are
+ * masked, `file` is kept intact (it is a link, not a secret).
+ * Tolerant to legacy object-shaped rows (returns them untouched).
  */
 export function maskPaymentDetails(
   details: IPaymentMethodDetails | Record<string, unknown> | null | undefined,

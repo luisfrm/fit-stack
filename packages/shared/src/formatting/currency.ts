@@ -1,17 +1,17 @@
 /* ── Formatting / currency — single source of truth ────────────────────
-   Centraliza conversión y formateo de valores para TODO el proyecto
-   (panel, console, jobs-worker). Los consumers importan de
-   `@workspace/shared` — nunca duplicar este archivo en apps.
-   Convención Money: todo dinero viaja en CENTAVOS ENTEROS; `formatCents`
-   es la única vía de display. Prohibido dividir `/ 100` a mano.
-   Soporta formato localizado (LATAM vs USA). Puro, edge-safe (Workers).
+   Centralizes value conversion and formatting for the ENTIRE project
+   (panel, console, jobs-worker). Consumers import from
+   `@workspace/shared` — never duplicate this file in apps.
+   Money convention: all money travels in INTEGER CENTS; `formatCents`
+   is the only display mechanism. Manually dividing `/ 100` is prohibited.
+   Supports localized format (LATAM vs USA). Pure, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 export type CurrencyFormat = "latam" | "usa";
 
 /**
- * Helper reusable: los amounts viajan en centavos (DB/API) y se muestran
- * en unidades mayores. Usarlo en vez de dividir `/ 100` a mano.
+ * Reusable helper: amounts travel in cents (DB/API) and are displayed
+ * in major units. Use this instead of dividing `/ 100` manually.
  */
 export function formatCents(
   cents: number,
@@ -21,7 +21,7 @@ export function formatCents(
   return ValueConverter.format(cents / 100, currency, format);
 }
 
-/** Fecha corta ES ("07 oct 2026"). Helper puro: vivir aquí, no en componentes. */
+/** Short ES date ("07 oct 2026"). Pure helper: lives here, not in components. */
 export function formatShortDate(value: string | Date): string {
   return new Date(value).toLocaleDateString("es-ES", {
     day: "2-digit",

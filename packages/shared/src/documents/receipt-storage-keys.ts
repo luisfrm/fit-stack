@@ -1,18 +1,18 @@
-/* ── Documents / receipt-storage-keys — keys R2 deterministas ────────────
-   Key del PDF inmutable: derivada solo de (emisor, año, número). Sin sufijo
-   aleatorio: reintentar el paso 2 con el mismo número hace overwrite de la
-   MISMA key (idempotencia). Puro, edge-safe. No colisiona con los assets del
-   gym (`<orgId>/receipts/`, capturas de pago: distinto prefijo, propósito
-   distinto: ver `@workspace/shared/storage`).
+/* ── Documents / receipt-storage-keys — deterministic R2 storage keys ──────
+   Immutable PDF key: derived solely from (emitter, year, number). No random
+   suffix: retrying step 2 with the same number overwrites the SAME key
+   (idempotency). Pure, edge-safe. Does not collide with gym assets
+   (`<orgId>/receipts/`, payment slips: different prefix, different purpose:
+   see `@workspace/shared/storage`).
 
-   Cada comprobante tiene DOS artefactos posibles, ambos deterministas:
+   Each receipt has TWO possible artifacts, both deterministic:
 
-     <...>/<numero>.pdf           → emisión (bytes congelados al numerar)
-     <...>/<numero>-anulado.pdf   → anulación (sello ANULADO, escrito después)
+     <...>/<number>.pdf           → issued (bytes frozen upon numbering)
+     <...>/<number>-anulado.pdf   → voided (VOIDED stamp, written later)
 
-   El sufijo `-anulado` no puede colisionar con una key de emisión porque el
-   número se valida contra el formato (`isValidPanelReceiptNumber`): ninguna
-   key de emisión termina con ese sufijo.
+   The `-anulado` suffix cannot collide with an issuance key because the
+   number is validated against format (`isValidPanelReceiptNumber`): no
+   issuance key ends with that suffix.
    ─────────────────────────────────────────────────────────────────────── */
 
 import {
@@ -23,7 +23,7 @@ import {
 
 const PANEL_SLUG_PATTERN = /^[a-z0-9-]+$/;
 
-/** Sufijo del PDF que lleva el sello ANULADO. */
+/** Suffix for the PDF bearing the VOIDED stamp. */
 export const VOIDED_RECEIPT_SUFFIX = '-anulado';
 
 function assertPanelInputs(
@@ -34,30 +34,30 @@ function assertPanelInputs(
 ): void {
   const slug = orgSlug.trim().toLowerCase();
   if (slug.length === 0 || !PANEL_SLUG_PATTERN.test(slug)) {
-    throw new Error(`${method}: slug inválido ("${orgSlug}").`);
+    throw new Error(`${method}: invalid slug ("${orgSlug}").`);
   }
   if (!Number.isInteger(year) || year < MIN_RECEIPT_YEAR || year > MAX_RECEIPT_YEAR) {
     throw new Error(
-      `${method}: año inválido (${String(year)}). Rango ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
+      `${method}: invalid year (${String(year)}). Range ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
     );
   }
   if (!isValidPanelReceiptNumber(receiptNumber)) {
-    throw new Error(`${method}: receiptNumber inválido (${receiptNumber}).`);
+    throw new Error(`${method}: invalid receiptNumber (${receiptNumber}).`);
   }
 }
 
 function assertPlatformInputs(method: string, year: number, receiptNumber: string): void {
   if (!Number.isInteger(year) || year < MIN_RECEIPT_YEAR || year > MAX_RECEIPT_YEAR) {
     throw new Error(
-      `${method}: año inválido (${String(year)}). Rango ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
+      `${method}: invalid year (${String(year)}). Range ${MIN_RECEIPT_YEAR}-${MAX_RECEIPT_YEAR}.`,
     );
   }
   if (receiptNumber.trim().length === 0) {
-    throw new Error(`${method}: receiptNumber es obligatorio.`);
+    throw new Error(`${method}: receiptNumber is required.`);
   }
 }
 
-/** `receipts/<orgSlug>/<year>/<numero>.pdf` (Panel, emisor = gym). */
+/** `receipts/<orgSlug>/<year>/<number>.pdf` (Panel, issuer = gym). */
 export function panelReceiptKey(
   orgSlug: string,
   year: number,
@@ -67,7 +67,7 @@ export function panelReceiptKey(
   return `receipts/${orgSlug.trim().toLowerCase()}/${year}/${receiptNumber}.pdf`;
 }
 
-/** `receipts/<orgSlug>/<year>/<numero>-anulado.pdf` (Panel, ANULADO). */
+/** `receipts/<orgSlug>/<year>/<number>-anulado.pdf` (Panel, VOIDED). */
 export function panelVoidedReceiptKey(
   orgSlug: string,
   year: number,
@@ -77,13 +77,13 @@ export function panelVoidedReceiptKey(
   return `receipts/${orgSlug.trim().toLowerCase()}/${year}/${receiptNumber}${VOIDED_RECEIPT_SUFFIX}.pdf`;
 }
 
-/** `platform/receipts/<year>/<numero>.pdf` (Console, emisor FitStack). */
+/** `platform/receipts/<year>/<number>.pdf` (Console, FitStack issuer). */
 export function platformReceiptKey(year: number, receiptNumber: string): string {
   assertPlatformInputs('platformReceiptKey', year, receiptNumber);
   return `platform/receipts/${year}/${receiptNumber}.pdf`;
 }
 
-/** `platform/receipts/<year>/<numero>-anulado.pdf` (Console, ANULADO). */
+/** `platform/receipts/<year>/<number>-anulado.pdf` (Console, VOIDED). */
 export function platformVoidedReceiptKey(year: number, receiptNumber: string): string {
   assertPlatformInputs('platformVoidedReceiptKey', year, receiptNumber);
   return `platform/receipts/${year}/${receiptNumber}${VOIDED_RECEIPT_SUFFIX}.pdf`;

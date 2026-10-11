@@ -1,37 +1,37 @@
 /* ── Documents / label gate — single source of truth ───────────────────
-   Decide la etiqueta visible del documento ("Comprobante de pago" vs
-   "Factura"). Gate defensivo de 3 condiciones: si falta CUALQUIERA,
-   se fuerza "Comprobante de pago" aunque el emisor pida "Factura".
-   Funciones puras, sin I/O, edge-safe (Workers).
+   Decides visible document label ("Comprobante de pago" vs
+   "Factura"). Defensive gate with 3 conditions: if ANY is missing,
+   "Comprobante de pago" is enforced even if emitter requested "Factura".
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
-/** Etiquetas visibles permitidas en un comprobante. */
+/** Allowed visible labels on a receipt. */
 export type DocumentLabel = 'Comprobante de pago' | 'Factura';
 
 /**
- * Hoy NO existe homologación fiscal real conectada (ni SENIAT, DIAN, SAT…).
- * Constante explícita — no silenciosa: el gate devuelve "Comprobante" por
- * construcción hasta que una fase futura la cablee a config real.
+ * Currently NO real fiscal homologation is connected (no SENIAT, DIAN, SAT…).
+ * Explicit constant — not silent: gate returns "Comprobante de pago" by
+ * construction until a future phase wires real configuration.
  */
 export const HAS_FISCAL_HOMOLOGATION = false as const;
 
 export interface DocumentLabelGateInput {
-  /** RIF/NIT/RUC/CUIT… del emisor. Vacío o solo espacios = ausente. */
+  /** RIF/NIT/RUC/CUIT… of emitter. Empty or whitespace = missing. */
   taxId?: string | null;
-  /** Declaración explícita de contribuyente formal (Fase 4, con fricción). */
+  /** Explicit formal taxpayer declaration (Phase 4, with UX friction). */
   isFormalTaxpayer?: boolean;
   /**
-   * Homologación fiscal real conectada. Si se omite, vale
-   * `HAS_FISCAL_HOMOLOGATION` (hoy `false`).
+   * Real connected fiscal homologation. If omitted, defaults to
+   * `HAS_FISCAL_HOMOLOGATION` (currently `false`).
    */
   hasFiscalHomologation?: boolean;
 }
 
 /**
- * Resuelve la etiqueta del documento. Solo devuelve `'Factura'` cuando las
- * 3 condiciones son verdaderas a la vez; en cualquier otro caso devuelve
- * `'Comprobante de pago'`. No hay parámetro de "etiqueta pedida": el gate
- * decide, el caller no elige.
+ * Resolves document label. Only returns `'Factura'` when all
+ * 3 conditions are true simultaneously; in any other case returns
+ * `'Comprobante de pago'`. No "requested label" parameter: gate decides,
+ * caller cannot override.
  */
 export function resolveDocumentLabel(input: DocumentLabelGateInput): DocumentLabel {
   const normalizedTaxId = (input.taxId ?? '').trim();

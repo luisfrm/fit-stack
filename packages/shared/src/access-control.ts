@@ -58,8 +58,8 @@ const organizationStatement = {
   reports: ["read"],
   members: ["read", "create", "update", "delete"],
   staff: ["read", "create", "update", "delete"],
-  // Un registro financiero (suscripción + pago) NO se elimina: se anula.
-  // Por eso `subscriptions` no expone `delete` a ningún rol.
+  // A financial record (subscription + payment) is NEVER deleted: it is voided.
+  // Therefore `subscriptions` does not expose `delete` to any role.
   subscriptions: ["read", "create", "update"],
   plans: ["read", "create", "update", "delete"],
   classes: ["read", "create", "update", "delete"],

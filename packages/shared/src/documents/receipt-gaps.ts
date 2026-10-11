@@ -1,13 +1,13 @@
-/* ── Documents / receipt-gaps — auditoría del correlativo ───────────────
-    Regla congelada (plan.md): un número ausente en la secuencia es un
-    "hueco" sospechoso; un número presente con `receipt_voided` es un
-    "anulado" explicado. Nunca se tratan igual y nunca se libera ni reusa
-    un número.
+/* ── Documents / receipt-gaps — sequence gap auditing ───────────────────
+    Frozen business rule (plan.md): a missing number in the sequence is a
+    suspicious "gap" (`hueco`); a present number marked with `receipt_voided`
+    is an explained "voided" (`anulado`). They are never treated the same,
+    and a number is never freed or reused.
     Two sequences, two distinct legal issuers: Panel (`{year}-{seq}`, yearly
     per organization) and Console (`FS-{seq}`, continuous global). The only
     difference is the number format, so it lives in an injected strategy; only
     the algorithm stays here.
-    Puro, sin I/O, edge-safe (Workers).
+    Pure functions, no I/O, edge-safe (Workers).
     ─────────────────────────────────────────────────────────────────────── */
 
 import {
@@ -17,13 +17,13 @@ import {
   parsePanelReceiptNumber,
 } from './receipt-number';
 
-/** Clasificación de un faltante/explicado en el correlativo. */
+/** Classification of a missing or explained entry in the sequence. */
 export type ReceiptGapKind = 'hueco' | 'anulado';
 
 export interface ReceiptGapEntry {
-  /** Secuencia dentro del universo auditado (1..lastNumber). */
+  /** Sequence number within the audited range (1..lastNumber). */
   seq: number;
-  /** `true` = número conservado pero anulado (explicado). */
+  /** `true` = number retained but voided (accounted for). */
   voided: boolean;
   voidedBy?: string | null;
   voidedAt?: string | Date | null;
@@ -33,26 +33,26 @@ export interface ReceiptGapEntry {
 export interface ReceiptGapItem {
   kind: ReceiptGapKind;
   seq: number;
-  /** Número humano del emisor. Nunca el UUID del pago. */
+  /** Human-readable emitter number. Never the internal payment UUID. */
   receiptNumber: string;
   voidedBy?: string | null;
-  /** ISO. Solo en `anulado`. */
+  /** ISO timestamp. Only present for `anulado`. */
   voidedAt?: string | null;
   voidReason?: string | null;
 }
 
-/** Formato y parse de UNA serie: el número humano y su seq. */
+/** Formatting and parsing of ONE series: the human number and its seq. */
 export interface ReceiptGapStrategy {
-  /** Número humano del `seq` (1-based). Lanza si el seq es inválido. */
+  /** Human representation of `seq` (1-based). Throws if seq is invalid. */
   format(seq: number): string;
-  /** `seq` del número, o `null` si no pertenece a esta serie. */
+  /** `seq` of the number, or `null` if it does not belong to this series. */
   parse(receiptNumber: string): number | null;
 }
 
 export interface ComputeReceiptGapsInput {
-  /** Último número reservado: universo auditado = `1..lastNumber`. */
+  /** Last reserved number: audited universe = `1..lastNumber`. */
   lastNumber: number;
-  /** Números presentes (emitidos o anulados) del universo auditado. */
+  /** Present numbers (issued or voided) in the audited range. */
   entries: ReceiptGapEntry[];
   strategy: ReceiptGapStrategy;
 }
@@ -64,7 +64,7 @@ export interface PanelReceiptGapsInput {
   entries: ReceiptGapEntry[];
 }
 
-/** Serie de Console: global continua, sin año (`FS-{seq}`). */
+/** Console series: continuous global, without year (`FS-{seq}`). */
 export interface ConsoleReceiptGapsInput {
   lastNumber: number;
   entries: ReceiptGapEntry[];
@@ -80,10 +80,10 @@ function toIsoOrNull(value: string | Date | null | undefined, seq: number): stri
 }
 
 /**
- * Calcula los faltantes del correlativo contra `1..lastNumber`.
- * Los emitidos no aparecen en el resultado; los ausentes son `hueco` y los
- * presentes-anulados son `anulado`. Lanza ante datos incoherentes (nunca
- * silencia un correlativo roto).
+ * Computes missing entries in the sequence against `1..lastNumber`.
+ * Issued receipts do not appear in the result; missing ones are `hueco`
+ * and present-but-voided are `anulado`. Throws on inconsistent data (never
+ * silently hides a broken sequence).
  */
 export function computeReceiptGaps(input: ComputeReceiptGapsInput): ReceiptGapItem[] {
   const { lastNumber, entries, strategy } = input;
@@ -109,8 +109,8 @@ export function computeReceiptGaps(input: ComputeReceiptGapsInput): ReceiptGapIt
   const gaps: ReceiptGapItem[] = [];
   for (let seq = 1; seq <= lastNumber; seq += 1) {
     const receiptNumber = strategy.format(seq);
-    // Coherencia número↔secuencia: el formateado debe parsear al mismo seq
-    // (detecta una serie corrupta antes de reportarla como hueco).
+    // Number↔sequence coherence: formatted number must parse back to the same seq
+    // (detects a corrupted series before reporting it as a gap).
     if (strategy.parse(receiptNumber) !== seq) {
       throw new Error(`computeReceiptGaps: número incoherente para seq ${seq}.`);
     }
@@ -132,8 +132,7 @@ export function computeReceiptGaps(input: ComputeReceiptGapsInput): ReceiptGapIt
 }
 
 /**
- * Gaps de la serie del Panel (anual, por organización). El slug se normaliza
- * como lo hace el formato para que el parse de coherencia coincida.
+ * Gaps for the Panel series (yearly, per organization).
  */
 export function computePanelReceiptGaps(input: PanelReceiptGapsInput): ReceiptGapItem[] {
   return computeReceiptGaps({
@@ -153,7 +152,7 @@ export function computePanelReceiptGaps(input: PanelReceiptGapsInput): ReceiptGa
   });
 }
 
-/** Gaps de la serie de Console (global continua, un solo emisor: FitStack). */
+/** Gaps for the Console series (global continuous, single issuer: FitStack). */
 export function computeConsoleReceiptGaps(input: ConsoleReceiptGapsInput): ReceiptGapItem[] {
   return computeReceiptGaps({
     lastNumber: input.lastNumber,

@@ -1,16 +1,16 @@
-/* ── Documents / receipt-events — contrato de cola de render ─────────────
-   Evento `receipt.render` de `fit-receipt-events`. Tipo SOLO-tipos (sin I/O,
-   edge-safe): lo importan api-worker (productor paso 1 + issue) y
-   jobs-worker (barrido + consumer) desde `@workspace/shared` — ninguna app
-   importa tipos de la otra. Un solo tipo con `scope`: C2 lo reutiliza sin
-   duplicar registro.
+/* ── Documents / receipt-events — render queue contract ─────────────────
+   `receipt.render` event of `fit-receipt-events`. Types-ONLY (no I/O,
+   edge-safe): imported by api-worker (producer step 1 + issue) and
+   jobs-worker (sweep + consumer) from `@workspace/shared` — neither app
+   imports types from the other. A single type with `scope`: C2 reuses it
+   without duplicating registration.
    ─────────────────────────────────────────────────────────────────────── */
 
 import { isValidConsoleReceiptNumber, isValidPanelReceiptNumber } from './receipt-number';
 
 export const RECEIPT_RENDER_EVENT_TYPE = 'receipt.render' as const;
 
-/** Emisor del comprobante: gym (panel) o FitStack (platform, reservado C2). */
+/** Receipt issuer: gym (panel) or FitStack (platform, C2 reserved). */
 export type ReceiptScope = 'panel' | 'platform';
 
 export interface ReceiptRenderEvent {
@@ -19,7 +19,7 @@ export interface ReceiptRenderEvent {
   /** Panel: `payment.id`. Platform (C2): `platform_subscription_payment.id`. */
   paymentId: number;
   organizationId: string;
-  /** Correlativo humano ya asignado (formato Panel validado). */
+  /** Human correlative already allocated (validated Panel format). */
   receiptNumber: string;
 }
 
@@ -27,24 +27,24 @@ export interface BuildReceiptRenderEventInput {
   paymentId: number;
   organizationId: string;
   receiptNumber: string;
-  /** Default `'panel'`. Fase actual nunca emite `'platform'` (reservado C2). */
+  /** Default `'panel'`. Current phase never emits `'platform'` (C2 reserved). */
   scope?: ReceiptScope;
 }
 
 /**
- * Construye el evento validado. Lanza con mensaje explícito si inválido —
- * el productor lo deja fallar en desarrollo, nunca silencia.
+ * Builds the validated event. Throws with an explicit message if invalid —
+ * producer fails fast in development, never silencing.
  */
 export function buildReceiptRenderEvent(
   input: BuildReceiptRenderEventInput,
 ): ReceiptRenderEvent {
   if (!Number.isInteger(input.paymentId) || input.paymentId < 1) {
     throw new Error(
-      `buildReceiptRenderEvent: paymentId inválido (${String(input.paymentId)}).`,
+      `buildReceiptRenderEvent: invalid paymentId (${String(input.paymentId)}).`,
     );
   }
   if (!input.organizationId || input.organizationId.trim().length === 0) {
-    throw new Error('buildReceiptRenderEvent: organizationId es obligatorio.');
+    throw new Error('buildReceiptRenderEvent: organizationId is required.');
   }
   const scope = input.scope ?? 'panel';
   const validNumber =
@@ -53,7 +53,7 @@ export function buildReceiptRenderEvent(
       : isValidPanelReceiptNumber(input.receiptNumber);
   if (!validNumber) {
     throw new Error(
-      `buildReceiptRenderEvent: receiptNumber con formato inválido para scope "${scope}" (${input.receiptNumber}).`,
+      `buildReceiptRenderEvent: invalid receiptNumber format for scope "${scope}" (${input.receiptNumber}).`,
     );
   }
   return {
@@ -65,7 +65,7 @@ export function buildReceiptRenderEvent(
   };
 }
 
-/** Type-guard estricto para el consumer (lo desconocido → ack + warn, no retry). */
+/** Strict type-guard for consumer (unknown → ack + warn, no retry). */
 export function isReceiptRenderEvent(v: unknown): v is ReceiptRenderEvent {
   if (typeof v !== 'object' || v === null) return false;
   const e = v as Record<string, unknown>;

@@ -2,28 +2,28 @@ import { TZDate, tzOffset } from '@date-fns/tz';
 import { addDays, addMonths, addWeeks, addYears } from 'date-fns';
 
 /**
- * Utilidades de fecha/zona horaria para Fit-Stack.
+ * Date and timezone utilities for Fit-Stack.
  *
- * Fuente única de verdad para convertir entre fechas UTC (lo que se guarda en la BD,
- * columnas `timestamptz`) y el día local de una organización (IANA, ej. `America/Caracas`).
+ * Single source of truth for converting between UTC dates (persisted in DB,
+ * `timestamptz` columns) and an organization's local day (IANA, e.g. `America/Caracas`).
  *
- * Regla de negocio clave: un pago registrado a las 11pm en Venezuela debe caer en el
- * MISMO día local en reportes/ingresos del día. Por eso nunca se usa la tz del servidor:
- * siempre se opera con una `TZDate` anclada a la tz de la organización.
+ * Core business rule: a payment registered at 11pm in Venezuela must fall on the
+ * SAME local day in daily revenue and reports. This is why the server timezone is
+ * never used: operations are always executed with a `TZDate` pinned to the organization's tz.
  *
- * ⚠️ La agregación por día/mes local en reportes se hace en SQL (`AT TIME ZONE`).
- * Estas funciones resuelven la ENTRADA (límites de día local como instantes UTC para los
- * `WHERE gte/lte`) y el DISPLAY; no reemplazan la agregación de Postgres.
+ * ⚠️ Local day/month aggregations in reports are done in SQL (`AT TIME ZONE`).
+ * These functions resolve INPUT boundaries (local day limits as UTC instants for
+ * `WHERE gte/lte`) and DISPLAY; they do not replace Postgres aggregation.
  */
 
 export type DurationUnit = 'day' | 'week' | 'month' | 'year';
 
-/** Timezone por defecto de la plataforma (Venezuela). */
+/** Default platform timezone (Venezuela). */
 export const DEFAULT_TIMEZONE = 'America/Caracas' as const;
 
 /**
- * Devuelve una tz IANA válida, con fallback al default de la plataforma.
- * @param tz tz IANA (ej. "America/Caracas") o null/undefined.
+ * Returns a valid IANA timezone, falling back to the platform default.
+ * @param tz IANA tz (e.g. "America/Caracas") or null/undefined.
  */
 export function resolveOrgTimezone(tz?: string | null): string {
   if (!tz) return DEFAULT_TIMEZONE;
@@ -36,8 +36,8 @@ function pad(n: number): string {
 }
 
 /**
- * Crea una `TZDate` anclada a la tz indicada, en el instante dado
- * (omitiendo `date` se obtiene "ahora" en esa tz).
+ * Creates a `TZDate` pinned to the specified timezone at the given instant
+ * (omitting `date` returns "now" in that timezone).
  */
 function toTzDate(tz: string, date?: Date | string | number): TZDate {
   if (date === undefined) return TZDate.tz(tz);
@@ -47,7 +47,7 @@ function toTzDate(tz: string, date?: Date | string | number): TZDate {
 }
 
 /**
- * Crea una `TZDate` en el instante de MEDIANOCHE LOCAL del día `dateStr` ('YYYY-MM-DD').
+ * Creates a `TZDate` at the instant of LOCAL MIDNIGHT for the day `dateStr` ('YYYY-MM-DD').
  */
 function localMidnightTz(tz: string, dateStr: string): TZDate {
   const [year, month, day] = dateStr.split('-').map((p) => Number(p));
@@ -55,8 +55,8 @@ function localMidnightTz(tz: string, dateStr: string): TZDate {
 }
 
 /**
- * Parsea un 'YYYY-MM-DD' local y devuelve el instante UTC de medianoche local.
- * Ej: parseLocalToUtc('America/Caracas', '2026-01-01') → Date UTC del 2026-01-01T04:00:00Z.
+ * Parses a local 'YYYY-MM-DD' and returns the UTC instant corresponding to local midnight.
+ * Example: parseLocalToUtc('America/Caracas', '2026-01-01') → UTC Date for 2026-01-01T04:00:00Z.
  */
 export function parseLocalToUtc(tz: string | null | undefined, dateStr: string): Date {
   const timezone = resolveOrgTimezone(tz);
@@ -64,9 +64,9 @@ export function parseLocalToUtc(tz: string | null | undefined, dateStr: string):
 }
 
 /**
- * Devuelve el día local ('YYYY-MM-DD') de `date` en la tz indicada.
- * Ej: toLocalDayString('America/Caracas', new Date('2026-01-02T03:00:00Z')) → '2026-01-01'
- *     (a las 11pm del 1ro en Caracas sigue siendo el día 1).
+ * Returns the local day ('YYYY-MM-DD') of `date` in the specified timezone.
+ * Example: toLocalDayString('America/Caracas', new Date('2026-01-02T03:00:00Z')) → '2026-01-01'
+ *     (at 11pm on the 1st in Caracas it is still the 1st).
  */
 export function toLocalDayString(tz?: string | null, date: Date | string | number = new Date()): string {
   const timezone = resolveOrgTimezone(tz);
@@ -75,7 +75,7 @@ export function toLocalDayString(tz?: string | null, date: Date | string | numbe
 }
 
 /**
- * Devuelve el mes local ('YYYY-MM') de `date` en la tz indicada.
+ * Returns the local month ('YYYY-MM') of `date` in the specified timezone.
  */
 export function toLocalMonthString(tz?: string | null, date: Date | string | number = new Date()): string {
   const timezone = resolveOrgTimezone(tz);
@@ -84,8 +84,8 @@ export function toLocalMonthString(tz?: string | null, date: Date | string | num
 }
 
 /**
- * Instante UTC del inicio del día local (00:00:00.000).
- * Sin `dateStr`, usa el día local de "ahora".
+ * UTC instant of local day start (00:00:00.000).
+ * Without `dateStr`, defaults to the local day of "now".
  */
 export function localDayStartUtc(tz?: string | null, dateStr?: string): Date {
   const timezone = resolveOrgTimezone(tz);
@@ -95,8 +95,8 @@ export function localDayStartUtc(tz?: string | null, dateStr?: string): Date {
 }
 
 /**
- * Instante UTC del fin del día local (23:59:59.999).
- * Sin `dateStr`, usa el día local de "ahora".
+ * UTC instant of local day end (23:59:59.999).
+ * Without `dateStr`, defaults to the local day of "now".
  */
 export function localDayEndUtc(tz?: string | null, dateStr?: string): Date {
   const timezone = resolveOrgTimezone(tz);
@@ -106,16 +106,16 @@ export function localDayEndUtc(tz?: string | null, dateStr?: string): Date {
 }
 
 /**
- * Rango completo del día local como instantes UTC: `{ start, end }`.
- * Útil para los `WHERE gte(start) / lte(end)` de pagos del día.
+ * Full local day range as UTC instants: `{ start, end }`.
+ * Useful for `WHERE gte(start) / lte(end)` filters on daily payments.
  */
 export function localDayRange(tz?: string | null, dateStr?: string): { start: Date; end: Date } {
   return { start: localDayStartUtc(tz, dateStr), end: localDayEndUtc(tz, dateStr) };
 }
 
 /**
- * Instante UTC del inicio del mes local ('YYYY-MM-01T00:00:00').
- * `monthsAgo` permite retroceder N meses (0 = mes actual).
+ * UTC instant of local month start ('YYYY-MM-01T00:00:00').
+ * `monthsAgo` allows stepping back N months (0 = current month).
  */
 export function localMonthStartUtc(tz?: string | null, monthsAgo: number = 0): Date {
   const timezone = resolveOrgTimezone(tz);
@@ -132,8 +132,8 @@ export function localMonthStartUtc(tz?: string | null, monthsAgo: number = 0): D
 }
 
 /**
- * Día de la semana local (0=dom … 6=sáb) del 'YYYY-MM-DD' en la tz indicada.
- * TZ-aware (vía TZDate): no usa la tz del servidor ni aritmética manual.
+ * Local day of the week (0=Sun … 6=Sat) for 'YYYY-MM-DD' in the given timezone.
+ * TZ-aware (via TZDate): does not use server timezone or manual arithmetic.
  */
 export function localWeekday(tz: string | null | undefined, dateStr?: string): number {
   const timezone = resolveOrgTimezone(tz);
@@ -142,8 +142,8 @@ export function localWeekday(tz: string | null | undefined, dateStr?: string): n
 }
 
 /**
- * Hora local 'HH:MM' (24 h) del instante en la tz indicada.
- * Útil para comparar rangos `startTime/endTime` ("HH:MM" lexicográfico).
+ * Local time 'HH:MM' (24 h) of the instant in the given timezone.
+ * Useful for lexicographical range comparisons of `startTime/endTime`.
  */
 export function localTimeString(tz: string | null | undefined, date: Date | string | number = new Date()): string {
   const timezone = resolveOrgTimezone(tz);
@@ -152,8 +152,8 @@ export function localTimeString(tz: string | null | undefined, date: Date | stri
 }
 
 /**
- * Suma N días calendario a un 'YYYY-MM-DD' local y devuelve 'YYYY-MM-DD'.
- * Opera en la tz indicada (evita saltos de día por DST).
+ * Adds N calendar days to a local 'YYYY-MM-DD' and returns 'YYYY-MM-DD'.
+ * Operates in the indicated timezone (avoids DST day-shift issues).
  */
 export function addLocalDays(tz: string | null | undefined, dateStr: string, days: number): string {
   const timezone = resolveOrgTimezone(tz);
@@ -162,17 +162,17 @@ export function addLocalDays(tz: string | null | undefined, dateStr: string, day
 }
 
 /**
- * Alias de `parseLocalToUtc` para compatibilidad con el antiguo helper de `display.ts`.
- * Crea un `Date` estable apuntando a la medianoche del día en la tz de la org
- * (evita el off-by-one día con inputs 'YYYY-MM-DD').
+ * Alias of `parseLocalToUtc` for compatibility with former `display.ts` helper.
+ * Creates a stable `Date` pointing to midnight of the day in the org timezone
+ * (avoids off-by-one day bugs with 'YYYY-MM-DD' inputs).
  */
 export function parseDateAsConfigTimezone(dateStr: string, timezone?: string | null): Date {
   return parseLocalToUtc(timezone, dateStr);
 }
 
 /**
- * Suma una duración a una fecha, operando en la tz indicada (evita saltos de día por DST).
- * Devuelve el instante UTC resultante como `Date`. Para obtener la fecha local usar
+ * Adds duration to a date, operating in the indicated timezone (avoids DST day-shifts).
+ * Returns the resulting UTC instant as a `Date`. To obtain the local date, use
  * `toLocalDayString(tz, addDuration(...))`.
  */
 export function addDuration(
@@ -181,10 +181,9 @@ export function addDuration(
   unit: DurationUnit,
   timezone: string,
 ): Date {
-  // tz REQUERIDA y explícita: sin fallback silencioso a `America/Caracas`
-  // (regla §10). `'UTC'` es un valor válido — lo que no se admite es omitirla
-  // y que el default decida por nosotros (fue justo lo que motivó la copia UTC
-  // de `billing-utils.ts`, hoy eliminada).
+  // Explicit REQUIRED timezone: no silent fallback to `America/Caracas` (§10).
+  // `'UTC'` is a valid value — what is not permitted is omitting it and having
+  // a fallback silently decide.
   if (!timezone?.trim()) {
     throw new Error(
       'addDuration: timezone es obligatoria (usa "UTC" para billing de plataforma).',
@@ -210,8 +209,8 @@ export function addDuration(
 }
 
 /**
- * Offset de la tz en formato '+hh:mm' (ej. '+05:30' para Asia/Kolkata, '-04:00' para Caracas).
- * Reemplaza el parser manual de `Intl.DateTimeFormat(...).timeZoneName` de `display.ts`.
+ * Timezone offset in '+hh:mm' format (e.g. '+05:30' for Asia/Kolkata, '-04:00' for Caracas).
+ * Replaces manual parser of `Intl.DateTimeFormat(...).timeZoneName`.
  */
 export function getTimezoneOffset(tz?: string | null, date: Date = new Date()): string {
   const timezone = resolveOrgTimezone(tz);
@@ -223,5 +222,5 @@ export function getTimezoneOffset(tz?: string | null, date: Date = new Date()): 
   return `${sign}${hh}:${mm}`;
 }
 
-// (Se eliminó `daysBetween`: usaba la aproximación Math.floor(ms/86_400_000), sensible a DST.
-//  Para "días restantes" tz-aware usar localDayRange/toLocalDayString.)
+// (`daysBetween` was removed: it used the DST-sensitive approximation Math.floor(ms/86_400_000).
+//  For tz-aware remaining days, use localDayRange/toLocalDayString.)

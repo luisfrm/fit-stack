@@ -1,11 +1,11 @@
-/* ── Documents / receipt-data — contrato del comprobante ─────────────────
-   `ReceiptData` es CADA COSA que el PDF, el email y el reporte necesitan y
-   nada más: emisor congelado, receptor, detalle snapshot, periodo, montos
-   en centavos enteros, método enmascarado, impuestos y pie legal.
-   El UUID técnico (`payment.id`) NUNCA va en campos visibles: solo viaja
-   como `internalPaymentId` marcado @internal y `checklistPrePdf` lo
-   detecta si se filtra a un campo visible.
-   Funciones puras, sin I/O, edge-safe (Workers).
+/* ── Documents / receipt-data — receipt contract ─────────────────────────
+   `ReceiptData` is EVERYTHING the PDF, email, and report need and nothing
+   more: frozen emitter, recipient, snapshot details, period, integer-cent
+   amounts, masked payment method, taxes, and legal footer.
+   The technical UUID (`payment.id`) NEVER goes into visible fields: it only
+   travels as `@internal` `internalPaymentId`, and `checklistPrePdf` detects
+   it if it ever leaks into a visible field.
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { ITaxDetail } from '../types';
@@ -15,10 +15,10 @@ import {
   isValidPanelReceiptNumber,
 } from './receipt-number';
 
-/** Tipo de documento emitido. Hoy solo `'receipt'` es efectivo (gate). */
+/** Issued document type. Currently only `'receipt'` is active (gate). */
 export type ReceiptDocumentType = 'receipt' | 'invoice';
 
-/** Emisor congelado al momento de la emisión (snapshot, no referencia viva). */
+/** Emitter frozen at the moment of issuance (snapshot, not live reference). */
 export interface ReceiptEmitter {
   name: string;
   legalName?: string | null;
@@ -26,7 +26,7 @@ export interface ReceiptEmitter {
   taxLabel: string;
   address?: string | null;
   countryCode: string;
-  /** Moneda base del emisor (para exigir tasa si el pago difiere). */
+  /** Emitter base currency (to require an exchange rate if payment currency differs). */
   currency: string;
 }
 
@@ -36,45 +36,44 @@ export interface ReceiptRecipient {
   docLabel?: string | null;
 }
 
-/** Impuesto tal como se aplicó al emitir (auditoría del cálculo, no del país). */
+/** Tax as applied upon issuance (calculation audit, not country live config). */
 export interface ReceiptSnapshotTax {
   name: string;
-  /** Fracción 0–1 realmente aplicada. */
+  /** Fraction 0–1 actually applied. */
   rate: number;
   enabled: boolean;
 }
 
 /**
- * Identidad del emisor CONGELADA en el momento de emitir (C1). Se persiste
- * junto al número (`emitter_snapshot`) y `GET /:id/receipt` la lee tal cual:
- * el JSON y la auditoría no cambian si el emisor edita su perfil después (el
- * PDF en R2 ya era inmutable). Congela todo lo que hoy se derivaba en vivo:
- * identidad, etiqueta aplicada por el gate, etiqueta del receptor, pie legal,
- * zona horaria con la que se imprimieron las fechas y el perfil fiscal con el
- * que se calcularon los impuestos.
+ * Emitter identity FROZEN at the time of issuance (C1). Persisted alongside
+ * the number (`emitter_snapshot`) and `GET /:id/receipt` reads it as-is:
+ * the JSON and audit trail do not change if the emitter edits their profile
+ * later (the PDF in R2 was already immutable). Freezes everything derived live:
+ * identity, label applied by the gate, recipient document label, legal footer,
+ * emitter timezone used to format dates, and the fiscal profile used for taxes.
  */
 export interface ReceiptEmitterSnapshot {
-  /** Versión del shape (permite evolucionar sin romper snapshots viejos). */
+  /** Shape version (allows evolution without breaking older snapshots). */
   version: 1;
   emitter: ReceiptEmitter;
-  /** Etiqueta aplicada por `resolveDocumentLabel` al emitir. */
+  /** Label applied by `resolveDocumentLabel` upon issuance. */
   documentLabel: string;
-  /** Etiqueta del documento del receptor (`FiscalProfile.docLabel`). */
+  /** Recipient document label (`FiscalProfile.docLabel`). */
   recipientDocLabel: string;
-  /** Pie legal aplicado (país del emisor o su `disclaimerOverride`). */
+  /** Applied legal disclaimer (emitter country or custom `disclaimerOverride`). */
   disclaimer: string[];
-  /** Zona horaria del emisor usada para imprimir las fechas. */
+  /** Emitter timezone used to format dates. */
   timezone?: string | null;
-  /** Perfil fiscal resuelto con el que se calcularon los impuestos. */
+  /** Resolved fiscal profile used to calculate taxes. */
   taxes: ReceiptSnapshotTax[];
 }
 
 export interface ReceiptDocument {
   number: string;
   type: ReceiptDocumentType;
-  /** Etiqueta aplicada por el gate (`resolveDocumentLabel`). */
+  /** Label applied by the gate (`resolveDocumentLabel`). */
   label: string;
-  /** Emisión (≠ fecha del pago). ISO. */
+  /** Issuance date (≠ payment date). ISO. */
   issuedAt: string;
 }
 
@@ -82,11 +81,11 @@ export interface ReceiptSale {
   planName: string;
   periodStart: string;
   periodEnd: string;
-  /** Fecha en que se pagó. ISO. */
+  /** Payment date. ISO. */
   paymentDate: string;
 }
 
-/** Montos en centavos enteros (ver `money.ts`). */
+/** Amounts in integer cents (see `money.ts`). */
 export interface ReceiptAmounts {
   subtotal: number;
   taxDetails: ITaxDetail[];
@@ -94,23 +93,22 @@ export interface ReceiptAmounts {
   total: number;
   currencyPaid: string;
   /**
-   * Moneda comercial base (la del plan). Si difiere de `currencyPaid` se
-   * exige tasa. Si se omite, el checklist usa la moneda del emisor.
+   * Base commercial currency (plan currency). If different from `currencyPaid`,
+   * exchange rate is required. If omitted, checklist uses emitter currency.
    */
   baseCurrency?: string;
   exchangeRateApplied?: string | null;
   /**
-   * Equivalente del total en `baseCurrency`, congelado desde la tasa
-   * persistida (`exchangeRateApplied`) — nunca recalculado con una API de
-   * cambio. `null` si el pago ya está en la moneda base (no hay conversión
-   * que mostrar).
+   * Total equivalent in `baseCurrency`, frozen from the persisted exchange rate
+   * (`exchangeRateApplied`) — never recalculated using a live exchange API.
+   * `null` if payment is already in base currency (no conversion to show).
    */
   baseTotal?: number | null;
 }
 
 export interface ReceiptMethod {
   name: string;
-  /** Detalles YA enmascarados (`maskPaymentDetails`). */
+  /** ALREADY masked details (`maskPaymentDetails`). */
   maskedDetails?: { label: string; value: string }[];
 }
 
@@ -127,12 +125,12 @@ export interface ReceiptData {
   amounts: ReceiptAmounts;
   method: ReceiptMethod;
   footer: ReceiptFooter;
-  /** Zona horaria del emisor: fechas se muestran en hora local, no UTC. */
+  /** Emitter timezone: dates are rendered in local time, not UTC. */
   timezone?: string;
-  /** `true` si el comprobante fue anulado (se conserva el número). */
+  /** `true` if receipt was voided (number remains preserved). */
   voided?: boolean;
   /**
-   * @internal UUID técnico para trazabilidad interna. NUNCA renderizar.
+   * @internal Technical UUID for internal traceability. NEVER render.
    */
   internalPaymentId?: number | string;
 }
@@ -147,12 +145,12 @@ export const UUID_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**
- * Placeholder prohibido en un campo visible: si el dato no existe, la línea
- * se OMITE (FACTURATION.md §3: "omitir línea si no existe, no inventar").
+ * Forbidden placeholder in a visible field: if the data does not exist,
+ * the line is OMITTED (FACTURATION.md §3: "omit line if missing, do not invent").
  */
 export const MISSING_VALUE_PLACEHOLDER = '---';
 
-/** Campos visibles opcionales: `null` (omitir) es válido, el placeholder no. */
+/** Optional visible fields: `null` (omit) is valid, the placeholder is not. */
 function placeholderViolations(data: ReceiptData): string[] {
   const optionalFields: { label: string; value: string | null | undefined }[] = [
     { label: 'identificación fiscal del emisor', value: data.emitter.taxId },
@@ -168,9 +166,9 @@ function placeholderViolations(data: ReceiptData): string[] {
 }
 
 /**
- * Valida el checklist pre-PDF: número presente y válido, sin UUID visible,
- * disclaimer del emisor, tasa si la moneda difiere, y cuadre de totales.
- * Acumula errores (no lanza): el caller decide (decisión §5.3).
+ * Validates pre-PDF checklist: number present and valid, no visible UUID,
+ * emitter disclaimer present, exchange rate if currency differs, and total balancing.
+ * Accumulates errors (does not throw): caller decides (§5.3).
  */
 export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
   const errors: string[] = [];
@@ -183,12 +181,11 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
     errors.push('Comprobante sin número correlativo válido.');
   }
 
-  // Solo campos GENERADOS POR EL SISTEMA: el checklist caza fugas técnicas
-  // (un id interno impreso donde va un dato del documento). Los detalles que
-  // escribe el operador (`method.maskedDetails`) quedan FUERA a propósito:
-  // juzgar su texto es trabajo de la validación de escritura
-  // (`paymentMethodSchema`), no del render — una referencia bancaria con forma
-  // de UUID no puede dejar el comprobante sin PDF y sin email para siempre.
+  // Only SYSTEM-GENERATED fields: checklist checks for technical leaks
+  // (an internal id printed where document data belongs). Operator-entered
+  // details (`method.maskedDetails`) are intentionally EXCLUDED: validation
+  // of their format belongs to input validation (`paymentMethodSchema`), not
+  // render time — a bank reference formatted like a UUID must not block PDF/email.
   const visibleStrings: string[] = [
     data.document.number,
     data.document.label,

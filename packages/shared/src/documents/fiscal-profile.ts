@@ -1,8 +1,8 @@
-/* ── Documents / fiscal-profile — perfil fiscal del emisor ───────────────
-   El país da el default (`COUNTRIES`), la org lo sobreescribe
-   (`fiscalConfig`, columna `organization.fiscalConfig`). Cero hardcode
-   en consumidores: ningún caller inventa etiquetas ni tasas.
-   Funciones puras, sin I/O, edge-safe (Workers).
+/* ── Documents / fiscal-profile — issuer fiscal profile ───────────────────
+   The country provides the default (`COUNTRIES`), the org overrides it
+   (`fiscalConfig`, column `organization.fiscalConfig`). Zero hardcoding
+   in consumers: no caller invents labels or tax rates.
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 import { z } from 'zod';
@@ -10,35 +10,34 @@ import { COUNTRIES } from '../constants';
 import type { ITaxDetail } from '../types';
 import { computeInclusiveTaxes } from './tax-math';
 
-/** Override de un impuesto por la org: apagarlo o cambiar su tasa. */
+/** Tax override by the org: disable it or change its rate. */
 export const FiscalTaxOverrideSchema = z.object({
   name: z.string().min(1),
-  /** Tasa como fracción 0–1 (0.16 = 16%). */
+  /** Rate as fraction 0–1 (0.16 = 16%). */
   rate: z.number().min(0).max(1),
   enabled: z.boolean(),
 });
 
 /**
- * Contrato de `organization.fiscalConfig`. La api-worker lo re-exporta
- * (no lo duplica) para validar el `PATCH /api/organizations/profile`
- * de Fase 4 y el create/update de orgs en console.
+ * Contract for `organization.fiscalConfig`. api-worker re-exports it
+ * (without duplicating) to validate `PATCH /api/organizations/profile`
+ * in Phase 4 and org create/update in console.
  */
 export const FiscalConfigSchema = z
   .object({
-    /** Etiqueta pedida por el emisor (el gate decide la aplicada). */
+    /** Label requested by issuer (gate determines the one actually applied). */
     documentLabel: z.string().min(1).optional(),
-    /** Declaración explícita de contribuyente formal (Fase 4, con fricción). */
+    /** Explicit formal taxpayer declaration (Phase 4, with UX friction). */
     isFormalTaxpayer: z.boolean().optional(),
     taxes: z.array(FiscalTaxOverrideSchema).optional(),
     /**
-     * Nombres de impuestos CONDICIONALES que el emisor confirmó
-     * explícitamente (misma fricción que `isFormalTaxpayer`: tasa manual +
-     * check de confirmación). Sin esta lista, un condicional (p. ej. IGTF)
-     * no se aplica aunque `enabled` sea `true`: el 3 % del país es solo
-     * referencia documentada, varía por decreto.
+     * Names of CONDITIONAL taxes that the issuer explicitly confirmed
+     * (same UX friction as `isFormalTaxpayer`: manual rate + confirmation check).
+     * Without this list, a conditional tax (e.g. IGTF) is not applied even if
+     * `enabled` is `true`: country's 3% is documented reference, varies by decree.
      */
     confirmedTaxes: z.array(z.string().min(1)).optional(),
-    /** Si se omite, vale el `legalDisclaimer` del país. */
+    /** If omitted, falls back to country's `legalDisclaimer`. */
     disclaimerOverride: z.array(z.string().min(1)).optional(),
   })
   .strict();
@@ -46,31 +45,31 @@ export const FiscalConfigSchema = z
 export type FiscalConfig = z.infer<typeof FiscalConfigSchema>;
 
 /**
- * Lectura tolerante de `fiscalConfig` ya almacenada (jsonb): parsea con
- * `.strip()` para NO perder los campos conocidos si la fila trae keys de una
- * versión previa/futura. Para escritura se usa siempre `FiscalConfigSchema`
- * (`.strict()`). `null`/inválida → `{}` (base vacía, sin romper el merge).
+ * Tolerant parsing of already stored `fiscalConfig` (jsonb): parsed with
+ * `.strip()` so known fields are NOT lost if row contains keys from a
+ * previous/future version. For writing, `FiscalConfigSchema` (`.strict()`) is always used.
+ * `null`/invalid → `{}` (empty baseline, without breaking merge).
  */
 export const StoredFiscalConfigSchema = FiscalConfigSchema.strip();
 
-/** Impuesto resuelto: default del país + override de la org. */
+/** Resolved tax: country default + org override. */
 export interface ResolvedTax {
   name: string;
-  /** Fracción 0–1. */
+  /** Fraction 0–1. */
   rate: number;
   enabled: boolean;
-  /** Condición sin evaluar (p. ej. `"payment_currency !== 'VES'"`). */
+  /** Unevaluated condition (e.g. `"payment_currency !== 'VES'"`). */
   condition?: string;
   /**
-   * `'gross_first'` = se EXTRAE del total cobrado antes de descomponer el
-   * resto (`computeInclusiveTaxes`). Aplica a los condicionales (IGTF VE).
+   * `'gross_first'` = EXTRACTED from total charged before decomposing the
+   * rest (`computeInclusiveTaxes`). Applies to conditional taxes (VE IGTF).
    */
   basis?: 'gross_first';
-  /** Activación sujeta a fricción explícita (tasa manual + confirmación). */
+  /** Activation subject to explicit friction (manual rate + confirmation). */
   requiresConfirmation?: boolean;
 }
 
-/** Perfil fiscal efectivo de un emisor para un país dado. */
+/** Effective fiscal profile of an issuer for a given country. */
 export interface FiscalProfile {
   taxes: ResolvedTax[];
   disclaimer: string[];
@@ -80,23 +79,23 @@ export interface FiscalProfile {
 }
 
 /**
- * Parsea una tasa en formato país (`"16%"`, `"16"`, `"0.16"`) a fracción
- * (`0.16`). Valores > 1 se interpretan como porcentaje. Lanza si el valor
- * no es numérico o es negativo — nunca inventa una tasa en silencio.
+ * Parses a rate in country format (`"16%"`, `"16"`, `"0.16"`) to a fraction
+ * (`0.16`). Values > 1 are interpreted as percentage. Throws if value
+ * is non-numeric or negative — never invents a rate silently.
  */
 export function parseRateValue(value: string): number {
   const cleaned = value.trim().replace(/%$/, '').trim().replace(',', '.');
   const parsed = Number(cleaned);
   if (cleaned.length === 0 || Number.isNaN(parsed) || parsed < 0) {
-    throw new Error(`parseRateValue: tasa inválida ("${value}")`);
+    throw new Error(`parseRateValue: invalid rate ("${value}")`);
   }
   return parsed > 1 ? parsed / 100 : parsed;
 }
 
 /**
- * Resuelve el perfil fiscal: defaults de `COUNTRIES[countryCode]` +
- * override de la org (matcheo por `name`; impuestos desconocidos se
- * ignoran). `countryCode` desconocido → error visible, nunca default.
+ * Resolves fiscal profile: defaults from `COUNTRIES[countryCode]` +
+ * org override (matched by `name`; unknown taxes are
+ * ignored). Unknown `countryCode` → visible error, never default.
  */
 export function resolveFiscalProfile(
   countryCode: string,
@@ -108,24 +107,24 @@ export function resolveFiscalProfile(
       `resolveFiscalProfile: countryCode desconocido ("${countryCode}"). Sin fallback silencioso.`,
     );
   }
-  // `fiscalConfig` es jsonb nullable: null y undefined significan "sin
-  // override" (defaults del país), no un objeto vacío inválido.
+  // `fiscalConfig` is nullable jsonb: null and undefined mean "no
+  // override" (country defaults), not an invalid empty object.
   const config: FiscalConfig =
     fiscalConfig == null ? {} : FiscalConfigSchema.parse(fiscalConfig);
   const isFormalTaxpayer = config.isFormalTaxpayer ?? false;
   const confirmed = new Set(config.confirmedTaxes ?? []);
 
-  // D1 (congelada): un emisor que NO declaró ser contribuyente formal no
-  // puede cobrar ni declarar impuestos → sus impuestos del país nacen
-  // APAGADOS (nunca un desglose que afirme un hecho fiscal falso).
+  // D1 (frozen): an issuer who did NOT declare being a formal taxpayer
+  // cannot charge or declare taxes → country taxes are born
+  // DISABLED (never a breakdown stating a false fiscal reality).
   const taxes: ResolvedTax[] = [
     ...country.countryTaxes.map((t) => ({
       name: t.name,
       rate: parseRateValue(t.value),
       enabled: isFormalTaxpayer,
     })),
-    // D2 (congelada): los condicionales nacen SIEMPRE apagados, nunca
-    // automáticos (la tasa del país es referencia, no valor efectivo).
+    // D2 (frozen): conditional taxes are ALWAYS born disabled, never
+    // automatic (country rate is reference, not effective value).
     ...(country.conditionalTaxes ?? []).map((t) => ({
       name: t.name,
       rate: parseRateValue(t.value),
@@ -143,10 +142,10 @@ export function resolveFiscalProfile(
     target.enabled = override.enabled;
   }
 
-  // Normalización defensiva (D6): la configuración ALMACENADA nunca puede
-  // activar impuestos que el emisor no declaró — cubre filas escritas antes
-  // de esta regla. El error visible se da en la escritura (400
-  // `TAXES_REQUIRE_FORMAL_TAXPAYER`); aquí se cierra la lectura.
+  // Defensive normalization (D6): STORED configuration must never
+  // activate taxes the issuer did not declare — covers rows written before
+  // this rule. Visible error happens on write (400
+  // `TAXES_REQUIRE_FORMAL_TAXPAYER`); here read is closed.
   for (const tax of taxes) {
     if (!isFormalTaxpayer) {
       tax.enabled = false;
@@ -166,19 +165,19 @@ export function resolveFiscalProfile(
   };
 }
 
-/** Códigos de violación al escribir `fiscalConfig` (los usa la API → 400). */
+/** Violation codes when writing `fiscalConfig` (used by API → 400). */
 export type FiscalWriteViolationCode =
   | 'TAXES_REQUIRE_FORMAL_TAXPAYER'
   | 'TAX_REQUIRES_CONFIRMATION';
 
 /**
- * Valida el `fiscalConfig` que se va a PERSISTIR (no el body entrante: un
- * parcial no conoce el `isFormalTaxpayer` almacenado, así que el caller debe
- * pasar el resultado del merge — D6). Devuelve la violación o `null`.
+ * Validates the `fiscalConfig` to be PERSISTED (not the incoming body: a
+ * partial update does not know stored `isFormalTaxpayer`, so caller must
+ * pass merge result — D6). Returns violation or `null`.
  *
- * Invariante fail-closed: el override solo puede REDUCIR carga fiscal. Un
- * contribuyente formal con actividad exenta desactiva impuestos (permitido);
- * un no-contribuyente nunca puede activarlos.
+ * Fail-closed invariant: override can only REDUCE tax burden. A
+ * formal taxpayer with exempt activity disables taxes (allowed);
+ * a non-taxpayer can never activate them.
  */
 export function findFiscalWriteViolation(
   countryCode: string,
@@ -202,7 +201,7 @@ export function findFiscalWriteViolation(
   return null;
 }
 
-/** Desglose de impuestos previsualizado (centavos enteros). */
+/** Previewed tax breakdown (integer cents). */
 export interface PreviewTaxesResult {
   subtotal: number;
   taxDetails: ITaxDetail[];
@@ -210,14 +209,14 @@ export interface PreviewTaxesResult {
 }
 
 /**
- * Previsualiza los impuestos del modo AUTOMÁTICO para un total cobrado
- * (tax-INCLUSIVE). Delega en `computeInclusiveTaxes` (misma función que usa
- * el paso 1 de emisión en `receipts.service.ts`): preview y comprobante real
- * comparten una única fuente, nunca divergen.
+ * Previews taxes in AUTOMATIC mode for total charged (tax-INCLUSIVE).
+ * Delegates to `computeInclusiveTaxes` (same function used by step 1
+ * of issuance in `receipts.service.ts`): preview and real receipt
+ * share a single source of truth, never diverging.
  *
- * `totalCents` es el total cobrado (centavos enteros, ya con impuestos).
- * Base 0 → sin desglose. Condiciones sin evaluar (p. ej. IGTF VE) requieren
- * `currencyPaid`; sin ella NO aplican (fail-closed, igual que el backend).
+ * `totalCents` is total charged (integer cents, already inclusive of tax).
+ * Base 0 → no breakdown. Unevaluated conditions (e.g. VE IGTF) require
+ * `currencyPaid`; without it they do NOT apply (fail-closed, same as backend).
  */
 export function previewReceiptTaxes(
   totalCents: number,

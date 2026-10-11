@@ -1,40 +1,40 @@
-/* ── Documents / tax-math — cálculo de impuestos ─────────────────────────
-   Modelo híbrido: automático por defecto (`computeTaxes` desde el perfil
-   fiscal), con override manual auditado (`applyTaxOverride` exige motivo).
-   UNIDADES: todo opera en CENTAVOS ENTEROS (la unidad de `payment` y
-   `platform_subscription_payment`: columnas `bigint`). Los callers con
-   unidades mayores convierten en la frontera con `unitsToCents` (`money.ts`).
-   REDONDEO: al centavo entero más cercano, SOLO aquí (`roundCents`). El
-   total es la suma de líneas ya redondeadas — determinista para PDF,
-   email y reportes.
-   Funciones puras, sin I/O, edge-safe (Workers).
+/* ── Documents / tax-math — tax calculation ─────────────────────────────
+   Hybrid model: automatic by default (`computeTaxes` from fiscal profile),
+   with audited manual override (`applyTaxOverride` requires a reason).
+   UNITS: everything operates in INTEGER CENTS (the unit of `payment` and
+   `platform_subscription_payment`: `bigint` columns). Callers with higher-level
+   units convert at the boundary using `unitsToCents` (`money.ts`).
+   ROUNDING: to the nearest integer cent, ONLY here (`roundCents`).
+   Total is the sum of already-rounded line items — deterministic for PDF,
+   email, and reporting.
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { ITaxDetail } from '../types';
 
-/** Impuesto candidato (tal como sale de `resolveFiscalProfile`). */
+/** Candidate tax (as emitted by `resolveFiscalProfile`). */
 export interface TaxInput {
   name: string;
-  /** Fracción 0–1. */
+  /** Fraction 0–1. */
   rate: number;
   enabled: boolean;
-  /** Condición sin evaluar (p. ej. `"payment_currency !== 'VES'"`). */
+  /** Unevaluated condition (e.g. `"payment_currency !== 'VES'"`). */
   condition?: string;
   /**
-   * `'gross_first'` = se EXTRAE del total cobrado y el remanente se
-   * descomprime tax-inclusive (IGTF VE). Omitido = tax-inclusive normal.
+   * `'gross_first'` = EXTRACTED from the total charged and the remainder
+   * is decomposed tax-inclusive (IGTF VE). Omitted = standard tax-inclusive.
    */
   basis?: 'gross_first';
-  /** Informativo: la activación exigió fricción explícita (no cambia el cálculo). */
+  /** Informative: activation required explicit user confirmation (does not affect calculation). */
   requiresConfirmation?: boolean;
 }
 
 export interface ComputeTaxesOptions {
-  /** Moneda del pago. Sin ella, los condicionales NO aplican (fail-closed). */
+  /** Payment currency. Without it, conditional taxes DO NOT apply (fail-closed). */
   currencyPaid?: string;
 }
 
-/** Desglose calculado en centavos enteros: `total = subtotal + taxTotal`. */
+/** Calculated breakdown in integer cents: `total = subtotal + taxTotal`. */
 export interface ComputedTaxes {
   subtotal: number;
   taxDetails: ITaxDetail[];
@@ -42,12 +42,11 @@ export interface ComputedTaxes {
   total: number;
 }
 
-/** Tolerancia de cuadre entre suma de líneas y total declarado (1 centavo). */
+/** Balance tolerance between line-item sum and declared total (1 cent). */
 export const TAX_TOTAL_TOLERANCE = 1;
 
 /**
- * Redondea al centavo entero más cercano. Único lugar del proyecto que
- * redondea impuestos.
+ * Rounds to the nearest integer cent. Sole place in the project rounding taxes.
  */
 export function roundCents(value: number): number {
   return Math.round(value + Number.EPSILON);
@@ -65,14 +64,14 @@ export function isTaxApplicable(tax: TaxInput, currencyPaid?: string): boolean {
   if (tax.condition === "payment_currency !== 'VES'") {
     return currencyPaid !== undefined && currencyPaid !== 'VES';
   }
-  // Condición desconocida: fail-closed, nunca asumir que aplica.
+  // Unknown condition: fail-closed, never assume it applies.
   return false;
 }
 
 /**
- * Cálculo automático: aplica cada impuesto habilitado sobre la base
- * (subtotal en centavos) en la moneda del pago.
- * Base 0 (trial/free) → sin desglose (`taxDetails: []`, `taxTotal: 0`).
+ * Automatic calculation: applies each enabled tax over the base
+ * (subtotal in integer cents) in the payment currency.
+ * Zero base (trial/free) → no breakdown (`taxDetails: []`, `taxTotal: 0`).
  */
 export function computeTaxes(
   base: number,
@@ -91,21 +90,21 @@ export function computeTaxes(
 }
 
 /**
- * Descomposición tax-INCLUSIVE (el total cobrado ya trae los impuestos).
+ * Tax-INCLUSIVE decomposition (total charged already includes taxes).
  *
- * Modelo: las líneas `basis: 'gross_first'` (IGTF VE) se EXTRAEN primero del
- * total — la ley las calcula sobre el monto pagado en divisa — y el remanente
- * se descompone tax-inclusive con las demás:
- * `subtotal = round((total − Σgross_first) / (1 + Σtasas))`. Las líneas se
- * calculan sobre esa base y el polvo de redondeo (≤1¢) va a la última para
- * que `subtotal + taxTotal === total` exacto. Base 0 → sin desglose.
+ * Model: `basis: 'gross_first'` lines (IGTF VE) are EXTRACTED first from
+ * the total — statutory rules calculate them on gross paid in foreign currency —
+ * and the remainder is decomposed tax-inclusive with the others:
+ * `subtotal = round((total − Σgross_first) / (1 + Σrates))`. Lines are
+ * computed on that base and rounding dust (≤1¢) goes to the last line so that
+ * `subtotal + taxTotal === total` holds exactly. Zero base → no breakdown.
  *
- * ⚠️ Activar un impuesto `gross_first` CAMBIA la base del resto (realidad
- * contable del IGTF, deliberado y avisado en el UI).
+ * ⚠️ Enabling a `gross_first` tax CHANGES the base for the remaining taxes
+ * (accounting reality of IGTF, deliberate and indicated in UI).
  *
- * ÚNICA fuente de esta descomposición: la consumen el paso 1 de emisión
- * (`receipts.service.ts`) y el preview del panel (`previewReceiptTaxes`),
- * para que nunca diverjan.
+ * SOLE source of this decomposition: consumed by issuance step 1
+ * (`receipts.service.ts`) and panel preview (`previewReceiptTaxes`),
+ * preventing divergence.
  */
 export function computeInclusiveTaxes(
   total: number,
@@ -139,14 +138,14 @@ export function computeInclusiveTaxes(
     amountByName.set(tax.name, roundCents(subtotal * tax.rate));
   }
 
-  // Orden = el del perfil fiscal (país), no el de las categorías.
+  // Order = fiscal profile order (country), not category order.
   const taxDetails: ITaxDetail[] = applicable.map((t) => ({
     name: t.name,
     rate: t.rate,
     amount: amountByName.get(t.name) ?? 0,
   }));
   const taxTotal = total - subtotal;
-  // Polvo de redondeo (≤1¢) a la última línea: la suma cuadra exacto.
+  // Rounding dust (≤1¢) assigned to last line: exact balance.
   const dust = taxTotal - taxDetails.reduce((sum, l) => sum + l.amount, 0);
   if (taxDetails.length > 0 && dust !== 0) {
     taxDetails[taxDetails.length - 1]!.amount += dust;
@@ -155,21 +154,20 @@ export function computeInclusiveTaxes(
 }
 
 export interface TaxOverrideInput {
-  /** Centavos enteros. */
+  /** Integer cents. */
   taxTotal: number;
-  /** Centavos enteros por línea. */
+  /** Integer cents per line. */
   taxDetails: ITaxDetail[];
-  /** Motivo de auditoría. Vacío o solo espacios → lanza. */
+  /** Audit reason. Empty or whitespace only → throws. */
   taxOverrideReason: string;
-  /** Actor (user.id) que autoriza el override. Informativo. */
+  /** Actor (user.id) authorizing the override. Informative. */
   actor?: string;
 }
 
 /**
- * Override manual auditado: el caller trae su propio desglose (centavos
- * enteros) y este lo valida (motivo obligatorio, líneas válidas, suma ≈
- * total). Lanza si algo no cuadra — nunca persiste un override incoherente
- * en silencio.
+ * Audited manual override: caller provides custom breakdown (integer cents)
+ * and this function validates it (mandatory reason, valid lines, sum ≈ total).
+ * Throws if inconsistent — never persists an inconsistent override silently.
  */
 export function applyTaxOverride(
   base: number,
