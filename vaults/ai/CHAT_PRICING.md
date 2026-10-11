@@ -31,7 +31,7 @@ Si el negocio es muy rentable, subir los créditos sin tocar precio es la palanc
 
 ## Packs fijos (futuro — pendiente Stripe)
 
-> **Pendiente:** constantes `CREDIT_PACKS` previstas en `shared/ai.ts` (no hardcode en rutas) + tabla `ai_credit_pack_purchase` FIFO. Ver `PENDING.md` § 6.
+> **Pendiente:** constantes `CREDIT_PACKS` previstas en `shared/ai.ts` (no hardcode en rutas) + tabla `ai_credit_pack_purchase` FIFO. Ver Linear — proyecto «Fit Stack».
 
 Propuestos (sin implementar compra): **1.000cr / $1.20**, **3.000cr / $3.00**, **7.000cr / $6.50**. Consumo **FIFO**: primero créditos del plan (`ai_credits_monthly`), luego packs. El ledger actual ya soporta `ai_usage.credits` por ciclo; los packs añadirán una tabla separada y endpoint de compra Stripe (no tocar `ai_usage` existente). Ver `FUTURE_IDEAS.md` para alternativas descartadas.
 

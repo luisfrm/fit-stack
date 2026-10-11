@@ -29,7 +29,7 @@ platform_document_sequence
  └─ next_number     -- guarda el ÚLTIMO número entregado (sin año). El nombre es cosmético
 ```
 
-La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver `[[PENDING]]` §15).
+La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver el backlog en Linear — proyecto «Fit Stack»).
 
 Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin componente de org).
 

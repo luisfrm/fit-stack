@@ -98,8 +98,6 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 - Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
 - Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope. An `HTTPException` that brings its own `Response` (`err.res`) is returned **as-is**: this is how the documented business codes arrive (`409 { code: 'SLUG_TAKEN' }`, `403 { code: 'FEATURE_NOT_AVAILABLE', feature }`) — toasts are resolved by code, never by text.
-- The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
-
 ### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.

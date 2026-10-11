@@ -80,7 +80,7 @@ export async function handleRegistrationInvite(
   const target = payload.target === 'console' ? 'console' : 'panel';
   const baseUrl =
     target === 'console'
-      ? env.CONSOLE_URL || 'http://localhost:3003'
+      ? env.CONSOLE_URL || 'http://localhost:3000'
       : env.PANEL_URL || 'http://localhost:3001';
 
   const { subject, html } = renderRegistrationInvite({

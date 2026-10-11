@@ -14,13 +14,6 @@ const NAV_ITEMS = [
 
 const SERVICES = [
   {
-    icon: "fingerprint",
-    title: "Control de Acceso Biometrico",
-    description:
-      "Valida la entrada de tus miembros con reconocimiento facial, huella dactilar, codigo QR o tarjeta. Todo sincronizado en tiempo real con tu sistema de membresias.",
-    featured: true,
-  },
-  {
     icon: "group",
     title: "Gestion de Miembros",
     description:
@@ -79,14 +72,14 @@ const STEPS = [
     icon: "trending_up",
     title: "Controla y Crece",
     description:
-      "Monitorea ingresos, controla el acceso fisico, gestiona clases y toma decisiones basadas en datos reales de tu negocio.",
+      "Monitorea ingresos, gestiona clases y toma decisiones basadas en datos reales de tu negocio.",
   },
 ]
 
 const TESTIMONIALS = [
   {
     quote:
-      "Desde que implementamos Fit-Stack, la administracion de nuestras tres sedes es impecable. El control de acceso biometrico elimino las membresias compartidas y los pagos multi-moneda nos simplificaron la contabilidad.",
+      "Desde que implementamos Fit-Stack, la administracion de nuestras tres sedes es impecable. Los pagos multi-moneda nos simplificaron la contabilidad y tener todo centralizado nos ahorra horas cada semana.",
     name: "Alejandro Marin",
     role: "Director",
     company: "Premium Gym",
@@ -127,7 +120,7 @@ export default function Page() {
               <TitleAccent>SIN LIMITES</TitleAccent>
             </>
           }
-          description="La plataforma todo-en-uno para controlar miembros, pagos, clases y acceso fisico de tu centro deportivo. Multi-moneda, multi-sede y con tecnologia biometrica integrada."
+          description="La plataforma todo-en-uno para controlar miembros, pagos y clases de tu centro deportivo. Multi-moneda, multi-sede y con reportes en tiempo real."
           primaryCta="Solicitar Demo"
           secondaryCta="Ver Funcionalidades"
           minHeight="100vh"
@@ -261,7 +254,7 @@ export default function Page() {
                 TRANSFORMA TU <TitleAccent>GIMNASIO</TitleAccent>
               </Title>
               <p className="text-[--color-foreground-muted] max-w-xl mx-auto mb-10 leading-relaxed">
-                Unete a los gimnasios que ya gestionan sus miembros, pagos y acceso fisico desde una sola plataforma. Configuracion en minutos, soporte en espanol.
+                Unete a los gimnasios que ya gestionan sus miembros y pagos desde una sola plataforma. Configuracion en minutos, soporte en espanol.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button variant="primary" size="xl">

@@ -24,9 +24,7 @@ fit-stack/
 │   ├── jobs-worker/      # Consumidor de Cloudflare Queues (Emails via Resend, PDFs, Notificaciones)
 │   ├── panel/            # Next.js 16 - Panel de administración para gimnasios (Staff/Owners/Cashiers)
 │   ├── web/              # Next.js 16 - Portal público y app web de socios/miembros
-│   ├── console/          # Next.js 16 - Panel interno Super-Admin de la Plataforma SaaS
-│   ├── bridge/           # Python / Flet - App Desktop local para torniquetes y biometría
-│   └── api/              # [DEPRECATED] Backend Next.js legado (Sustituido por api-worker)
+│   └── console/          # Next.js 16 - Panel interno Super-Admin de la Plataforma SaaS
 └── packages/
     ├── database/         # Drizzle ORM + cliente Neon Postgres Serverless
     ├── shared/           # Constantes, DTOs, Permisos (RBAC) y helpers compartidos
@@ -41,7 +39,7 @@ fit-stack/
 ## 3. Decisiones Arquitectónicas del Backend (`apps/api-worker`)
 
 ### 3.1. Migración a Cloudflare Workers (`api-worker`)
-* **Decisión**: La API principal reside en `apps/api-worker` construida con **Hono** y desplegada en **Cloudflare Workers**. La API antigua en Next.js (`apps/api`) ha sido declarada **DEPRECATED**.
+* **Decisión**: La API principal reside en `apps/api-worker` construida con **Hono** y desplegada en **Cloudflare Workers**.
 * **Razones**:
   * **Latencia Ultra Baja (Edge)**: Ejecución en aislados V8 globales sin arranque en frío (*cold starts*).
   * **Eficiencia Económica**: Modelo de costos optimizado con tiempo de ejecución efímero.
@@ -245,15 +243,7 @@ No existe un "upload bypass": cada superficie tiene su propia ruta y la organiza
 
 ---
 
-## 7. Integración de Hardware (`apps/bridge`)
-
-La aplicación desktop en Python/Flet corre en la PC de recepción del gimnasio.
-* **Autenticación**: Cabecera `x-api-key`.
-* **Flujo**: Consulta `POST /api/access-control/verify` para validar el documento biométrico o código QR del socio. Si el miembro tiene una suscripción activa, la API responde con éxito y abre el torniquete, registrando la entrada en `access_control_log`.
-
----
-
-## 8. Infraestructura y Despliegue (Terraform + GitHub Actions)
+## 7. Infraestructura y Despliegue (Terraform + GitHub Actions)
 
 Toda la infraestructura de Cloudflare (Workers, R2, Queues, Secrets) se gestiona con Terraform y los despliegues se automatizan con GitHub Actions. **Nunca se usa wrangler manualmente.**
 
@@ -325,7 +315,6 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `AI_GATEWAY_URL` *(opcional — si se setea, `createWorkersAIClient` apunta al AI Gateway en vez de Workers AI directo)*
 - `OPENROUTER_API_KEY` *(opcional — necesario para el modelo `openrouter/free`)*
 - `TEST_DATABASE_URL` *(opcional — branch de Neon para la suite de integración de api-worker; sin él, los tests de integración se saltan en CI)*
-- `ACCESS_CONTROL_API_KEY` *(pausado: se agregará si se reactiva Bridge y se migra access-control al api-worker)*
 
 **Variables por environment (nombres de recursos, no sensibles):**
 - `API_WORKER_NAME` (ej: `fit-stack-api`)

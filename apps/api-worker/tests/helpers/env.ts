@@ -139,7 +139,7 @@ export function createTestEnv(baseUrl = 'http://localhost:8788'): TestEnv {
     JWT_SECRET: 'test-jwt-secret-value-for-invite-tokens',
 
     PANEL_URL: 'http://localhost:3001',
-    CONSOLE_URL: 'http://localhost:3003',
+    CONSOLE_URL: 'http://localhost:3000',
     R2_PUBLIC_URL: 'http://localhost:8788/api/public/files',
 
     // Deliberately absent: UPSTASH_* (cache no-ops), RESEND_* (jobs-worker's job),

@@ -54,7 +54,6 @@ Este documento detalla la arquitectura de infraestructura, aprovisionamiento y e
 | **`apps/panel`** | Next.js 16 (Gym CMS) | Vercel | Manual (Vercel Dashboard / Vercel CLI) |
 | **`apps/web`** | Next.js 16 (Member Portal) | Vercel | Manual (Vercel Dashboard / Vercel CLI) |
 | **`apps/console`** | Next.js 16 (SaaS Admin) | Vercel | Manual (Vercel Dashboard / Vercel CLI) |
-| **`apps/bridge`** | Desktop (Python/Flet) | Local en Gimnasio | Ejecución local vía `uv` |
 | **Base de Datos** | Serverless Postgres | Neon | Migraciones vía GitHub Actions / Drizzle |
 | **Cache & KV** | Redis Serverless | Upstash | Administrado vía REST |
 | **Storage (R2)** | Object Storage | Cloudflare R2 | Aprovisionado vía Terraform |

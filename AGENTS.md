@@ -29,19 +29,13 @@ cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
 cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused, reference only)
-
-# Bridge (Python/Flet — managed separately with uv) ⏸ PAUSED
-# cd apps/bridge
-# uv sync
-# uv run python main.py
 ```
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000), `bridge` (Python/Flet, **⏸ PAUSED**), `api` (Next 16, **DEPRECATED** — 3003, excluded from the workspace).
+- **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
 - **Packages**: `auth`, `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
-- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`), `backlog/`. Bridge is Python, managed with `uv`, not part of Turbo.
+- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`). Backlog/pending work lives in Linear (project «Fit Stack»).
 
 ## Project Context (Business Overview)
 
@@ -49,11 +43,9 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 Multi-tenant SaaS for the Gym/Fitness industry (Latin America): multi-currency billing, member retention, automated physical access. Every gym is an `Organization` (isolation via `organizationId`); B2B SaaS (Platform layer + CMS layer).
 
-**Modules**: Members · Plans · Subscriptions (cumulative expiration) · Payments · Platform/SaaS Admin (`console`) · Staff & Trainers · Classes · CMS (DnD pages/blocks) · Routines · Access Control/Bridge (**⏸ paused**) · Reports · Settings. → [`vaults/architecture/modules.md`](vaults/architecture/modules.md).
+**Modules**: Members · Plans · Subscriptions (cumulative expiration) · Payments · Platform/SaaS Admin (`console`) · Staff & Trainers · Classes · CMS (DnD pages/blocks) · Routines · Reports · Settings. → [`vaults/architecture/modules.md`](vaults/architecture/modules.md).
 
 **Staff & Trainers**: `gym_member` (base) + `coach_profile` (1:1, role `COACH`) + `auth_member` (role) + `coach_assignment`; views `/dashboard/staff` and `/dashboard/trainers` (coaches appear in both). → [`vaults/architecture/staff-trainers.md`](vaults/architecture/staff-trainers.md).
-
-**Bridge**: Python/Flet desktop at the gym entrance, auth via `x-api-key`. **⏸ PAUSED** — its 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) exist **only in legacy `apps/api`**; `api-worker` does **not** mount `/api/access-control`. → [`vaults/architecture/bridge.md`](vaults/architecture/bridge.md).
 
 ### 5. Business Rules Summary
 
@@ -94,7 +86,7 @@ Centralized middleware — never write auth/error boilerplate manually.
 | `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
 | `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |
 
-Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`); toasts resolve by **code**, never text. Legacy `apps/api/lib/route-handler.ts` deprecated.
+Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`); toasts resolve by **code**, never text.
 
 ### 7. Error Handling & Mutations
 
@@ -126,14 +118,15 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 | Roles / permissions / anti-escalation | [`business/rbac.md`](vaults/business/rbac.md) — never trust client checks; all queries filter `organizationId`; no platform-admin bypass in CMS; uploads = two routes, one authority |
 | Subscription rules / compensation | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
 | Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
-| API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE; `/api/access-control/*` not mounted |
+| API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE (immutable financial record) |
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
 | Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib` |
 | R2 storage | [`architecture/file-storage.md`](vaults/architecture/file-storage.md) — every org key starts `<orgId>/` (server-resolved); public only `cms/` + `platform/branding/` |
 | Package exports / DB schema | [`architecture/packages-and-schema.md`](vaults/architecture/packages-and-schema.md) — 33 tables |
-| Modules / Staff & Trainers / Bridge | [`architecture/modules.md`](vaults/architecture/modules.md), [`staff-trainers.md`](vaults/architecture/staff-trainers.md), [`bridge.md`](vaults/architecture/bridge.md) |
+| Modules / Staff & Trainers | [`architecture/modules.md`](vaults/architecture/modules.md), [`staff-trainers.md`](vaults/architecture/staff-trainers.md) |
 | Frontend data layer | [`guides/frontend-data-layer.md`](vaults/guides/frontend-data-layer.md) — no raw `fetch`; post-mutation = service → `updateTag` → `router.refresh()`; `updateTag` server-only |
 | Testing | [`guides/testing.md`](vaults/guides/testing.md) — unit+integration and E2E are separate layers |
+| Pending work / backlog | Linear — project «Fit Stack» (the former `vaults/backlog/` was migrated there) |
 | Technical standards (full detail) | [`architecture/technical-standards.md`](vaults/architecture/technical-standards.md) |
 | Infra & deploy | [`architecture/INFRASTRUCTURE.md`](vaults/architecture/INFRASTRUCTURE.md), [`terraform.md`](vaults/architecture/terraform.md) |
 
@@ -145,7 +138,7 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 
 ### When to update AGENTS.md
 
-After structural changes, update `AGENTS.md` **and** the matching `vaults/` doc for: API routes, RBAC, business rules/modules, new app/package, DB workflow, auth/security, CMS blocks, Bridge, cache keys, queue/email/PDF flows, RSC patterns, E2E config, skills, or the `vaults/` structure.
+After structural changes, update `AGENTS.md` **and** the matching `vaults/` doc for: API routes, RBAC, business rules/modules, new app/package, DB workflow, auth/security, CMS blocks, cache keys, queue/email/PDF flows, RSC patterns, E2E config, skills, or the `vaults/` structure.
 
 ## Skills Available
 
@@ -157,11 +150,11 @@ Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`
 - `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
 - `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
 - `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}`
-- `vaults/architecture/ARCHITECTURE.md` (architecture spec) · `vaults/backlog/README.md` (pending index)
+- `vaults/architecture/ARCHITECTURE.md` (architecture spec) · pending work: Linear (project «Fit Stack»)
 
 ## Infrastructure & Deployment
 
-> Source in `vaults/architecture/ARCHITECTURE.md` §8; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
+> Source in `vaults/architecture/ARCHITECTURE.md` §7; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
 
 
 ## NOTES:

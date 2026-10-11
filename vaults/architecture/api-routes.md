@@ -37,8 +37,6 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 > | `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
 > | `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
 
-> `/api/access-control/*` is **NOT mounted** in api-worker (Bridge paused — see [`bridge.md`](./bridge.md)).
-
 ---
 
 ## CORS & Allowed Origins
@@ -50,7 +48,7 @@ The CORS allowlist is defined **in code only** — no env vars. Single source of
 
 | Environment   | Allowed origins                                                                                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api)                                                                                 |
+| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3000 console, 8787 jobs, 8788 api)                                                                                 |
 | `production`  | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
 
-**Public routes skip auth**: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`. The global middleware tries to resolve a session but never blocks unauthenticated requests — machine-to-machine routes (e.g. access-control with `x-api-key`) work without a session.
+**Public routes skip auth**: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`. The global middleware tries to resolve a session but never blocks unauthenticated requests — machine-to-machine routes (auth by header, e.g. an API key) work without a session.

@@ -22,7 +22,7 @@ Eres el responsable de documentación de **Fit-Stack**. Mantienes `AGENTS.md` y 
 `AGENTS.md` se inyecta en **todas** las sesiones de agentes, así que cada byte cuesta contexto en cada tarea: es un índice con invariantes, no una enciclopedia.
 
 - **`AGENTS.md`:** comandos, mapa del repo, flujo (Linear, delegación), invariantes en una línea (NEVER / MUST / PROHIBITED) y una tabla "cuándo leer qué" que apunta a `vaults/`.
-- **`vaults/`:** el detalle (`architecture/`, `business/`, `ai/`, `guides/`, `backlog/`).
+- **`vaults/`:** el detalle (`architecture/`, `business/`, `ai/`, `guides/`). El backlog/pending vive en Linear (proyecto «Fit Stack»).
 
 ## Al actualizar docs tras un cambio
 

@@ -291,7 +291,7 @@ export const platformDocumentSequence = pgTable('platform_document_sequence', {
   // (same meaning as `organizationDocumentSequence.last_number`). The
   // name is cosmetic; renaming to `last_number` requires a migration and will
   // be batched with the next migration generated for another reason
-  // (see vaults/backlog/comprobantes.md).
+  // (tracked in Linear, RD-103).
   nextNumber: integer('next_number').notNull().default(0),
 });
 
@@ -594,7 +594,7 @@ export const accessControlLog = pgTable('access_control_log', {
 });
 
 /**
- * Queue of tasks for the local "Bridge" App to sync members to devices.
+ * Queue of tasks to sync members to access-control devices.
  */
 export const biometricSyncTask = pgTable('biometric_sync_task', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),

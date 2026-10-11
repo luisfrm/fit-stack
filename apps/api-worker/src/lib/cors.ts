@@ -3,7 +3,7 @@ import { cors } from 'hono/cors';
 export const ALLOWED_ORIGINS = [
   'http://localhost:3001',
   'http://localhost:3002',
-  'http://localhost:3003',
+  'http://localhost:3000',
   'http://localhost:8787',
   'http://localhost:8788',
   'https://fitstack-panel.luisrivas.site',

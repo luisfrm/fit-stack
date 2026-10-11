@@ -34,9 +34,6 @@ Schema Drizzle ORM + cliente Neon Postgres + migraciones. Contiene las 33 tablas
 ### Memberships & Payments
 `membership_plan` (gym product catalog), `subscription` (member ↔ plan), `payment` (financial audit trail), `organization_document_sequence` (correlativo por org/año)
 
-### Access Control
-`access_control_log` (every access attempt), `biometric_sync_task` (device sync queue)
-
 ### AI / RAG
 `ai_knowledge_document` (org `NULL` = plataforma), `ai_knowledge_chunk` (pgvector 1024 dims + HNSW)
 

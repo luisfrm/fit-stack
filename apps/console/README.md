@@ -2,7 +2,7 @@
 
 Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de plataforma, suscripciones, configuraciones globales (currencies, payment methods) y el equipo de administración (Staff).
 
-**Puerto:** 3003  
+**Puerto:** 3000  
 **Acceso:** Usuarios con rol global de plataforma que pasen `canAccessConsole(role)` (admin/owner — los que tienen `organization.create` en `platformRoles`); `support` es read-only y no entra al layout
 
 ---
@@ -28,7 +28,7 @@ cp .env.example .env
 ### Run
 
 ```bash
-pnpm dev          # Dev server (Turbopack, port 3003)
+pnpm dev          # Dev server (Turbopack, port 3000)
 pnpm build        # Production build
 pnpm start        # Production server
 pnpm typecheck    # TypeScript check

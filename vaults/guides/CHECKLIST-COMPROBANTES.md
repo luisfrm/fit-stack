@@ -1,7 +1,7 @@
 # Checklist — estados de suscripción, flujo de pago y fases
 
 > Estado verificado: **2026-09-18**. Track C0–C9 cerrado; modelo de estados de pago unificado (commit `cef10c7`) + migración `0017` (commit `d1b3720`).
-> Documentos relacionados: `[[PAYMENT_STATUSES]]` (semántica completa), `correcciones-comprobantes.md` (plan del track), `[[PENDING]]` (pendientes).
+> Documentos relacionados: `[[PAYMENT_STATUSES]]` (semántica completa). El plan del track y los pendientes viven en Linear (proyecto «Fit Stack»).
 
 ## 1. Estados de una suscripción (derivados, no se guardan)
 
@@ -45,18 +45,21 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] **B2** El PDF ANULADO es un artefacto propio (3.er predicado del barrido; el original no se sirve sin sello)
 - [x] **C7** Higiene, docs y matriz de tests
 
-## 4. Pendientes abiertos (`[[PENDING]]`)
+## 4. Pendientes abiertos (Linear — proyecto «Fit Stack»)
+
+> Los `§N` corresponden a las secciones del antiguo `PENDING.md`, migrado a Linear (proyecto «Fit Stack»).
 
 - [ ] **§12.1** `create()` no es atómico de verdad (dos inserts): un fallo del pago deja suscripción huérfana y ya no hay DELETE que la limpie.
 - [ ] **§12.2** El borrado de un **miembro** arrastra su histórico financiero por cascada — la única vía por la que un pago desaparece hoy.
 - [ ] **§13** `DELETE /api/platform/subscriptions/:id` (Console) borra la suscripción SaaS y sus pagos: puede dejar la serie `FS-N` sin las filas que la auditoría necesita.
 - [ ] **§14** El email que agota reintentos y cae a la DLQ **después** de la marca de notificado no lo recupera el barrido: recuperación manual (`send-email` / `resend`).
-- [ ] **§9** Tasa y base del IGTF a confirmar con contador + declaración fiscal del emisor plataforma (los `FS-N` no detallan impuestos).
+- [ ] **§9 → RD-138** Tasa y base del IGTF a confirmar con contador + declaración fiscal del emisor plataforma (los `FS-N` no detallan impuestos).
 - [ ] **§11** Los comprobantes emitidos antes de C1 recomponen en vivo (limitación documentada, sin backfill inventado).
-- [ ] **§10** Universo de `gaps[]` a escala (disparador de performance).
+- [ ] **§10 → RD-139** Universo de `gaps[]` a escala (disparador de performance).
 - [ ] **§8** Disclaimer de Console con país proxy hasta configurar `fitstack_country_code`.
 - [ ] **§15** Naming `platform_document_sequence.next_number` → `last_number` (cosmético, requiere migración; agrupar).
-- [ ] **§16** Claim-then-number para cerrar la carrera de correlativo (disparador: hueco no explicado en `gaps[]`).
+- [ ] **§16 → RD-140** Claim-then-number para cerrar la carrera de correlativo (disparador: hueco no explicado en `gaps[]`).
+- [ ] **RD-141** Mostrar `receiptVoided` en el estado `pending` del diálogo.
 
 ## 5. Verificación
 
@@ -71,11 +74,11 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 
 ## 6. Checklist de release (no es fase: es el día que entra un cliente real)
 
-- [ ] **Cadencia del barrido**: pasar el cron de `0 */10 * * *` a `*/10 * * * *` en `vaults/architecture/terraform.md` (hoy 10 h es un ahorro de pre-venta, no un SLA) y actualizar `[[plan]]` / `[[PENDING]]` §7.
+- [ ] **Cadencia del barrido**: pasar el cron de `0 */10 * * *` a `*/10 * * * *` en `vaults/architecture/terraform.md` (hoy 10 h es un ahorro de pre-venta, no un SLA) y actualizar el backlog en Linear (proyecto «Fit Stack»).
 - [ ] **Verificar la migración `0017`**: confirmar que `database-migrations.yml` la aplicó en prod y que ninguna fila conserva `pending`/`invalid` (`SELECT status, count(*) … GROUP BY status`).
 - [ ] **Escanear la serie**: correr la auditoría de correlativo en Panel y Console (`gaps[]` vacío o con huecos explicados por anulaciones).
 - [ ] **Vigilar §14**: revisar la DLQ de `fit-task-events` y confirmar que ningún comprobante quedó sin email entregado.
-- [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (`[[PENDING]]` §9).
+- [ ] **Confirmar con contador** la tasa y base del IGTF antes de encenderla en un gym real (RD-138, Linear — proyecto «Fit Stack»).
 - [ ] **Terraform**: correr `terraform apply` (environment `production`) para crear la cola `fit-receipt-events` + DLQ + consumer + cron (el action es manual). Los nombres se derivan del ambiente (sin variables); `pnpm check:infra-parity` garantiza la paridad con los `wrangler.jsonc`.
 
 ## 7. Cómo repetir la verificación

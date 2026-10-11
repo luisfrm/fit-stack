@@ -109,10 +109,6 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 `membership_plan` (gym product catalog), `subscription` (member ↔ plan, + `end_date_override_reason` nullable — migration `0019`), `payment` (financial audit trail)
 
-### Access Control
-
-`access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
-
 ### AI / RAG
 
 `ai_usage` (AI credits), `ai_knowledge_document` (KB docs; `organization_id NULL` = platform, set = org), `ai_knowledge_chunk` (chunks with pgvector 1024 dims embedding + HNSW cosine)

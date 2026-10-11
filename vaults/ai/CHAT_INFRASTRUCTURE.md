@@ -53,7 +53,7 @@ POST /api/ai/chat (SSE)
 
 ## Futuro (packs, RAG) — pendientes
 
-> Pack Stripe sigue **pendiente** (`PENDING.md` § 6). RAG Fase 1 ya implementado con `@cf/baai/bge-m3` + pgvector (ver `FUTURE_IDEAS.md` § 5).
+> Pack Stripe sigue **pendiente** (Linear — proyecto «Fit Stack»). RAG Fase 1 ya implementado con `@cf/baai/bge-m3` + pgvector (ver `FUTURE_IDEAS.md` § 5).
 
 - **RAG Fase 1 (implementado):** `@cf/baai/bge-m3` 1024 dims (multilingüe) + **pgvector** HNSW cosine, tablas `ai_knowledge_document`/`ai_knowledge_chunk`, retrieval automático en `/api/ai/chat` (topK 4, minSimilarity 0.35), system prompt `PANEL_SYSTEM_PROMPT` + `[Contexto]`.
 - **Packs:** constantes `CREDIT_PACKS` (1K/$1.20, 3K/$3.00, 7K/$6.50) + tabla `ai_credit_pack_purchase` **FIFO** (consumo plan → packs), compra **Stripe** después.

@@ -87,7 +87,7 @@ conditionalTaxes: [
 ]
 ```
 
-> El IGTF nace **apagado** y nunca es automático: activarlo exige declaración de contribuyente formal + confirmación explícita + tasa manual (`fiscalConfig.confirmedTaxes`). La base `gross_first` extrae el IGTF del total **antes** de descomponer el resto con IVA. Ver `[[PENDING]]` §9.
+> El IGTF nace **apagado** y nunca es automático: activarlo exige declaración de contribuyente formal + confirmación explícita + tasa manual (`fiscalConfig.confirmedTaxes`). La base `gross_first` extrae el IGTF del total **antes** de descomponer el resto con IVA. Ver RD-138 (Linear — proyecto «Fit Stack»).
 ```
 
 ## 6. Notas específicas de Venezuela

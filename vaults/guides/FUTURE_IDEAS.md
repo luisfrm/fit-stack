@@ -10,7 +10,7 @@ Transformar el CMS en una aplicación nativa para Windows/macOS/Linux.
 ### Beneficios
 - **Acceso Directo**: Icono en el escritorio para Admins y Managers.
 - **Rendimiento**: Ejecución más fluida mediante WebView2 (Edge) sin la carga de un navegador completo.
-- **Integración de Hardware**: Comunicación directa con torniquetes y cámaras biométricas (en enlace con el Bridge de Python).
+- **Integración de Hardware**: Comunicación directa con torniquetes y cámaras biométricas.
 
 ### Detalles Técnicos y Código Base
 Para evitar conflictos con el CMS en la web (Vercel), usaremos una **Configuración Condicional** en `next.config.mjs`:
@@ -62,7 +62,7 @@ Se añadirán estos scripts al `package.json` de la app correspondiente (`apps/p
 ---
 
 ## ⚡ 2. Optimizaciones de Red y Offline
-- **Modo Offline Crítico**: Permitir que el Bridge registre accesos localmente aunque el servidor de Fit-Stack esté caído, sincronizando los logs al recuperar la conexión.
+- **Modo Offline Crítico**: Permitir que la app de control de acceso registre accesos localmente aunque el servidor de Fit-Stack esté caído, sincronizando los logs al recuperar la conexión.
 
 ---
 
@@ -74,7 +74,7 @@ Se añadirán estos scripts al `package.json` de la app correspondiente (`apps/p
 
 ## 🤖 4. IA — Créditos, RAG y Escalabilidad (post-créditos 2026-08)
 
-> Migración a créditos completada (`ai_credits_monthly`, `ai_usage.credits`). Lo de abajo son **ideas no comprometidas** — ver `PENDING.md` § 6 para los follow-ups comprometidos (packs Stripe, RAG). Docs vigentes: `CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`.
+> Migración a créditos completada (`ai_credits_monthly`, `ai_usage.credits`). Lo de abajo son **ideas no comprometidas** — ver Linear (proyecto «Fit Stack») para los follow-ups comprometidos (packs Stripe, RAG). Docs vigentes: `CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`.
 
 - **Durable Objects si tools lo exige:** hoy `ai.service` es stateless (SSE + `include_usage` + `ctx.waitUntil(settle)`). Si se añaden tools con estado (memoria de sesión, tool chaining largo, streaming multi-turn con `maxToolOutputTokens: 2_048`), evaluar **Cloudflare Durable Objects** para coordinar estado por `organizationId`/`sessionId` y evitar carreras en `settleAiCredits`. No necesario mientras los tools sean idempotentes y el ledger siga en `ai_usage` (upsert atómico).
 - **RAG Fase 1 completado:** `@cf/baai/bge-m3` + pgvector (tablas `ai_knowledge_document`/`ai_knowledge_chunk`, Console → Base de Conocimiento). Siguiente: Fase 2 con datos vivos por org + KB panel. Como idea futura: re-ranking, embeddings por idioma (ES/PT), cache de retrieval por hash y facturación 1 crédito/1K emb.

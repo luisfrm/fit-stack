@@ -19,8 +19,6 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 | `panel` | Next.js 16 (App) | 3001 | Gym admin panel (Owner/Manager/Cashier) |
 | `web` | Next.js 16 (App) | 3002 | Public marketing + CMS pages & Member portal |
 | `console` | Next.js 16 (App) | 3000 | SaaS super-admin (organizations, plans, subscriptions) |
-| `bridge` | Python/Flet | Desktop Kiosk | Desktop app for biometric & QR access control — ⏸ **pausado** |
-| `api` | Next.js 16 | 3003 | *(DEPRECATED)* Legacy Next.js API Routes — ⏸ **pausado, solo referencia** |
 
 ### Packages
 
@@ -41,7 +39,6 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 
 - Node.js >= 20
 - pnpm 10+
-- Python 3.12+ (for `bridge`)
 - Neon Postgres account
 - (Optional) Cloudflare R2 bucket
 - (Optional) Upstash Redis account
@@ -60,7 +57,6 @@ cp apps/panel/.env.example apps/panel/.env
 cp apps/console/.env.example apps/console/.env
 cp apps/web/.env.example apps/web/.env
 cp packages/database/.env.example packages/database/.env
-cp apps/bridge/.env.example apps/bridge/.env
 ```
 
 ### Database
@@ -84,7 +80,6 @@ cd apps/api-worker && pnpm dev
 cd apps/panel && pnpm dev
 cd apps/console && pnpm dev
 cd apps/web && pnpm dev
-cd apps/bridge && uv run python main.py
 ```
 
 ### Lint & Typecheck
@@ -109,7 +104,6 @@ pnpm format
 - **Atomic Invoicing** — Subscriptions + Payments created in a single unit.
 - **Cumulative Expiration** — Renewing extends from `periodEnd`, not today.
 - **Multi-currency** — Base currency (USD) + local currencies via real-time exchange rates.
-- **Bridge (pausado)** — Local Flet app polls `/api/access-control/sync-tasks` for biometric device enrollment (endpoints aún no migrados al api-worker).
 
 ---
 
@@ -147,7 +141,7 @@ For the full deployment guide see [vaults/architecture/INFRASTRUCTURE.md](vaults
 
 - [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md) — Detailed architecture design & system decisions
 - [AGENTS.md](AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
-- `vaults/backlog/` — Roadmap & pending tasks (por tema)
+- Pending work & backlog — [Linear](https://linear.app/rivas-digital) (project «Fit Stack»)
 - `vaults/business/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
 - `vaults/guides/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
 - `vaults/business/TIMEZONE_MANAGEMENT.md` — Timezone handling

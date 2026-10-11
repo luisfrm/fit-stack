@@ -1,6 +1,6 @@
 # RBAC — Estructura actual
 
-> Fuente vigente: `packages/shared/src/access-control.ts` + `AGENTS.md` § RBAC. Rutas `apps/api` → `apps/api-worker` y `apps/cms` → `apps/panel`.
+> Fuente vigente: `packages/shared/src/access-control.ts` + `AGENTS.md` § RBAC.
 
 Sistema de permisos basado en **Better Auth Access Control** con matriz tipada. Sin strings hardcodeados: todo permiso se consulta vía `PERMISSION_MODULES` + `PERMISSION_ACTIONS`.
 

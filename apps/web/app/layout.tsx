@@ -16,7 +16,7 @@ const fontDisplay = Space_Grotesk({
 export const metadata = {
   title: "Fit-Stack | Gestion Fitness Sin Limites",
   description:
-    "La plataforma todo-en-uno para controlar miembros, pagos, clases y acceso fisico de tu centro deportivo.",
+    "La plataforma todo-en-uno para controlar miembros, pagos y clases de tu centro deportivo.",
 }
 
 export default function RootLayout({

@@ -8,7 +8,7 @@ Esta carpeta contiene toda la infraestructura de Cloudflare como código.
 - **R2 Bucket** para archivos (logos, imágenes CMS, etc.).
 - **Queues** para tareas asíncronas (emails, PDFs) y su DLQ.
 - **Queue consumers** de `jobs-worker`: `fit-task-events` (emails) y `fit-receipt-events` (render de comprobantes), cada uno con su DLQ.
-- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver `[[PENDING]]`).
+- **Cron trigger** de `jobs-worker`: barrido de comprobantes pendientes (**pre-venta cada 10 h** `0 */10 * * *`; bajar a `*/10 * * * *` con clientes reales — ver el backlog en Linear, proyecto «Fit Stack»).
 - **Secrets** de cada worker (DATABASE_URL, BETTER_AUTH_SECRET, etc.).
 
 > **Dueño único de consumers/cron = Terraform.** Los `wrangler.jsonc` de los workers solo declaran `producers` (y R2), nunca `queues.consumers` ni `triggers`, para que `wrangler deploy` no compita con el estado. Los `wrangler deploy` suben el **código** (incl. el `scheduled()`); el trigger lo crea este Terraform.
@@ -67,7 +67,6 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 | `EMAIL_PROVIDER` | `resend` o `gmail` (jobs-worker) |
 | `SMTP_USER` | Usuario SMTP (si EMAIL_PROVIDER=smtp) |
 | `SMTP_PASS` | Contraseña SMTP (si EMAIL_PROVIDER=smtp) |
-| `ACCESS_CONTROL_API_KEY` | API key del Bridge (pausado — se agrega al migrar access-control al api-worker) |
 
 ### 3. Nombres de recursos (derivados — sin variables)
 

@@ -24,7 +24,7 @@ pnpm install                # desde la raíz del monorepo
 pnpm dev                    # wrangler dev --port 8788
 ```
 
-> **Nota**: en dev, las apps (`panel` :3001, `web` :3002, `console` :3003) apuntan a `http://localhost:8788` vía `NEXT_PUBLIC_API_BASE_URL`.
+> **Nota**: en dev, las apps (`panel` :3001, `web` :3002, `console` :3000) apuntan a `http://localhost:8788` vía `NEXT_PUBLIC_API_BASE_URL`.
 
 ### Scripts
 
@@ -255,7 +255,7 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 | `RESEND_API_KEY` | ❌ | Declarado en `Env` pero **no consumido por este worker** — los emails se encolan en `TASK_QUEUE` y los envía el `jobs-worker` |
 | `RESEND_FROM_EMAIL` | ❌ | Ídem |
 | `PANEL_URL` | ❌ | Base URL del panel para links de invitación (default `http://localhost:3001`) |
-| `CONSOLE_URL` | ❌ | Base URL del console para links de invitación de staff (default `http://localhost:3003`) |
+| `CONSOLE_URL` | ❌ | Base URL del console para links de invitación de staff (default `http://localhost:3000`) |
 
 ### Bindings (Cloudflare)
 
