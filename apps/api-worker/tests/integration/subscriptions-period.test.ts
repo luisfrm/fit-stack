@@ -1,10 +1,10 @@
 /**
- * Periodo autoritativo del servidor (RD-94).
+ * Server-authoritative period.
  *
- * `POST /api/subscriptions` calcula el periodo acumulativo (Regla 4):
- * `startDate`/`endDate` son opcionales; el `endDate` explícito solo exige
- * motivo si acorta un periodo vigente; `endDate < startDate` se rechaza.
- * Todo dinero en centavos enteros; la tz la inyecta `requireOrgTimezone()`.
+ * `POST /api/subscriptions` computes the cumulative period (Rule 4):
+ * `startDate`/`endDate` are optional; an explicit `endDate` only requires a
+ * reason when it shortens an active period; `endDate < startDate` is rejected.
+ * All money in integer cents; the tz is injected by `requireOrgTimezone()`.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';

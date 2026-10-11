@@ -1,10 +1,10 @@
 /**
- * Tests de las plantillas de email (RD-109): el CTA se resuelve desde el
- * handler (env), nunca desde un placeholder dentro del template, y todo
- * valor de operador/usuario interpolado se escapa.
+ * Email template tests: the CTA is resolved by the handler (env), never by a
+ * placeholder inside the template, and every interpolated operator/user value
+ * is escaped.
  *
- * Este es el test que habría cazado `@@PANEL_URL@@` en
- * `renderOrgPaymentReceived` y la inyección de HTML en los nombres.
+ * This is the test that would have caught `@@PANEL_URL@@` in
+ * `renderOrgPaymentReceived` and HTML injection in the names.
  */
 import { describe, expect, it } from 'vitest';
 import { renderOrgPaymentReceived } from '../src/templates/org-payment-received';

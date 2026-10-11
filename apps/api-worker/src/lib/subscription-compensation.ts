@@ -1,6 +1,6 @@
 /**
- * Compensación explícita del alta cuando falla la emisión del comprobante
- * (RD-94). Nacido en el alta del panel, reutilizado en los 4 flujos SaaS.
+ * Explicit compensation for a creation whose receipt emission failed.
+ * Born in the panel creation flow, reused by the 4 SaaS flows.
  *
  * Sin transacciones interactivas (driver HTTP de Neon): el servicio commitea
  * en 3 pasos (`subsRepo.create` → `paymentsRepo.create` → paso 1) y compensa

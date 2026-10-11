@@ -1,11 +1,11 @@
 /**
- * `computeReceiptGaps`: hueco sospechoso vs anulado explicado, nunca iguales.
- * Dos series: Panel (`{slug}-{año}-{seq}`) y Console (`FS-{seq}`).
+ * `computeReceiptGaps`: suspicious hole vs explained void, never the same.
+ * Two sequences: Panel (`{year}-{seq}`) and Console (`FS-{seq}`).
  */
 import { describe, expect, it } from 'vitest';
 import { computeConsoleReceiptGaps, computePanelReceiptGaps } from '../../src/documents/receipt-gaps';
 
-const base = { year: 2026, slug: 'fit-stack', lastNumber: 4 };
+const base = { year: 2026, lastNumber: 4 };
 
 describe('computePanelReceiptGaps', () => {
   it('ausente → hueco con número humano; anulado → explicado con auditoría', () => {
@@ -25,11 +25,11 @@ describe('computePanelReceiptGaps', () => {
     });
     // El emitido (seq 1 y 4) no aparece; el ausente (2) es hueco.
     expect(gaps).toEqual([
-      { kind: 'hueco', seq: 2, receiptNumber: 'fit-stack-2026-000002' },
+      { kind: 'hueco', seq: 2, receiptNumber: '2026-000002' },
       {
         kind: 'anulado',
         seq: 3,
-        receiptNumber: 'fit-stack-2026-000003',
+        receiptNumber: '2026-000003',
         voidedBy: 'user-1',
         voidedAt: '2026-09-01T10:00:00.000Z',
         voidReason: 'Pago anulado',
@@ -68,12 +68,6 @@ describe('computePanelReceiptGaps', () => {
     ).toThrow(/voidedAt inválida/);
   });
 
-  it('slug inválido lanza (el número debe ser coherente)', () => {
-    expect(() =>
-      computePanelReceiptGaps({ ...base, slug: 'Slug Malo!', entries: [] }),
-    ).toThrow();
-  });
-
   it('año fuera de rango lanza', () => {
     expect(() =>
       computePanelReceiptGaps({ ...base, year: 1999, entries: [] }),
@@ -86,14 +80,9 @@ describe('computePanelReceiptGaps', () => {
     ).toThrow(/lastNumber inválido/);
   });
 
-  it('slug en mayúsculas numera como el formato (normalizado)', () => {
-    const gaps = computePanelReceiptGaps({
-      ...base,
-      slug: 'Fit-Stack',
-      lastNumber: 1,
-      entries: [],
-    });
-    expect(gaps).toEqual([{ kind: 'hueco', seq: 1, receiptNumber: 'fit-stack-2026-000001' }]);
+  it('el número formateado incluye el año del universo auditado', () => {
+    const gaps = computePanelReceiptGaps({ ...base, year: 2027, lastNumber: 1, entries: [] });
+    expect(gaps).toEqual([{ kind: 'hueco', seq: 1, receiptNumber: '2027-000001' }]);
   });
 });
 

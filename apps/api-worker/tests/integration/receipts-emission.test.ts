@@ -124,7 +124,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const { owner, organization, payment } = await createValidatedPayment();
 
     expect(payment['receipt_number']).toMatch(
-      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+      new RegExp(`^\\d{4}-\\d{6}$`),
     );
     // C2/D1: sede SIN declararse contribuyente formal → el comprobante no
     // detalla impuestos (se persiste el total, nunca un IVA que no declaró).
@@ -205,7 +205,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     );
     expect(rows[0]!['status']).toBe('validated');
     expect(rows[0]!['receipt_number']).toMatch(
-      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+      new RegExp(`^\\d{4}-\\d{6}$`),
     );
     expect(rows[0]!['receipt_issued_at']).not.toBeNull();
     // Snapshot de la duración con la que se calculó el periodo.
@@ -226,7 +226,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     ]);
 
     expect(payment['receipt_number']).toMatch(
-      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+      new RegExp(`^\\d{4}-\\d{6}$`),
     );
     const renders = owner.client.receiptQueue.ofType('receipt.render');
     expect(renders).toHaveLength(1);
@@ -496,7 +496,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const issued = await owner.client.post(`/api/payments/${validatedId}/issue`);
     expect(issued.status).toBe(200);
     expect(issued.body.pdfStatus).toBe('pending');
-    expect(issued.body.receiptNumber).toMatch(/-\d{4}-\d{6}$/);
+    expect(issued.body.receiptNumber).toMatch(/^\d{4}-\d{6}$/);
 
     const seq = await testQuery<{ last_number: number }>(
       `SELECT last_number FROM organization_document_sequence WHERE organization_id = $1 AND document_type = 'receipt'`,

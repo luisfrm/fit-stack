@@ -183,7 +183,7 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity (C0)', () =
     );
     const persisted = rows[0]!.receipt_number;
     expect(persisted).toMatch(
-      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+      new RegExp(`^\\d{4}-\\d{6}$`),
     );
     // Ambos reportan el número AUTORITATIVO persistido, nunca uno local perdido.
     expect(a.body.receiptNumber).toBe(persisted);

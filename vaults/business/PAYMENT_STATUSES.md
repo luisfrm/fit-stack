@@ -49,7 +49,7 @@ Al anular se persisten **siempre** `voided_by` / `voided_at` / `void_reason`, ha
 | Código | Panel — `payment` (gym) | Console — `platform_subscription_payment` (SaaS) |
 |---|---|---|
 | `processing` | "Por validar": aparece en el accionable de `/payments` y no numera | "Procesando": bloquea otro pendiente; a la espera de que soporte apruebe |
-| `validated` | Numera comprobante (`{slug}-año-n`) + encola render | Suma el periodo del plan a `current_period_end` + numera `FS-N` |
+| `validated` | Numera comprobante (`{año}-n`) + encola render | Suma el periodo del plan a `current_period_end` + numera `FS-N` |
 | `voided` | **ANULADO** (si había número: PDF con sello, el de emisión deja de entregarse) + suscripción **ANULADA** | **ANULADO** (si había número); el status computado **lo ignora** y la suscripción sigue su curso por periodo/gracia |
 | `refunded` | No se usa | Reservado, sin efectos |
 

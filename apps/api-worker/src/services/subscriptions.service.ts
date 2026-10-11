@@ -45,7 +45,6 @@ export interface ReceiptHooks {
     orgId: string;
     paymentId: number;
     timezone: string;
-    orgSlug?: string | null;
     actor?: string;
     taxOverride?: {
       subtotal: number;
@@ -64,7 +63,6 @@ export interface ReceiptHooks {
 
 export interface ReceiptContext {
   receipts?: ReceiptHooks;
-  orgSlug?: string | null;
   timezone?: string;
   by?: string;
   /** Motivo de anulación/rechazo: se persiste en el pago y viaja al void del comprobante. */
@@ -192,9 +190,9 @@ export function createSubscriptionsService(
 
       const dateManager = new OrganizationDateManager(timezone);
 
-      // (RD-94) el periodo lo calcula el servidor (Regla 4).
-      // 1. `startDate` por defecto = hoy local. 2. `plan` + `latest` ya
-      // cargados arriba (el guard `processing` sigue primero, intacto).
+      // The server computes the period (Rule 4).
+      // 1. `startDate` defaults to local today. 2. `plan` + `latest` are
+      // already loaded above (the `processing` guard still runs first).
       const startDate = parseSubscriptionDate(payload.startDate, dateManager);
       if (Number.isNaN(startDate.getTime())) {
         throw new HTTPException(400, { message: 'Fecha de inicio inválida' });
@@ -336,7 +334,6 @@ export function createSubscriptionsService(
             orgId: organizationId,
             paymentId: createdPayment.id,
             timezone,
-            orgSlug: opts.orgSlug,
             actor: opts.by,
             taxOverride:
               p.taxTotal !== undefined && p.taxDetails !== undefined
@@ -462,7 +459,6 @@ export function createSubscriptionsService(
           orgId: organizationId,
           paymentId,
           timezone: opts.timezone,
-          orgSlug: opts.orgSlug,
           actor: opts.by,
         });
       }

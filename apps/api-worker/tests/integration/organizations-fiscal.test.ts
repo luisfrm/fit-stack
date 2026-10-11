@@ -204,7 +204,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     const paymentId = Number(payment['id']);
     const receiptNumber = payment['receipt_number'] as string;
     expect(receiptNumber).toMatch(
-      new RegExp(`^${organization.slug}-\\d{4}-\\d{6}$`),
+      new RegExp(`^\\d{4}-\\d{6}$`),
     );
 
     // Paso 2 real: el compose debe reflejar disclaimer custom y etiqueta

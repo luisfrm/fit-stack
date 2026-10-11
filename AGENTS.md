@@ -1,5 +1,7 @@
 # Fit-Stack Agent Guide
 
+> Índice + invariantes. El detalle por área vive en `vaults/` (lectura on-demand). Este archivo define **qué** es innegociable; el **cómo** de cada feature lo decide `coder-expert`.
+
 ## Dev Commands
 
 ```bash
@@ -10,12 +12,12 @@ pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
 pnpm test         # Full test suite (shared → api-worker → jobs-worker → panel → console, Vitest)
 pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
-pnpm seed:e2e       # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
+pnpm seed:e2e     # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
 pnpm format       # Format code (Prettier)
 
 # Database (Drizzle ORM — all run via @workspace/database)
-pnpm db:generate  # Generate migrations
-pnpm db:migrate   # Run migrations
+pnpm db:generate  # Generate migrations (local, no approval needed)
+pnpm db:migrate   # Run migrations (REQUIRES approval; CI applies on merge)
 pnpm db:push      # Push schema (LOCAL ONLY — never on shared branches)
 pnpm db:pull      # Pull schema (LOCAL ONLY)
 pnpm db:check     # Verify schema consistency
@@ -27,7 +29,7 @@ cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
 cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
 cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
-cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused, read-only reference)
+cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused, reference only)
 
 # Bridge (Python/Flet — managed separately with uv) ⏸ PAUSED
 # cd apps/bridge
@@ -37,1180 +39,160 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Cloudflare Workers API - **Active**), `jobs-worker` (Cloudflare Queues — email + PDF receipts), `panel` (Next.js 16, port 3001), `web` (Next.js 16, port 3002), `console` (Next.js 16, port 3000), `bridge` (Python/Flet desktop, **⏸ PAUSED**), `api` (Next.js 16, **DEPRECATED** — port 3003, ⏸ paused, kept only as reference, excluded from pnpm workspace).
-- **Packages**: `auth` (Better Auth client/hooks), `ui` (shadcn/ui), `shared` (DTOs/types/constants/RBAC), `database` (Drizzle ORM + Neon Postgres), `eslint-config`, `typescript-config`
-- **Docs** (`vaults/`, Obsidian vault): `architecture/` (`ARCHITECTURE.md`, `INFRASTRUCTURE.md`, `terraform.md`), `business/` (receipt model, payment statuses, RBAC, timezone, fiscal), `ai/` (`CHAT_PRICING.md`, `CHAT_INFRASTRUCTURE.md`; `archive/CHAT_IMPLEMENTATION.MD` deprecated), `guides/` (`FUTURE_IDEAS.md`, `CHECKLIST-COMPROBANTES.md` + `how/` — AI Knowledge Base), `backlog/` (pending items by topic; index `README.md`, alias `PENDING`). There is **no `vaults/tasks/`** — planned work lives in Linear, see below.
-- **Tasks → Linear**: planned work is tracked in **Linear** (team `Rivas Digital`, MCP `linear`). One issue = one coherent scope, **no fixed relation to PRs** (split into sub-issues when there are distinct findings or it is too large); branch `<type>/RD-<number>-<kebab-brief-summary>`, commits `<type>: RD-<number> <brief-description>`. The `planner` agent writes the whole spec into the issue description. The old local system (`vaults/tasks/FS-NNNN/`, `pnpm task:new`, `scripts/task-new.mjs`, `vaults/guides/task-system.md`) has been **removed**: there is no local id space and nothing to keep in sync. See [Task Tracking (Linear)](#task-tracking-linear). Unowned pending ideas → `vaults/backlog/` until they have an owner and a scope.
-- **Architecture Spec**: For detailed design decisions, see [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md).
-
-- **Bridge is Python** — not part of Turbo, managed separately with `uv`
-
----
+- **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000), `bridge` (Python/Flet, **⏸ PAUSED**), `api` (Next 16, **DEPRECATED** — 3003, excluded from the workspace).
+- **Packages**: `auth`, `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
+- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`), `backlog/`. There is **no `vaults/tasks/`** — planned work lives in Linear. Bridge is Python, managed with `uv`, not part of Turbo.
 
 ## Task Tracking (Linear)
 
-**Linear is the single source of truth for planned work.** The old local task system (`vaults/tasks/FS-NNNN/`, `task.md` + `plan.md` + `phases/`, `pnpm task:new`, `scripts/task-new.mjs`, `vaults/guides/task-system.md`) has been **removed from the repository**. Consequences to keep in mind:
+**Linear is the single source of truth for planned work.** The old local system (`vaults/tasks/FS-NNNN/`, `pnpm task:new`, `vaults/guides/task-system.md`) was **removed**: no local id space, nothing to keep in sync.
 
-- **No local id space.** Work is referenced by its Linear id (`RD-89`). Never invent an `FS-NNNN` id, never reintroduce a task folder, never add a `task:new` script.
-- **The `planner` agent cannot edit the repository** (its permissions deny `edit`/`write`): the issue description *is* the deliverable.
-- **Long reference material goes to a Linear document**, not back into the repo. Frozen contracts, inventories and audits that do not fit in an issue are attached to the project. The receipt engine frozen contract is one such document.
-- **Code comments cite Linear ids.** A comment that explains *why* code exists points at `RD-9x` (e.g. `// (RD-94) el periodo lo calcula el servidor`). Do not write task ids that no longer resolve.
-- ⚠️ `FS-0000001` in code and tests is **not** a task id: it is the SaaS receipt number format produced by `formatConsoleReceiptNumber` (`packages/shared/src/documents/receipt-number.ts`). Never "migrate" it.
-- A few `[[FS-000N]]` wiki-links survive in `vaults/backlog/` as historical references to decisions that are already implemented; they are prose, not live links. Leave them.
-- Git history is the archive of the removed task folders (`git log --diff-filter=D -- vaults/tasks/`).
+- **No local id space.** Reference work by its Linear id (`RD-89`). Never invent an `FS-NNNN` id, never reintroduce a task folder. **Long reference material goes to a Linear document.** **No task ids in the codebase** — not in comments, not in tests: the id lives in Linear and in the commit message. ⚠️ `FS-0000001` is **not** a task id: it is the SaaS receipt number from `formatConsoleReceiptNumber`. Never "migrate" it.
+- **Workspace**: `Rivas Digital` (`6630fb5f-e79c-42de-8867-49da2a325e10`) via the `linear` MCP server, reachable from `execute` as `tools["linear"].<tool>(…)`.
+- **One issue, one coherent scope — no fixed relation to PRs.** Split into **sub-issues** only when there are **distinct hallazgos** or it is **too large** (judge by reviewability). The DB change, backend, frontend, tests and docs that make **one behaviour** work end to end belong together.
+- **Split rule**: the **parent is the container** (problem, context, state, sub-issue list); each **sub-issue** (`parentId`) is a self-contained spec. Link issues with `blocks` / `blockedBy` / `relatedTo` whenever a real dependency or shared area exists, **within or across parents**; the parent carries no relations. **Never split by architectural layer**, **never create phases**.
+- **Lifecycle**: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done` (plus `Canceled`, `Duplicate`). A rejected PR sends the **same** issue back to `In Progress` with a new PR — never a duplicate.
+- **Labels**: `Feature`, `Bug`, `Improvement` → branch prefix `feat`/`fix`/`chore` (`refactor` if structural, `docs` if docs-only); no `Backlog` label.
+- **Branch** `<type>/RD-<number>-<kebab-brief-summary>` (≤ 60 chars after prefix); **commit** `<type>: RD-<number> <brief-description>` — the **id goes right after the type**, in every commit, never at the end; a sub-issue uses **its own** id. Both derive from the label and id; `coder-expert` proposes them. **Never auto-commit.**
+- **Description template** (English): `## Context` · `## Scope` (In/Out) · `## Acceptance criteria` (verifiable checklist) · `## Notes` (optional). The issue defines **what and why**; **how** is decided by `coder-expert`. **No** implementation plan, **no** verification commands, **no** `## Git`.
+- **Language**: Linear content is **English**; the chat response is **Spanish**. `/task "<req>"` captures an issue, `/plan "<req|RD-NNN>"` plans one — both delegate to `planner`. **Unowned work** stays in `vaults/backlog/`.
 
-- **Workspace/team**: `Rivas Digital` (`6630fb5f-e79c-42de-8867-49da2a325e10`), accessed through the `linear` MCP server (`.opencode` → `opencode.json`). Its tools are only reachable from the `execute` runtime as `tools["linear"].<tool>(…)` — e.g. `tools["linear"].save_issue({ team, title, description, priority, state, labels })`, `get_issue`, `list_issues`, `save_comment`.
-- **One issue, one coherent scope — no fixed relation to PRs.** A task may be delivered in a single PR, or split into **sub-issues** when it carries **distinct hallazgos** (independent findings) or is simply **too large**. Judge by reviewability, never by a rule. The DB change, backend, frontend, tests and docs that make **one behaviour** work end to end belong together.
-- **How to split**: the **parent issue is the container** — it holds the problem, the shared context, the overall state and a list of its sub-issues. Each **sub-issue** (`parentId`) carries a self-contained spec. Link them with `blocks`/`blockedBy` when the order matters; the parent blocks and is blocked by nothing. **Never split by architectural layer** and **never create phases**: the layers are the ordered sections of a description, not separate issues.
-- **Issue lifecycle = workflow**: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done` (plus `Canceled`, `Duplicate`). A rejected PR sends the **same** issue back to `In Progress` and a new PR is opened — never a duplicate issue.
-- **Labels**: `Feature`, `Bug`, `Improvement`. The label determines the branch prefix: `Feature → feat`, `Bug → fix`, `Improvement → chore` (`refactor` when purely structural, `docs` when documentation-only). Do **not** use the `Backlog` label — the state covers it.
-- **Branch**: `<type>/RD-<number>-<kebab-brief-summary>` (lowercase, ≤ 60 chars after the prefix), recorded in the issue's `## Git` section.
-- **Commits**: `<type>: RD-<number> <brief-description>` — the **task id goes right after the type**, in every commit. Example: `feat: RD-99 one receipt composer for both issuers`. Never at the end of the message, never inside scope parentheses. A sub-issue uses **its own** id, not the parent's. This is what makes `git log` traceable back to the issue without any tooling.
-- **Description template** (English): `## Problem` · `## Scope` (In/Out) · `## Implementation plan` (ordered by layer — DB, Shared, Backend, Frontend, Cache, Jobs, Tests, Docs — only the layers actually touched, each with **verified** file paths) · `## Acceptance criteria` (verifiable checklist) · `## Verification` (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm --filter api-worker test:integration` when contracts/payments/receipts change, plus manual steps) · `## Risks & notes` (migrations needing approval, multi-tenancy/permission/money consequences, `⏸ PAUSED` areas) · `## Git`.
-- **Language**: Linear content (titles, descriptions, branch names, comments) is **English**, so prose matches the paths, symbols and commands it cites. The chat response to the user is in **Spanish**.
-- **Commands**: `/task "<requirement>"` captures a requirement as a new issue; `/plan "<requirement or RD-NNN>"` plans it (or re-plans an existing issue). Both delegate to the `planner` subagent.
-- **Unowned work** (findings, loose bugs, ideas with no owner or scope) stays in `vaults/backlog/` and does not become an issue on its own.
+## Delegation
 
----
+Use the `subagent` tool with the exact agent id:
+
+| id | Use it for |
+|---|---|
+| `planner` | Capture, plan, read or update anything in Linear. Never write issues yourself. |
+| `coder-expert` | Implement or fix code once a Linear issue exists. Pass its id (`RD-NN`). |
+| `reviewer` | Read-only review of the working tree against the issue and AGENTS.md. |
+| `docs-writer` | Update `AGENTS.md` and `vaults/` after structural changes. |
+| `explore` | Read-only exploration of the codebase. |
+
+Flow: requirement → `planner` → user approves the issue → `coder-expert` → `reviewer` → `docs-writer` when structural.
 
 ## Project Context (Business Overview)
 
 ### 1. Vision
 
-Fit-Stack is a multi-tenant SaaS for the Gym and Fitness industry, primarily targeting the Latin American market. It solves the complexity of multi-currency billing, member retention, and automated physical access control.
+Multi-tenant SaaS for the Gym/Fitness industry (Latin America): multi-currency billing, member retention, automated physical access. Every gym is an `Organization` (isolation via `organizationId`); B2B SaaS (Platform layer + CMS layer).
 
-- **Multi-tenancy**: Every gym is an `Organization`. Data isolation strictly enforced via `organizationId`.
-- **B2B SaaS Model**: "Platform" layer (SaaS Admins) + "CMS" layer (Gym Admins).
+**Modules**: Members · Plans · Subscriptions (cumulative expiration) · Payments · Platform/SaaS Admin (`console`) · Staff & Trainers · Classes · CMS (DnD pages/blocks) · Routines · Access Control/Bridge (**⏸ paused**) · Reports · Settings. → [`vaults/architecture/modules.md`](vaults/architecture/modules.md).
 
-### 2. Module Breakdown
+**Staff & Trainers**: `gym_member` (base) + `coach_profile` (1:1, role `COACH`) + `auth_member` (role) + `coach_assignment`; views `/dashboard/staff` and `/dashboard/trainers` (coaches appear in both). → [`vaults/architecture/staff-trainers.md`](vaults/architecture/staff-trainers.md).
 
-| Module                      | Purpose                                                                                                                                                                                                                                                                                        |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Members**                 | Centralized identity for gym clients. Tracks historical behavior and preferences.                                                                                                                                                                                                              |
-| **Membership Plans**        | Commercial product catalog. Defines durations (Daily, Weekly, Monthly, Yearly) and pricing in a configurable base currency (USD by default).                                                                                                                                                   |
-| **Subscriptions**           | Temporal access control linking a Member to a Plan. Uses **Cumulative Expiration Logic** — renewing adds time to current `endDate` so no paid day is lost.                                                                                                                                     |
-| **Payments**                | Financial audit trail. Captures dynamic metadata (bank hashes, reference numbers, screenshots). Prevents duplicate registrations while `processing`.                                                                                                                                           |
-| **Platform (SaaS Admin)**   | Super-admin panel in `apps/console`. Manage Organizations, FitStack plans, subscriptions, global settings, currencies, payment methods.                                                                                                                                                        |
-| **Staff & Trainers**        | HR and operations separation. Distinguishes business managers (Staff) from service deliverers (Trainers).                                                                                                                                                                                      |
-| **Classes**                 | Group activity scheduling (Crossfit, Yoga, etc.) with capacity management.                                                                                                                                                                                                                     |
-| **CMS (Dynamic Content)**   | Drag-and-drop pages/blocks (hero, services, testimonials, gallery, contact, team_info). Authored in CMS, rendered in `web` via public API. Panel: `/content/[id]` = SEO config (title, slug, description, metaTitle, metaDescription, isActive) and `/content/[id]/blocks` = DnD block editor. |
-| **Routines**                | Exercise library, routine templates, workout sessions, coach-client assignments (future fitness app).                                                                                                                                                                                          |
-| **Access Control / Bridge** | Desktop app (Flet/Python) for biometric/QR verification at entry. Sync queue + audit logs. **⏸ Paused** — endpoints live only in legacy `apps/api`, not migrated to api-worker.                                                                                                                |
-| **Reports**                 | Revenue analytics with multi-currency normalization.                                                                                                                                                                                                                                           |
-| **Settings**                | Localization and branding per gym (Timezone, currency formats, country config, OKLCH theme injection).                                                                                                                                                                                         |
-
-### 3. Staff & Trainers Architecture
-
-**Data model:**
-
-- `gym_member` (base table) — all gym members: clients, staff, trainers
-- `coach_profile` (extension) — optional 1:1 for gym_members with role `COACH`. Fields: `specialities`, `bio`, `isVisible`, `displayOrder`
-- `auth_member` — Better Auth membership linking user ↔ organization with role (`OWNER`, `MANAGER`, `CASHIER`, `COACH`, `MEMBER`)
-- `coach_assignment` — links a coach (gym_member) to a client (gym_member)
-
-**Staff (`/dashboard/staff`):**
-
-- Table view for gym_members with roles: Owner, Manager, Cashier, Coach
-- Components: `StaffTable`, `StaffModal`, `StaffForm` (`apps/panel/components/staff/`)
-- Columns: Avatar+Name, Email, Role, Status, Actions
-- Service: `membersService` (shared with Members module)
-
-**Trainers (`/dashboard/trainers`):**
-
-- Table view for gym_members with role `COACH` that have a `coach_profile`
-- Components: `TrainersTable`, `TrainerModal`, `TrainerForm` (`apps/panel/components/trainers/`)
-- Fields: name, photo, specialities, bio, visibility toggle, display order
-- Service: `trainersService` (joins gym_member + coach_profile)
-- API routes: `/api/trainers`
-
-**Note**: Trainers appear in both views (staff table + trainers table) because they are gym_members with role `COACH`.
-
-### 4. The Bridge App (Hardware Integration)
-
-A Python/Flet desktop application running locally at the gym entrance. Communicates with the API to validate a member's QR/Biometric data against their active subscription, turning "billing data" into "physical access."
-
-**API contract** (authenticated via `x-api-key` header → `ACCESS_CONTROL_API_KEY`):
-
-- `POST /api/access-control/verify` — validate `documentId` + `organizationId`, returns access decision, creates audit log
-- `GET /api/access-control/sync-tasks` — poll pending biometric enroll/delete tasks
-- `POST /api/access-control/mark-synced` — confirm task completion
-
-**Tables**: `access_control_log` (audit trail of every access attempt), `biometric_sync_task` (queue of sync tasks for devices)
-
-> **⏸ Status: PAUSED.** The Bridge and `apps/api` are paused. The 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) and the `access-control.repository.ts` repository exist **only in `apps/api` (legacy)** — the active `apps/api-worker` does **not** mount `/api/access-control` yet. There is no migration in progress. When reactivated, port it to a `createAccessControlRepository(db)` factory + Hono router with `requireApiKey` middleware, and add `ACCESS_CONTROL_API_KEY` to `apps/api-worker/src/lib/env.ts` + Terraform `secret_text_bindings`.
+**Bridge**: Python/Flet desktop at the gym entrance, auth via `x-api-key`. **⏸ PAUSED** — its 3 endpoints (`/verify`, `/sync-tasks`, `/mark-synced`) exist **only in legacy `apps/api`**; `api-worker` does **not** mount `/api/access-control`. → [`vaults/architecture/bridge.md`](vaults/architecture/bridge.md).
 
 ### 5. Business Rules Summary
 
-1. **Multi-currency**: System thinks in a base currency (USD by default) but allows payment in any active local currency via real-time exchange rates. Both configurable dynamically in **Settings**.
-2. **Atomic Invoicing**: Subscriptions and Payments are created as an atomic unit to ensure financial and temporal data never desync.
-3. **Strict Isolation**: No gym sees another gym's data. Everything scoped to `activeOrganizationId` in the session. Panel never uses a `|| "global"` fallback — it is always org-scoped via `(protected)/layout.tsx` (renders `OrganizationPicker` if no org); platform-scoped logic lives in console-specific services.
-4. **Cumulative Expiration**: Renewing a subscription extends from the current `periodEnd` (not today), preserving all paid days. The period is **server-computed** (`POST /api/subscriptions`): `startDate?` defaults to today in the org timezone, `endDate?` defaults to `computeSubscriptionPeriod` (`@workspace/shared` — baseline = `max(latestEndDate, startDate)` on local-day validity, tz-aware `addDuration`); an explicit `endDate` before `startDate` → **422 `END_DATE_BEFORE_START`**, shortening an active period without `endDateOverrideReason` → **422 `END_DATE_OVERRIDE_REASON_REQUIRED`** (persisted in `subscription.end_date_override_reason`, migration `0019`, nullable). The panel sends no `endDate` unless the operator edits the preview (dirty flag).
-5. **Grace Period Billing**: Platform subscriptions have a tiered grace period: 1-7 days overdue → `past_due`, 8-14 days → `read_only`, 15+ → `suspended`.
-6. **Immutable financial record**: a subscription with its payment is **never deleted** — `subscriptions` does not expose `delete` to any role and there is no `DELETE /api/subscriptions/:id`. If the record is wrong it is **voided** (the charge becomes `voided` and the subscription is computed as `ANULADA`); if access is revoked it is **cancelled**. Void ≠ cancel: `voided` = invalid record, `cancelled` = access was revoked with a charge that is still valid.
-   - **Unified payment statuses**: `PAYMENT_STATUSES = processing | validated | voided | refunded` (without `pending`/`invalid`). Rejection and voiding share `voided`; the kind is **derived** with `getVoidKind` (`rejected` without `receiptNumber` / `annulled` with it). Only `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) sustain a period. When voiding, `voided_by`/`voided_at`/`void_reason` are always persisted.
-   - **Void by domain**: in **Panel** a `voided` payment leaves the subscription **ANULADA** (voids the service); in **Console/SaaS** a `voided` is **ignored** in the computed status (does not revoke service; grace runs from `currentPeriodEnd` and does not accumulate). Free-tier gate: if enabled, it wins; if there is no subscription, free tier is evaluated; otherwise, `/no-subscription`.
-7. **Unique org slug**: `organization.slug` is unique (DB `text('slug').unique()`). Conflicts return **409 `{ code: 'SLUG_TAKEN' }`** (create/update service + `GET /api/platform/organizations/check-slug`). Console validates **live** in `organization-form.tsx` (debounce 500ms → input `success`/`error` + toast) and the org detail pages are routed **by slug** (`/organizations/[slug]/...`, resolved via `GET /api/platform/organizations/by-slug/:slug`).
-
----
+1. **Multi-currency** (base USD default, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
 
 ## Project Rules (Technical Standards)
 
 ### 1. Monorepo Architecture & Boundaries
 
-- **Package Separation**: Respect boundaries between `apps/` and `packages/`. Logic belonging to a package MUST NEVER be duplicated in an app.
-- **Strict Isolation**: Don't mix API and Frontend contexts. Never import anything between apps directly; the only allowed interaction is through shared packages (`packages/shared`).
-- **Shared Logic & Types**: Use `@workspace/shared` for interfaces, DTOs, constants, and permission helpers shared between backend, frontend, or other consumers.
-- **Type Safety**: Avoid `any`. Prioritize strict, strong typing everywhere.
-- **Backend 3-Layer Strict Separation**: Route Handler → Service → Repository.
-  - Repository: Drizzle ORM, filter by `organizationId` for multi-tenancy.
-  - Service: Business logic layer.
-  - Route Handler: HTTP concerns only.
-- **Worker DB Pattern**: In `api-worker` the DB client is created **per request** via `createDb(c.env.DATABASE_URL)` (`@workspace/database/factory`) — `process.env` does not exist in Workers. Repositories and services are **factory functions** that receive dependencies by parameter (`createXRepository(db)`, `createXService(repo)`).
-- **Shared repositories (conscious exception, not a general rule)**: repositories live in the app — UNLESS 2+ apps need the byte-identical implementation (criterion: same SQL, same atomicity guarantees). Only then it lives in `packages/database/src/repositories/` (today solely `receipts.repository.ts`: atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`, consumed by api-worker step 1 and jobs-worker step 2 — plus `platform-receipts.repository.ts`: the SaaS mirror, same criterion). Any other new repo stays in `apps/api-worker/src/repositories/`. This exception exists because two runtimes need identical SQL; it does not authorize moving business logic or other repos.
+Respect `apps/` vs `packages/`: package logic **MUST NEVER** be duplicated in an app; never import between apps (only via `@workspace/shared`). **3 layers**: Route Handler → Service → Repository (repo filters `organizationId`). **Worker DB pattern**: `createDb(c.env.DATABASE_URL)` **per request**; factories `createX(db)`/`createXService(repo)`; no `process.env` in Workers. No `any`. **Shared-repo exception**: only `receipts`/`platform-receipts` live in `packages/database`; everything else stays in `apps/api-worker`.
 
 ### 2. UI Design System & Hierarchy
 
-- **Library Origins**: All UI components MUST be imported from `@workspace/ui` (`packages/ui`).
-- **Form required convention**: `Input` uses native `required`; `CountrySelector` and `SimpleSelect` accept a `required` prop (renders `*` on the label). Forms group into sections and close with the note "Fields with _ are required." (Fields with _ are required.)
-- **ActiveCurrenciesField** (`packages/ui/.../active-currencies-field.tsx`): currency multi-toggle (`currencies` universe, `value/onChange`, `locked[]` not uncheckable with badge, `disabled`, search). Source of truth for the universe: `COUNTRY_INDEX.currencies` (never the exchange API, which is only for rates).
-- **Variant Enforcement**: Use predefined variants. Do not use ad-hoc Tailwind classes to override sizes/spacing/styles unless absolutely necessary and after notifying the user.
-- **Mathematical Scale + Premium Aesthetic**:
-  - **Backgrounds**: `bg-input`, `bg-card`, `bg-surface`, translucent scales (`bg-white/5`, `bg-white/10`).
-  - **Borders**: Low opacity boundaries (`border-white/5`, `border-white/10`, `border-input-border`) over solid hexes. Limit solid colors to focus rings.
-  - **Border Radius**:
-    - Inputs, Buttons, CheckboxCards → `rounded-md`
-    - Cards, Containers → `rounded-xl`
-    - Modals, Dialogs → `rounded-2xl`
-- **Responsive Modal** (`packages/ui/src/components/modal.tsx`): renders a **bottom sheet** (drag handle + drag-to-close, `rounded-t-2xl`) on mobile (<768px via `useIsMobile`) and a **centered modal** on desktop. Exports the legacy `Modal` (same API: `trigger`/`title`/`description`/`footer`/`size`/`isScrollable`/`open`/`onOpenChange`) and the composite API `ResponsiveModal` / `ResponsiveModalTrigger` / `ResponsiveModalClose` / `ResponsiveModalContent` (icon, subtitle, `desktopMaxWidth`). Built on `radix-ui` Dialog; open/close animations are **custom keyframes** in `packages/ui/src/styles/globals.css` (`animate-sheet-in/out`, `animate-modal-in/out`) that animate `translate`/`scale` so they don't clash with Tailwind v4 centering; the overlay uses `tw-animate-css` (`data-open:`/`data-closed:`). Hook `useIsMobile` in `packages/ui/src/hooks/use-is-mobile.ts`.
+All components from `@workspace/ui`, predefined variants (no ad-hoc Tailwind without notifying the user). Radius: inputs/buttons `rounded-md` · cards `rounded-xl` · modals `rounded-2xl`. Backgrounds `bg-input`/`bg-card`/`bg-surface` + translucent; low-opacity borders; solid only for focus rings. Forms: native `required` (`CountrySelector`/`SimpleSelect` accept it), close with "Fields with _ are required.". `ActiveCurrenciesField` universe = `COUNTRY_INDEX.currencies`. `ResponsiveModal`: sheet <768px / modal desktop.
 
 ### 3. Database Integrity & ORM
 
-- **ORM**: Always Drizzle ORM. All DB code from `@workspace/database`.
-- **Workflow**: `generate` → `review` → `migrate`. NO `push`, `generate`, `migrate`, or `seed` without explicit user approval.
-- **Push Restriction**: `db:push` is EXCLUSIVELY for local prototyping. Strictly prohibited on shared branches or production.
-- **Naming**: Table names are **singular** (`user`, `organization`). Repositories and Services are **plural** (`users.service.ts`).
-- **No `pgEnum`**: Use plain `text('col')` — no `.$type<...>()` annotation. The DB treats these columns as plain strings. Allowed values are validated exclusively by Zod schemas on the backend and by the frontend; they never live in the DB layer. pgEnum is strictly forbidden (breaks Drizzle migrations).
-- **Validation**: Run `pnpm db:check` before pushing. CI verifies on PRs automatically.
-- **No interactive transactions (serverless)**: `api-worker` runs on Cloudflare Workers with Neon's **HTTP** driver, where interactive `db.transaction()` **does not exist**. Atomicity is achieved with a **single statement** (canonical pattern: the receipt sequence, `INSERT … ON CONFLICT DO UPDATE … RETURNING`) or with **explicit compensation** in the service's `catch`. Never wrap multiple writes in a transaction nor assume automatic rollback.
-- **Explicit creation compensation (RD-94)**: since there are no transactions, `subscriptions.service.create()` (gym) and the 4 sites in `platform-subscriptions.service` (creation, renewal, additional payment via `registerPayment`, late validation in `PATCH status`) delegate to the `compensateFailedEmission` helper (`apps/api-worker/src/lib/subscription-compensation.ts`) in the `catch`. The decision is **by re-read, never by error type** (up to 3 bounded retries to ride out a Neon HTTP blip): if the persisted payment carries `receiptNumber` → `committed` (success, not re-thrown; the sweep recovers the pending render); if the re-read stays unresolved after the retries → `unresolved` (**fail-closed real**: nothing is voided/reverted/cancelled — voiding a possibly-numbered receipt would serve/email an unsealed ANULADO — the original error is re-thrown and the sweep reconciles); otherwise → the payment is voided with the fixed reason `COMPENSATION_VOID_REASON` (`voided_by`/`void_reason` always persisted). In the gym flow the voided payment already computes as `ANULADA`, so the subscription is **not** additionally cancelled; only when `paymentsRepo.create` never ran is the orphan **cancelled with `cancel()` — never `delete()`** (rule 6; the `FS-N` series is not emptied). In SaaS, where the period is extended BEFORE emission, the `catch` also **reverts the period** (`revertEffect` → `updatePeriodEnd(previousPeriodEnd)`, read before extending: an honest single write, no transaction) **only if the void actually succeeded** (otherwise the charge is still valid and the days paid must be kept); a SaaS creation whose payment was created-but-voided **also cancels the subscription** (a `voided` payment is ignored by `computePlatformSubscriptionStatus`, so it would leave a front-loaded period with no charge backing it) — this cancel fires only on `outcome === 'compensated'`, never on `unresolved`; and a `voided` payment **cannot be re-validated** — `PATCH status` → **409 `PAYMENT_NOT_REVALIDATABLE`** (and **409 `SUBSCRIPTION_CANCELLED`** when the parent subscription is cancelled) so a re-PATCH neither extends again over a voided charge nor leaves a `validated` without a receipt. Trial/free $0 (`skipped`) = success, they do not compensate. If the compensation write fails, it is logged and the **original error** is re-thrown (never masked by the compensation one). Successful mutations invalidate dependent caches in a `finally`, so the compensated-failure path invalidates too.
+Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`).
 
 ### 4. Next.js Patterns & Best Practices
 
-- **Server First**: `"use client"` only at leaf nodes. Default to Server Components. Fetch data server-side where possible.
-- **State in URL**: Prefer URL state (`?search=foo`) over `useState` for pagination, tabs, global searches.
-- **Async Params**: `params` and `searchParams` are **Promises** in Next.js 15+. Declare as `Promise<...>` and `await`.
-- **Navigation**: Use `useRouter` from `next/navigation`, never `window.location`. Use `router.refresh()` to sync server state after auth/org changes.
-- **Proxy/Middleware**: Heavy logic stays out of the proxy file. Use solely for CORS, header manipulation, and early session validation. The proxy file is **`proxy.ts`** (Next.js 16 convention, replaces `middleware.ts`).
+Server First (`"use client"` only at leaf nodes; fetch server-side). URL state over `useState`. `params`/`searchParams` are **Promises**. `useRouter` from `next/navigation` (never `window.location`) + `router.refresh()`. Proxy file = **`proxy.ts`** (heavy logic out).
 
 ### 5. Security & Authentication Architecture
 
-Fit-Stack uses **Better Auth** for authentication.
-
-**Package layers:**
-
-- **`@workspace/auth`** — canonical auth package. Entry points:
-  - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
-  - `@workspace/auth/service` — `sessionService.getSession()` for server components
-  - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)` and `canAccessCms()`
-- **`apps/panel/lib/auth-client.ts`** and **`apps/console/lib/auth-client.ts`** — re-export `@workspace/auth/client`
-- **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
-
-**Conventions:**
-
-- Client MUST use `useAuth()`. It exposes `activeOrganization` (the org object, resolved by the api-worker custom session) alongside `member`. NEVER use `useSession()` directly in components.
-- For server Components/Layouts/API layers: `sessionService` or server-side `getSession()`.
-- **Source of Truth**: The `organization` table (Better Auth) is the sole source for Name/Logo. Use `authClient.organization.update()`.
-- **Writing the location in the panel**: the organization identity (name/slug/logo/slogan/timezone/currencyFormat + legalName/taxId/address/`fiscalConfig`) is saved with `orgProfileService.updateProfile` → **`PATCH /api/organizations/profile`** (org-scoped, `ORGANIZATION.UPDATE`). The panel **never** calls `/api/platform/organizations` from a tenant form: that endpoint requires `requirePlatformAuth` (platform permission) and a gym owner/manager receives **403**. `countryCode`/`primaryCurrency` are immutable post-creation (400 `IMMUTABLE_FIELD`); changing the country recalculates the primary currency and is a platform-level operation.
-
-#### CORS & Allowed Origins
-
-The CORS allowlist is defined **in code only** — no env vars. Single source of truth in `apps/api-worker/src/lib/cors.ts`, consumed by:
-
-- `apps/api-worker/src/lib/auth.ts` → `trustedOrigins` of Better Auth
-- `apps/api-worker/src/index.ts` → `corsMiddleware` (Hono CORS)
-
-| Environment   | Allowed origins                                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `development` | Any `http://localhost:*` (3001 panel, 3002 web, 3003 console, 8787 jobs, 8788 api)                                                                                 |
-| `production`  | Exact: `fitstack-panel.luisrivas.site`, `fitstack-console.luisrivas.site`, `fitstack-api.luisrivas.site`, `luisrivas.site` · Wildcards: `https://*.luisrivas.site` |
-
-**Public routes skip auth**: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`. The global middleware tries to resolve a session but never blocks unauthenticated requests — machine-to-machine routes (e.g. access-control with `x-api-key`) work without a session.
+Better Auth; client **MUST** use `useAuth()` (never `useSession()` directly); server uses `sessionService`/`getSession()`. Name/Logo SSOT = the `organization` table (`authClient.organization.update()`); tenant identity → `PATCH /api/organizations/profile`; the panel **never** calls `/api/platform/*` from a tenant form; `countryCode`/`primaryCurrency` immutable post-creation. **CORS is code-only** (`apps/api-worker/src/lib/cors.ts`). Public routes skip auth: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`.
 
 ### 6. Route Handler Pattern (`apps/api-worker/src/lib/route-handler.ts`)
 
-The Hono API uses centralized middleware — never write auth/error boilerplate manually.
+Centralized middleware — never write auth/error boilerplate manually.
 
-| Middleware                                  | When to use                                                                                                       | Auth check / Context                                                                                            |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `requireOrgPermission(module, action)`      | Org-scoped CRUD routes                                                                                            | Session + orgId + permission via `auth.api.hasPermission` (with `can()` fallback). Sets `c.set('orgId', orgId)` |
-| `requireOrg()`                              | Org-scoped routes without permission check                                                                        | Session + active org. Sets `c.set('orgId', orgId)`                                                              |
-| `requireOrgTimezone()`                      | Routes that compute or filter by local date (reports, stats, billing)                                             | Validates the org has a timezone (500 if missing). Sets `c.set('orgTimezone', tz)`                              |
-| `requireAuth()`                             | General authenticated routes                                                                                      | Session + user only                                                                                             |
-| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`)                                                                             | Session + platform permission via `auth.api.userHasPermission`                                                  |
-| `requirePlatformAuth()`                     | Alias of `requirePlatformPermission('organization', 'create')` — standard middleware for `/api/platform/*` routes | Session + `organization.create` permission                                                                      |
+| Middleware | When | Auth / Context |
+| --- | --- | --- |
+| `requireOrgPermission(module, action)` | Org-scoped CRUD | Session + orgId + permission (`hasPermission`, `can()` fallback); sets `orgId` |
+| `requireOrg()` | Org-scoped, no permission | Session + active org; sets `orgId` |
+| `requireOrgTimezone()` | Routes by local date | Validates tz (500 if missing); sets `orgTimezone` |
+| `requireAuth()` | General authenticated | Session + user |
+| `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
+| `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |
 
-```ts
-// Typical org-scoped route (Hono)
-.get('/', requireOrgPermission(PM.MEMBERS, PA.READ), async (c) => {
-  const orgId = c.get('orgId')!;
-  const repo = createMembersRepository(c.get('db'));
-  const service = createMembersService(repo, /* ...deps */);
-  return c.json(await service.getAllMembers({ organizationId: orgId }));
-})
-```
-
-- Body validation via `zValidator('json', schema)` from `@hono/zod-validator` (+ `zod`).
-- Errors are normalized by the global `onError` handler (`apps/api-worker/src/lib/errors.ts`) → `{ error, details? }` envelope. An `HTTPException` that brings its own `Response` (`err.res`) is returned **as-is**: this is how the documented business codes arrive (`409 { code: 'SLUG_TAKEN' }`, `403 { code: 'FEATURE_NOT_AVAILABLE', feature }`) — toasts are resolved by code, never by text.
-- The legacy `apps/api/lib/route-handler.ts` (`withAuth` / `withSession` / `withPlatformAuth`) is **deprecated** with the old API.
-
-#### API Route Map (api-worker)
-
-Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/healthz` and `/favicon.ico`):
-
-| Router               | Notable endpoints                                                                                                                                                                                                                                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/api/auth/*`        | Better Auth engine (sessions, orgs, invitations)                                                                                                                                                                                                                                                                                                                                     |
-| `/api/members`       | CRUD gym members + invites (`members.service` enqueues `email.registration_invite`) · `GET /stats` (client KPIs: total/active/inactive/newThisMonth/withoutActiveSubscription/withPortal + growth 6M + upcomingBirthdays, cache `org:*:members:stats`) · `GET /` accepts `?hasActiveSubscription=` (JOIN with gym-active semantics, `processing` counts as active) |
-| `/api/plans`         | Membership plans (gym catalog)                                                                                                                                                                                                                                                                                                                                                       |
-| `/api/subscriptions` | Subscriptions (create/list/update-status; payment registration enqueues `email.payment_receipt`) — **no DELETE** (immutable financial record) · `POST /` with the server-computed period (`startDate?`/`endDate?`/`endDateOverrideReason?`, 422 by code — contract in `apps/api-worker/README.md`) |
-| `/api/payments`       | `PATCH /:id/status` accepts `processing \| validated \| voided` + optional `voidReason` (retired `pending`/`invalid` → **400**); returns the explicit void outcome (`receiptVoided` + `receiptVoidReason`). `→ validated` only from `processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**, and never over a cancelled subscription → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (mirror of the console guard — invariant *validado ⇔ numerado*). `POST /:id/send-email` (receipt resend) |
-| `/api/classes`       | Class schedule CRUD                                                                                                                                                                                                                                                                                                                                                                  |
-| `/api/trainers`      | Trainers (gym_member + coach_profile)                                                                                                                                                                                                                                                                                                                                                |
-| `/api/cms`           | Content pages/blocks                                                                                                                                                                                                                                                                                                                                                                 |
-| `/api/dashboard`     | KPI stats (`GET /stats`, cache `org:*:dashboard:stats:*`) + actionable lists (`GET /action-items`, cache `org:*:dashboard:action-items`)                                                                                                                                                                                                                                             |
-| `/api/settings`      | Gym settings (currencies, payment methods, theme)                                                                                                                                                                                                                                                                                                                                    |
-| `/api/reports`       | `GET /revenue` (multi-currency, cache 1h) · `GET /receipts` (receipt sequence audit: rows + summary + totals per currency + `gaps[]`, filters `from/to/status/method/year/page/limit`, cache 5 min) |
-| `/api/organizations` | `GET /subscription-status` (org billing status) · `GET /subscription` (org SaaS sub with plan details, cache 1 min) · `GET /payment-methods` (platform payment methods exposed to the org, cache 10 min) · `POST /subscription/renew` (self-service renewal — see "Self-service renewal" below) · `PATCH /profile` (location identity —name/slug/logo/slogan/timezone/currencyFormat— + emitter identity + `fiscalConfig` merge, `countryCode`/`primaryCurrency` immutable, invalidates `org:{id}:profile`) |
-| `/api/upload`        | Uploads from the **panel** (SESSION org): `GET /` (list), `DELETE /`, `PUT /direct`, `POST /presigned` with `requireOrgPermission(MEMBERS, CREATE)` + `GET /file?key=` (authenticated delivery of private assets, `MEMBERS.READ`). Keys `<orgId>/<folder>/…`; `organizationId` **does not exist** in the contract |
-| `/api/ai`            | `POST /chat` (SSE chat streaming: OpenAI SDK → fixed OpenRouter chain or Workers AI GLM, pre-generation RAG + `PANEL_SYSTEM_PROMPT`, `ai_chat` quota with RAG cap in pre-flight + `X-Ai-Credits-*` headers), `GET /models` (allowlist), `GET /usage` (AI quotas), `GET /conversations` + `PUT /conversations/:id` (upsert 1 conv, cap 10 msgs) + `DELETE /conversations/:id` (Redis) |
-
-> **AI Chat**: the provider is inferred from the model id (`getAiProvider` in `@workspace/shared`). Fixed OpenRouter model chain (`OPENROUTER_TEXT_MODEL_CHAIN`) with fallback to GLM in Workers AI. The first SSE event is `{"model": ...}` with the concrete model that responded. `OPENROUTER_API_KEY` optional; if missing and an OpenRouter model is requested → 503. 1 credit = 1K tokens ×1.0 (`AI_CREDIT_CONSTANTS`), limits `AI_CHAT_LIMITS`, monthly cycle per subscription, RAG with embeddings `@cf/baai/bge-m3` (see `vaults/ai/CHAT_PRICING.md` / `vaults/ai/CHAT_INFRASTRUCTURE.md`). |
-> | `/api/init` | Org bootstrap (no auth) |
-> | `/api/public` | `GET /pages/:slug` (public CMS, cache 15 min) · `GET /files/*` (R2) — no auth, **allowlist**: only `<orgId>/cms/…` and `platform/branding/…`; the rest 404 |
-> | `/api/platform/plans` | SaaS plan catalog (console) |
-> | `/api/platform/subscriptions` | SaaS subscriptions + invoices + `GET /stats` + `GET /revenue?months=12` (monthly UTC buckets, validated only, cache 1h) + `GET /receipts` (audit of the `FS-N` sequence: rows + summary + totals per currency + `gaps[]`, filters `from/to/status/method/year/page/limit` in UTC, cache 5 min, `subscription:list` — support reads) + `GET /by-organization/:orgId/invoices` (SaaS invoice history per org, cache 5 min) + `GET /payments/:id/receipt` (3-state contract, `subscription:list` — support reads) + `GET /payments/:id/receipt/pdf` (binary, `subscription:list`) + `POST /payments/:id/resend` (4 branches, `requirePlatformAuth` — support 403) |
-> | `/api/platform/organizations` | Platform org CRUD (console) + `GET /check-slug` (live availability, 409 `{ code: 'SLUG_TAKEN' }` if in use) + `GET /by-slug/:slug` (detail by slug, `?includeMemberCount=`) + `GET /:id/ai-usage` (cycle AI quota, cache 5 min, invalidated on grant) + `GET /:id/gym-overview` (gym adoption + portal seats, cache 5 min, staleness accepted: gym writes do not invalidate platform keys) |
-> | `/api/platform/settings` | Platform global settings |
-> | `/api/platform/staff` | Platform staff (console invites → enqueues `email.registration_invite`) |
-> | `/api/platform/upload` | Platform assets WITHOUT organization — `POST /presigned`, `PUT /direct`, `GET /` (list), `GET /file`, `DELETE /` — auth `requirePlatformAuth`, **fixed scope `platform/branding/`** (only public platform prefix) |
-> | `/api/platform/organizations/:id/upload` | Assets of ONE organization from the console: the org goes by **path** (never body/query) + `assertOrganizationExists` — `POST /presigned`, `PUT /direct`, `GET /` (list), `GET /file`, `DELETE /`; keys `<orgId>/…`, `requirePlatformAuth` |
-> | `/api/platform/features` | Feature catalog (`GET /`, cache `platform:features`) |
-> | `/api/platform/knowledge` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings, no Redis cache) — `GET /:id/content` (content only, no chunks, for editing without transferring embeddings) |
-> | `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
-> | `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
-
-> `/api/access-control/*` is **NOT mounted** in api-worker (Bridge paused — see section 4).
+Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`); toasts resolve by **code**, never text. Legacy `apps/api/lib/route-handler.ts` deprecated.
 
 ### 7. Error Handling & Mutations
 
-- **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
-- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `mutationError(scope, err, "<generic action message>")` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(...)`, e.g. "Could not save the plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
-- **Implementation Plans**: a plan is a **Linear issue**, written in **English** (see [Task Tracking (Linear)](#task-tracking-linear)); the chat response about it is in **Spanish**. Always ask for explicit approval before implementing.
+No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text. A requirement becomes a **Linear issue** (what & why); the **user approves it**; **`coder-expert` decides how** — no implementation plan in the issue; chat in **Spanish**.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
-**Native `fetch` is PROHIBITED.** All HTTP requests use **ofetch**:
-
-- **Fit-Stack API (api-worker)** → ALWAYS through each app's context-aware client:
-  - Console: `apps/console/lib/api/client.ts` (export `api`)
-  - Panel: `apps/panel/lib/api/client.ts` (exports `api` and `apiBlob`)
-  - The client adds `baseURL` (`${apiBaseUrl}/api`), **forwards cookies on server** (RSC), `credentials: "include"` on client, `retry`/`timeout`, and intercepts `ORGANIZATION_NOT_FOUND`.
-  - Server actions that invalidate cache (`updateTag`) + `router.refresh()` do NOT make HTTP requests — they combine with `api()` for the calls.
-- **External APIs** (e.g. exchange rates from open.er-api.com) → `ofetch` directly, WITHOUT going through the internal client (which must not send session or API baseURL). See `apps/{console,panel}/lib/api/exchange-rates.ts` with `next: { revalidate }` for Next cache.
-- `next/headers` (`cookies()`, `headers()`) is used only to read request context — never to make the HTTP request.
-
-**Frontend env vars** (`apps/{panel,console}/lib/config/envs.ts`, Zod-validated): `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` (required); `NEXT_PUBLIC_EXCHANGE_URL` (optional, read in `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
-
----
+**Native `fetch` is PROHIBITED**; use **ofetch** — Fit-Stack API always via each app's context-aware client (`apps/{console,panel}/lib/api/client.ts`: baseURL, cookie forwarding on server, `credentials:"include"`, intercepts `ORGANIZATION_NOT_FOUND`); external APIs via `ofetch` directly; `next/headers` only to read context. Env: `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_R2_URL` required; `NEXT_PUBLIC_EXCHANGE_URL` optional.
 
 ### 9. Date & Timezone Handling
 
-- **Single source of truth**: `packages/shared/src/date.ts` (exported by `@workspace/shared`), built on `date-fns` + `@date-fns/tz` (both purely functional, edge-safe). **NEVER** reintroduce manual date arithmetic (`Intl.DateTimeFormat("en-CA")`, `new Date().toISOString().slice(0,10)`, offsets with `padStart`, `setUTCMonth`, `Math.floor(ms / 86_400_000)`).
-- **Business rule**: a payment at 11pm in Venezuela must land on the **same local day**. To achieve this, the tz is ALWAYS resolved from the **session** (`session.activeOrganization.timezone`, cached 5 min in `org:{orgId}:profile`), **never** from a client query param (`?timezone=`).
-- **Timezone is REQUIRED**: no fallback `?? 'America/Caracas'`. If the org doesn't have one, it's an error.
-  - **API**: Composable middleware `requireOrgTimezone()` (`apps/api-worker/src/lib/route-handler.ts`) validates the org has a timezone (500 if missing) and injects it typed into `c.get('orgTimezone')!`. Used in `subscriptions`, `reports`, `plans`, `dashboard` and `payments`.
-  - **Services**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` require `timezone: string` **without default**.
-  - **Org creation (console → `/api/platform/organizations`)**: `timezone` is `required` in `createOrgSchema`, validated in `organizations.service.createOrganization`, and `required: true` in `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). The `organization.timezone` schema is `notNull` **without default** (DB).
-- **SQL vs JS**: **aggregation** by local day/month (reports, daily revenue) is done **in SQL** with `AT TIME ZONE`. The JS util resolves the **input** (local day boundaries as UTC `Date` for the `WHERE gte/lte`) and the **display**; it doesn't replace Postgres.
-- **UI** (panel/console): local "today" is obtained with `toLocalDayString(orgTimezone)`; parsing `'YYYY-MM-DD'` with `parseDateAsConfigTimezone(dateStr, tz)` (alias of `parseLocalToUtc`). Wall-clock helpers (`formatTime`/`formatTimeRange`) live in `apps/{panel,console}/lib/config/display.ts`, which re-exports the tz helpers from `@workspace/shared`.
-- **Platform (SaaS) billing operates in UTC**: it calls the shared `addDuration(…, 'UTC')` **explicitly** — never mixed with the org tz. The old `billing-utils.ts` UTC copy was deleted; `addDuration` now requires the tz (no silent `America/Caracas` fallback).
+SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.DateTimeFormat`, `toISOString().slice(0,10)`, etc.). tz ALWAYS from the **session** (`activeOrganization.timezone`), never a client param. **Timezone is REQUIRED** — no `?? 'America/Caracas'` (`requireOrgTimezone()`; services take `timezone` without default; column `notNull`). Aggregation by local day in **SQL** (`AT TIME ZONE`). SaaS billing in **UTC**. → [`vaults/business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md).
 
-### 10. Explicit Configuration Without Silent Fallbacks (Seeding)
+### 10. Explicit Configuration Without Silent Fallbacks
 
-- **Golden rule**: NEVER invent silent fallbacks in frontend or backend code (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`). If a configuration is missing, it must be a visible error, not silently assumed behavior.
-- **Taxonomy**: **required** are `NOT NULL` columns without default in `organization` (`timezone`, `countryCode`, `primaryCurrency`, `currencyFormat`) — a single `insert` at creation, impossible to miss. **Extensible** lives in KV (`gym_setting`: `active_currencies`, `active_payment_methods`, `brand_*`) with the only allowed fallback `[]`/safe parse. Guards over **data** (`currencyPaid`, `planCurrency` in UI) are not config and stay, documented.
-- **Org creation** (`organizations.service.createOrganization`): derives `primaryCurrency = COUNTRIES[countryCode].currency`, accepts explicit `currencyFormat` (`'latam'` is the **write** default) + `settings` override (`{ ...buildDefaultOrgSettings(cc), ...settings }`); seeds only extensible stuff. Changing `countryCode` recalculates the primary. `POST /api/settings` rejects `primary_currency`/`currency_format` (400).
-- **User creation** (the 3 flows: `POST /api/members`, `POST /platform/organizations/:id/staff`, `POST /platform/staff`): no `.default()` in zod — defaults in `@workspace/shared/defaults.ts` (`DEFAULT_MEMBER_VALUES`, `DEFAULT_ORG_STAFF_VALUES`, `DEFAULT_PLATFORM_STAFF_VALUES`) resolved with spread in route/service.
-- **Platform seeding (`platform_setting`)**: unchanged (KV singleton, seeded in `/api/init` via `DEFAULT_PLATFORM_SETTINGS`).
-- **UI reads**: currency/format are read from the org (`session.activeOrganization` / `useAuth().activeOrganization`), never from settings. The panel Currencies page only edits `active_currencies` (primary readonly); the format is edited in Location Settings.
+**NEVER** invent silent fallbacks (`|| "USD"`, `|| "latam"`, `|| "openrouter"`); missing config = visible error. Required (no default): `timezone`/`countryCode`/`primaryCurrency`/`currencyFormat`; extensible → KV `gym_setting` (only fallback `[]`). Org creation derives currency; `POST /api/settings` rejects primary/format (400); no zod `.default()` (defaults in `@workspace/shared/defaults.ts`); UI reads currency/format from the org.
 
 ### 11. Money Convention (integer cents)
 
-- **Golden rule**: ALL money travels and stores as **integer cents** — DB (`bigint`), API contracts (`z.number().int()`), services, tests, seeds, E2E fixtures. `exchangeRateApplied` is a rate, not money — it stays `numeric(10,4)`.
-- **Display**: ONLY via `formatCents(cents, currency, format)` from `@workspace/shared` (single source; `ValueConverter` lives there too). Inline `/ 100` for money display is PROHIBITED.
-- **Unit inputs** (forms editing "50.00"): convert at the boundary with `centsToUnits` / `unitsToCents` from `@workspace/shared`. Fiscal math (`tax-math`, `receipt-data`) operates in integer cents and rounds with `roundCents` — the only place that rounds money.
-
----
-
-## File Storage (R2)
-
-Single bucket (`FILES_BUCKET`) with **prefix taxonomy**: the first segment of the key is the organization.
-
-| Key | Write | Read |
-| --- | --- | --- |
-| `<orgId>/cms/…` | panel (CMS) | **public** (`/api/public/files/*`): it is the site |
-| `<orgId>/<folder>/…` (`general`, `members`, `staff`, `trainers`, `receipts`…) | panel / console | **private**: `/api/upload/file` (panel) · `/api/platform/organizations/:orgId/upload/file` (console) |
-| `platform/branding/…` | console | **public** (login and emails, without session) |
-| `receipts/<org>/<año>/<n>.pdf` · `platform/receipts/<año>/FS-<n>.pdf` | only the renderer (`putFile`) | authenticated receipt routes |
-
-- **Golden rule**: every org-scoped key starts with `<orgId>/` and every write/delete validates that prefix against the organization **resolved on the server** (session in the panel, path in the console). The client never chooses the folder's organization.
-- **Sanitized folder**: `safeFolderSegment` (`slugify`) neutralizes `../` and separators, and the extension is cleaned (`getFileExtension`). No client folder can escape the scope.
-- **Public by design** = `isPublicStorageKey` (`@workspace/shared`, consumed by the public route and by panel/console `getMediaUrl`). No invented exceptions: if an asset must be visible on the public site, it goes in `cms`.
-- **Private assets in the UI**: `getMediaUrl` returns the public URL for public keys and `/api/media?key=…` for private ones (authenticated Next proxy that forwards the cookie to the API). Never an R2 URL guessable from the browser.
-- **Structural immutability**: issued receipts live in a namespace that no upload route can reach, and SaaS branding (`platform/receipts/…`) is not reachable from `/api/platform/upload` (fixed scope `platform/branding/`).
-
----
-
-## Redis Caching (Upstash)
-
-The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compatible caching.
-
-### Setup
-
-- **Wrapper**: `apps/api-worker/src/lib/cache.ts` — `createCache(env)` with error handling; Redis being down never blocks requests (graceful degradation).
-- **Env vars**: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (both optional)
-
-### Cache Methods
-
-| Method            | Signature                      | Description                                         |
-| ----------------- | ------------------------------ | --------------------------------------------------- |
-| `get`             | `get<T>(key: string)`          | Fetch cached value by key                           |
-| `set`             | `set(key, data, ttlSeconds?)`  | Store value with optional TTL (default 5 min)       |
-| `invalidate`      | `invalidate(pattern: string)`  | Delete all keys matching a glob pattern (uses SCAN) |
-| `invalidateExact` | `invalidateExact(key: string)` | Delete a single key                                 |
-
-### Cache Key Conventions
-
-| Pattern                                    | TTL    | Used For                                                                                          |
-| ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------- |
-| `org:${orgId}:settings`                    | 1 h    | Organization settings (invalidated on-write in POST /api/settings)                                |
-| `org:${orgId}:profile`                     | 5 min  | Active org profile in custom session (branding/theme/timezone)                                    |
-| `org:${orgId}:plans:*`                     | 1 h    | Membership plans (invalidated on-write in POST/PUT/DELETE /api/plans)                             |
-| `org:${orgId}:classes:*`                   | 5 min  | Classes                                                                                           |
-| `org:${orgId}:members:*`                   | 5 min  | Gym members                                                                                       |
-| `org:${orgId}:members:stats`                | 5 min  | Member KPIs (`GET /api/members/stats`; cross-invalidated on subscription/payment writes because `withoutActiveSubscription` depends on subs/payments) |
-| `org:${orgId}:subscriptions`               | 5 min  | Member subscriptions                                                                              |
-| `org:${orgId}:dashboard:stats:*`           | 5 min  | Dashboard KPIs                                                                                    |
-| `org:${orgId}:dashboard:action-items`      | 5 min  | Dashboard actionable lists (expiring soon / recently expired)                                     |
-| `org:${orgId}:coaches:*`                   | 5 min  | Coaches/trainers                                                                                  |
-| `org:${orgId}:cms:*`                       | 5 min  | CMS invalidation (reads are not cached)                                                           |
-| `org:${orgId}:public:page:*`               | 15 min | Public page slugs (web)                                                                           |
-| `org:${orgId}:subscription-status`         | 1 min  | Org billing status                                                                                |
-| `org:${orgId}:subscription`                | 1 min  | Org SaaS sub with plan details (self-service renewal)                                             |
-| `org:${orgId}:payment-methods`             | 1 h    | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
-| `rates:${base}`                            | 1 hr   | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`)  |
-| `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
-| `org:${orgId}:reports:revenue:12m`         | 1 hr   | Monthly revenue reports                                                                           |
-| `org:${orgId}:reports:receipts:*`          | 5 min  | Receipts audit report (invalidated on-write in issue/status/subscription writes)                  |
-| `member:role:${userId}:${orgId}`           | 1 min  | Cached Better Auth member role (custom session)                                                   |
-| `platform:settings`                        | 1 h    | SaaS-level global settings (invalidated on-write in POST /api/platform/settings)                  |
-| `platform:features`                        | 10 min | Feature catalog (console)                                                                         |
-| `platform:organizations*`                  | 5 min  | Organization list (SaaS admin)                                                                    |
-| `platform:plans*`                          | 1 h    | Platform plan catalog (invalidated on-write in /api/platform/plans)                               |
-| `platform:subscriptions*`                  | 5 min  | SaaS subscriptions                                                                                |
-| `platform:subscriptions:stats`             | 5 min  | Subscription KPI stats                                                                            |
-| `platform:subscriptions:revenue:{months}m` | 1 h    | Monthly SaaS revenue series (invalidated on-write via `platform:subscriptions*`)                   |
-| `platform:ai-usage:{orgId}`                | 5 min  | AI quota per org (invalidated in `POST /:id/ai-credits`)                                           |
-| `platform:subscriptions:invoices:{orgId}`  | 5 min  | SaaS invoices per org (invalidated on-write via `platform:subscriptions*`)                         |
-| `platform:gym-overview:{orgId}`            | 5 min  | Gym adoption + portal per org (no cross-invalidation from gym writes)                     |
-| `platform:receipts:*`                      | 5 min  | Audit of the `FS-N` sequence (Console); key by filters, invalidated on-write on any subscription/payment write (issuance/voiding) |
-| `platform:staff*`                          | 5 min  | Platform staff (SaaS admins: support/admin/owner)                                                 |
-
-### Cache Invalidation Strategy
-
-- **On writes (POST/PUT/DELETE)**: Invalidate related cache patterns immediately — e.g., creating a subscription invalidates `platform:subscriptions*`, `platform:subscriptions:stats`, and `org:${orgId}:subscription-status`. Low-frequency data (plans, settings, payment-methods) uses 1 h TTL as a safety net: real invalidation is always on-write.
-- **Dashboard invalidations**: member/subscription/payment writes invalidate `org:{orgId}:dashboard:stats:*` and `org:{orgId}:dashboard:action-items` (KPIs and actionable lists).
-- **Role invalidation**: `afterUpdateMemberRole` hook in Better Auth invalidates `member:role:${userId}:${orgId}` so role changes take effect instantly
-- **Graceful degradation**: All cache methods wrap errors with `console.error` and return `null`/void — Redis being down never blocks requests
-
----
-
-## Background Jobs (Cloudflare Queues)
-
-Emails and PDF generation are processed **asynchronously** via Cloudflare Queues: the `api-worker` produces events in the `TASK_QUEUE` binding (`fit-task-events`, DLQ `fit-task-events-dlq`) and `apps/jobs-worker` consumes them.
-
-**Event contract** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
-
-| Type                         | Payload                                                  | Producer                                                                                                                                                                                                   |
-| ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `email.registration_invite`  | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations)                                                                                                 |
-| `email.org_invite`           | `{ email, orgName, inviterName, inviteLink }`            | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account)                                                                                                                  |
-| `email.payment_receipt`      | `{ paymentId, organizationId }`                          | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal, processing, payer+owners) + step 2 platform (PDF ready, payer from DB or owners-only) + manual resend |
-
-**Handlers** (`apps/jobs-worker/src/handlers/`):
-
-- `email.handler.ts` — email TRANSPORT ONLY (**Resend** with `EMAIL_PROVIDER=resend` or **Gmail SMTP** with `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); the HTML is composed by the templates.
-- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation).
-
-**Templates** (`apps/jobs-worker/src/templates/`) — the HTML lives here, never in the handlers:
-
-- `layout.ts` — base shells: `renderDarkShell` (invitations, dark background) and `renderLightShell` (receipts, yellow-receipt style) + `escapeHtml`.
-- `send-invitation.ts`, `org-invite.ts`, `payment-receipt.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
-
-**Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
-
-> **Rule**: never couple api-worker to synchronous email/PDF sends — always enqueue in `TASK_QUEUE` and let jobs-worker process it.
-
-> **Receipts queue (`fit-receipt-events`)**: dedicated queue, own DLQ, **single consumer = jobs-worker**. `api-worker` is only a producer (step 1 + manual issue + re-enqueues); jobs-worker consumes **two** queues (`fit-task-events` emails + `fit-receipt-events` render) and branches `queue()` by `batch.queue`. Consumers are declared in **both** `workers.tf` (`cloudflare_queue_consumer` ×2) and `apps/jobs-worker/wrangler.jsonc` (root + each env) with **identical settings**: `wrangler deploy` upserts the consumer on every deploy, so the numbers are the contract, not the ownership — `pnpm check:infra-parity` compares both sides (`max_batch_timeout` in seconds == `max_wait_time_ms` in milliseconds). The cron is Terraform-only (`cloudflare_workers_cron_trigger`); `wrangler.jsonc` declares no `triggers`. Sweep cron runs **every 10 hours in pre-sale** (`0 */10 * * *`; revert to `*/10 * * * *` with real customers — see `vaults/backlog/comprobantes.md`). The render lives in `apps/jobs-worker/src/receipt-pdf.ts` (lazy `pdf-lib`, workerd-safe, no WASM) — **api-worker must never depend on `pdf-lib`**. Shared receipt data access lives in `packages/database/src/repositories/receipts.repository.ts` (see §1 exception): atomic numbering + `getReceiptComposedData` + `completeReceiptPdf`/`markReceiptNotified`. The receipt email is gated by `markReceiptNotified` (with `clearReceiptNotified` rollback on send failure) so a transient queue error never loses the email — and that gate is exactly why the sweep can safely re-enqueue both pending states (C6).
-
----
-
-## Payment Receipts (Panel + Console)
-
-Panel receipts are internal payment records — never fiscal invoices (see `vaults/business/ORGANIZATION_RECEIPT_MODEL.md`). Source of truth for the frozen contract of the unified engine: the Linear document **"Receipt engine — frozen contract"** attached to the project Fit Stack, plus issues RD-91 (origin of the model), RD-94 (server-owned period + compensation) and the unification chain RD-99 → RD-101/RD-102/RD-100 → RD-98 → RD-97.
-
-- **Two-step emission**: step 1 assigns the number atomically (single `INSERT … ON CONFLICT DO UPDATE … RETURNING`, per-org yearly sequence `{slug}-año-n`) in the validating request; step 2 renders the PDF in `jobs-worker` (`fit-receipt-events` queue + DLQ, sweep cron 10 h pre-sale) and `PUT`s it to R2 (`receipts/<org>/<año>/<n>.pdf`, immutable, generated once).
-- **Email only from step 2**, after `UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` (`rowCount === 1` gate); `markReceiptNotified` with `clearReceiptNotified` rollback on send failure.
-- **Sweep covers three states (C6 + B2)** (`sweepPendingReceiptPdfs`, `jobs-worker`): *numbered without PDF* (≥15 min — the render was lost), *PDF ready but unnotified* (≥30 min — the step-2 email never left) **and** *voided without the sealed PDF* (≥15 min — the void was persisted but the ANULADO render never landed). All three are safe to re-enqueue because each artifact has its own idempotent gate; a corrupt row never aborts the rest.
-- **Explicit void outcome (C6)**: `markReceiptVoided` throws `RECEIPT_NOT_ISSUED` as an **internal service contract**, but `PATCH /api/payments/:id/status` (and its Console twin) answers **200** with `receiptVoided: boolean` + `receiptVoidReason: 'not_issued'` when there was no receipt to void — the status change is never reverted and the panel/console show a differentiated toast. Never text-match; the code is the contract.
-- **ANULADO is an artifact, not just a flag (B2)**: voiding keeps the emission PDF **intact** (write-once) and materializes a **new** one with the seal (`<numero>-anulado.pdf`, `receipt_voided_pdf_key` column). The original **stops being delivered** as soon as `receipt_voided` is true: until the sealed PDF exists, the contract responds `pending` (202 + `/receipt/pdf` 404) — *fail-closed*: a voided receipt never travels without its seal. Voiding enqueues the render (step 1-bis) and the sweep's third predicate is the backstop. It is not re-sent by email either: **409 `RECEIPT_VOIDED`** (the email would go out with the unsealed PDF), although an event already in flight is also discarded in the handler.
-- **Contract**: `GET /:id/receipt` → 200 ready / 202 pending / 200 `available:false,reason:pre_system` (never 409); `GET /:id/receipt/pdf` binary download; `POST /:id/issue` manual fallback (owner/manager).
-- **Validated ⇔ numbered invariant (B1)**: issuance is decided by the **persisted** state (`createdPayment.status`), never by the payload — `payment.status` is optional in the contract and the repo normalizes it to `validated`, so deciding by the payload left a validated payment **without** a number, without render and without email (and the PATCH to `validated` does not repair it: `wasPending` is already false; only `POST /:id/issue` does).
-- **Document gate** forces `"Comprobante de pago"` (`HAS_FISCAL_HOMOLOGATION=false` by construction); the technical UUID is never shown (only `receiptNumber`); voided = `ANULADO`, the number is never released or reused; serial audit at `GET /api/reports/receipts` (rows + per-currency totals + `gaps[]` = `1..lastNumber` per org/year).
-- **Fiscal gating (C2, fail-closed)**: a receipt **never details taxes the emitter did not declare**. Without `fiscalConfig.isFormalTaxpayer: true` (declared with `confirmed: true` friction) the country taxes are born **off** and the receipt persists only the total (`subtotal = amountPaid`, `taxTotal = 0`, `taxDetails = []`). Enabling a tax without the declaration → **400 `TAXES_REQUIRE_FORMAL_TAXPAYER`**; conditional taxes (`basis: 'gross_first'`, e.g. IGTF VE) are born off, are never automatic, and require an explicit rate + `confirmedTaxes: ['IGTF']` → **400 `TAX_REQUIRES_CONFIRMATION`**. Validated on the **merged** config (not the incoming body) in `organizations.service` + defensive normalization in `resolveFiscalProfile`. The manual payment override can only **reduce** tax load: detailing taxes while informal → 400. `gross_first` taxes are extracted from the gross total **before** decomposing the rest (it changes the IVA base — the UI warns). Panel: `settings/organization` → Billing; the platform emitter (FitStack) is **not** declared formal, so SaaS `FS-N` receipts also carry no breakdown (see `vaults/backlog/fiscal.md`).
-- **Document fidelity (C3)**: the PDF/contract **omit** lines without data (tax id, address, recipient document) — never filled with placeholders (`---`); `checklistPrePdf` rejects a visible placeholder (omitting is the correct path). The UUID scan inside that checklist covers **system-generated fields only** (document number/label, emitter, recipient, plan and method names): the operator's free-text details (`method.maskedDetails`) are deliberately **not** scanned, because judging operator input is write-side validation's job (`paymentMethodSchema`) — a bank reference shaped like a UUID must not strand the receipt without a PDF or an email. Do not re-add it. If `currencyPaid ≠ baseCurrency` it prints `1 {base} = {rate} {paid}` **plus** the base-currency equivalent (`amounts.baseTotal`, derived with `roundCents` from the **persisted** rate — never from an exchange API).
-- **Emitter snapshot (C1)**: step 1 persists `emitterSnapshot` (jsonb) **in the same statement as the number** — `version`, frozen `emitter` (name/legalName/taxId/taxLabel/address/countryCode/currency), the label applied by the gate, the recipient `docLabel`, the `disclaimer`, the `timezone` used to print dates and the resolved fiscal profile (`taxes[]` = name/rate/enabled). The compose reads the snapshot **first and skips live config entirely** (`resolveFiscalProfile` is not even evaluated), so `GET /:id/receipt` is reproducible after the emitter edits its profile. `NULL` = emitted before C1 → composed live (terminal, documented state); a present-but-invalid snapshot **throws** (never silently degrades).
-- **Emission traceability (C5)**: `issuedBy` (actor of the numbering request) travels from the session (`c.get('user')?.id`) through `subscriptions.service` / `payments.route` / `platform-subscriptions.*` into `attach*Receipt`. Step 2 and the sweep never number, so they never write it: an existing `issued_by` is never overwritten or invented (`NULL` = historical/automatic emission). Both reports expose `issuedBy` + `emitterName` (from the snapshot) and the CSV export includes them.
-- Shared-repo exception (§1): `packages/database/src/repositories/receipts.repository.ts` + `platform-receipts.repository.ts` — the only shared repos (two runtimes need identical SQL each).
-
-> Columns (C1/C5): `payment.emitter_snapshot` / `payment.issued_by` and their twins on `platform_subscription_payment` — migration `0016`, additive nullable, no backfill (`NULL` = pre-C1 emission).
-
-> Columns (B2): `receipt_voided_pdf_key` on `payment` and `platform_subscription_payment` + `idx_payment_voided_pending` / `idx_psp_voided_pending` (partial indexes of the 3rd predicate) and the gym `payment.plan_snapshot_duration_value` / `plan_snapshot_duration_unit` — migration `0018`, additive nullable, no backfill (`NULL` = voided before B2 → the sweep recovers it; duration without snapshot → the calculation falls back to the live plan).
-
-> Payment-status migration (`0017`, additive/backward-compatible): sets `platform_subscription_payment.status` default to `'processing'` and normalizes legacy data (`pending → processing`, `invalid → voided`, marking `receipt_voided`/`voided_at`/`void_reason` when a receipt existed). Applied by CI (`database-migrations.yml`) on merge. After merge, no row may carry `pending`/`invalid`.
-
-> Column `0019` (RD-94, additive nullable, no backfill): `subscription.end_date_override_reason` (motivo exigido al acortar un periodo vigente, `NULL` en el resto de casos). Pendiente de aplicar — se aplica por CI (`database-migrations.yml`) al hacer merge; no correr `db:migrate` manual. Solo añade una columna: el conteo de tablas sigue en **33**.
-
-**Console (SaaS) receipts** mirror the same guarantees with one legal emitter (FitStack):
-- Global continuous sequence `FS-N` (no year reset) + same two steps on the same `fit-receipt-events` queue (`scope:'platform'`); R2 keys `platform/receipts/<año-UTC>/FS-<n>.pdf`; sweep covers both tables.
-- Same 3-state contract at `GET /api/platform/subscriptions/payments/:id/receipt` (+ `/receipt/pdf` binary, `POST /resend` with the 4 frozen branches); reads allow `subscription:list` (support downloads), writes require `organization:create` (support 403).
-- Trial/free $0 never burn the series (`available:false,reason:pre_system`); payer persisted only at `processing` creation, validation never overwrites; year/period in UTC (platform billing convention).
-- Voided SaaS payments keep number + PDF and set the ANULADO flag (`markPlatformReceiptVoided` on status →VOIDED, fixed reason, `by` required fail-closed); without a number the service code is `RECEIPT_NOT_ISSUED` but the endpoint answers **200** with `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6); voiding never cancels the subscription nor reverts the cumulative period; `refunded` (reserved, no flow produces it) doesn't touch the flag and `voided` is the only annulment state (`rejected`/`annulled` is derived with `getVoidKind`). Same B2 rule as the Panel: the ANULADO PDF is a separate artifact (`platform/receipts/<año-UTC>/FS-<n>-anulado.pdf`), the emission PDF stops being delivered while it is missing and `POST /resend` answers **409 `RECEIPT_VOIDED`**.
-- Emitter identity in `platform_setting` (`fitstack_*`, console Settings → Emitter); empty = generic "FitStack" + gate Payment receipt.
-- **Audit parity (C4)**: the audit of the global series lives at `GET /api/platform/subscriptions/receipts` + `/subscriptions/receipts` (console page with URL filters + CSV export up to 1000 rows), mirroring the Panel. Same `computeReceiptGaps` algorithm with an **injected strategy** (Panel: `{slug}-{año}-{seq}` annual; Console: `FS-{seq}` continuous, no year) → `gaps[]` classifies `hueco` vs `anulado` identically on both sides. Console filters run in **UTC** (platform billing convention); `year` there means the UTC year of `payment_date`, not a sequence universe. `support` reads (200); writes stay 403.
-
----
-
-## Platform Subscription Status (Organization Billing)
-
-Subscription status is **computed dynamically** via SQL CASE — NOT stored in DB.
-
-**Constants** (`@workspace/shared/constants`):
-
-```ts
-PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active", // periodEnd >= now and EXISTS(validated|refunded)
-  TRIAL: "trial", // isTrial && periodEnd >= now
-  PAST_DUE: "past_due", // 1-7 days overdue
-  READ_ONLY: "read_only", // 8-14 days overdue
-  SUSPENDED: "suspended", // 15+ days overdue
-  CANCELLED: "cancelled", // cancelledAt != null
-};
-```
-
-The payment enum (`PAYMENT_STATUSES = processing | validated | voided | refunded`) and its derived helpers live in `@workspace/shared/constants`: `QUALIFYING_PAYMENT_STATUSES` (`validated | refunded`) and `getVoidKind` (`voided` without `receiptNumber` → `rejected`; with → `annulled`). `pending` and `invalid` no longer exist.
-
-**Computation** (`platform-subscriptions.repository.ts` — SQL CASE, order matters; pure mirror `computePlatformSubscriptionStatus`, parity-tested):
-
-- `cancelledAt IS NOT NULL` → `cancelled`
-- `isTrial = true` and active period → `trial`
-- Active period + **`EXISTS(validated|refunded)`** (`QUALIFYING_PAYMENT_STATUSES`, never "the last payment") → `active`
-- Active period without a qualifying payment (`processing`/`voided`/none) → `past_due`
-- Grace from `currentPeriodEnd` (using `FLOOR` to match the pure helper): overdue ≤ 7 days → `past_due`; ≤ 14 → `read_only`; > 14 → `suspended`
-
-`computePlatformSubscriptionStatus` (pure mirror) now requires **`hasValidatedPayment: boolean`** (no longer optional). The SQL and the helper are parity-tested (`platform-subscription-status.test.ts`).
-
-A `voided` payment is **ignored**: it never revokes service; grace runs from `currentPeriodEnd` and the tiers do **not** accumulate. `processing` does not qualify either. `getLastSubscriptionStatus(organizationId)` exposes this same status + `hasValidatedPayment` for the self-service renewal guard, which blocks a re-payment **only if `currentPeriodEnd > now && hasValidatedPayment`** (a client whose only payment was voided can pay again). When the status does not grant access, the free-tier gate decides (`features.service.ts`): if `feature_flags_free_tier_enabled === 'true'` the free floor applies; otherwise the legacy gate sends the panel to `/no-subscription` (see "Features & Free Tier").
-
-> Careful: the gym `subscription` table (`subscriptions.repository.ts`) has its own derived status (`getSubscriptionStatusSql`): a `voided` payment → **`voided` (ANULADA)** and it wins over `cancelledAt`; `cancelledAt` alone → `cancelled` (revoked); `endDate < now` → `expired`. `cancelledAt` remains the internal "out of force" flag used by reports/actives. This is **not** the `platform_subscription` rule.
-
-**Validation flow** (`apps/panel/app/(protected)/layout.tsx`):
-
-- `SUSPENDED` / `CANCELLED` → redirect to `/no-subscription`
-- `PAST_DUE` / `READ_ONLY` → show `<SubscriptionWarningBanner />`
-- `ACTIVE` / `TRIAL` → normal render
-
-**Endpoint**: `GET /api/organizations/subscription-status` (reads org from session) — fetch wrapped in `getOrgSubscriptionStatus(activeOrgId)` (`apps/panel/lib/services/subscription-status.ts`), used by the layout and by the gate page.
-
-**Dynamic gate pages** (`/no-subscription`, `/unauthorized` in panel and console) — Server Components with `force-dynamic` that check the session on every request: no session → `redirect('/login')`; valid access (active subscription or allowed role) → `redirect('/dashboard')`; only without access they render. Prevents getting stuck after logout or refresh.
-
-- **Note**: The `/no-subscription` page is OUTSIDE the `(protected)` layout to prevent infinite redirect loops.
-
-### Self-service renewal (phase 2 — org pays from the panel)
-
-Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → support approves/rejects it in console (badge "Pending payment" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VIEW SCREENSHOT" links to R2) → once validated, the period is extended automatically.
-
-- **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
-  - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.
-  - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override for tests). `rate = 1` if currency == plan currency; provider failure → 503.
-  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
-  - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
-  - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).
-  - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
-- **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
-- **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).
-
----
-
-## Features & Free Tier (SaaS Plan Feature-Flags)
-
-Platform SaaS plans are described with **features (feature-flags)** instead of loose booleans. Single source of truth in code: `packages/shared/src/features/catalog.ts` (re-exported by `@workspace/shared`).
-
-### Catalog (`FEATURE_CATALOG`, version `FEATURE_CATALOG_VERSION`)
-
-| Feature          | kind    | Limits               | Notes                                  |
-| ---------------- | ------- | -------------------- | -------------------------------------- |
-| `panel`          | boolean | —                    | `alwaysOn` (cannot be disabled)        |
-| `cms`            | boolean | —                    | Content/pages                          |
-| `blog`           | boolean | —                    | Blog                                   |
-| `members_portal` | boolean | `member_seats`       | Member Portal (seats)                  |
-| `ai_chat`        | boolean | `ai_credits_monthly` | AI Chat (credits/month; 0 = unlimited) |
-
-Extension rules: every new feature is born `defaultEnabled: false` (additive); `normalizeFeatures` ignores unknown IDs and sanitizes types (numeric limits, 0 = unlimited); `resolveFeatures(null)` → catalog defaults.
-
-### Free Tier (free floor)
-
-- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
-- **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
-- **Resolution rule** (`features.service.ts → getOrgFeatures`):
-  - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).
-  - Sub `PAST_DUE`/`READ_ONLY`/`SUSPENDED`/`CANCELLED` **or no sub** + free tier **enabled** (`enabled === 'true'`) → free floor (`isFreeTier: true`).
-  - No free tier enabled → legacy behavior (`past_due`/`read_only` banner, `suspended`/`cancelled` blocking).
-
-### Enforcement (downgrade = hide)
-
-- **Middleware** `requireFeature(featureId)` in `apps/api-worker/src/lib/route-handler.ts` → 403 `{ code: 'FEATURE_NOT_AVAILABLE' }` if the feature is not enabled. Applied after `requireOrgPermission`.
-- **Gated routes**: `/api/cms/*` → `cms`; `/api/ai/chat` → `ai_chat` (plus monthly credit quota, see below).
-- **Portal seats** (`members_portal.member_seats`): `GET /api/organizations/seats` → `{ used, limit, pending }` (used = active gym_members with `userId`; pending = Better Auth `pending` invitations). Guard in `members.route.ts` (POST `/api/members` with `sendInvite` and role `member`, and in `link-user`) → 403 `FEATURE_LIMIT_REACHED` if `limit > 0` and `used + pending >= limit`. `limit 0` = unlimited.
-- **Frontend**: `OrgFeaturesProvider` + `filterNavItemsByFeatures` hide sidebar items; guards in `/dashboard/content` and `/dashboard/chat`; `ai-quota-banner` and `portal-seats-banner`.
-
-### AI Credits (`ai_chat`)
-
-- **Unit**: 1 credit = 1K tokens (x1.0, see `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Default provider in `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, automatic fallback to the other). Docs: `vaults/ai/CHAT_PRICING.md`, `vaults/ai/CHAT_INFRASTRUCTURE.md`.
-- **Limits**: `ai_chat.limits.ai_credits_monthly` per plan (configurable in admins, not hardcoded) + free tier `FREE_TIER_FEATURES` (500/month). Catalog in `shared/features/catalog.ts`.
-- **Balance limits**: `AI_CHAT_LIMITS` in `shared/ai.ts` (`maxUserMessageChars: 500`, `maxHistoryMessageChars: 2_000`, `maxInputChars: 8_000`, `maxOutputTokens: 800` normal / `maxToolOutputTokens: 2_048` for tool, `maxHistoryMessages: 10`). Zod and `ai.service` clamp `max_tokens`. The system prompt is composed server-side — the client never sends role `system`.
-- **Source of truth**: `ai_usage` table — row per `(organization_id, period_type='monthly', periodStart)` with `credits`, atomic upsert. `periodStart` = subscription cycle if ACTIVE/TRIAL, otherwise calendar day 1 (lazy reset, no cron). Index `idx_ai_usage_org_period`.
-- **Accounting**: `consumeAiCredits(estimated)` (pre-flight) + `settleAiCredits(actual)` post-stream via `ctx.waitUntil` (DB is source of truth). Compat `consumeAiMessage` (3 credits) for tests. `cache.increment` exists but is unused.
-- **RAG (Knowledge Base)**: automatic retrieval pre-generation in `/api/ai/chat`. Config in `RAG_CONFIG` (`shared/ai.ts`: topK 4, minSimilarity 0.35, chunkSizeChars 800, overlap 100, maxContextChars 2_000). Embeddings ALWAYS Workers AI `@cf/baai/bge-m3` (1024 dims, multilingual) via `aiService.embed()` — independent of the chat provider. System prompt = `PANEL_SYSTEM_PROMPT` (`shared/prompts.ts`) + `[Contexto]` block; RAG failure never breaks chat. KB admin: Console → Settings → Knowledge Base (`/api/platform/knowledge`, tables `ai_knowledge_document`/`ai_knowledge_chunk`, pgvector HNSW; `organization_id NULL` = platform, set = org doc with isolation in SQL). Phase 2: panel org-KB + function calling (live data).
-- `GET /api/ai/usage` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `POST /api/ai/chat` estimates credits (+ chars of the composed prompt + `RAG_CONFIG.maxContextChars` cap), validates balance, does openrouter→glm fallback and settles `creditsFromUsage(usage)`; headers `X-Ai-Credits-Used/Limit/Remaining`; if exhausted → 429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`. `limit 0` = unlimited.
-
-### Feature snapshot in payments
-
-Every platform payment (`platform_subscription_payment`) stores `features_snapshot` (JSON of `PlanFeaturesV2`) when creating a subscription, renewing, changing plan and recording payment — to compare "features at payment time" vs "plan today" (`summarizeFeatures` in console). Cache invalidation: `org:${orgId}:features` on subscription, plan and platform settings writes.
-
-### Endpoints
-
-| Endpoint                          | Auth                  | Use                                                       |
-| --------------------------------- | --------------------- | --------------------------------------------------------- |
-| `GET /api/platform/features`      | `requirePlatformAuth` | Catalog (console)                                         |
-| `/api/platform/knowledge`         | `requirePlatformAuth` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
-| `GET /api/organizations/features` | `requireAuth`         | Resolved features + `isFreeTier` + status (panel gate)    |
-| `GET /api/organizations/seats`    | `requireAuth`         | Portal seats                                              |
-| `GET /api/ai/usage`               | `requireAuth`         | AI quotas                                                 |
-
----
-
-## Role-Based Access Control (RBAC)
-
-Fit-Stack uses **two levels of roles**: Platform (SaaS) and Organization (tenant).
-
-### Platform Roles
-
-Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared/src/access-control.ts`): `owner`, `admin`, `support` (+ `user` as Better Auth default, no role in `platformRoles`). The `user.role` field stores this platform role.
-
-**Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` only for roles with `organization.create` (admin/owner); `support` is read-only and doesn't enter the console layout.
-
-### Organization Roles
-
-```ts
-ORG_ROLES = {
-  OWNER: "owner", // Super Admin / Creator — total control
-  MANAGER: "manager", // Gym Owner/Manager — full tenant control
-  CASHIER: "cashier", // Staff/Cashier — payments and check-ins
-  COACH: "coach", // Trainer — routines and athlete progress
-  MEMBER: "member", // Gym client — app access to their own data
-};
-```
-
-### Permission Matrix
-
-**Source of truth**: `packages/shared/src/access-control.ts` — `organizationStatement` + `organizationAc.newRole(...)` (Better Auth Access Control). Helpers in `packages/shared/src/permissions/` expose the matrix through `can(role, module, action)`.
-
-| Module            |  Owner  |    Manager     |    Cashier     |         Coach         | Member  |
-| ----------------- | :-----: | :------------: | :------------: | :-------------------: | :-----: |
-| **Panel**         |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
-| **Dashboard**     |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
-| **Reports**       |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
-| **Members**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
-| **Staff**         | ✅ CRUD | ✅ (no delete) |       ❌       |          ❌           |   ❌    |
-| **Subscriptions** | ✅ (no delete) | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
-| **Plans**         | ✅ CRUD | ✅ (no delete) |    ✅ read     |        ✅ read        | ✅ read |
-| **Classes**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
-| **Content**       | ✅ CRUD | ✅ (no delete) |       ❌       |        ✅ read        | ✅ read |
-| **Settings**      | ✅ r+w  |     ✅ r+w     |    ✅ read     |          ❌           |   ❌    |
-| **Organization**  | ✅ r+w  |     ✅ r+w     |       ❌       |          ❌           |   ❌    |
-| **AI (Chat)**     | ✅ read |    ✅ read     |    ✅ read     |          ❌           |   ❌    |
-
-### How to Verify Permissions
-
-**In API routes (api-worker)**: Use `requireOrgPermission` / `requirePlatformPermission` middleware from `apps/api-worker/src/lib/route-handler.ts`
-
-```ts
-import { requireOrgPermission } from '../lib/route-handler'
-import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
-
-.get('/', requireOrgPermission(PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ), async (c) => { ... })
-```
-
-**In UI (client-side)**: Use `useAuth()` and `usePermissions()` from `@workspace/auth/hooks`
-
-```tsx
-import { useAuth, usePermissions } from "@workspace/auth/hooks";
-const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth();
-const { can } = usePermissions();
-const canEditClasses = can(
-  PERMISSION_MODULES.CLASSES,
-  PERMISSION_ACTIONS.UPDATE,
-);
-```
-
-### Anti-escalation
-
-Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/src/permissions/role-assignment.ts`) to prevent role escalation:
-
-- `OWNER` → can assign any role
-- `MANAGER` → cannot assign `OWNER`
-- `CASHIER` → can only assign `MEMBER`
-
-**Platform anti-escalation** (`canAssignPlatformRole(actor, target)`):
-
-- `owner` → can assign any platform role (support/admin/owner)
-- `admin` → only `support` or `admin` (NEVER `owner`)
-- `support` → cannot assign
-
-> Anti-escalation is validated **server-side** in `/api/platform/staff` (POST and DELETE) — the UI only filters options.
-
-### Panel Access Control
-
-Only `OWNER`, `MANAGER`, `CASHIER` can use the panel app (`apps/panel`). Implemented via the `panel: ["access"]` permission (`PANEL` module, `ACCESS` action):
-
-```ts
-import { usePermissions } from "@workspace/auth/hooks";
-const { canAccessCms } = usePermissions(); // equivalent to can(PANEL, ACCESS)
-if (orgRole && !canAccessCms()) redirect("/unauthorized");
-```
-
-### Security Rules
-
-1. **Never trust client-side role checks** — Always re-verify in API
-2. **Session-based authorization** — Use `session.member.role` from Better Auth
-3. **Organization scoping** — All queries MUST filter by `organizationId`
-4. **No platform admin bypass in CMS** — Platform roles are for SaaS platform management only
-5. **Uploads: two routes, a single authority per case** — The panel uploads via `/api/upload/*` with the org from **its own session** (`requireOrgPermission(MEMBERS, CREATE)`): `organizationId` does not exist in the contract, so no member can write to another gym's folder. The console (which does NOT have an active org) uploads via `/api/platform/organizations/:orgId/upload/*` with the org by **path** and `requirePlatformAuth` (admin/owner; `support` → 403) or via `/api/platform/upload/*` for branding. Every written/deleted key must start with `<orgId>/` (or `platform/branding/`); public reading lives at `/api/public/files/*` and only serves `<orgId>/cms/…` and `platform/branding/…`.
-
----
-
-## Shared Package Exports (`packages/shared`)
-
-```ts
-// Entry point: @workspace/shared
-// Re-exports: constants, types, access-control, auth-config, permissions
-
-// constants.ts
-ORG_ROLES, PAYMENT_STATUSES, SUBSCRIPTION_STATUSES,
-PLATFORM_SUBSCRIPTION_STATUSES, COUNTRIES (8 countries: VE/CO/MX/AR/CL/PE/ES/US),
-COUNTRY_LIST, COUNTRY_INDEX (`indexCountries()` — derived codes, currencies, timezones and timezoneOptions; single source for iterations), DEFAULT_COUNTRY, ICountryConfig,
-ORG_ROLE_LABELS + formatOrgRole (organization/Panel roles),
-PLATFORM_ROLE_LABELS + formatPlatformRole (platform/Console roles: owner, admin, support, user)
-
-// types.ts
-IUser, ISession, IAuthMember, IOrganization, ICmsClass, IMember, MemberFilter,
-PaginatedMembers, IAuthError, TrendDirection, FrequencyType, PlanFeatures, IPlatformOrganization,
-IPlatformSubscription (incl. `organizationSlug?` — joined from the org, used for slug-based detail routes),
-IPaymentMethodConfig, IPaymentMethodField (type: 'text' | 'file' | 'number' | 'visual' + value?)
-
-> **`visual` field in payment methods**: a field with `type: 'visual'` stores instructions
-> in `value` (e.g. "Payment method: Binance\nSend to: ...") that the payment-methods editor
-> writes with a `Textarea`. In payment forms (`payment-section.tsx` in panel and console)
-> it renders as an **info card** (`whitespace-pre-line`), never as input, never
-> `required`, and **is not persisted** in `paymentMethodDetails` (forms filter it when
-> building details — `subscription-form.tsx` / `platform-subscription-form.tsx`).
-> `paymentMethodDetailsSchema` (api-worker) remains `text|file|number`.
-
-// access-control.ts
-platformStatement/platformAc/platformRoles (owner, admin, support),
-organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
-orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationStatement,
-OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
-
-// auth-config.ts
-ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode*, taxId, legalName, address, fiscalConfig, timezone*, primaryCurrency*, currencyFormat* — *required)
-
-// permissions/
-  modules.ts:         PERMISSION_MODULES (12 modules: dashboard, reports, members, staff,
-                      subscriptions, plans, classes, content, settings, organization, ai, panel)
-  actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
-  can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
-  role-assignment.ts: canAssignRole(actor, target) (org) and canAssignPlatformRole(actor, target) (platform)
-
-// ai.ts
-AI_MODEL_IDS, OPENROUTER_FREE_MODEL_IDS, ALL_CHAT_MODEL_IDS (allowlist — single source
-of truth consumed by api-worker to validate/route provider and by panel for the
-selector via RSC), AiProvider ("workers-ai" | "openrouter"), getAiProvider(modelId),
-AI_MODELS, IAiChatMessage, IAiChatRequest, IAiSseEvent (chat SSE contract)
-
-// content.ts
-CMS module types and Zod schemas (single source of truth — api-worker validates and the
-panel types forms with them): ContentBlockType, BLOCK_SCHEMAS (hero/services/classes/
-testimonials/gallery/contact/team) + validateBlockData(), IContentPage, IContentBlock
-(discriminated by blockType → block-typed data), IContentPageWithBlocks.
-Requires `zod` as a dependency of @workspace/shared.
-```
-
----
-
-## Auth Package (`@workspace/auth`)
-
-```ts
-// Entry: @workspace/auth (re-exports client, service, hooks, permissions + shared constants)
-
-// client.ts — createAuthClient with customSession + organization plugin
-authClient, useSession, organization
-Types: User, Session, SignInParams, SignUpParams
-
-// service.ts — sessionService (works client & server)
-sessionService.getSession(headers?) → { data: Session | null, error: IAuthError | null }
-sessionService.getServerSession(headers) → { data, error }
-sessionService.signIn({ email, password }) → { data, error }
-sessionService.signUp({ email, password, name }) → { data, error }
-
-// hooks.ts — "use client"
-useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, error, roleName,
-              orgRole, isAdmin, isOwner, isManager, isCashier, isCoach, isMember, refetch }
-usePermissions() → { orgRole, can(module, action), canAccessCms() }
-
-// permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
-```
-
----
-
-## Database Schema (33 tables)
-
-### Better Auth Core
-
-`user`, `session`, `account`, `verification`
-
-### Organization & Membership
-
-`organization` (includes: slogan, countryCode (**no DB default**, required at creation), timezone (**notNull**, no default), **primaryCurrency + currencyFormat (`notNull` columns without default — currency derives from country, format comes explicit; never read from settings)**)
-`member` (auth_member — Better Auth plugin), `invitation`
-
-### Platform Billing (SaaS)
-
-`platform_plan` (catalog with features as PlanFeatures, price in cents), `platform_subscription` (status computed in SQL — `status` column is legacy), `platform_subscription_payment` (invoices with commercial snapshots), `ai_usage` (AI credits: `credits` (consumption) + `bonus_credits` (one-off bonus per cycle, via **Give AI Credits** in console) + `count` legacy, index `idx_ai_usage_org_period`, monthly period per cycle)
-
-### Gym Domain
-
-`gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
-`coach_assignment` (coach ↔ client)
-
-### Memberships & Payments
-
-`membership_plan` (gym product catalog), `subscription` (member ↔ plan, + `end_date_override_reason` nullable — migration `0019`), `payment` (financial audit trail)
-
-### Access Control
-
-`access_control_log` (every access attempt: granted, denied, error), `biometric_sync_task` (device sync queue)
-
-### AI / RAG
-
-`ai_usage` (AI credits), `ai_knowledge_document` (KB docs; `organization_id NULL` = platform, set = org), `ai_knowledge_chunk` (chunks with pgvector 1024 dims embedding + HNSW cosine)
-
-### Routines (Fitness)
-
-`exercise`, `routine_template`, `routine_template_item`, `workout_session`, `workout_session_log`
-
-### CMS & Web
-
-`gym_class` (class schedule), `content_page` (includes `metaTitle`/`metaDescription` SEO; canonical derives from slug), `content_block` (blocks by type with display order)
-
-### Settings
-
-`platform_setting`, `gym_setting`
-
----
-
-## Console API Layer (ofetch)
-
-`apps/console` uses **ofetch** as the unified wrapper for native `fetch` (global rule: **no raw `fetch`** — see section 8 of Technical Standards). Replaces axios with a lighter API (~6kb) and native support for `next: { revalidate, tags }`.
-
-### Structure
-
-```
-lib/
-├── api/
-│   ├── client.ts          ← ofetch.create() context-aware
-│   ├── types.ts           ← ApiFetchOptions (extends FetchOptions + next)
-│   └── exchange-rates.ts  ← external fetch (no auth)
-├── services/              ← typed methods (reusable from RSC and client)
-│   ├── organizations-service.ts
-│   ├── platform-plans-service.ts
-│   ├── platform-subscriptions-service.ts
-│   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
-│   ├── currency-service.ts (legacy, use lib/api/exchange-rates in RSC)
-│   ├── init-service.ts
-│   ├── upload-service.ts
-│   └── session-service.ts (uses authClient, unchanged)
-└── hooks/                 ← vanilla hooks (no TanStack Query): use-auth, use-debounce,
-                             use-exchange-rates, use-organization-activation, use-theme
-```
-
-### Context-aware behavior (`lib/api/client.ts`)
-
-| Context              | Cookie handling                                                            | Interceptors                                                             |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op)                                             |
-| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
-
-### Service usage pattern
-
-```ts
-import { api, type ApiFetchOptions } from "@/lib/api/client";
-
-export const exampleService = {
-  // RSC: pass { next: { revalidate, tags } } to cache
-  async getAll(
-    params?: { page?: number; limit?: number },
-    options?: ApiFetchOptions,
-  ) {
-    return await api("/example", { query: params, ...options });
-  },
-
-  // Client: without options, ofetch doesn't cache
-  async create(data: any) {
-    return await api("/example", { method: "POST", body: data });
-  },
-};
-```
-
-### Post-mutation convention (invalidation + refetch per request)
-
-Every mutation from a client component (modal/form/table action) must run
-all three steps **in this order** — neither one alone is enough:
-
-```ts
-// 1. Call the service (ofetch `api()` — the HTTP request)
-// 2. Purge the Next cache tag via a server action (`updateTag`)
-// 3. Re-fetch the RSC (`router.refresh()`)
-```
-
-```tsx
-// RSC page — owns the server action (it alone can call `updateTag`):
-import { updateTag } from "next/cache";
-
-const refreshOrgs = async () => {
-  "use server";
-  updateTag("console:orgs");  // purges every fetch tagged `console:orgs`
-};
-
-return <OrganizationsResults organizations={...} onRefreshServer={refreshOrgs} />;
-```
-
-```tsx
-// Client component — awaits the purge BEFORE refreshing:
-const refresh = React.useCallback(async () => {
-  if (onRefreshServer) {
-    await onRefreshServer(); // without this, refresh() re-reads stale cache
-  }
-  router.refresh(); // without this, the purge never reaches the screen
-}, [router, onRefreshServer]);
-```
-
-Why both: `router.refresh()` re-fetches the RSC but still hits fresh
-(`revalidate`, `tags`) cache entries — without `updateTag` the screen shows
-stale data until the TTL expires. `updateTag` without `refresh()` purges
-silently without re-rendering. Panel uses the same shape
-(`members-client.tsx` + `onRefreshServer` prop).
-
-> **Client-only pages (no RSC parent to own the action)**: the purge travels
-> through a shared `"use server"` module instead — reference:
-> `apps/panel/lib/actions/settings.ts` (`invalidateSettingsCache`), consumed by
-> the `useSettings` hook of the panel `settings/*` pages. It derives the tag from
-> the **session on the server** (`sessionService.getSession()`, i.e.
-> `session?.session?.activeOrganizationId`), never from a value the client sends,
-> and the caller `await`s it before `router.refresh()`.
->
-> This is not optional: **`updateTag` is server-only**, so a client component
-> that imports `next/cache` breaks (the settings save failed silently that way).
-> Before adding a purge, check where the consumer lives: RSC → inline `"use
-> server"` action passed as a prop; client-only page → shared action module.
-> When in doubt, grep for `next/cache` in a client file — it must never appear.
-
-> **Actionable lists always fresh**: the "To validate" list in
-> `/payments` is requested with `cache: 'no-store'` (`payments/page.tsx`). A work
-> list cannot have staleness: a payment recorded through another channel must
-> appear on reload, not when a TTL expires. The subscriptions table can
-> tolerate `revalidate: 60` + tag because every write in the app purges it.
-
-> **Next.js 16 note**: `revalidateTag(tag, profile)` now requires a `profile` (string or `CacheLifeConfig`). For server actions use `updateTag(tag)` (new in Next 16, no profile).
-
-### Console Cache Tags
-
-| Tag                 | Endpoint                                         |
-| ------------------- | ------------------------------------------------ |
-| `console:orgs`      | `/api/platform/organizations*`                   |
-| `console:plans`     | `/api/platform/plans*` (with-stats, summary)     |
-| `console:subs`      | `/api/platform/subscriptions*` (includes /stats) |
-| `console:settings`  | `/api/platform/settings`                         |
-| `console:staff`     | `/api/platform/staff`                            |
-| `console:knowledge` | `/api/platform/knowledge*`                       |
-| `console:receipts`  | `/api/platform/subscriptions/receipts`           |
-
-### RSC Pattern in `apps/console`
-
-- **Pages are Server Components** (no `"use client"`) that call services directly with caching options.
-- **Filters and pagination in URL** (`searchParams` is `Promise<...>` in Next 15+):
-  ```tsx
-  export default async function Page({
-    searchParams,
-  }: {
-    searchParams: Promise<{ query?: string; page?: string }>;
-  }) {
-    const { query, page = "1" } = await searchParams;
-    const result = await service.getAll({ query, page });
-    // ...
-  }
-  ```
-- **Client leaves** (search inputs, pagination buttons, modals) use `useRouter` + `searchParams` from `next/navigation` to modify the URL → server re-render.
-- **Type C pages** (currencies, payment-methods) are already **RSC parent + client child with `initialData`**: the server fetches settings (`console:settings`) and the client starts with the data (no loading flash) and saves via `api POST` + server action `updateTag`. The `organizations/[id]/settings` page remains client (fetch with `useState`/`useEffect`, no TanStack Query).
-- **TanStack Query is REMOVED from the project** (console and panel). Single standard: **RSC + ofetch + Next cache for all reads**; mutations in RSC pages use `service → toast → updateTag → refresh`. A client-side fetching library would only be reintroduced if a live-data feature (polling, optimistic UI, infinite scroll) justifies it.
-- **Reusable module pattern** (dashboard/staff/subscriptions/organizations): pure selectors in `lib/platform/*-selectors.ts` (unit-tested) + permissions in `lib/platform-permissions.ts` + server-safe formatting in `lib/utils/value-converters.ts` (`formatCents`, `formatShortDate`); tables with `MAX_ITEMS=10` and URL filters; unique hooks → `data-testid`, repeated hooks → `class`.
-
-### Settings constants
-
-- `PLATFORM_SETTINGS_KEYS` → `apps/console/lib/config/platform-settings.ts` (platform settings)
-- `SETTINGS_KEYS` → `apps/console/lib/config/settings.ts` (organization settings)
-
-Both are imported from server and client (they don't depend on hooks).
-
----
-
-## Testing
-
-Fit-Stack has **3 test layers**.
-
-### 1. `pnpm test` — Unit + Integration (Vitest)
-
-Runs the Vitest suite across all packages/apps:
-
-```bash
-pnpm test  # shared → api-worker → jobs-worker → panel → console (Vitest)
-```
-
-**What it includes:**
-
-- **Unit Tests (all packages/apps)**: pure functions, no DB or HTTP.
-  - `packages/shared/tests/`: features catalog, RBAC permissions, constants, RAG helpers, date utils
-  - `apps/api-worker/tests/unit/`: AI helpers (`ai-helpers.test.ts`)
-  - `apps/panel/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`, `error.test.ts`)
-  - `apps/console/tests/unit/`: UI utilities (`helper.test.ts`, `display.test.ts`, `features.test.ts`) + pure selectors/permissions (`dashboard-selectors`, `subscription-selectors`, `organization-selectors`, `platform-permissions`, `paginate`, `staff-role-counts`)
-- **Integration Tests (api-worker)**: real HTTP against the Hono app + Neon branch. `pnpm --filter api-worker test:integration`.
-  - **Real HTTP, no mocks**: `app.fetch(request, env, ctx)` — the same production entry point — against a **Neon branch** (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`; read `tests/setup.ts`).
-  - **Hard guards**: refuses to run if `TEST_DATABASE_URL` points to the same host+db as `DATABASE_URL`; without `TEST_DATABASE_URL` the whole suite is skipped with `describe.skipIf` (CI included).
-  - **Determinism**: `fileParallelism: false` (one shared branch), `TRUNCATE ... RESTART IDENTITY CASCADE` between files (`tests/helpers/db.ts`), Redis intentionally absent (no-op cache).
-  - **Recording spies** for R2 and Queues (`tests/helpers/env.ts`) — can assert enqueued events (e.g. `email.payment_receipt`).
-  - **Fixtures** (`tests/helpers/auth.ts`): sign-up/orgs via real HTTP (Better Auth), direct SQL insert only for what has no endpoint (global roles). **Shared per `describe`** (`beforeAll`) when assertions don't depend on mutated state (unique emails/keys) — each Better Auth sign-up costs ~3s (bcrypt + Neon), so one tenant per test only where isolation requires it. **Watch the day helpers**: `isoDate(n)` derives the **UTC** day while `localDay(n, tz)` derives the **org-local** day; they diverge between 20:00-24:00 in America/Caracas (UTC-4), so use `localDay` whenever the assertion is about the local-day contract.
-  - **Auth guards** (`tests/integration/guards.test.ts`): cover the 3 middlewares of `route-handler.ts` — `requireAuth` (401 without session; lets a valid session without org through, 200 with `admin`), `requireOrgPermission` (401, **400 without active org**, role matrix: positive owner/manager/cashier settings, member/coach plans/classes read; negative coach settings, cashier staff, coach classes.create even with update, member subscriptions) and `requirePlatformPermission`/`requirePlatformAuth` (admin/owner 200, **support 403 read-only** in settings/orgs/staff, user 403, 401).
-  - **Financial invariants** (`subscriptions.test.ts` — period + payment-transition guards, `subscriptions-period.test.ts`, `subscriptions-compensation.test.ts`, `platform-subscriptions-compensation.test.ts`, `receipts-*.test.ts`): pin the rules that must not regress — *validated ⇔ numbered*, server-computed period, compensated creation (no double charge, no access without a charge), the ANULADO artifact. Touch subscriptions, payments or receipts → run these first.
-  - **Schema sync**: `pnpm --filter api-worker test:db:push` (drizzle-kit push against the test branch, never production).
-
-> **panel/console have no integration tests** — their tests are unit only (`tests/unit/`). api-worker is the only one with an integration suite.
-
-> E2E **don't** run with `pnpm test` — they are a separate layer (`pnpm test:e2e`).
-
-### 2. E2E Tests (Playwright) — normal suite: tests only, zero evidence
-
-End-user tests navigating the real UI in Chromium. Config in `playwright.config.ts` (root).
-The suite creates its own tenant (`e2e-suite` + `e2e-empty`), tests the flows
-(create/edit), and deletes everything on teardown — no residue. This is NOT demo
-data: the demo org (`Fit Stack` / `fit-stack`) is filled by `pnpm seed:e2e` and
-is never touched by the suite.
-
-```bash
-pnpm test:e2e           # All E2E tests (console first, then panel)
-pnpm test:e2e:ui        # Playwright UI mode (visual debug)
-pnpm test:e2e:panel     # Panel only (Gym Admin, + its login setup)
-pnpm test:e2e:console   # Console only (SaaS Admin, + its login setup)
-pnpm test:e2e:report    # Open HTML report
-pnpm seed:e2e           # Demo seed: fills Fit Stack/fit-stack (NOT a test, keeps data)
-```
-
-**Suite coverage**: panel — auth, dashboard (KPIs + sidebar nav), members, plans, subscriptions, classes, settings, content (CMS), empty-state; console — auth, dashboard, organizations, subscriptions, staff, plans, settings.
-
-**Lifecycle** (`global-setup.ts` → setups → specs → `global-teardown.ts`):
-
-1. Reset (crash-safe, fixed slugs/emails): wipe `e2e-suite` + `e2e-empty` orgs + reserved users. Worst case is "suite orgs exist", never accumulation.
-2. Platform owner (`e2e-platform@e2e.test`, role promoted via SQL).
-3. Console creates the suite org via `POST /api/platform/organizations` (same path as prod) → provisions the panel owner via `POST /:id/staff` (role owner) → trial platform sub → minimal gym seed (1 plan, 3 members, 1 sub, 1 class, 1 CMS page). Same for the empty org `e2e-empty` (no gym seed, used by `empty-state.spec.ts`).
-4. `console-setup` / `panel-setup` do UI login only + `storageState` (+ route prewarm).
-5. Teardown wipes the suite orgs + users (best-effort; skipped with `E2E_KEEP_DATA=1` for inspection). The platform plan catalog row is shared and reused by name — never deleted (other orgs' subs reference it).
-
-**Playwright config** (`playwright.config.ts`):
-
-- `testDir: './e2e'`, `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org), `timeout: 60_000`, `retries: 1` in CI.
-- `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
-- **Project order: console first, then panel** (`console-setup` → `console` → `panel-setup` → `panel`). `--project` filters still run isolated (each pulls only its login setup).
-- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
-
-**Structure**:
-
-```
-e2e/
-├── global-setup.ts      # Suite tenant: console user → org (platform endpoint) → owner → seed
-├── global-teardown.ts   # Wipes suite orgs + users (never fit-stack, never the plan catalog)
-├── seed.ts              # Demo seed (pnpm seed:e2e): fills Fit Stack/fit-stack, idempotent, keeps data
-├── fixtures.ts          # Shared test/api/consoleApi (panelApi.create/track auto-deletes per test, LIFO)
-├── panel-setup.ts       # UI login only → panel-user.json (+ prewarm)
-├── console-setup.ts     # UI login only → console-user.json (+ prewarm)
-├── helpers/
-│   ├── api.ts             # HTTP over real network: registerUser/signIn/organization/invite helpers + uid/uniqueEmail (per-test disposables only, org-scoped)
-│   ├── api-client.ts      # ApiClient with resource tracking (create/track + cleanupDisposables)
-│   ├── db.ts              # Direct dev DB (DATABASE_URL from apps/api-worker/.dev.vars): roles, lookups, wipeTenant (orgs+users; never the platform plan)
-│   ├── domain.ts          # findByName/Email (resolve UI-created resources for track())
-│   ├── platform.ts        # Provisioning: platform tenant, suite org via console endpoint, staff owner, platform sub, gym seed (check-then-create)
-│   ├── test-tenant.ts     # Fixed identities: e2e-suite / e2e-empty slugs, reserved emails, seed literals, state.json
-│   ├── prewarm.ts         # Route prewarm (Turbopack compile out of test time)
-│   ├── modal.ts           # openModal(): robust click vs hydration race
-│   ├── nav.ts             # navigateByClick(): robust navigation vs hydration race
-│   └── selectors.ts       # Common design-system selectors (data-testid > role > text > CSS)
-├── panel/
-│   ├── auth.spec.ts       # Login, session, redirect, error toast
-│   ├── dashboard.spec.ts  # KPIs, sidebar nav, navigation, charts row + revenue mini + report button
-│   ├── members.spec.ts    # Members list, search, create via UI (tracked), KPI section, growth/birthdays, status/subscription URL filters
-│   ├── plans.spec.ts      # Plans list, modal
-│   ├── subscriptions.spec.ts # Pending-payment actionable (per-test API fixture + validate flow)
-│   ├── classes.spec.ts    # Classes list, modal, week calendar (?week= nav), next class + visibility summary
-│   ├── settings.spec.ts   # Tab navigation, General/Org/Currencies/Payments
-│   ├── content.spec.ts    # CMS pages, list
-│   └── empty-state.spec.ts # Empty states on e2e-empty (own storageState; never touches e2e-suite)
-└── console/
-    ├── auth.spec.ts       # Login, session
-    ├── dashboard.spec.ts  # Stats, sidebar nav
-    ├── organizations.spec.ts # List, search, create button, KPI filters
-    ├── subscriptions.spec.ts # List, filters, KPIs, side panel
-    ├── staff.spec.ts      # Table, side panel, role/search URL filters
-    ├── plans.spec.ts      # List, create
-    └── settings.spec.ts   # Tab navigation, General/Currencies/FreeTier/AI-Provider/Knowledge
-```
-
-**TestTenantState** (`e2e/.auth/state.json`, written by global-setup): `orgId/orgSlug` (suite), `ownerUserId`, `platformUserId`, `emptyOrgId/emptyOrgSlug/emptyOwnerEmail`, `ids` (seeded fixtures), `reusedExisting` (true when pre-existing users were reused, e.g. after `E2E_KEEP_DATA=1`), `createdAt`. Specs import `test`/`expect` from `../fixtures` (never from `@playwright/test` when they need `tenant`/`panelApi`/`consoleApi`).
-
-**Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
-
-**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`): the member delete (later in LIFO) cascades it away by FK, so the cleanup is still complete and the FK warning noise is gone. The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
-
-**Setup sessions**: `panel-setup` writes **two** storage states before the `panel` project creates any context — `panel-user.json` (suite org) and `empty-org-user.json` (org `e2e-empty`, used by `empty-state.spec.ts` via `test.use`). A `test.use({ storageState })` path must exist *before* the project runs, so it can never be created in a spec's `beforeAll`.
-
-**Env vars** (optional):
-
-- `E2E_KEEP_DATA=1` — skip teardown to inspect the suite tenant (next run resets anyway).
-- `API_BASE_URL` / `PANEL_URL` / `CONSOLE_URL` — override app URLs (defaults: 8788/3001/3000).
-
-**Dev dependencies** (root): `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`, `tsx` (seed runner), `@workspace/shared` (date utils in e2e/seed).
-
-> When you add or change API behavior, the integration tests are the first line of defense: run `pnpm test` before asking for review.
-> E2E tests validate complete user flows in the UI — run with `pnpm test:e2e` (separate from `pnpm test`).
+ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate. Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
+
+## Where to read more
+
+| When you touch … | Read (key invariant) |
+| --- | --- |
+| Receipts / numbering / ANULADO / fiscal gating | [`business/receipts.md`](vaults/business/receipts.md) — never fiscal invoices; validated ⇔ numbered; ANULADO sealed; never delete (void ≠ cancel) |
+| SaaS billing / grace / renewal | [`business/platform-billing.md`](vaults/business/platform-billing.md) — status computed in SQL (not stored); `voided` ignored in Console; free-tier gate else `/no-subscription` |
+| Feature flags / free tier / AI credits | [`business/features-and-free-tier.md`](vaults/business/features-and-free-tier.md) — new features `defaultEnabled:false`; downgrade = hide; `403 FEATURE_NOT_AVAILABLE`/`FEATURE_LIMIT_REACHED`; `429 AI_QUOTA_EXCEEDED` |
+| Roles / permissions / anti-escalation | [`business/rbac.md`](vaults/business/rbac.md) — never trust client checks; all queries filter `organizationId`; no platform-admin bypass in CMS; uploads = two routes, one authority |
+| Subscription rules / compensation | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
+| Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
+| API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE; `/api/access-control/*` not mounted |
+| Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
+| Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib` |
+| R2 storage | [`architecture/file-storage.md`](vaults/architecture/file-storage.md) — every org key starts `<orgId>/` (server-resolved); public only `cms/` + `platform/branding/` |
+| Package exports / DB schema | [`architecture/packages-and-schema.md`](vaults/architecture/packages-and-schema.md) — 33 tables |
+| Modules / Staff & Trainers / Bridge | [`architecture/modules.md`](vaults/architecture/modules.md), [`staff-trainers.md`](vaults/architecture/staff-trainers.md), [`bridge.md`](vaults/architecture/bridge.md) |
+| Frontend data layer | [`guides/frontend-data-layer.md`](vaults/guides/frontend-data-layer.md) — no raw `fetch`; post-mutation = service → `updateTag` → `router.refresh()`; `updateTag` server-only |
+| Testing | [`guides/testing.md`](vaults/guides/testing.md) — unit+integration and E2E are separate layers |
+| Technical standards (full detail) | [`architecture/technical-standards.md`](vaults/architecture/technical-standards.md) |
+| Infra & deploy | [`architecture/INFRASTRUCTURE.md`](vaults/architecture/INFRASTRUCTURE.md), [`terraform.md`](vaults/architecture/terraform.md) |
 
 ## Important Constraints
 
-- **Never auto-commit** — Always let the user review and commit manually. The user owns their git history.
-- **Tests**: `pnpm test` runs the full suite (shared → api-worker → panel → console, Vitest). api-worker integration tests talk real HTTP to the Hono app against a Neon branch (`TEST_DATABASE_URL` in `apps/api-worker/.dev.vars`); without that variable they're skipped with a clear message, and they never run against the production database (hard guards). CI runs them on PRs (`ci.yml` job `test`).
-- **Implementation plans**: they are **Linear issues written in English** (one coherent scope each, split into sub-issues when needed); ask for explicit approval before implementing. Commits carry the task id: `<type>: RD-<number> <brief>`. The chat response is in Spanish. See [Task Tracking (Linear)](#task-tracking-linear)
-- **Database changes**: Require explicit user approval. `pnpm db:push` is forbidden on shared branches
-- **Keep AGENTS.md updated** — After any structural change, update AGENTS.md to reflect it. When in doubt, update it.
+- **Never auto-commit**; the user owns their git history.
+- **Tests**: run `pnpm test` before asking for review. Integration tests hit real HTTP against a Neon branch (`TEST_DATABASE_URL`; skipped without it; never against prod). Touch subscriptions/payments/receipts → run the financial invariant tests first.
+- **Requirements → Linear**: issue states **what and why**; user approves; **`coder-expert` decides how**. Commits carry the id (`<type>: RD-<number> <brief>`); chat in **Spanish**.
+- **Database changes** require explicit approval; `db:push` forbidden on shared branches.
 
 ### When to update AGENTS.md
 
-- New API endpoints or route restructuring (e.g., migrating `/api/access-control` to api-worker when Bridge reactivates)
-- Changes to RBAC (new roles, permission matrix changes, new modules)
-- New business rules or module changes
-- New apps or packages added to the monorepo (e.g., `console`, `auth`)
-- Changes to dev commands or database workflow
-- New auth patterns or security rules
-- New skills or hooks that become project-wide conventions
-- New CMS block types or page schema changes
-- New Bridge endpoints or device management
-- New cache key patterns
-- New RSC patterns or RSC migrations in any app
-- New queue event types or email/PDF flows in jobs-worker
-- New E2E specs, helpers, or Playwright config changes
-- Changes to the vault (`vaults/`) structure or new docs
-- Changes to task tracking (the Linear workflow in [Task Tracking (Linear)](#task-tracking-linear), labels, branch convention, the `planner` agent) or to the backlog (`vaults/backlog/`)
-
----
+After structural changes, update `AGENTS.md` **and** the matching `vaults/` doc for: API routes, RBAC, business rules/modules, new app/package, DB workflow, auth/security, CMS blocks, Bridge, Linear workflow/backlog, cache keys, queue/email/PDF flows, RSC patterns, E2E config, skills, or the `vaults/` structure.
 
 ## Skills Available
 
-Use skill tool for specialized tasks:
-
-| Skill                         | When to use                                                         |
-| ----------------------------- | ------------------------------------------------------------------- |
-| `postgresql-table-design`     | PostgreSQL/Drizzle schema design (types, indexes, constraints)      |
-| `neon-postgres`               | Neon database questions (features, branching, connection)             |
-| `neon-drizzle`                | Drizzle + Neon setup and migrations                                  |
-| `drizzle-orm`                 | Type-safe SQL ORM operations                                        |
-| `better-auth-best-practices`  | Better Auth server/client, sessions, plugins                        |
-| `organization-best-practices` | Better Auth organizations, members, RBAC                            |
-| `vercel-react-best-practices` | React/Next.js performance                                           |
-| `next-best-practices`         | Next.js route handlers, data fetching, bundling, image optimization |
-| `terraform-stacks`            | Terraform Stacks configuration                                      |
-| `rag-implementation`          | RAG systems (retrieval, embeddings, vector search)                  |
-| `rag-knowledge-doc-writer`    | Write/audit docs for a RAG knowledge base             |
-| `copywriting`                 | Marketing copy changes                                              |
-| `hallmark`                    | New pages, redesigns, design audits                     |
-| `find-skills`                 | Discover/install additional skills                               |
-| `customize-opencode`          | Configure opencode itself (agents, commands, skills)               |
-
-> Skills installed in `.agents/skills/` (project) and `~/.agents/skills/` (global). To discover more: `npx skills find <query>` and confirm with the user before installing.
-
----
+Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`, `drizzle-orm`, `better-auth-best-practices`, `organization-best-practices`, `vercel-react-best-practices`, `next-best-practices`, `terraform-stacks`, `rag-implementation`, `rag-knowledge-doc-writer`, `copywriting`, `hallmark`, `find-skills`, `customize-opencode`. Skills live in `.agents/skills/` (project) and `~/.agents/skills/` (global); discover with `npx skills find <query>`.
 
 ## Key Files to Read First
 
-- `apps/*/package.json` — App-specific scripts
-- `packages/*/package.json` — Package dependencies
-- `packages/database/src/schema.ts` — Full DB schema (33 tables)
-- `packages/shared/src/access-control.ts` — RBAC statements + roles (single source of truth)
-- `apps/api-worker/src/index.ts` — Hono app: middleware, mounts, healthcheck
-- `apps/api-worker/src/lib/auth.ts` — Better Auth server config (per-request factory)
-- `apps/api-worker/src/lib/route-handler.ts` — Auth/permission middleware
-- `apps/api-worker/src/lib/cache.ts` — Upstash Redis wrapper
-- `apps/api-worker/src/lib/cors.ts` — CORS allowlist
-- `apps/api-worker/src/lib/env.ts` — Worker env/bindings types
-- `apps/jobs-worker/src/index.ts` — Queue event contract (`FitTaskEvent`) + handlers
-- `packages/auth/src/` — Shared auth client, service, hooks, permissions
-- `packages/ui/src/components/safe-image.tsx` — SafeImage with skeleton loading + error fallback
-- `packages/ui/src/components/next/image.tsx` — NextImage with error fallback UI
-- `playwright.config.ts` — E2E config: projects, setup deps, webServers
-- `e2e/panel-setup.ts` / `e2e/console-setup.ts` — E2E auth setup (storageState)
-- `vaults/architecture/ARCHITECTURE.md` — architecture spec (design decisions)
-- `vaults/backlog/README.md` — index of the pending-item backlog (alias `PENDING`)
-- `.opencode/agents/planner.md` — the Linear planner (issue template, metadata, split rules)
-- `.opencode/commands/plan.md` / `task.md` — the `/plan` and `/task` entry points
-
----
+- `packages/database/src/schema.ts` (33 tables) · `packages/shared/src/access-control.ts` (RBAC SSOT)
+- `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
+- `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
+- `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}` · `.opencode/agents/` (subagent roster) · `.opencode/commands/{plan.md,task.md}`
+- `vaults/architecture/ARCHITECTURE.md` (architecture spec) · `vaults/backlog/README.md` (pending index)
 
 ## Infrastructure & Deployment
 
-> Current source in `vaults/architecture/ARCHITECTURE.md` §8. Infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
+> Source in `vaults/architecture/ARCHITECTURE.md` §8; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
+
+
+## NOTES:
+
+Any comment, function name, doc, or inline text in the codebase should be in **ENGLISH**.

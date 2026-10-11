@@ -180,7 +180,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
       voidReason: 'Pago anulado',
     });
     expect(huecos.map((g) => g.seq)).toEqual([3, 4, 5, 6, 7]);
-    expect(thirdNumber).toMatch(new RegExp(`^${organization.slug}-${year}-0*8$`));
+    expect(thirdNumber).toMatch(new RegExp(`^${year}-0*8$`));
 
     // El filtro voided devuelve solo el anulado; anular no renumera.
     const voidedRes = await owner.client.get('/api/reports/receipts', {
@@ -192,8 +192,31 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
       second.payment['receipt_number'],
     ]);
     expect(first.payment['receipt_number']).toMatch(
-      new RegExp(`^${organization.slug}-${year}-0*1$`),
+      new RegExp(`^${year}-0*1$`),
     );
+  });
+
+  it('a legacy receipt (slug inside the number) still shows up in the report', async () => {
+    const { owner, organization } = await createGymTenant('legacy-format');
+    const { payment } = await createNumberedPayment(owner.client);
+    const paymentId = Number(payment['id']);
+    const year = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }),
+    ).getFullYear();
+
+    // The number of an issued receipt is immutable: those issued before the
+    // slug was dropped carry it. They must keep showing up in the audit (the
+    // repo LIKE matches both shapes) and keep parsing in JS.
+    const legacyNumber = `${organization.slug}-${year}-000001`;
+    await testQuery(`UPDATE payment SET receipt_number = $1 WHERE id = $2`, [
+      legacyNumber,
+      paymentId,
+    ]);
+
+    const res = await owner.client.get('/api/reports/receipts');
+    expect(res.status, res.text).toBe(200);
+    const body = res.body as { rows: Array<{ receiptNumber: string }> };
+    expect(body.rows.map((r) => r.receiptNumber)).toContain(legacyNumber);
   });
 
   it('filtros de día local: 01:00 UTC es el día anterior en VE', async () => {
