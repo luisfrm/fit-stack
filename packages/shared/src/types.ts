@@ -87,11 +87,11 @@ export interface IRecentRegistration {
 }
 
 /**
- * Fila de las listas accionables del dashboard (`GET /api/dashboard/action-items`):
- * - kind 'expiring': sub activa que vence en ≤ 7 días.
- * - kind 'recently_expired': sub que expiró en los últimos 7 días y no renovó.
- * `days` es positivo para expiring (vence en N) y negativo para expired
- * (venció hace N, en valor absoluto).
+ * Actionable dashboard items (`GET /api/dashboard/action-items`):
+ * - kind 'expiring': active subscription expiring in ≤ 7 days.
+ * - kind 'recently_expired': subscription expired in the last 7 days and not renewed.
+ * `days` is positive for expiring (expires in N) and negative for expired
+ * (expired N days ago, in absolute value).
  */
 export interface IDashboardActionItem {
   kind: 'expiring' | 'recently_expired';
@@ -101,9 +101,9 @@ export interface IDashboardActionItem {
   phone?: string | null;
   email?: string | null;
   planName?: string | null;
-  /** Fin de la última sub (ISO). */
+  /** End of the latest subscription (ISO). */
   endDate: string;
-  /** Vence en N días (positivo) o venció hace N días (negativo). */
+  /** Expires in N days (positive) or expired N days ago (negative). */
   days: number;
 }
 
@@ -127,16 +127,16 @@ export interface IGymClass {
   trainerName?: string;
   isVisible: boolean;
 
-  // Horario
+  // Schedule
   startTime: string;       // "HH:MM"
-  endTime?: string;        // "HH:MM" opcional
+  endTime?: string;        // "HH:MM" optional
 
-  // Frecuencia
+  // Frequency
   frequencyType: FrequencyType;
-  scheduledDate?: string;  // ISO date, solo para 'once'
-  daysOfWeek?: number[];   // [0-6], solo para 'weekly'
+  scheduledDate?: string;  // ISO date, only for 'once'
+  daysOfWeek?: number[];   // [0-6], only for 'weekly'
 
-  // Capacidad
+  // Capacity
   capacity?: number;
 }
 
@@ -170,7 +170,7 @@ export interface MemberFilter {
   query?: string;
   role?: string;
   isActive?: boolean;
-  /** Solo miembros CON (true) o SIN (false) suscripción gym-activa. */
+  /** Only members WITH (true) or WITHOUT (false) active gym subscription. */
   hasActiveSubscription?: boolean;
   page?: number;
   limit?: number;
@@ -191,16 +191,16 @@ export interface IPaginatedResult<T> {
 export type PaginatedMembers = IPaginatedResult<IMember>;
 
 /**
- * KPIs de clientes del gym (`GET /api/members/stats`).
+ * Gym client KPIs (`GET /api/members/stats`).
  *
- * Población: `gym_member` con `role = 'member'` de la org activa.
- * - `active`/`inactive`: flag `isActive` del perfil.
- * - `newThisMonth`: `createdAt` dentro del mes local de la org.
- * - `withoutActiveSubscription`: sin suscripción gym-activa, es decir, sin
- *   fila que cumpla `getSubscriptionIsActiveSql` (`endDate` vigente, no
- *   cancelada, pago NO `voided`/`invalid` — `processing` SÍ cuenta como
- *   activa porque el acceso aún no fue revocado).
- * - `withPortal`: espejo exacto de `countActivePortalUsers`
+ * Population: `gym_member` with `role = 'member'` of active org.
+ * - `active`/`inactive`: profile `isActive` flag.
+ * - `newThisMonth`: `createdAt` within the org local month.
+ * - `withoutActiveSubscription`: without active gym subscription, i.e., no
+ *   row satisfying `getSubscriptionIsActiveSql` (valid `endDate`, not cancelled,
+ *   payment NOT `voided`/`invalid` — `processing` DOES count as active because access
+ *   has not yet been revoked).
+ * - `withPortal`: exact mirror of `countActivePortalUsers`
  *   (`userId NOT NULL + isActive + role member`).
  */
 export interface IMemberStats {
@@ -210,24 +210,24 @@ export interface IMemberStats {
   newThisMonth: number;
   withoutActiveSubscription: number;
   withPortal: number;
-  /** Altas por mes local ('YYYY-MM'), últimos 6 meses con actividad. */
+  /** Signups per local month ('YYYY-MM'), last 6 active months. */
   growth: IMemberGrowthPoint[];
-  /** Próximos cumpleaños (top 5, ordenados por MM-DD con vuelta de año). */
+  /** Upcoming birthdays (top 5, sorted by MM-DD with year wrap-around). */
   upcomingBirthdays: IMemberBirthday[];
 }
 
-/** Un bucket mensual de altas de clientes. */
+/** Monthly signup bucket. */
 export interface IMemberGrowthPoint {
   month: string;
   count: number;
 }
 
-/** Cumpleañero próximo (dominio miembro, nada de pagos). */
+/** Upcoming birthday member (member domain, non-financial). */
 export interface IMemberBirthday {
   id: number;
   firstName: string;
   lastName: string;
-  /** 'YYYY-MM-DD' (columna `date` sin tz). */
+  /** 'YYYY-MM-DD' (date column without tz). */
   birthday: string;
 }
 
@@ -310,7 +310,7 @@ export interface ISubscription {
   role?: string;
   isActive?: boolean;
 
-  // Payment Data (From Join) — montos en centavos enteros (convención Money)
+  // Payment Data (From Join) — amounts in integer cents (Money convention)
   paymentId?: number;
   amountPaid?: number;
   currencyPaid?: string;
@@ -320,7 +320,7 @@ export interface ISubscription {
   paymentStatus?: PaymentStatus;
   paymentDate?: string;
 
-  // Correlative receipt (columnas reales desde Fase 1; ver IPayment)
+  // Correlative receipt (real columns from Phase 1; see IPayment)
   receiptNumber?: string | null;
   receiptIssuedAt?: string | null;
   documentType?: 'receipt' | 'invoice';
@@ -333,10 +333,10 @@ export interface IPaymentMethodDetail {
   type?: 'text' | 'file' | 'number';
 }
 /**
- * Contracto canónico de `paymentMethodDetails` (panel + console + API).
- * Los forms envían un array de items auto-descriptivos; el API lo valida
- * con `paymentMethodDetailsSchema` (api-worker/src/lib/schemas.ts).
- * El lado de lectura mantiene tolerancia a filas legacy con forma de objeto.
+ * Canonical contract for `paymentMethodDetails` (panel + console + API).
+ * Forms send an array of self-describing items; the API validates it
+ * via `paymentMethodDetailsSchema` (api-worker/src/lib/schemas.ts).
+ * Read side retains tolerance for legacy object-shaped rows.
  */
 export type IPaymentMethodDetails = IPaymentMethodDetail[];
 
@@ -345,7 +345,7 @@ export interface IPaymentMethodField {
   label: string;
   type: 'text' | 'file' | 'number' | 'visual';
   required: boolean;
-  /** Contenido de instrucciones para type 'visual' — se renderiza como card informativa, no como input. */
+  /** Instruction content for 'visual' type — rendered as informational card, not input. */
   value?: string;
 }
 
@@ -358,9 +358,8 @@ export interface IPaymentMethodConfig {
 }
 
 /**
- * Ordena los campos de un método de pago: los `visual` (instrucciones
- * informativas) primero, luego el resto. Aplicado en los payment forms
- * (panel + console) al momento de renderizar.
+ * Sorts payment method fields: `visual` (instructional) first, then the rest.
+ * Applied in payment forms (panel + console) at render time.
  */
 export function sortPaymentMethodFields(fields: IPaymentMethodField[]): IPaymentMethodField[] {
   const rank = (t: IPaymentMethodField['type']) => (t === 'visual' ? 0 : 1);
@@ -374,10 +373,9 @@ export interface ITaxDetail {
 }
 
 /**
- * Contratos del módulo `documents/` (Fase 0). Se re-exportan aquí para que
- * los consumers que ya importan de `@workspace/shared` (tipos) los
- * encuentren sin importar rutas profundas. La implementación canónica vive
- * en `src/documents/` — nunca duplicar.
+ * Contracts from `documents/` module (Phase 0). Re-exported here so
+ * consumers importing from `@workspace/shared` (types) find them without
+ * deep path imports. Canonical implementation lives in `src/documents/` — never duplicate.
  */
 export type { FiscalConfig } from './documents/fiscal-profile';
 export type {
@@ -401,8 +399,8 @@ export type {
 
 /**
  * Interface for a Payment record.
- * Montos (planSnapshotPrice, amountPaid, subtotal, taxTotal) en centavos
- * enteros (convención Money). Display solo vía `formatCents`.
+ * Amounts (planSnapshotPrice, amountPaid, subtotal, taxTotal) in integer
+ * cents (Money convention). Display only via `formatCents`.
  */
 export interface IPayment {
   id?: number;
@@ -422,7 +420,7 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any>;
 
-  /** Estado del pago (alineado con `IPlatformSubscriptionPayment.status`). */
+  /** Payment status (aligned with `IPlatformSubscriptionPayment.status`). */
   status: PaymentStatus;
 
   // Invoice Details (Optional/Internal)
@@ -430,7 +428,7 @@ export interface IPayment {
   taxTotal?: number;
   taxDetails?: ITaxDetail[] | null;
 
-  // Correlative receipt (Fase 0: tipos; columnas reales en Fase 1)
+  // Correlative receipt (Phase 0: types; real DB columns in Phase 1)
   receiptNumber?: string | null;
   receiptIssuedAt?: string | null;
   receiptPdfKey?: string | null;
@@ -445,9 +443,9 @@ export interface IPayment {
   createdAt?: string;
 }
 
-/* ── Receipts report (Fase 5) ── */
+/* ── Receipts report (Phase 5) ── */
 
-/** Estado de auditoría de una fila del reporte (nunca mezcla anulado/hueco). */
+/** Audit state of a report row (never confuses voided with gap). */
 export type ReceiptReportState = 'issued' | 'pending' | 'voided' | 'pre_system';
 
 export type ReceiptReportStatusFilter =
@@ -456,22 +454,21 @@ export type ReceiptReportStatusFilter =
   | 'gaps';
 
 export interface IReceiptReportRow {
-  /** @internal UUID técnico: solo para fetch del dialog, NUNCA renderizar. */
+  /** @internal Technical UUID: only for dialog fetching, NEVER render. */
   paymentId: number;
-  /** Número humano; `null` = anterior al sistema (pre_system). */
+  /** Human receipt number; `null` = prior to system introduction (pre_system). */
   receiptNumber: string | null;
   state: ReceiptReportState;
-  /** `ready` | `pending` | `null` (pre_system no tiene PDF). */
+  /** `ready` | `pending` | `null` (pre_system has no PDF). */
   pdfStatus: 'ready' | 'pending' | null;
   /**
-   * Receptor del comprobante: el miembro (Panel) o la organización que paga
-   * (Console, donde el emisor es FitStack).
+   * Receipt recipient: member (Panel) or paying organization (Console, where emitter is FitStack).
    */
   memberName: string;
-  /** Solo Panel; `null` en Console (el receptor es una organización). */
+  /** Panel only; `null` in Console (recipient is an organization). */
   memberEmail?: string | null;
   planName: string;
-  /** Centavos enteros (convención Money). */
+  /** Integer cents (Money convention). */
   subtotal: number | null;
   taxTotal: number | null;
   taxDetails: ITaxDetail[];
@@ -486,22 +483,22 @@ export interface IReceiptReportRow {
   voidedBy?: string | null;
   voidedAt?: string | null;
   voidReason?: string | null;
-  /** Actor que emitió (`issued_by`, C5); `null` en históricos o barrido. */
+  /** Actor that issued (`issued_by`, C5); `null` on historical records or sweep. */
   issuedBy?: string | null;
-  /** Emisor congelado en el snapshot (`emitter.name`, C1); `null` pre-C1. */
+  /** Emitter frozen in snapshot (`emitter.name`, C1); `null` pre-C1. */
   emitterName?: string | null;
 }
 
 export interface IReceiptTaxTotal {
   name: string;
-  /** Centavos enteros. */
+  /** Integer cents. */
   amount: number;
 }
 
-/** Totales por moneda (nunca sumas mixtas). */
+/** Currency totals (never mixed sums). */
 export interface IReceiptCurrencyTotal {
   currency: string;
-  /** Centavos enteros. */
+  /** Integer cents. */
   subtotal: number;
   taxTotal: number;
   amount: number;
@@ -575,7 +572,7 @@ export interface IPlatformPlan {
   durationUnit: 'day' | 'week' | 'month' | 'year';
   features: PlanFeaturesV2 | null;
   isActive: boolean;
-  trialDays: number; // 0 = sin trial
+  trialDays: number; // 0 = no trial
   createdAt?: string | Date;
   organizationCount?: number;
 }
@@ -585,12 +582,12 @@ export interface IPlatformSubscription {
   organizationId: string;
   organizationSlug?: string | null;
   planId: number;
-  /** Status computado (no se guarda en DB) */
+  /** Computed status (not stored in DB) */
   status: PlatformSubscriptionStatus;
   startDate: string | Date;
   currentPeriodEnd: string | Date;
   isTrial: boolean;
-  /** Override del precio (en centavos). null = usar precio del plan */
+  /** Price override (in integer cents). null = use plan price */
   priceOverride?: number | null;
   cancelledAt?: string | Date | null;
   cancellationReason?: string | null;
@@ -613,43 +610,43 @@ export interface IPlatformSubscriptionPayment {
   organizationId: string;
   planId: number;
 
-  // Snapshot comercial
+  // Commercial snapshot
   planSnapshotName: string;
-  planSnapshotPrice: number; // centavos
+  planSnapshotPrice: number; // integer cents
   planSnapshotCurrency: string;
   planSnapshotDurationValue: number;
   planSnapshotDurationUnit: 'day' | 'week' | 'month' | 'year';
-  /** Snapshot de las features del plan al momento del pago (para comparar vs el plan hoy) */
+  /** Plan features snapshot at time of payment (to compare against current plan) */
   featuresSnapshot?: PlanFeaturesV2 | null;
 
-  // Datos del pago
-  amountPaid: number; // centavos
+  // Payment data
+  amountPaid: number; // integer cents
   currencyPaid: string;
   exchangeRateApplied?: string | null;
-  baseAmount?: number | null; // centavos en moneda base
+  baseAmount?: number | null; // integer cents in base currency
 
-  // Método
+  // Method
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
-  // Fechas
+  // Dates
   paymentDate: string | Date;
   dueDate: string | Date;
   paidAt?: string | Date | null;
   refundedAt?: string | Date | null;
   createdAt?: string | Date;
 
-  // Estado
+  // Status
   status: PaymentStatus;
 
-  // Comprobante SaaS (C1-C3). NULL = anterior al sistema / $0 SKIP.
+  // SaaS receipt (C1-C3). NULL = prior to system / $0 SKIP.
   receiptNumber?: string | null;
   receiptIssuedAt?: string | Date | null;
   receiptPdfKey?: string | null;
   receiptVoided?: boolean;
 }
 
-/** @deprecated usar IPlatformSubscriptionPayment */
+/** @deprecated use IPlatformSubscriptionPayment */
 export type IPlatformPayment = IPlatformSubscriptionPayment;
 
 export interface IOrganization {
@@ -660,7 +657,7 @@ export interface IOrganization {
   metadata?: Record<string, any> | null;
 
   // Fiscal/Localization Fields
-  // Obligatorios: columnas NOT NULL en `organization` (un solo insert al crear).
+  // Mandatory: NOT NULL columns in `organization` (single insert upon creation).
   countryCode: string;
   timezone: string;
   primaryCurrency: string;

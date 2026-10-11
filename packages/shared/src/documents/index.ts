@@ -1,7 +1,7 @@
-/* ── Documents module — motor de reglas fiscales/documentales ───────────
-   Único origen de: gate de etiqueta, perfil fiscal, cálculo de impuestos,
-   conversión de unidades, correlativos, enmascarado y contrato ReceiptData.
-   Puro, sin DB, sin Workers. Re-exportado por `@workspace/shared`.
+/* ── Documents module — fiscal & documentary rules engine ──────────────
+   Single origin for: document label gate, fiscal profile, tax math,
+   monetary unit conversion, correlative numbers, masking, and ReceiptData contract.
+   Pure functions, no DB, no Workers. Re-exported by `@workspace/shared`.
    ─────────────────────────────────────────────────────────────────────── */
 
 export * from './document-label-gate';

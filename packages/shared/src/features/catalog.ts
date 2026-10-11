@@ -1,13 +1,13 @@
 /**
- * Catálogo de features de los planes SaaS de Fit-Stack.
- * Fuente de verdad única (single source of truth) consumida por:
- * - `apps/api-worker` → validación Zod de planes + middleware `requireFeature` + resolver free tier
- * - `apps/console` / `apps/panel` → form de planes, free tier settings, sidebar, guards
+ * SaaS plans feature catalog for Fit-Stack.
+ * Single source of truth consumed by:
+ * - `apps/api-worker` → Zod validation for plans + `requireFeature` middleware + free tier resolver
+ * - `apps/console` / `apps/panel` → plans form, free tier settings, sidebar, guards
  *
- * Reglas de extensión (agregar una feature NUNCA debe romper nada):
- * - Toda feature nueva nace con `defaultEnabled: false` (aditivo por defecto).
- * - El normalizador ignora IDs desconocidos (tolerante a versiones viejas).
- * - `panel` es `alwaysOn` (no puede desactivarse).
+ * Extension rules (adding a feature MUST NEVER break existing code):
+ * - Every new feature starts with `defaultEnabled: false` (additive by default).
+ * - Normalizer ignores unknown IDs (tolerant to older payload versions).
+ * - `panel` is `alwaysOn` (cannot be disabled).
  */
 
 export const FEATURE_CATALOG = {
@@ -47,7 +47,7 @@ export type FeatureCatalog = Record<string, FeatureDefinition>;
 
 export interface FeatureValue {
   enabled: boolean;
-  /** Límites numéricos por feature; 0 = ilimitado */
+  /** Numeric limits per feature; 0 = unlimited */
   limits?: Record<string, number>;
 }
 
@@ -67,9 +67,9 @@ function defaultLimits(def: FeatureDefinition): Record<string, number> {
 }
 
 /**
- * Normaliza un valor arbitrario (payload de API, JSON de DB o setting) a un
- * `PlanFeaturesV2` válido: ignora features desconocidas, aplica los defaults
- * del catálogo y valida tipos (límites numéricos, 0 = ilimitado).
+ * Normalizes an arbitrary value (API payload, DB JSON or setting) into a
+ * valid `PlanFeaturesV2`: ignores unknown features, applies catalog defaults,
+ * and validates types (numeric limits, 0 = unlimited).
  */
 export function normalizeFeatures(raw: unknown): PlanFeaturesV2 {
   const out: PlanFeaturesV2 = {};
@@ -95,7 +95,7 @@ export function normalizeFeatures(raw: unknown): PlanFeaturesV2 {
     out[id as FeatureId] = def.limits?.length ? { enabled, limits } : { enabled };
   }
 
-  // Seguridad: `panel` es alwaysOn — nunca puede quedar deshabilitado.
+  // Safety: `panel` is alwaysOn — can never be disabled.
   const panel = out.panel;
   if (panel) panel.enabled = true;
   else out.panel = { enabled: true };
@@ -104,15 +104,15 @@ export function normalizeFeatures(raw: unknown): PlanFeaturesV2 {
 }
 
 /**
- * Resuelve features parciales/nulas aplicando los defaults del catálogo.
+ * Resolves partial/null features applying catalog defaults.
  */
 export function resolveFeatures(features?: PlanFeaturesV2 | null): PlanFeaturesV2 {
   return normalizeFeatures(features ?? {});
 }
 
 /**
- * Defaults del free tier (piso cuando la org no tiene suscripción pagada).
- * Se puede overridear desde console → Settings → Plan Gratuito
+ * Free tier defaults (floor when org has no paid subscription).
+ * Overridable from console → Settings → Plan Gratuito
  * (`platform_setting` key `FEATURE_FLAGS_FREE_TIER`).
  */
 export const FREE_TIER_FEATURES: PlanFeaturesV2 = {
@@ -130,8 +130,8 @@ export function getFeatureLimitLabel(limitId: string): string {
 }
 
 /**
- * Texto legible de los límites de una feature, ej. "5 Mensajes / día · 0 Cupos".
- * `null` si la feature no tiene límites definidos.
+ * Human-readable text for feature limits, e.g. "5 Mensajes / día · 0 Cupos".
+ * `null` if feature has no limits defined.
  */
 export function formatFeatureLimits(value: FeatureValue | undefined): string | null {
   if (!value?.limits) return null;
@@ -143,7 +143,7 @@ export function formatFeatureLimits(value: FeatureValue | undefined): string | n
 }
 
 /**
- * Resumen compacto de un set de features para comparar snapshots, ej.
+ * Compact summary of a feature set for comparing snapshots, e.g.
  * "Panel de Administración: Sí · CMS: No · ...".
  */
 export function summarizeFeatures(features: PlanFeaturesV2 | null | undefined): string {

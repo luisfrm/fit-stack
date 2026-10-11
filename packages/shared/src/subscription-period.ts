@@ -1,20 +1,20 @@
 import { addDuration, localDayStartUtc, toLocalDayString, type DurationUnit } from './date';
 
 /**
- * Entrada de la regla de periodo acumulativo (Regla 4: ningún día pagado se pierde).
+ * Cumulative subscription period input (Rule 4: no paid day is lost).
  *
- * Los `Date` ya vienen resueltos (instantes UTC); la función no parsea strings.
- * `timezone` es obligatoria y sin fallback silencioso: sin tz es un error visible.
+ * `Date` instances are already resolved (UTC instants); the function does not parse strings.
+ * `timezone` is mandatory without silent fallback: missing tz is a visible error.
  */
 export interface ComputeSubscriptionPeriodInput {
   startDate: Date;
-  /** `latest.endDate` o null si no hay periodo vigente. */
+  /** `latest.endDate` or null if there is no active period. */
   latestEndDate?: Date | null;
   durationValue: number;
   durationUnit: DurationUnit;
-  /** IANA de la organización (ej. 'America/Caracas'). Obligatoria. */
+  /** Organization IANA timezone (e.g. 'America/Caracas'). Mandatory. */
   timezone: string;
-  /** Inyectable para tests (default new Date()). */
+  /** Injectable for tests (defaults to new Date()). */
   now?: Date;
 }
 
@@ -22,20 +22,20 @@ export interface ComputeSubscriptionPeriodResult {
   startDate: Date;
   endDate: Date;
   baseline: Date;
-  /** true si baseline = latestEndDate (la renovación acumuló). */
+  /** true if baseline = latestEndDate (renewal was cumulative). */
   accumulated: boolean;
   hasActivePeriod: boolean;
 }
 
 /**
- * Una sola regla para el periodo acumulativo, compartida por servidor y panel.
+ * Single rule for cumulative subscription periods, shared between server and panel.
  *
- * 1. `hasActivePeriod` = vigencia a día local (un periodo que vence hoy sigue
- *    vigente hoy), no al instante.
- * 2. `baseline` = `max(latestEndDate, startDate)` si hay periodo vigente;
- *    `startDate` en caso contrario (vencido o `startDate` futuro no acumulan).
- * 3. `endDate` = suma tz-aware vía `addDuration` (nunca aritmética manual).
- * 4. Pura: no valida motivo ni rangos (eso es contrato HTTP, no regla pura).
+ * 1. `hasActivePeriod` = active by local day (period expiring today remains
+ *    active today), not by instant.
+ * 2. `baseline` = `max(latestEndDate, startDate)` if active period exists;
+ *    `startDate` otherwise (expired periods or future `startDate` do not accumulate).
+ * 3. `endDate` = tz-aware addition via `addDuration` (never manual arithmetic).
+ * 4. Pure: does not validate reason or ranges (HTTP boundary responsibility).
  */
 export function computeSubscriptionPeriod(
   input: ComputeSubscriptionPeriodInput,
@@ -48,10 +48,9 @@ export function computeSubscriptionPeriod(
   const todayStart = localDayStartUtc(timezone, toLocalDayString(timezone, effectiveNow));
   const hasActivePeriod =
     latestEndDate != null && latestEndDate.getTime() >= todayStart.getTime();
-  // `accumulated` sale de la MISMA condición que elige el baseline: solo
-  // acumula si hay periodo vigente Y su fin es estrictamente posterior al
-  // inicio. Con `latestEndDate === startDate` no se acumula (baseline =
-  // startDate) y el flag no debe mentir.
+  // `accumulated` is derived from the SAME condition choosing baseline: only
+  // accumulates if active period exists AND its end is strictly after start.
+  // When `latestEndDate === startDate` it does not accumulate (baseline = startDate).
   const accumulates =
     hasActivePeriod &&
     latestEndDate != null &&

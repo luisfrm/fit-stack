@@ -1,48 +1,48 @@
 /**
- * Taxonomía de storage (R2) — política compartida por api-worker, panel y console.
+ * Storage taxonomy (R2) — policy shared by api-worker, panel, and console.
  *
- *   <orgId>/<folder>/<slug>_<shortId>.<ext>      ← assets de una organización
- *   platform/branding/<slug>_<shortId>.<ext>     ← branding de la plataforma
+ *   <orgId>/<folder>/<slug>_<shortId>.<ext>      ← organization assets
+ *   platform/branding/<slug>_<shortId>.<ext>     ← platform branding
  *
- * El namespace de comprobantes emitidos (`receipts/<org>/<año>/<n>.pdf` y
- * `platform/receipts/<año>/FS-<n>.pdf`) es determinista y solo lo escribe el
- * renderer; se lee por las rutas autenticadas de comprobantes.
+ * The issued receipt namespace (`receipts/<org>/<year>/<n>.pdf` and
+ * `platform/receipts/<year>/FS-<n>.pdf`) is deterministic and written solely
+ * by the renderer; it is accessed via authenticated receipt endpoints.
  *
- * La construcción de keys (con sufijo aleatorio y saneado de carpeta) vive en
- * `apps/api-worker/src/lib/storage-keys.ts`; aquí vive solo lo que necesitan
- * las tres apps: el prefijo de aislamiento y la política de "público".
+ * Key construction (with random suffix and folder sanitization) lives in
+ * `apps/api-worker/src/lib/storage-keys.ts`; this file hosts what all apps need:
+ * the tenant isolation prefix and the "public" policy.
  */
 
-/** Única carpeta de organización servida públicamente (assets del sitio/CMS). */
+/** Sole organization folder publicly served (site/CMS assets). */
 export const PUBLIC_ORG_FOLDER = 'cms';
 
-/** Scope de plataforma (sin organización). */
+/** Platform scope (no organization). */
 export const PLATFORM_SCOPE = 'platform';
 
-/** Único scope de plataforma servido públicamente: logo de FitStack (login/correos). */
+/** Sole platform scope publicly served: FitStack logo (login/emails). */
 export const PLATFORM_BRANDING_FOLDER = 'branding';
 export const PLATFORM_BRANDING_PREFIX = `${PLATFORM_SCOPE}/${PLATFORM_BRANDING_FOLDER}/`;
 
 /**
- * Prefijo R2 de TODO lo que pertenece a una organización. Toda key org-scoped
- * debe empezar por aquí: es el guard de aislamiento multi-tenant.
+ * R2 prefix for EVERYTHING belonging to an organization. Every org-scoped key
+ * must start with this prefix: multi-tenant isolation guard.
  */
 export function orgStoragePrefix(orgId: string): string {
   return `${orgId}/`;
 }
 
-/** `key` cae dentro del scope de la organización (nunca acepta keys ajenas). */
+/** Checks if `key` falls within the organization scope (never accepts foreign keys). */
 export function isOrgStorageKey(orgId: string, key: string): boolean {
   return Boolean(orgId) && key.startsWith(orgStoragePrefix(orgId));
 }
 
 /**
- * Único criterio de "público por diseño": assets del sitio (`<orgId>/cms/…`) y
- * branding de la plataforma. Todo lo demás (avatares, logos de org, evidencia de
- * pago, comprobantes) se entrega por las rutas autenticadas.
+ * Sole criteria for "public by design": site assets (`<orgId>/cms/…`) and
+ * platform branding. Everything else (avatars, org logos, payment proof,
+ * receipts) is served via authenticated routes.
  *
- * Lo consumen: el route público de api-worker (allowlist) y el `getMediaUrl` de
- * panel/console (URL pública vs. proxy autenticado).
+ * Consumed by: api-worker public route (allowlist) and panel/console `getMediaUrl`
+ * (public URL vs authenticated proxy).
  */
 export function isPublicStorageKey(key: string): boolean {
   if (key.startsWith(PLATFORM_BRANDING_PREFIX)) return true;

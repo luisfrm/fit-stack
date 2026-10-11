@@ -1,7 +1,7 @@
 /**
  * AI chat configuration.
  * Single source of truth for model allowlist.
- * Solo glm-4.7-flash en Workers AI + cadena OpenRouter free.
+ * Only glm-4.7-flash in Workers AI + OpenRouter free chain.
  */
 
 export const WORKERS_AI_TEXT_MODEL = "@cf/zai-org/glm-4.7-flash" as const;
@@ -24,7 +24,7 @@ export type ChatModelId = (typeof ALL_CHAT_MODEL_IDS)[number];
 export type OpenRouterChatModelId = (typeof OPENROUTER_TEXT_MODEL_CHAIN)[number];
 export type WorkersAiChatModelId = typeof WORKERS_AI_TEXT_MODEL;
 
-// Compat con código que importaba AI_MODEL_IDS / OPENROUTER_FREE_MODEL_IDS
+// Compatibility with code importing AI_MODEL_IDS / OPENROUTER_FREE_MODEL_IDS
 export const AI_MODEL_IDS = [WORKERS_AI_TEXT_MODEL] as const;
 export const OPENROUTER_FREE_MODEL_IDS = [...OPENROUTER_TEXT_MODEL_CHAIN] as const;
 export type AiModelId = WorkersAiChatModelId;
@@ -47,7 +47,7 @@ export const AI_MODELS: AiModelInfo[] = [
   {
     id: "z-ai/glm-5.2:free",
     label: "GLM 5.2 Free",
-    description: "OpenRouter · z-ai — cadena primaria",
+    description: "OpenRouter · z-ai — primary chain",
     provider: "openrouter",
   },
   {
@@ -65,7 +65,7 @@ export const AI_MODELS: AiModelInfo[] = [
   {
     id: "@cf/zai-org/glm-4.7-flash",
     label: "GLM 4.7 Flash",
-    description: "Workers AI · rápido y económico",
+    description: "Workers AI · fast and lightweight",
     provider: "workers-ai",
   },
 ] as const;
@@ -97,30 +97,30 @@ export function getOrderedModelChain(provider?: string | null): readonly string[
   return [...getProviderModelChain(primary), ...getProviderModelChain(fallback)];
 }
 
-// ── Ventana de contexto del chat (SSOT para frontend y backend) ──
-export const CHAT_HISTORY_LIMIT = 6 as const; // últimos N mensajes enviados al LLM
-export const CHAT_MAX_STORED = 10 as const; // máximo persistido por conversación (sliding window)
-export const CHAT_MAX_CONVERSATIONS = 20 as const; // máximo conversaciones por usuario/org
+// ── Chat context window (SSOT for frontend and backend) ──
+export const CHAT_HISTORY_LIMIT = 6 as const; // last N messages sent to LLM
+export const CHAT_MAX_STORED = 10 as const; // max persisted per conversation (sliding window)
+export const CHAT_MAX_CONVERSATIONS = 20 as const; // max conversations per user/org
 
-// ── Límites de balance del chat (no hardcodear en rutas) ──
+// ── Chat budget limits (do not hardcode in routes) ──
 export const AI_CHAT_LIMITS = {
-  /** Máx. caracteres del mensaje del usuario (una pregunta/rutina). */
+  /** Max characters for user message (single query/prompt). */
   maxUserMessageChars: 500,
-  /** Máx. caracteres por mensaje del historial (user/assistant). */
+  /** Max characters per history message (user/assistant). */
   maxHistoryMessageChars: 2_000,
-  /** Máx. tokens de salida en una respuesta normal. */
+  /** Max output tokens in normal response. */
   maxOutputTokens: 1200,
-  /** Máx. tokens de salida cuando hay tool (caso especial). */
+  /** Max output tokens when tool calling is used (special case). */
   maxToolOutputTokens: 2_048,
-  /** Máx. mensajes en el historial enviado al modelo (últimos N). */
+  /** Max messages in history sent to model (last N). */
   maxHistoryMessages: CHAT_HISTORY_LIMIT,
-  /** Máx. mensajes que valida el schema (límite duro). */
+  /** Max messages schema validation allows (hard limit). */
   maxMessages: 50,
-  /** Máx. caracteres totales de los mensajes del cliente por request (input cap). */
+  /** Max total characters across client messages per request (input cap). */
   maxInputChars: 8_000,
 } as const;
 
-/** Config RAG: chunking + recuperación para la Base de Conocimiento. */
+/** RAG config: chunking + retrieval for Knowledge Base. */
 export const RAG_CONFIG = {
   topK: 4,
   minSimilarity: 0.35,
@@ -129,12 +129,12 @@ export const RAG_CONFIG = {
   maxContextChars: 2_000,
 } as const;
 
-// ── Créditos (1 crédito = 1K tokens) ──
+// ── Credits (1 credit = 1K tokens) ──
 export const AI_CREDIT_CONSTANTS = {
   tokensPerCredit: 1_000,
-  /** Multiplicador por modelo (x1.0 para GLM y openrouter/free por ahora). */
+  /** Multiplier per model (x1.0 for GLM and openrouter/free for now). */
   creditMultiplier: 1.0,
-  /** Fracción diaria como guard del mensual (20% para evitar fundir todo en un día). */
+  /** Daily cap fraction against monthly pool (20% to prevent exhausting quota in one day). */
   dailyCapFraction: 0.2,
 } as const;
 
@@ -150,8 +150,8 @@ export function estimateCreditsFromMessages(
 }
 
 /**
- * Divide texto en chunks solapados para embedding (RAG_CONFIG).
- * Corta preferentemente en saltos de línea o fin de oración.
+ * Splits text into overlapping chunks for embedding (RAG_CONFIG).
+ * Breaks preferentially on double-newlines, newlines, or sentence boundaries.
  */
 export function splitIntoChunks(content: string): string[] {
   const text = content.trim();
@@ -209,7 +209,7 @@ export interface IAiSseDelta {
   content?: string;
 }
 
-/** Actual model that answered (relevant con fallback). */
+/** Actual model that answered (relevant with fallback). */
 export interface IAiSseModel {
   model: string;
 }

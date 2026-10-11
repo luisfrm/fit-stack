@@ -1,6 +1,6 @@
-/* ── Formatting module — display de valores, fuente única ───────────────
-   Re-exporta formateo de moneda/fechas. La conversión centavos↔unidades
-   vive en `documents/money.ts` (implementación única, no duplicada aquí).
+/* ── Formatting module — value display, single source of truth ──────────
+   Re-exports currency and date formatting. Cents↔units conversion
+   lives in `documents/money.ts` (single implementation, not duplicated here).
    ─────────────────────────────────────────────────────────────────────── */
 
 export * from './currency';

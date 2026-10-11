@@ -57,17 +57,17 @@ export function formatPlatformRole(role?: string | null): string {
  * Payment statuses for audit and box flow.
  */
 export const PAYMENT_STATUSES = {
-  PROCESSING: "processing", // pago recibido, esperando revisión/validación
-  VALIDATED: "validated", // pago confirmado
-  VOIDED: "voided", // anulado o rechazado (ver `getVoidKind`)
-  REFUNDED: "refunded", // reservado (no implementado)
+  PROCESSING: "processing", // payment received, awaiting review/validation
+  VALIDATED: "validated", // confirmed payment
+  VOIDED: "voided", // voided or rejected (see `getVoidKind`)
+  REFUNDED: "refunded", // reserved (unimplemented)
 } as const;
 
 export type PaymentStatus = typeof PAYMENT_STATUSES[keyof typeof PAYMENT_STATUSES];
 
 /**
- * Estados de pago que "sostienen" un periodo pagado. `processing` y `voided`
- * NO califican. Es la fuente única para el status SaaS (`EXISTS(validated|refunded)`).
+ * Payment statuses that "sustain" a paid period. `processing` and `voided`
+ * do NOT qualify. Single source for SaaS status (`EXISTS(validated|refunded)`).
  */
 export const QUALIFYING_PAYMENT_STATUSES = [
   PAYMENT_STATUSES.VALIDATED,
@@ -77,11 +77,10 @@ export const QUALIFYING_PAYMENT_STATUSES = [
 export type VoidKind = "rejected" | "annulled";
 
 /**
- * Distingue un rechazo de una anulación a partir del comprobante emitido.
- * **No es un estado de DB**: `voided` es el único estado de anulación; el tipo
- * se deriva.
- * - sin `receiptNumber` → `rejected` (nunca fue un pago válido emitido)
- * - con `receiptNumber` → `annulled` (existió comprobante y se anuló)
+ * Distinguishes a rejection from a void based on the issued receipt.
+ * **Not a DB state**: `voided` is the only database status; the kind is derived:
+ * - without `receiptNumber` → `rejected` (never was an issued valid payment)
+ * - with `receiptNumber` → `annulled` (a receipt existed and was voided)
  */
 export function getVoidKind(payment: { receiptNumber?: string | null }): VoidKind {
   return payment.receiptNumber ? "annulled" : "rejected";
@@ -90,14 +89,14 @@ export function getVoidKind(payment: { receiptNumber?: string | null }): VoidKin
 /**
  * Subscription statuses for access control.
  *
- * `CANCELLED` y `VOIDED` NO son sinónimos:
- * - `CANCELLED` = el acceso se revocó (decisión administrativa). El registro
- *   es legítimo: el cobro existió y sigue siendo válido.
- * - `VOIDED` = el registro es inválido: su cobro se anuló o se rechazó
- *   (`voided`; ver `getVoidKind`). El correlativo del comprobante no se reutiliza.
+ * `CANCELLED` and `VOIDED` are NOT synonyms:
+ * - `CANCELLED` = access revoked (administrative decision). The record
+ *   is legitimate: billing took place and remains valid.
+ * - `VOIDED` = the record is invalid: its payment was voided or rejected
+ *   (`voided`; see `getVoidKind`). The receipt sequence number is never reused.
  *
- * Ninguna suscripción se elimina: se anula o se revoca (mismo vocabulario que
- * `PAYMENT_STATUSES.VOIDED` y el flag ANULADO del comprobante).
+ * No subscription is ever deleted: it is either voided or cancelled (aligned with
+ * `PAYMENT_STATUSES.VOIDED` and the ANULADO flag on receipts).
  */
 export const SUBSCRIPTION_STATUSES = {
   ACTIVE: "active",
@@ -111,15 +110,15 @@ export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSC
 
 /**
  * Platform subscription statuses for SaaS org billing.
- * El status se computa en SQL (no se guarda en DB) según currentPeriodEnd
- * y el último pago. Mantenemos la constante para tipado y helpers.
+ * Status is computed in SQL (not persisted in DB) based on currentPeriodEnd
+ * and the latest payment. We keep the constant for typing and helpers.
  */
 export const PLATFORM_SUBSCRIPTION_STATUSES = {
-  ACTIVE: "active", // periodEnd >= now y pago válido
+  ACTIVE: "active", // periodEnd >= now and valid payment
   TRIAL: "trial", // isTrial = true
-  PAST_DUE: "past_due", // 1-7 días vencida
-  READ_ONLY: "read_only", // 8-14 días vencida
-  SUSPENDED: "suspended", // 15+ días vencida
+  PAST_DUE: "past_due", // 1-7 days overdue
+  READ_ONLY: "read_only", // 8-14 days overdue
+  SUSPENDED: "suspended", // 15+ days overdue
   CANCELLED: "cancelled", // cancelledAt != null
 } as const;
 
@@ -127,7 +126,7 @@ export type PlatformSubscriptionStatus =
   typeof PLATFORM_SUBSCRIPTION_STATUSES[keyof typeof PLATFORM_SUBSCRIPTION_STATUSES];
 
 /**
- * Días de gracia para escalar el status de una plataforma_subscription.
+ * Grace period days for escalating a platform_subscription status.
  */
 export const PLATFORM_GRACE_PERIODS = {
   PAST_DUE_DAYS: 7, // 1-7
@@ -136,19 +135,19 @@ export const PLATFORM_GRACE_PERIODS = {
 } as const;
 
 /**
- * Helpers puros para computar el status de una platform_subscription.
- * Reciben los datos crudos y devuelven el status, sin acceso a DB.
+ * Pure helpers to compute the status of a platform_subscription.
+ * Receive raw data and return the status, without DB access.
  *
- * Fuente única de la regla: el SQL (`platform-subscriptions.repository.ts`)
- * debe producir el MISMO resultado (garantizado por el test de paridad).
+ * Single source of truth: SQL (`platform-subscriptions.repository.ts`)
+ * must produce the EXACT SAME result (guaranteed by parity test).
  */
 export interface IPlatformSubscriptionStatusInput {
   currentPeriodEnd: Date | string;
   cancelledAt?: Date | string | null;
   isTrial?: boolean;
   /**
-   * `EXISTS(validated|refunded)` sobre los pagos de la suscripción. `processing`
-   * y `voided` NO califican. NUNCA usar "el último pago".
+   * `EXISTS(validated|refunded)` over subscription payments. `processing`
+   * and `voided` do NOT qualify. NEVER use "the latest payment".
    */
   hasValidatedPayment: boolean;
   now?: Date;
@@ -164,7 +163,7 @@ export function computePlatformSubscriptionStatus(
       : new Date(input.currentPeriodEnd);
 
   if (input.cancelledAt) return PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
-  // El trial solo mantiene el status mientras su periodo está vigente.
+  // Trial only maintains active status while its period is valid.
   if (input.isTrial && end >= now) return PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
 
   if (end >= now) {
@@ -231,7 +230,7 @@ export function isFinalDeliveryAttempt(attempts: number, maxRetries: number): bo
  */
 
 /**
- * Tipo de campo para el taxForm
+ * Field type for taxForm.
  */
 export type countryTax = {
   name: string;
@@ -438,10 +437,8 @@ export type Country = typeof COUNTRY_LIST[number];
 export const DEFAULT_COUNTRY = COUNTRIES.VE;
 
 /**
- * Índice global derivado de `COUNTRIES` (fuente única para recorridos:
- * validación, universos de selección, opciones con label). Se computa una
- * vez al importar. A futuro, si un país gana `timezones: string[]`, solo
- * cambia el interior (aplanado) sin romper consumidores.
+ * Global index derived from `COUNTRIES` (single source of truth for iterations:
+ * validation, selection options, labelled options). Computed once upon import.
  */
 export interface CountryIndex {
   codes: string[];

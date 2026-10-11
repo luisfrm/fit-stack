@@ -1,15 +1,14 @@
-/* ── Documents / money — unidades monetarias ───────────────────────────
-   Convención del proyecto (verificada contra el schema Drizzle y los
-   contratos de API/E2E): TODO monto de pago y precio viaja y se guarda en
-   CENTAVOS ENTEROS (`bigint` en DB, `int` en contratos).
-   Estos helpers solo existen para la frontera con display/inputs en
-   unidades mayores (formularios que editan "50.00" y muestran con
-   `formatCents`). El motor fiscal (`tax-math`, `receipt-data`) opera
-   siempre en centavos enteros.
-   Funciones puras, sin I/O, edge-safe (Workers).
+/* ── Documents / money — monetary units ─────────────────────────────────
+   Project convention (verified against Drizzle schema and API/E2E contracts):
+   EVERY payment amount and price travels and persists in
+   INTEGER CENTS (`bigint` in DB, `int` in contracts).
+   These helpers exist solely at the boundary with display/inputs in
+   major units (forms editing "50.00" and displaying with `formatCents`).
+   The fiscal engine (`tax-math`, `receipt-data`) always operates in integer cents.
+   Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
-/** Convierte centavos enteros a unidades mayores (199 → 1.99). */
+/** Converts integer cents to major units (199 → 1.99). */
 export function centsToUnits(cents: number): number {
   if (!Number.isFinite(cents)) {
     throw new Error(`centsToUnits: monto inválido (${String(cents)})`);
@@ -18,8 +17,8 @@ export function centsToUnits(cents: number): number {
 }
 
 /**
- * Convierte unidades mayores a centavos enteros (1.99 → 199).
- * Redondea half-up al centavo más cercano.
+ * Converts major units to integer cents (1.99 → 199).
+ * Rounds half-up to nearest cent.
  */
 export function unitsToCents(units: number): number {
   if (!Number.isFinite(units)) {

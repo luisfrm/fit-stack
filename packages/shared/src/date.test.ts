@@ -33,10 +33,10 @@ describe('parseLocalToUtc (regla de negocio: pago a las 11pm en Venezuela)', () 
   });
 
   it('un pago a las 23:30 del 1ro en Caracas cae en el día local 2026-01-01', () => {
-    // Instante UTC del pago (23:30 local Caracas = 03:30 UTC del día siguiente)
+    // UTC instant of payment (23:30 local Caracas = 03:30 UTC next day)
     const paymentUtc = new Date('2026-01-02T03:30:00.000Z');
     const localDay = toLocalDayString('America/Caracas', paymentUtc);
-    // Debe seguir siendo el día local 01, NO el 02.
+    // Must remain local day 01, NOT 02.
     expect(localDay).toBe('2026-01-01');
   });
 
@@ -74,13 +74,13 @@ describe('localDayStartUtc / localDayEndUtc', () => {
 
 describe('toLocalDayString / toLocalMonthString', () => {
   it('formatea 2026-01-01 como día/mes local en Caracas', () => {
-    const d = new Date('2026-01-01T04:00:00.000Z'); // medianoche en Caracas
+    const d = new Date('2026-01-01T04:00:00.000Z'); // midnight in Caracas
     expect(toLocalDayString('America/Caracas', d)).toBe('2026-01-01');
     expect(toLocalMonthString('America/Caracas', d)).toBe('2026-01');
   });
 
   it('el día local NO cambia por el offset UTC de la tarde noche', () => {
-    // 23:30 local Caracas (03:30 UTC del día siguiente) sigue siendo el día 01
+    // 23:30 local Caracas (03:30 UTC next day) is still day 01
     const late = new Date('2026-01-02T03:30:00.000Z');
     expect(toLocalDayString('America/Caracas', late)).toBe('2026-01-01');
   });
@@ -102,7 +102,7 @@ describe('getTimezoneOffset', () => {
 
 describe('localMonthStartUtc', () => {
   it('devuelve el inicio del mes local actual', () => {
-    // Usamos una tz fija; verificamos que sea día 1 del mes a medianoche local.
+    // Pinned timezone; assert 1st day of month at local midnight.
     const start = localMonthStartUtc('America/Caracas', 0);
     expect(start.getUTCHours()).toBe(4); // 00:00 local Caracas = 04:00 UTC
     expect(start.getUTCDate()).toBe(1);
