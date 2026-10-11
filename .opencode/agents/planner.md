@@ -48,11 +48,10 @@ Título: el resultado, concreto (`Un miembro puede renovar una suscripción venc
 2–4 frases: qué falta o está roto, a quién afecta y qué cuesta. Sin solución.
 
 ## Alcance
-**Dentro:** lo que entrega esta issue.
-**Fuera:** no-objetivos, con la issue o doc que los cubre.
+Lo que entrega esta issue.
 
 ## Criterios de aceptación
-- [ ] Comportamiento observable que un test o una comprobación manual pueda demostrar.
+-Comportamiento observable que un test o una comprobación manual pueda demostrar.
 
 ## Notas (opcional; omitir si está vacía)
 Solo lo que el coder no puede descubrir solo: decisiones tomadas y por qué, restricciones
