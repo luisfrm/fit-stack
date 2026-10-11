@@ -12,7 +12,7 @@ aliases: ["PENDING", "Backlog"]
 | ----------------------- | -------------------------------------------------------------- | ------------------------- |
 | Fiscal                  | Facturación formal (PAC/PAD), IGTF, disclaimer del emisor      | [[fiscal]]                |
 | Comprobantes            | Correlativo, barrido, auditoría `gaps[]`, DLQ de email         | [[comprobantes]]          |
-| Pagos y suscripciones   | Atomicidad, DELETE SaaS, devoluciones, doble periodo histórico | [[pagos-suscripciones]]   |
+| Pagos y suscripciones   | Atomicidad, DELETE SaaS, devoluciones, doble periodo histórico, cambio de plan | [[pagos-suscripciones]]   |
 | Storage (R2)            | Re-subida de assets tras el corte de taxonomía                 | [[storage]]               |
 | IA / Chat               | Packs de créditos (Stripe), RAG fase 2 y avanzado              | [[ai-chat]]               |
 | Access control / Bridge | Refactor del Bridge, esquema de hardware multi-dispositivo     | [[access-control-bridge]] |

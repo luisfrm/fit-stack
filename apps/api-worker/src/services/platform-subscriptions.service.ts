@@ -56,13 +56,6 @@ export interface RenewPlatformSubscriptionPayload {
   payment: PlatformPaymentPayload;
 }
 
-export interface ChangePlatformPlanPayload {
-  newPlanId: number;
-  isTrial?: boolean;
-  priceOverrideCents?: number;
-  payment: PlatformPaymentPayload;
-}
-
 export interface UpdatePlatformPaymentStatusPayload {
   status: PaymentStatus;
   /** Motivo de anulación/rechazo (se persiste y viaja al void del comprobante). */
@@ -433,45 +426,6 @@ export function createPlatformSubscriptionsService(
       }
 
       return { paymentId };
-    },
-
-    /**
-     * Cambia el plan de una organización: crea la nueva suscripción y solo
-     * entonces cancela la actual.
-     *
-     * Orden deliberado (create-new-then-cancel-old): si el alta nueva falla y
-     * se compensa, la anterior sigue activa — la org nunca queda con cero
-     * suscripciones. El `cancel` de la anterior es un efecto distinto de la
-     * reversión del periodo y no lo deshace la compensación del alta.
-     *
-     * Note: mounted at `POST /api/platform/subscriptions/change-plan`. If the
-     * `cancel` of the old subscription fails, two actives remain (preferable
-     * to zero; documented here).
-     */
-    async changePlan(
-      organizationId: string,
-      data: ChangePlatformPlanPayload,
-      opts?: PlatformReceiptContext
-    ): Promise<{ subscriptionId: number }> {
-      const current = await platformSubsRepo.findActiveByOrganization(organizationId);
-
-      // Crear la nueva primero (reenvía opts: el hook emite si valida y la
-      // compensación se hereda de `createSubscriptionWithPayment`). Si lanza,
-      // la anterior permanece intacta.
-      const result = await this.createSubscriptionWithPayment({
-        organizationId,
-        planId: data.newPlanId,
-        isTrial: data.isTrial,
-        priceOverrideCents: data.priceOverrideCents,
-        payment: data.payment,
-      }, opts);
-
-      // Solo con la nueva persistida se cancela la anterior.
-      if (current && !current.cancelledAt) {
-        await platformSubsRepo.cancel(current.id, 'Plan cambiado');
-      }
-
-      return result;
     },
 
     /**

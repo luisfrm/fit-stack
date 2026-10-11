@@ -1,6 +1,6 @@
 # Fit-Stack Agent Guide
 
-> Índice + invariantes. El detalle por área vive en `vaults/` (lectura on-demand). Este archivo define **qué** es innegociable; el **cómo** de cada feature lo decide `coder-expert`.
+> Índice + invariantes del código y arquitectura. El detalle por área vive en `vaults/` (lectura on-demand).
 
 ## Dev Commands
 
@@ -41,19 +41,7 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 
 - **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000), `bridge` (Python/Flet, **⏸ PAUSED**), `api` (Next 16, **DEPRECATED** — 3003, excluded from the workspace).
 - **Packages**: `auth`, `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
-- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`), `backlog/`. There is **no `vaults/tasks/`** — planned work lives in Linear. Bridge is Python, managed with `uv`, not part of Turbo.
-
-## Task Tracking (Linear)
-
-**Linear is the single source of truth for planned work.** The old local system (`vaults/tasks/FS-NNNN/`, `pnpm task:new`, `vaults/guides/task-system.md`) was **removed**: no local id space, nothing to keep in sync.
-
-- **No local id space.** Reference work by its Linear id (`RD-89`). Never invent an `FS-NNNN` id, never reintroduce a task folder. **Long reference material goes to a Linear document.** **No task ids in the codebase** — not in comments, not in tests: the id lives in Linear and in the commit message. ⚠️ `FS-0000001` is **not** a task id: it is the SaaS receipt number from `formatConsoleReceiptNumber`. Never "migrate" it.
-- **Workspace**: `Rivas Digital` (`6630fb5f-e79c-42de-8867-49da2a325e10`) via the `linear` MCP server, reachable from `execute` as `tools["linear"].<tool>(…)`.
-- **One issue, one coherent scope — no fixed relation to PRs.** Split into **sub-issues** only when there are **distinct hallazgos** or it is **too large** (judge by reviewability). The DB change, backend, frontend, tests and docs that make **one behaviour** work end to end belong together.
-- **Split rule**: the **parent is the container** (problem, context, state, sub-issue list); each **sub-issue** (`parentId`) is a self-contained spec. Link issues with `blocks` / `blockedBy` / `relatedTo` whenever a real dependency or shared area exists, **within or across parents**; the parent carries no relations. **Never split by architectural layer**, **never create phases**.
-- **Lifecycle**: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done` (plus `Canceled`, `Duplicate`). A rejected PR sends the **same** issue back to `In Progress` with a new PR — never a duplicate.
-- **Labels**: `Feature`, `Bug`, `Improvement` → branch prefix `feat`/`fix`/`chore` (`refactor` if structural, `docs` if docs-only); no `Backlog` label.
-- **Branch** `<type>/RD-<number>-<kebab-brief-summary>` (≤ 60 chars after prefix); **commit** `<type>: RD-<number> <brief-description>` — the **id goes right after the type**, in every commit, never at the end; a sub-issue uses **its own** id. Both derive from the label and id; `coder-expert` proposes them. **Never auto-commit.**
+- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`), `backlog/`. Bridge is Python, managed with `uv`, not part of Turbo.
 
 ## Project Context (Business Overview)
 
@@ -69,7 +57,7 @@ Multi-tenant SaaS for the Gym/Fitness industry (Latin America): multi-currency b
 
 ### 5. Business Rules Summary
 
-1. **Multi-currency** (base USD default, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
+1. **Multi-currency** (base USD default, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** (note: `FS-0000001` is the SaaS receipt number format via `formatConsoleReceiptNumber`) → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
 
 ## Project Rules (Technical Standards)
 
@@ -110,7 +98,7 @@ Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }
 
 ### 7. Error Handling & Mutations
 
-No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text. A requirement becomes a **Linear issue** (what & why); the **user approves it**; **`coder-expert` decides how** — no implementation plan in the issue; chat in **Spanish**.
+No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
@@ -153,12 +141,11 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 
 - **Never auto-commit**; the user owns their git history.
 - **Tests**: run `pnpm test` before asking for review. Integration tests hit real HTTP against a Neon branch (`TEST_DATABASE_URL`; skipped without it; never against prod). Touch subscriptions/payments/receipts → run the financial invariant tests first.
-- **Requirements → Linear**: issue states **what and why**; user approves; **`coder-expert` decides how**. Commits carry the id (`<type>: RD-<number> <brief>`); chat in **Spanish**.
 - **Database changes** require explicit approval; `db:push` forbidden on shared branches.
 
 ### When to update AGENTS.md
 
-After structural changes, update `AGENTS.md` **and** the matching `vaults/` doc for: API routes, RBAC, business rules/modules, new app/package, DB workflow, auth/security, CMS blocks, Bridge, Linear workflow/backlog, cache keys, queue/email/PDF flows, RSC patterns, E2E config, skills, or the `vaults/` structure.
+After structural changes, update `AGENTS.md` **and** the matching `vaults/` doc for: API routes, RBAC, business rules/modules, new app/package, DB workflow, auth/security, CMS blocks, Bridge, cache keys, queue/email/PDF flows, RSC patterns, E2E config, skills, or the `vaults/` structure.
 
 ## Skills Available
 
@@ -169,7 +156,7 @@ Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`
 - `packages/database/src/schema.ts` (33 tables) · `packages/shared/src/access-control.ts` (RBAC SSOT)
 - `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
 - `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
-- `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}` · `.opencode/agents/` (subagent roster) · `.opencode/commands/{plan.md,task.md}`
+- `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}`
 - `vaults/architecture/ARCHITECTURE.md` (architecture spec) · `vaults/backlog/README.md` (pending index)
 
 ## Infrastructure & Deployment

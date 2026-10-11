@@ -107,6 +107,22 @@ const businessError = (
   });
 
 /**
+ * Resolves a contract date to a UTC instant. Absent/empty falls back to
+ * `fallback()`; `'YYYY-MM-DD'` → local midnight; ISO with `T` (or Date) → the
+ * instant as-is. A string carrying `T` is honored — never silently replaced.
+ */
+function parseContractDate(
+  value: string | Date | undefined | null,
+  dateManager: OrganizationDateManager,
+  fallback: () => Date,
+): Date {
+  if (value === undefined || value === null) return fallback();
+  if (value instanceof Date) return value;
+  if (value.trim() === '') return fallback();
+  return !value.includes('T') ? dateManager.parseLocalToUtc(value) : new Date(value);
+}
+
+/**
  * Resuelve una fecha del contrato a instante UTC. Ausente/vacía = hoy local;
  * `'YYYY-MM-DD'` → medianoche local; ISO con `T` (o Date) → instante tal cual.
  */
@@ -114,14 +130,21 @@ function parseSubscriptionDate(
   value: string | Date | undefined | null,
   dateManager: OrganizationDateManager,
 ): Date {
-  if (value === undefined || value === null) {
-    return dateManager.parseLocalToUtc(dateManager.getTodayLocalString());
-  }
-  if (value instanceof Date) return value;
-  if (value.trim() === '') {
-    return dateManager.parseLocalToUtc(dateManager.getTodayLocalString());
-  }
-  return !value.includes('T') ? dateManager.parseLocalToUtc(value) : new Date(value);
+  return parseContractDate(value, dateManager, () =>
+    dateManager.parseLocalToUtc(dateManager.getTodayLocalString()),
+  );
+}
+
+/**
+ * `payment.paymentDate` follows the same contract, but absent/empty falls back
+ * to "now" (an instant), not local midnight. Before this existed, an ISO
+ * date-time was silently dropped and replaced by `new Date()`.
+ */
+function parsePaymentDate(
+  value: string | Date | undefined | null,
+  dateManager: OrganizationDateManager,
+): Date {
+  return parseContractDate(value, dateManager, () => new Date());
 }
 
 export function createSubscriptionsService(
@@ -258,6 +281,13 @@ export function createSubscriptionsService(
         endDateOverrideReason = null;
       }
 
+      // Validate the payment instant BEFORE any write: a garbage date must
+      // fail with an explicit 400, never leave an orphan subscription behind.
+      const paymentDateFinal = parsePaymentDate(payload.payment.paymentDate, dateManager);
+      if (Number.isNaN(paymentDateFinal.getTime())) {
+        throw new HTTPException(400, { message: 'Fecha de pago inválida' });
+      }
+
       // 6. Persistir con el motivo (columna 0019) y seguir con pago + emisión
       // + compensación de fase-2 sin cambios.
       const subscription = await subsRepo.create(organizationId, {
@@ -270,17 +300,6 @@ export function createSubscriptionsService(
 
       if (!subscription?.id) {
         throw new Error('Error al generar el registro de suscripción');
-      }
-
-      let paymentDateFinal: Date;
-      if (
-        payload.payment.paymentDate &&
-        typeof payload.payment.paymentDate === 'string' &&
-        !payload.payment.paymentDate.includes('T')
-      ) {
-        paymentDateFinal = dateManager.parseLocalToUtc(payload.payment.paymentDate);
-      } else {
-        paymentDateFinal = new Date();
       }
 
       // Alta en 3 pasos sin red (Neon HTTP no tiene `db.transaction()`):
