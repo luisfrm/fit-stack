@@ -43,7 +43,7 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
 
   const openCreate = () => setMode("create");
   const openEdit = async (doc: KnowledgeDoc) => {
-    // Abre modal de inmediato con contenido vacío y luego carga solo el texto (sin chunks)
+    // Open modal immediately with empty content and then load only text (without chunks)
     setMode({ edit: doc, content: "" });
     try {
       const { data } = await knowledgeService.getContent(doc.id);
@@ -71,7 +71,7 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
           title: values.title,
           source: values.source,
         };
-        // Solo re-embebe si el contenido cambió realmente
+        // Only re-embed if content has actually changed
         if (values.content.trim() && values.content.trim() !== original.trim()) {
           payload.content = values.content;
         }

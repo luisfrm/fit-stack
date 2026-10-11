@@ -50,7 +50,7 @@ export function KnowledgeDocModal({
         await onSubmit(values);
         handleOpenChange(false);
       } catch {
-        // onSubmit ya mostró toast; mantener modal abierto para no perder datos
+        // onSubmit already displayed toast; keep modal open to avoid losing input
       }
     },
     [onSubmit, handleOpenChange],

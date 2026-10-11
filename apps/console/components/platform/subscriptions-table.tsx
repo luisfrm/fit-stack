@@ -54,7 +54,7 @@ interface SubscriptionsTableProps {
   currencyFormat?: CurrencyFormat;
   onChange?: () => void;
   settings?: Record<string, string>;
-  /** Enlaza el nombre de la org a su perfil. Desactivar en la propia página de detalle. */
+  /** Links the org name to its profile. Disable on the detail page itself. */
   linkOrganization?: boolean;
 }
 
@@ -69,10 +69,10 @@ function formatDate(date: string | Date) {
 function DetailRow({
   label,
   children,
-}: {
+}: Readonly<{
   label: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-white/5 py-2.5 last:border-b-0">
       <Text
@@ -87,6 +87,288 @@ function DetailRow({
   );
 }
 
+interface OrganizationCellProps {
+  readonly sub: SubscriptionWithDetails;
+  readonly linkOrganization: boolean;
+}
+
+function OrganizationCell({ sub, linkOrganization }: OrganizationCellProps) {
+  const name = (
+    <>
+      <Text
+        weight="bold"
+        className="text-foreground hover:text-primary transition-colors leading-tight"
+      >
+        {sub.organizationName || sub.organizationId}
+      </Text>
+      {sub.organizationId && (
+        <Text size="xs" variant="muted" className="opacity-50 font-mono">
+          {sub.organizationId}
+        </Text>
+      )}
+    </>
+  );
+
+  if (!linkOrganization) {
+    return <div className="flex flex-col gap-0.5 text-left">{name}</div>;
+  }
+
+  return (
+    <Link
+      href={`/organizations/${sub.organizationSlug ?? sub.organizationId}`}
+      className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
+    >
+      {name}
+    </Link>
+  );
+}
+
+function SubscriptionPlanCell({
+  sub,
+  currencyFormat,
+}: {
+  readonly sub: SubscriptionWithDetails;
+  readonly currencyFormat: CurrencyFormat;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-2">
+        <Text
+          as="span"
+          size="sm"
+          className="uppercase font-bold tracking-widest text-primary leading-tight"
+        >
+          {sub.planName ?? "—"}
+        </Text>
+        {sub.isTrial && (
+          <Badge
+            variant="info"
+            size="sm"
+            className="uppercase font-bold tracking-widest"
+          >
+            Trial
+          </Badge>
+        )}
+      </div>
+      {sub.planPrice !== undefined && sub.planCurrency && (
+        <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
+          {formatCents(sub.planPrice, sub.planCurrency, currencyFormat)}
+        </Text>
+      )}
+    </div>
+  );
+}
+
+function SubscriptionPeriodCell({
+  sub,
+}: {
+  readonly sub: SubscriptionWithDetails;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <div className="flex items-center gap-1.5">
+        <Calendar size={12} className="text-primary opacity-70" />
+        <Text size="sm" className="font-bold tabular-nums">
+          {formatDate(sub.currentPeriodEnd)}
+        </Text>
+      </div>
+      <Text size="xs" variant="muted" className="opacity-40 italic">
+        Desde: {formatDate(sub.startDate)}
+      </Text>
+    </div>
+  );
+}
+
+function SubscriptionStatusCell({
+  sub,
+}: {
+  readonly sub: SubscriptionWithDetails;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <SubscriptionStatusBadge status={sub.status} />
+      {sub.latestPaymentStatus === PAYMENT_STATUSES.PROCESSING && (
+        <Badge
+          variant="warning"
+          size="sm"
+          className="uppercase tracking-widest text-[9px] w-fit"
+        >
+          Pago pendiente
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function SubscriptionPriceCell({
+  sub,
+  currencyFormat,
+}: {
+  readonly sub: SubscriptionWithDetails;
+  readonly currencyFormat: CurrencyFormat;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <PriceCell
+        isTrial={sub.isTrial}
+        priceOverride={sub.priceOverride}
+        planPrice={sub.planPrice}
+        planCurrency={sub.planCurrency}
+        currencyFormat={currencyFormat}
+      />
+      <Text size="xs" variant="muted" className="opacity-50 tabular-nums">
+        {sub.paymentsCount ?? 0} pago(s)
+      </Text>
+    </div>
+  );
+}
+
+interface SubscriptionActionsCellProps {
+  readonly sub: SubscriptionWithDetails;
+  readonly canMutateBilling: boolean;
+  readonly onDetail: (sub: SubscriptionWithDetails) => void;
+  readonly onHistory: (sub: SubscriptionWithDetails) => void;
+  readonly onPayment: (sub: SubscriptionWithDetails) => void;
+  readonly onExtend: (sub: SubscriptionWithDetails) => void;
+  readonly onCancel: (sub: SubscriptionWithDetails) => void;
+  readonly onDelete: (sub: SubscriptionWithDetails) => void;
+}
+
+function SubscriptionActionsCell({
+  sub,
+  canMutateBilling,
+  onDetail,
+  onHistory,
+  onPayment,
+  onExtend,
+  onCancel,
+  onDelete,
+}: SubscriptionActionsCellProps) {
+  return (
+    <div
+      className="flex justify-end gap-1"
+      data-testid={`subs-row-${sub.id}`}
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onDetail(sub)}
+        className="h-8 w-8 subs-row-detail"
+        title="Ver detalle"
+      >
+        <ExternalLink size={14} className="text-foreground/50" />
+      </Button>
+      <ActionsDropdown
+        modalData={sub}
+        className="subs-row-menu"
+        sections={[
+          {
+            label: "Gestión de Suscripción",
+            items: [
+              {
+                label: "Ver Pagos",
+                icon: <History size={14} />,
+                variant: "default",
+                onClick: () => onHistory(sub),
+              },
+              {
+                label: "Registrar Pago",
+                icon: <CreditCard size={14} />,
+                variant: "default",
+                show: canMutateBilling && hasActiveSubscription(sub),
+                onClick: () => onPayment(sub),
+              },
+              {
+                label: "Extender Periodo",
+                icon: <CalendarPlus size={14} />,
+                variant: "default",
+                show: canMutateBilling && hasActiveSubscription(sub),
+                onClick: () => onExtend(sub),
+              },
+              {
+                label: "Cancelar Suscripción",
+                icon: <XCircle size={14} />,
+                variant: "destructive",
+                show: canMutateBilling && hasActiveSubscription(sub),
+                onClick: () => onCancel(sub),
+              },
+            ],
+          },
+          {
+            label: "Danger Zone",
+            items: [
+              {
+                label: "Eliminar Registro",
+                icon: <Trash2 size={14} />,
+                variant: "destructive",
+                show: canMutateBilling,
+                onClick: () => onDelete(sub),
+              },
+            ],
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+function createSubscriptionsColumns(
+  currencyFormat: CurrencyFormat,
+  linkOrganization: boolean,
+  canMutateBilling: boolean,
+  actionHandlers: {
+    readonly onDetail: (sub: SubscriptionWithDetails) => void;
+    readonly onHistory: (sub: SubscriptionWithDetails) => void;
+    readonly onPayment: (sub: SubscriptionWithDetails) => void;
+    readonly onExtend: (sub: SubscriptionWithDetails) => void;
+    readonly onCancel: (sub: SubscriptionWithDetails) => void;
+    readonly onDelete: (sub: SubscriptionWithDetails) => void;
+  },
+): ColumnDef<SubscriptionWithDetails>[] {
+  return [
+    {
+      header: "Organización",
+      className: "pl-6",
+      headerClassName: "pl-6",
+      cell: (sub) => (
+        <OrganizationCell sub={sub} linkOrganization={linkOrganization} />
+      ),
+    },
+    {
+      header: "Plan",
+      cell: (sub) => (
+        <SubscriptionPlanCell sub={sub} currencyFormat={currencyFormat} />
+      ),
+    },
+    {
+      header: "Periodo",
+      cell: (sub) => <SubscriptionPeriodCell sub={sub} />,
+    },
+    {
+      header: "Status",
+      cell: (sub) => <SubscriptionStatusCell sub={sub} />,
+    },
+    {
+      header: "Precio",
+      cell: (sub) => (
+        <SubscriptionPriceCell sub={sub} currencyFormat={currencyFormat} />
+      ),
+    },
+    {
+      header: "Acciones",
+      className: "pr-6 text-right",
+      headerClassName: "pr-6 text-right",
+      cell: (sub) => (
+        <SubscriptionActionsCell
+          sub={sub}
+          canMutateBilling={canMutateBilling}
+          {...actionHandlers}
+        />
+      ),
+    },
+  ];
+}
+
 export function SubscriptionsTable({
   subscriptions,
   loading = false,
@@ -95,7 +377,7 @@ export function SubscriptionsTable({
   onChange,
   settings,
   linkOrganization = true,
-}: SubscriptionsTableProps) {
+}: Readonly<SubscriptionsTableProps>) {
   const { user } = useAuth();
   const canMutateBilling = canManageBilling(user?.role);
   const [detailModal, setDetailModal] =
@@ -175,192 +457,23 @@ export function SubscriptionsTable({
     }
   };
 
-  const columns: ColumnDef<SubscriptionWithDetails>[] = [
-    {
-      header: "Organización",
-      className: "pl-6",
-      headerClassName: "pl-6",
-      cell: (sub) => {
-        const name = (
-          <>
-            <Text
-              weight="bold"
-              className="text-foreground hover:text-primary transition-colors leading-tight"
-            >
-              {sub.organizationName || sub.organizationId}
-            </Text>
-            {sub.organizationId && (
-              <Text size="xs" variant="muted" className="opacity-50 font-mono">
-                {sub.organizationId}
-              </Text>
-            )}
-          </>
-        );
-        if (!linkOrganization) {
-          return <div className="flex flex-col gap-0.5 text-left">{name}</div>;
-        }
-        return (
-          <Link
-            href={`/organizations/${sub.organizationSlug ?? sub.organizationId}`}
-            className="flex flex-col gap-0.5 text-left hover:text-primary transition-colors"
-          >
-            {name}
-          </Link>
-        );
-      },
-    },
-    {
-      header: "Plan",
-      cell: (sub) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <Text
-              as="span"
-              size="sm"
-              className="uppercase font-bold tracking-widest text-primary leading-tight"
-            >
-              {sub.planName ?? "—"}
-            </Text>
-            {sub.isTrial && (
-              <Badge
-                variant="info"
-                size="sm"
-                className="uppercase font-bold tracking-widest"
-              >
-                Trial
-              </Badge>
-            )}
-          </div>
-          {sub.planPrice !== undefined && sub.planCurrency && (
-            <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
-              {formatCents(sub.planPrice, sub.planCurrency, currencyFormat)}
-            </Text>
-          )}
-        </div>
+  const columns = React.useMemo(
+    () =>
+      createSubscriptionsColumns(
+        currencyFormat,
+        linkOrganization,
+        canMutateBilling,
+        {
+          onDetail: setDetailModal,
+          onHistory: setHistoryModal,
+          onPayment: setPaymentModal,
+          onExtend: setExtendModal,
+          onCancel: setCancelModal,
+          onDelete: setDeleteModal,
+        },
       ),
-    },
-    {
-      header: "Periodo",
-      cell: (sub) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-1.5">
-            <Calendar size={12} className="text-primary opacity-70" />
-            <Text size="sm" className="font-bold tabular-nums">
-              {formatDate(sub.currentPeriodEnd)}
-            </Text>
-          </div>
-          <Text size="xs" variant="muted" className="opacity-40 italic">
-            Desde: {formatDate(sub.startDate)}
-          </Text>
-        </div>
-      ),
-    },
-    {
-      header: "Status",
-      cell: (sub) => (
-        <div className="flex flex-col gap-1">
-          <SubscriptionStatusBadge status={sub.status} />
-          {sub.latestPaymentStatus === PAYMENT_STATUSES.PROCESSING && (
-            <Badge
-              variant="warning"
-              size="sm"
-              className="uppercase tracking-widest text-[9px] w-fit"
-            >
-              Pago pendiente
-            </Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "Precio",
-      cell: (sub) => (
-        <div className="flex flex-col gap-0.5">
-          <PriceCell
-            isTrial={sub.isTrial}
-            priceOverride={sub.priceOverride}
-            planPrice={sub.planPrice}
-            planCurrency={sub.planCurrency}
-            currencyFormat={currencyFormat}
-          />
-          <Text size="xs" variant="muted" className="opacity-50 tabular-nums">
-            {sub.paymentsCount ?? 0} pago(s)
-          </Text>
-        </div>
-      ),
-    },
-    {
-      header: "Acciones",
-      className: "pr-6 text-right",
-      headerClassName: "pr-6 text-right",
-      cell: (sub) => (
-        <div
-          className="flex justify-end gap-1"
-          data-testid={`subs-row-${sub.id}`}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDetailModal(sub)}
-            className="h-8 w-8 subs-row-detail"
-            title="Ver detalle"
-          >
-            <ExternalLink size={14} className="text-foreground/50" />
-          </Button>
-          <ActionsDropdown
-            modalData={sub}
-            className="subs-row-menu"
-            sections={[
-              {
-                label: "Gestión de Suscripción",
-                items: [
-                  {
-                    label: "Ver Pagos",
-                    icon: <History size={14} />,
-                    variant: "default",
-                    onClick: () => setHistoryModal(sub),
-                  },
-                  {
-                    label: "Registrar Pago",
-                    icon: <CreditCard size={14} />,
-                    variant: "default",
-                    show: canMutateBilling && hasActiveSubscription(sub),
-                    onClick: () => setPaymentModal(sub),
-                  },
-                  {
-                    label: "Extender Periodo",
-                    icon: <CalendarPlus size={14} />,
-                    variant: "default",
-                    show: canMutateBilling && hasActiveSubscription(sub),
-                    onClick: () => setExtendModal(sub),
-                  },
-                  {
-                    label: "Cancelar Suscripción",
-                    icon: <XCircle size={14} />,
-                    variant: "destructive",
-                    show: canMutateBilling && hasActiveSubscription(sub),
-                    onClick: () => setCancelModal(sub),
-                  },
-                ],
-              },
-              {
-                label: "Danger Zone",
-                items: [
-                  {
-                    label: "Eliminar Registro",
-                    icon: <Trash2 size={14} />,
-                    variant: "destructive",
-                    show: canMutateBilling,
-                    onClick: () => setDeleteModal(sub),
-                  },
-                ],
-              },
-            ]}
-          />
-        </div>
-      ),
-    },
-  ];
+    [currencyFormat, linkOrganization, canMutateBilling],
+  );
 
   return (
     <>
@@ -417,10 +530,10 @@ export function SubscriptionsTable({
                 {detailModal.isTrial
                   ? "Gratuito"
                   : formatCents(
-                      detailModal.priceOverride ?? detailModal.planPrice ?? 0,
-                      detailModal.planCurrency ?? "USD",
-                      currencyFormat,
-                    )}
+                    detailModal.priceOverride ?? detailModal.planPrice ?? 0,
+                    detailModal.planCurrency ?? "USD",
+                    currencyFormat,
+                  )}
               </Text>
             </DetailRow>
             <DetailRow label="Pagos">

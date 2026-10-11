@@ -43,47 +43,74 @@ export function OrganizationModal({
 
   const isEdit = !!initialData?.id;
 
-  const handleSubmit = async (formData: Partial<IPlatformOrganization>, ownerData?: OwnerData, logoFile?: File | null, settings?: Record<string, string>) => {
+  const handleLogoUpload = async (orgId: string, logoFile: File) => {
+    try {
+      const logoUrl = await uploadService.uploadFile(logoFile, orgId);
+      await organizationsService.update(orgId, { logo: logoUrl } as any);
+    } catch (uploadError) {
+      console.error("Error al subir logo en creación:", uploadError);
+      toast.warning("Sede creada, pero hubo un problema al subir el logo.");
+    }
+  };
+
+  const handleOwnerProvisioning = async (orgId: string, ownerData?: OwnerData) => {
+    if (!ownerData) {
+      toast.success("Organización creada exitosamente.");
+      return;
+    }
+
+    try {
+      await organizationsService.provisionOwner(
+        orgId,
+        {
+          ...DEFAULT_ORG_STAFF_VALUES,
+          firstName: ownerData.firstName,
+          lastName: ownerData.lastName,
+          email: ownerData.email,
+        },
+        ownerData.sendInvite
+      );
+      toast.success("Sede y Propietario configurados exitosamente.");
+    } catch (staffError: any) {
+      console.error("Error al crear propietario:", staffError);
+      toast.warning("Sede creada, pero hubo un problema al registrar al propietario.");
+    }
+  };
+
+  const handleCreateOrganization = async (
+    formData: Partial<IPlatformOrganization>,
+    ownerData?: OwnerData,
+    logoFile?: File | null,
+    settings?: Record<string, string>
+  ) => {
+    const newOrg = await organizationsService.create({
+      ...(formData as any),
+      ...(settings ? { settings } : {}),
+    });
+
+    if (!newOrg?.id) {
+      throw new Error("No se pudo obtener el ID de la nueva organización.");
+    }
+
+    if (logoFile) {
+      await handleLogoUpload(newOrg.id, logoFile);
+    }
+
+    await handleOwnerProvisioning(newOrg.id, ownerData);
+  };
+
+  const handleSubmit = async (
+    formData: Partial<IPlatformOrganization>,
+    ownerData?: OwnerData,
+    logoFile?: File | null,
+    settings?: Record<string, string>
+  ) => {
     try {
       if (isEdit && initialData?.id) {
         await organizationsService.update(initialData.id, formData as any);
         toast.success("Organización actualizada correctamente.");
       } else {
-        // 1. Crear la Organización (Base + settings extensibles)
-        const newOrg = await organizationsService.create({ ...(formData as any), ...(settings ? { settings } : {}) });
-        
-        if (!newOrg?.id) throw new Error("No se pudo obtener el ID de la nueva organización.");
-
-        const finalOrgId = newOrg.id;
-
-        // 2. Si hay logo, subirlo y actualizar la organización
-        if (logoFile) {
-          try {
-            const logoUrl = await uploadService.uploadFile(logoFile, finalOrgId);
-            await organizationsService.update(finalOrgId, { logo: logoUrl } as any);
-          } catch (uploadError) {
-            console.error("Error al subir logo en creación:", uploadError);
-            toast.warning("Sede creada, pero hubo un problema al subir el logo.");
-          }
-        }
-
-        // 3. Si hay datos de propietario, crearlo
-        if (ownerData) {
-          try {
-            await organizationsService.provisionOwner(finalOrgId, {
-              ...DEFAULT_ORG_STAFF_VALUES,
-              firstName: ownerData.firstName,
-              lastName: ownerData.lastName,
-              email: ownerData.email,
-            }, ownerData.sendInvite);
-            toast.success("Sede y Propietario configurados exitosamente.");
-          } catch (staffError: any) {
-            console.error("Error al crear propietario:", staffError);
-            toast.warning("Sede creada, pero hubo un problema al registrar al propietario.");
-          }
-        } else {
-          toast.success("Organización creada exitosamente.");
-        }
+        await handleCreateOrganization(formData, ownerData, logoFile, settings);
       }
       handleSuccess();
     } catch (error: any) {

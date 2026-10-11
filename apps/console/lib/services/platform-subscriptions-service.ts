@@ -69,7 +69,7 @@ export interface ReceiptsReportFilters {
   to?: string;
   status?: ReceiptReportStatusFilter;
   method?: string;
-  /** Año UTC de `payment_date` (la serie FS-N es continua, no lleva año). */
+  /** UTC year of `payment_date` (the FS-N series is continuous, does not include year). */
   year?: number;
   page?: number;
   limit?: number;
@@ -264,9 +264,9 @@ export const platformSubscriptionsService = {
   /**
    * Updates the status of an existing payment.
    *
-   * Devuelve el resultado del intento de anulación del comprobante: con
-   * `voided` sin comprobante emitido, `receiptVoided` es `false` y
-   * `receiptVoidReason` es `'not_issued'` (C6).
+   * Returns the outcome of the receipt voiding attempt: with
+   * `voided` without an issued receipt, `receiptVoided` is `false` and
+   * `receiptVoidReason` is `'not_issued'` (C6).
    */
   async updatePaymentStatus(
     paymentId: number,
@@ -279,12 +279,12 @@ export const platformSubscriptionsService = {
     );
   },
 
-  /* ── Auditoría del correlativo (C4) ── */
+  /* ── Correlative sequence audit (C4) ── */
 
   /**
-   * Reporte de comprobantes `FS-N`: filas, resumen, totales por moneda y
-   * gaps (hueco sospechoso vs anulado explicado). Espejo del Panel.
-   * `limit` admite hasta 1000 para la exportación CSV.
+   * `FS-N` receipts report: rows, summary, totals per currency and
+   * gaps (suspicious gap vs explained voided). Mirrors gym Panel.
+   * `limit` accepts up to 1000 for CSV export.
    */
   async getReceiptsReport(
     filters: ReceiptsReportFilters = {},
@@ -304,17 +304,17 @@ export const platformSubscriptionsService = {
     });
   },
 
-  /* ── Comprobantes SaaS (C3) ── */
+  /* ── SaaS Receipts (C3) ── */
 
   /**
-   * Descarga el PDF del comprobante (`FS-N.pdf`). Lanza si no está listo.
+   * Downloads receipt PDF (`FS-N.pdf`). Throws if not ready.
    */
   async downloadReceipt(paymentId: number): Promise<Blob> {
     return await apiBlob(`${SUBSCRIPTIONS_PATH}/payments/${paymentId}/receipt/pdf`);
   },
 
   /**
-   * Reenvía el comprobante a payer+owners (contrato 4 ramas del POST resend:
+   * Resends receipt to payer+owners (4 branches contract of POST resend:
    * ready / pending-202 / presystem / error).
    */
   async resendReceipt(

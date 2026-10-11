@@ -53,7 +53,7 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
       const body: Record<string, string> = {
         [PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER_ENABLED]: next ? "true" : "false",
       };
-      // Al habilitar, persistimos las features (si aún no había config, defaults de código)
+      // When enabling, persist features (code defaults if no config exists yet)
       if (next) {
         body[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER] = JSON.stringify(features);
       }
@@ -136,7 +136,7 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
         </p>
       </div>
 
-      {/* Editor — sección plana con header + lista, sin card-en-card */}
+      {/* Editor — flat section with header + list, no card-in-card */}
       <section
         className={`mt-8 overflow-hidden rounded-xl border transition-opacity ${
           enabled ? "border-border bg-surface" : "border-border-muted bg-surface/60"
@@ -158,7 +158,7 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
         </div>
       </section>
 
-      {/* Acciones — barra distinta, no otra Card idéntica */}
+      {/* Actions — distinct bar, not another identical Card */}
       <div className="mt-6 flex flex-col gap-3 border-t border-border-muted pt-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-2 text-xs leading-relaxed text-foreground-muted max-w-[44ch]">
           <Info className="size-3.5 text-foreground-dim shrink-0 mt-0.5" />

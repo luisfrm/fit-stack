@@ -43,7 +43,7 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
       toast.success(`Invitación reenviada a ${member.email}`);
       await fetchStaff();
     } catch (error) {
-      // El mensaje del API nunca se muestra al usuario — solo consola.
+      // Raw API message is never shown to the user — console only.
       console.error("Error resending invite:", error);
       toast.error("Ocurrió un error al reenviar la invitación");
     } finally {
@@ -52,6 +52,100 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
   };
 
   const hasOwner = staff.some((member) => member.role === "owner");
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          Cargando personal...
+        </div>
+      );
+    }
+
+    if (staff.length === 0) {
+      return (
+        <div className="py-10 text-center space-y-4 border border-dashed border-border rounded-xl bg-card/30 p-6">
+          <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <Users className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-medium text-foreground">Sin propietarios ni personal registrados</h4>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Esta sede aún no tiene un usuario propietario asignado. Agrega un propietario para enviarle su invitación.
+            </p>
+          </div>
+          <ProvisionOwnerModal
+            organizationId={organizationId}
+            onSuccess={fetchStaff}
+            trigger={
+              <Button size="sm" className="gap-2 text-xs font-semibold">
+                <UserPlus className="w-4 h-4" />
+                Agregar Propietario
+              </Button>
+            }
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="divide-y divide-border border rounded-lg overflow-hidden">
+        {staff.map((member) => {
+          const isLinked = Boolean(member.userId || member.user?.id);
+          const isResending = resendingId === member.id;
+
+          return (
+            <div
+              key={member.id ?? member.email}
+              className="flex items-center justify-between p-4 bg-card/50 hover:bg-muted/30 transition-colors"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm text-foreground">
+                    {member.firstName} {member.lastName}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-mono px-2 py-0.5">
+                    {member.role || "Member"}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>{member.email}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {isLinked ? (
+                  <Badge variant="success" className="gap-1.5 py-1 px-2.5 text-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Vinculado
+                  </Badge>
+                ) : (
+                  <Badge variant="warning" className="gap-1.5 py-1 px-2.5 text-xs">
+                    <Clock className="w-3.5 h-3.5" />
+                    Invitación Pendiente
+                  </Badge>
+                )}
+
+                {!isLinked && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleResendInvite(member)}
+                    disabled={isResending}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Mail className={`w-3.5 h-3.5 ${isResending ? "animate-pulse" : ""}`} />
+                    {isResending ? "Enviando..." : "Reenviar Invitación"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <Card className="p-6 space-y-6 bg-card border-border shadow-sm rounded-xl">
@@ -96,89 +190,7 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">
-          Cargando personal...
-        </div>
-      ) : staff.length === 0 ? (
-        <div className="py-10 text-center space-y-4 border border-dashed border-border rounded-xl bg-card/30 p-6">
-          <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <Users className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-sm font-medium text-foreground">Sin propietarios ni personal registrados</h4>
-            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-              Esta sede aún no tiene un usuario propietario asignado. Agrega un propietario para enviarle su invitación.
-            </p>
-          </div>
-          <ProvisionOwnerModal
-            organizationId={organizationId}
-            onSuccess={fetchStaff}
-            trigger={
-              <Button size="sm" className="gap-2 text-xs font-semibold">
-                <UserPlus className="w-4 h-4" />
-                Agregar Propietario
-              </Button>
-            }
-          />
-        </div>
-      ) : (
-        <div className="divide-y divide-border border rounded-lg overflow-hidden">
-          {staff.map((member) => {
-            const isLinked = Boolean(member.userId || member.user?.id);
-            const isResending = resendingId === member.id;
-
-            return (
-              <div
-                key={member.id ?? member.email}
-                className="flex items-center justify-between p-4 bg-card/50 hover:bg-muted/30 transition-colors"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm text-foreground">
-                      {member.firstName} {member.lastName}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] uppercase font-mono px-2 py-0.5">
-                      {member.role || "Member"}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>{member.email}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {isLinked ? (
-                    <Badge variant="success" className="gap-1.5 py-1 px-2.5 text-xs">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Vinculado
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning" className="gap-1.5 py-1 px-2.5 text-xs">
-                      <Clock className="w-3.5 h-3.5" />
-                      Invitación Pendiente
-                    </Badge>
-                  )}
-
-                  {!isLinked && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleResendInvite(member)}
-                      disabled={isResending}
-                      className="gap-1.5 text-xs"
-                    >
-                      <Mail className={`w-3.5 h-3.5 ${isResending ? "animate-pulse" : ""}`} />
-                      {isResending ? "Enviando..." : "Reenviar Invitación"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {renderContent()}
     </Card>
   );
 }

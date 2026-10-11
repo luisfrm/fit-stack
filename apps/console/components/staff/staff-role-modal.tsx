@@ -44,18 +44,18 @@ export function StaffRoleModal({
     if (member) setRole(member.role);
   }, [member]);
 
-  // Anti-escalation: solo los roles que el actor puede asignar.
+  // Anti-escalation: only roles that the actor is allowed to assign.
   const assignableRoles = ROLE_OPTIONS.filter((opt) =>
     canAssignPlatformRole(actorRole, opt.value as PlatformRole),
   );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!member) return;
     setIsSubmitting(true);
     try {
-      // Email existente → el backend actualiza su rol global (con
-      // anti-escalation en servidor). sendInvite no aplica aquí.
+      // Existing email → backend updates global role (with server-side
+      // anti-escalation enforcement). sendInvite does not apply here.
       const result = await staffService.create({
         email: member.email,
         role,

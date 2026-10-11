@@ -47,9 +47,9 @@ interface PlatformSubscriptionFormProps {
   readonly isLoading?: boolean;
   readonly initialOrganization?: IPlatformOrganization | null;
   readonly settings?: Record<string, string>;
-  /** Plan precargado (modo pago sobre una suscripción existente). */
+  /** Preloaded plan (payment mode on an existing subscription). */
   readonly initialPlan?: IPlatformPlan | null;
-  /** Solo pago: oculta selector de plan, trial y fechas; cambia el submit. */
+  /** Payment only: hides plan selector, trial, and dates; modifies submit. */
   readonly paymentOnly?: boolean;
   readonly submitLabel?: string;
 }
@@ -170,12 +170,12 @@ export function PlatformSubscriptionForm({
     [allPlans, planId],
   );
 
-  // Plan free (precio 0) o trial explícito
+  // Free plan (zero price) or explicit trial
   const isFreePlan = selectedPlan ? Number(selectedPlan.price) === 0 : false;
   const hasTrialDays = selectedPlan ? (selectedPlan.trialDays ?? 0) > 0 : false;
   const showPayment = selectedPlan && !isFreePlan && (!isTrial || paymentOnly);
 
-  // Preview de la fecha de fin (solo visual)
+  // End date preview (visual only)
   const previewEndDate = React.useMemo(() => {
     if (!selectedPlan) return "";
     if (isTrial && hasTrialDays) {
@@ -279,7 +279,7 @@ export function PlatformSubscriptionForm({
       rate = planRates[paymentCurrency] ?? 1;
     }
     setExchangeRate(rate);
-    // price ya está en centavos → unidades para mostrar
+    // price is already in cents → units for display
     setFinalAmount(centsToUnits(Number(selectedPlan.price) * rate));
   }, [selectedPlan, paymentCurrency, planRates]);
 
@@ -315,8 +315,8 @@ export function PlatformSubscriptionForm({
           .toLowerCase()
           .replaceAll(/\s+/g, "-");
         const customName = `${orgName}_${methodName}_${timestamp}`;
-        // La org es obligatoria: el console sube assets por path, sin fallback
-        // a la sesión (el console no tiene organización activa).
+        // Organization is mandatory: console uploads assets by path, without fallback
+        // to session (console has no active organization).
         if (!organizationId) {
           throw new Error(
             "Selecciona la organización antes de adjuntar el comprobante de pago.",
@@ -369,7 +369,7 @@ export function PlatformSubscriptionForm({
 
     setIsProcessingUploads(true);
     try {
-      // Trial o plan free: pago automático validated con 0
+      // Trial or free plan: automatic validated payment with 0
       if (isTrial || isFreePlan) {
         await onSubmit({
           organizationId,

@@ -17,7 +17,7 @@ interface OrgSubscriptionsProps {
   readonly onRefresh?: () => Promise<void>;
 }
 
-/** Misma tabla de suscripciones, acotada a una org (máx `limit` + paginación URL). */
+/** Same subscriptions table, scoped to an org (max `limit` + URL pagination). */
 export function OrgSubscriptions({
   subscriptions,
   total,

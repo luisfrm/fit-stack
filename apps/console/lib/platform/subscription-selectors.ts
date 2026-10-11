@@ -1,5 +1,5 @@
 /**
- * Selectores puros del módulo de suscripciones SaaS (sin fetch, sin fechas "ahora").
+ * Pure selectors for SaaS subscriptions module (no fetch, no "now" hardcoded dates).
  */
 import { differenceInCalendarDays } from "date-fns";
 import type {
@@ -15,13 +15,13 @@ export interface TopPlanRevenue {
   count: number;
 }
 
-/** Precio efectivo de la sub en centavos (override o precio del plan; trial/ausente = 0). */
+/** Effective price of the subscription in cents (override or plan price; trial/absent = 0). */
 export function effectivePriceCents(sub: SubscriptionWithDetails): number {
   if (sub.isTrial) return 0;
   return sub.priceOverride ?? sub.planPrice ?? 0;
 }
 
-/** Top planes por revenue sumado, ordenados de mayor a menor. */
+/** Top plans by cumulative revenue, ordered descending. */
 export function selectTopPlansByRevenue(
   subs: SubscriptionWithDetails[],
 ): TopPlanRevenue[] {
@@ -43,11 +43,11 @@ export function selectTopPlansByRevenue(
 export interface RevenueGrowth {
   current: number;
   previous: number;
-  /** % de crecimiento mes a mes, null si no es calculable (mes previo en 0). */
+  /** Month-over-month growth %, null if not computable (previous month was 0). */
   pct: number | null;
 }
 
-/** Crecimiento de ingresos mes actual vs previo (null-safe ante división por cero). */
+/** Current vs previous month revenue growth (null-safe against division by zero). */
 export function selectRevenueGrowth(stats: SubscriptionStats): RevenueGrowth {
   const current = stats.monthlyRevenueCents;
   const previous = stats.previousMonthRevenueCents;
@@ -61,9 +61,9 @@ export interface ExpiringSoon {
 }
 
 /**
- * Suscripciones que vencen en `days` días (incluye hoy), ordenadas por
- * vencimiento ascendente y topadas a `limit`. Incluye trials y periodos
- * con pago pendiente: todo lo que necesita atención comercial.
+ * Subscriptions expiring in `days` days (including today), sorted by
+ * ascending expiration and capped at `limit`. Includes trials and periods
+ * with pending payments: everything needing commercial attention.
  */
 export function selectExpiringSoon(
   subs: SubscriptionWithDetails[],
@@ -89,8 +89,8 @@ export function selectExpiringSoon(
 }
 
 /**
- * Facturación SaaS de una org en el mes UTC en curso (solo pagos
- * `validated`, `baseAmount ?? amountPaid` — misma fórmula que el revenue).
+ * SaaS billing for an organization in current UTC month (only `validated`
+ * payments, `baseAmount ?? amountPaid` — same formula as revenue).
  */
 export function selectOrgCurrentMonth(
   invoices: Pick<
@@ -114,7 +114,7 @@ export function selectOrgCurrentMonth(
   return { totalCents, count };
 }
 
-/** Total validado de una org (misma fórmula que el bucket mensual). */
+/** Total validated for an organization (same formula as monthly bucket). */
 export function selectOrgBilledTotal(
   invoices: Pick<PlatformPayment, "status" | "amountPaid" | "baseAmount">[],
 ): { totalCents: number; count: number } {

@@ -3,24 +3,24 @@ import type { IPlatformOrganization } from "@workspace/shared/types";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";
 
 /**
- * Selectores puros para los widgets del dashboard de console.
+ * Pure selectors for console dashboard widgets.
  *
- * Se derivan de datos ya disponibles (organizaciones con `latestSubscription`
- * y suscripciones recientes) para no agregar endpoints al backend.
- * Todas las fechas usan los helpers de `@workspace/shared/date`; el corte de
- * mes es UTC porque el billing SaaS opera en UTC.
+ * Derived from existing available data (organizations with `latestSubscription`
+ * and recent subscriptions) to avoid adding extra backend endpoints.
+ * All dates use helpers from `@workspace/shared/date`; the month boundary
+ * is UTC because SaaS billing operates in UTC.
  */
 
-/** Tope de filas por widget (la paginación local muestra de a 10). */
+/** Max rows per widget (local pagination displays in groups of 10). */
 export const DASHBOARD_WIDGET_LIMIT = 30;
 
-/** Filas por página dentro de cada widget. */
+/** Rows per page within each widget. */
 export const DASHBOARD_WIDGET_PAGE_SIZE = 10;
 
-/** Ventana de "por vencer": 7 días (igual que `status=expiring` del backend). */
+/** "Expiring soon" window: 7 days (matching backend `status=expiring`). */
 export const EXPIRING_WINDOW_DAYS = 7;
 
-/** Timezone de referencia para cortes a nivel plataforma. */
+/** Reference timezone for platform-level thresholds. */
 const PLATFORM_TIMEZONE = "UTC";
 
 export interface RenewalItem {
@@ -46,7 +46,7 @@ function toDate(value: string | Date | undefined | null): Date | null {
 }
 
 /**
- * Gimnasios creados en el mes calendario actual (UTC), más recientes primero.
+ * Gyms created during the current calendar month (UTC), newest first.
  */
 export function selectNewOrgsThisMonth(
   orgs: IPlatformOrganization[],
@@ -70,10 +70,10 @@ export function selectNewOrgsThisMonth(
 }
 
 /**
- * Gimnasios pendientes de renovar: primero vencidas (`past_due`/`read_only`/
- * `suspended`, la más vencida arriba) y luego por vencer (activas con fin
- * dentro de 7 días, la más próxima arriba). Excluye trials, canceladas y
- * organizaciones sin suscripción (free tier / sin plan).
+ * Gyms pending renewal: overdue first (`past_due`/`read_only`/
+ * `suspended`, most overdue at the top) followed by expiring (active with end
+ * within 7 days, soonest at the top). Excludes trials, cancelled, and
+ * organizations without active subscription (free tier / no plan).
  */
 export function selectRenewals(
   orgs: IPlatformOrganization[],
@@ -115,8 +115,8 @@ export function selectRenewals(
 }
 
 /**
- * Trials: `expiring` (fin dentro de 7 días, no cancelados) y `all`
- * (todos los trials no cancelados). Ambos ordenados por fin de periodo.
+ * Trials: `expiring` (end within 7 days, non-cancelled) and `all`
+ * (all non-cancelled trials). Both sorted by period end.
  */
 export function selectTrials(
   orgs: IPlatformOrganization[],
@@ -155,8 +155,8 @@ export function selectTrials(
 }
 
 /**
- * Suscripciones con último pago en revisión (`processing`), más recientes primero.
- * La aprobación/rechazo vive en el detalle de la org (modal de historial de pagos).
+ * Subscriptions with latest payment under review (`processing`), newest first.
+ * Approval/rejection happens in org details (payment history modal).
  */
 export function selectPaymentsReview(
   subs: SubscriptionWithDetails[],

@@ -14,14 +14,14 @@ export const dynamic = "force-dynamic";
 const PAGE_LIMIT = 20;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-const VALID_STATUSES: ReceiptReportStatusFilter[] = [
+const VALID_STATUSES: Set<ReceiptReportStatusFilter> = new Set([
   "all",
   "issued",
   "pending",
   "voided",
   "pre_system",
   "gaps",
-];
+]);
 
 const EMPTY_REPORT: IReceiptsReportResult = {
   rows: [],
@@ -40,7 +40,7 @@ const EMPTY_REPORT: IReceiptsReportResult = {
  */
 export default async function PlatformReceiptsReportPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{
     from?: string;
     to?: string;
@@ -49,17 +49,17 @@ export default async function PlatformReceiptsReportPage({
     year?: string;
     page?: string;
   }>;
-}) {
+}>) {
   const params = await searchParams;
-  const status: ReceiptReportStatusFilter = VALID_STATUSES.includes(
+  const status: ReceiptReportStatusFilter = VALID_STATUSES.has(
     params.status as ReceiptReportStatusFilter,
   )
     ? (params.status as ReceiptReportStatusFilter)
     : "all";
   const page = Math.max(1, Number(params.page) || 1);
 
-  // Filtros inválidos del usuario degradan a estado vacío visible (nunca 500
-  // por query manipulada; los fallos inesperados del fetch sí propagan).
+  // Invalid user filters degrade to a visible empty state (never a 500
+  // due to manipulated query params; unexpected fetch failures do propagate).
   let from = params.from || undefined;
   let to = params.to || undefined;
   let year = params.year ? Number(params.year) : undefined;
@@ -78,17 +78,17 @@ export default async function PlatformReceiptsReportPage({
     filtersError
       ? Promise.resolve(EMPTY_REPORT)
       : platformSubscriptionsService.getReceiptsReport(
-          {
-            from,
-            to,
-            status,
-            method: params.method || undefined,
-            year,
-            page,
-            limit: PAGE_LIMIT,
-          },
-          { next: { revalidate: 300, tags: ["console:receipts"] } },
-        ),
+        {
+          from,
+          to,
+          status,
+          method: params.method || undefined,
+          year,
+          page,
+          limit: PAGE_LIMIT,
+        },
+        { next: { revalidate: 300, tags: ["console:receipts"] } },
+      ),
     api<Record<string, string>>("/platform/settings", {
       next: { revalidate: 600, tags: ["console:settings"] },
     }),

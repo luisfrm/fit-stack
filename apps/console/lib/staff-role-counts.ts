@@ -8,9 +8,9 @@ export interface StaffRoleCounts {
 }
 
 /**
- * Conteo de staff de plataforma por rol. Solo owner/admin/support tienen
- * conteo propio (la lista ya viene filtrada a roles de plataforma);
- * `total` es el tamaño real de la lista.
+ * Counts of platform staff by role. Only owner/admin/support have
+ * dedicated counters (the list is already filtered to platform roles);
+ * `total` is the actual list size.
  */
 export function getStaffRoleCounts(
   staff: Pick<PlatformStaffMember, "role">[],

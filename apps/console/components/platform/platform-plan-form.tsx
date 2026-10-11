@@ -84,7 +84,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
-    // Convert dezenas para el API (centavos enteros)
+    // Convert decimal units for API (integer cents)
     const priceInCents = unitsToCents(Number(formData.price));
 
     const submissionData = {

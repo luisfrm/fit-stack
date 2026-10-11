@@ -36,7 +36,7 @@ interface WidgetCardProps {
   readonly action?: React.ReactNode;
   readonly children: React.ReactNode;
   readonly footer?: React.ReactNode;
-  /** Sin filas: el cuerpo toma su tamaño natural en vez de la altura fija. */
+  /** No rows: body takes natural height instead of fixed height. */
   readonly isEmpty?: boolean;
 }
 

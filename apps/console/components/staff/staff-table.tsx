@@ -22,7 +22,7 @@ import { staffService } from "@/lib/services/staff-service";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";
 import { StaffRoleModal } from "./staff-role-modal";
 
-/** Items por página de la tabla de staff. */
+/** Items per page for staff table. */
 const MAX_ITEMS = 10;
 
 const ROLE_BADGE_VARIANT: Record<

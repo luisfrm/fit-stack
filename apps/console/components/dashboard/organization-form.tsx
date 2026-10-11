@@ -78,6 +78,22 @@ function OrganizationStep1({
 }: Step1Props) {
   const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
   const primaryCurrency = countryConfig?.currency ?? "";
+  const getSlugInputState = () => {
+    if (slugStatus === "error") return "error";
+    if (slugStatus === "valid") return "success";
+    return "default";
+  };
+
+  const getSlugHint = () => {
+    if (slugStatus === "error") {
+      return slugError ?? "El slug ya está en uso por otra organización";
+    }
+    if (slugStatus === "valid") {
+      return "Slug disponible";
+    }
+    return "Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre.";
+  };
+
   return (
     <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="col-span-full pt-2">
@@ -111,14 +127,8 @@ function OrganizationStep1({
         value={formData.slug ?? ""}
         onChange={(e) => onChange("slug", e.target.value)}
         leftIcon={<Globe size={16} />}
-        state={slugStatus === "error" ? "error" : slugStatus === "valid" ? "success" : "default"}
-        hint={
-          slugStatus === "error"
-            ? slugError ?? "El slug ya está en uso por otra organización"
-            : slugStatus === "valid"
-              ? "Slug disponible"
-              : "Se utilizará para la URL del portal. Si se deja en blanco, se generará a partir del nombre."
-        }
+        state={getSlugInputState()}
+        hint={getSlugHint()}
       />
 
       <Input
@@ -391,13 +401,13 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   }, [debouncedSlug, initialData?.id]);
 
   const handleChange = (field: keyof IOrganization, value: unknown) => {
-    // Al cambiar el slug se reinicia la validación (se re-evalúa tras el debounce).
+    // When slug changes, reset validation (re-evaluated after debounce).
     if (field === "slug") {
       setSlugStatus("idle");
       setSlugError(null);
     }
-    // Cambiar de país re-sugiere timezone y re-deriva la principal en activas
-    // (conservando las extras que el usuario ya marcó).
+    // Changing country re-suggests timezone and re-derives primary currency in active list
+    // (preserving any extras the user already selected).
     if (field === "countryCode" && typeof value === "string") {
       const config = COUNTRY_LIST.find((c) => c.code === value);
       const prevPrimary =
@@ -436,25 +446,41 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     setFormData((prev) => ({ ...prev, logo: "" }));
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const validateStep1 = (): boolean => {
+    if (!formData.name?.trim() || !formData.countryCode || !formData.timezone) {
+      toast.error("Completa nombre, país y zona horaria para continuar.");
+      return false;
+    }
+    const primary = formData.countryCode
+      ? COUNTRIES[formData.countryCode]?.currency
+      : undefined;
+    if (!primary || !activeCurrencies.includes(primary)) {
+      toast.error("Las monedas activas deben incluir la principal.");
+      return false;
+    }
+    if (slugStatus === "error") {
+      toast.error(slugError ?? "El slug ya está en uso por otra organización");
+      return false;
+    }
+    return true;
+  };
+
+  const resolveEditLogoUrl = async (): Promise<string | null | undefined> => {
+    if (!isEdit || !selectedFile) {
+      return formData.logo;
+    }
+    const orgId = initialData?.id;
+    if (!orgId) {
+      throw new Error("No se pudo resolver la organización para subir el logo.");
+    }
+    return uploadService.uploadFile(selectedFile, orgId);
+  };
+
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
     if (!isEdit && activeStep === 0) {
-      if (!formData.name?.trim() || !formData.countryCode || !formData.timezone) {
-        toast.error("Completa nombre, país y zona horaria para continuar.");
-        return;
-      }
-      const primary = formData.countryCode
-        ? COUNTRIES[formData.countryCode]?.currency
-        : undefined;
-      if (!primary || !activeCurrencies.includes(primary)) {
-        toast.error("Las monedas activas deben incluir la principal.");
-        return;
-      }
-      if (slugStatus === "error") {
-        toast.error(slugError ?? "El slug ya está en uso por otra organización");
-        return;
-      }
+      if (!validateStep1()) return;
       setActiveStep(1);
       setMaxReachedStep((prev) => Math.max(prev, 1));
       return;
@@ -462,24 +488,14 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
 
     setIsUploading(true);
     try {
-      let finalLogoUrl = formData.logo;
-
-      if (isEdit && selectedFile) {
-        // La org destino va por path: sin ella no hay upload (no se inventa una
-        // carpeta ni se cae a la sesión del console, que no tiene org activa).
-        const orgId = initialData?.id;
-        if (!orgId) {
-          throw new Error("No se pudo resolver la organización para subir el logo.");
-        }
-        finalLogoUrl = await uploadService.uploadFile(selectedFile, orgId);
-      }
+      const finalLogoUrl = await resolveEditLogoUrl();
 
       const payload: Partial<IOrganization> = {
         ...formData,
         logo: previewUrl ? (finalLogoUrl || null) : null,
       };
 
-      // Activas solo al crear (en edición se gestionan desde el panel de la sede).
+      // Active currencies set only on creation (in edit mode they are managed from gym panel).
       const settings = isEdit
         ? undefined
         : { active_currencies: JSON.stringify(activeCurrencies) };

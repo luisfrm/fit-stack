@@ -35,7 +35,7 @@ interface ReceiptsReportClientProps {
     year: string;
   };
   readonly initialCurrencyFormat: CurrencyFormat;
-  /** Error de filtros inválidos (visible, sin tumbar la página). */
+  /** Error from invalid filters (visible to user, without crashing page). */
   readonly loadError?: string | null;
 }
 
@@ -80,6 +80,131 @@ function stateBadge(state: IReceiptReportRow["state"]) {
 function toCsvCell(value: string | number | null | undefined): string {
   const text = value === null || value === undefined ? "" : String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+interface ReceiptActionsCellProps {
+  readonly row: IReceiptReportRow;
+  readonly isDownloading: boolean;
+  readonly onDownloadPdf: (row: IReceiptReportRow) => void;
+}
+
+function ReceiptActionsCell({
+  row,
+  isDownloading,
+  onDownloadPdf,
+}: ReceiptActionsCellProps) {
+  if (row.pdfStatus !== "ready") return null;
+
+  return (
+    <div className="flex justify-end">
+      <Button
+        variant="outlined"
+        size="sm"
+        leftIcon={<Eye size={14} />}
+        loading={isDownloading}
+        onClick={() => onDownloadPdf(row)}
+      >
+        PDF
+      </Button>
+    </div>
+  );
+}
+
+interface ReceiptTotalCellProps {
+  readonly row: IReceiptReportRow;
+  readonly currencyFormat: CurrencyFormat;
+}
+
+function ReceiptTotalCell({ row, currencyFormat }: ReceiptTotalCellProps) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Text weight="bold" size="sm" className="tabular-nums">
+        {formatCents(row.amountPaid, row.currencyPaid, currencyFormat)}
+      </Text>
+      <Text size="xs" variant="muted" className="uppercase">
+        {row.paymentMethod}
+      </Text>
+    </div>
+  );
+}
+
+function ReceiptAuditCell({ row }: { readonly row: IReceiptReportRow }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {row.voided && (
+        <Text size="xs" variant="muted" className="italic">
+          Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
+        </Text>
+      )}
+      {row.issuedBy && (
+        <Text size="xs" variant="muted">
+          Emitido por: {row.issuedBy}
+        </Text>
+      )}
+      {!row.voided && !row.issuedBy && (
+        <Text size="xs" variant="muted" className="opacity-50">
+          —
+        </Text>
+      )}
+    </div>
+  );
+}
+
+function createReceiptReportColumns(
+  currencyFormat: CurrencyFormat,
+  downloadingId: number | null,
+  onDownloadPdf: (row: IReceiptReportRow) => void,
+): ColumnDef<IReceiptReportRow>[] {
+  return [
+    {
+      header: "Comprobante",
+      className: "pl-6",
+      headerClassName: "pl-6",
+      cell: (row) => (
+        <div className="flex flex-col gap-1">
+          <Text weight="bold" size="sm" className="font-mono">
+            {row.receiptNumber ?? "SIN COMPROBANTE"}
+          </Text>
+          {stateBadge(row.state)}
+        </div>
+      ),
+    },
+    {
+      header: "Organización / Plan",
+      cell: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <Text weight="bold" size="sm">
+            {row.memberName}
+          </Text>
+          <Text size="xs" variant="muted">
+            {row.planName}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      header: "Total",
+      cell: (row) => (
+        <ReceiptTotalCell row={row} currencyFormat={currencyFormat} />
+      ),
+    },
+    {
+      header: "Auditoría",
+      cell: (row) => <ReceiptAuditCell row={row} />,
+    },
+    {
+      header: "Acciones",
+      className: "pr-6 text-right",
+      headerClassName: "pr-6 text-right",
+      cell: (row) => (
+        <ReceiptActionsCell
+          row={row}
+          isDownloading={downloadingId === row.paymentId}
+          onDownloadPdf={onDownloadPdf}
+        />
+      ),
+    },
+  ];
 }
 
 export function ReceiptsReportClient({
@@ -154,63 +279,63 @@ export function ReceiptsReportClient({
         page: 1,
         limit: 1000,
       });
-      // En vista de huecos se exporta lo visible (gaps), no filas vacías.
-      // Montos en centavos enteros (convención Money): headers *_cents.
+      // In gaps view, visible items (gaps) are exported, not empty rows.
+      // Amounts in integer cents (Money convention): headers *_cents.
       const header =
         status === "gaps"
           ? ["tipo", "comprobante", "motivo", "actor", "fecha"]
           : [
-              "comprobante",
-              "estado",
-              "organizacion",
-              "plan",
-              "subtotal_cents",
-              "impuestos_cents",
-              "total_cents",
-              "moneda",
-              "metodo",
-              "fecha_pago",
-              "fecha_emision",
-              "anulado",
-              "motivo_anulacion",
-              "emisor",
-              "emitido_por",
-            ];
+            "comprobante",
+            "estado",
+            "organizacion",
+            "plan",
+            "subtotal_cents",
+            "impuestos_cents",
+            "total_cents",
+            "moneda",
+            "metodo",
+            "fecha_pago",
+            "fecha_emision",
+            "anulado",
+            "motivo_anulacion",
+            "emisor",
+            "emitido_por",
+          ];
       const lines =
         status === "gaps"
           ? full.gaps.map((gap) =>
-              [
-                gap.kind,
-                gap.receiptNumber,
-                gap.voidReason ?? "",
-                gap.voidedBy ?? "",
-                gap.voidedAt ?? "",
-              ]
-                .map(toCsvCell)
-                .join(","),
-            )
+            [
+              gap.kind,
+              gap.receiptNumber,
+              gap.voidReason ?? "",
+              gap.voidedBy ?? "",
+              gap.voidedAt ?? "",
+            ]
+              .map(toCsvCell)
+              .join(","),
+          )
           : full.rows.map((row) =>
-              [
-                row.receiptNumber ?? "SIN COMPROBANTE",
-                row.state,
-                row.memberName,
-                row.planName,
-                row.subtotal ?? "",
-                row.taxTotal ?? "",
-                row.amountPaid,
-                row.currencyPaid,
-                row.paymentMethod,
-                row.paymentDate,
-                row.receiptIssuedAt ?? "",
-                row.voided ? "SI" : "NO",
-                row.voidReason ?? "",
-                // C1/C5: emisor congelado + actor (libro exportable).
-                row.emitterName ?? "",
-                row.issuedBy ?? "",
-              ]
-                .map(toCsvCell)
-                .join(","),
-            );
+            [
+              row.receiptNumber ?? "SIN COMPROBANTE",
+              row.state,
+              row.memberName,
+              row.planName,
+              row.subtotal ?? "",
+              row.taxTotal ?? "",
+              row.amountPaid,
+              row.currencyPaid,
+              row.paymentMethod,
+              row.paymentDate,
+              row.receiptIssuedAt ?? "",
+              row.voided ? "SI" : "NO",
+              row.voidReason ?? "",
+              // C1/C5: emisor congelado + actor (libro exportable).
+              row.emitterName ?? "",
+              row.issuedBy ?? "",
+            ]
+              .map(toCsvCell)
+              .join(","),
+          );
       const csv = [header.map(toCsvCell).join(","), ...lines].join("\n");
       downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), "comprobantes-fs.csv");
       toast.success("Reporte exportado");
@@ -221,88 +346,15 @@ export function ReceiptsReportClient({
     }
   };
 
-  const columns: ColumnDef<IReceiptReportRow>[] = [
-    {
-      header: "Comprobante",
-      className: "pl-6",
-      headerClassName: "pl-6",
-      cell: (row) => (
-        <div className="flex flex-col gap-1">
-          <Text weight="bold" size="sm" className="font-mono">
-            {row.receiptNumber ?? "SIN COMPROBANTE"}
-          </Text>
-          {stateBadge(row.state)}
-        </div>
+  const columns = React.useMemo(
+    () =>
+      createReceiptReportColumns(
+        initialCurrencyFormat,
+        downloadingId,
+        handleDownloadPdf,
       ),
-    },
-    {
-      header: "Organización / Plan",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <Text weight="bold" size="sm">
-            {row.memberName}
-          </Text>
-          <Text size="xs" variant="muted">
-            {row.planName}
-          </Text>
-        </div>
-      ),
-    },
-    {
-      header: "Total",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <Text weight="bold" size="sm" className="tabular-nums">
-            {formatCents(row.amountPaid, row.currencyPaid, initialCurrencyFormat)}
-          </Text>
-          <Text size="xs" variant="muted" className="uppercase">
-            {row.paymentMethod}
-          </Text>
-        </div>
-      ),
-    },
-    {
-      header: "Auditoría",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          {row.voided && (
-            <Text size="xs" variant="muted" className="italic">
-              Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
-            </Text>
-          )}
-          {row.issuedBy && (
-            <Text size="xs" variant="muted">
-              Emitido por: {row.issuedBy}
-            </Text>
-          )}
-          {!row.voided && !row.issuedBy && (
-            <Text size="xs" variant="muted" className="opacity-50">
-              —
-            </Text>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "Acciones",
-      className: "pr-6 text-right",
-      headerClassName: "pr-6 text-right",
-      cell: (row) =>
-        row.pdfStatus === "ready" ? (
-          <div className="flex justify-end">
-            <Button
-              variant="outlined"
-              size="sm"
-              leftIcon={<Eye size={14} />}
-              loading={downloadingId === row.paymentId}
-              onClick={() => void handleDownloadPdf(row)}
-            >
-              PDF
-            </Button>
-          </div>
-        ) : null,
-    },
-  ];
+    [initialCurrencyFormat, downloadingId, handleDownloadPdf],
+  );
 
   return (
     <div className="flex flex-col gap-8" data-testid="receipts-report">
@@ -442,17 +494,17 @@ export function ReceiptsReportClient({
         className="min-h-[400px]"
         columns={columns}
         data={initialReport.rows}
-        // En vista de huecos no hay filas paginables: se oculta la paginación.
+        // In gaps view there are no pageable rows: pagination is hidden.
         pagination={
           status === "gaps"
             ? undefined
             : {
-                page: initialPage,
-                totalPages: initialTotalPages,
-                total: initialReport.total,
-                limit: initialReport.limit,
-                onPageChange: navigatePage,
-              }
+              page: initialPage,
+              totalPages: initialTotalPages,
+              total: initialReport.total,
+              limit: initialReport.limit,
+              onPageChange: navigatePage,
+            }
         }
         emptyState={
           <div className="py-20 w-full flex flex-col items-center gap-2">

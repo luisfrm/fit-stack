@@ -155,8 +155,8 @@ export function PlatformPaymentHistoryModal({
         status,
         voidReason,
       );
-      // C6: anular sin comprobante emitido no es un error, pero se dice
-      // explícitamente en vez de un "marcado como voided" ambiguo.
+      // C6: voiding without an issued receipt is not an error, but it is stated
+      // explicitly rather than using an ambiguous "marked as voided".
       if (status === PAYMENT_STATUSES.VOIDED) {
         const rejected = voidReason === 'Pago rechazado';
         if (result?.receiptVoided === false) {
@@ -174,9 +174,9 @@ export function PlatformPaymentHistoryModal({
       await loadPayments();
       onChange?.();
     } catch (err) {
-      // Errores con significado de UX: se mapean por CÓDIGO (nunca por el
-      // texto del servidor). El servidor solo acepta `processing → validated`
-      // y rechaza validar sobre una suscripción cancelada.
+      // UX-meaningful errors: mapped by CODE (never by server text).
+      // The server only accepts `processing → validated` and rejects validating
+      // on a cancelled subscription.
       const code = apiCode(err);
       toast.error(
         code === "PAYMENT_NOT_REVALIDATABLE"
@@ -416,9 +416,9 @@ export function PlatformPaymentHistoryModal({
                                   p.id,
                                   PAYMENT_STATUSES.VALIDATED,
                                 ),
-                              // Solo `processing → validated` es una transición
-                              // válida (un `voided`/`refunded` responde 409):
-                              // no se ofrece una acción que el servidor rechaza.
+                              // Only `processing → validated` is a valid transition
+                              // (a `voided`/`refunded` returns 409):
+                              // an action rejected by the server is not offered.
                               show:
                                 canChangeStatus &&
                                 p.status === PAYMENT_STATUSES.PROCESSING,

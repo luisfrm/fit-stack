@@ -70,7 +70,7 @@ export function PlatformGeneralSettings({
 
     try {
       if (pendingLogo) {
-        // Branding: scope fijo `platform/branding` (el router no acepta folder).
+        // Branding: fixed scope `platform/branding` (router does not accept custom folder).
         nextLogoKey = await uploadService.uploadPlatformFile(pendingLogo, "logo");
       }
 

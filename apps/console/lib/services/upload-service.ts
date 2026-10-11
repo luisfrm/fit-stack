@@ -4,7 +4,7 @@ import { env } from "@/lib/config/envs";
 
 export interface FileItem {
   key: string;
-  /** URL pública directa; `null` cuando el asset solo se entrega autenticado. */
+  /** Direct public URL; `null` when asset is authenticated-only. */
   url: string | null;
   size: number;
   uploadedAt: string;
@@ -14,15 +14,15 @@ export interface FileItem {
 /**
  * Service to handle file uploads, listing, and deletion with R2 storage.
  *
- * El console NO tiene organización activa en la sesión, así que la org destino
- * de un asset de gimnasio viaja por **path** (`/platform/organizations/:orgId/upload`)
- * y el branding vive en su propio scope (`/platform/upload`, solo `platform/branding`).
+ * Console does NOT have an active organization in session, so the target
+ * org of a gym asset travels via **path** (`/platform/organizations/:orgId/upload`)
+ * and branding lives in its own scope (`/platform/upload`, only `platform/branding`).
  */
 export const uploadService = {
   /**
-   * Presigned + direct upload de un asset DE UNA ORGANIZACIÓN (logo, evidencia
-   * de pago). La organización es obligatoria: no hay fallback a la sesión.
-   * Key resultante: `<orgId>/<folder>/<nombre>_<id>.<ext>`.
+   * Presigned + direct upload for AN ORGANIZATION ASSET (logo, payment
+   * proof). The organization is mandatory: there is no fallback to session.
+   * Resulting key: `<orgId>/<folder>/<name>_<id>.<ext>`.
    */
   async uploadFile(
     file: File,
@@ -117,11 +117,11 @@ export const uploadService = {
   },
 
   /**
-   * URL con la que la UI muestra un archivo.
+   * URL used by the UI to display a file.
    *
-   * Público por diseño (`<orgId>/cms/…`, branding): URL directa de R2.
-   * Privado (logos de org, evidencia de pago): proxy autenticado del console
-   * (`/api/media`), que resuelve la org desde la propia key y reenvía la cookie.
+   * Public by design (`<orgId>/cms/…`, branding): direct R2 URL.
+   * Private (org logos, payment evidence): authenticated console proxy
+   * (`/api/media`), which resolves the org from the key itself and forwards the cookie.
    */
   getMediaUrl(key: string | null | undefined): string {
     if (!key) return "";

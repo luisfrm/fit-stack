@@ -1,5 +1,5 @@
 /**
- * Selectores puros del módulo de organizaciones (sin fetch).
+ * Pure selectors for the organizations module (no fetch).
  */
 import type { IPlatformOrganization } from "@workspace/shared/types";
 import { hasActiveSubscription } from "@/lib/platform-permissions";
@@ -11,12 +11,12 @@ export interface OrgKpis {
   withoutActiveSub: number;
 }
 
-/** Inicio del mes UTC de `now` en ms (mirror de selectNewOrgsThisMonth del dashboard). */
+/** Start of current UTC month for `now` in ms (mirror of selectNewOrgsThisMonth from dashboard). */
 function monthStartUtcMs(now: Date): number {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
 }
 
-/** KPIs derivados del dataset en memoria (exactos mientras el dataset sea completo). */
+/** KPIs derived from in-memory dataset (exact as long as dataset is complete). */
 export function selectOrgKpis(
   orgs: IPlatformOrganization[],
   now: Date,
@@ -25,7 +25,7 @@ export function selectOrgKpis(
   let newThisMonth = 0;
   let withActiveSub = 0;
   for (const org of orgs) {
-    const createdAt = org.createdAt ? new Date(org.createdAt).getTime() : NaN;
+    const createdAt = org.createdAt ? new Date(org.createdAt).getTime() : Number.NaN;
     if (!Number.isNaN(createdAt) && createdAt >= monthStart) newThisMonth += 1;
     if (
       org.latestSubscription &&
@@ -50,10 +50,10 @@ const DOWN_STATUSES = new Set(["suspended", "cancelled"]);
 const EXPIRING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Semáforo de salud de la org:
- * - `down`: sin suscripción o `suspended`/`cancelled`.
- * - `warn`: `past_due`/`read_only` o vence en ≤7 días.
- * - `ok`: `active`/`trial` en el resto de casos.
+ * Health indicator for the org:
+ * - `down`: no subscription or `suspended`/`cancelled`.
+ * - `warn`: `past_due`/`read_only` or expires in ≤7 days.
+ * - `ok`: `active`/`trial` for other cases.
  */
 export function selectOrgHealth(
   org: IPlatformOrganization,
@@ -80,7 +80,7 @@ export type OrgSubStatusFilter =
   | "cancelled"
   | "none";
 
-/** Filtra orgs por estado de suscripción (`none` = sin suscripción activa). */
+/** Filters orgs by subscription status (`none` = no active subscription). */
 export function filterOrgsBySubStatus(
   orgs: IPlatformOrganization[],
   subStatus: OrgSubStatusFilter | null | undefined,
@@ -102,7 +102,7 @@ export function filterOrgsBySubStatus(
   return orgs.filter((org) => org.latestSubscription?.status === subStatus);
 }
 
-/** Filtra orgs por país. */
+/** Filters orgs by country. */
 export function filterOrgsByCountry(
   orgs: IPlatformOrganization[],
   countryCode: string | null | undefined,
@@ -112,13 +112,13 @@ export function filterOrgsByCountry(
 }
 
 export interface PortalAdoption {
-  /** % de miembros con sub activa que NO están en el Member Platform (upsell). null sin base. */
+  /** % of members with active subscription NOT on Member Platform (upsell). null if no base. */
   outsidePct: number | null;
   inPortal: number;
   pending: number;
 }
 
-/** Adopción del Member Platform desde el gym-overview de la org. */
+/** Member Platform adoption from org gym-overview. */
 export function selectPortalAdoption(overview: {
   activeSubMembers: number;
   portal: { used: number; pending: number };
