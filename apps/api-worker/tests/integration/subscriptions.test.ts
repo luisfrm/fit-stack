@@ -111,6 +111,60 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
     });
 
+    it('honors an ISO date-time paymentDate instead of replacing it with now', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const sentPaymentDate = '2026-03-01T14:30:00.000Z';
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: sentPaymentDate,
+        },
+      });
+      expect(res.status, res.text).toBe(201);
+
+      // The instant must survive as-is: before, any string with `T` was
+      // silently dropped and the payment was stamped with `new Date()`.
+      const rows = await testQuery<{ payment_date: string | Date }>(
+        'SELECT payment_date FROM payment WHERE subscription_id = $1',
+        [res.body.id],
+      );
+      expect(new Date(rows[0]!.payment_date).toISOString()).toBe(sentPaymentDate);
+    });
+
+    it('rejects an invalid paymentDate with 400 and writes nothing', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: 'not-a-date',
+        },
+      });
+      expect(res.status, res.text).toBe(400);
+
+      // Validated before any write: no orphan subscription may survive.
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE member_id = $1',
+        [member.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+    });
+
     it('rejects object-shaped paymentMethodDetails (contract is an array)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
 
