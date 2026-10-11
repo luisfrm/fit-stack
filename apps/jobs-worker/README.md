@@ -19,7 +19,9 @@ src/
 ├── handlers/
 │   ├── email.handler.ts        # TRANSPORTE de email (Resend / Gmail SMTP)
 │   ├── pdf.handler.ts          # emails con comprobante adjunto (lee el PDF de R2)
-│   └── receipt.handler.ts      # paso 2 (completeReceiptPdf + notify) + sweepPendingReceiptPdfs
+│   ├── receipt.handler.ts      # paso 2: selección de perfil por scope + sweepPendingReceiptPdfs
+│   ├── render-profile.ts       # núcleo del paso 2 + perfiles de emisor (Panel / Console)
+│   └── notify-mark.ts          # limpieza de la marca al dead-letter (fit-task-events)
 └── templates/                  # el HTML vive aquí, nunca en los handlers
     ├── layout.ts               # renderDarkShell / renderLightShell + escapeHtml
     ├── send-invitation.ts
@@ -43,10 +45,10 @@ src/
 
 ## Emisión de comprobantes en dos pasos
 
-1. **Paso 1** (síncrono, en `api-worker`): asigna el número correlativo e **encola** el evento de render. No envía email.
-2. **Paso 2** (aquí, `handleReceiptRender`): arma el `ReceiptData` (snapshot del emisor primero), renderiza el PDF, lo `PUT` a R2, completa `receipt_pdf_key` (`UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` como gate) y **solo entonces** encola el email. Entrega duplicada = overwrite idempotente, sin segundo email.
+1. **Paso 1** (síncrono, en `api-worker`): asigna el número correlativo e **encola** el evento de render. No envía email. Los dos emisores comparten un único núcleo (`apps/api-worker/src/services/receipt-issue.core.ts`) parametrizado por un `issuer profile`.
+2. **Paso 2** (aquí, `handleReceiptRender`): selecciona el perfil por `event.scope`, arma el `ReceiptData` (snapshot del emisor primero), renderiza el PDF, lo `PUT` a R2, completa `receipt_pdf_key` (`UPDATE … WHERE receipt_pdf_key IS NULL RETURNING` como gate) y **solo entonces** encola el email. Entrega duplicada = overwrite idempotente, sin segundo email. La secuencia vive **una sola vez** en `handlers/render-profile.ts` (núcleo + perfiles); la única divergencia de negocio por emisor es el año de la clave de R2 (Panel: año local del número; Console: año UTC de `receiptIssuedAt`).
 
-La composición y el acceso a datos viven en repos compartidos de `@workspace/database` (`receipts.repository.ts`, `platform-receipts.repository.ts`) y en `@workspace/shared`; aquí vive solo el render.
+El motor de comprobantes está **unificado**: núcleo + perfiles de emisor (composer en `@workspace/shared/src/documents/receipt-composer.ts`, paso 1 y paso 2 con sus perfiles). La composición y el acceso a datos viven en repos compartidos de `@workspace/database` (`receipts.repository.ts`, `platform-receipts.repository.ts`) y en `@workspace/shared`; aquí vive solo el render.
 
 ## Barrido (`scheduled`)
 

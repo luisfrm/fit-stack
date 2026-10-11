@@ -31,5 +31,5 @@
   - Ejemplo verificado en tests: cobrado 30,90 con IVA 16 % + IGTF 3 % → IGTF 0,93 · base 25,84 + IVA 4,13 · suma exacta 30,90.
 - [ ] **Declarar a FitStack (emisor plataforma) como contribuyente formal si se quiere desglose en los comprobantes `FS-N`.**
   - Hoy no existe storage ni UI de `fiscalConfig` para el emisor plataforma, así que los comprobantes SaaS persisten `subtotal = amountPaid / taxTotal = 0 / taxDetails = []` (solo el total cobrado) y lo dicen en Console → Settings → Emisor. Es la postura conservadora correcta (nadie declaró ese IVA).
-  - Para habilitarlo: `platform_setting` con el `fiscalConfig` de FitStack + toggles en `emitter-settings.tsx` (mismo patrón del Panel: declaración, tasa manual, confirmación) y cablearlo en el paso 1 SaaS y en el twin de `receipt-compose` (`platform-receipts.service.ts` + `jobs-worker`).
+  - Para habilitarlo: `platform_setting` con el `fiscalConfig` de FitStack + toggles en `emitter-settings.tsx` (mismo patrón del Panel: declaración, tasa manual, confirmación) y cablearlo en el paso 1 SaaS (`platform-receipts.service.ts`, perfil Console del núcleo `receipt-issue.core.ts`) y en el compose/render Console (`receipt-composer.ts` + `render-profile.ts` en `jobs-worker`).
   - **Disparador**: decisión de producto de facturar con impuestos en el lado plataforma.

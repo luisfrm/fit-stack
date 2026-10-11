@@ -17,7 +17,9 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 **Handlers** (`apps/jobs-worker/src/handlers/`):
 
 - `email.handler.ts` — email TRANSPORT ONLY (**Resend** with `EMAIL_PROVIDER=resend` or **Gmail SMTP** with `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); the HTML is composed by the templates.
-- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation).
+- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation); both branches resolve the R2 attachment through the shared `resolveReceiptAttachment` (bytes read as stored, never regenerated).
+- `receipt.handler.ts` — step-2 entry point: validates the render event, selects the issuer render profile by `event.scope` and keeps `sweepPendingReceiptPdfs` (the sweep cron).
+- `render-profile.ts` — step-2 core, ONCE for both issuers: load composed rows → voided-pending check → render + R2 put → notify gate → dispatch email. Issuer divergences are tiny profiles (`createPanelRenderProfile` / `createPlatformRenderProfile`); the R2 key year stays per issuer on purpose (Panel: local year of the persisted number; Console: UTC year of `receiptIssuedAt`).
 
 **Templates** (`apps/jobs-worker/src/templates/`) — the HTML lives here, never in the handlers:
 

@@ -52,11 +52,11 @@ Código: `apps/api-worker/src/services/subscriptions.service.ts:190`, `apps/api-
 7. Encola `receipt.render`.
 8. No envía correo en este paso.
 
-Código: `apps/api-worker/src/services/receipts.service.ts:81`, `apps/api-worker/src/services/receipts.service.ts:149`, `apps/api-worker/src/services/receipts.service.ts:175`, `packages/shared/src/documents/tax-math.ts:95`.
+Código: `apps/api-worker/src/services/receipt-issue.core.ts` (secuencia del paso 1), `apps/api-worker/src/services/receipts.service.ts` (perfil Panel: override de impuestos), `packages/shared/src/documents/tax-math.ts`.
 
 ### 3.3 Paso 2: PDF inmutable y notificación
 
-El consumer `handleReceiptRender` hace lo siguiente:
+El consumer `handleReceiptRender` selecciona el perfil por `scope` y ejecuta el núcleo compartido del paso 2 (`apps/jobs-worker/src/handlers/render-profile.ts`), que hace lo siguiente:
 
 1. Lee pago, organización, miembro y suscripción con aislamiento por organización.
 2. Construye `ReceiptData` con el mismo builder usado por la API.
@@ -69,7 +69,7 @@ El consumer `handleReceiptRender` hace lo siguiente:
 
 Si el envío falla, limpia la marca para que la cola pueda reintentarlo. No genera un segundo PDF ni un segundo correo por entregas duplicadas.
 
-Código: `apps/jobs-worker/src/handlers/receipt.handler.ts:87`, `apps/jobs-worker/src/handlers/receipt.handler.ts:129`, `apps/jobs-worker/src/handlers/receipt.handler.ts:133`, `packages/database/src/repositories/receipts.repository.ts:268`, `packages/database/src/repositories/receipts.repository.ts:296`.
+Código: `apps/jobs-worker/src/handlers/render-profile.ts` (secuencia del paso 2 y perfiles por emisor), `packages/shared/src/documents/receipt-composer.ts` (mapeo de filas a `ReceiptData`), `packages/database/src/repositories/receipts.repository.ts` (gates `completeReceiptPdf` / `markReceiptNotified`).
 
 ### 3.4 Qué recibe el miembro
 
@@ -81,7 +81,7 @@ El correo es una notificación corta. El PDF adjunto es la fuente de verdad:
 - El asunto y cuerpo usan el número correlativo humano, nunca el ID técnico del pago.
 - Los pagos anteriores al sistema correlativo pueden enviarse sin adjunto como caso histórico terminal.
 
-Código: `apps/jobs-worker/src/handlers/pdf.handler.ts:30`, `apps/jobs-worker/src/handlers/pdf.handler.ts:114`, `apps/jobs-worker/src/templates/payment-receipt-short.ts:23`.
+Código: `apps/jobs-worker/src/handlers/pdf.handler.ts` (resolutor compartido `resolveReceiptAttachment`), `apps/jobs-worker/src/templates/payment-receipt-short.ts`.
 
 El Panel expone tres estados:
 
@@ -89,7 +89,7 @@ El Panel expone tres estados:
 - `pending`: numerado, PDF en preparación.
 - `pre_system`: pago anterior al sistema correlativo.
 
-Código: `apps/api-worker/src/routes/payments.route.ts:83`, `apps/api-worker/src/routes/payments.route.ts:110`, `apps/api-worker/src/services/receipts.service.ts:215`.
+Código: `apps/api-worker/src/routes/payments.route.ts`, `apps/api-worker/src/services/receipts.service.ts` (`getReceiptState`).
 
 ## 4. Qué emitimos como “recibo de pago”
 
@@ -106,7 +106,7 @@ Cada comprobante contiene:
 - Marca `ANULADO` cuando aplica: el sello vive en los bytes del PDF (`receipt_voided_pdf_key`), no solo en la UI.
 - `internalPaymentId` solo para trazabilidad interna, nunca visible.
 
-Código: `packages/shared/src/documents/receipt-compose.ts:115`, `packages/shared/src/documents/receipt-compose.ts:127`, `packages/shared/src/documents/receipt-compose.ts:152`, `packages/shared/src/documents/receipt-compose.ts:192`.
+Código: `packages/shared/src/documents/receipt-composer.ts` (mapeo de filas por emisor), `packages/shared/src/documents/receipt-compose.ts` (ensamblaje único y snapshot del emisor).
 
 ## 5. De qué nos encargamos
 
@@ -222,7 +222,7 @@ HAS_FISCAL_HOMOLOGATION = false
 
 Por construcción, ningún comprobante actual puede decir “Factura”.
 
-Código: `packages/shared/src/documents/document-label-gate.ts:16`, `packages/shared/src/documents/document-label-gate.ts:36`, `packages/shared/src/documents/receipt-compose.ts:128`.
+Código: `packages/shared/src/documents/document-label-gate.ts`, `packages/shared/src/documents/receipt-compose.ts`.
 
 La etiqueta solicitada por el emisor no es un parámetro del gate. Por eso el campo `documentLabel` se presenta como solo lectura: evita prometer un título que el sistema no puede aplicar legalmente.
 
@@ -271,9 +271,11 @@ Mientras eso no exista, la única etiqueta válida sigue siendo “Comprobante d
   - `packages/shared/src/documents/fiscal-profile.ts`
   - `packages/shared/src/documents/tax-math.ts`
   - `packages/shared/src/documents/receipt-compose.ts`
+  - `packages/shared/src/documents/receipt-composer.ts`
   - `packages/shared/src/documents/receipt-data.ts`
   - `packages/shared/src/documents/masking.ts`
 - Emisión en `api-worker`:
+  - `apps/api-worker/src/services/receipt-issue.core.ts`
   - `apps/api-worker/src/services/receipts.service.ts`
   - `apps/api-worker/src/services/subscriptions.service.ts`
   - `apps/api-worker/src/services/organizations.service.ts`
@@ -282,6 +284,7 @@ Mientras eso no exista, la única etiqueta válida sigue siendo “Comprobante d
 - Persistencia compartida:
   - `packages/database/src/repositories/receipts.repository.ts`
 - Render y correo en `jobs-worker`:
+  - `apps/jobs-worker/src/handlers/render-profile.ts`
   - `apps/jobs-worker/src/handlers/receipt.handler.ts`
   - `apps/jobs-worker/src/handlers/pdf.handler.ts`
   - `apps/jobs-worker/src/handlers/email.handler.ts`
