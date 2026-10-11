@@ -51,11 +51,12 @@
 
 ## 5. Email perdido en la DLQ después de la marca de notificado (C6)
 
-- [ ] **El barrido de C6 no cubre el email que ya se encoló y agotó reintentos.**
-  - El paso 2 marca `receipt_notified_at` **antes** de encolar `email.payment_receipt` / `email.org_payment_received`, y solo la revierte si el `send()` a la cola falla. Si el mensaje ya encolado falla N veces en el handler de email y cae a la DLQ de `fit-task-events`, la marca queda puesta y el 2.º predicado del barrido (`receipt_notified_at IS NULL`) no lo ve.
-  - Recuperación hoy: **manual** — `POST /api/payments/:id/send-email` (Panel) o `POST /api/platform/subscriptions/payments/:id/resend` (Console).
-  - Opciones si se quiere automático: (a) que el handler de email limpie la marca al fallar de forma definitiva (requiere que conozca el `paymentId`/scope, hoy no lo hace), o (b) un barrido de la DLQ, que Cloudflare no expone como cola consultable (habría que persistir el fallo en DB).
-  - **Disparador**: si aparece un comprobante con `receipt_pdf_key` y sin email entregado en una auditoría real.
+- [x] **El barrido de C6 no cubría el email que ya se encoló y agotó reintentos.** ✅ Implementado (opción (a)).
+  - El hueco original: el paso 2 marca `receipt_notified_at` **antes** de encolar `email.payment_receipt` / `email.org_payment_received`, y solo la revierte si el `send()` a la cola falla. Si el mensaje ya encolado falla N veces en el handler de email y cae a la DLQ de `fit-task-events`, la marca quedaba puesta y el 2.º predicado del barrido (`receipt_notified_at IS NULL`) no lo veía.
+  - Solución: en la entrega final fallida — la que DLQ-ea (`isFinalDeliveryAttempt` con el umbral compartido `TASK_QUEUE_MAX_RETRIES`, espejado en wrangler + Terraform y vigilado por `pnpm check:infra-parity`) — `processTaskBatch` limpia la marca (`clearReceiptNotifiedMarkForEvent`, best-effort: un fallo de la limpieza jamás interrumpe el `message.retry()`). El 2.º predicado del barrido vuelve a ver el pago y lo recupera.
+  - Riesgo asumido (aprobado): la garantía anti-duplicado se relaja solo en el intento final — un fallo "engañoso" (timeout después de que el SMTP aceptó) puede duplicar el email vía barrido. Se acepta porque perder el comprobante de un pago es peor que recibirlo dos veces.
+  - Verificación empírica pendiente (manual): jobs-worker en dev con SMTP inválido y confirmar que el último `attempt=` logueado antes de la DLQ es 4; si Cloudflare contara distinto, el helper vive en un solo lugar (`isFinalDeliveryAttempt`).
+  - La opción (b) (barrido de la DLQ) sigue descartada: Cloudflare no expone la DLQ como cola consultable. La recuperación manual (`POST /api/payments/:id/send-email` / `POST /api/platform/subscriptions/payments/:id/resend`) queda como backstop para fallos de la limpieza.
 
 ## 6. Naming cosmético `platform_document_sequence.next_number` (C7)
 
