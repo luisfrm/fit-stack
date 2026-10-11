@@ -1,5 +1,8 @@
 import type { Db } from '@workspace/database/factory';
-import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
+import {
+  createPlatformReceiptsRepository,
+  type AttachPlatformReceiptInput,
+} from '@workspace/database/repositories/platform-receipts';
 import {
   buildPlatformEmitterSnapshot,
   buildReceiptRenderEvent,
@@ -9,13 +12,20 @@ import {
   parseConsoleReceiptNumber,
   platformEmitterFromSettings,
   resolveFiscalProfile,
-  type ITaxDetail,
+  type FiscalProfile,
   type ReceiptData,
+  type ReceiptDocumentType,
 } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
-import { ReceiptError } from './receipts.service';
+import {
+  issueReceipt,
+  ReceiptError,
+  type IssuerProfile,
+  type ReceiptIssueAttached,
+  type ReceiptIssuePayment,
+} from './receipt-issue.core';
 
 export interface AssignPlatformReceiptNumberInput {
   paymentId: number;
@@ -56,86 +66,71 @@ export interface PlatformReceiptContext {
   by?: string;
 }
 
-export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQueue?: Queue) {
-  const platformReceiptsRepo = createPlatformReceiptsRepository(db);
-  const platformSubsRepo = createPlatformSubscriptionsRepository(db);
-  const orgsRepo = createOrganizationsRepository(db);
-  const platformSettingsRepo = createPlatformSettingsRepository(db);
+/**
+ * Platform repositories the issuer profile orchestrates (structural ports:
+ * the unit test fakes exactly these).
+ */
+export interface PlatformIssuerRepos {
+  platformSubsRepo: {
+    findPaymentById(paymentId: number): Promise<ReceiptIssuePayment | null>;
+  };
+  platformReceiptsRepo: {
+    nextPlatformDocumentNumber(type: ReceiptDocumentType): Promise<number>;
+    releaseLastPlatformNumber(
+      type: ReceiptDocumentType,
+      seq: number,
+    ): Promise<{ released: boolean }>;
+    attachPlatformReceipt(
+      paymentId: number,
+      input: AttachPlatformReceiptInput,
+    ): Promise<ReceiptIssueAttached>;
+    setPlatformPayerIfMissing(
+      paymentId: number,
+      payerEmail: string,
+      payerName: string,
+    ): Promise<void>;
+  };
+  platformSettingsRepo: {
+    getAll(): Promise<Record<string, string>>;
+  };
+}
 
-  /**
-   * Re-encola el render si el PDF aún no existe y devuelve el estado real.
-   * Espejo de `requeueRenderIfPdfPending` (Panel): mismo evento, `scope`
-   * distinto. Idempotente — el paso 2 hace overwrite y gatea el email.
-   */
-  async function requeueRenderIfPdfPending(
-    paymentId: number,
-    orgId: string,
-    receiptNumber: string,
-    receiptPdfKey: string | null | undefined,
-  ): Promise<'pending' | 'ready'> {
-    if (receiptPdfKey) return 'ready';
-    console.log(
-      `[api-worker] platform-receipts: re-queuing render — paymentId=${paymentId} receiptNumber=${receiptNumber} org=${orgId}`,
-    );
-    await receiptQueue.send(
-      buildReceiptRenderEvent({
-        scope: 'platform',
-        paymentId,
-        organizationId: orgId,
-        receiptNumber,
-      }),
-    );
-    console.log(`[api-worker] platform-receipts: render re-queued — paymentId=${paymentId}`);
-    return 'pending';
-  }
+/**
+ * Platform issuer profile (FitStack, SaaS): global continuous sequence, no
+ * year, $0 trial/free skip, no tax override, payer capture, `platform` event
+ * scope. Exported for the step-order unit test; routes only see
+ * `createPlatformReceiptsService`.
+ */
+export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerProfile<null> {
+  const { platformSubsRepo, platformReceiptsRepo, platformSettingsRepo } = repos;
 
   return {
-    /**
-     * Paso 1 (síncrono, sin I/O externo salvo DB+cola): valida, calcula
-     * impuestos en centavos, asigna el número global (atómico), lo persiste
-     * y encola `receipt.render` con `scope:'platform'`. NUNCA encola email
-     * (lo hace el paso 2). Trial/free $0 → SKIP (no queman la serie).
-     */
-    async assignPlatformReceiptNumber(
-      input: AssignPlatformReceiptNumberInput,
-    ): Promise<PlatformAssignResult> {
-      const { paymentId } = input;
-      const payment = await platformSubsRepo.findPaymentById(paymentId);
-      if (!payment) {
-        throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
-      }
-      if (payment.status !== 'validated') {
-        throw new ReceiptError(
-          409,
-          'NOT_VALIDATED',
-          'Solo un pago validado puede emitir comprobante.',
-        );
-      }
+    logTag: 'platform-receipts',
+    releaseFailureLabel: 'platform receipt emission',
+    incoherentMessage: 'Número generado incoherente con la secuencia.',
 
-      // Trial/free $0: sin documento (no queman la serie continua global).
-      const amountPaid = Number(payment.amountPaid);
-      if (amountPaid === 0) {
-        return { receiptNumber: null, pdfStatus: 'pending', skipped: true };
-      }
+    resolveYear() {
+      // FitStack is a single issuer: `FS-N` is continuous, no year.
+      return null;
+    },
 
-      // Idempotencia: ya numerado → devuelve el existente sin quemar secuencia.
-      if (payment.receiptNumber) {
-        const pdfStatus = await requeueRenderIfPdfPending(
-          paymentId,
-          payment.organizationId,
-          payment.receiptNumber,
-          payment.receiptPdfKey,
-        );
-        return { receiptNumber: payment.receiptNumber, pdfStatus, skipped: false };
-      }
+    loadPayment(input) {
+      return platformSubsRepo.findPaymentById(input.paymentId);
+    },
 
-      const org = await orgsRepo.findById(payment.organizationId);
-      if (!org) {
-        throw new ReceiptError(404, 'ORG_NOT_FOUND', 'Organización no encontrada.');
-      }
-      // Sin override de la org: FitStack define impuestos uniformes por
-      // país. País desconocido → error visible con código, nunca default.
-      let profile: ReturnType<typeof resolveFiscalProfile>;
+    resolveOrgId(payment) {
+      return payment.organizationId;
+    },
+
+    shouldSkip(payment) {
+      // Trial/free $0: no document (never burns the global continuous series).
+      return Number(payment.amountPaid) === 0;
+    },
+
+    async resolveFiscal(payment, org) {
+      // No org override: FitStack defines uniform taxes per country.
+      // Unknown country → visible error with code, never a default.
+      let profile: FiscalProfile;
       try {
         profile = resolveFiscalProfile(org.countryCode);
       } catch {
@@ -145,113 +140,105 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           `País fiscal desconocido (${org.countryCode}).`,
         );
       }
-      // Descomposición tax-inclusive: fuente única en shared.
-      const computed = computeInclusiveTaxes(amountPaid, profile.taxes, {
+      // Tax-inclusive decomposition: single source in shared.
+      const computed = computeInclusiveTaxes(Number(payment.amountPaid), profile.taxes, {
         currencyPaid: payment.currencyPaid,
       });
-      const subtotal: number = computed.subtotal;
-      const taxTotal: number = computed.taxTotal;
-      const taxDetails: ITaxDetail[] = computed.taxDetails;
+      return {
+        profile,
+        subtotal: computed.subtotal,
+        taxTotal: computed.taxTotal,
+        taxDetails: computed.taxDetails,
+        taxOverrideReason: null,
+      };
+    },
 
-      // Guarda tardía (espejo Panel): releer antes de consumir el correlativo
-      // global evita quemar un número que otra entrega concurrente ya usó.
-      const fresh = await platformSubsRepo.findPaymentById(paymentId);
-      if (fresh?.receiptNumber) {
-        const pdfStatus = await requeueRenderIfPdfPending(
-          paymentId,
-          fresh.organizationId,
-          fresh.receiptNumber,
-          fresh.receiptPdfKey,
-        );
-        return { receiptNumber: fresh.receiptNumber, pdfStatus, skipped: false };
-      }
-
-      // Identidad del emisor CONGELADA (C1): FitStack (settings) + perfil del
-      // país receptor. Se persiste junto al número, así que se construye
-      // ANTES de consumir la secuencia global (nada quema un correlativo).
-      const emitterSnapshot = buildPlatformEmitterSnapshot(
+    async buildEmitterSnapshot(payment, org, profile) {
+      // Frozen emitter identity (C1): FitStack (settings) + receptor country
+      // profile. Built BEFORE consuming the global sequence (nothing burns a
+      // correlative).
+      return buildPlatformEmitterSnapshot(
         {
-          receptor: {
-            name: org.name,
-            legalName: org.legalName,
-            taxId: org.taxId,
-            countryCode: org.countryCode,
-            timezone: org.timezone,
-          },
+          receptor: org,
           emitter: platformEmitterFromSettings(await platformSettingsRepo.getAll()),
           currency: payment.planSnapshotCurrency,
         },
         profile,
       );
+    },
 
+    async nextNumber() {
       const seq = await platformReceiptsRepo.nextPlatformDocumentNumber('receipt');
       const receiptNumber = formatConsoleReceiptNumber(seq);
-      if (parseConsoleReceiptNumber(receiptNumber) !== seq) {
-        // Defensivo: no dejar el número colgado.
-        await platformReceiptsRepo.releaseLastPlatformNumber('receipt', seq);
-        throw new ReceiptError(
-          500,
-          'RECEIPT_INCOHERENT',
-          'Número generado incoherente con la secuencia.',
-        );
-      }
+      return {
+        seq,
+        receiptNumber,
+        coherent: parseConsoleReceiptNumber(receiptNumber) === seq,
+      };
+    },
 
-      // Pagador: solo rellena si está vacío (la sesión de validación
-      // —soporte— nunca sobrescribe al pagador real). Sin PII cross-org.
+    releaseNumber(_orgId, _year, seq) {
+      return platformReceiptsRepo.releaseLastPlatformNumber('receipt', seq);
+    },
+
+    async capturePayer(input) {
+      // Payer: only fills when empty (the validation session — support —
+      // never overwrites the real payer). No cross-org PII.
       if (input.payerEmail && input.payerEmail.trim().length > 0) {
         await platformReceiptsRepo.setPlatformPayerIfMissing(
-          paymentId,
+          input.paymentId,
           input.payerEmail,
           input.payerName ?? '',
         );
       }
+    },
 
-      // Número AUTORITATIVO: el que attach persistió (bajo concurrencia,
-      // un segundo request puede perder el WHERE y recibir la fila
-      // existente; el evento lleva SIEMPRE ese número, no el local).
-      const persisted = await platformReceiptsRepo.attachPlatformReceipt(paymentId, {
-        receiptNumber,
-        receiptIssuedAt: new Date(),
-        subtotal,
-        taxTotal,
-        taxDetails,
-        emitterSnapshot,
-        issuedBy: input.actor ?? null,
+    attach(_org, data, input) {
+      return platformReceiptsRepo.attachPlatformReceipt(input.paymentId, {
+        receiptNumber: data.receiptNumber,
+        receiptIssuedAt: data.receiptIssuedAt,
+        subtotal: data.subtotal,
+        taxTotal: data.taxTotal,
+        taxDetails: data.taxDetails,
+        emitterSnapshot: data.emitterSnapshot,
+        issuedBy: data.issuedBy,
       });
-      const persistedNumber = persisted.receiptNumber ?? receiptNumber;
+    },
 
-      // Carrera perdida: otra entrega ya numeró el pago. Compensar la
-      // secuencia global si seguimos siendo el último consumidor; si no, el
-      // número es irreversible y queda como hueco auditado.
-      if (persistedNumber !== receiptNumber) {
-        const { released } = await platformReceiptsRepo.releaseLastPlatformNumber(
-          'receipt',
-          seq,
-        );
-        if (!released) {
-          console.error(
-            `platform receipt emission: correlativo ${receiptNumber} no persistido y no liberable (la secuencia ya avanzó).`,
-          );
-        }
-      }
+    buildRenderEvent(paymentId, orgId, receiptNumber) {
+      return buildReceiptRenderEvent({
+        scope: 'platform',
+        paymentId,
+        organizationId: orgId,
+        receiptNumber,
+      });
+    },
+  };
+}
 
-      console.log(
-        `[api-worker] platform-receipts: queuing render — paymentId=${paymentId} receiptNumber=${persistedNumber} org=${payment.organizationId}`,
-      );
-      await receiptQueue.send(
-        buildReceiptRenderEvent({
-          scope: 'platform',
-          paymentId,
-          organizationId: payment.organizationId,
-          receiptNumber: persistedNumber,
-        }),
-      );
-      console.log(`[api-worker] platform-receipts: render queued — paymentId=${paymentId} receiptNumber=${persistedNumber}`);
-      return {
-        receiptNumber: persistedNumber,
-        pdfStatus: persisted.receiptPdfKey ? 'ready' : 'pending',
-        skipped: false,
-      };
+export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQueue?: Queue) {
+  const platformReceiptsRepo = createPlatformReceiptsRepository(db);
+  const platformSubsRepo = createPlatformSubscriptionsRepository(db);
+  const orgsRepo = createOrganizationsRepository(db);
+  const platformSettingsRepo = createPlatformSettingsRepository(db);
+  const profile = createPlatformIssuerProfile({
+    platformSubsRepo,
+    platformReceiptsRepo,
+    platformSettingsRepo,
+  });
+
+  return {
+    /**
+     * Paso 1 (síncrono, sin I/O externo salvo DB+cola): valida, calcula
+     * impuestos en centavos, asigna el número global (atómico), lo persiste
+     * y encola `receipt.render` con `scope:'platform'`. NUNCA encola email
+     * (lo hace el paso 2). Trial/free $0 → SKIP (no queman la serie).
+     * La secuencia compartida vive en `receipt-issue.core.ts`.
+     */
+    async assignPlatformReceiptNumber(
+      input: AssignPlatformReceiptNumberInput,
+    ): Promise<PlatformAssignResult> {
+      return issueReceipt(profile, { orgsRepo, queue: receiptQueue }, input);
     },
 
     /**
@@ -271,9 +258,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
 
     /**
      * Anulación con número: idempotente sin pisar auditoría (el repo hace
-     * UPDATE siempre, así que el early-return vive aquí); sin número →
-     * 409 (no hay comprobante que anular). `by` obligatorio (fail-closed:
-     * nunca void anónimo).
+     * UPDATE siempre, así que el early-return vive aquí); sin número → 409
+     * (no hay comprobante que anular). `by` obligatorio (fail-closed: nunca
+     * void anónimo).
      *
      * Encola el render del PDF ANULADO (espejo Panel): el sello lo materializa
      * el paso 2 y hasta entonces el original no se sirve. Si el envío a la

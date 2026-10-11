@@ -1,5 +1,8 @@
 import type { Db } from '@workspace/database/factory';
-import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
+import {
+  createReceiptsRepository,
+  type AttachReceiptInput,
+} from '@workspace/database/repositories/receipts';
 import {
   applyTaxOverride,
   buildEmitterSnapshot,
@@ -12,24 +15,21 @@ import {
   toLocalDayString,
   type ITaxDetail,
   type ReceiptData,
+  type ReceiptDocumentType,
 } from '@workspace/shared';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import {
+  issueReceipt,
+  ReceiptError,
+  type IssuerProfile,
+  type ReceiptIssueAttached,
+  type ReceiptIssuePayment,
+} from './receipt-issue.core';
 
-/**
- * Error con status HTTP + código de negocio. Las rutas lo traducen a
- * `c.json({ error, code }, status)` — el `onError` global no emite `code`,
- * así que NUNCA se confía en él para estos casos (regla toasts: código, no texto).
- */
-export class ReceiptError extends Error {
-  constructor(
-    public status: 400 | 404 | 409 | 422 | 500,
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+// Preserved re-export: routes, `subscriptions.service` and `lib/errors` keep
+// importing `ReceiptError` from this module.
+export { ReceiptError };
 
 export interface TaxOverrideInput {
   subtotal: number;
@@ -110,6 +110,120 @@ function resolveTaxBreakdown(
   return { ...computed, taxOverrideReason: o.taxOverrideReason };
 }
 
+/**
+ * Panel repositories the issuer profile orchestrates (structural ports: the
+ * unit test fakes exactly these).
+ */
+export interface PanelIssuerRepos {
+  paymentsRepo: {
+    findById(orgId: string, paymentId: number): Promise<ReceiptIssuePayment | undefined>;
+  };
+  receiptsRepo: {
+    nextDocumentNumber(
+      orgId: string,
+      type: ReceiptDocumentType,
+      year: number,
+    ): Promise<number>;
+    releaseLastNumber(
+      orgId: string,
+      type: ReceiptDocumentType,
+      year: number,
+      seq: number,
+    ): Promise<{ released: boolean }>;
+    attachReceipt(
+      paymentId: number,
+      orgId: string,
+      input: AttachReceiptInput,
+    ): Promise<ReceiptIssueAttached>;
+  };
+}
+
+/**
+ * Panel issuer profile (the gym organization): per-organization yearly
+ * sequence, audited tax override, no $0 skip, `panel` event scope. Exported
+ * for the step-order unit test; routes only see `createReceiptsService`.
+ */
+export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile<number> {
+  const { paymentsRepo, receiptsRepo } = repos;
+
+  return {
+    logTag: 'receipts',
+    releaseFailureLabel: 'receipt emission',
+    incoherentMessage: 'Número generado incoherente con el año.',
+
+    resolveYear(input) {
+      if (!input.timezone || input.timezone.trim().length === 0) {
+        throw new ReceiptError(500, 'TIMEZONE_MISSING', 'Timezone de la org es obligatoria.');
+      }
+      const year = receiptYear(input.timezone);
+      // Valid year BEFORE any I/O: an impossible format would make
+      // `formatPanelReceiptNumber` throw with the number already burned.
+      // Validated with seq=1 (the format does not depend on the value).
+      formatPanelReceiptNumber(year, 1);
+      return year;
+    },
+
+    loadPayment(input) {
+      return paymentsRepo.findById(input.orgId!, input.paymentId);
+    },
+
+    resolveOrgId(_payment, input) {
+      return input.orgId!;
+    },
+
+    async resolveFiscal(payment, org, input) {
+      const profile = resolveFiscalProfile(org.countryCode, org.fiscalConfig);
+      // Taxes in integer cents. amountPaid = TOTAL charged (taxes included):
+      // auto mode decomposes the base; an override is validated.
+      const { subtotal, taxTotal, taxDetails, taxOverrideReason } = resolveTaxBreakdown(
+        Number(payment.amountPaid),
+        profile,
+        payment.currencyPaid,
+        input.taxOverride,
+      );
+      return { profile, subtotal, taxTotal, taxDetails, taxOverrideReason };
+    },
+
+    async buildEmitterSnapshot(_payment, org, profile) {
+      // Frozen emitter identity (C1): persisted together with the number in
+      // `attachReceipt`, so it is built BEFORE consuming the sequence.
+      return buildEmitterSnapshot(org, profile);
+    },
+
+    async nextNumber(orgId, year) {
+      const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
+      const receiptNumber = formatPanelReceiptNumber(year, seq);
+      return {
+        seq,
+        receiptNumber,
+        coherent: parsePanelReceiptNumber(receiptNumber)?.year === year,
+      };
+    },
+
+    releaseNumber(orgId, year, seq) {
+      return receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
+    },
+
+    attach(org, data, input) {
+      return receiptsRepo.attachReceipt(input.paymentId, org.id, {
+        receiptNumber: data.receiptNumber,
+        documentType: 'receipt',
+        receiptIssuedAt: data.receiptIssuedAt,
+        taxOverrideReason: data.taxOverrideReason,
+        subtotal: data.subtotal,
+        taxTotal: data.taxTotal,
+        taxDetails: data.taxDetails,
+        emitterSnapshot: data.emitterSnapshot,
+        issuedBy: data.issuedBy,
+      });
+    },
+
+    buildRenderEvent(paymentId, orgId, receiptNumber) {
+      return buildReceiptRenderEvent({ paymentId, organizationId: orgId, receiptNumber });
+    },
+  };
+}
+
 export function createReceiptsService(
   db: Db,
   receiptQueue: Queue,
@@ -118,192 +232,29 @@ export function createReceiptsService(
   const receiptsRepo = createReceiptsRepository(db);
   const paymentsRepo = createPaymentsRepository(db);
   const orgsRepo = createOrganizationsRepository(db);
-
-  /**
-   * Re-encola el render si el PDF aún no existe y devuelve el estado real
-   * (`pending` si falta el PDF). Idempotente: el paso 2 hace overwrite sobre
-   * la MISMA key y su propio gate decide el email.
-   */
-  async function requeueRenderIfPdfPending(
-    paymentId: number,
-    orgId: string,
-    receiptNumber: string,
-    receiptPdfKey: string | null | undefined,
-  ): Promise<'pending' | 'ready'> {
-    if (receiptPdfKey) return 'ready';
-    console.log(
-      `[api-worker] receipts: re-queuing render — paymentId=${paymentId} receiptNumber=${receiptNumber} org=${orgId}`,
-    );
-    await receiptQueue.send(
-      buildReceiptRenderEvent({ paymentId, organizationId: orgId, receiptNumber }),
-    );
-    console.log(`[api-worker] receipts: render re-queued — paymentId=${paymentId}`);
-    return 'pending';
-  }
+  const profile = createPanelIssuerProfile({ paymentsRepo, receiptsRepo });
 
   return {
     /**
      * Paso 1 (síncrono, sin I/O externo salvo DB+cola): valida, calcula
      * impuestos en centavos, asigna el número (atómico), lo persiste y
      * encola `receipt.render`. NUNCA encola email (lo hace el paso 2).
+     * La secuencia compartida vive en `receipt-issue.core.ts`.
      */
     async assignReceiptNumber(
       input: AssignReceiptNumberInput,
     ): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }> {
-      const { orgId, paymentId } = input;
-      if (!input.timezone || input.timezone.trim().length === 0) {
-        throw new ReceiptError(500, 'TIMEZONE_MISSING', 'Timezone de la org es obligatoria.');
-      }
-      const payment = await paymentsRepo.findById(orgId, paymentId);
-      if (!payment) {
-        throw new ReceiptError(404, 'PAYMENT_NOT_FOUND', 'Pago no encontrado.');
-      }
-      if (payment.status !== 'validated') {
-        throw new ReceiptError(
-          409,
-          'NOT_VALIDATED',
-          'Solo un pago validado puede emitir comprobante.',
-        );
-      }
-
-      // Idempotencia: ya numerado → devuelve el existente sin quemar secuencia.
-      if (payment.receiptNumber) {
-        const pdfStatus = await requeueRenderIfPdfPending(
-          paymentId,
-          orgId,
-          payment.receiptNumber,
-          payment.receiptPdfKey,
-        );
-        return { receiptNumber: payment.receiptNumber, pdfStatus };
-      }
-
-      const org = await orgsRepo.findById(orgId);
-      if (!org) {
-        throw new ReceiptError(404, 'ORG_NOT_FOUND', 'Organización no encontrada.');
-      }
-      const year = receiptYear(input.timezone);
-      // Valid year BEFORE consuming the sequence: an impossible format would
-      // make `formatPanelReceiptNumber` throw with the number already burned.
-      // Validated with seq=1 (the format does not depend on the value).
-      formatPanelReceiptNumber(year, 1);
-
-      // Impuestos en centavos enteros. amountPaid = TOTAL cobrado (con impuestos
-      // incluidos): en modo auto se descompone la base; con override se valida.
-      //
-      // ⚠️ ORDEN CRÍTICO: el perfil fiscal y la descomposición se calculan
-      // ANTES de consumir la secuencia. Un número consumido NUNCA se reutiliza,
-      // así que un fallo aquí (país desconocido, monto no entero) quemaría un
-      // correlativo y dejaría un hueco inexplicado en el reporte de auditoría.
-      const profile = resolveFiscalProfile(org.countryCode, org.fiscalConfig);
-      // Identidad del emisor CONGELADA (C1): se persiste junto al número en
-      // `attachReceipt`, así que se construye ANTES de consumir la secuencia
-      // (si algo lanza aquí, no se quema ningún correlativo).
-      const emitterSnapshot = buildEmitterSnapshot(
-        {
-          name: org.name,
-          legalName: org.legalName,
-          taxId: org.taxId,
-          address: org.address,
-          countryCode: org.countryCode,
-          primaryCurrency: org.primaryCurrency,
-          timezone: org.timezone,
-          fiscalConfig: org.fiscalConfig,
-        },
-        profile,
-      );
-      const amountPaid = Number(payment.amountPaid);
-      // Tax breakdown: validate + compute via helper to keep this function flat.
-      const { subtotal, taxTotal, taxDetails, taxOverrideReason } = resolveTaxBreakdown(
-        amountPaid,
-        profile,
-        payment.currencyPaid,
-        input.taxOverride,
-      );
-
-      // Guarda tardía: entre la lectura del pago y este punto otra entrega
-      // concurrente pudo numerarlo. Releer evita consumir un número que ya no
-      // se va a persistir (prevenir la carrera, además de compensarla).
-      const fresh = await paymentsRepo.findById(orgId, paymentId);
-      if (fresh?.receiptNumber) {
-        const pdfStatus = await requeueRenderIfPdfPending(
-          paymentId,
-          orgId,
-          fresh.receiptNumber,
-          fresh.receiptPdfKey,
-        );
-        return { receiptNumber: fresh.receiptNumber, pdfStatus };
-      }
-
-      const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
-      const receiptNumber = formatPanelReceiptNumber(year, seq);
-      const parsed = parsePanelReceiptNumber(receiptNumber);
-      if (parsed?.year !== year) {
-        // Defensive (the year is already validated): never leave the number
-        // dangling.
-        await receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
+      const result = await issueReceipt(profile, { orgsRepo, queue: receiptQueue }, input);
+      if (result.skipped) {
+        // The panel profile never skips ($0 skip is console-only): reaching
+        // this branch means a broken profile, not a business state.
         throw new ReceiptError(
           500,
           'RECEIPT_INCOHERENT',
-          'Número generado incoherente con el año.',
+          'La emisión del panel nunca omite el número.',
         );
       }
-
-      // Número AUTORITATIVO: el que attachReceipt persistió (bajo concurrencia,
-      // un segundo request puede perder el WHERE receipt_number IS NULL y recibir
-      // la fila existente; el evento debe llevar SIEMPRE ese número, no el local).
-      // `document_type` siempre `'receipt'`: la etiqueta aplicada la decide el
-      // gate (`resolveDocumentLabel`, HAS_FISCAL_HOMOLOGATION=false), no el caller.
-      const attached = await receiptsRepo.attachReceipt(paymentId, orgId, {
-        receiptNumber,
-        documentType: 'receipt',
-        receiptIssuedAt: new Date(),
-        taxOverrideReason,
-        subtotal,
-        taxTotal,
-        taxDetails,
-        emitterSnapshot,
-        issuedBy: input.actor ?? null,
-      });
-      const persistedNumber = attached.receiptNumber ?? receiptNumber;
-
-      // Carrera perdida: otra entrega ya numeró el pago, este número local no
-      // se persistió. Compensar la secuencia si seguimos siendo el último
-      // consumidor; si no, el número es irreversible y queda como hueco.
-      //
-      // NO compensar ante una EXCEPCIÓN de `attachReceipt`: si el error llegó
-      // después de que la sentencia commiteó (respuesta perdida, timeout),
-      // devolver el número haría que se reasigne a otro pago → duplicado, que
-      // es peor que un hueco. Aquí el `persistedNumber` se leyó de la fila, así
-      // que la no-persistencia está confirmada.
-      if (persistedNumber !== receiptNumber) {
-        const { released } = await receiptsRepo.releaseLastNumber(
-          orgId,
-          'receipt',
-          year,
-          seq,
-        );
-        if (!released) {
-          console.error(
-            `receipt emission: correlativo ${receiptNumber} no persistido y no liberable (la secuencia ya avanzó).`,
-          );
-        }
-      }
-
-      console.log(
-        `[api-worker] receipts: queuing render — paymentId=${paymentId} receiptNumber=${persistedNumber} org=${orgId}`,
-      );
-      await receiptQueue.send(
-        buildReceiptRenderEvent({
-          paymentId,
-          organizationId: orgId,
-          receiptNumber: persistedNumber,
-        }),
-      );
-      console.log(`[api-worker] receipts: render queued — paymentId=${paymentId} receiptNumber=${persistedNumber}`);
-      return {
-        receiptNumber: persistedNumber,
-        pdfStatus: attached.receiptPdfKey ? 'ready' : 'pending',
-      };
+      return { receiptNumber: result.receiptNumber, pdfStatus: result.pdfStatus };
     },
 
     /**
