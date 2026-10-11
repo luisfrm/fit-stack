@@ -1,7 +1,12 @@
 import { handleRegistrationInvite, handleOrgInvite } from './handlers/email.handler';
 import { handlePaymentReceipt, handleOrgPaymentReceived } from './handlers/pdf.handler';
 import { handleReceiptRender, sweepPendingReceiptPdfs } from './handlers/receipt.handler';
-import type { ReceiptRenderEvent } from '@workspace/shared';
+import { clearReceiptNotifiedMarkForEvent } from './handlers/notify-mark';
+import {
+  isFinalDeliveryAttempt,
+  TASK_QUEUE_MAX_RETRIES,
+  type ReceiptRenderEvent,
+} from '@workspace/shared';
 
 export type FitTaskEvent =
   | {
@@ -87,6 +92,10 @@ async function processReceiptBatch(
 /**
  * Processes a single batch of task events from fit-task-events.
  * Routes by event type, acks on success, retries on failure.
+ *
+ * On the final failed delivery (the one that dead-letters the message), the
+ * receipt notified mark is cleared first so the sweep's second predicate can
+ * recover the payment — see `clearReceiptNotifiedMarkForEvent`.
  */
 async function processTaskBatch(
   batch: MessageBatch<FitTaskEvent>,
@@ -123,6 +132,12 @@ async function processTaskBatch(
       message.ack();
     } catch (error) {
       console.error(`[jobs-worker] task event FAILED — type="${(event as any).type}" attempt=${message.attempts}:`, error);
+      // Final failed delivery: the message is about to be dead-lettered.
+      // Clear the receipt notified mark so the sweep can recover the payment
+      // (best-effort; a cleanup failure never interrupts the retry below).
+      if (isFinalDeliveryAttempt(message.attempts, TASK_QUEUE_MAX_RETRIES)) {
+        await clearReceiptNotifiedMarkForEvent(env, event);
+      }
       message.retry();
     }
   }

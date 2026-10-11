@@ -199,6 +199,33 @@ export function isPlatformSubscriptionExpired(status: PlatformSubscriptionStatus
 }
 
 /**
+ * `max_retries` of the `fit-task-events` consumer (emails) in jobs-worker.
+ *
+ * Single source for the dead-letter threshold: it mirrors
+ * `apps/jobs-worker/wrangler.jsonc` (root + env blocks) and
+ * `infrastructure/terraform/workers.tf` (`cloudflare_queue_consumer.task`).
+ * Drift between those surfaces is blocked by the parity guard
+ * (`infrastructure/terraform/scripts/check-name-parity.mjs`), which asserts
+ * the constant equals the consumer's `max_retries` in every block.
+ */
+export const TASK_QUEUE_MAX_RETRIES = 3;
+
+/**
+ * Whether the current delivery is the final one, i.e. the delivery whose
+ * failure sends the message to the dead-letter queue.
+ *
+ * Cloudflare docs: a consumer retries delivery `max_retries` times before
+ * marking the delivery as failed — the initial delivery plus `max_retries`
+ * redeliveries. The delivery that dead-letters therefore carries
+ * `attempts = max_retries + 1` (with 3: attempts 1, 2, 3, 4). Kept in this
+ * single place so the counting can be adjusted if empirical verification
+ * (dev worker + invalid SMTP credentials) ever disagrees.
+ */
+export function isFinalDeliveryAttempt(attempts: number, maxRetries: number): boolean {
+  return attempts >= maxRetries + 1;
+}
+
+/**
  * Detailed configuration for each supported country.
  * Includes labels for identification and tax registration to avoid hardcoding.
  */

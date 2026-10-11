@@ -17,6 +17,14 @@
  *    `max_wait_time_ms` (milisegundos). Sin esto, un cambio en un solo lado
  *    cambia el comportamiento de la cola en silencio.
  *
+ * 3. **Dead-letter threshold**: the shared constant `TASK_QUEUE_MAX_RETRIES`
+ *    (`packages/shared/src/constants.ts`) is what jobs-worker compares
+ *    `message.attempts` against to detect the final delivery before the DLQ.
+ *    This script asserts the constant equals the `fit-task-events` consumer's
+ *    `max_retries` in every wrangler block (root + envs) and in Terraform
+ *    (`cloudflare_queue_consumer.task`), so a silent change of the retry
+ *    policy can never desync the worker's threshold from the real one.
+ *
  * Sin dependencias: se apoya en el parser JSON de Node. Los `wrangler.jsonc`
  * de este repo son JSON estricto (comentarios solo fuera de objetos), así que
  * un `JSON.parse` directo es suficiente. Si en el futuro se agregaran comentarios
@@ -116,6 +124,26 @@ function parseTerraformConsumers() {
   return found;
 }
 
+/**
+ * Reads `TASK_QUEUE_MAX_RETRIES` from the shared constants (regex, no deps —
+ * the script must stay dependency-free). Never falls back silently: a missing
+ * or malformed constant is a hard error.
+ */
+function readTaskQueueMaxRetries() {
+  const relPath = 'packages/shared/src/constants.ts';
+  let raw;
+  try {
+    raw = readFileSync(resolve(repoRoot, relPath), 'utf8');
+  } catch {
+    throw new Error(`No se pudo leer ${relPath}`);
+  }
+  const hit = /export\s+const\s+TASK_QUEUE_MAX_RETRIES\s*=\s*(\d+)\s*;/.exec(raw);
+  if (!hit) {
+    throw new Error(`TASK_QUEUE_MAX_RETRIES no está declarado en ${relPath}`);
+  }
+  return Number(hit[1]);
+}
+
 const apiWrangler = readJson('apps/api-worker/wrangler.jsonc');
 const jobsWrangler = readJson('apps/jobs-worker/wrangler.jsonc');
 
@@ -189,6 +217,15 @@ try {
   errors.push(`[consumers] ${err.message}`);
 }
 
+// Shared dead-letter threshold: must equal the fit-task-events consumer's
+// max_retries in every wrangler block AND in Terraform.
+let taskMaxRetries;
+try {
+  taskMaxRetries = readTaskQueueMaxRetries();
+} catch (err) {
+  errors.push(`[consumers] ${err.message}`);
+}
+
 if (terraformConsumers) {
   for (const block of jobsWranglerBlocks) {
     const ctx = `[consumers/${block.label}]`;
@@ -231,6 +268,20 @@ if (terraformConsumers) {
           `${ctx} ${queueName} max_retries: wrangler="${actual.max_retries}" vs terraform="${tf.max_retries}"`,
         );
       }
+      // Dead-letter threshold: the shared constant must match the
+      // fit-task-events consumer on every surface (wrangler + Terraform).
+      if (tfName === 'task' && taskMaxRetries !== undefined) {
+        if (actual.max_retries !== taskMaxRetries) {
+          errors.push(
+            `${ctx} ${queueName} max_retries: wrangler="${actual.max_retries}" vs shared TASK_QUEUE_MAX_RETRIES="${taskMaxRetries}"`,
+          );
+        }
+        if (tf.max_retries !== taskMaxRetries) {
+          errors.push(
+            `${ctx} ${queueName} max_retries: terraform="${tf.max_retries}" vs shared TASK_QUEUE_MAX_RETRIES="${taskMaxRetries}"`,
+          );
+        }
+      }
     }
 
     for (const consumer of declaredList) {
@@ -255,5 +306,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  '✅ Paridad Terraform ↔ wrangler.jsonc OK (nombres + settings de consumers; production, staging, dev).',
+  '✅ Paridad Terraform ↔ wrangler.jsonc OK (nombres + settings de consumers + TASK_QUEUE_MAX_RETRIES; production, staging, dev).',
 );
