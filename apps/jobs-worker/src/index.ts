@@ -51,7 +51,7 @@ export interface Env {
 
 /**
  * Processes a single batch of receipt render events from fit-receipt-events.
- * Acks on success, retries on failure with a structured error log (RD-92).
+ * Acks on success, retries on failure with a structured error log.
  */
 async function processReceiptBatch(
   batch: MessageBatch<ReceiptRenderEvent>,
@@ -69,8 +69,8 @@ async function processReceiptBatch(
       message.ack();
     } catch (error) {
       // Never emit an empty error: name, message and cause travel in the
-      // log so the failure is actionable (RD-92). No semantic change:
-      // exhausted retries still go to the DLQ.
+      // log so the failure is actionable. No semantic change: exhausted
+      // retries still go to the DLQ.
       const cause = error instanceof Error ? error.cause : undefined;
       const name = error instanceof Error ? error.name : 'UnknownError';
       const messageText = error instanceof Error ? error.message : String(error);

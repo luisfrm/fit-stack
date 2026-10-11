@@ -1,13 +1,14 @@
 /**
- * Compensación del alta del panel cuando falla la emisión (RD-94).
+ * Panel creation compensation when the emission fails.
  *
- * El alta commitea en 3 pasos sin red (`subsRepo.create` →
- * `paymentsRepo.create` → paso 1). Sin transacciones interactivas (driver
- * HTTP de Neon) el `catch` compensa por relectura: pago sin número → `voided`
- * con motivo fijo (reintentable: el guard solo frena `processing`); fallo en
- * el insert del pago → huérfana cancelada, nunca borrada (regla 6).
+ * The creation commits in 3 steps without a transaction (`subsRepo.create` →
+ * `paymentsRepo.create` → step 1). Without interactive transactions (Neon HTTP
+ * driver) the `catch` compensates by re-reading: a payment with no number →
+ * `voided` with a fixed reason (retryable: the guard only blocks `processing`);
+ * a failure inserting the payment → the orphan is cancelled, never deleted
+ * (rule 6).
  *
- * Todo dinero en centavos enteros; la tz la inyecta `requireOrgTimezone()`.
+ * All money in integer cents; the tz is injected by `requireOrgTimezone()`.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
@@ -212,9 +213,9 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
   });
 
   it('(d) alta exitosa con la invalidación en finally → 201 intacto (sin regresión de C2)', async () => {
-    // C2 (RD-94) envolvió `servicio + invalidación` en try/finally: en el
-    // camino feliz el resultado no debe alterarse (la invalidación corre igual,
-    // Redis es no-op en tests, pero el 201 y el cuerpo deben ser los de antes).
+    // The compensation wrapped `service + invalidation` in try/finally: on the
+    // happy path the result must stay intact (the invalidation still runs,
+    // Redis is a no-op in tests, but the 201 and the body must be unchanged).
     const { owner, organization } = await createGymTenant('comp-d');
     const { member, plan } = await setupFixture({ owner, organization });
 
