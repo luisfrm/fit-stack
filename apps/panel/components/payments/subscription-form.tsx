@@ -177,9 +177,9 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     initialMember ?? null
   );
 
-  // Sync with initialMember if it changes (callback from creation). También
-  // resetea el override del periodo: el preview editado pertenece al miembro
-  // anterior y no debe arrastrarse al nuevo (ver `resetPeriodOverride`).
+  // Sync with initialMember if it changes (callback from creation). Also
+  // resets period override: edited preview belongs to previous member
+  // and must not carry over to the new one (see `resetPeriodOverride`).
   React.useEffect(() => {
     if (initialMember) {
       setSelectedMember(initialMember);
@@ -202,8 +202,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
 
-  // Fiscal override (modo auto = el backend descompone; override = tasas
-  // manuales + motivo de auditoría, montos siempre en centavos).
+  // Fiscal override (auto mode = backend decomposes; override = manual
+  // rates + audit reason, amounts always in integer cents).
   const [taxMode, setTaxMode] = React.useState<TaxMode>("auto");
   const [taxRateOverrides, setTaxRateOverrides] = React.useState<Record<string, string>>({});
   const [taxOverrideReason, setTaxOverrideReason] = React.useState("");
@@ -222,15 +222,15 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [startDate, setStartDate] = React.useState(todayStr);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
   const [endDate, setEndDate] = React.useState(defaultEndStr);
-  // `endDate` es un preview editable: mientras el operador no lo toque
-  // (`dirty` en false) se sincroniza con la regla compartida; al enviar
-  // sin `dirty` no se manda `endDate` y el periodo lo fija el servidor.
+  // `endDate` is an editable preview: as long as operator does not edit it
+  // (`dirty` is false) it syncs with shared business rule; on submit
+  // without `dirty` no `endDate` is sent and period is determined by server.
   const [endDateDirty, setEndDateDirty] = React.useState(false);
   const [endDateOverrideReason, setEndDateOverrideReason] = React.useState("");
-  // El cálculo local puede discrepar del servidor (el `latestSubscription` del
-  // cliente puede estar desactualizado por caché): si el servidor responde 422
-  // `END_DATE_OVERRIDE_REASON_REQUIRED`, forzamos la aparición del motivo y
-  // refrescamos el latest del miembro para converger (#5).
+  // Local calculation may differ from server (client `latestSubscription`
+  // could be stale due to cache): if server responds 422
+  // `END_DATE_OVERRIDE_REASON_REQUIRED`, force reason field display and
+  // refresh member latest subscription to converge (#5).
   const [serverRequiresReason, setServerRequiresReason] = React.useState(false);
 
   const [memberSearch, setMemberSearch] = React.useState("");
@@ -238,10 +238,10 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [searchResults, setSearchResults] = React.useState<PaginatedMembers["data"]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
 
-  // Preview de Fecha Final con la regla compartida (Regla 4: ningún día
-  // pagado se pierde). El latest sale de `selectedMember.latestSubscription`
-  // (el search ya pide `includeLatestSubscription: true`). Sin plan o sin
-  // miembro → +1 mes como antes (solo display, nunca se envía).
+  // End Date preview with shared rule (Rule 4: no paid day is lost).
+  // Latest comes from `selectedMember.latestSubscription` (search requests
+  // `includeLatestSubscription: true`). Without plan or member → +1 month
+  // (display only, never sent to server).
   const periodPreview = React.useMemo(() => {
     const start = parseDateAsConfigTimezone(startDate, timezone);
     if (Number.isNaN(start.getTime())) return null;
@@ -270,8 +270,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     if (!endDateDirty && computedEndStr) setEndDate(computedEndStr);
   }, [computedEndStr, endDateDirty]);
 
-  // Acorte de un periodo vigente (comparación a día local, como el
-  // servidor: el mismo día cuenta como idempotente, no como recorte).
+  // Shortening an active period (local day comparison matching server:
+  // same day counts as idempotent, not a shortening).
   const isShorteningActivePeriod =
     endDateDirty &&
     periodPreview !== null &&
@@ -280,11 +280,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     computedEndStr !== null &&
     endDate < computedEndStr;
 
-  // El campo motivo se exige si el cálculo local dice que acorta O si el
-  // servidor ya lo pidió (autoridad final, nunca el texto del error).
+  // Reason field is required if local calculation detects shortening OR
+  // server already requested it (final authority, never error text).
   const requiresOverrideReason = isShorteningActivePeriod || serverRequiresReason;
 
-  // Inicialización
+  // Initialization
   React.useEffect(() => {
     plansService.getAll().then(setPlans);
     settingsService.getByKey('allow_price_override').then(v => setAllowPriceOverride(v === 'true'));
@@ -319,7 +319,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     );
   }, [activePaymentMethods, paymentCurrency]);
 
-  // Perfil fiscal de la org emisora (defaults del país + overrides).
+  // Issuer org fiscal profile (country defaults + overrides).
   const fiscalProfile = React.useMemo(() => {
     const countryCode = activeOrganization?.countryCode;
     if (!countryCode) return null;
@@ -330,14 +330,14 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [activeOrganization]);
 
-  // D6: un emisor que no declaró ser contribuyente formal no detalla
-  // impuestos, así que tampoco puede ajustarlos a mano (el backend lo
-  // rechaza con 400). El modo efectivo es siempre "auto" en ese caso.
+  // D6: an issuer that has not declared being a formal taxpayer does not detail
+  // taxes, and thus cannot adjust them manually (backend rejects with 400).
+  // Effective mode is always "auto" in that case.
   const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";
 
-  // Preview del desglose con la única fuente compartida. En override se
-  // aplican las tasas manuales; si alguna es inválida se muestra el auto y
-  // el submit se bloquea con toast.
+  // Breakdown preview using the single shared source of truth. Under override,
+  // manual rates are applied; if any rate is invalid, auto is shown and
+  // submit is blocked with toast.
   const taxPreview = React.useMemo(() => {
     if (!fiscalProfile) return null;
     const totalCents = unitsToCents(finalAmount);
@@ -395,7 +395,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     updateFinance();
   }, [selectedPlan, paymentCurrency]);
 
-  // Buscar miembros dinámicamente
+  // Dynamically search members
   React.useEffect(() => {
     if (!debouncedSearch) {
       setSearchResults([]);
@@ -513,14 +513,13 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   const handleSubmissionError = async (err: unknown) => {
     console.error("Error processing subscription payment:", err);
-    // Dueño ÚNICO del toast de submit: el modal (`SubscriptionModal`), que es
-    // quien mapea los códigos de negocio. Aquí solo se resuelve el estado
-    // local; toastear también duplicaría el aviso (1 acción → 1 toast).
+    // SOLE owner of submit toast: the modal (`SubscriptionModal`), which
+    // maps business error codes. Here only local state is updated;
+    // toasting here as well would duplicate the notification (1 action → 1 toast).
     if (apiCode(err) !== "END_DATE_OVERRIDE_REASON_REQUIRED") return;
 
-    // El servidor pide motivo (cálculo local desactualizado): forzamos el
-    // campo y refrescamos el latest del miembro para que el preview
-    // converja.
+    // Server requires reason (stale local calculation): force field
+    // and refresh member latest subscription so preview converges.
     setServerRequiresReason(true);
     if (!selectedMember) return;
 
@@ -540,8 +539,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     e.preventDefault();
     if (!validatePaymentFields()) return;
 
-    // Acortar un periodo vigente exige motivo (validación local antes del
-    // submit; si igual llega sin motivo el servidor responde 422).
+    // Shortening an active period requires a reason (local validation before submit;
+    // if submitted without reason the server responds with 422).
     if (requiresOverrideReason && !endDateOverrideReason.trim()) {
       toast.error("Indica el motivo del ajuste de fecha");
       return;
@@ -564,10 +563,10 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   };
 
-  // El preview es una edición del operador atada al miembro/plan vigente: al
-  // cambiar cualquiera de los dos, `dirty` y el motivo se resetean para no
-  // arrastrar un período editado hacia otro miembro (el servidor aceptaría
-  // libremente un `endDate` explícito en un período no vigente).
+  // Preview is an operator edit tied to active member/plan: when
+  // either changes, `dirty` and reason reset to avoid dragging
+  // an edited period to another member (server would freely accept
+  // an explicit `endDate` on an inactive period).
   const resetPeriodOverride = () => {
     setEndDateDirty(false);
     setEndDateOverrideReason("");
@@ -689,7 +688,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
         />
       )}
 
-      {/* Selector de Fechas */}
+      {/* Date Selector */}
       <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4", isSectionDisabled && "cursor-not-allowed opacity-40")}>
         <Input
           id="start-date"

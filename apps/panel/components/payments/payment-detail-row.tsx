@@ -33,18 +33,18 @@ interface NormalizedDetail {
 function isImageUrl(value: unknown): boolean {
   if (typeof value !== "string") return false;
   if (value.startsWith("http") || value.startsWith("/")) return true;
-  // Keys relativas sin type (p. ej. `org/capturas/abc.png`): evidencia, no secreto.
+  // Relative keys without type (e.g., `org/capturas/abc.png`): evidence, not a secret.
   return value.includes("/") || /\.(png|jpe?g|webp|gif|pdf)$/i.test(value);
 }
 
 /**
- * Aplana `paymentMethodDetails` a un formato único para renderizar. Acepta
- * el formato nuevo (`IPaymentMethodDetail[]`) y el legacy (`Record<string, any>`)
- * mientras conviven las dos formas en la BD.
+ * Flattens `paymentMethodDetails` into a unified format for rendering. Accepts
+ * the new format (`IPaymentMethodDetail[]`) and the legacy format (`Record<string, any>`)
+ * while both coexist in the DB.
  *
- * Los valores `text`/`number` se enmascaran (`maskReference` de shared) en
- * AMBAS formas; `file` (o URL/key de evidencia) sigue como link
- * "VER CAPTURA" (es evidencia, no secreto).
+ * `text`/`number` values are masked (`maskReference` from shared) in
+ * BOTH formats; `file` (or evidence URL/key) remains as a link
+ * "VER CAPTURA" (it is evidence, not a secret).
  */
 export function normalizePaymentDetails(
   input: PaymentMethodDetailsInput,
@@ -52,9 +52,9 @@ export function normalizePaymentDetails(
   if (!input) return [];
   if (Array.isArray(input)) {
     return input.map((detail, idx) => {
-      // El tipo de `detail` es union (shared IPaymentMethodDetail + nuestro ReceiptPaymentDetail);
-      // la coerción es segura porque solo leemos `label`, `value` y un `type` opcional.
-      // `value` puede ser `number` (schema admite `type: "number"`): String() antes de enmascarar.
+      // The type of `detail` is union (shared IPaymentMethodDetail + our ReceiptPaymentDetail);
+      // coercion is safe because we only read `label`, `value`, and an optional `type`.
+      // `value` can be `number` (schema allows `type: "number"`): String() before masking.
       const d = detail as ReceiptPaymentDetail;
       const isImage =
         d.type === "file" ||
@@ -70,11 +70,13 @@ export function normalizePaymentDetails(
 
   return Object.entries(input).flatMap(([key, value]) => {
     if (value === null || value === undefined || value === "" || key === "last4") return [];
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return [];
+    const strValue = `${value}`;
     const isImage = isImageUrl(value);
     return [
       {
         label: key.replaceAll("_", " ").toUpperCase(),
-        value: isImage ? String(value) : maskReference(String(value)),
+        value: isImage ? strValue : maskReference(strValue),
         isImage,
         key,
       },

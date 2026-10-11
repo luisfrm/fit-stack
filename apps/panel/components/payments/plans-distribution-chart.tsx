@@ -15,8 +15,8 @@ export function PlansDistributionChart({
 }: Readonly<PlansDistributionChartProps>) {
   // 1. Transform raw data
   const processedData = React.useMemo(() => {
-    // Para simplificar la visualización en el BarChart, mapeamos el nombre del plan como la categoría X
-    // y asignamos el count a una llave estática 'Activos'. Si se quisiera apilar, el objeto sería diferente.
+    // To simplify display in BarChart, we map the plan name as the X category
+    // and assign the count to a static key 'Suscriptores'. If stacking is needed, the structure would differ.
     return data.map((item) => ({
       plan: item.planName,
       Suscriptores: item.count,

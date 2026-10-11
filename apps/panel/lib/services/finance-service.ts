@@ -49,7 +49,7 @@ type RevenueRow = {
  * Service to handle financial operations: exchange rate fetching,
  * payment status mutations, and analytics/revenue aggregations.
  */
-/** Respuesta de `PATCH /payments/:id/status` (ver C6 en `vaults/business/PAYMENT_STATUSES.md`). */
+/** Response of `PATCH /payments/:id/status` (see C6 in `vaults/business/PAYMENT_STATUSES.md`). */
 export interface PaymentStatusResult {
   receiptVoided: boolean;
   receiptVoidReason?: "not_issued";
@@ -57,12 +57,12 @@ export interface PaymentStatusResult {
 
 export const financeService = {
   /**
-   * Updates the status of a payment (`PATCH /:id/status` — el backend no
-   * acepta POST en esta ruta).
+   * Updates the status of a payment (`PATCH /:id/status` — the backend does not
+   * accept POST on this route).
    *
-   * Devuelve el resultado del intento de anulación del comprobante: con
-   * `voided` sin comprobante emitido, `receiptVoided` es `false` y
-   * `receiptVoidReason` es `'not_issued'` (C6) — la UI lo dice explícitamente.
+   * Returns the receipt voiding attempt result: with
+   * `voided` without an issued receipt, `receiptVoided` is `false` and
+   * `receiptVoidReason` is `'not_issued'` (C6) — the UI states this explicitly.
    */
   async updatePaymentStatus(
     paymentId: number,

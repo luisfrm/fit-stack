@@ -4,7 +4,7 @@ import { env } from "@/lib/config/envs";
 
 export interface FileItem {
   key: string;
-  /** URL pública directa; `null` cuando el asset solo se entrega autenticado. */
+  /** Direct public URL; `null` when asset is authenticated-only. */
   url: string | null;
   size: number;
   uploadedAt: string;
@@ -14,9 +14,9 @@ export interface FileItem {
 /**
  * Service to handle file uploads, listing, and deletion with R2 storage.
  *
- * La organización la resuelve el API desde la sesión: este cliente NUNCA manda
- * `organizationId` (pedir la carpeta de otro gimnasio es imposible desde aquí).
- * Key resultante: `<orgId>/<folder>/<nombre>_<id>.<ext>`.
+ * Organization is resolved by API from session: this client NEVER sends
+ * `organizationId` (requesting another gym's folder is impossible from here).
+ * Resulting key: `<orgId>/<folder>/<name>_<id>.<ext>`.
  */
 export const uploadService = {
   /**
@@ -65,11 +65,11 @@ export const uploadService = {
   },
 
   /**
-   * URL con la que la UI muestra un archivo.
+   * URL used by the UI to display a file.
    *
-   * Público por diseño (`<orgId>/cms/…`, branding): URL directa de R2.
-   * Privado (avatares, logos, evidencia de pago): proxy autenticado del panel
-   * (`/api/media`), que reenvía la cookie al API — nunca una URL adivinable.
+   * Public by design (`<orgId>/cms/…`, branding): direct R2 URL.
+   * Private (avatars, logos, payment evidence): authenticated panel proxy
+   * (`/api/media`), which forwards cookie to API — never a guessable URL.
    */
   getMediaUrl(key: string | null | undefined): string {
     if (!key) return "";

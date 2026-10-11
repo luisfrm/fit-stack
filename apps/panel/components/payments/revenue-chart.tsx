@@ -94,8 +94,8 @@ export function RevenueChart({
         grouped[dateLabel] = group;
       }
 
-      // Agregación en centavos enteros (convención Money); el display
-      // convierte con formatCents en el tooltip y el eje.
+      // Aggregation in integer cents (Money convention); display
+      // formats via formatCents in tooltip and axis.
       group[item.currency] = ((group[item.currency] as number) || 0) + item.normalizedAmount;
       group[`${item.currency}_raw`] = ((group[`${item.currency}_raw`] as number) || 0) + item.amount;
     });

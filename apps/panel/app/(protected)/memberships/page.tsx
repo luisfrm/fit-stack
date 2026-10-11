@@ -35,8 +35,8 @@ export default async function MembershipsPage() {
     }
   }
 
-  // Server action: purga el data cache de Next (tag org:{orgId}:plans) para que
-  // router.refresh() tras crear/editar/eliminar un plan traiga datos frescos.
+  // Server action: purges Next's data cache (tag org:{orgId}:plans) so that
+  // router.refresh() after creating/editing/deleting a plan fetches fresh data.
   const refreshPlans = async () => {
     "use server";
     updateTag(plansTag);

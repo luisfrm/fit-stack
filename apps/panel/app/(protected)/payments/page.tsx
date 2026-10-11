@@ -19,13 +19,13 @@ type MonthlyReportRow = {
 
 export default async function PaymentsPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{
     search?: string;
     status?: string;
     page?: string;
   }>;
-}) {
+}>) {
   const params = await searchParams;
   const search = params.search || "";
   const statusFilter = params.status || null;
@@ -50,10 +50,10 @@ export default async function PaymentsPage({
       },
       { next: { revalidate: 60, tags: [subsTag] } },
     ),
-    // Accionable "Por validar": top-5 con pago `processing`, SIN caché.
-    // Es una lista de trabajo (se valida desde aquí): un pago registrado por
-    // otro canal debe aparecer al recargar, no 60s después. La tabla sí puede
-    // tolerar 60s porque toda escritura de la app purga `subsTag`.
+    // Actionable "To Validate": top-5 with `processing` payment, WITHOUT cache.
+    // It's a task queue (validated from here): a payment recorded through
+    // another channel should appear upon refresh, not 60s later. The table can
+    // tolerate 60s because all app writes purge `subsTag`.
     subscriptionsService.getAll(
       { status: PAYMENT_STATUSES.PROCESSING, limit: 5 },
       { cache: "no-store" },
@@ -69,7 +69,7 @@ export default async function PaymentsPage({
   const refreshPayments = async () => {
     "use server";
     updateTag(subsTag);
-    // Toda escritura de pago mueve el reporte de comprobantes.
+    // Any payment write affects the receipts report.
     updateTag(`org:${activeOrgId}:reports:receipts`);
   };
 

@@ -30,11 +30,9 @@ function RegisterForm() {
   // ── AUTO-LINK: If user was ALREADY logged in when page loaded (e.g. returned from /login) ──
   React.useEffect(() => {
     if (sessionPending) return;
-    
+
     // Record initial session state on first non-pending render
-    if (hadSessionOnMount.current === null) {
-      hadSessionOnMount.current = !!session;
-    }
+    hadSessionOnMount.current ??= !!session;
 
     // Only auto-link if user had session on mount (came from login redirect)
     // NOT if session appeared mid-lifecycle (signUp just happened in handleSubmit)
@@ -133,7 +131,7 @@ function RegisterForm() {
     // Prevent useEffect from also calling linkUser
     hasLinked.current = true;
 
-    // Si Better-Auth creó el usuario exitosamente, vinculamos la cuenta
+    // If Better-Auth successfully created the user, link the account
     try {
       await membersService.linkUser(token);
       toast.success("Cuenta configurada correctamente.");

@@ -14,14 +14,14 @@ export interface WeekOccurrence {
   readonly startTime: string;
   readonly endTime?: string;
   readonly isVisible: boolean;
-  /** Ya transcurrió hoy (solo se evalúa en el día actual). */
+  /** Already elapsed today (only evaluated for the current day). */
   readonly isElapsed: boolean;
 }
 
 export interface WeekCalendarDay {
-  /** Día local 'YYYY-MM-DD'. */
+  /** Local day 'YYYY-MM-DD'. */
   readonly date: string;
-  /** 0=dom … 6=sáb. */
+  /** 0=Sun … 6=Sat. */
   readonly dayOfWeek: number;
   readonly isToday: boolean;
   readonly count: number;
@@ -31,8 +31,8 @@ export interface WeekCalendarDay {
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Valida el ancla `?week=` ('YYYY-MM-DD'); si es inválido/ausente,
- * devuelve el día local actual. Pura y testeable.
+ * Validates the `?week=` ('YYYY-MM-DD') anchor; if invalid or absent,
+ * returns the current local day. Pure and testable.
  */
 export function resolveWeekAnchor(
   raw: string | undefined,
@@ -44,13 +44,13 @@ export function resolveWeekAnchor(
       const parsed = parseLocalToUtc(tz, raw);
       if (toLocalDayString(tz, parsed) === raw) return raw;
     } catch {
-      // cae al default
+      // falls back to default
     }
   }
   return toLocalDayString(tz, now);
 }
 
-/** Domingo ('YYYY-MM-DD') de la semana que contiene al ancla. */
+/** Sunday ('YYYY-MM-DD') of the week containing the anchor. */
 export function weekStartOf(
   weekAnchor: string,
   tz: string | null | undefined,

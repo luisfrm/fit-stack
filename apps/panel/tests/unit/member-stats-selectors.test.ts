@@ -8,7 +8,7 @@ const TZ = 'America/Caracas';
 
 describe('fillGrowthGaps', () => {
   beforeEach(() => {
-    // Miércoles 2026-09-09 15:00 Caracas.
+    // Wednesday 2026-09-09 15:00 Caracas.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-09T19:00:00Z'));
   });

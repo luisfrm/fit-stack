@@ -2,8 +2,8 @@ import { api, type ApiFetchOptions } from "@/lib/api/client";
 import type { IPaymentMethodConfig, IPaymentMethodDetails } from "@workspace/shared/types";
 
 /**
- * Suscripción SaaS de la org con detalles del plan (viene de
- * GET /api/organizations/subscription — fechas como ISO strings).
+ * Org SaaS subscription with plan details (comes from
+ * GET /api/organizations/subscription — dates as ISO strings).
  */
 export interface OrgSubscriptionInfo {
   id: number;
@@ -12,7 +12,7 @@ export interface OrgSubscriptionInfo {
   startDate: string;
   currentPeriodEnd: string;
   isTrial: boolean;
-  /** precio en centavos o null */
+  /** price in cents or null */
   priceOverride: number | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
@@ -21,7 +21,7 @@ export interface OrgSubscriptionInfo {
   latestPaymentStatus: string | null;
   organizationName: string;
   planName: string;
-  /** precio del plan en centavos */
+  /** plan price in cents */
   planPrice: number;
   planCurrency: string;
   planDurationValue: number;
@@ -72,7 +72,7 @@ export async function getOrgPaymentMethods(
   }
 }
 
-/** Client-side mutation: renueva la suscripción (pago queda en revisión). */
+/** Client-side mutation: renews subscription (payment stays under review). */
 export async function renewOrgSubscription(
   payload: OrgRenewPayload,
 ): Promise<{ success: true; paymentId: number }> {

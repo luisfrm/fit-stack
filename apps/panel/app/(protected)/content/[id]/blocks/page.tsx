@@ -250,7 +250,7 @@ function DraggableBlock({ block, index, onDelete, onToggleVisibility, refresh }:
         >
           <Card className="bg-white/5 border-none overflow-hidden relative">
             <div className="flex">
-              {/* DND Handle — mismo fondo que la card para que no se vea un bloque negro */}
+              {/* DND Handle — same background as card to avoid a black block appearance */}
               <div
                 {...provided.dragHandleProps}
                 className="w-10 bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors cursor-grab active:cursor-grabbing"
@@ -359,6 +359,7 @@ function BlockCreationModal({
         {BLOCK_TYPES.map((block) => (
           <button
             key={block.type}
+            type="button"
             onClick={() => handleCreate(block.type)}
             disabled={isSubmitting}
             className="flex items-start gap-4 p-4 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 hover:border-primary/30 text-left transition-all group disabled:opacity-50"

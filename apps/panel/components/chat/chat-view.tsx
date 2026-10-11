@@ -40,6 +40,23 @@ function buildTitle(content: string): string {
   return clean.length > 42 ? `${clean.slice(0, 42)}…` : clean;
 }
 
+function renderMessageContent(message: IAiChatMessage) {
+  if (!message.content) {
+    return (
+      <span className="inline-flex items-center gap-2 text-foreground-dim">
+        <Spinner className="size-3.5" />
+        Pensando...
+      </span>
+    );
+  }
+
+  if (message.role === "user") {
+    return <span className="whitespace-pre-wrap">{message.content}</span>;
+  }
+
+  return <ChatMarkdown>{message.content}</ChatMarkdown>;
+}
+
 interface ChatViewProps {
   readonly initialUsage?: AiUsage | null;
   readonly initialConversations?: UiChat[];
@@ -77,7 +94,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [activeChat?.messages, isStreaming]);
 
-  // Persistencia en Redis: guarda solo la conversación activa (no todo el historial)
+  // Redis persistence: saves only active conversation (not entire history)
   const persistConversation = React.useCallback(async (chat: UiChat) => {
     const trimmed = {
       ...chat,
@@ -86,7 +103,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     try {
       await chatService.saveConversation(trimmed);
     } catch {
-      // silencioso: Redis es best-effort, el chat sigue funcionando
+      // silent: Redis is best-effort, chat continues working
     }
   }, []);
 
@@ -94,7 +111,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
   persistRef.current = persistConversation;
   React.useEffect(() => {
     if (!activeChat) return;
-    // evita persistir el estado inicial vacío antes de hidratar
+    // avoid persisting initial empty state before hydration
     if (chats.length === 1 && chats[0]?.messages.length === 0 && !initialConversations?.length) return;
     const snapshot = activeChat;
     const t = setTimeout(() => void persistRef.current(snapshot), 400);
@@ -116,16 +133,16 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
     event.stopPropagation();
     setChats((prev) => prev.filter((chat) => chat.id !== id));
     if (activeChatId === id) setActiveChatId(null);
-    // persistirá vía useEffect; además borra en Redis explícitamente
-    void chatService.deleteConversation(id).catch(() => {});
+    // persists via useEffect; also deletes in Redis explicitly
+    void chatService.deleteConversation(id).catch(() => { });
   };
 
   const appendAssistantDelta = (chatId: string, delta: string) => {
     setChats((prev) =>
       prev.map((chat) => {
         if (chat.id !== chatId) return chat;
-        const last = chat.messages[chat.messages.length - 1];
-        if (last && last.role === "assistant") {
+        const last = chat.messages.at(-1);
+        if (last?.role === "assistant") {
           const merged = { ...last, content: last.content + delta };
           return {
             ...chat,
@@ -157,11 +174,11 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
       prev.map((chat) =>
         chat.id === chatId
           ? {
-              ...chat,
-              title: chat.messages.length === 0 ? buildTitle(content) : chat.title,
-              modelUsed: undefined,
-              messages,
-            }
+            ...chat,
+            title: chat.messages.length === 0 ? buildTitle(content) : chat.title,
+            modelUsed: undefined,
+            messages,
+          }
           : chat,
       ),
     );
@@ -181,7 +198,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
           );
         },
         onDone: () => undefined,
-        // El detalle crudo del stream ya se logueó en consola (chat-service).
+        // Raw stream error details are already logged to console (chat-service).
         onError: () => toast.error("No se pudo enviar el mensaje. Intente nuevamente."),
         onUsage: (fresh) => setUsage(fresh),
       });
@@ -272,7 +289,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
               <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto custom-scrollbar p-4">
                 {activeChat.messages.map((message, index) => (
                   <div
-                    key={index}
+                    key={`${activeChat.id}-${index}-${message.role}`}
                     className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
                   >
                     <div
@@ -283,18 +300,7 @@ export function ChatView({ initialUsage, initialConversations }: ChatViewProps) 
                           : "border-white/5 bg-surface text-foreground",
                       )}
                     >
-                      {message.content ? (
-                        message.role === "user" ? (
-                          <span className="whitespace-pre-wrap">{message.content}</span>
-                        ) : (
-                          <ChatMarkdown>{message.content}</ChatMarkdown>
-                        )
-                      ) : (
-                        <span className="inline-flex items-center gap-2 text-foreground-dim">
-                          <Spinner className="size-3.5" />
-                          Pensando...
-                        </span>
-                      )}
+                      {renderMessageContent(message)}
                     </div>
                   </div>
                 ))}

@@ -17,15 +17,15 @@ export interface MemberDeadlineItem {
   email?: string | null;
   planName?: string | null;
   endDate: string;
-  /** Vence en N días (positivo) o venció hace N días (negativo). */
+  /** Expires in N days (positive) or expired N days ago (negative). */
   days: number;
 }
 
 interface MemberDeadlineRowProps {
   item: MemberDeadlineItem;
-  /** Texto del badge, p. ej. "vence en 3 días" / "vencido hace 2 días". */
+  /** Badge text, e.g. "expires in 3 days" / "expired 2 days ago". */
   badgeLabel: string;
-  /** Variante del badge del design system (destructive/warning). */
+  /** Badge variant from design system (destructive/warning). */
   badgeVariant: "destructive" | "warning";
 }
 

@@ -20,9 +20,9 @@ export default function CurrencySettingsPage() {
   const { settings, isLoading, isUpdating, updateSettings } = useSettings();
   const { activeOrganization } = useAuth();
 
-  // Moneda principal y formato: columnas de la org (la principal deriva del
-  // país y el formato se edita en Configuración de Sede). Aquí solo se
-  // gestionan las monedas activas (extensible, fallback []).
+  // Primary currency and format: org columns (primary is derived from country
+  // and format is configured in Gym Settings). Here only active currencies
+  // are managed (extensible, fallback []).
   const primaryCurrency = activeOrganization?.primaryCurrency ?? "";
   const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>([]);
 

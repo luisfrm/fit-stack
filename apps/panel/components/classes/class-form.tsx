@@ -127,7 +127,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         </ToggleGroup>
       </div>
 
-      {/* ── Condicional: días de la semana o fecha puntual ── */}
+      {/* ── Conditional: days of the week or specific date ── */}
       {formData.frequencyType === "weekly" ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -164,7 +164,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         />
       )}
 
-      {/* ── Entrenador + Capacidad ── */}
+      {/* ── Trainer + Capacity ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Entrenador"
@@ -184,7 +184,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         />
       </div>
 
-      {/* ── Descripción ── */}
+      {/* ── Description ── */}
       <Textarea
         label="Descripción"
         placeholder="Describe brevemente la clase..."
@@ -193,7 +193,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
         rows={4}
       />
 
-      {/* ── Visibilidad ── */}
+      {/* ── Visibility ── */}
       <div className="col-span-full pt-2">
         <CheckboxCard
           id="isVisible"

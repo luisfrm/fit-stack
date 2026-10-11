@@ -23,7 +23,7 @@ export default async function UnauthorizedPage() {
   }
 
   const orgRole = session.member?.role as OrgRole | undefined;
-  // Sin rol (usuario sin org activa) → el layout de dashboard muestra el OrganizationPicker.
+  // No role (user without active org) → dashboard layout displays OrganizationPicker.
   if (!orgRole) {
     redirect("/dashboard");
   }

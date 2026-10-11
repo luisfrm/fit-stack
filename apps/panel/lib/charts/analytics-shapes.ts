@@ -18,10 +18,10 @@ export type MethodsChartData = Array<{
   Transacciones: number;
   breakdown: Record<string, number>;
 }>;
-export type RenewalsChartData = Array<{ dia: string; Vencimientos: number }>;
-export type GrowthChartData = Array<{ dia: string; Altas: number; Bajas: number }>;
+export type RenewalsChartData = Array<{ day: string; Vencimientos: number }>;
+export type GrowthChartData = Array<{ day: string; Altas: number; Bajas: number }>;
 
-/** Suscriptores activos distribuidos por plan. */
+/** Active subscribers distributed across plans. */
 export function buildPlansData(plans: PlansDistribution | undefined): PlansChartData {
   return plans?.map((item) => ({
     plan: item.planName,
@@ -33,7 +33,7 @@ export const PLANS_CHART_CONFIG: ChartConfig = {
   Suscriptores: { label: "Suscriptores Activos", color: "var(--color-primary)" },
 };
 
-/** Volumen transaccional por método de pago (con breakdown por divisa para tooltip). */
+/** Transaction volume by payment method (with per-currency breakdown for tooltip). */
 export function buildMethodsData(methods: PaymentMethods | undefined): MethodsChartData {
   return methods?.map((item) => ({
     metodo: item.method?.replaceAll('_', ' '),
@@ -46,11 +46,11 @@ export const METHODS_CHART_CONFIG: ChartConfig = {
   Transacciones: { label: "Transacciones", color: "var(--color-primary)" },
 };
 
-/** Vencimientos programados para los próximos 30 días. */
+/** Scheduled expirations for the next 30 days. */
 export function buildRenewalsData(renewals: Renewals | undefined): RenewalsChartData {
   return renewals?.map((item) => {
     const [, m, d] = item.day.split('-');
-    return { dia: `${d}-${m}`, Vencimientos: item.count };
+    return { day: `${d}-${m}`, Vencimientos: item.count };
   }) ?? [];
 }
 
@@ -63,25 +63,25 @@ export const RENEWALS_CHART_CONFIG: ChartConfig = {
  * ordenadas cronológicamente.
  */
 export function buildGrowthData(growth: Growth | undefined): GrowthChartData {
-  const map: Record<string, { dia: string; Altas: number; Bajas: number }> = {};
+  const map: Record<string, { day: string; Altas: number; Bajas: number }> = {};
 
   growth?.altas?.forEach((a) => {
     const [, m, d] = a.day.split('-');
-    const dia = `${d}-${m}`;
-    map[dia] = { dia, Altas: a.count, Bajas: 0 };
+    const day = `${d}-${m}`;
+    map[day] = { day, Altas: a.count, Bajas: 0 };
   });
 
   growth?.bajas?.forEach((b) => {
     const [, m, d] = b.day.split('-');
-    const dia = `${d}-${m}`;
-    if (!map[dia]) map[dia] = { dia, Altas: 0, Bajas: 0 };
+    const day = `${d}-${m}`;
+    map[day] ??= { day, Altas: 0, Bajas: 0 };
     // Bajas represented as negative numbers for diverging bar chart
-    map[dia].Bajas = -b.count;
+    map[day].Bajas = -b.count;
   });
 
   return Object.values(map).sort((a, b) => {
-    const [d1, m1] = a.dia.split('-');
-    const [d2, m2] = b.dia.split('-');
+    const [d1, m1] = a.day.split('-');
+    const [d2, m2] = b.day.split('-');
     if (m1 !== m2) return Number(m1) - Number(m2);
     return Number(d1) - Number(d2);
   });

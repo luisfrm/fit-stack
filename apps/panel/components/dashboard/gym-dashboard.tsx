@@ -34,17 +34,17 @@ interface GymDashboardProps {
   readonly stats: DashboardStats;
   readonly todayClasses: IClassToday[];
   readonly recentRegistrations: IRecentRegistration[];
-  /** Monto del día normalizado a la divisa primaria (unidades mayores) */
+  /** Today's income normalized to primary currency (major units) */
   readonly todayIncome?: TodayIncome | null;
   readonly pendingPayments?: number | null;
-  /** Listas accionables: próximos a vencer / vencidos recientemente. */
+  /** Actionable lists: expiring soon / recently expired. */
   readonly actionItems: {
     expiring: MemberDeadlineItem[];
     recentlyExpired: MemberDeadlineItem[];
   } | null;
-  /** Analítica de pagos (gráficas del dashboard, ya traída por el RSC). */
+  /** Payments analytics (dashboard charts, pre-fetched by RSC). */
   readonly analytics: AnalyticsSlice | null;
-  /** Reporte mensual de ingresos (mini-gráfica 6M + CSV, ya traído por el RSC). */
+  /** Monthly revenue report (6M mini-chart + CSV, pre-fetched by RSC). */
   readonly monthlyReport: MonthlyRevenueRow[];
   readonly primaryCurrency: string;
 }

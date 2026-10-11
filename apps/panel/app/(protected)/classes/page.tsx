@@ -30,7 +30,7 @@ function withWeek(base: URLSearchParams, week: string | null): string {
   if (week) params.set("week", week);
   else params.delete("week");
   const qs = params.toString();
-  return `/classes${qs ? `?${qs}` : ""}`;
+  return qs ? `/classes?${qs}` : "/classes";
 }
 
 export default async function ClassesPage({
@@ -95,14 +95,14 @@ export default async function ClassesPage({
   const weekStart = weekDays[0]?.date ?? weekAnchor;
   const weekEnd = weekDays[6]?.date ?? weekAnchor;
 
-  // C2: próxima clase de hoy + visibles/ocultas (sin backend, misma fuente).
+  // C2: today's next class + visible/hidden (without backend call, same source).
   const todayLocal = toLocalDayString(orgTimezone);
   const todayOccurrences =
     expandWeek(calendarResult.data, todayLocal, orgTimezone).find((d) => d.date === todayLocal)
       ?.occurrences ?? [];
   const visibility = countVisibility(calendarResult.data);
 
-  // `?week=` se fusiona con los filtros existentes, no los reemplaza.
+  // `?week=` merges with existing filters, does not replace them.
   const preserved = new URLSearchParams();
   if (query) preserved.set("query", query);
   if (page !== 1) preserved.set("page", String(page));

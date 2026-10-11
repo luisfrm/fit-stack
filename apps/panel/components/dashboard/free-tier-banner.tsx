@@ -53,7 +53,7 @@ export function FreeTierBanner({ features, isFreeTier, className, organizationId
 
   if (!isFreeTier || dismissed) return null;
 
-  // Evita flash de banner descartado durante hidratación: hasta montar, renderiza oculto pero sin shift brusco
+  // Prevents dismissed banner flash during hydration: until mounted, renders hidden without layout shift
   if (!mounted) {
     return <div className={cn("h-0 overflow-hidden", className)} aria-hidden />;
   }
@@ -67,15 +67,14 @@ export function FreeTierBanner({ features, isFreeTier, className, organizationId
     });
 
   return (
-    <div
+    <section
       className={cn(
-        // Fixed debajo del top nav: ocupa todo el ancho del main, se mantiene visible al hacer scroll
+        // Fixed below top nav: spans full main width, stays visible on scroll
         "sticky top-0 z-40 -mx-4 lg:-mx-8 border-b border-amber-500/20 bg-amber-500/10 backdrop-blur supports-[backdrop-filter]:bg-amber-500/10",
-        // Compensa el padding del main para que quede edge-to-edge arriba
+        // Compensates main padding so it sits edge-to-edge at the top
         "-mt-4 lg:-mt-8 mb-4",
         className,
       )}
-      role="region"
       aria-label="Plan gratuito activo"
     >
       <div className="relative flex items-start gap-3 px-4 lg:px-8 py-3">
@@ -116,6 +115,6 @@ export function FreeTierBanner({ features, isFreeTier, className, organizationId
           <X className="size-4" />
         </button>
       </div>
-    </div>
+    </section>
   );
 }

@@ -135,7 +135,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5 py-4">
-      {/* Información Básica */}
+      {/* Basic Information */}
       <Input
         label="Nombre del Plan"
         id="plan-name"
@@ -183,7 +183,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         leftIcon={<BadgeDollarSign size={16} />}
       />
 
-      {/* Configuración Personalizada si aplica */}
+      {/* Custom configuration if applicable */}
       {frequency === "custom" && (
         <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-primary/5 border border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
           <Input
@@ -207,7 +207,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         </div>
       )}
 
-      {/* Estados y Visibilidad */}
+      {/* Status and Visibility */}
       <div className="col-span-full flex flex-col gap-3 pt-2">
         <CheckboxCard
           id="isPopular"
@@ -234,7 +234,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         />
       </div>
 
-      {/* Builder de Features */}
+      {/* Features Builder */}
       <div className="col-span-full flex flex-col gap-4 pt-2">
         <div className="flex items-center justify-between pb-1">
           <Label className="text-xs font-semibold uppercase tracking-wider text-gray-400">Beneficios (Features)</Label>
@@ -279,7 +279,7 @@ export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
         </div>
       </div>
 
-      {/* Acción Final */}
+      {/* Final Action */}
       <div className="col-span-full pt-4">
         <Button
           type="submit"

@@ -166,7 +166,7 @@ export function OrgRenewalModal({
       onOpenChange(false);
       await onRenewed?.();
     } catch (err) {
-      // El mensaje del API nunca se muestra al usuario — solo consola.
+      // The API message is never shown directly to the user — console only.
       toast.error(mutationError("OrgRenewalModal", err, "No se pudo registrar el pago. Intente nuevamente."));
     } finally {
       setIsSubmitting(false);

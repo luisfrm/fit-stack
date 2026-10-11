@@ -110,7 +110,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 py-4">
 
-      {/* ── Nombre y Apellido ── */}
+      {/* ── First and Last Name ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Nombre"
@@ -130,7 +130,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         />
       </div>
 
-      {/* ── Email e Identificación ── */}
+      {/* ── Email and Identification ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Correo Electrónico"
@@ -150,7 +150,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         />
       </div>
 
-      {/* ── Teléfono y Fecha de Nacimiento ── */}
+      {/* ── Phone and Birthday ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input
           label="Teléfono"
@@ -169,7 +169,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         />
       </div>
 
-      {/* ── Especialidades ── */}
+      {/* ── Specialties ── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Especialidades ({specialities.length}/6)</span>
@@ -241,7 +241,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         </div>
       </div>
 
-      {/* ── Biografía ── */}
+      {/* ── Biography ── */}
       <Textarea
         label="Biografía / Perfil Profesional"
         placeholder="Cuéntanos un poco sobre la trayectoria y enfoque del entrenador..."
@@ -250,7 +250,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         rows={4}
       />
 
-      {/* ── Imagen y Orden ── */}
+      {/* ── Image and Display Order ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div className="md:col-span-2 flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Foto de Perfil</span>
@@ -308,7 +308,7 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
         />
       </div>
 
-      {/* ── Visibilidad ── */}
+      {/* ── Visibility ── */}
       <div className="col-span-full flex flex-col gap-3 pt-2">
         <CheckboxCard
           id="isVisible"

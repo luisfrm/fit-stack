@@ -10,19 +10,19 @@ export interface AiUsage {
   periodStart: string;
 }
 
-/** Una cuota está agotada cuando tiene límite (> 0) y el uso lo alcanzó. */
+/** A quota is exhausted when it has a limit (> 0) and usage reaches or exceeds it. */
 export function isQuotaExhausted(quota: QuotaUsage | undefined | null): boolean {
   return !!quota && quota.limit > 0 && quota.used >= quota.limit;
 }
 
-/** Formatea "usado/límite"; si límite 0 retorna "Ilimitado". */
+/** Formats "used/limit"; if limit is 0 returns "Ilimitado". */
 export function formatQuotaLabel(quota: QuotaUsage | undefined | null): string {
   if (!quota) return "—";
   if (quota.limit === 0) return "Ilimitado";
   return `${quota.used}/${quota.limit}`;
 }
 
-/** Texto para restantes: null → Ilimitado. */
+/** Text for remaining units: null → Ilimitado. */
 export function formatRemaining(remaining: number | null | undefined): string {
   if (remaining === null || remaining === undefined) return "Ilimitado";
   return String(remaining);

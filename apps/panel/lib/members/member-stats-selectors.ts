@@ -31,7 +31,7 @@ const MONTHS_SHORT = [
   "jul", "ago", "sep", "oct", "nov", "dic",
 ] as const;
 
-/** 'YYYY-MM-DD' → '15 jun' (display de cumpleaños, sin año). */
+/** 'YYYY-MM-DD' → '15 jun' (birthday display, without year). */
 export function formatBirthdayDay(birthday: string): string {
   const [, m, d] = birthday.split("-").map(Number);
   return `${d} ${MONTHS_SHORT[(m ?? 1) - 1]}`;

@@ -14,12 +14,60 @@ import {
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import {
   type IMembershipPlan,
-  type IPaymentMethodConfig
+  type IPaymentMethodConfig,
+  type IPaymentMethodField,
 } from "@/types/dashboard";
 import { sortPaymentMethodFields } from "@workspace/shared";
 import { ValueConverter, type CurrencyFormat, type ITaxDetail } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { TaxBlock, type TaxMode } from "./tax-block";
+
+interface RenderDynamicFieldParams {
+  readonly field: IPaymentMethodField;
+  readonly value: unknown;
+  readonly onChange: (value: unknown) => void;
+  readonly disabled?: boolean;
+}
+
+function renderDynamicField({ field, value, onChange, disabled }: RenderDynamicFieldParams) {
+  if (field.type === "visual") {
+    return (
+      <div className="rounded-xl border border-border bg-foreground/3 p-4 space-y-2 animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex items-center gap-2">
+          <Eye className="w-4 h-4 text-primary" />
+          <Text as="span" variant="muted" size="xs" weight="bold" uppercase className="tracking-wider">
+            Instrucciones de pago
+          </Text>
+        </div>
+        <Text size="sm" className="whitespace-pre-line leading-relaxed">
+          {field.value || "Sin instrucciones configuradas."}
+        </Text>
+      </div>
+    );
+  }
+
+  if (field.type === "file") {
+    return (
+      <ImageUpload
+        value={typeof value === "string" ? value : undefined}
+        onChange={(file) => onChange(file)}
+        onRemove={() => onChange(null)}
+        className="w-full"
+        disabled={disabled}
+      />
+    );
+  }
+
+  return (
+    <Input
+      type={field.type === "number" ? "number" : "text"}
+      placeholder="Escribe aquí..."
+      value={typeof value === "string" || typeof value === "number" ? value : ""}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    />
+  );
+}
 
 interface PaymentSectionProps {
   readonly selectedPlan: IMembershipPlan;
@@ -49,7 +97,7 @@ interface PaymentSectionProps {
   readonly paymentDate: string;
   readonly onPaymentDateChange: (value: string) => void;
   readonly disabled?: boolean;
-  // Bloque fiscal (preview calculado por el padre con `previewReceiptTaxes`).
+  // Tax block (preview calculated by parent via `previewReceiptTaxes`).
   readonly taxPreview: { subtotal: number; taxTotal: number; lines: ITaxDetail[] } | null;
   readonly taxMode: TaxMode;
   readonly onTaxModeChange: (mode: TaxMode) => void;
@@ -57,7 +105,7 @@ interface PaymentSectionProps {
   readonly onTaxRateChange: (name: string, pct: string) => void;
   readonly taxOverrideReason: string;
   readonly onTaxOverrideReasonChange: (value: string) => void;
-  /** Declaración de contribuyente formal del emisor (gating fiscal, C2). */
+  /** Issuer formal taxpayer declaration (tax gating, C2). */
   readonly taxEmitterIsFormal: boolean;
 }
 
@@ -229,35 +277,12 @@ export function PaymentSection({
                 {field.required && <span className="text-red-500">*</span>}
               </Text>
 
-              {field.type === 'visual' ? (
-                <div className="rounded-xl border border-border bg-foreground/3 p-4 space-y-2 animate-in fade-in zoom-in-95 duration-300">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-primary" />
-                    <Text as="span" variant="muted" size="xs" weight="bold" uppercase className="tracking-wider">
-                      Instrucciones de pago
-                    </Text>
-                  </div>
-                  <Text size="sm" className="whitespace-pre-line leading-relaxed">
-                    {field.value || "Sin instrucciones configuradas."}
-                  </Text>
-                </div>
-              ) : field.type === 'file' ? (
-                <ImageUpload
-                  value={typeof dynamicFieldValues[field.id] === 'string' ? dynamicFieldValues[field.id] : undefined}
-                  onChange={(file) => onDynamicChange(field.id, file)}
-                  onRemove={() => onDynamicChange(field.id, null)}
-                  className="w-full"
-                  disabled={disabled}
-                />
-              ) : (
-                <Input
-                  type={field.type === 'number' ? 'number' : 'text'}
-                  placeholder="Escribe aquí..."
-                  value={dynamicFieldValues[field.id] || ""}
-                  onChange={(e) => onDynamicChange(field.id, e.target.value)}
-                  disabled={disabled}
-                />
-              )}
+              {renderDynamicField({
+                field,
+                value: dynamicFieldValues[field.id],
+                onChange: (val) => onDynamicChange(field.id, val),
+                disabled,
+              })}
             </div>
           ))}
         </div>

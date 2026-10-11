@@ -11,16 +11,16 @@ import type { ISubscription } from "@workspace/shared/types";
 interface PendingPaymentsListProps {
   readonly items: ISubscription[];
   readonly currencyFormat: CurrencyFormat;
-  /** paymentId con acción en curso (deshabilita sus botones). */
+  /** paymentId with action in progress (disables its buttons). */
   readonly actionId: number | null;
   readonly onValidate: (paymentId: number) => void;
   readonly onReject: (paymentId: number) => void;
 }
 
 /**
- * Accionable "Por validar": top-5 suscripciones con pago `processing`
- * con validar/rechazar rápido. Mismo patrón que `actionItems` del dashboard:
- * los datos llegan del RSC, aquí solo se disparan las mutaciones.
+ * Actionable "To Validate": top-5 subscriptions with `processing` payment
+ * offering quick validate/reject. Same pattern as `actionItems` on the dashboard:
+ * data comes from the RSC, this component only triggers mutations.
  */
 export function PendingPaymentsList({
   items,

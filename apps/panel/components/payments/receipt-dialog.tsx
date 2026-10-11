@@ -197,8 +197,8 @@ export function ReceiptDialog({ initialData: subscription, trigger, onSuccess }:
     try {
       setState(await receiptsService.getReceipt(paymentId));
     } catch (err) {
-      // Único log del camino de carga (sin toast): el feedback UX es el
-      // estado inline con Reintentar. Los demás caminos usan mutationError.
+      // Only log on load path (no toast): UX feedback is the inline state with Retry.
+      // Other paths use mutationError.
       console.error("[ReceiptDialog]", err);
       setLoadError("No se pudo cargar el comprobante.");
     } finally {
@@ -208,7 +208,7 @@ export function ReceiptDialog({ initialData: subscription, trigger, onSuccess }:
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
-    // Recarga siempre al abrir: cubre pending→ready y ANULADO externo.
+    // Always reload on open: covers pending→ready and external ANULADO.
     if (next) {
       setState(null);
       void load();
@@ -285,9 +285,9 @@ export function ReceiptDialog({ initialData: subscription, trigger, onSuccess }:
 
   const readyState =
     !loading && !loadError && state?.available && state.pdfStatus === "ready" ? state : null;
-  // TZ de visualización: la fijada al comprobante en emisión, con fallback
-  // a la org de la sesión. Nunca la del navegador. Registro del pago y
-  // emisión del servidor se ajustan a esta TZ.
+  // Display TZ: timezone attached to the receipt on issuance, with fallback
+  // to session org. Never browser timezone. Payment record and
+  // server issuance are both pinned to this TZ.
   const displayTz = readyState ? (readyState.receipt.timezone ?? org?.timezone) : undefined;
   const readyBlocked = !!readyState && (!currencyFormat || !displayTz);
 

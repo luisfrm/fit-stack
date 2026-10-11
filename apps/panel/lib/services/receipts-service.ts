@@ -58,14 +58,14 @@ export const receiptsService = {
     }
   },
 
-  /** Fallback manual de emisión (owner/manager): responde sin esperar el PDF. */
+  /** Manual issuance fallback (owner/manager): responds without waiting for PDF. */
   async issueReceipt(paymentId: number): Promise<unknown> {
     return await api(`/payments/${paymentId}/issue`, { method: "POST" });
   },
 
   /**
-   * Reenvío manual. `queued:false` (HTTP 202) = numerado sin PDF: el
-   * backend re-encoló el render y enviará el email al completarse.
+   * Manual resend. `queued:false` (HTTP 202) = numbered without PDF:
+   * backend re-queued rendering and will send email once complete.
    */
   async sendReceiptEmail(paymentId: number): Promise<SendReceiptEmailResult> {
     const res = await api<SendEmailResponse>(

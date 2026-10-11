@@ -81,7 +81,7 @@ export function PaymentsClient({
 }: PaymentsClientProps) {
   const router = useRouter();
   const { activeOrganization } = useAuth();
-  // Sin acción de borrado: un registro de pago se anula o se revoca, nunca se elimina.
+  // No delete action: a payment record is voided or revoked, never deleted.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;
   const currencyFormat =
@@ -96,7 +96,7 @@ export function PaymentsClient({
   const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
   const [pendingActionId, setPendingActionId] = React.useState<number | null>(null);
 
-  // P2: solo inputs ya disponibles (último bucket + subs activas del KPI).
+  // P2: only readily available inputs (latest bucket + active subs from KPI).
   const monthCollectedCents = React.useMemo(
     () => monthCollectedTotal(initialMonthlyReport),
     [initialMonthlyReport],
@@ -167,8 +167,8 @@ export function PaymentsClient({
   ) => {
     try {
       const result = await financeService.updatePaymentStatus(paymentId, status, voidReason);
-      // C6: anular un cobro sin comprobante emitido no es un error, pero tampoco
-      // un "todo bien" genérico: el cajero tiene que saber que no se anuló nada.
+      // C6: voiding a payment without an issued receipt is not an error, nor
+      // a generic "success": cashier needs to know that nothing was voided.
       if (status === PAYMENT_STATUSES.VOIDED) {
         const rejected = voidReason === "Pago rechazado";
         if (result?.receiptVoided === false) {
@@ -185,16 +185,16 @@ export function PaymentsClient({
       }
       refreshAll();
     } catch (err) {
-      // Códigos con significado de UX (nunca se compara el texto del
-      // servidor): el guard de la invariante validado ⇔ numerado solo acepta
-      // `processing → validated` y rechaza validar sobre una sub cancelada.
+      // UX-meaningful codes (never compare raw server error text):
+      // the invariant guard validated ⇔ numbered only accepts
+      // `processing → validated` and rejects validating on a cancelled sub.
       toast.error(
         resolvePaymentErrorMessage(err, "PaymentsClient", "Error al actualizar pago"),
       );
     }
   };
 
-  /** Validar/rechazar rápido desde el accionable "Por validar". */
+  /** Fast validate/reject from "Needs validation" action list. */
   const handlePendingAction = async (
     paymentId: number,
     status: string,
@@ -208,8 +208,8 @@ export function PaymentsClient({
       );
       refreshAll();
     } catch (err) {
-      // Mismo mapeo por código que `handlePaymentStatusChange`: el accionable
-      // "Por validar" también puede traer el pago de una sub cancelada.
+      // Same code mapping as `handlePaymentStatusChange`: "Needs validation"
+      // item may also bring up payment for a cancelled subscription.
       toast.error(
         resolvePaymentErrorMessage(err, "PendingPaymentsList", "No se pudo actualizar el pago"),
       );

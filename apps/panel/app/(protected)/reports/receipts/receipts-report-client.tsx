@@ -40,7 +40,7 @@ interface ReceiptsReportClientProps {
   };
   readonly initialCurrencyFormat: CurrencyFormat;
   readonly onSuccess?: () => Promise<void> | void;
-  /** Error de filtros inválidos (visible, sin tumbar la página). */
+  /** Error from invalid filters (visible to user, without crashing page). */
   readonly loadError?: string | null;
 }
 
@@ -69,6 +69,136 @@ function stateBadge(state: IReceiptReportRow["state"]) {
 function toCsvCell(value: string | number | null | undefined): string {
   const text = value === null || value === undefined ? "" : String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function ReceiptNumberCell({ row }: { readonly row: IReceiptReportRow }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <Text weight="bold" size="sm" className="font-mono">
+        {row.receiptNumber ?? "SIN COMPROBANTE"}
+      </Text>
+      {stateBadge(row.state)}
+    </div>
+  );
+}
+
+function ReceiptMemberCell({ row }: { readonly row: IReceiptReportRow }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Text weight="bold" size="sm">{row.memberName}</Text>
+      <Text size="xs" variant="muted">{row.planName}</Text>
+    </div>
+  );
+}
+
+function ReceiptTotalCell({
+  row,
+  currencyFormat,
+}: {
+  readonly row: IReceiptReportRow;
+  readonly currencyFormat: CurrencyFormat;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Text weight="bold" size="sm" className="tabular-nums">
+        {formatCents(row.amountPaid, row.currencyPaid, currencyFormat)}
+      </Text>
+      <Text size="xs" variant="muted" className="uppercase">{row.paymentMethod}</Text>
+    </div>
+  );
+}
+
+function ReceiptAuditCell({ row }: { readonly row: IReceiptReportRow }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      {row.taxOverrideReason && (
+        <Text size="xs" variant="muted" className="italic">
+          Override: {row.taxOverrideReason}
+        </Text>
+      )}
+      {row.voided && (
+        <Text size="xs" variant="muted" className="italic">
+          Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
+        </Text>
+      )}
+      {row.issuedBy && (
+        <Text size="xs" variant="muted">
+          Emitido por: {row.issuedBy}
+        </Text>
+      )}
+      {!row.taxOverrideReason && !row.voided && !row.issuedBy && (
+        <Text size="xs" variant="muted" className="opacity-50">
+          —
+        </Text>
+      )}
+    </div>
+  );
+}
+
+interface ReceiptActionsCellProps {
+  readonly row: IReceiptReportRow;
+  readonly onRefresh: () => void | Promise<void>;
+}
+
+function ReceiptActionsCell({ row, onRefresh }: ReceiptActionsCellProps) {
+  if (!row.paymentId) return null;
+
+  return (
+    <div className="flex justify-end">
+      <ReceiptDialog
+        initialData={
+          {
+            paymentId: row.paymentId,
+            paymentStatus: row.paymentStatus,
+            memberEmail: row.memberEmail,
+            memberName: row.memberName,
+          } as unknown as ISubscription
+        }
+        onSuccess={onRefresh}
+        trigger={
+          <Button variant="outlined" size="sm" leftIcon={<Eye size={14} />}>
+            Ver
+          </Button>
+        }
+      />
+    </div>
+  );
+}
+
+function createReceiptsReportColumns(
+  currencyFormat: CurrencyFormat,
+  onRefresh: () => void | Promise<void>,
+): ColumnDef<IReceiptReportRow>[] {
+  return [
+    {
+      header: "Comprobante",
+      className: "pl-6",
+      headerClassName: "pl-6",
+      cell: (row) => <ReceiptNumberCell row={row} />,
+    },
+    {
+      header: "Miembro / Plan",
+      cell: (row) => <ReceiptMemberCell row={row} />,
+    },
+    {
+      header: "Total",
+      cell: (row) => (
+        <ReceiptTotalCell row={row} currencyFormat={currencyFormat} />
+      ),
+    },
+    {
+      header: "Auditoría",
+      cell: (row) => <ReceiptAuditCell row={row} />,
+    },
+    {
+      header: "Acciones",
+      className: "pr-6 text-right",
+      headerClassName: "pr-6 text-right",
+      cell: (row) => (
+        <ReceiptActionsCell row={row} onRefresh={onRefresh} />
+      ),
+    },
+  ];
 }
 
 export function ReceiptsReportClient({
@@ -124,8 +254,8 @@ export function ReceiptsReportClient({
         page: 1,
         limit: 1000,
       });
-      // En vista de huecos se exporta lo visible (gaps), no filas vacías.
-      // Montos en centavos enteros (convención Money): headers *_cents.
+      // In gaps view, visible items (gaps) are exported, not empty rows.
+      // Amounts in integer cents (Money convention): headers *_cents.
       const header =
         status === "gaps"
           ? ["tipo", "comprobante", "motivo", "actor", "fecha"]
@@ -205,93 +335,10 @@ export function ReceiptsReportClient({
     }
   };
 
-  const columns: ColumnDef<IReceiptReportRow>[] = [
-    {
-      header: "Comprobante",
-      className: "pl-6",
-      headerClassName: "pl-6",
-      cell: (row) => (
-        <div className="flex flex-col gap-1">
-          <Text weight="bold" size="sm" className="font-mono">
-            {row.receiptNumber ?? "SIN COMPROBANTE"}
-          </Text>
-          {stateBadge(row.state)}
-        </div>
-      ),
-    },
-    {
-      header: "Miembro / Plan",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <Text weight="bold" size="sm">{row.memberName}</Text>
-          <Text size="xs" variant="muted">{row.planName}</Text>
-        </div>
-      ),
-    },
-    {
-      header: "Total",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <Text weight="bold" size="sm" className="tabular-nums">
-            {formatCents(row.amountPaid, row.currencyPaid, initialCurrencyFormat)}
-          </Text>
-          <Text size="xs" variant="muted" className="uppercase">{row.paymentMethod}</Text>
-        </div>
-      ),
-    },
-    {
-      header: "Auditoría",
-      cell: (row) => (
-        <div className="flex flex-col gap-0.5">
-          {row.taxOverrideReason && (
-            <Text size="xs" variant="muted" className="italic">
-              Override: {row.taxOverrideReason}
-            </Text>
-          )}          {row.voided && (
-            <Text size="xs" variant="muted" className="italic">
-              Anulado{row.voidReason ? `: ${row.voidReason}` : ""}
-            </Text>
-          )}
-          {row.issuedBy && (
-            <Text size="xs" variant="muted">
-              Emitido por: {row.issuedBy}
-            </Text>
-          )}
-          {!row.taxOverrideReason && !row.voided && !row.issuedBy && (
-            <Text size="xs" variant="muted" className="opacity-50">
-              —
-            </Text>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "Acciones",
-      className: "pr-6 text-right",
-      headerClassName: "pr-6 text-right",
-      cell: (row) =>
-        row.paymentId ? (
-          <div className="flex justify-end">
-            <ReceiptDialog
-              initialData={
-                {
-                  paymentId: row.paymentId,
-                  paymentStatus: row.paymentStatus,
-                  memberEmail: row.memberEmail,
-                  memberName: row.memberName,
-                } as unknown as ISubscription
-              }
-              onSuccess={refreshAll}
-              trigger={
-                <Button variant="outlined" size="sm" leftIcon={<Eye size={14} />}>
-                  Ver
-                </Button>
-              }
-            />
-          </div>
-        ) : null,
-    },
-  ];
+  const columns = React.useMemo(
+    () => createReceiptsReportColumns(initialCurrencyFormat, refreshAll),
+    [initialCurrencyFormat, refreshAll],
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -398,7 +445,7 @@ export function ReceiptsReportClient({
         className="min-h-[400px]"
         columns={columns}
         data={initialReport.rows}
-        // En vista de huecos no hay filas paginables: se oculta la paginación.
+        // In gaps view there are no pageable rows: pagination is hidden.
         pagination={
           status === "gaps"
             ? undefined

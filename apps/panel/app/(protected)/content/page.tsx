@@ -16,9 +16,9 @@ export default async function ContentPage() {
     redirect("/dashboard");
   }
 
-  // Sin cache de fetch: la página es force-dynamic y las mutaciones
-  // (crear/borrar/editar) refrescan vía router.refresh() en el cliente —
-  // así el listado nunca muestra datos stale.
+  // No fetch cache: page is force-dynamic and mutations
+  // (create/delete/edit) refresh via router.refresh() on the client —
+  // this way the listing never displays stale data.
   const pages = await contentService.getPages();
 
   return <ContentListClient initialPages={pages} />;

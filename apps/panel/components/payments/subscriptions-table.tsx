@@ -37,7 +37,7 @@ const getPaymentStatusBadge = (status?: string, receiptNumber?: string | null) =
       </Badge>
     );
     case PAYMENT_STATUSES.VOIDED: {
-      // `voided` cubre rechazo y anulación; se deriva del comprobante emitido.
+      // `voided` covers rejection and voiding; derived from issued receipt.
       const rejected = getVoidKind({ receiptNumber }) === "rejected";
       return rejected ? (
         <Badge variant="destructive" className="flex items-center gap-1 px-2 py-0.5 pointer-events-none">
@@ -60,13 +60,26 @@ const getPaymentStatusBadge = (status?: string, receiptNumber?: string | null) =
 const getSubscriptionStatusBadge = (status: string) => {
   switch (status) {
     case SUBSCRIPTION_STATUSES.ACTIVE: return <Badge variant="success" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">ACTIVA</Badge>;
-    // CANCELADA = acceso revocado (el cobro sigue válido).
+    // CANCELLED = access revoked (payment remains valid).
     case SUBSCRIPTION_STATUSES.CANCELLED: return <Badge variant="destructive" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">CANCELADA</Badge>;
-    // ANULADA = el registro es inválido: su cobro se anuló o se rechazó.
+    // VOIDED = record is invalid: payment was voided or rejected.
     case SUBSCRIPTION_STATUSES.VOIDED: return <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">ANULADA</Badge>;
     case SUBSCRIPTION_STATUSES.EXPIRED: return <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-widest px-1.5 h-4 pointer-events-none">EXPIRADA</Badge>;
     default: return <Badge variant="outline" className="pointer-events-none">{status}</Badge>;
   }
+};
+
+const getReceiptLabel = (sub: ISubscription): string => {
+  if (!sub.receiptNumber) {
+    return "Emitir comprobante";
+  }
+  if (sub.receiptVoided) {
+    return "Ver comprobante (Anulado)";
+  }
+  if (sub.paymentStatus === PAYMENT_STATUSES.VALIDATED) {
+    return "Reimprimir comprobante";
+  }
+  return "Ver comprobante";
 };
 
 const getColumns = (
@@ -192,19 +205,13 @@ const getColumns = (
       className: "pr-6 text-right",
       headerClassName: "pr-6 text-right",
       cell: (sub) => {
-        // Auditoría del comprobante: con número siempre se puede ver
-        // (emitido, anulado o rechazado después de emitir); sin número
-        // solo `validated` puede emitir. `processing`/`voided` sin número
-        // no ofrecen nada.
+        // Receipt audit: with a number it can always be viewed
+        // (issued, voided or rejected after issuance); without a number
+        // only `validated` can issue. `processing`/`voided` without a number
+        // offer nothing.
         const canViewReceipt =
           !!sub.receiptNumber || sub.paymentStatus === PAYMENT_STATUSES.VALIDATED;
-        const receiptLabel = !sub.receiptNumber
-          ? "Emitir comprobante"
-          : sub.receiptVoided
-            ? "Ver comprobante (Anulado)"
-            : sub.paymentStatus === PAYMENT_STATUSES.VALIDATED
-              ? "Reimprimir comprobante"
-              : "Ver comprobante";
+        const receiptLabel = getReceiptLabel(sub);
         return (
         <div className="flex justify-end">
           <ActionsDropdown
@@ -232,9 +239,9 @@ const getColumns = (
                   {
                     label: "Validar Pago",
                     icon: <CheckCircle2 size={14} />,
-                    // El servidor solo valida `processing` y rechaza validar
-                    // sobre una suscripción fuera de vigencia (409 por código)
-                    // — no se ofrece una acción que va a fallar.
+                    // Server only validates `processing` and rejects validating
+                    // on a subscription out of validity (409 by code)
+                    // — an action bound to fail is not offered.
                     show:
                       sub.paymentStatus === 'processing' &&
                       sub.status !== SUBSCRIPTION_STATUSES.CANCELLED &&
@@ -283,7 +290,7 @@ interface SubscriptionsTableProps {
   readonly onPaymentStatusChange: (paymentId: number, status: string, voidReason?: string) => void;
   readonly loading?: boolean;
   readonly pagination?: any;
-  /** Refresca la página tras acciones del comprobante (updateTag + refresh). */
+  /** Refreshes the page following receipt actions (updateTag + refresh). */
   readonly onSuccess?: () => void | Promise<void>;
 }
 

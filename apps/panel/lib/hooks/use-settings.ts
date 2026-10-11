@@ -126,14 +126,14 @@ export function useSettings() {
         // Use it so the local state and cache always reflect reality.
         setSettings(updated);
         writeCache(updated);
-        // Invalida el data cache de Next (RSC con tags org:{orgId}:settings)
-        // antes de refrescar: la purga es server-only, así que viaja por el
-        // server action. Sin ella, refresh() relee la entrada cacheada.
+        // Invalidates Next data cache (RSC with tags org:{orgId}:settings)
+        // before refreshing: purge is server-only, so it travels via the
+        // server action. Without it, refresh() re-reads the cached entry.
         await invalidateSettingsCache();
         toast.success("Ajustes actualizados correctamente");
         router.refresh();
       } catch (error) {
-        // El mensaje del API nunca se muestra al usuario — solo consola.
+        // Raw API message is never shown to the user — console only.
         toast.error(mutationError("useSettings.update", error, "Error al actualizar los ajustes"));
         throw error;
       } finally {

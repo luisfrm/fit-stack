@@ -12,9 +12,9 @@ interface SubscriptionStatusCardProps {
   readonly subscription: OrgSubscriptionInfo | null;
   readonly paymentMethods: OrgPaymentMethodsResponse | null;
   readonly isFreeTier: boolean;
-  /** true si la sub ya venció (computado server-side). */
+  /** true if subscription already expired (computed server-side). */
   readonly isExpired: boolean;
-  /** días hasta vencer (positivo) o desde que venció (negativo). */
+  /** days until expiration (positive) or since expired (negative). */
   readonly daysDiff: number;
   readonly refreshBilling?: () => Promise<void>;
 }
@@ -73,6 +73,15 @@ export function SubscriptionStatusCard({
     router.refresh();
   };
 
+  const getBadgeConfig = (): { variant: "destructive" | "warning" | "success"; label: string } => {
+    if (isCancelled) return { variant: "destructive", label: "Cancelada" };
+    if (isExpired) return { variant: "destructive", label: "Expirada" };
+    if (hasPending) return { variant: "warning", label: "En revisión" };
+    return { variant: "success", label: subscription.status };
+  };
+
+  const badgeConfig = getBadgeConfig();
+
   return (
     <>
       <section className="mt-8 overflow-hidden rounded-xl border border-border bg-surface">
@@ -85,13 +94,11 @@ export function SubscriptionStatusCard({
             </span>
           </div>
           <Badge
-            variant={
-              isCancelled ? "destructive" : isExpired ? "destructive" : hasPending ? "warning" : "success"
-            }
+            variant={badgeConfig.variant}
             size="sm"
             className="uppercase tracking-widest"
           >
-            {isCancelled ? "Cancelada" : isExpired ? "Expirada" : hasPending ? "En revisión" : subscription.status}
+            {badgeConfig.label}
           </Badge>
         </div>
 

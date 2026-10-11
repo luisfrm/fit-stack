@@ -23,11 +23,22 @@ export default async function MembersPage({
   const params = await searchParams;
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
-  // `?active=` = flag `isActive` del perfil; `?subscription=` = filtro nuevo
-  // por suscripción gym-activa (`active` = con plan, `none` = sin plan).
-  const activeParam = params.active === "true" ? true : params.active === "false" ? false : undefined;
-  const subscriptionParam =
-    params.subscription === "active" ? true : params.subscription === "none" ? false : undefined;
+  // `?active=` = profile `isActive` flag; `?subscription=` = new filter
+  // by gym-active subscription (`active` = with plan, `none` = without plan).
+  const parseActiveParam = (value?: string): boolean | undefined => {
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return undefined;
+  };
+
+  const parseSubscriptionParam = (value?: string): boolean | undefined => {
+    if (value === "active") return true;
+    if (value === "none") return false;
+    return undefined;
+  };
+
+  const activeParam = parseActiveParam(params.active);
+  const subscriptionParam = parseSubscriptionParam(params.subscription);
 
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;

@@ -24,7 +24,7 @@ export default async function NoSubscriptionPage() {
     redirect("/login");
   }
 
-  // Sin rol de acceso a panel (coach/member) → la página correcta es /unauthorized.
+  // No panel access role (coach/member) → proper destination is /unauthorized.
   const orgRole = session.member?.role as OrgRole | undefined;
   if (orgRole && !hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     redirect("/unauthorized");
@@ -32,7 +32,7 @@ export default async function NoSubscriptionPage() {
 
   const activeOrgId = session.session?.activeOrganizationId;
 
-  // Free tier: la org entra al dashboard aunque no tenga suscripción pagada.
+  // Free tier: org enters dashboard even without a paid subscription.
   const featuresData = await getOrgFeatures(activeOrgId);
   if (featuresData?.isFreeTier) {
     redirect("/dashboard");

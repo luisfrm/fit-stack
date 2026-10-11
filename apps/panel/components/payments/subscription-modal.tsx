@@ -69,8 +69,8 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onO
       const code = apiCode(error);
       if (code === "END_DATE_OVERRIDE_REASON_REQUIRED") {
         toast.error("El periodo vigente se acorta: indica el motivo del ajuste");
-        // Re-lanza para que el form active el campo motivo y refresque el
-        // latest del miembro (el form es quien posee ese estado).
+        // Re-throw so the form can activate the reason field and refresh the
+        // member's latest subscription (the form owns that state).
         throw error;
       } else if (code === "END_DATE_BEFORE_START") {
         toast.error("La fecha final no puede ser anterior a la de inicio");

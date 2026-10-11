@@ -21,9 +21,9 @@ interface KpiSectionProps {
   onFilterChange: (filter: string | null) => void;
   activeFilter: string | null;
   currencyFormat: CurrencyFormat;
-  /** Cobrado del mes en centavos normalizados (P2, opcional). */
+  /** Month collected in normalized cents (P2, optional). */
   monthCollectedCents?: number | null;
-  /** Cobro por suscripción activa en centavos (P2, opcional). */
+  /** Charge per active subscription in cents (P2, optional). */
   perSubscriptionCents?: number | null;
   primaryCurrency?: string;
 }

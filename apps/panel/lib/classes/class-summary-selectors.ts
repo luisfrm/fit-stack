@@ -1,7 +1,7 @@
 import type { IGymClass } from "@workspace/shared/types";
 import type { WeekOccurrence } from "./week-calendar";
 
-/** Resumen visibles/ocultas del catálogo (sin backend, sobre lo ya traído). */
+/** Catalog visibility summary (client-side, over already-fetched classes). */
 export function countVisibility(classes: IGymClass[]): { visible: number; hidden: number } {
   let visible = 0;
   for (const cls of classes) {
@@ -12,7 +12,7 @@ export function countVisibility(classes: IGymClass[]): { visible: number; hidden
 
 export interface NextClass {
   readonly occurrence: WeekOccurrence;
-  /** Minutos hasta el inicio (<= 0 = ya empezó / ahora). */
+  /** Minutes until class starts (<= 0 = already started / right now). */
   readonly minutesLeft: number;
 }
 
@@ -22,8 +22,8 @@ function toMinutes(time: string): number {
 }
 
 /**
- * Próxima clase de hoy: primera ocurrencia no transcurrida ordenada por
- * `startTime`. `nowTime` es 'HH:MM' local (inyectado para testear).
+ * Today's next class: first upcoming occurrence sorted by
+ * `startTime`. `nowTime` is local 'HH:MM' (injected for deterministic testing).
  */
 export function nextClassToday(
   occurrences: WeekOccurrence[],
@@ -37,7 +37,7 @@ export function nextClassToday(
   return { occurrence, minutesLeft: toMinutes(occurrence.startTime) - toMinutes(nowTime) };
 }
 
-/** 'En 2 h 15 min' | 'En 45 min' | 'Ahora mismo'. */
+/** 'In 2 h 15 min' | 'In 45 min' | 'Right now'. */
 export function formatCountdown(minutesLeft: number): string {
   if (minutesLeft <= 0) return "Ahora mismo";
   if (minutesLeft < 60) return `En ${minutesLeft} min`;

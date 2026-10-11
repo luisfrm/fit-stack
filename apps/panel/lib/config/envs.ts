@@ -6,8 +6,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_R2_URL: z.string().url(),
 });
 
-// En el CMS, al ser Next.js, verificamos en qué lado estamos
-// para evitar que el log de error sature el navegador
+// In the CMS (Next.js), verify which side we are executing on
+// to prevent error logs from saturating the browser console
 const parsed = envSchema.safeParse({
   APP_ENV: process.env.APP_ENV,
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
@@ -19,7 +19,7 @@ const isBuildTime = process.env.CI === "true" || process.env.NEXT_PHASE === "pha
 
 if (!parsed.success) {
   if (globalThis.window === undefined) {
-    // Si es producción real, NUNCA permitimos saltarnos la validación
+    // In real production, NEVER skip env validation
     if (isBuildTime && !isProduction) {
       console.warn("⚠️  Skipping strict CMS env validation during build/CI (Non-production)");
     } else {
@@ -31,11 +31,21 @@ if (!parsed.success) {
   }
 }
 
-const validatedEnv = parsed.success 
-  ? parsed.data 
-  : (isBuildTime && !isProduction)
-    ? { APP_ENV: "development", NEXT_PUBLIC_API_BASE_URL: "http://localhost:3001", NEXT_PUBLIC_R2_URL: "http://localhost:3001" }
-    : ({} as z.infer<typeof envSchema>);
+function getValidatedEnv(): z.infer<typeof envSchema> {
+  if (parsed.success) {
+    return parsed.data;
+  }
+  if (isBuildTime && !isProduction) {
+    return {
+      APP_ENV: "development",
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:3001",
+      NEXT_PUBLIC_R2_URL: "http://localhost:3001",
+    };
+  }
+  return {} as z.infer<typeof envSchema>;
+}
+
+const validatedEnv = getValidatedEnv();
 
 export const env = {
   appEnv: validatedEnv.APP_ENV ?? "development",

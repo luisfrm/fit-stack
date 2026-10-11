@@ -3,7 +3,7 @@ import type { IGymClass } from '@workspace/shared/types';
 import { expandWeek, resolveWeekAnchor, weekStartOf } from '../../lib/classes/week-calendar';
 
 const TZ = 'America/Caracas';
-// Miércoles 2026-09-09 15:00 Caracas = 19:00Z.
+// Wednesday 2026-09-09 15:00 Caracas = 19:00Z.
 const NOW = new Date('2026-09-09T19:00:00Z');
 
 function weekly(overrides: Partial<IGymClass> = {}): IGymClass {
@@ -51,7 +51,7 @@ describe('resolveWeekAnchor', () => {
 
 describe('weekStartOf', () => {
   it('returns the Sunday of the anchor week', () => {
-    // Miércoles 2026-09-09 → domingo 2026-09-06.
+    // Wednesday 2026-09-09 → Sunday 2026-09-06.
     expect(weekStartOf('2026-09-09', TZ)).toBe('2026-09-06');
   });
 
@@ -68,7 +68,7 @@ describe('expandWeek', () => {
     expect(days[6]?.date).toBe('2026-09-12');
 
     const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
-    // Lun(1), mié(3), vie(5).
+    // Mon(1), Wed(3), Fri(5).
     expect(byDate['2026-09-07']?.count).toBe(1);
     expect(byDate['2026-09-09']?.count).toBe(1);
     expect(byDate['2026-09-11']?.count).toBe(1);
@@ -96,7 +96,7 @@ describe('expandWeek', () => {
     );
     const wednesday = days.find((d) => d.date === '2026-09-09');
     expect(wednesday?.isToday).toBe(true);
-    // 15:00 local: la de las 08:00 ya pasó, la de las 18:00 no.
+    // 15:00 local: 08:00 has already passed, 18:00 has not.
     expect(wednesday?.occurrences.find((o) => o.name === 'Mañana')?.isElapsed).toBe(true);
     expect(wednesday?.occurrences.find((o) => o.name === 'Tarde')?.isElapsed).toBe(false);
 

@@ -5,12 +5,12 @@ import { cn } from "@workspace/ui/lib/utils";
 import type { CurrencyFormat } from "@workspace/shared";
 
 interface CompactMoneyProps {
-  /** Monto en unidades mayores (ej. 1250.45), ya normalizado a la divisa mostrada */
+  /** Amount in major units (e.g., 1250.45), already normalized to the displayed currency */
   readonly amount: number | null | undefined;
-  /** Código o símbolo de divisa (USD, VES...) — se muestra en tamaño reducido */
+  /** Currency code or symbol (USD, VES...) — rendered in smaller size */
   readonly currency?: string;
   readonly format?: CurrencyFormat;
-  /** Clase para controlar el tamaño del dígito principal (default text-3xl) */
+  /** Class to control the font size of the primary digits (default text-3xl) */
   readonly valueClassName?: string;
   readonly className?: string;
 }
@@ -21,12 +21,12 @@ const SEPARATORS: Record<CurrencyFormat, { thousand: string; decimal: string }> 
 };
 
 /**
- * Monto monetario compacto para KPIs: miles con K / millones con M,
- * decimales y símbolo de divisa en tamaños menores.
+ * Compact money display for KPIs: thousands with K / millions with M,
+ * decimals and currency symbol rendered in smaller font sizes.
  *
- *   1250450 →  1,3M USD      (solo parte compacta)
- *    12504.5 → 12,5K USD      (solo parte compacta)
- *      450.75 → 450 ,75 USD   (entero grande + decimales pequeños)
+ *   1250450 →  1.3M USD      (compact part only)
+ *    12504.5 → 12.5K USD      (compact part only)
+ *      450.75 → 450 .75 USD   (large integer + small cents)
  */
 export function CompactMoney({
   amount,
@@ -61,10 +61,14 @@ export function CompactMoney({
   } else if (abs >= 1_000) {
     big = `${sign}${(abs / 1000).toFixed(1).replace(".", decimal)}K`;
   } else {
-    // Valor chico: entero grande, centavos pequeños
+    // Small amount: large integer, small cents
     const fixed = abs.toFixed(2);
-    const [intPart, decPart] = fixed.split(".");
-    const formattedInt = intPart!.replaceAll(/\B(?=(\d{3})+(?!\d))/g, thousand);
+    const [intPart = "", decPart] = fixed.split(".");
+    const chunks: string[] = [];
+    for (let i = intPart.length; i > 0; i -= 3) {
+      chunks.unshift(intPart.slice(Math.max(0, i - 3), i));
+    }
+    const formattedInt = chunks.join(thousand);
     big = `${sign}${formattedInt}`;
     small = `${decimal}${decPart}`;
   }

@@ -14,7 +14,7 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-function FeatureRow({ label, enabled, detail, alwaysOn }: { label: string; enabled: boolean; detail?: string | null; alwaysOn?: boolean }) {
+function FeatureRow({ label, enabled, detail, alwaysOn }: Readonly<{ label: string; enabled: boolean; detail?: string | null; alwaysOn?: boolean }>) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border-muted px-4 py-3 last:border-b-0">
       <div className="flex items-center gap-3 min-w-0">
@@ -73,6 +73,26 @@ export default async function BillingSettingsPage() {
     return <Badge variant="destructive" size="md" className="uppercase tracking-widest">{String(effectiveStatus)}</Badge>;
   };
 
+  const renderPortalSeatsContent = () => {
+    if (!features.members_portal?.enabled) {
+      return <p className="text-sm text-foreground-muted">Portal no contratado en este plan.</p>;
+    }
+    if (seats) {
+      return <PortalSeatsBanner used={seats.used} limit={seats.limit} pending={seats.pending} />;
+    }
+    return <Text size="sm" variant="muted">Cargando…</Text>;
+  };
+
+  const renderAiChatContent = () => {
+    if (!features.ai_chat?.enabled) {
+      return <p className="text-sm text-foreground-muted">Chat IA no contratado en este plan.</p>;
+    }
+    if (usage) {
+      return <AiQuotaBanner usage={usage} />;
+    }
+    return <Text size="sm" variant="muted">Sin datos todavía.</Text>;
+  };
+
   return (
     <div className="pb-20 max-w-4xl animate-in fade-in slide-in-from-bottom-2 duration-500">
       {/* Header — editorial, sin card */}
@@ -108,7 +128,7 @@ export default async function BillingSettingsPage() {
         ) : null}
       </div>
 
-      {/* Suscripción SaaS — estado, vencimiento y renovación autoservicio */}
+      {/* SaaS Subscription — status, expiration, and self-service renewal */}
       <SubscriptionStatusCard
         subscription={subscription}
         paymentMethods={billingPaymentMethods}
@@ -118,7 +138,7 @@ export default async function BillingSettingsPage() {
         refreshBilling={refreshBilling}
       />
 
-      {/* Plan — sección con lista plana, sin card-en-card */}
+      {/* Plan — flat list section, no card-in-card */}
       <section className="mt-8 overflow-hidden rounded-xl border border-border bg-surface">
         <div className="flex items-center justify-between gap-3 border-b border-border-muted bg-surface-2/40 px-4 py-3">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -150,7 +170,7 @@ export default async function BillingSettingsPage() {
         </div>
       </section>
 
-      {/* Cuotas — dos bloques con ritmo distinto, no dos Cards idénticas */}
+      {/* Quotas — two blocks with distinct rhythm, not two identical Cards */}
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
           <div className="flex items-center gap-2">
@@ -160,11 +180,7 @@ export default async function BillingSettingsPage() {
             <span className="text-sm font-bold">Portal</span>
             <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-foreground-muted border border-border-muted rounded-full px-2 py-0.5">members_portal</span>
           </div>
-          {features.members_portal?.enabled ? (
-            seats ? <PortalSeatsBanner used={seats.used} limit={seats.limit} pending={seats.pending} /> : <Text size="sm" variant="muted">Cargando…</Text>
-          ) : (
-            <p className="text-sm text-foreground-muted">Portal no contratado en este plan.</p>
-          )}
+          {renderPortalSeatsContent()}
         </section>
 
         <section className="rounded-xl border border-border bg-surface p-4 space-y-3">
@@ -175,11 +191,7 @@ export default async function BillingSettingsPage() {
             <span className="text-sm font-bold">Chat IA</span>
             <span className="ml-auto text-[10px] font-bold uppercase tracking-widest text-foreground-muted border border-border-muted rounded-full px-2 py-0.5">ai_chat</span>
           </div>
-          {features.ai_chat?.enabled ? (
-            usage ? <AiQuotaBanner usage={usage} /> : <Text size="sm" variant="muted">Sin datos todavía.</Text>
-          ) : (
-            <p className="text-sm text-foreground-muted">Chat IA no contratado en este plan.</p>
-          )}
+          {renderAiChatContent()}
           <p className="text-[11px] text-foreground-muted">1 crédito = 1K tokens · 0 = ilimitado · ciclo de suscripción</p>
         </section>
       </div>

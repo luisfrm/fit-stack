@@ -24,7 +24,7 @@ import { toast } from "@workspace/ui/components";
 import { contentService } from "@/lib/services/content-service";
 import { IContentPage } from "@/types/content";
 
-/** Normaliza un slug de página: minúsculas, espacios → guiones, `/` simple. */
+/** Normalizes a page slug: lowercase, spaces → dashes, single `/`. */
 function normalizeSlug(value: string): string {
   let slug = value.toLowerCase();
   if (slug === "") return "/";
@@ -32,7 +32,7 @@ function normalizeSlug(value: string): string {
   return slug.replaceAll(/\s+/g, "-").replaceAll(/\/+/g, "/");
 }
 
-/** Convierte strings vacíos a null para limpiar campos opcionales en la API. */
+/** Converts empty strings to null to clean up optional fields in the API. */
 function emptyToNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === "" ? null : trimmed;
@@ -157,7 +157,7 @@ export default function CMSPageConfig() {
         </div>
       </header>
 
-      {/* ── Configuración General ── */}
+      {/* ── General Configuration ── */}
       <section className="space-y-6">
         <Text as="p" weight="bold" size="lg" className="flex items-center gap-2">
           <Settings className="w-5 h-5 text-primary" /> Configuración de Página

@@ -51,13 +51,13 @@ async function normalizeTodayRevenue(
 export default async function DashboardPage() {
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
-  // Usa la tz de la org activa (obligatoria, igual que el api-worker) para que
-  // "hoy" no dependa de la tz del servidor ni de un default hardcodeado.
+  // Uses the active org tz (required, just like api-worker) so that
+  // "today" does not depend on server tz nor a hardcoded default.
   const orgTimezone = session?.activeOrganization?.timezone;
 
   const today = toLocalDayString(orgTimezone);
 
-  // Moneda principal: columna obligatoria de la org (sin fallback de config).
+  // Primary currency: mandatory org column (no config fallback).
   const primaryCurrency = session?.activeOrganization?.primaryCurrency ?? "";
 
   const [stats, todayClassesRaw, recentRegistrations, analytics, monthlyReport, actionItems] =
@@ -74,8 +74,8 @@ export default async function DashboardPage() {
         .getRecent(5, { next: { revalidate: 60, tags: [`org:${activeOrgId}:subscriptions`] } })
         .catch(() => []),
       financeService.getAnalytics(primaryCurrency).catch(() => null),
-      // Fuente única de la mini-gráfica 6M: reporte mensual (sin ApiFetchOptions;
-      // el cache server vive en el endpoint 1h + rates Next 1h).
+      // Single source of truth for the 6M mini-chart: monthly report (without ApiFetchOptions;
+      // server cache lives in the endpoint 1h + Next rates 1h).
       financeService.getRevenueReport(primaryCurrency).catch(() => []),
       activeOrgId
         ? dashboardService.getActionItems(activeOrgId).catch(() => null)

@@ -36,12 +36,80 @@ interface FiscalTaxRow {
   ratePct: string;
   enabled: boolean;
   /**
-   * Impuesto condicional (p. ej. IGTF): la activación exige tasa manual +
-   * confirmación explícita, nunca se aplica solo (varía por decreto).
+   * Conditional tax (e.g., IGTF): activation requires manual rate +
+   * explicit confirmation, never applied alone (varies by decree).
    */
   requiresConfirmation: boolean;
-  /** Confirmación registrada (`fiscalConfig.confirmedTaxes`). */
+  /** Recorded confirmation (`fiscalConfig.confirmedTaxes`). */
   confirmed: boolean;
+}
+
+interface FiscalTaxCardProps {
+  readonly tax: FiscalTaxRow;
+  readonly isSavingFiscal: boolean;
+  readonly fiscalFormal: boolean;
+  readonly onRateChange: (name: string, ratePct: string) => void;
+  readonly onToggle: (name: string, enabled: boolean) => void;
+  readonly onConfirmChange: (name: string, confirmed: boolean) => void;
+}
+
+function FiscalTaxCard({
+  tax,
+  isSavingFiscal,
+  fiscalFormal,
+  onRateChange,
+  onToggle,
+  onConfirmChange,
+}: FiscalTaxCardProps) {
+  return (
+    <div
+      className="space-y-3 bg-foreground/5 border border-border p-4 rounded-xl"
+      data-testid={`fiscal-tax-${tax.name}`}
+    >
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_auto] gap-4 items-end">
+        <Input
+          label={`${tax.name} (%)`}
+          placeholder="16"
+          value={tax.ratePct}
+          disabled={!tax.enabled || isSavingFiscal}
+          data-testid={`fiscal-tax-rate-${tax.name}`}
+          onChange={(e) => onRateChange(tax.name, e.target.value)}
+        />
+        <div className="flex items-center gap-2 pb-2">
+          <Switch
+            checked={tax.enabled}
+            disabled={
+              !fiscalFormal ||
+              (tax.requiresConfirmation && !tax.confirmed) ||
+              isSavingFiscal
+            }
+            data-testid={`fiscal-tax-toggle-${tax.name}`}
+            onCheckedChange={(value) => onToggle(tax.name, value)}
+          />
+          <Text size="xs" variant="muted">{tax.enabled ? "Activo" : "Apagado"}</Text>
+        </div>
+      </div>
+      {tax.requiresConfirmation && (
+        <div className="space-y-2">
+          <label className="flex items-start gap-3">
+            <Checkbox
+              checked={tax.confirmed}
+              disabled={!fiscalFormal || isSavingFiscal}
+              data-testid={`fiscal-tax-confirm-${tax.name}`}
+              aria-label={`Confirmar tasa vigente de ${tax.name}`}
+              onCheckedChange={(value) => onConfirmChange(tax.name, value === true)}
+            />
+            <Text size="xs" variant="muted">
+              Confirmo que verifiqué la tasa vigente de {tax.name} con mi contador: los impuestos condicionales cambian por decreto y no se aplican solos.
+            </Text>
+          </label>
+          <Text size="xs" variant="muted" className="italic">
+            Activar {tax.name} cambia la base de los demás impuestos de esos comprobantes: se extrae primero del total cobrado.
+          </Text>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function OrganizationSettingsPage() {
@@ -148,11 +216,11 @@ export default function OrganizationSettingsPage() {
         finalLogoUrl = await uploadService.uploadFile(logoFile);
       }
 
-      // 2. Update via the ORG-SCOPED endpoint. El panel NUNCA llama a
-      //    `/api/platform/*`: un owner/manager de gym no tiene rol de
-      //    plataforma y recibiría 403 (con el formulario pareciendo guardar).
-      //    Los campos vacíos van como `null` para poder limpiarlos; el país
-      //    no se envía porque es inmutable post-creación (400 si viniera).
+      // 2. Update via the ORG-SCOPED endpoint. Panel NEVER calls
+      //    `/api/platform/*`: a gym owner/manager has no platform role
+      //    and would receive 403 (with form falsely appearing to save).
+      //    Empty fields are sent as `null` to clear them; country is omitted
+      //    as it is immutable post-creation (400 if sent).
       await orgProfileService.updateProfile({
         name: formData.name,
         slug: formData.slug.trim() || undefined,
@@ -202,7 +270,7 @@ export default function OrganizationSettingsPage() {
       return;
     }
 
-    // Guardas de espejo del invariante del backend (el 400 sigue mandando).
+    // Mirror guards of backend invariants (400 remains authoritative).
     if (!fiscalFormal && taxes.some((tax) => tax.enabled)) {
       toast.error(
         "Para activar impuestos primero declara el negocio como contribuyente formal.",
@@ -240,8 +308,8 @@ export default function OrganizationSettingsPage() {
         fiscalConfig: {
           taxes,
           isFormalTaxpayer: fiscalFormal,
-          // Confirmaciones explícitas de los impuestos condicionales: sin
-          // esta lista el resolver los apaga (fail-closed, D2).
+          // Explicit confirmations for conditional taxes: without this list
+          // the resolver turns them off (fail-closed, D2).
           confirmedTaxes: fiscalTaxes
             .filter((tax) => tax.requiresConfirmation && tax.confirmed)
             .map((tax) => tax.name),
@@ -287,6 +355,143 @@ export default function OrganizationSettingsPage() {
     taxId: fiscalTaxId.trim() || activeOrg?.taxId,
     isFormalTaxpayer: fiscalFormal,
   });
+
+  const handleTaxRateChange = (name: string, ratePct: string) => {
+    setFiscalTaxes((prev) =>
+      prev.map((row) => (row.name === name ? { ...row, ratePct } : row)),
+    );
+  };
+
+  const handleTaxToggle = (name: string, enabled: boolean) => {
+    setFiscalTaxes((prev) =>
+      prev.map((row) => (row.name === name ? { ...row, enabled } : row)),
+    );
+  };
+
+  const handleTaxConfirmChange = (name: string, confirmed: boolean) => {
+    setFiscalTaxes((prev) =>
+      prev.map((row) =>
+        row.name === name
+          ? { ...row, confirmed, enabled: confirmed ? row.enabled : false }
+          : row,
+      ),
+    );
+  };
+
+  const renderFiscalContent = () => {
+    if (fiscalError) {
+      return <Text variant="muted" size="sm">{fiscalError}</Text>;
+    }
+
+    if (!fiscalCountry) {
+      return <Text variant="muted" size="sm">La organización no tiene país configurado.</Text>;
+    }
+
+    return (
+      <div className="space-y-8 pt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Input
+            label="Nombre de Registro / Legal"
+            placeholder="Elite Fitness C.A."
+            value={fiscalLegalName}
+            onChange={(e) => setFiscalLegalName(e.target.value)}
+          />
+          <Input
+            label={`Nro. Registro (${fiscalCountry.taxLabel})`}
+            placeholder="J-12345678-9"
+            value={fiscalTaxId}
+            onChange={(e) => setFiscalTaxId(e.target.value)}
+          />
+        </div>
+
+        <Input
+          label="Dirección fiscal"
+          placeholder="Av. Principal, Caracas"
+          value={fiscalAddress}
+          onChange={(e) => setFiscalAddress(e.target.value)}
+        />
+
+        <div className="bg-foreground/5 border border-border p-4 rounded-xl space-y-1">
+          <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Etiqueta aplicada del documento</Text>
+          <Text size="lg" weight="bold">{appliedDocumentLabel}</Text>
+          {fiscalRequestedLabel && fiscalRequestedLabel !== appliedDocumentLabel && (
+            <Text size="xs" variant="muted" className="italic">
+              Solicitada: “{fiscalRequestedLabel}”. El sistema aplica “{appliedDocumentLabel}” mientras no haya homologación fiscal.
+            </Text>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-col gap-1">
+            <Text weight="bold" size="sm" className="uppercase tracking-wider">Impuestos por país</Text>
+            <Text size="xs" variant="muted">
+              {fiscalFormal
+                ? "Solo se detallan los impuestos que dejes activos; desactivarlos siempre se respeta (actividad exenta)."
+                : "Tu comprobante no detalla impuestos: se registra únicamente el total pagado. Para detallarlos, declara el negocio como contribuyente formal."}
+            </Text>
+          </div>
+          {fiscalTaxes.map((tax) => (
+            <FiscalTaxCard
+              key={tax.name}
+              tax={tax}
+              isSavingFiscal={isSavingFiscal}
+              fiscalFormal={fiscalFormal}
+              onRateChange={handleTaxRateChange}
+              onToggle={handleTaxToggle}
+              onConfirmChange={handleTaxConfirmChange}
+            />
+          ))}
+        </div>
+
+        <Textarea
+          label="Disclaimer legal alternativo"
+          placeholder={fiscalCountry.legalDisclaimer.join("\n")}
+          value={fiscalDisclaimer}
+          onChange={(e) => setFiscalDisclaimer(e.target.value)}
+        />
+
+        <div className="flex items-start gap-3 bg-foreground/5 border border-border p-4 rounded-xl">
+          <Checkbox
+            checked={fiscalFormal}
+            disabled={isSavingFiscal}
+            data-testid="fiscal-formal-toggle"
+            onCheckedChange={(value) => {
+              const formalNow = value === true;
+              setFiscalFormal(formalNow);
+              if (!formalNow) {
+                // Without declaration no taxes apply: UI must not leave
+                // enabled an option that backend will reject (400).
+                setFiscalTaxes((prev) =>
+                  prev.map((row) => ({
+                    ...row,
+                    enabled: false,
+                    confirmed: false,
+                  })),
+                );
+              }
+            }}
+            aria-label="Declaración de contribuyente formal"
+          />
+          <div className="space-y-1">
+            <Text size="sm" weight="bold">Declaro bajo mi responsabilidad que este negocio está registrado como contribuyente formal.</Text>
+            <Text size="xs" variant="muted">
+              Esta declaración no convierte el comprobante en factura fiscal. Mientras no haya homologación, el documento seguirá diciendo “Comprobante de pago”.
+            </Text>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          loading={isSavingFiscal}
+          disabled={isSavingFiscal}
+          onClick={() => void saveFiscal()}
+          className="w-full md:w-auto font-bold uppercase tracking-widest text-xs"
+        >
+          Guardar facturación
+        </Button>
+      </div>
+    );
+  };
 
   if (sessionLoading && !hasInitialized.current) {
     return (
@@ -378,7 +583,7 @@ export default function OrganizationSettingsPage() {
           </div>
         </Card>
 
-        {/* DATOS DE IDENTIFICACIÓN Y LOCALIZACIÓN */}
+        {/* IDENTIFICATION AND LOCATION DATA */}
         <Card variant="settings">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-xl bg-foreground/5 text-foreground-dim border border-border/50">
@@ -392,9 +597,9 @@ export default function OrganizationSettingsPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-0 items-start">
             <div className="space-y-6">
-              {/* País inmutable post-creación: cambiarlo recalcularía la
-                  moneda principal (operación de nivel plataforma). Solo
-                  lectura aquí, con el motivo explícito. */}
+              {/* Country immutable post-creation: changing it would recalculate
+                  primary currency (platform-level operation). Read-only here,
+                  with explicit rationale. */}
               <div className="space-y-2">
                 <CountrySelector
                   label="País de Operación"
@@ -418,9 +623,9 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="space-y-6">
-              {/* No `required`: un emisor sin registro fiscal es válido (emite
-                  "Comprobante de pago"). Marcarlo obligatorio bloqueaba el
-                  submit nativo del formulario entero. */}
+              {/* No `required`: an issuer without tax registry is valid (issues
+                  "Payment Receipt"). Marking mandatory blocked native submit
+                  for the entire form. */}
               <div className="space-y-2">
                 <Input
                   label={`Nro. Registro (${currentCountry?.taxLabel})`}
@@ -478,7 +683,7 @@ export default function OrganizationSettingsPage() {
           </div>
         </Card>
 
-        {/* FACTURACIÓN */}
+        {/* BILLING */}
         {canUpdateFiscal && (
           <Card variant="settings" data-testid="org-fiscal-section">
             <div className="flex items-center gap-4">
@@ -491,170 +696,7 @@ export default function OrganizationSettingsPage() {
               </div>
             </div>
 
-            {fiscalError ? (
-              <Text variant="muted" size="sm">{fiscalError}</Text>
-            ) : !fiscalCountry ? (
-              <Text variant="muted" size="sm">La organización no tiene país configurado.</Text>
-            ) : (
-              <div className="space-y-8 pt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Input
-                    label="Nombre de Registro / Legal"
-                    placeholder="Elite Fitness C.A."
-                    value={fiscalLegalName}
-                    onChange={(e) => setFiscalLegalName(e.target.value)}
-                  />
-                  <Input
-                    label={`Nro. Registro (${fiscalCountry.taxLabel})`}
-                    placeholder="J-12345678-9"
-                    value={fiscalTaxId}
-                    onChange={(e) => setFiscalTaxId(e.target.value)}
-                  />
-                </div>
-
-                <Input
-                  label="Dirección fiscal"
-                  placeholder="Av. Principal, Caracas"
-                  value={fiscalAddress}
-                  onChange={(e) => setFiscalAddress(e.target.value)}
-                />
-
-                <div className="bg-foreground/5 border border-border p-4 rounded-xl space-y-1">
-                  <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Etiqueta aplicada del documento</Text>
-                  <Text size="lg" weight="bold">{appliedDocumentLabel}</Text>
-                  {fiscalRequestedLabel && fiscalRequestedLabel !== appliedDocumentLabel && (
-                    <Text size="xs" variant="muted" className="italic">
-                      Solicitada: “{fiscalRequestedLabel}”. El sistema aplica “{appliedDocumentLabel}” mientras no haya homologación fiscal.
-                    </Text>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-1">
-                    <Text weight="bold" size="sm" className="uppercase tracking-wider">Impuestos por país</Text>
-                    <Text size="xs" variant="muted">
-                      {fiscalFormal
-                        ? "Solo se detallan los impuestos que dejes activos; desactivarlos siempre se respeta (actividad exenta)."
-                        : "Tu comprobante no detalla impuestos: se registra únicamente el total pagado. Para detallarlos, declara el negocio como contribuyente formal."}
-                    </Text>
-                  </div>
-                  {fiscalTaxes.map((tax) => (
-                    <div
-                      key={tax.name}
-                      className="space-y-3 bg-foreground/5 border border-border p-4 rounded-xl"
-                      data-testid={`fiscal-tax-${tax.name}`}
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_auto] gap-4 items-end">
-                        <Input
-                          label={`${tax.name} (%)`}
-                          placeholder="16"
-                          value={tax.ratePct}
-                          disabled={!tax.enabled || isSavingFiscal}
-                          data-testid={`fiscal-tax-rate-${tax.name}`}
-                          onChange={(e) =>
-                            setFiscalTaxes((prev) =>
-                              prev.map((row) => (row.name === tax.name ? { ...row, ratePct: e.target.value } : row)),
-                            )
-                          }
-                        />
-                        <div className="flex items-center gap-2 pb-2">
-                          <Switch
-                            checked={tax.enabled}
-                            disabled={
-                              !fiscalFormal ||
-                              (tax.requiresConfirmation && !tax.confirmed) ||
-                              isSavingFiscal
-                            }
-                            data-testid={`fiscal-tax-toggle-${tax.name}`}
-                            onCheckedChange={(value) =>
-                              setFiscalTaxes((prev) =>
-                                prev.map((row) => (row.name === tax.name ? { ...row, enabled: value } : row)),
-                              )
-                            }
-                          />
-                          <Text size="xs" variant="muted">{tax.enabled ? "Activo" : "Apagado"}</Text>
-                        </div>
-                      </div>
-                      {tax.requiresConfirmation && (
-                        <div className="space-y-2">
-                          <label className="flex items-start gap-3">
-                            <Checkbox
-                              checked={tax.confirmed}
-                              disabled={!fiscalFormal || isSavingFiscal}
-                              data-testid={`fiscal-tax-confirm-${tax.name}`}
-                              aria-label={`Confirmar tasa vigente de ${tax.name}`}
-                              onCheckedChange={(value) => {
-                                const confirmedNow = value === true;
-                                setFiscalTaxes((prev) =>
-                                  prev.map((row) =>
-                                    row.name === tax.name
-                                      ? { ...row, confirmed: confirmedNow, enabled: confirmedNow ? row.enabled : false }
-                                      : row,
-                                  ),
-                                );
-                              }}
-                            />
-                            <Text size="xs" variant="muted">
-                              Confirmo que verifiqué la tasa vigente de {tax.name} con mi contador: los impuestos condicionales cambian por decreto y no se aplican solos.
-                            </Text>
-                          </label>
-                          <Text size="xs" variant="muted" className="italic">
-                            Activar {tax.name} cambia la base de los demás impuestos de esos comprobantes: se extrae primero del total cobrado.
-                          </Text>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <Textarea
-                  label="Disclaimer legal alternativo"
-                  placeholder={fiscalCountry.legalDisclaimer.join("\n")}
-                  value={fiscalDisclaimer}
-                  onChange={(e) => setFiscalDisclaimer(e.target.value)}
-                />
-
-                <div className="flex items-start gap-3 bg-foreground/5 border border-border p-4 rounded-xl">
-                  <Checkbox
-                    checked={fiscalFormal}
-                    disabled={isSavingFiscal}
-                    data-testid="fiscal-formal-toggle"
-                    onCheckedChange={(value) => {
-                      const formalNow = value === true;
-                      setFiscalFormal(formalNow);
-                      if (!formalNow) {
-                        // Sin declaración no hay impuestos: la UI no debe
-                        // dejar activado algo que el backend rechazará (400).
-                        setFiscalTaxes((prev) =>
-                          prev.map((row) => ({
-                            ...row,
-                            enabled: false,
-                            confirmed: false,
-                          })),
-                        );
-                      }
-                    }}
-                    aria-label="Declaración de contribuyente formal"
-                  />
-                  <div className="space-y-1">
-                    <Text size="sm" weight="bold">Declaro bajo mi responsabilidad que este negocio está registrado como contribuyente formal.</Text>
-                    <Text size="xs" variant="muted">
-                      Esta declaración no convierte el comprobante en factura fiscal. Mientras no haya homologación, el documento seguirá diciendo “Comprobante de pago”.
-                    </Text>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  loading={isSavingFiscal}
-                  disabled={isSavingFiscal}
-                  onClick={() => void saveFiscal()}
-                  className="w-full md:w-auto font-bold uppercase tracking-widest text-xs"
-                >
-                  Guardar facturación
-                </Button>
-              </div>
-            )}
+            {renderFiscalContent()}
           </Card>
         )}
 
