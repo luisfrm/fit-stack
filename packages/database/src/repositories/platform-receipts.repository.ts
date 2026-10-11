@@ -64,7 +64,7 @@ function assertPaymentId(paymentId: number, method: string): void {
 
 function assertDocumentType(type: ReceiptDocumentType, method: string): void {
   if (type !== 'receipt' && type !== 'invoice') {
-    throw new Error(`${method}: invalid document_type (${String(type)}). No pgEnum.`);
+    throw new Error(`${method}: document_type inválido (${String(type)}). Sin pgEnum.`);
   }
 }
 
