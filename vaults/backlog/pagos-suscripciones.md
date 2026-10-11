@@ -1,6 +1,6 @@
 # Backlog — Pagos y suscripciones
 
-> Atomicidad del registro financiero, borrado de suscripción SaaS, devoluciones y doble periodo histórico.
+> Atomicidad del registro financiero, borrado de suscripción SaaS, devoluciones, doble periodo histórico y cambio de plan.
 > Volver al [[backlog/README|índice del backlog]]. Semántica de estados: [[PAYMENT_STATUSES]].
 
 ## 1. Atomicidad y cascada del borrado de miembro (C9)
@@ -47,3 +47,11 @@
 
   - Revisar manualmente cada exceso (puede ser un caso legítimo) antes de tocar datos; si procede, corregir con una migración de datos aprobada, nunca por inferencia automática.
   - **Disparador**: auditoría de facturación SaaS o reclamo de un gym.
+
+## 5. Cambio de plan SaaS (`change-plan`) — semántica de upgrade/downgrade
+
+- [ ] **Diseñar el flujo de cambio de plan de una organización (upgrade/downgrade).**
+  - El endpoint `POST /api/platform/subscriptions/change-plan`, su método de servicio y la llamada de la consola se retiraron: no tenían caller (ninguna UI usaba el método de la consola) y la semántica de upgrade nunca se diseñó. Cuando exista el diseño, se implementa desde cero y se monta correctamente.
+  - Dirección anotada: **downgrade** = dejar expirar el periodo actual y elegir el plan más barato al renovar (sin prorrateo ni reembolso).
+  - Sin decidir: **upgrade a un plan más caro** — ¿cobrar la diferencia (prorrateo del periodo restante) o exigir renovación temprana pagando el plan nuevo completo?
+  - **Disparador**: cuando producto pida el flujo de cambio de plan o haya que migrar el plan de un gym existente.
