@@ -1,7 +1,7 @@
 ---
 description: "Scrum master. Lee y escribe issues de Linear en español: convierte un requisito en una issue breve (o un padre con sub-issues) con contexto, alcance y criterios de aceptación, sin plan de implementación, y la enlaza con issues relacionadas o bloqueantes. Usar para capturar, planificar o consultar trabajo en Linear."
 mode: subagent
-model: opencode-go/space-bunny-free
+model: opencode-go/longcat-2.5-preview-free
 steps: 25
 permissions:
   - {action: edit, resource: "*", effect: deny}
