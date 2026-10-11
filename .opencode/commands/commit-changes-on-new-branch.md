@@ -22,3 +22,5 @@ Incluye todos los archivos modificados, nuevos y eliminados.
 No uses `amend` ni `force-push`.
 
 Luego haz `git push`.
+
+Indica PR Title y PR description para los cambios registrados.
