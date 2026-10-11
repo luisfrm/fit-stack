@@ -51,8 +51,10 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
           `getReceiptGaps: número con formato inválido (${row.receiptNumber}).`,
         );
       }
-      // Otra secuencia (slug/año distinto): no pertenece a este universo.
-      if (parsed.year !== year || parsed.slug !== orgSlug.toLowerCase()) return [];
+      // A different sequence (other year): not part of this universe. Legacy
+      // receipts (slug inside the number) DO belong: they share the per
+      // organization/year counter and the `seq` is the identity.
+      if (parsed.year !== year) return [];
       return [
         {
           seq: parsed.seq,
@@ -64,7 +66,7 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
       ];
     });
 
-    return computePanelReceiptGaps({ year, slug: orgSlug, lastNumber, entries });
+    return computePanelReceiptGaps({ year, lastNumber, entries });
   }
 
   return {

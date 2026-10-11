@@ -10,7 +10,6 @@ import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
 import { createCache, type Cache } from '../lib/cache';
-import { resolveOrgSlug } from '../lib/org-slug';
 import { paymentMethodDetailsSchema, paymentMethodSchema, taxDetailSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
@@ -33,9 +32,9 @@ async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string
 const createSubSchema = z.object({
   memberId: z.number().int().positive(),
   planId: z.number().int().positive(),
-  // (RD-94) el periodo lo calcula el servidor. `startDate` y
-  // `endDate` son opcionales; el `trim().length > 0` del motivo se exige en el
-  // servicio (no en zod) para devolver el código 422 propio.
+  // The server computes the period. `startDate` and `endDate` are optional;
+  // the non-empty reason is enforced in the service (not in zod) so it can
+  // return its own 422 code.
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   endDateOverrideReason: z.string().optional(),
@@ -116,19 +115,17 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const plansRepo = createPlansRepository(db);
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE);
-    const orgSlug = await resolveOrgSlug(c, orgId);
 
     let newSub;
     try {
       newSub = await subsService.create(orgId, payload as any, timezone, {
         receipts: receiptsService,
-        orgSlug,
         // C5: actor de sesión que emite el comprobante (queda en `issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
-      // En el fallo compensado el servicio re-lanza tras mutar (pago anulado /
-      // huérfana cancelada): la caché se invalida igual (RD-94).
+      // On a compensated failure the service re-throws after mutating (payment
+      // voided / orphan cancelled): the cache is invalidated either way.
       await invalidateSubscriptionDependentCaches(cache, orgId);
     }
     return c.json(newSub, 201);

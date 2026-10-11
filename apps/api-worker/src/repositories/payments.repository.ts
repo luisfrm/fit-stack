@@ -400,11 +400,16 @@ export function createPaymentsRepository(db: Db) {
         .where(
           and(
             eq(payment.organizationId, organizationId),
-            // Slug en minúsculas (el correlativo normaliza) y con `%_\\`
-            // escapados para no alterar el universo de gaps vía LIKE.
-            like(
-              payment.receiptNumber,
-              `${slug.toLowerCase().replaceAll(/[%_\\]/g, (c) => `\\${c}`)}-${year}-%`,
+            // The current number is `{year}-{seq}` (no slug) and the legacy one
+            // is `{slug}-{year}-{seq}`. BOTH must match or the report goes
+            // blind to one format. The slug is normalized like the correlative
+            // and `%_\` are escaped so the LIKE never alters the gaps universe.
+            or(
+              like(payment.receiptNumber, `${year}-%`),
+              like(
+                payment.receiptNumber,
+                `${slug.toLowerCase().replaceAll(/[%_\\]/g, (c) => `\\${c}`)}-${year}-%`,
+              ),
             ),
           ),
         );

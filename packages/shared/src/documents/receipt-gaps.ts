@@ -3,10 +3,10 @@
     "hueco" sospechoso; un número presente con `receipt_voided` es un
     "anulado" explicado. Nunca se tratan igual y nunca se libera ni reusa
     un número.
-    Dos series, dos emisores legales: Panel (`{slug}-{año}-{seq}`, anual por
-    organización) y Console (`FS-{seq}`, global continua). La única
-    diferencia es el formato del número, así que vive en una estrategia
-    inyectada; aquí queda solo el algoritmo.
+    Two sequences, two distinct legal issuers: Panel (`{year}-{seq}`, yearly
+    per organization) and Console (`FS-{seq}`, continuous global). The only
+    difference is the number format, so it lives in an injected strategy; only
+    the algorithm stays here.
     Puro, sin I/O, edge-safe (Workers).
     ─────────────────────────────────────────────────────────────────────── */
 
@@ -57,11 +57,9 @@ export interface ComputeReceiptGapsInput {
   strategy: ReceiptGapStrategy;
 }
 
-/** Serie del Panel: anual por organización (`{slug}-{año}-{seq}`). */
+/** Panel sequence: yearly per organization (`{year}-{seq}`). */
 export interface PanelReceiptGapsInput {
   year: number;
-  /** Slug del emisor (parte del número humano). */
-  slug: string;
   lastNumber: number;
   entries: ReceiptGapEntry[];
 }
@@ -138,15 +136,17 @@ export function computeReceiptGaps(input: ComputeReceiptGapsInput): ReceiptGapIt
  * como lo hace el formato para que el parse de coherencia coincida.
  */
 export function computePanelReceiptGaps(input: PanelReceiptGapsInput): ReceiptGapItem[] {
-  const slug = input.slug.trim().toLowerCase();
   return computeReceiptGaps({
     lastNumber: input.lastNumber,
     entries: input.entries,
     strategy: {
-      format: (seq) => formatPanelReceiptNumber(slug, input.year, seq),
+      // The number no longer carries the slug. Legacy receipts still belong to
+      // the same universe (they share the per organization/year counter): the
+      // `seq` is the identity and the format is only the rendering.
+      format: (seq) => formatPanelReceiptNumber(input.year, seq),
       parse: (receiptNumber) => {
         const parsed = parsePanelReceiptNumber(receiptNumber);
-        if (!parsed || parsed.year !== input.year || parsed.slug !== slug) return null;
+        if (!parsed || parsed.year !== input.year) return null;
         return parsed.seq;
       },
     },

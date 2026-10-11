@@ -43,8 +43,6 @@ export interface AssignReceiptNumberInput {
   paymentId: number;
   /** Zona horaria de la org (de `requireOrgTimezone()`): define el año local. */
   timezone: string;
-  /** Slug de la org (del perfil/sesión): parte del número humano. */
-  orgSlug?: string | null;
   taxOverride?: TaxOverrideInput | null;
   /**
    * Actor de sesión que emite (C5). Opcional en la firma porque el barrido
@@ -183,19 +181,11 @@ export function createReceiptsService(
       if (!org) {
         throw new ReceiptError(404, 'ORG_NOT_FOUND', 'Organización no encontrada.');
       }
-      const orgSlug = input.orgSlug ?? org.slug;
-      if (!orgSlug) {
-        throw new ReceiptError(
-          500,
-          'ORG_SLUG_MISSING',
-          'La organización no tiene slug para numerar.',
-        );
-      }
       const year = receiptYear(input.timezone);
-      // Slug/año válidos ANTES de consumir la secuencia: si el formato es
-      // imposible, `formatPanelReceiptNumber` lanzaría con el número ya
-      // quemado. Se valida con seq=1 (el formato no depende del valor).
-      formatPanelReceiptNumber(orgSlug, year, 1);
+      // Valid year BEFORE consuming the sequence: an impossible format would
+      // make `formatPanelReceiptNumber` throw with the number already burned.
+      // Validated with seq=1 (the format does not depend on the value).
+      formatPanelReceiptNumber(year, 1);
 
       // Impuestos en centavos enteros. amountPaid = TOTAL cobrado (con impuestos
       // incluidos): en modo auto se descompone la base; con override se valida.
@@ -245,15 +235,16 @@ export function createReceiptsService(
       }
 
       const seq = await receiptsRepo.nextDocumentNumber(orgId, 'receipt', year);
-      const receiptNumber = formatPanelReceiptNumber(orgSlug, year, seq);
+      const receiptNumber = formatPanelReceiptNumber(year, seq);
       const parsed = parsePanelReceiptNumber(receiptNumber);
-      if (parsed?.year !== year || parsed.slug !== orgSlug.toLowerCase()) {
-        // Defensivo (slug/año ya validados): no dejar el número colgado.
+      if (parsed?.year !== year) {
+        // Defensive (the year is already validated): never leave the number
+        // dangling.
         await receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
         throw new ReceiptError(
           500,
           'RECEIPT_INCOHERENT',
-          'Número generado incoherente con año/slug.',
+          'Número generado incoherente con el año.',
         );
       }
 

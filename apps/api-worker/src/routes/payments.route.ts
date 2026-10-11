@@ -12,7 +12,6 @@ import { createReceiptsService } from '../services/receipts.service';
 import { createFinanceService } from '../services/finance.service';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
-import { resolveOrgSlug } from '../lib/org-slug';
 import type { AppEnv } from '../lib/env';
 
 const updateStatusSchema = z.object({
@@ -64,7 +63,6 @@ export const paymentRoutes = new Hono<AppEnv>()
       status,
       {
         receipts: receiptsService,
-        orgSlug: await resolveOrgSlug(c, orgId),
         timezone,
         by: c.get('user')?.id,
         voidReason,
@@ -149,7 +147,6 @@ export const paymentRoutes = new Hono<AppEnv>()
       orgId,
       paymentId: id,
       timezone,
-      orgSlug: await resolveOrgSlug(c, orgId),
       // C5: la emisión manual también queda con actor.
       actor: c.get('user')?.id,
     });
