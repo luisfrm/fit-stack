@@ -1,33 +1,19 @@
 import { neon } from '@neondatabase/serverless';
 import { createDb } from '@workspace/database/factory';
 import {
-  createReceiptsRepository,
-  type ReceiptComposedData,
-} from '@workspace/database/repositories/receipts';
-import {
-  createPlatformReceiptsRepository,
-  type PlatformReceiptComposedData,
-  type PlatformReceiptsRepository,
-} from '@workspace/database/repositories/platform-receipts';
-import {
   buildReceiptRenderEvent,
-  checklistPrePdf,
-  composePanelReceipt,
-  composePlatformReceipt,
   isReceiptRenderEvent,
-  panelReceiptKey,
-  panelVoidedReceiptKey,
-  parsePanelReceiptNumber,
-  platformReceiptKey,
-  platformVoidedReceiptKey,
-  type CurrencyFormat,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
+import {
+  createPanelRenderProfile,
+  createPlatformRenderProfile,
+  renderReceipt,
+  type RenderEnv,
+} from './render-profile';
 
-export interface ReceiptHandlerEnv {
+export interface ReceiptHandlerEnv extends RenderEnv {
   DATABASE_URL: string;
-  FILES_BUCKET: R2Bucket;
-  TASK_QUEUE: Queue;
 }
 
 export interface SweepEnv {
@@ -35,108 +21,11 @@ export interface SweepEnv {
   RECEIPT_QUEUE: Queue;
 }
 
-type ReceiptsRepo = ReturnType<typeof createReceiptsRepository>;
-
-function renderFormat(currencyFormat: string | null | undefined): CurrencyFormat {
-  // `organization.currencyFormat` is NOT NULL and only `latam|usa`.
-  return currencyFormat === 'usa' ? 'usa' : 'latam';
-}
-
 /**
- * Variante del PDF de un comprobante. `voided` escribe el artefacto con el
- * sello ANULADO (key propia, `receipt_voided_pdf_key`); el de emisión nunca se
- * reescribe. Ambos se componen del MISMO estado persistido (`receipt_voided`),
- * así que el sello no depende de lo que diga el evento.
- */
-type RenderVariant = 'emission' | 'voided';
-
-async function renderAndStoreReceiptPdf(
-  env: ReceiptHandlerEnv,
-  repo: ReceiptsRepo,
-  composed: ReceiptComposedData,
-  persistedNumber: string,
-  variant: RenderVariant = 'emission',
-): Promise<boolean> {
-  const { payment, organization } = composed;
-  if (!payment.receiptIssuedAt) {
-    throw new Error(
-      `receipt.render: pago ${payment.id} numerado sin fecha de emisión (invariante rota).`,
-    );
-  }
-
-  // Compose via the shared row mapper: the persisted number and issue date
-  // in the payment row are authoritative (the caller already verified them).
-  const data = composePanelReceipt(composed);
-
-  const check = checklistPrePdf(data);
-  if (!check.ok) {
-    throw new Error(
-      `receipt.render: checklist pre-PDF falló para pago ${payment.id}: ${check.errors.join(' | ')}`,
-    );
-  }
-
-  const slug = organization.slug;
-  const year = parsePanelReceiptNumber(persistedNumber)?.year;
-  if (!slug || !year) {
-    throw new Error(
-      `receipt.render: no se pudo derivar slug/año para ${persistedNumber}.`,
-    );
-  }
-
-  const key =
-    variant === 'voided'
-      ? panelVoidedReceiptKey(slug, year, persistedNumber)
-      : panelReceiptKey(slug, year, persistedNumber);
-  // Lazy: PDF engine only loaded during PDF render path, never in emails/sweep.
-  const { renderReceiptPdfBytes } = await import('../receipt-pdf');
-  const bytes = await renderReceiptPdfBytes(
-    data,
-    renderFormat(organization.currencyFormat),
-  );
-
-  await env.FILES_BUCKET.put(key, bytes, {
-    httpMetadata: { contentType: 'application/pdf' },
-  });
-
-  const { completed } =
-    variant === 'voided'
-      ? await repo.completeVoidedReceiptPdf(payment.id, organization.id, key)
-      : await repo.completeReceiptPdf(payment.id, organization.id, key);
-  return completed;
-}
-
-async function dispatchReceiptNotification(
-  env: ReceiptHandlerEnv,
-  repo: ReceiptsRepo,
-  orgId: string,
-  paymentId: number,
-): Promise<boolean> {
-  // Notification: own gate. The winner sends; if it fails, clear and re-throw.
-  const { completed: notifyGate } = await repo.markReceiptNotified(paymentId, orgId);
-  if (!notifyGate) {
-    return false;
-  }
-
-  try {
-    await env.TASK_QUEUE.send({
-      type: 'email.payment_receipt',
-      paymentId,
-      organizationId: orgId,
-    });
-    return true;
-  } catch (err) {
-    await repo.clearReceiptNotified(paymentId, orgId);
-    throw err;
-  }
-}
-
-/**
- * Step 2 (consumer of `fit-receipt-events`): composes via shared repo ->
- * fiscal shared -> render PDF -> PUT R2 (idempotent overwrite) ->
- * `completeReceiptPdf`. Then notifies via email with its own gate
- * (`markReceiptNotified`): if dispatch fails, clears mark and re-throws
- * so the queue retries (email is never lost). Duplicate deliveries
- * do not re-render or re-send.
+ * Step 2 (consumer of `fit-receipt-events`): validates the event, picks the
+ * issuer render profile by `event.scope` and runs the shared core. The whole
+ * sequence (load → render → notify gate → dispatch) lives in
+ * `render-profile.ts`, ONCE for both issuers.
  */
 export async function handleReceiptRender(
   env: ReceiptHandlerEnv,
@@ -146,70 +35,24 @@ export async function handleReceiptRender(
     console.warn('receipt.render: evento no soportado, ack sin procesar.');
     return 'already-done';
   }
-  // C2: el emisor FitStack ramifica por `scope` (misma cola, un consumer).
+  // The FitStack issuer branches by `scope` (same queue, one consumer).
   if (event.scope === 'platform') {
     return handlePlatformReceiptRender(env, event);
   }
-  const { organizationId: orgId, paymentId } = event;
   const db = createDb(env.DATABASE_URL);
-  const repo = createReceiptsRepository(db);
+  return renderReceipt(createPanelRenderProfile(db), env, event);
+}
 
-  const composed = await repo.getReceiptComposedData(orgId, paymentId);
-  if (!composed) {
-    console.warn(`receipt.render: pago ${paymentId} no encontrado en org ${orgId}, ack.`);
-    return 'already-done';
-  }
-  // Un comprobante anulado normalmente YA está notificado, así que la marca no
-  // puede cerrar el paso: lo que falta es el PDF con sello, que es trabajo
-  // pendiente real y no un duplicado.
-  const voidedPdfPending =
-    composed.payment.receiptVoided && !composed.payment.receiptVoidedPdfKey;
-  // Already notified: work finished (avoids re-render and re-send).
-  if (composed.payment.receiptNotifiedAt && !voidedPdfPending) {
-    return 'already-done';
-  }
-  const persistedNumber = composed.payment.receiptNumber;
-  if (!persistedNumber) {
-    console.warn(`receipt.render: pago ${paymentId} sin número persistido, ack.`);
-    return 'already-done';
-  }
-  if (persistedNumber !== event.receiptNumber) {
-    console.warn(
-      `receipt.render: número del evento (${event.receiptNumber}) ≠ persistido (${persistedNumber}); se usa el persistido.`,
-    );
-  }
-
-  let didWork = false;
-
-  // ANULADO: artefacto propio y terminal. No notifica (el comprobante válido
-  // ya se envió) y su único entregable es este PDF.
-  if (composed.payment.receiptVoided) {
-    if (!composed.payment.receiptVoidedPdfKey) {
-      const rendered = await renderAndStoreReceiptPdf(
-        env,
-        repo,
-        composed,
-        persistedNumber,
-        'voided',
-      );
-      didWork = rendered || didWork;
-    }
-    return didWork ? 'completed' : 'already-done';
-  }
-
-  // PDF: only if it doesn't already exist (UPDATE gate prevents race conditions).
-  if (!composed.payment.receiptPdfKey) {
-    const rendered = await renderAndStoreReceiptPdf(env, repo, composed, persistedNumber);
-    didWork = rendered || didWork;
-  }
-
-  // Notification: own gate. The winner sends; if it fails, clear and re-throw.
-  const notified = await dispatchReceiptNotification(env, repo, orgId, paymentId);
-  if (notified) {
-    didWork = true;
-  }
-
-  return didWork ? 'completed' : 'already-done';
+/**
+ * Platform (FitStack issuer) entry point. Kept exported on purpose: the
+ * integration suites drive the platform scope directly, without the queue.
+ */
+export async function handlePlatformReceiptRender(
+  env: ReceiptHandlerEnv,
+  event: ReceiptRenderEvent,
+): Promise<'completed' | 'already-done'> {
+  const db = createDb(env.DATABASE_URL);
+  return renderReceipt(createPlatformRenderProfile(db), env, event);
 }
 
 /**
@@ -300,163 +143,4 @@ export async function sweepPendingReceiptPdfs(
     }
   }
   return { requeued };
-}
-
-/* ── Emisor FitStack (Console, C2) ───────────────────────────────────── */
-
-type PlatformReceiptsRepo = PlatformReceiptsRepository;
-
-async function renderAndStorePlatformReceiptPdf(
-  env: ReceiptHandlerEnv,
-  repo: PlatformReceiptsRepo,
-  composed: PlatformReceiptComposedData,
-  persistedNumber: string,
-  variant: RenderVariant = 'emission',
-): Promise<boolean> {
-  const { payment, organization } = composed;
-  if (!payment.receiptIssuedAt) {
-    throw new Error(
-      `receipt.render: pago SaaS ${payment.id} numerado sin fecha de emisión (invariante rota).`,
-    );
-  }
-
-  // Compose via the shared row mapper (mirror of the Panel path above).
-  const data = composePlatformReceipt(composed);
-
-  const check = checklistPrePdf(data);
-  if (!check.ok) {
-    throw new Error(
-      `receipt.render: checklist pre-PDF falló para pago SaaS ${payment.id}: ${check.errors.join(' | ')}`,
-    );
-  }
-
-  // Billing platform opera en UTC (AGENTS §9): el año es UTC, no local.
-  const year = payment.receiptIssuedAt.getUTCFullYear();
-  const key =
-    variant === 'voided'
-      ? platformVoidedReceiptKey(year, persistedNumber)
-      : platformReceiptKey(year, persistedNumber);
-  // Lazy: PDF engine only loaded during PDF render path, never in emails/sweep.
-  const { renderReceiptPdfBytes } = await import('../receipt-pdf');
-  const bytes = await renderReceiptPdfBytes(
-    data,
-    renderFormat(organization.currencyFormat),
-  );
-
-  await env.FILES_BUCKET.put(key, bytes, {
-    httpMetadata: { contentType: 'application/pdf' },
-  });
-
-  const { completed } =
-    variant === 'voided'
-      ? await repo.completePlatformVoidedReceiptPdf(payment.id, key)
-      : await repo.completePlatformReceiptPdf(payment.id, key);
-  return completed;
-}
-
-async function dispatchPlatformNotification(
-  env: ReceiptHandlerEnv,
-  repo: PlatformReceiptsRepo,
-  orgId: string,
-  paymentId: number,
-  payer: { email?: string | null; name?: string | null },
-): Promise<boolean> {
-  // Notification: own gate. The winner sends; if it fails, clear and re-throw.
-  const { completed: notifyGate } = await repo.markPlatformReceiptNotified(paymentId);
-  if (!notifyGate) {
-    return false;
-  }
-
-  const payerEmail = payer.email?.trim() || null;
-  if (!payerEmail) {
-    console.log(
-      `receipt.render: pago SaaS ${paymentId} sin payer persistido (payer-missing); se notifica solo a owners.`,
-    );
-  }
-  try {
-    await env.TASK_QUEUE.send({
-      type: 'email.org_payment_received',
-      paymentId,
-      organizationId: orgId,
-      ...(payerEmail ? { payerEmail, payerName: payer.name?.trim() || '' } : {}),
-    });
-    return true;
-  } catch (err) {
-    await repo.clearPlatformReceiptNotified(paymentId);
-    throw err;
-  }
-}
-
-/**
- * Step 2 SaaS (consumer de `fit-receipt-events`, `scope:'platform'`):
- * compone vía repo shared -> fiscal shared -> render PDF -> PUT R2
- * (idempotent overwrite) -> `completePlatformReceiptPdf`. Luego notifica
- * vía email con su propio gate (`markPlatformReceiptNotified`). Duplicados
- * no re-renderizan ni re-envían.
- */
-export async function handlePlatformReceiptRender(
-  env: ReceiptHandlerEnv,
-  event: ReceiptRenderEvent,
-): Promise<'completed' | 'already-done'> {
-  const { organizationId: orgId, paymentId } = event;
-  const db = createDb(env.DATABASE_URL);
-  const repo = createPlatformReceiptsRepository(db);
-
-  const composed = await repo.getPlatformReceiptComposedData(paymentId);
-  if (!composed) {
-    console.warn(`receipt.render: pago SaaS ${paymentId} no encontrado, ack.`);
-    return 'already-done';
-  }
-  // Espejo Panel: un anulado ya notificado sigue teniendo trabajo pendiente
-  // (el PDF con sello), así que la marca no puede cerrar el paso.
-  const voidedPdfPending =
-    composed.payment.receiptVoided && !composed.payment.receiptVoidedPdfKey;
-  // Already notified: work finished (avoids re-render and re-send).
-  if (composed.payment.receiptNotifiedAt && !voidedPdfPending) {
-    return 'already-done';
-  }
-  const persistedNumber = composed.payment.receiptNumber;
-  if (!persistedNumber) {
-    console.warn(`receipt.render: pago SaaS ${paymentId} sin número persistido, ack.`);
-    return 'already-done';
-  }
-  if (persistedNumber !== event.receiptNumber) {
-    console.warn(
-      `receipt.render: número del evento (${event.receiptNumber}) ≠ persistido (${persistedNumber}); se usa el persistido.`,
-    );
-  }
-
-  let didWork = false;
-
-  // ANULADO: artefacto propio, sin email.
-  if (composed.payment.receiptVoided) {
-    if (!composed.payment.receiptVoidedPdfKey) {
-      const rendered = await renderAndStorePlatformReceiptPdf(
-        env,
-        repo,
-        composed,
-        persistedNumber,
-        'voided',
-      );
-      didWork = rendered || didWork;
-    }
-    return didWork ? 'completed' : 'already-done';
-  }
-
-  // PDF: only if it doesn't already exist (UPDATE gate prevents race conditions).
-  if (!composed.payment.receiptPdfKey) {
-    const rendered = await renderAndStorePlatformReceiptPdf(env, repo, composed, persistedNumber);
-    didWork = rendered || didWork;
-  }
-
-  // Notification: own gate. The winner sends; if it fails, clear and re-throw.
-  const notified = await dispatchPlatformNotification(env, repo, orgId, paymentId, {
-    email: composed.payment.payerEmail,
-    name: composed.payment.payerName,
-  });
-  if (notified) {
-    didWork = true;
-  }
-
-  return didWork ? 'completed' : 'already-done';
 }

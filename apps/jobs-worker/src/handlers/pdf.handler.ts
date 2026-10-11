@@ -28,18 +28,18 @@ function formatDate(date: Date, timezone: string): string {
 }
 
 /**
- * Recibo de pago de membresía de gym (email.payment_receipt): notificación
- * corta + PDF adjunto leído desde R2 (nunca regenerado: el PDF es la
- * fuente de verdad). Tres ramas:
- * - **A numerado con PDF** (`receipt_pdf_key` existe) → email con adjunto
- *   `<número>.pdf` idéntico byte-a-byte al descargado en el panel.
- * - **B histórico** (`receipt_number IS NULL`, pre-sistema) → email sin
- *   adjunto, sin error (viene solo del reenvío manual).
- * - **C número sin PDF** → defensiva, no debería ocurrir (el evento se
- *   encola desde el paso 2 tras `completeReceiptPdf`): log + return sin
- *   enviar (el barrido de Fase 2 completará el PDF y re-encolará el email).
- * Sin `member.email` → log + return (la emisión ya ocurrió en api-worker;
- * el fallo es solo de envío, reintentar sería inútil).
+ * Gym membership payment receipt (email.payment_receipt): short notification
+ * + PDF attachment read from R2 (never regenerated: the stored PDF is the
+ * source of truth). Three branches through the shared attachment resolver:
+ * - **A numbered with PDF** (`receipt_pdf_key` exists) → email with
+ *   `<number>.pdf` attached, byte-identical to the panel download.
+ * - **B historical** (`receipt_number IS NULL`, pre-system) → email without
+ *   attachment, no error (only reachable via manual resend).
+ * - **C number without PDF** → defensive, should not happen (the event is
+ *   enqueued by step 2 after `completeReceiptPdf`): log + return without
+ *   sending (the sweep will complete the PDF and re-enqueue the email).
+ * Without `member.email` → log + return (issuance already happened in
+ * api-worker; the failure is delivery-only, retrying would be useless).
  */
 export async function handlePaymentReceipt(
   env: PdfHandlerEnv,
@@ -99,9 +99,9 @@ export async function handlePaymentReceipt(
   const receiptNumber = paymentRow.receiptNumber;
   const receiptPdfKey = paymentRow.receiptPdfKey;
 
-  // Anulado (defensivo): un evento en vuelo de un comprobante anulado no se
-  // envía — saldría con el PDF de emisión, sin sello. El entregable de un
-  // anulado es su descarga autenticada (`receipt_voided_pdf_key`).
+  // Voided (defensive): an in-flight event of a voided receipt is never sent —
+  // it would carry the emission PDF, without the stamp. The deliverable of a
+  // voided receipt is its sealed download (`receipt_voided_pdf_key`).
   if (paymentRow.receiptVoided) {
     console.warn(
       `Payment ${payload.paymentId}: comprobante ${receiptNumber ?? '—'} ANULADO; envío omitido (el entregable es el PDF con sello).`,
@@ -109,73 +109,63 @@ export async function handlePaymentReceipt(
     return;
   }
 
-  // Rama B — histórico pre-sistema: sin adjunto, sin error.
-  if (!receiptNumber) {
-    const { subject, html } = renderPaymentReceiptShort({
-      ...baseData,
-      receiptNumber: null,
-      hasAttachment: false,
-    });
-    await sendEmail(env, { to: email, subject, html });
-    return;
-  }
-
-  // Rama A — numerado con PDF: adjunta los bytes de R2 tal cual.
-  if (receiptPdfKey) {
-    const stored = await env.FILES_BUCKET.get(receiptPdfKey);
-    const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
-    if (!bytes) {
-      // R2 inconsistente (key seteada pero objeto ausente): como Rama C.
-      console.error(
-        `Payment ${payload.paymentId}: número ${receiptNumber} (evento: ${payload.receiptNumber ?? '—'}) con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
-      );
-      return;
-    }
-    const { subject, html } = renderPaymentReceiptShort({
-      ...baseData,
-      receiptNumber,
-      hasAttachment: true,
-    });
-    await sendEmail(env, {
-      to: email,
-      subject,
-      html,
-      attachments: [
-        {
-          filename: `${receiptNumber}.pdf`,
-          content: bytes,
-          contentType: 'application/pdf',
-        },
-      ],
-    });
-    return;
-  }
-
-  // Rama C — número sin PDF: defensiva, log + ack sin enviar.
-  console.error(
-    `Payment ${payload.paymentId}: número ${receiptNumber} (evento: ${payload.receiptNumber ?? '—'}) sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+  // Shared resolver (same one used by the org payment branch): `null` =
+  // pre-system (send without attachment), `undefined` = PDF not ready (log +
+  // ack; the sweep repairs it). The event number is an observability hint only
+  // (in-flight events may lack it — `—` then).
+  const attachments = await resolveReceiptAttachment(
+    env,
+    'Payment',
+    payload.paymentId,
+    receiptNumber,
+    receiptPdfKey,
+    payload.receiptNumber ?? '—',
   );
+  if (attachments === undefined) {
+    return;
+  }
+
+  const { subject, html } = renderPaymentReceiptShort({
+    ...baseData,
+    receiptNumber: receiptNumber ?? null,
+    hasAttachment: attachments !== null,
+  });
+  await sendEmail(env, {
+    to: email,
+    subject,
+    html,
+    ...(attachments ? { attachments } : {}),
+  });
 }
 
 type PdfAttachment = { filename: string; content: Uint8Array; contentType: string };
 
 /**
- * Resolves the PDF attachment for an org payment email.
- * Returns `null` when no receipt number exists (no-number path = no attachment).
- * Returns `undefined` when the caller should abort (PDF not yet ready).
- * Returns the attachment array when the PDF is available in R2.
+ * Resolves the PDF attachment for a receipt email from R2 (never regenerated:
+ * the stored PDF is the source of truth). Shared by both email branches
+ * (member receipt and org payment confirmation).
+ *
+ * - `null`: no receipt number (pre-system path = send without attachment).
+ * - `undefined`: abort the send (PDF not yet ready; the sweep repairs it).
+ * - `PdfAttachment[]`: the bytes as stored, named `<number>.pdf`.
+ *
+ * `eventReceiptNumber` is the number carried by the event (observability hint
+ * only; platform events never carry one and omit it).
  */
-async function resolveOrgReceiptAttachment(
+async function resolveReceiptAttachment(
   env: PdfHandlerEnv,
+  logPrefix: string,
   paymentId: number,
   receiptNumber: string | null | undefined,
   receiptPdfKey: string | null | undefined,
+  eventReceiptNumber?: string,
 ): Promise<PdfAttachment[] | null | undefined> {
   if (!receiptNumber) return null; // No-number path: send without attachment.
 
+  const eventHint = eventReceiptNumber ? ` (evento: ${eventReceiptNumber})` : '';
   if (!receiptPdfKey) {
     console.error(
-      `Platform payment ${paymentId}: número ${receiptNumber} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+      `${logPrefix} ${paymentId}: número ${receiptNumber}${eventHint} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
     );
     return undefined; // Signal: abort send.
   }
@@ -183,7 +173,7 @@ async function resolveOrgReceiptAttachment(
   const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
   if (!bytes) {
     console.error(
-      `Platform payment ${paymentId}: número ${receiptNumber} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
+      `${logPrefix} ${paymentId}: número ${receiptNumber}${eventHint} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
     );
     return undefined; // Signal: abort send.
   }
@@ -299,8 +289,14 @@ export async function handleOrgPaymentReceived(
     panelUrl,
   });
 
-  // Rama A (C2): resolve attachment; undefined = abort (PDF not yet ready).
-  const attachments = await resolveOrgReceiptAttachment(env, payload.paymentId, receiptNumber, receiptPdfKey);
+  // Shared resolver: undefined = abort (PDF not yet ready; the sweep repairs it).
+  const attachments = await resolveReceiptAttachment(
+    env,
+    'Platform payment',
+    payload.paymentId,
+    receiptNumber,
+    receiptPdfKey,
+  );
   if (attachments === undefined) return;
 
   for (const to of recipients) {
