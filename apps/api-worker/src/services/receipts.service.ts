@@ -3,9 +3,9 @@ import { createReceiptsRepository } from '@workspace/database/repositories/recei
 import {
   applyTaxOverride,
   buildEmitterSnapshot,
-  buildReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
+  composePanelReceipt,
   formatPanelReceiptNumber,
   parsePanelReceiptNumber,
   resolveFiscalProfile,
@@ -332,59 +332,9 @@ export function createReceiptsService(
           receiptNumber: composed.payment.receiptNumber,
         };
       }
-      const receipt = buildReceiptDataFromComposed({
-        receiptNumber: composed.payment.receiptNumber,
-        documentType:
-          composed.payment.documentType === 'invoice' ? 'invoice' : 'receipt',
-        issuedAt: composed.payment.receiptIssuedAt ?? new Date(),
-        payment: {
-          id: composed.payment.id,
-          amountPaid: Number(composed.payment.amountPaid),
-          currencyPaid: composed.payment.currencyPaid,
-          exchangeRateApplied: composed.payment.exchangeRateApplied,
-          paymentMethod: composed.payment.paymentMethod,
-          paymentMethodDetails: composed.payment.paymentMethodDetails,
-          paymentDate: composed.payment.paymentDate,
-          subtotal:
-            composed.payment.subtotal != null
-              ? Number(composed.payment.subtotal)
-              : null,
-          taxTotal:
-            composed.payment.taxTotal != null
-              ? Number(composed.payment.taxTotal)
-              : null,
-          taxDetails: composed.payment.taxDetails,
-          receiptNumber: composed.payment.receiptNumber,
-          receiptVoided: composed.payment.receiptVoided,
-          planSnapshotName: composed.payment.planSnapshotName,
-          planSnapshotCurrency: composed.payment.planSnapshotCurrency,
-        },
-        organization: {
-          name: composed.organization.name,
-          legalName: composed.organization.legalName,
-          taxId: composed.organization.taxId,
-          address: composed.organization.address,
-          countryCode: composed.organization.countryCode,
-          primaryCurrency: composed.organization.primaryCurrency,
-          timezone: composed.organization.timezone,
-          fiscalConfig: composed.organization.fiscalConfig,
-        },
-        member: composed.member
-          ? {
-            firstName: composed.member.firstName,
-            lastName: composed.member.lastName,
-            documentId: composed.member.documentId,
-          }
-          : null,
-        subscription: composed.subscription
-          ? {
-            startDate: composed.subscription.startDate,
-            endDate: composed.subscription.endDate,
-          }
-          : null,
-        // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
-        emitterSnapshot: composed.payment.emitterSnapshot,
-      });
+      // Compose via the shared row mapper (C1: if the payment was numbered
+      // after C1 the persisted snapshot wins; null = legacy, live compose).
+      const receipt = composePanelReceipt(composed);
       return {
         available: true,
         pdfStatus: 'ready',

@@ -20,6 +20,7 @@ import type {
   ReceiptEmitter,
   ReceiptEmitterSnapshot,
   ReceiptMethod,
+  ReceiptRecipient,
   ReceiptSnapshotTax,
 } from './receipt-data';
 
@@ -105,10 +106,10 @@ function toBaseTotal(
   return roundCents(total / rate);
 }
 
-function toIso(value: DateInput): string {
+function toIso(value: DateInput, method: string): string {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) {
-    throw new TypeError(`buildReceiptDataFromComposed: fecha inválida (${String(value)}).`);
+    throw new TypeError(`${method}: fecha inválida (${String(value)}).`);
   }
   return d.toISOString();
 }
@@ -313,10 +314,119 @@ export function toReceiptMaskedDetails(masked: unknown): ReceiptMethod['maskedDe
   }));
 }
 
+/* ── Assembly core (single, shared by every issuer) ─────────────────────
+   The `document`, `amounts`, `method` and `footer` blocks are assembled
+   ONCE here. The per-issuer builders resolve the differences (emitter
+   identity, recipient, period, base currency, document type, voided flag)
+   and delegate; they never re-assemble the contract themselves.
+   Validation (persisted taxes, emitter snapshot) stays in the builders so
+   the error precedence and messages of each public entry point are kept.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/** Validated payment fields the assembly consumes (cents, taxes already read). */
+export interface ReceiptAssemblyPayment {
+  id: number;
+  amountPaid: number;
+  currencyPaid: string;
+  exchangeRateApplied?: string | null;
+  paymentMethod: string;
+  paymentMethodDetails?: unknown;
+  subtotal: number;
+  taxTotal: number;
+  taxDetails: ITaxDetail[];
+}
+
+/** Issuer differences, already resolved by the per-issuer mapper. */
+export interface ReceiptAssemblyInput {
+  /** Public entry point name, used in error messages. */
+  method: string;
+  identity: ReceiptEmitterSnapshot;
+  recipient: ReceiptRecipient;
+  document: {
+    number: string;
+    type: ReceiptDocumentType;
+    issuedAt: DateInput;
+  };
+  sale: {
+    planName: string;
+    periodStart: DateInput;
+    periodEnd: DateInput;
+    paymentDate: DateInput;
+  };
+  payment: ReceiptAssemblyPayment;
+  baseCurrency: string;
+  voided: boolean;
+}
+
 /**
- * Arma `ReceiptData` desde filas crudas. Lanza si faltan los impuestos
- * persistidos o fechas inválidas. NO valida el checklist (lo hace el
- * caller con `checklistPrePdf` y decide).
+ * Assembles the `ReceiptData` contract from resolved issuer differences.
+ * Pure: no I/O, no recalculation — taxes are the persisted lines, the base
+ * total comes from the persisted rate, details are masked once here.
+ */
+export function assembleReceiptData(input: ReceiptAssemblyInput): ReceiptData {
+  const { payment, identity } = input;
+
+  const masked = maskPaymentDetails(
+    payment.paymentMethodDetails as
+      | IPaymentMethodDetails
+      | Record<string, unknown>
+      | null
+      | undefined,
+  );
+  const maskedDetails = toReceiptMaskedDetails(masked);
+
+  return {
+    emitter: identity.emitter,
+    recipient: input.recipient,
+    document: {
+      number: input.document.number,
+      type: input.document.type,
+      label: identity.documentLabel,
+      issuedAt: toIso(input.document.issuedAt, input.method),
+    },
+    sale: {
+      planName: input.sale.planName,
+      periodStart: toIso(input.sale.periodStart, input.method),
+      periodEnd: toIso(input.sale.periodEnd, input.method),
+      paymentDate: toIso(input.sale.paymentDate, input.method),
+    },
+    amounts: {
+      subtotal: payment.subtotal,
+      taxDetails: payment.taxDetails,
+      taxTotal: payment.taxTotal,
+      total: payment.amountPaid,
+      currencyPaid: payment.currencyPaid,
+      baseCurrency: input.baseCurrency,
+      exchangeRateApplied: payment.exchangeRateApplied ?? null,
+      baseTotal: toBaseTotal(
+        payment.amountPaid,
+        payment.currencyPaid,
+        input.baseCurrency,
+        payment.exchangeRateApplied,
+      ),
+    },
+    method: {
+      name: payment.paymentMethod,
+      maskedDetails,
+    },
+    footer: {
+      disclaimer: identity.disclaimer,
+      generatedBy: 'Generado con FitStack',
+    },
+    timezone: identity.timezone ?? undefined,
+    voided: input.voided,
+    internalPaymentId: payment.id,
+  };
+}
+
+/**
+ * Arma `ReceiptData` desde filas crudas (emisor Panel: la organización del
+ * gimnasio). Valida impuestos persistidos y snapshot, resuelve las
+ * diferencias del issuer (destinatario = miembro, período = suscripción,
+ * moneda base = snapshot del plan u org, `type` = document_type) y delega
+ * el ensamblaje al core único (`assembleReceiptData`). Lanza si faltan los
+ * impuestos persistidos o fechas inválidas. NO valida el checklist (lo
+ * hace el caller con `checklistPrePdf` y decide).
  */
 export function buildReceiptDataFromComposed(
   input: ComposeReceiptInput,
@@ -330,7 +440,6 @@ export function buildReceiptDataFromComposed(
   }
   const taxDetails = assertPersistedTaxDetails(payment.taxDetails, 'buildReceiptDataFromComposed');
 
-  const baseCurrency = payment.planSnapshotCurrency ?? organization.primaryCurrency;
   // Snapshot primero: si existe, la configuración viva NO se lee (ni siquiera
   // se resuelve el perfil fiscal) — el documento emitido es reproducible.
   const identity =
@@ -340,21 +449,13 @@ export function buildReceiptDataFromComposed(
       resolveFiscalProfile(organization.countryCode, organization.fiscalConfig),
     );
 
-  const masked = maskPaymentDetails(
-    payment.paymentMethodDetails as
-    | IPaymentMethodDetails
-    | Record<string, unknown>
-    | null
-    | undefined,
-  );
-  const maskedDetails = toReceiptMaskedDetails(masked);
-
   const memberName = member
     ? `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || 'Miembro'
     : 'Miembro';
 
-  return {
-    emitter: identity.emitter,
+  return assembleReceiptData({
+    method: 'buildReceiptDataFromComposed',
+    identity,
     recipient: {
       name: memberName,
       documentId: member?.documentId ?? null,
@@ -363,42 +464,30 @@ export function buildReceiptDataFromComposed(
     document: {
       number: input.receiptNumber,
       type: input.documentType,
-      label: identity.documentLabel,
-      issuedAt: toIso(input.issuedAt),
+      issuedAt: input.issuedAt,
     },
     sale: {
       planName: payment.planSnapshotName?.trim() || 'Plan de membresía',
-      periodStart: subscription?.startDate ? toIso(subscription.startDate) : toIso(input.issuedAt),
-      periodEnd: subscription?.endDate ? toIso(subscription.endDate) : toIso(input.issuedAt),
-      paymentDate: toIso(payment.paymentDate),
+      periodStart: subscription?.startDate
+        ? subscription.startDate
+        : input.issuedAt,
+      periodEnd: subscription?.endDate ? subscription.endDate : input.issuedAt,
+      paymentDate: payment.paymentDate,
     },
-    amounts: {
-      subtotal: payment.subtotal,
-      taxDetails,
-      taxTotal: payment.taxTotal,
-      total: payment.amountPaid,
+    payment: {
+      id: payment.id,
+      amountPaid: payment.amountPaid,
       currencyPaid: payment.currencyPaid,
-      baseCurrency,
-      exchangeRateApplied: payment.exchangeRateApplied ?? null,
-      baseTotal: toBaseTotal(
-        payment.amountPaid,
-        payment.currencyPaid,
-        baseCurrency,
-        payment.exchangeRateApplied,
-      ),
+      exchangeRateApplied: payment.exchangeRateApplied,
+      paymentMethod: payment.paymentMethod,
+      paymentMethodDetails: payment.paymentMethodDetails,
+      subtotal: payment.subtotal,
+      taxTotal: payment.taxTotal,
+      taxDetails,
     },
-    method: {
-      name: payment.paymentMethod,
-      maskedDetails,
-    },
-    footer: {
-      disclaimer: identity.disclaimer,
-      generatedBy: 'Generado con FitStack',
-    },
-    timezone: identity.timezone ?? undefined,
+    baseCurrency: payment.planSnapshotCurrency ?? organization.primaryCurrency,
     voided: payment.receiptVoided ?? false,
-    internalPaymentId: payment.id,
-  };
+  });
 }
 
 /* ── Comprobante SaaS (Console, C2) ────────────────────────────────────
@@ -461,10 +550,14 @@ export interface PlatformComposeReceiptInput {
 }
 
 /**
- * Arma `ReceiptData` SaaS desde filas crudas. Impuestos LEÍDOS del pago
- * (nunca recalculados); `type` siempre `'receipt'` (invoice bloqueado por
- * construcción, `HAS_FISCAL_HOMOLOGATION=false`). Lanza si faltan
- * impuestos persistidos o fechas inválidas.
+ * Arma `ReceiptData` SaaS desde filas crudas (emisor FitStack, receptor la
+ * org). Impuestos LEÍDOS del pago (nunca recalculados); `type` siempre
+ * `'receipt'` (invoice bloqueado por construcción,
+ * `HAS_FISCAL_HOMOLOGATION=false`). Resuelve las diferencias del issuer
+ * (destinatario = org, período = startDate/currentPeriodEnd, moneda base =
+ * snapshot del plan) y delega el ensamblaje al core único
+ * (`assembleReceiptData`). Lanza si faltan impuestos persistidos o fechas
+ * inválidas.
  */
 export function buildPlatformReceiptDataFromComposed(
   input: PlatformComposeReceiptInput,
@@ -490,20 +583,12 @@ export function buildPlatformReceiptDataFromComposed(
       resolveFiscalProfile(receptor.countryCode),
     );
 
-  const masked = maskPaymentDetails(
-    payment.paymentMethodDetails as
-    | IPaymentMethodDetails
-    | Record<string, unknown>
-    | null
-    | undefined,
-  );
-  const maskedDetails = toReceiptMaskedDetails(masked);
-
   const periodStart = subscription?.startDate ?? payment.paymentDate;
   const periodEnd = subscription?.currentPeriodEnd ?? periodStart;
 
-  return {
-    emitter: identity.emitter,
+  return assembleReceiptData({
+    method: 'buildPlatformReceiptDataFromComposed',
+    identity,
     recipient: {
       name: receptor.legalName?.trim() || receptor.name,
       documentId: receptor.taxId?.trim() || null,
@@ -512,40 +597,26 @@ export function buildPlatformReceiptDataFromComposed(
     document: {
       number: input.receiptNumber,
       type: 'receipt',
-      label: identity.documentLabel,
-      issuedAt: toIso(input.issuedAt),
+      issuedAt: input.issuedAt,
     },
     sale: {
       planName: payment.planSnapshotName?.trim() || 'Plan de suscripción',
-      periodStart: toIso(periodStart),
-      periodEnd: toIso(periodEnd),
-      paymentDate: toIso(payment.paymentDate),
+      periodStart,
+      periodEnd,
+      paymentDate: payment.paymentDate,
     },
-    amounts: {
-      subtotal: payment.subtotal,
-      taxDetails,
-      taxTotal: payment.taxTotal,
-      total: payment.amountPaid,
+    payment: {
+      id: payment.id,
+      amountPaid: payment.amountPaid,
       currencyPaid: payment.currencyPaid,
-      baseCurrency: payment.planSnapshotCurrency,
-      exchangeRateApplied: payment.exchangeRateApplied ?? null,
-      baseTotal: toBaseTotal(
-        payment.amountPaid,
-        payment.currencyPaid,
-        payment.planSnapshotCurrency,
-        payment.exchangeRateApplied,
-      ),
+      exchangeRateApplied: payment.exchangeRateApplied,
+      paymentMethod: payment.paymentMethod,
+      paymentMethodDetails: payment.paymentMethodDetails,
+      subtotal: payment.subtotal,
+      taxTotal: payment.taxTotal,
+      taxDetails,
     },
-    method: {
-      name: payment.paymentMethod,
-      maskedDetails,
-    },
-    footer: {
-      disclaimer: identity.disclaimer,
-      generatedBy: 'Generado con FitStack',
-    },
-    timezone: identity.timezone ?? undefined,
+    baseCurrency: payment.planSnapshotCurrency,
     voided: payment.voided,
-    internalPaymentId: payment.id,
-  };
+  });
 }

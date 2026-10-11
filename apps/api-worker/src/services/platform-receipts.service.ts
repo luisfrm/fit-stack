@@ -2,9 +2,9 @@ import type { Db } from '@workspace/database/factory';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import {
   buildPlatformEmitterSnapshot,
-  buildPlatformReceiptDataFromComposed,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
+  composePlatformReceipt,
   formatConsoleReceiptNumber,
   parseConsoleReceiptNumber,
   platformEmitterFromSettings,
@@ -325,8 +325,8 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
 
     /**
      * Estado del comprobante SaaS (contrato 3 estados, nunca 409; espejo
-     * `getReceiptState` de Panel). El mapeo a `PlatformComposeReceiptInput`
-     * es twin intencional del consumer jobs-worker (precedente Panel).
+     * `getReceiptState` de Panel). Compone con el mapper shared de filas:
+     * el mismo camino que el consumer de jobs-worker (precedente Panel).
      */
     async getPlatformReceiptState(paymentId: number): Promise<
       | { available: true; pdfStatus: 'ready'; receiptNumber: string; receipt: ReceiptData; pdfKey: string }
@@ -351,44 +351,9 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           receiptNumber: composed.payment.receiptNumber,
         };
       }
-      const { payment, subscription, organization, emitter } = composed;
-      const receipt = buildPlatformReceiptDataFromComposed({
-        receiptNumber: composed.payment.receiptNumber,
-        // Defensivo: invariante receiptIssuedAt non-null cuando hay pdfKey
-        // (ambos se setean juntos en el paso 1 / attach).
-        issuedAt: composed.payment.receiptIssuedAt ?? new Date(),
-        payment: {
-          id: payment.id,
-          amountPaid: Number(payment.amountPaid),
-          currencyPaid: payment.currencyPaid,
-          exchangeRateApplied: payment.exchangeRateApplied,
-          paymentMethod: payment.paymentMethod,
-          paymentMethodDetails: payment.paymentMethodDetails,
-          paymentDate: payment.paymentDate,
-          subtotal: payment.subtotal != null ? Number(payment.subtotal) : null,
-          taxTotal: payment.taxTotal != null ? Number(payment.taxTotal) : null,
-          taxDetails: payment.taxDetails,
-          planSnapshotName: payment.planSnapshotName,
-          planSnapshotCurrency: payment.planSnapshotCurrency,
-          voided: payment.receiptVoided,
-        },
-        subscription: subscription
-          ? {
-            startDate: subscription.startDate,
-            currentPeriodEnd: subscription.currentPeriodEnd,
-          }
-          : null,
-        receptor: {
-          name: organization.name,
-          legalName: organization.legalName,
-          taxId: organization.taxId,
-          countryCode: organization.countryCode,
-          timezone: organization.timezone,
-        },
-        emitter: platformEmitterFromSettings(emitter),
-        // C1: si el pago se numeró tras C1, el snapshot manda (NULL = legacy).
-        emitterSnapshot: payment.emitterSnapshot,
-      });
+      // Compose via the shared row mapper (C1: if the payment was numbered
+      // after C1 the persisted snapshot wins; null = legacy, live compose).
+      const receipt = composePlatformReceipt(composed);
       return {
         available: true,
         pdfStatus: 'ready',

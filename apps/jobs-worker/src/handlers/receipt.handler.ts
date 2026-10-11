@@ -10,15 +10,14 @@ import {
   type PlatformReceiptsRepository,
 } from '@workspace/database/repositories/platform-receipts';
 import {
-  buildPlatformReceiptDataFromComposed,
-  buildReceiptDataFromComposed,
   buildReceiptRenderEvent,
   checklistPrePdf,
+  composePanelReceipt,
+  composePlatformReceipt,
   isReceiptRenderEvent,
   panelReceiptKey,
   panelVoidedReceiptKey,
   parsePanelReceiptNumber,
-  platformEmitterFromSettings,
   platformReceiptKey,
   platformVoidedReceiptKey,
   type CurrencyFormat,
@@ -43,59 +42,6 @@ function renderFormat(currencyFormat: string | null | undefined): CurrencyFormat
   return currencyFormat === 'usa' ? 'usa' : 'latam';
 }
 
-function buildComposeInput(
-  composed: ReceiptComposedData,
-  persistedNumber: string,
-): Parameters<typeof buildReceiptDataFromComposed>[0] {
-  const { payment, organization, member, subscription } = composed;
-  return {
-    receiptNumber: persistedNumber,
-    documentType: payment.documentType === 'invoice' ? 'invoice' : 'receipt',
-    issuedAt: payment.receiptIssuedAt!,
-    payment: {
-      id: payment.id,
-      amountPaid: Number(payment.amountPaid),
-      currencyPaid: payment.currencyPaid,
-      exchangeRateApplied: payment.exchangeRateApplied,
-      paymentMethod: payment.paymentMethod,
-      paymentMethodDetails: payment.paymentMethodDetails,
-      paymentDate: payment.paymentDate,
-      subtotal: payment.subtotal != null ? Number(payment.subtotal) : null,
-      taxTotal: payment.taxTotal != null ? Number(payment.taxTotal) : null,
-      taxDetails: payment.taxDetails,
-      receiptNumber: persistedNumber,
-      receiptVoided: payment.receiptVoided,
-      planSnapshotName: payment.planSnapshotName,
-      planSnapshotCurrency: payment.planSnapshotCurrency,
-    },
-    organization: {
-      name: organization.name,
-      legalName: organization.legalName,
-      taxId: organization.taxId,
-      address: organization.address,
-      countryCode: organization.countryCode,
-      primaryCurrency: organization.primaryCurrency,
-      timezone: organization.timezone,
-      fiscalConfig: organization.fiscalConfig,
-    },
-    member: member
-      ? {
-          firstName: member.firstName,
-          lastName: member.lastName,
-          documentId: member.documentId,
-        }
-      : null,
-    subscription: subscription
-      ? {
-          startDate: subscription.startDate,
-          endDate: subscription.endDate,
-        }
-      : null,
-    // C1: identidad congelada al emitir (NULL = emisión previa, en vivo).
-    emitterSnapshot: payment.emitterSnapshot,
-  };
-}
-
 /**
  * Variante del PDF de un comprobante. `voided` escribe el artefacto con el
  * sello ANULADO (key propia, `receipt_voided_pdf_key`); el de emisión nunca se
@@ -118,7 +64,9 @@ async function renderAndStoreReceiptPdf(
     );
   }
 
-  const data = buildReceiptDataFromComposed(buildComposeInput(composed, persistedNumber));
+  // Compose via the shared row mapper: the persisted number and issue date
+  // in the payment row are authoritative (the caller already verified them).
+  const data = composePanelReceipt(composed);
 
   const check = checklistPrePdf(data);
   if (!check.ok) {
@@ -358,48 +306,6 @@ export async function sweepPendingReceiptPdfs(
 
 type PlatformReceiptsRepo = PlatformReceiptsRepository;
 
-function buildPlatformComposeInput(
-  composed: PlatformReceiptComposedData,
-  persistedNumber: string,
-): Parameters<typeof buildPlatformReceiptDataFromComposed>[0] {
-  const { payment, subscription, organization, emitter } = composed;
-  return {
-    receiptNumber: persistedNumber,
-    issuedAt: payment.receiptIssuedAt!,
-    payment: {
-      id: payment.id,
-      amountPaid: Number(payment.amountPaid),
-      currencyPaid: payment.currencyPaid,
-      exchangeRateApplied: payment.exchangeRateApplied,
-      paymentMethod: payment.paymentMethod,
-      paymentMethodDetails: payment.paymentMethodDetails,
-      paymentDate: payment.paymentDate,
-      subtotal: payment.subtotal != null ? Number(payment.subtotal) : null,
-      taxTotal: payment.taxTotal != null ? Number(payment.taxTotal) : null,
-      taxDetails: payment.taxDetails,
-      planSnapshotName: payment.planSnapshotName,
-      planSnapshotCurrency: payment.planSnapshotCurrency,
-      voided: payment.receiptVoided,
-    },
-    subscription: subscription
-      ? {
-          startDate: subscription.startDate,
-          currentPeriodEnd: subscription.currentPeriodEnd,
-        }
-      : null,
-    receptor: {
-      name: organization.name,
-      legalName: organization.legalName,
-      taxId: organization.taxId,
-      countryCode: organization.countryCode,
-      timezone: organization.timezone,
-    },
-    emitter: platformEmitterFromSettings(emitter),
-    // C1: identidad congelada al emitir (NULL = emisión previa, en vivo).
-    emitterSnapshot: payment.emitterSnapshot,
-  };
-}
-
 async function renderAndStorePlatformReceiptPdf(
   env: ReceiptHandlerEnv,
   repo: PlatformReceiptsRepo,
@@ -414,9 +320,8 @@ async function renderAndStorePlatformReceiptPdf(
     );
   }
 
-  const data = buildPlatformReceiptDataFromComposed(
-    buildPlatformComposeInput(composed, persistedNumber),
-  );
+  // Compose via the shared row mapper (mirror of the Panel path above).
+  const data = composePlatformReceipt(composed);
 
   const check = checklistPrePdf(data);
   if (!check.ok) {
