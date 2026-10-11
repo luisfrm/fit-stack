@@ -64,13 +64,6 @@ export interface CreatePlatformSubscriptionPayload {
   payment: PlatformPaymentPayload;
 }
 
-export interface ChangePlanPayload {
-  newPlanId: number;
-  isTrial?: boolean;
-  priceOverrideCents?: number;
-  payment: PlatformPaymentPayload;
-}
-
 export interface ReceiptsReportFilters {
   from?: string;
   to?: string;
@@ -190,19 +183,6 @@ export const platformSubscriptionsService = {
     return await api<{ success: boolean; newPeriodEnd: string }>(
       `${SUBSCRIPTIONS_PATH}/${id}/renew`,
       { method: "POST", body: { payment } },
-    );
-  },
-
-  /**
-   * Changes the plan for an organization (cancels current, creates new).
-   */
-  async changePlan(
-    organizationId: string,
-    data: ChangePlanPayload,
-  ): Promise<IPlatformSubscription> {
-    return await api<IPlatformSubscription>(
-      `${SUBSCRIPTIONS_PATH}/change-plan`,
-      { method: "POST", body: { organizationId, ...data } },
     );
   },
 
