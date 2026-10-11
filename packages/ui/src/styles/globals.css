@@ -189,7 +189,7 @@
     }
   }
 
-  /* Puntos de "escribiendo..." del chat IA (3 puntos que brincan escalonados) */
+  /* AI chat typing indicator dots (3 staggered bouncing dots) */
   --animate-typing-bounce: typing-bounce 1.2s ease-in-out infinite;
   @keyframes typing-bounce {
     0%,
@@ -203,9 +203,9 @@
   }
 
   /* ── Modal / bottom-sheet open & close ──
-     Animan las propiedades individuales `translate`/`scale` (no `transform`)
-     para no chocar con las utilidades de centrado de Tailwind v4
-     (`-translate-x-1/2 -translate-y-1/2` usan la propiedad `translate`). */
+     Animate individual `translate`/`scale` properties (not `transform`)
+     to avoid colliding with Tailwind v4 centering utilities
+     (`-translate-x-1/2 -translate-y-1/2` use the `translate` property). */
   --animate-sheet-in: sheet-in 0.42s cubic-bezier(0.32, 0.72, 0, 1);
   --animate-sheet-out: sheet-out 0.28s cubic-bezier(0.4, 0, 1, 1);
   --animate-modal-in: modal-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);

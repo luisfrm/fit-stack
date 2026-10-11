@@ -1,6 +1,6 @@
 import { parse, formatHex, formatCss, converter, modeOklch, useMode as culoriUseMode } from 'culori';
 
-// Activa el modo OKLCH en culori
+// Enable OKLCH mode in culori
 culoriUseMode(modeOklch);
 
 /**

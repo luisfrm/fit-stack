@@ -12,7 +12,7 @@ export function useWindowSize() {
   });
 
   useEffect(() => {
-    // Solo se ejecuta en el cliente
+    // Only runs on the client
     function handleResize() {
       setWindowSize({
         width: window.innerWidth,
@@ -20,13 +20,13 @@ export function useWindowSize() {
       });
     }
 
-    // Registrar evento de redimensionamiento
+    // Register resize event listener
     window.addEventListener("resize", handleResize);
 
-    // Llamar a la función inmediatamente para establecer el tamaño inicial
+    // Call handler immediately to set initial size
     handleResize();
 
-    // Eliminar el evento al desmontar el componente
+    // Clean up event listener on unmount
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 

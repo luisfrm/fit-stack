@@ -85,12 +85,12 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 // ==========================================
 
 /**
- * ⚠️ NOTA TÉCNICA (SonarQube S6478):
- * Para evitar problemas de rendimiento y pérdida de foco en los inputs dentro de las tablas,
- * NO definas el array 'columns' ni las funciones 'cell' dentro del cuerpo del componente padre.
+ * ⚠️ TECHNICAL NOTE (SonarQube S6478):
+ * To prevent performance degradations and input focus losses inside tables,
+ * do NOT define the 'columns' array or 'cell' functions inside the parent component body.
  *
- * ✅ CORRECTO: Define las columnas fuera del componente o usa React.useMemo(() => [...], []).
- * ❌ INCORRECTO: Definir const columns = [...] directamente en el componente funcional.
+ * ✅ CORRECT: Define columns outside the component or use React.useMemo(() => [...], []).
+ * ❌ INCORRECT: Defining const columns = [...] directly inside the functional component.
  */
 
 export interface ColumnDef<T> {
@@ -170,7 +170,7 @@ function Table<T>({
           )}
 
           {!loading && data.map((item, rowIndex) => {
-            // Intenta usar la prop rowKey, sino busca un .id, sino usa string del índice con tableId.
+            // Attempts to use rowKey prop, otherwise looks for an .id, otherwise falls back to index string with tableId.
             const itemKey = rowKey ? rowKey(item) : ((item as Record<string, unknown>).id as string | number | undefined ?? `${tableId}-row-${rowIndex}`);
 
             return (

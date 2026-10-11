@@ -74,7 +74,7 @@ function ChartContainer({
         data-chart={chartId}
         className={cn(
           "flex aspect-video justify-center text-xs",
-          // Sinergia: Líneas sutiles y ticks con baja opacidad
+          // Synergy: subtle lines and low-opacity ticks
           "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground/70",
           "[&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/20",
           "[&_.recharts-curve.recharts-tooltip-cursor]:stroke-border/50",

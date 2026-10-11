@@ -85,12 +85,12 @@ export const organization = pgTable('organization', {
 
   // Localization & Fiscal (Optional)
   countryCode: text('country_code').notNull(),
-  // La timezone es OBLIGATORIA y debe setearse explícitamente al crear la org
-  // (sin default silencioso que asigne 'America/Caracas' por accidente).
+  // Timezone is REQUIRED and must be explicitly set upon organization creation
+  // (no silent default accidentally assigning 'America/Caracas').
   timezone: text('timezone').notNull(),
-  // Moneda principal y formato: OBLIGATORIOS, columnas NOT NULL sin default.
-  // La moneda deriva del país al crear (un solo insert); el formato viene
-  // explícito del request. Nunca se inventan en lectura.
+  // Primary currency and format: REQUIRED, NOT NULL columns without default.
+  // Currency derives from country upon creation (single insert); format comes
+  // explicit in the request. Never invented on read.
   primaryCurrency: text('primary_currency').notNull(),
   currencyFormat: text('currency_format').notNull(),
   taxId: text('tax_id'),
@@ -131,26 +131,26 @@ export const invitation = pgTable('invitation', {
 // ── B2B PLATFORM BILLING ──
 
 /**
- * platform_plan: catálogo de planes SaaS que vende FitStack.
- * El precio se guarda en CENTAVOS (bigint) para evitar problemas de punto flotante.
+ * platform_plan: SaaS plan catalog sold by FitStack.
+ * Price is stored in CENTS (bigint) to avoid floating-point issues.
  */
 export const platformPlan = pgTable('platform_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
   name: text('name').notNull(),
-  price: bigint('price', { mode: 'number' }).notNull(), // centavos
+  price: bigint('price', { mode: 'number' }).notNull(), // cents
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
   durationUnit: text('duration_unit').default('month').notNull(),
   features: jsonb('features').$type<PlanFeaturesV2 | null>(), // PlanFeaturesV2 from shared/features
   isActive: boolean('is_active').default(true).notNull(),
-  trialDays: integer('trial_days').default(0).notNull(), // 0 = sin trial
+  trialDays: integer('trial_days').default(0).notNull(), // 0 = no trial
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 /**
- * platform_subscription: suscripción de una Organization a un platform_plan.
- * El estado NO se guarda; se computa en SQL según currentPeriodEnd y el último pago.
- * Mantenemos `status` como columna legacy (a remover en migración futura).
+ * platform_subscription: Organization subscription to a platform_plan.
+ * Status is NOT stored; computed in SQL based on currentPeriodEnd and latest payment.
+ * We keep `status` as a legacy column (to be removed in a future migration).
  */
 export const platformSubscription = pgTable(
   'platform_subscription',
@@ -162,12 +162,12 @@ export const platformSubscription = pgTable(
     planId: bigint('plan_id', { mode: 'number' })
       .references(() => platformPlan.id)
       .notNull(),
-    // legacy column — a dropear una vez validada la migración a status computado
+    // legacy column — to drop once migration to computed status is verified
     status: text('status').notNull().default('active'),
     startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
     isTrial: boolean('is_trial').default(false).notNull(),
-    priceOverride: bigint('price_override', { mode: 'number' }), // centavos — excepción comercial
+    priceOverride: bigint('price_override', { mode: 'number' }), // cents — commercial override
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancellationReason: text('cancellation_reason'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -180,16 +180,16 @@ export const platformSubscription = pgTable(
 );
 
 /**
- * platform_subscription_payment: pagos asociados a una platform_subscription.
- * Guarda snapshot comercial completo para preservar la integridad histórica
- * aunque cambien los datos del plan.
+ * platform_subscription_payment: payments associated with a platform_subscription.
+ * Stores full commercial snapshot to preserve historical integrity
+ * even if plan details change.
  */
 export const platformSubscriptionPayment = pgTable(
   'platform_subscription_payment',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
 
-    // Relaciones
+    // Relations
     subscriptionId: bigint('subscription_id', { mode: 'number' })
       .references(() => platformSubscription.id, { onDelete: 'cascade' }),
     organizationId: text('organization_id')
@@ -199,61 +199,61 @@ export const platformSubscriptionPayment = pgTable(
       .references(() => platformPlan.id)
       .notNull(),
 
-    // Snapshot comercial
+    // Commercial snapshot
     planSnapshotName: text('plan_snapshot_name').notNull(),
-    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
+    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // cents
     planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
     planSnapshotDurationValue: integer('plan_snapshot_duration_value').notNull(),
     planSnapshotDurationUnit: text('plan_snapshot_duration_unit').notNull(),
-    // Snapshot de features del plan al momento del pago (comparar vs el plan a día de hoy)
+    // Snapshot of plan features at payment time (compare vs current plan)
     featuresSnapshot: jsonb('features_snapshot').$type<PlanFeaturesV2 | null>(),
 
-    // Datos del pago
-    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
+    // Payment details
+    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // cents
     currencyPaid: text('currency_paid').notNull(),
     exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
-    baseAmount: bigint('base_amount', { mode: 'number' }), // centavos en moneda base
+    baseAmount: bigint('base_amount', { mode: 'number' }), // cents in base currency
 
-    // Método y metadata
-    paymentMethod: text('payment_method').notNull(), // incluye 'trial' | 'free' | 'manual' | etc
+    // Method and metadata
+    paymentMethod: text('payment_method').notNull(), // includes 'trial' | 'free' | 'manual' | etc
     paymentMethodDetails: jsonb('payment_method_details'),
     paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
 
-    // Estados
+    // Statuses
     status: text('status').notNull().default('processing'),
     dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
-    // Correlative receipt (C1). NULL = anterior al sistema (pre_system).
-    // Secuencia GLOBAL continua (un solo emisor: FitStack), sin año.
+    // Correlative receipt (C1). NULL = prior to system (pre_system).
+    // Continuous GLOBAL sequence (single issuer: FitStack), without year.
     receiptNumber: text('receipt_number').unique(),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
-    // PDF con el sello ANULADO (C6+). El PDF original YA NO se sirve cuando
-    // `receipt_voided` es true: el único documento descargable de un
-    // comprobante anulado es este. NULL = anulación sin render todavía
-    // (la descarga responde `pending`, nunca el original sin sello).
+    // PDF with VOIDED stamp (C6+). The original PDF is NO LONGER served when
+    // `receipt_voided` is true: the only downloadable document for a voided
+    // receipt is this one. NULL = voided without rendering yet
+    // (download responds `pending`, never the unstamped original).
     receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
-    // Desglose fiscal persistido por el paso 1 (C2). El paso 2 nunca
-    // recalcula: los lee (NULL = legacy/pre-C2). Centavos enteros.
+    // Tax breakdown persisted by step 1 (C2). Step 2 never
+    // recalculates: it reads them (NULL = legacy/pre-C2). Integer cents.
     subtotal: bigint('subtotal', { mode: 'number' }),
     taxTotal: bigint('tax_total', { mode: 'number' }),
     taxDetails: jsonb('tax_details'),
-    // Gate de notificación (C2, espejo Panel): email encolado solo tras PDF.
+    // Notification gate (C2, Panel mirror): email enqueued only after PDF.
     receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
-    // Pagador (C2): solo se escribe en creación `processing` (sesión org
-    // renovadora); en validación SET solo si IS NULL, nunca overwrite.
+    // Payer (C2): only written upon `processing` creation (renewing org session);
+    // on validation SET only if IS NULL, never overwritten.
     payerEmail: text('payer_email'),
     payerName: text('payer_name'),
-    // ANULADO (C2, espejo Panel): conserva número y PDF, nunca se reusa.
+    // VOIDED (C2, Panel mirror): preserves number and PDF, never reused.
     receiptVoided: boolean('receipt_voided').notNull().default(false),
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
-    // Identidad del emisor CONGELADA al emitir (C1, espejo Panel).
+    // Issuer identity FROZEN upon issue (C1, Panel mirror).
     emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
-    // Actor que emitió (C5, espejo Panel).
+    // Issuing actor (C5, Panel mirror).
     issuedBy: text('issued_by'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -262,11 +262,11 @@ export const platformSubscriptionPayment = pgTable(
     index('idx_psp_subscription_id').on(table.subscriptionId),
     index('idx_psp_payment_date').on(table.paymentDate),
     index('idx_psp_subscription_status').on(table.subscriptionId, table.status),
-    // Barrido de PDFs pendientes (C2): numerados sin PDF.
+    // Sweep of pending PDFs (C2): numbered without PDF.
     index('idx_psp_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
-    // Barrido de PDFs anulados pendientes: anulados sin el PDF con sello.
+    // Sweep of pending voided PDFs: voided without stamped PDF.
     index('idx_psp_voided_pending')
       .on(table.voidedAt)
       .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
@@ -276,28 +276,28 @@ export const platformSubscriptionPayment = pgTable(
 // ── PLATFORM RECEIPT SEQUENCE (C1) ──
 
 /**
- * Correlativo GLOBAL continuo del emisor FitStack (un solo emisor legal).
- * Sin org ni año: una sola fila por tipo de documento ('receipt' | 'invoice').
- * `nextPlatformDocumentNumber` lo incrementará con una sola sentencia atómica
- * (INSERT ... ON CONFLICT DO UPDATE), sin transacciones interactivas.
- * Sin reinicio anual por decisión cerrada (plan.md): mientras FitStack no esté
- * constituida ni tenga régimen fiscal propio, una secuencia continua evita la
- * ambigüedad de "año fiscal de FitStack".
+ * Continuous GLOBAL correlative sequence for issuer FitStack (single legal issuer).
+ * Without org or year: a single row per document type ('receipt' | 'invoice').
+ * `nextPlatformDocumentNumber` increments this with a single atomic statement
+ * (INSERT ... ON CONFLICT DO UPDATE), without interactive transactions.
+ * No annual reset by closed architectural decision: while FitStack is not
+ * incorporated nor has its own tax regime, a continuous sequence avoids
+ * the ambiguity of "FitStack fiscal year".
  */
 export const platformDocumentSequence = pgTable('platform_document_sequence', {
-  // 'receipt' | 'invoice' (valida Zod; hoy solo 'receipt' efectivo). Sin pgEnum.
+  // 'receipt' | 'invoice' (validated by Zod; currently only 'receipt' effective). No pgEnum.
   documentType: text('document_type').primaryKey(),
-  // OJO: `next_number` guarda el ÚLTIMO número entregado, no el siguiente
-  // (mismo significado que `organizationDocumentSequence.last_number`). El
-  // nombre es cosmético; renombrarlo a `last_number` requiere migración y se
-  // agrupará con la próxima migración que se genere por otro motivo
-  // (ver vaults/backlog/comprobantes.md).
+  // NOTE: `next_number` stores the LAST allocated number, not the next one
+  // (same meaning as `organizationDocumentSequence.last_number`). The
+  // name is cosmetic; renaming to `last_number` requires a migration and will
+  // be batched with the next migration generated for another reason
+  // (see vaults/backlog/comprobantes.md).
   nextNumber: integer('next_number').notNull().default(0),
 });
 
-// ── AI USAGE (rate-limit de chat IA por período) ──
-// Fuente de verdad de créditos (1 crédito = 1K tokens). Reset mensual por ciclo de suscripción (o calendario si no hay sub).
-// bonusCredits: créditos extra otorgados manualmente (Dar AI Credits) — one-off por ciclo, no recurrente.
+// ── AI USAGE (AI chat rate-limit per period) ──
+// Source of truth for credits (1 credit = 1K tokens). Monthly reset per subscription cycle (or calendar if no subscription).
+// bonusCredits: extra credits granted manually (Grant AI Credits) — one-off per cycle, non-recurring.
 export const aiUsage = pgTable(
   'ai_usage',
   {
@@ -305,11 +305,11 @@ export const aiUsage = pgTable(
     organizationId: text('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    periodType: text('period_type').notNull(), // 'monthly' (legado: daily/weekly siguen válidos)
+    periodType: text('period_type').notNull(), // 'monthly' (legacy: daily/weekly remain valid)
     periodStart: date('period_start', { mode: 'date' }).notNull(),
     credits: integer('credits').notNull().default(0),
     bonusCredits: integer('bonus_credits').notNull().default(0),
-    count: integer('count').notNull().default(0), // @deprecated legacy mensajes (mantener para compat)
+    count: integer('count').notNull().default(0), // @deprecated legacy messages (kept for compatibility)
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -322,9 +322,9 @@ export const aiUsage = pgTable(
   ]
 );
 
-// ── AI KNOWLEDGE BASE (RAG: documentos + chunks embebidos) ──
-// organizationId NULL = documento de plataforma FitStack (visible para todas las gyms).
-// organizationId seteado = documento del gym (solo visible para esa org).
+// ── AI KNOWLEDGE BASE (RAG: documents + embedded chunks) ──
+// organizationId NULL = FitStack platform document (visible to all gyms).
+// organizationId set = gym document (only visible to that org).
 export const aiKnowledgeDocument = pgTable(
   'ai_knowledge_document',
   {
@@ -421,7 +421,7 @@ export const coachProfile = pgTable('coach_profile', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ── GYM MANAGEMENT: MEMBRESÍAS & PAGOS ──
+// ── GYM MANAGEMENT: MEMBERSHIPS & PAYMENTS ──
 
 export const membershipPlan = pgTable('membership_plan', {
   id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
@@ -429,7 +429,7 @@ export const membershipPlan = pgTable('membership_plan', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  price: bigint('price', { mode: 'number' }).notNull(), // centavos
+  price: bigint('price', { mode: 'number' }).notNull(), // cents
   currency: text('currency').default('USD').notNull(),
   durationValue: integer('duration_value').default(1).notNull(),
   durationUnit: text('duration_unit').default('month').notNull(),
@@ -475,16 +475,16 @@ export const payment = pgTable(
       .references(() => subscription.id),
 
     planSnapshotName: text('plan_snapshot_name').notNull(),
-    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // centavos
+    planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // cents
     planSnapshotCurrency: text('plan_snapshot_currency').notNull(),
-    // Snapshot de la duración del plan al registrar el pago: el periodo se
-    // calcula en el servidor con ESTE valor, así que editar el plan después
-    // no reescribe la semántica de un cobro histórico. NULL = fila anterior
-    // al snapshot (el cálculo cae al plan vivo, estado terminal documentado).
+    // Plan duration snapshot when recording the payment: the period is
+    // calculated on the server using THIS value, so editing the plan later
+    // does not rewrite historical payment semantics. NULL = row prior
+    // to snapshot (computation falls back to active plan, documented terminal state).
     planSnapshotDurationValue: integer('plan_snapshot_duration_value'),
     planSnapshotDurationUnit: text('plan_snapshot_duration_unit'),
 
-    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // centavos
+    amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // cents
     currencyPaid: text('currency_paid').notNull(),
     exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
 
@@ -492,7 +492,7 @@ export const payment = pgTable(
     paymentMethod: text('payment_method').notNull(),
     paymentMethodDetails: jsonb('payment_method_details'),
 
-    // Invoice Breakdown (Optional, centavos)
+    // Invoice Breakdown (Optional, cents)
     subtotal: bigint('subtotal', { mode: 'number' }),
     taxTotal: bigint('tax_total', { mode: 'number' }),
     taxDetails: jsonb('tax_details'),
@@ -500,59 +500,59 @@ export const payment = pgTable(
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 
-    // Correlative receipt (Fase 1). NULL = anterior al sistema (pre_system).
+    // Correlative receipt (Phase 1). NULL = prior to system (pre_system).
     receiptNumber: text('receipt_number'),
     documentType: text('document_type').notNull().default('receipt'),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
-    // PDF con el sello ANULADO (C6+). El original deja de servirse en cuanto
-    // `receipt_voided` es true: un comprobante anulado solo se descarga con
-    // su sello. NULL = anulación aún sin render (descarga `pending`).
+    // PDF with VOIDED stamp (C6+). The original is no longer served once
+    // `receipt_voided` is true: a voided receipt is only downloaded with
+    // its stamp. NULL = voided without rendering yet (download `pending`).
     receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
-    // Marca de notificación por email: gate anti-pérdida (reintentos).
+    // Email notification flag: loss-prevention gate (retries).
     receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
     taxOverrideReason: text('tax_override_reason'),
     receiptVoided: boolean('receipt_voided').notNull().default(false),
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
-    // Identidad del emisor CONGELADA al emitir (C1). NULL = emisión anterior
-    // al snapshot: se compone en vivo (estado terminal, nunca se reescribe).
+    // Issuer identity FROZEN upon issue (C1). NULL = issue prior
+    // to snapshot: composed live (terminal state, never rewritten).
     emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
-    // Actor que emitió (C5). NULL = emisión histórica o reconstruida por el
-    // barrido (nunca se inventa un actor).
+    // Issuing actor (C5). NULL = historical issue or reconstructed by
+    // sweep (actor is never fabricated).
     issuedBy: text('issued_by'),
   },
   (table) => [
     index('idx_payment_subscription_id').on(table.subscriptionId),
     index('idx_payment_payment_date').on(table.paymentDate),
     index('idx_payment_org_status').on(table.organizationId, table.status),
-    // Correlativo único por org (los NULL no entran al índice parcial).
+    // Unique correlative per org (NULLs do not enter the partial index).
     uniqueIndex('idx_payment_org_receipt_number')
       .on(table.organizationId, table.receiptNumber)
       .where(sql`${table.receiptNumber} IS NOT NULL`),
-    // Reporte de huecos (Fase 5): rango por fecha de emisión.
+    // Gap report (Phase 5): range by issue date.
     index('idx_payment_org_issued_at')
       .on(table.organizationId, table.receiptIssuedAt),
-    // Barrido de PDFs pendientes (Fase 2): numerados sin PDF.
+    // Sweep of pending PDFs (Phase 2): numbered without PDF.
     index('idx_payment_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
-    // Barrido de PDFs anulados pendientes: anulados sin el PDF con sello.
+    // Sweep of pending voided PDFs: voided without stamped PDF.
     index('idx_payment_voided_pending')
       .on(table.voidedAt)
       .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
   ]
 );
 
-// ── RECEIPT SEQUENCES (Fase 1) ──
+// ── RECEIPT SEQUENCES (Phase 1) ──
 
 /**
- * Correlativo por organización / tipo de documento / año (reinicio anual
- * por emisor). Cada fila es el contador de una combinación (org, tipo, año);
- * `nextDocumentNumber` lo incrementa con una sola sentencia atómica
- * (INSERT ... ON CONFLICT DO UPDATE), sin transacciones interactivas.
- * El año es el año LOCAL del emisor (lo resuelve el caller, nunca el repo).
+ * Correlative per organization / document type / year (annual reset
+ * per issuer). Each row is the counter of a combination (org, type, year);
+ * `nextDocumentNumber` increments it with a single atomic statement
+ * (INSERT ... ON CONFLICT DO UPDATE), without interactive transactions.
+ * Year is the LOCAL year of the issuer (resolved by caller, never the repo).
  */
 export const organizationDocumentSequence = pgTable(
   'organization_document_sequence',
@@ -560,7 +560,7 @@ export const organizationDocumentSequence = pgTable(
     organizationId: text('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
-    // 'receipt' | 'invoice' (valida Zod; hoy solo 'receipt' efectivo). Sin pgEnum.
+    // 'receipt' | 'invoice' (validated by Zod; currently only 'receipt' effective). No pgEnum.
     documentType: text('document_type').notNull(),
     year: integer('year').notNull(),
     lastNumber: integer('last_number').notNull().default(0),

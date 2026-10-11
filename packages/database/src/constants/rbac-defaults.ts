@@ -1,8 +1,8 @@
 /**
- * 🔐 Definiciones Globales de RBAC (Roles & Permissions)
+ * 🔐 Global RBAC Definitions (Roles & Permissions)
  * 
- * Este archivo es la fuente de verdad para los permisos y roles básicos del sistema.
- * Se utiliza tanto en el script de 'seed' de la base de datos como en los servicios de la API.
+ * This file is the source of truth for basic system permissions and roles.
+ * It is used both in the database seed script and API services.
  */
 
 export const DEFAULT_PERMISSIONS = [

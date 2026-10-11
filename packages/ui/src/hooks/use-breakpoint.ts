@@ -7,7 +7,7 @@ export type DeviceType = "mobile" | "tablet" | "desktop";
 export function useBreakpoint() {
   const { width } = useWindowSize();
 
-  // Breakpoints estándar (pueden ajustarse según el diseño)
+  // Standard breakpoints (can be adjusted according to design system)
   const isMobile = width !== undefined && width < 768;
   const isTablet = width !== undefined && width >= 768 && width < 1024;
   const isDesktop = width !== undefined && width >= 1024;

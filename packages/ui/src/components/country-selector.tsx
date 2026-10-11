@@ -25,7 +25,7 @@ interface CountrySelectorProps {
   readonly error?: string;
   readonly placeholder?: string;
   readonly required?: boolean;
-  /** Read-only: el trigger no abre el listado (p. ej. país inmutable). */
+  /** Read-only: trigger does not open the dropdown (e.g. immutable country). */
   readonly disabled?: boolean;
 }
 

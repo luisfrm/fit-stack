@@ -8,17 +8,17 @@ import { Input } from "./input";
 import { Text } from "./text";
 
 interface ActiveCurrenciesFieldProps {
-  /** Universo elegible (p. ej. `COUNTRY_INDEX.currencies`). */
+  /** Eligible universe (e.g. `COUNTRY_INDEX.currencies`). */
   readonly currencies: readonly string[];
-  /** Monedas activas seleccionadas. */
+  /** Selected active currencies. */
   readonly value: string[];
   readonly onChange: (next: string[]) => void;
-  /** Monedas que no se pueden quitar (p. ej. la principal derivada). */
+  /** Currencies that cannot be removed (e.g. the derived primary currency). */
   readonly locked?: readonly string[];
   readonly label?: string;
   readonly hint?: string;
   readonly disabled?: boolean;
-  /** Se invoca al intentar quitar una moneda bloqueada (p. ej. para un toast). */
+  /** Invoked when attempting to remove a locked currency (e.g. for a toast). */
   readonly onLockedAttempt?: (code: string) => void;
 }
 

@@ -115,7 +115,7 @@ export function PlanCard({
         </div>
       </div>
 
-      {/* Módulo de Features (Lista de Checks) */}
+      {/* Features Module (Checklist) */}
       <div className="flex flex-col gap-3 mb-8 flex-1">
         {plan.features?.map((feature) => (
           <div key={`${plan.id}-${feature}`} className="flex items-center gap-3">
@@ -127,7 +127,7 @@ export function PlanCard({
         ))}
       </div>
 
-      {/* Indicador de Miembros Activos (Opcional) */}
+      {/* Active Members Indicator (Optional) */}
       {showMembersCount && (
         <div className={cn(
           "flex items-center justify-between px-4 py-3 rounded-xl mb-6 border border-white/5",
@@ -142,7 +142,7 @@ export function PlanCard({
         </div>
       )}
 
-      {/* Botonera Inferior (Inyectada desde el exterior) */}
+      {/* Bottom Footer / Action Buttons (Injected from outside) */}
       {footer && (
         <div className="flex items-center gap-2 mt-auto">
           {footer}

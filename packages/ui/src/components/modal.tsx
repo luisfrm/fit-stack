@@ -75,7 +75,7 @@ const ResponsiveModalClose = DialogPrimitive.Close;
 	 Content — swaps between bottom sheet (mobile)
 	 and centered modal (desktop)
 ───────────────────────────────────────────── */
-const CLOSE_THRESHOLD = 120; // px de arrastre para cerrar (mobile)
+const CLOSE_THRESHOLD = 120; // px of drag distance to close (mobile)
 
 interface ResponsiveModalContentProps {
   /** Icon shown at the left of the header */
@@ -159,9 +159,9 @@ function ResponsiveModalContent({
         <DialogPrimitive.Content
           style={{
             transform: dragDelta > 0 ? `translateY(${dragDelta}px)` : undefined,
-            // Snap-back suave al soltar sin llegar al umbral. Los keyframes
-            // de open/close animan `translate`/`opacity`, no `transform`,
-            // así que esta transición no interfiere con ellos.
+            // Smooth snap-back when released below the threshold. Open/close
+            // keyframes animate `translate`/`opacity`, not `transform`,
+            // so this transition does not interfere with them.
             transition: isDragging ? "none" : "transform 0.2s ease-out",
             opacity: dragDelta > 0 ? 1 - dragDelta / 300 : undefined,
           }}
@@ -175,7 +175,7 @@ function ResponsiveModalContent({
             "shadow-[0_-8px_40px_rgba(0,0,0,0.35)]",
             // Max height
             "max-h-[90dvh]",
-            // Radix data-state animations (custom keyframes en globals.css)
+            // Radix data-state animations (custom keyframes in globals.css)
             "data-[state=open]:animate-sheet-in data-[state=closed]:animate-sheet-out",
             className
           )}
@@ -241,8 +241,8 @@ function ResponsiveModalContent({
           "rounded-2xl bg-popover text-popover-foreground",
           "shadow-2xl ring-1 ring-foreground/10",
           "flex flex-col max-h-[90dvh]",
-          // Animations — keyframes custom que animan `translate`/`scale`
-          // (sin chocar con el centrado `-translate-x-1/2 -translate-y-1/2`)
+          // Animations — custom keyframes that animate `translate`/`scale`
+          // (without colliding with centering `-translate-x-1/2 -translate-y-1/2`)
           "data-[state=open]:animate-modal-in data-[state=closed]:animate-modal-out",
           className
         )}
