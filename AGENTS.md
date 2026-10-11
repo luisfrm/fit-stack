@@ -54,22 +54,6 @@ cd apps/api         # [DEPRECATED] Next.js legacy API — port 3003 (⏸ paused,
 - **Lifecycle**: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done` (plus `Canceled`, `Duplicate`). A rejected PR sends the **same** issue back to `In Progress` with a new PR — never a duplicate.
 - **Labels**: `Feature`, `Bug`, `Improvement` → branch prefix `feat`/`fix`/`chore` (`refactor` if structural, `docs` if docs-only); no `Backlog` label.
 - **Branch** `<type>/RD-<number>-<kebab-brief-summary>` (≤ 60 chars after prefix); **commit** `<type>: RD-<number> <brief-description>` — the **id goes right after the type**, in every commit, never at the end; a sub-issue uses **its own** id. Both derive from the label and id; `coder-expert` proposes them. **Never auto-commit.**
-- **Description template** (English): `## Context` · `## Scope` (In/Out) · `## Acceptance criteria` (verifiable checklist) · `## Notes` (optional). The issue defines **what and why**; **how** is decided by `coder-expert`. **No** implementation plan, **no** verification commands, **no** `## Git`.
-- **Language**: Linear content is **English**; the chat response is **Spanish**. `/task "<req>"` captures an issue, `/plan "<req|RD-NNN>"` plans one — both delegate to `planner`. **Unowned work** stays in `vaults/backlog/`.
-
-## Delegation
-
-Use the `subagent` tool with the exact agent id:
-
-| id | Use it for |
-|---|---|
-| `planner` | Capture, plan, read or update anything in Linear. Never write issues yourself. |
-| `coder-expert` | Implement or fix code once a Linear issue exists. Pass its id (`RD-NN`). |
-| `reviewer` | Read-only review of the working tree against the issue and AGENTS.md. |
-| `docs-writer` | Update `AGENTS.md` and `vaults/` after structural changes. |
-| `explore` | Read-only exploration of the codebase. |
-
-Flow: requirement → `planner` → user approves the issue → `coder-expert` → `reviewer` → `docs-writer` when structural.
 
 ## Project Context (Business Overview)
 
