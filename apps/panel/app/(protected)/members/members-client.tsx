@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Button, toast } from "@workspace/ui/components";
+import { Button, ConfirmationModal, toast } from "@workspace/ui/components";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type IMember, type IMemberStats } from "@workspace/shared/types";
@@ -75,6 +75,7 @@ export function MembersClient({
       : "all",
   );
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
+  const [memberToDelete, setMemberToDelete] = React.useState<IMember | undefined>(undefined);
 
   const refresh = React.useCallback(async () => {
     if (onRefreshServer) {
@@ -100,7 +101,13 @@ export function MembersClient({
     router.push(buildParams(searchTerm, nextActive, nextSub, 1));
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
+    setMemberToDelete(members.find((m) => m.id === id));
+  };
+
+  const confirmDelete = async () => {
+    const id = memberToDelete?.id;
+    if (!id) return;
     setDeletingId(id);
     try {
       await membersService.deleteMember(id);
@@ -251,6 +258,19 @@ export function MembersClient({
       {deletingId !== null && (
         <span className="sr-only">Eliminando cliente {deletingId}</span>
       )}
+
+      <ConfirmationModal
+        open={memberToDelete !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setMemberToDelete(undefined);
+        }}
+        title="¿Eliminar cliente?"
+        description="Se ocultará al cliente de los listados y se revocará su acceso al portal. Su historial de pagos y suscripciones se conservará."
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -138,6 +138,21 @@ describe.skipIf(skipReason !== null)('Members stats API', () => {
       expect(res.body.withPortal).toBe(1);
     });
 
+    it('excludes soft-deleted members from KPIs', async () => {
+      const tenant = await createGymTenant('stats-softdel');
+      await createGymMember(tenant.owner.client, { firstName: 'Keep' });
+      const gone = await createGymMember(tenant.owner.client, { firstName: 'Gone' });
+
+      const del = await tenant.owner.client.delete(`/api/members/${gone.id}`);
+      expect(del.status, del.text).toBe(200);
+
+      const res = await tenant.owner.client.get('/api/members/stats');
+
+      expect(res.status, res.text).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.active).toBe(1);
+    });
+
     it('rejects unauthenticated requests', async () => {
       const client = createClient();
       const res = await client.get('/api/members/stats', { anonymous: true });

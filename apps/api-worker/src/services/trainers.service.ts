@@ -31,6 +31,12 @@ export function createTrainersService(trainersRepo: TrainersRepository) {
       if (!trainer) {
         throw new Error('Entrenador no encontrado');
       }
+      // Revoke access first (fail-closed): a soft-deleted trainer must not keep
+      // a live org membership. Mirrors the members soft-delete flow.
+      const userId = trainer.user?.id;
+      if (userId) {
+        await trainersRepo.deleteAuthMember(userId, organizationId);
+      }
       await trainersRepo.delete(organizationId, id);
     },
   };

@@ -47,7 +47,10 @@ export function createMembersRepository(db: Db) {
       const { organizationId, query, role, excludeRole, isActive, hasActiveSubscription, page = 1, limit = 10 } = filters;
       const offset = (page - 1) * limit;
 
-      const conditions = [eq(gymMember.organizationId, organizationId)];
+      const conditions = [
+        eq(gymMember.organizationId, organizationId),
+        isNull(gymMember.deletedAt),
+      ];
 
       if (query) {
         conditions.push(
@@ -176,7 +179,16 @@ export function createMembersRepository(db: Db) {
       };
     },
 
-    async findById(organizationId: string, id: number): Promise<MemberWithRelations | undefined> {
+    async findById(
+      organizationId: string,
+      id: number,
+      options: { includeDeleted?: boolean } = {}
+    ): Promise<MemberWithRelations | undefined> {
+      const conditions = [eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)];
+      if (!options.includeDeleted) {
+        conditions.push(isNull(gymMember.deletedAt));
+      }
+
       const result = await db
         .select({
           member: gymMember,
@@ -195,7 +207,7 @@ export function createMembersRepository(db: Db) {
           )
         )
         .leftJoin(user, eq(user.id, gymMember.userId))
-        .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)))
+        .where(and(...conditions))
         .limit(1);
 
       if (result.length === 0 || !result[0]) return undefined;
@@ -234,8 +246,24 @@ export function createMembersRepository(db: Db) {
       return updatedMember;
     },
 
-    async delete(organizationId: string, id: number) {
-      await db.delete(gymMember).where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
+    /**
+     * Soft delete: a single UPDATE statement (no interactive transactions).
+     * `RETURNING` lets the service confirm the row was actually flagged.
+     * Idempotent: a second call matches no row (`deleted_at IS NULL` guard).
+     */
+    async softDelete(organizationId: string, id: number) {
+      const [updated] = await db
+        .update(gymMember)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(gymMember.id, id),
+            eq(gymMember.organizationId, organizationId),
+            isNull(gymMember.deletedAt)
+          )
+        )
+        .returning();
+      return updated;
     },
 
     async deleteAuthMember(userId: string, organizationId: string) {
@@ -257,6 +285,7 @@ export function createMembersRepository(db: Db) {
           and(
             eq(gymMember.organizationId, organizationId),
             eq(gymMember.isActive, true),
+            isNull(gymMember.deletedAt),
             sql`${subscription.cancelledAt} IS NULL`,
             gte(subscription.endDate, now),
             eq(payment.status, 'validated')
@@ -281,7 +310,8 @@ export function createMembersRepository(db: Db) {
     async getMemberStats(organizationId: string, dateManager: OrganizationDateManager, now: Date = new Date()) {
       const memberScope = and(
         eq(gymMember.organizationId, organizationId),
-        eq(gymMember.role, 'member')
+        eq(gymMember.role, 'member'),
+        isNull(gymMember.deletedAt)
       );
 
       const [counts] = await db
@@ -315,6 +345,7 @@ export function createMembersRepository(db: Db) {
           and(
             eq(gymMember.organizationId, organizationId),
             eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt),
             isNull(activeSubs.memberId)
           )
         );
@@ -327,7 +358,8 @@ export function createMembersRepository(db: Db) {
             eq(gymMember.organizationId, organizationId),
             sql`${gymMember.userId} IS NOT NULL`,
             eq(gymMember.isActive, true),
-            eq(gymMember.role, 'member')
+            eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt)
           )
         );
 
@@ -365,6 +397,7 @@ export function createMembersRepository(db: Db) {
           and(
             eq(gymMember.organizationId, organizationId),
             eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt),
             gte(gymMember.createdAt, windowStart)
           )
         )
@@ -393,6 +426,7 @@ export function createMembersRepository(db: Db) {
           and(
             eq(gymMember.organizationId, organizationId),
             eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt),
             isNotNull(gymMember.birthday)
           )
         )

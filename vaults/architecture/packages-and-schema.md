@@ -102,8 +102,10 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 ### Gym Domain
 
-`gym_member` (local profiles, linked to user via userId), `coach_profile` (1:1 extension),
+`gym_member` (local profiles, linked to user via userId; **soft delete via `deleted_at` timestamp nullable** — a non-null value hides the member from active views while preserving financial history; `is_active` keeps its independent business "Activo/Inactivo" semantics), `coach_profile` (1:1 extension),
 `coach_assignment` (coach ↔ client)
+
+> **Referential safety (migration `0020`):** every FK pointing at `gym_member` — `coach_profile.member_id`, `subscription.member_id`, `payment.member_id`, `biometric_sync_task.member_id`, `workout_session.member_id`, `coach_assignment.coach_member_id`, `coach_assignment.client_member_id` — is `ON DELETE RESTRICT`: a direct hard delete of a member with related data is rejected by the database. `access_control_log.member_id` stays `SET NULL` (legacy). Deleting a member is a soft delete (never a hard delete): `DELETE /api/members/:id` revokes `auth_member` access first, then sets `deleted_at`, and returns `404` when the member does not exist (idempotent on an already-deleted member).
 
 ### Memberships & Payments
 

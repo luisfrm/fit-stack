@@ -164,6 +164,8 @@ export interface IMember {
   documentId?: string;
   address?: string | null;
   isActive: boolean;
+  /** Soft-delete marker. Non-null means removed from active views (history preserved). */
+  deletedAt?: Date | null;
   latestSubscription?: (ISubscription & { planName?: string }) | null;
 }
 

@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, asc, type SQL, type Db } from '@workspace/database/factory';
+import { eq, ilike, and, or, count, asc, isNull, type SQL, type Db } from '@workspace/database/factory';
 import { gymMember, coachProfile, authMember, user } from '@workspace/database/schema';
 import { ORG_ROLES } from '@workspace/shared';
 import type { TrainersFilter as ITrainersFilter, CreateTrainerDTO as ICreateTrainerDTO, UpdateTrainerDTO as IUpdateTrainerDTO } from '@workspace/shared/types';
@@ -13,6 +13,7 @@ export function createTrainersRepository(db: Db) {
       const conditions: SQL[] = [
         eq(gymMember.organizationId, organizationId),
         eq(authMember.role, ORG_ROLES.COACH),
+        isNull(gymMember.deletedAt),
       ];
 
       if (name) {
@@ -113,7 +114,7 @@ export function createTrainersRepository(db: Db) {
         .leftJoin(coachProfile, eq(gymMember.id, coachProfile.memberId))
         .leftJoin(user, eq(gymMember.userId, user.id))
         .innerJoin(authMember, eq(user.id, authMember.userId))
-        .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId), eq(authMember.role, ORG_ROLES.COACH)));
+        .where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId), eq(authMember.role, ORG_ROLES.COACH), isNull(gymMember.deletedAt)));
 
       return result;
     },
@@ -209,8 +210,28 @@ export function createTrainersRepository(db: Db) {
       return this.findById(organizationId, id);
     },
 
+    /**
+     * Soft delete (single UPDATE, no interactive transactions). Trainers are
+     * gym_member rows: hard delete is forbidden (financial/session history).
+     */
     async delete(organizationId: string, id: number) {
-      await db.delete(gymMember).where(and(eq(gymMember.id, id), eq(gymMember.organizationId, organizationId)));
+      await db
+        .update(gymMember)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(gymMember.id, id),
+            eq(gymMember.organizationId, organizationId),
+            isNull(gymMember.deletedAt)
+          )
+        );
+    },
+
+    /** Revokes the coach's org membership so a soft-deleted trainer loses access. */
+    async deleteAuthMember(userId: string, organizationId: string) {
+      await db
+        .delete(authMember)
+        .where(and(eq(authMember.userId, userId), eq(authMember.organizationId, organizationId)));
     },
   };
 }

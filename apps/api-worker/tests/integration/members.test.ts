@@ -6,16 +6,42 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
-import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
+import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
 import {
   createGymTenant,
   addUserToOrganization,
   createGymMember,
+  createPlan,
+  isoDate,
   uniqueEmail,
   uid,
   type GymTenant,
 } from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
+
+async function createSubscription(
+  tenant: GymTenant,
+  memberId: number,
+  planId: number,
+  endOffsetDays = 30,
+) {
+  const res = await tenant.owner.client.post('/api/subscriptions', {
+    memberId,
+    planId,
+    startDate: isoDate(0),
+    endDate: isoDate(endOffsetDays),
+    payment: {
+      amountPaid: 100,
+      currencyPaid: 'USD',
+      paymentMethod: 'cash',
+      paymentMethodDetails: [],
+      status: 'validated',
+      paymentDate: isoDate(0),
+    },
+  });
+  if (res.status !== 201) throw new Error(`create subscription failed: ${res.text}`);
+  return res.body;
+}
 
 describe.skipIf(skipReason !== null)('Members API', () => {
   beforeAll(async () => {
@@ -161,16 +187,113 @@ describe.skipIf(skipReason !== null)('Members API', () => {
   });
 
   describe('DELETE /api/members/:id', () => {
-    it('deletes a member as owner', async () => {
-      const { owner } = await createGymTenant();
-      const member = await createGymMember(owner.client);
+    it('soft-deletes a member: row persists, hidden from GET and listing', async () => {
+      const { owner } = await createGymTenant('del-soft');
+      const member = await createGymMember(owner.client, { firstName: 'SoftDel' });
 
       const del = await owner.client.delete(`/api/members/${member.id}`);
       expect(del.status, del.text).toBe(200);
+      expect(del.body).toEqual({ success: true });
 
-      // Verify gone — GET /:id returns 404 for deleted member
+      // GET /:id returns 404 for a soft-deleted member.
       const get = await owner.client.get(`/api/members/${member.id}`);
       expect(get.status, get.text).toBe(404);
+
+      // The row still exists; only `deleted_at` is set.
+      const rows = await testQuery<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM gym_member WHERE id = $1`,
+        [member.id],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.deleted_at).not.toBeNull();
+
+      // Absent from the listing.
+      const list = await owner.client.get('/api/members', { query: { limit: '50' } });
+      expect(list.status, list.text).toBe(200);
+      expect(list.body.data.map((m: { id: number }) => m.id)).not.toContain(member.id);
+    });
+
+    it('is idempotent: re-deleting an already-deleted member returns 200', async () => {
+      const { owner } = await createGymTenant('del-idem');
+      const member = await createGymMember(owner.client, { firstName: 'Idem' });
+
+      const first = await owner.client.delete(`/api/members/${member.id}`);
+      expect(first.status, first.text).toBe(200);
+      const second = await owner.client.delete(`/api/members/${member.id}`);
+      expect(second.status, second.text).toBe(200);
+      expect(second.body).toEqual({ success: true });
+    });
+
+    it('returns 404 when the member does not exist', async () => {
+      const { owner } = await createGymTenant('del-missing');
+      const res = await owner.client.delete('/api/members/999999999');
+      expect(res.status, res.text).toBe(404);
+    });
+
+    it('preserves payments and subscriptions, revokes auth access', async () => {
+      const tenant = await createGymTenant('del-history');
+      const plan = await createPlan(tenant.owner.client, { name: 'Plan SoftDelete' });
+      const member = await createGymMember(tenant.owner.client, { firstName: 'ConHistorial' });
+      await createSubscription(tenant, member.id, plan.id, 30);
+
+      // Simulate a linked account so `auth_member` exists to be revoked.
+      const linked = await addUserToOrganization(
+        tenant.organization.id,
+        ORG_ROLES.MEMBER,
+        'del-history-linked',
+      );
+      await testQuery(`UPDATE "gym_member" SET "user_id" = $1 WHERE "id" = $2`, [
+        linked.userId,
+        member.id,
+      ]);
+      const before = await testQuery<{ id: string }>(
+        `SELECT id FROM "member" WHERE organization_id = $1 AND user_id = $2`,
+        [tenant.organization.id, linked.userId],
+      );
+      expect(before).toHaveLength(1);
+
+      const del = await tenant.owner.client.delete(`/api/members/${member.id}`);
+      expect(del.status, del.text).toBe(200);
+
+      // Financial history is intact.
+      const subs = await testQuery(`SELECT id FROM subscription WHERE member_id = $1`, [member.id]);
+      const pays = await testQuery(`SELECT id FROM payment WHERE member_id = $1`, [member.id]);
+      expect(subs).toHaveLength(1);
+      expect(pays).toHaveLength(1);
+
+      // Portal access revoked (per-member auth membership removed).
+      const after = await testQuery<{ id: string }>(
+        `SELECT id FROM "member" WHERE organization_id = $1 AND user_id = $2`,
+        [tenant.organization.id, linked.userId],
+      );
+      expect(after).toHaveLength(0);
+
+      // Still hidden from the listing.
+      const list = await tenant.owner.client.get('/api/members', { query: { limit: '50' } });
+      expect(list.body.data.map((m: { id: number }) => m.id)).not.toContain(member.id);
+    });
+
+    it('keeps an inactive (not deleted) member visible with its badge state', async () => {
+      const { owner } = await createGymTenant('del-inactive');
+      const member = await createGymMember(owner.client, { firstName: 'Inactivo', isActive: false });
+
+      const get = await owner.client.get(`/api/members/${member.id}`);
+      expect(get.status, get.text).toBe(200);
+      expect(get.body.isActive).toBe(false);
+
+      const list = await owner.client.get('/api/members', { query: { limit: '50' } });
+      expect(list.body.data.map((m: { id: number }) => m.id)).toContain(member.id);
+    });
+
+    it('database rejects a direct hard delete of a member with history (restrict)', async () => {
+      const tenant = await createGymTenant('del-restrict');
+      const plan = await createPlan(tenant.owner.client, { name: 'Plan Restrict' });
+      const member = await createGymMember(tenant.owner.client, { firstName: 'ConFK' });
+      await createSubscription(tenant, member.id, plan.id, 30);
+
+      await expect(
+        testQuery(`DELETE FROM gym_member WHERE id = $1`, [member.id]),
+      ).rejects.toThrow();
     });
 
     it('rejects delete by member without MEMBERS.DELETE', async () => {

@@ -1,4 +1,4 @@
-import { eq, and, sql, type Db } from '@workspace/database/factory';
+import { eq, and, sql, isNull, type Db } from '@workspace/database/factory';
 import { gymMember, invitation, aiUsage, subscription, payment } from '@workspace/database/schema';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
@@ -212,7 +212,8 @@ export function createFeaturesRepository(db: Db) {
             eq(gymMember.organizationId, orgId),
             sql`${gymMember.userId} IS NOT NULL`,
             eq(gymMember.isActive, true),
-            eq(gymMember.role, 'member')
+            eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt)
           )
         );
       return row?.count ?? 0;
@@ -231,7 +232,11 @@ export function createFeaturesRepository(db: Db) {
         .select({ totalMembers: sql<number>`count(*)::int` })
         .from(gymMember)
         .where(
-          and(eq(gymMember.organizationId, orgId), eq(gymMember.role, 'member')),
+          and(
+            eq(gymMember.organizationId, orgId),
+            eq(gymMember.role, 'member'),
+            isNull(gymMember.deletedAt)
+          ),
         );
 
       const [active] = await db
