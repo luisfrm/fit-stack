@@ -2,7 +2,7 @@
 description: Crea una nueva tarea en Linear.
 agent: build
 subagent: planner
-model: opencode-go/longcat-2.5-preview-free
+model: opencode/nemotron-3-ultra-free
 ---
 
 Crea una nueva tarea en Linear en el proyecto de FitStack.
