@@ -6,6 +6,7 @@ export default defineConfig({
     globals: false,
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    globalSetup: ['./tests/global-setup.ts'],
 
     // Integration tests share a single Neon branch, so they must never run
     // concurrently: parallel suites would truncate each other's fixtures.
