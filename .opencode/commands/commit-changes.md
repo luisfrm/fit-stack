@@ -1,5 +1,6 @@
 ---
 description: Commit current changes in semantic units
+model: opencode/nemotron-3-ultra-free
 ---
 
 Commitea todos los cambios realizados en el proyecto en commits semanticós.

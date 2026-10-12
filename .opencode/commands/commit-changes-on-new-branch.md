@@ -1,5 +1,6 @@
 ---
 description: Commit current changes in semantic units in a new branch
+model: opencode/nemotron-3-ultra-free
 ---
 
 Commitea todos los cambios realizados en el proyecto en commits semanticós en una nueva rama con un nombre acorde a su tarea o al feature trabajado.

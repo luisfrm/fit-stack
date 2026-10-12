@@ -1,6 +1,7 @@
 ---
 description: "Mantiene AGENTS.md y los docs de vaults/ al día tras cambios estructurales (endpoints, RBAC, claves de caché, colas, patrones, flujo). Solo edita AGENTS.md y vaults/**; nunca código. También reestructura o adelgaza AGENTS.md."
 mode: subagent
+model: opencode/nemotron-3-ultra-free
 steps: 30
 permissions:
   - {action: edit, resource: "*", effect: deny}

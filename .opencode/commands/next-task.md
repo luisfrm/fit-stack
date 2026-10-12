@@ -1,7 +1,7 @@
 ---
 description: Investiga cual es la siguiente tarea a trabajar en Linear.
 agent: build
-model: opencode/nemotron-3-ultra-free
+model: opencode-go/deepseek-v4.1-flash
 ---
 
 Investiga las próximas tareas a trabajar en Linear.

@@ -2,7 +2,7 @@
 description: Crea una nueva tarea en Linear.
 agent: build
 subagent: planner
-model: opencode/nemotron-3-ultra-free
+model: opencode-go/deepseek-v4.1-flash
 ---
 
 Crea una nueva tarea en Linear en el proyecto de FitStack.
