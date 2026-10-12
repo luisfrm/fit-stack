@@ -60,6 +60,31 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.body.planId).toBe(plan.id);
     });
 
+    it('rejects creating a subscription for a deleted plan (400)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const del = await owner.client.delete(`/api/plans/${plan.id}`);
+      expect(del.status, del.text).toBe(200);
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      expect(res.status, res.text).toBe(400);
+      expect(res.body.error).toContain('no existe o fue eliminado');
+    });
+
     it('validated payment numbers the receipt and enqueues render (email waits for step 2)', async () => {
       const { owner, organization, member, plan } = await setupSubscriptionFixture();
       owner.client.queue.reset();

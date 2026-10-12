@@ -203,7 +203,7 @@ export function createSubscriptionsService(
 
       const plan = await plansRepo.findById(organizationId, payload.planId);
       if (!plan) {
-        throw new HTTPException(400, { message: 'El plan seleccionado no existe' });
+        throw new HTTPException(400, { message: 'El plan seleccionado no existe o fue eliminado' });
       }
 
       const latest = await subsRepo.findLatestForMember(organizationId, payload.memberId);

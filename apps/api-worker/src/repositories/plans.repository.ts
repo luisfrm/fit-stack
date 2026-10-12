@@ -1,4 +1,4 @@
-import { eq, sql, getTableColumns, sum, gte, and, type Db } from '@workspace/database/factory';
+import { eq, sql, getTableColumns, sum, gte, and, isNull, type Db } from '@workspace/database/factory';
 import { membershipPlan, subscription, payment } from '@workspace/database/schema';
 import { OrganizationDateManager } from '../lib/date-manager';
 
@@ -15,6 +15,7 @@ export interface IMembershipPlan {
   isPopular: boolean;
   isActive: boolean;
   isVisibleOnSite: boolean;
+  deletedAt?: Date | null;
   createdAt?: string | Date;
   activeMembersCount?: number;
 }
@@ -41,7 +42,7 @@ export function createPlansRepository(db: Db) {
               gte(subscription.endDate, now)
             )
           )
-          .where(eq(membershipPlan.organizationId, organizationId))
+          .where(and(eq(membershipPlan.organizationId, organizationId), isNull(membershipPlan.deletedAt)))
           .groupBy(membershipPlan.id)
           .orderBy(membershipPlan.id);
 
@@ -51,7 +52,7 @@ export function createPlansRepository(db: Db) {
       const records = await db
         .select()
         .from(membershipPlan)
-        .where(eq(membershipPlan.organizationId, organizationId))
+        .where(and(eq(membershipPlan.organizationId, organizationId), isNull(membershipPlan.deletedAt)))
         .orderBy(membershipPlan.id);
       return records as unknown as IMembershipPlan[];
     },
@@ -96,11 +97,19 @@ export function createPlansRepository(db: Db) {
       };
     },
 
-    async findById(organizationId: string, id: number): Promise<IMembershipPlan | undefined> {
+    async findById(
+      organizationId: string,
+      id: number,
+      options: { includeDeleted?: boolean } = {}
+    ): Promise<IMembershipPlan | undefined> {
+      const conditions = [eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)];
+      if (!options.includeDeleted) {
+        conditions.push(isNull(membershipPlan.deletedAt));
+      }
       const records = await db
         .select()
         .from(membershipPlan)
-        .where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)));
+        .where(and(...conditions));
       return records[0] as unknown as IMembershipPlan | undefined;
     },
 
@@ -142,10 +151,24 @@ export function createPlansRepository(db: Db) {
       return updated[0] as unknown as IMembershipPlan;
     },
 
-    async delete(organizationId: string, id: number): Promise<void> {
-      await db
-        .delete(membershipPlan)
-        .where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)));
+    /**
+     * Soft delete: a single UPDATE statement (no interactive transactions).
+     * `RETURNING` lets the service confirm the row was actually flagged.
+     * Idempotent: a second call matches no row (`deleted_at IS NULL` guard).
+     */
+    async softDelete(organizationId: string, id: number) {
+      const [updated] = await db
+        .update(membershipPlan)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(membershipPlan.id, id),
+            eq(membershipPlan.organizationId, organizationId),
+            isNull(membershipPlan.deletedAt)
+          )
+        )
+        .returning();
+      return updated;
     },
   };
 }
