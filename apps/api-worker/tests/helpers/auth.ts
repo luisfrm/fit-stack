@@ -79,9 +79,25 @@ export async function registerPlatformUser(
 ): Promise<AuthedUser> {
   const user = await registerUser({ email: uniqueEmail(`platform-${role}`) });
   await setUserPlatformRole(user.userId, role);
-  // Re-issue the session so the custom session picks up the new platform role.
+  // Re-issue the session with a clean cookie jar so the custom session picks up
+  // the new platform role. Reusing the sign-up cookie could serve a stale,
+  // role-less session, which surfaces downstream as a spurious 401/403.
+  user.client.clearCookies();
   await signIn(user.client, user.email);
+  await assertPlatformRole(user.client, role);
   return user;
+}
+
+/** Fails loudly if a freshly promoted platform user does not carry its role. */
+async function assertPlatformRole(client: TestClient, role: string): Promise<void> {
+  const res = await client.get('/api/auth/get-session');
+  const sessionRole = (res.body as { user?: { role?: string } } | undefined)?.user?.role;
+  if (sessionRole !== role) {
+    throw new Error(
+      `platform role not present on the session after sign-in: expected "${role}", ` +
+        `got "${sessionRole ?? 'undefined'}" (status ${res.status}).`,
+    );
+  }
 }
 
 export interface TestOrganization {
@@ -125,7 +141,16 @@ export async function setActiveOrganization(
 ): Promise<void> {
   const res = await client.post('/api/auth/organization/set-active', { organizationId });
   if (res.status !== 200) {
-    throw new Error(`set-active-organization failed (${res.status}): ${res.text}`);
+    // Diagnose the usual cause — a membership row that vanished (e.g. a
+    // concurrent TRUNCATE) — instead of leaving a bare 401/403 behind.
+    const rows = await testQuery<{ count: string }>(
+      `SELECT count(*)::text AS count FROM "member" WHERE organization_id = $1`,
+      [organizationId],
+    );
+    throw new Error(
+      `set-active-organization failed (${res.status}): ${res.text} ` +
+        `[member rows for this org: ${rows[0]?.count ?? 'unknown'}]`,
+    );
   }
 }
 

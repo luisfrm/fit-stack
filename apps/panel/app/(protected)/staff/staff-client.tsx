@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Button, toast } from "@workspace/ui/components";
+import { Button, ConfirmationModal, toast } from "@workspace/ui/components";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type IMember } from "@workspace/shared/types";
@@ -36,6 +36,7 @@ export function StaffClient({
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
   const debouncedSearch = useDebounce(searchTerm, 500);
   const [deletingId, setDeletingId] = React.useState<number | null>(null);
+  const [staffToDelete, setStaffToDelete] = React.useState<IMember | undefined>(undefined);
 
   const refresh = React.useCallback(async () => {
     if (onRefreshServer) {
@@ -58,7 +59,13 @@ export function StaffClient({
     setTotalPages(initialTotalPages);
   }, [initialStaff, initialPage, initialTotalPages]);
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
+    setStaffToDelete(staff.find((s) => s.id === id));
+  };
+
+  const confirmDelete = async () => {
+    const id = staffToDelete?.id;
+    if (!id) return;
     setDeletingId(id);
     try {
       await membersService.deleteMember(id);
@@ -153,6 +160,19 @@ export function StaffClient({
       )}
 
       <span className="sr-only">Límite {limit}</span>
+
+      <ConfirmationModal
+        open={staffToDelete !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setStaffToDelete(undefined);
+        }}
+        title="¿Eliminar miembro del staff?"
+        description="Se ocultará al miembro del staff de los listados y se revocará su acceso. Su historial se conservará."
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={deletingId !== null}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@
  * clear message instead of silently passing.
  */
 import { neon } from '@neondatabase/serverless';
+import { drainAllPending } from './pending';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
 
@@ -117,6 +118,10 @@ const TABLES_TO_TRUNCATE = [
  */
 export async function truncateAll(): Promise<void> {
   if (!sql) return;
+
+  // Let any fire-and-forget work from the previous file finish before wiping
+  // the database, so it cannot re-insert or touch rows we are about to delete.
+  await drainAllPending();
 
   const quoted = TABLES_TO_TRUNCATE.map((t) => `"${t}"`).join(', ');
   await query(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);

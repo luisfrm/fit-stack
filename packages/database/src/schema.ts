@@ -391,6 +391,12 @@ export const gymMember = pgTable('gym_member', {
   biometricId: text('biometric_id'),
   isBiometricEnrolled: boolean('is_biometric_enrolled').default(false).notNull(),
 
+  // Soft delete marker (nullable, no default). A non-null value means the
+  // member is removed from active views but its financial history
+  // (subscriptions, payments, sessions) is preserved. `isActive` remains the
+  // independent business "Activo/Inactivo" state and is never reused for this.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -405,7 +411,7 @@ export const coachProfile = pgTable('coach_profile', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   memberId: bigint('member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' })
+    .references(() => gymMember.id, { onDelete: 'restrict' })
     .notNull()
     .unique(),
 
@@ -448,7 +454,7 @@ export const subscription = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
     memberId: bigint('member_id', { mode: 'number' })
-      .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+      .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(),
     planId: bigint('plan_id', { mode: 'number' })
       .references(() => membershipPlan.id).notNull(),
     startDate: timestamp('start_date', { withTimezone: true }).notNull(),
@@ -470,7 +476,7 @@ export const payment = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
     memberId: bigint('member_id', { mode: 'number' })
-      .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+      .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(),
     subscriptionId: bigint('subscription_id', { mode: 'number' })
       .references(() => subscription.id),
 
@@ -602,7 +608,7 @@ export const biometricSyncTask = pgTable('biometric_sync_task', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   memberId: bigint('member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' })
+    .references(() => gymMember.id, { onDelete: 'restrict' })
     .notNull(),
 
   type: text('type').default('enroll').notNull(), // 'enroll', 'delete'
@@ -658,7 +664,7 @@ export const workoutSession = pgTable('workout_session', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   memberId: bigint('member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(),
+    .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(),
   routineTemplateId: bigint('routine_template_id', { mode: 'number' })
     .references(() => routineTemplate.id, { onDelete: 'set null' }),
   date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
@@ -685,9 +691,9 @@ export const coachAssignment = pgTable('coach_assignment', {
     .notNull()
     .references(() => organization.id, { onDelete: 'cascade' }),
   coachMemberId: bigint('coach_member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(), // A coach is a staff member
+    .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(), // A coach is a staff member
   clientMemberId: bigint('client_member_id', { mode: 'number' })
-    .references(() => gymMember.id, { onDelete: 'cascade' }).notNull(), // A client is also a gymMember
+    .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(), // A client is also a gymMember
   assignedAt: timestamp('assigned_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -153,14 +153,32 @@ export function createMembersService(
       return membersRepo.update(organizationId, id, sanitizedData);
     },
 
+    /**
+     * Soft delete. A member with financial history must never be hard-deleted
+     * (financial record is immutable); the row is flagged and hidden, history
+     * preserved. No interactive transactions (Neon HTTP): access is revoked
+     * first, then the row is flagged, and the outcome is confirmed by re-read.
+     * Returns `null` when the member does not exist (route maps to 404);
+     * re-deleting an already-deleted member is a no-op success (idempotent).
+     */
     async deleteMember(organizationId: string, id: number) {
-      const member = await membersRepo.findById(organizationId, id);
+      const member = await membersRepo.findById(organizationId, id, { includeDeleted: true });
 
-      if (member?.userId) {
+      if (!member) return null;
+      if (member.deletedAt) return member;
+
+      if (member.userId) {
         await membersRepo.deleteAuthMember(member.userId, organizationId);
       }
 
-      await membersRepo.delete(organizationId, id);
+      await membersRepo.softDelete(organizationId, id);
+
+      // Fail-closed: confirm by re-read, never assume the UPDATE landed.
+      const reRead = await membersRepo.findById(organizationId, id, { includeDeleted: true });
+      if (!reRead?.deletedAt) {
+        throw new Error('No se pudo eliminar el miembro');
+      }
+      return reRead;
     },
 
     async resendInvite(organizationId: string, id: number, ctx?: { auth: Auth; headers: Headers }) {

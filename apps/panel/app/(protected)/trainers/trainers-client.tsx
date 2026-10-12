@@ -269,8 +269,8 @@ export function TrainersClient({
         open={isDeleteModalOpen}
         onOpenChange={setIsDeleteModalOpen}
         title="¿Eliminar entrenador?"
-        description={`Esta acción eliminará permanentemente a ${trainerToDelete?.firstName} y todos sus datos asociados (perfil, suscripciones, pagos y rutinas). Esta acción no se puede deshacer.`}
-        confirmText="Eliminar permanentemente"
+        description={`Se ocultará a ${trainerToDelete?.firstName} de los listados y se revocará su acceso. Su historial (perfil, suscripciones, pagos y rutinas) se conservará.`}
+        confirmText="Eliminar"
         variant="danger"
         onConfirm={confirmDelete}
       />

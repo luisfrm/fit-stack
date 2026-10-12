@@ -1,4 +1,4 @@
-import { eq, ilike, and, or, count, desc, sql, type Db } from '@workspace/database/factory';
+import { eq, ilike, and, or, count, desc, sql, isNull, type Db } from '@workspace/database/factory';
 import {
   organization,
   platformSubscription,
@@ -40,7 +40,7 @@ async function getMemberCounts(
   const [mCount] = await db
     .select({ total: count() })
     .from(gymMember)
-    .where(eq(gymMember.organizationId, organizationId));
+    .where(and(eq(gymMember.organizationId, organizationId), isNull(gymMember.deletedAt)));
   const [uCount] = await db
     .select({ total: count() })
     .from(authMember)

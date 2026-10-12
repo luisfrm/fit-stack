@@ -12,6 +12,7 @@
  */
 import app from '../../src/index';
 import { createTestEnv, type QueueSpy, type R2Spy } from './env';
+import { trackPending } from './pending';
 
 export const BASE_URL = 'http://localhost:8788';
 
@@ -34,6 +35,24 @@ export interface RequestOptions {
   anonymous?: boolean;
 }
 
+/**
+ * Under sustained load the shared Neon branch intermittently fails a session
+ * lookup; Better Auth then reports "no session" and the permission middleware
+ * answers 401 even though the cookie is valid. A 401 is emitted *before* any
+ * route handler runs, so retrying an authenticated request is side-effect-free.
+ *
+ * We retry only this specific case: an authenticated, non-auth-endpoint request
+ * that came back 401. Auth endpoints (a real 401 is expected there) and
+ * anonymous requests are never retried, and no other status is ever retried —
+ * so genuine 401/403 assertions keep their meaning.
+ */
+const MAX_TRANSIENT_RETRIES = 2;
+const TRANSIENT_RETRY_DELAY_MS = 150;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Minimal execution context; `waitUntil` runs work inline so tests can await it. */
 function createExecutionContext() {
   const pending: Promise<unknown>[] = [];
@@ -41,12 +60,21 @@ function createExecutionContext() {
     ctx: {
       waitUntil(promise: Promise<unknown>) {
         pending.push(promise);
+        trackPending(promise);
       },
       passThroughOnException() {},
       props: {},
     },
     async settle() {
-      await Promise.allSettled(pending);
+      // Drain in a loop: settling one batch can register further `waitUntil`
+      // work. The iteration guard keeps a pathological producer from looping
+      // forever (the global `drainAllPending` is the timeout-backed safety net).
+      let guard = 0;
+      while (pending.length > 0 && guard < 100) {
+        guard += 1;
+        const batch = pending.splice(0, pending.length);
+        await Promise.allSettled(batch);
+      }
     },
   };
 }
@@ -111,7 +139,23 @@ export class TestClient {
     }
   }
 
+  private shouldRetryTransient(path: string, options: RequestOptions): boolean {
+    return !options.anonymous && this.cookies.size > 0 && !path.startsWith('/api/auth/');
+  }
+
   async request<T = any>(path: string, options: RequestOptions = {}): Promise<TestResponse<T>> {
+    const maxAttempts = this.shouldRetryTransient(path, options) ? MAX_TRANSIENT_RETRIES + 1 : 1;
+
+    let result: TestResponse<T> | undefined;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      result = await this.dispatch<T>(path, options);
+      if (result.status !== 401 || attempt === maxAttempts - 1) break;
+      await delay(TRANSIENT_RETRY_DELAY_MS * (attempt + 1));
+    }
+    return result as TestResponse<T>;
+  }
+
+  private async dispatch<T>(path: string, options: RequestOptions): Promise<TestResponse<T>> {
     const { method = 'GET', body, headers = {}, query, anonymous = false } = options;
 
     const url = new URL(path, BASE_URL);

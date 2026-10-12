@@ -19,6 +19,8 @@ node_modules
 
 # Testing
 coverage
+# Cross-process lock for the shared Neon test branch (see tests/global-setup.ts)
+apps/api-worker/.vitest-db.lock/
 
 # Playwright
 e2e/.auth/
