@@ -146,7 +146,16 @@ export function createPlansRepository(db: Db) {
           isActive: data.isActive,
           isVisibleOnSite: data.isVisibleOnSite,
         })
-        .where(and(eq(membershipPlan.id, id), eq(membershipPlan.organizationId, organizationId)))
+        .where(
+          and(
+            eq(membershipPlan.id, id),
+            eq(membershipPlan.organizationId, organizationId),
+            // A soft-deleted plan is immutable (RD-142): the row is kept as
+            // history only, so it can never be edited nor resurrected. The
+            // route already 404s it via `findById`, this is defence in depth.
+            isNull(membershipPlan.deletedAt)
+          )
+        )
         .returning();
       return updated[0] as unknown as IMembershipPlan;
     },
