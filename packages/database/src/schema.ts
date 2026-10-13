@@ -429,31 +429,38 @@ export const coachProfile = pgTable('coach_profile', {
 
 // ── GYM MANAGEMENT: MEMBERSHIPS & PAYMENTS ──
 
-export const membershipPlan = pgTable('membership_plan', {
-  id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  price: bigint('price', { mode: 'number' }).notNull(), // cents
-  currency: text('currency').default('USD').notNull(),
-  durationValue: integer('duration_value').default(1).notNull(),
-  durationUnit: text('duration_unit').default('month').notNull(),
-  features: jsonb('features'),
-  isPopular: boolean('is_popular').default(false).notNull(),
-  isActive: boolean('is_active').default(true).notNull(),
-  isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
+export const membershipPlan = pgTable(
+  'membership_plan',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    price: bigint('price', { mode: 'number' }).notNull(), // cents
+    currency: text('currency').default('USD').notNull(),
+    durationValue: integer('duration_value').default(1).notNull(),
+    durationUnit: text('duration_unit').default('month').notNull(),
+    features: jsonb('features'),
+    isPopular: boolean('is_popular').default(false).notNull(),
+    isActive: boolean('is_active').default(true).notNull(),
+    isVisibleOnSite: boolean('is_visible_on_site').default(true).notNull(),
 
-  // Soft delete marker (nullable, no default). A non-null value means the
-  // plan is removed from active views (panel listings, plan picker) and can
-  // no longer be sold, but subscription/payment history is preserved:
-  // historical JOINs still resolve planName. `isActive` remains the
-  // independent draft/published catalog state and `isVisibleOnSite` the
-  // public web visibility; neither is reused for deletion.
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    // Soft delete marker (nullable, no default). A non-null value means the
+    // plan is removed from active views (panel listings, plan picker) and can
+    // no longer be sold, but subscription/payment history is preserved:
+    // historical JOINs still resolve planName. `isActive` remains the
+    // independent draft/published catalog state and `isVisibleOnSite` the
+    // public web visibility; neither is reused for deletion.
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
 
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // Hot listing query: org-scoped, excluding soft-deleted plans (RD-142).
+    index('idx_membership_plan_org_deleted').on(table.organizationId, table.deletedAt),
+  ]
+);
 
 export const subscription = pgTable(
   'subscription',
@@ -474,6 +481,9 @@ export const subscription = pgTable(
   },
   (table) => [
     index('idx_subscription_org_member').on(table.organizationId, table.memberId),
+    // `includeStats` aggregate (plans listing) joins by plan + active period,
+    // and the `restrict` FK check on a plan hard delete arrives by `plan_id`.
+    index('idx_subscription_plan_end').on(table.planId, table.endDate),
   ]
 );
 
