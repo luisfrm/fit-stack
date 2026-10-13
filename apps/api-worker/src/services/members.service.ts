@@ -3,7 +3,7 @@ import type { UsersRepository } from '../repositories/users.repository';
 import type { TokenService } from './token.service';
 import type { Auth } from '../lib/env';
 import { OrganizationDateManager } from '../lib/date-manager';
-import { DEFAULT_MEMBER_VALUES } from '@workspace/shared';
+import { buildRegistrationInviteEvent, DEFAULT_MEMBER_VALUES } from '@workspace/shared';
 
 const sanitizeMemberData = <T extends Record<string, any>>(data: T): T => {
   const sanitized = { ...data };
@@ -53,12 +53,13 @@ export function createMembersService(
 
     const token = await tokenService.signInviteToken(organizationId, newMember.id, newMember.email);
     if (taskQueue) {
-      await taskQueue.send({
-        type: 'email.registration_invite',
-        email: newMember.email,
-        token,
-        target: 'panel',
-      });
+      await taskQueue.send(
+        buildRegistrationInviteEvent({
+          email: newMember.email,
+          token,
+          target: 'panel',
+        }),
+      );
     }
   };
 
@@ -202,12 +203,13 @@ export function createMembersService(
       // Re-issue JWT invite token and dispatch email registration invite event
       const token = await tokenService.signInviteToken(organizationId, member.id, member.email);
       if (taskQueue) {
-        await taskQueue.send({
-          type: 'email.registration_invite',
-          email: member.email,
-          token,
-          target: 'panel',
-        });
+        await taskQueue.send(
+          buildRegistrationInviteEvent({
+            email: member.email,
+            token,
+            target: 'panel',
+          }),
+        );
       }
 
       return { success: true };

@@ -5,6 +5,7 @@ import { createDb } from '@workspace/database/factory';
 import * as schema from '@workspace/database/schema';
 import {
   ORGANIZATION_ADDITIONAL_FIELDS,
+  buildOrgInviteEvent,
   platformAc,
   platformRoles,
   organizationAc,
@@ -72,13 +73,14 @@ export function createAuth(env: Env) {
           const inviteLink = `${panelBaseUrl}/accept-invitation/${data.id}`;
 
           if (env.TASK_QUEUE) {
-            await env.TASK_QUEUE.send({
-              type: 'email.org_invite',
-              email: data.email,
-              orgName: data.organization.name,
-              inviterName: data.inviter.user.name,
-              inviteLink,
-            });
+            await env.TASK_QUEUE.send(
+              buildOrgInviteEvent({
+                email: data.email,
+                orgName: data.organization.name,
+                inviterName: data.inviter.user.name,
+                inviteLink,
+              }),
+            );
           }
         },
         organizationHooks: {

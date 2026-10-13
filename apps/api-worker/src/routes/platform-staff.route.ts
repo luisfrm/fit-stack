@@ -6,7 +6,7 @@ import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
 import { createCache } from '../lib/cache';
 import { canAssignPlatformRole, platformRoles, type PlatformRole } from '@workspace/shared';
-import { DEFAULT_PLATFORM_STAFF_VALUES } from '@workspace/shared';
+import { DEFAULT_PLATFORM_STAFF_VALUES, buildRegistrationInviteEvent } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -85,13 +85,14 @@ export const platformStaffRoutes = new Hono<AppEnv>()
     // Case 2: user doesn't exist → send registration invite pointing to Console.
     const token = await tokenService.signConsoleInviteToken(data.email, data.role);
     if (c.env.TASK_QUEUE) {
-      await c.env.TASK_QUEUE.send({
-        type: 'email.registration_invite',
-        email: data.email,
-        token,
-        target: 'console',
-        role: data.role,
-      });
+      await c.env.TASK_QUEUE.send(
+        buildRegistrationInviteEvent({
+          email: data.email,
+          token,
+          target: 'console',
+          role: data.role,
+        }),
+      );
     }
 
     await cache.invalidate('platform:staff*');

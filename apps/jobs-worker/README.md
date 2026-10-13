@@ -4,7 +4,7 @@ Cloudflare Worker de **procesamiento asíncrono** de Fit-Stack: consume colas de
 
 ## Responsabilidades
 
-- **`fit-task-events`** (consumer): emails transaccionales (invitaciones, recibo de pago al miembro, confirmación de pago SaaS).
+- **`fit-task-events`** (consumer): emails transaccionales (invitaciones, recibo de pago al miembro, confirmación de pago SaaS). El contrato vive en **`@workspace/shared`** (`packages/shared/src/queues/fit-task-events.ts`): cada productor construye el evento con un **builder validado** (lanza si el payload es inválido) y este worker estrecha el `unknown` con `isFitTaskEvent`; un evento fuera del contrato se **ackea sin retry** (mensaje veneno) con log de error.
 - **`fit-receipt-events`** (consumer): render del PDF de comprobantes (Panel y Console), subida a R2 y notificación por email.
 - **Cron de barrido**: re-encola render pendientes (ver abajo).
 
@@ -14,7 +14,7 @@ El `queue()` de `src/index.ts` ramifica por nombre de cola (`batch.queue.startsW
 
 ```
 src/
-├── index.ts                    # default export: queue() + scheduled(); Env; FitTaskEvent
+├── index.ts                    # default export: queue() + scheduled(); Env
 ├── receipt-pdf.ts                # render del PDF con pdf-lib (JS puro, sin WASM, compatible con workerd; lazy)
 ├── handlers/
 │   ├── email.handler.ts        # TRANSPORTE de email (Resend / Gmail SMTP)
@@ -32,14 +32,16 @@ src/
 
 ## Eventos
 
-`FitTaskEvent` (`src/index.ts`):
+`FitTaskEvent` es un contrato compartido: vive en **`@workspace/shared`** (`packages/shared/src/queues/fit-task-events.ts`), nunca en este worker. Los productores (`api-worker` y el paso 2 de aquí) usan los **builders validados** (`buildRegistrationInviteEvent`, `buildOrgInviteEvent`, `buildPaymentReceiptEvent`, `buildOrgPaymentReceivedEvent`) — lanzan si el payload es inválido, así que un rename no puede caer en silencio en el `default` del consumer. El consumer valida con `isFitTaskEvent`: un body fuera del contrato es un **mensaje veneno** → `error` log + `ack`, **nunca retry** (el `default` del switch queda solo como defensa en profundidad ante drift).
 
 | Tipo | Payload | Productor |
 |---|---|---|
 | `email.registration_invite` | `{ email, token, target?: 'panel' \| 'console', role? }` | `api-worker` (`members.service`, `/api/platform/staff`) |
 | `email.org_invite` | `{ email, orgName, inviterName, inviteLink }` | hook `sendInvitationEmail` de Better Auth (`api-worker`) |
-| `email.payment_receipt` | `{ paymentId, organizationId }` | `subscriptions.service` (alta validada / aprobación / reenvío) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route` (autoservicio) + paso 2 SaaS + reenvío |
+| `email.payment_receipt` | `{ paymentId, organizationId }` | `receipts.service.ts` (reenvío manual) + paso 2 Panel (`render-profile.ts`, PDF listo y numerado) |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (autoservicio) + `platform-receipts.service.ts` (reenvío manual) + paso 2 Platform (`render-profile.ts`) |
+
+El payload de `email.payment_receipt` **no** incluye `receiptNumber`: el número persistido en la DB es la fuente de verdad (eventos antiguos en vuelo pueden traer la clave extra y se ignora).
 
 `ReceiptRenderEvent` (compartido con `@workspace/shared`) llega por `fit-receipt-events` con `scope: 'panel' | 'platform'`.
 

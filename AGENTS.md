@@ -120,7 +120,7 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 | Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
 | API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE (immutable financial record) |
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
-| Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib` |
+| Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib`; the `FitTaskEvent` contract lives in `@workspace/shared` (`queues/fit-task-events.ts`): validated builders at every send site + `isFitTaskEvent` guard, unknown → ack + error log, never retry |
 | R2 storage | [`architecture/file-storage.md`](vaults/architecture/file-storage.md) — every org key starts `<orgId>/` (server-resolved); public only `cms/` + `platform/branding/` |
 | Package exports / DB schema | [`architecture/packages-and-schema.md`](vaults/architecture/packages-and-schema.md) — 33 tables |
 | Modules / Staff & Trainers | [`architecture/modules.md`](vaults/architecture/modules.md), [`staff-trainers.md`](vaults/architecture/staff-trainers.md) |
@@ -146,7 +146,7 @@ Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`
 
 ## Key Files to Read First
 
-- `packages/database/src/schema.ts` (33 tables) · `packages/shared/src/access-control.ts` (RBAC SSOT)
+- `packages/database/src/schema.ts` (33 tables) · `packages/shared/src/access-control.ts` (RBAC SSOT) · `packages/shared/src/queues/fit-task-events.ts` (`FitTaskEvent` contract: builders + guard)
 - `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
 - `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
 - `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}`
