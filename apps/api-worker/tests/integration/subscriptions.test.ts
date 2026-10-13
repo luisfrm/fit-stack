@@ -4,6 +4,9 @@
  * Covers: the full subscription lifecycle — create (with atomic payment),
  * list, cancel — plus permission enforcement and org isolation.
  *
+ * RD-113: creation only accepts `processing`/`validated` (a payment cannot be
+ * born `voided`); `refunded` is never a patchable status.
+ *
  * Flow tested: create member → create plan → POST /api/subscriptions (atomic)
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -134,6 +137,78 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.status, res.text).toBe(201);
 
       expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
+    });
+
+    it('rejects creation with payment status voided (400) and creates no subscription nor payment', async () => {
+      const { owner, organization, member, plan } = await setupSubscriptionFixture();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'voided',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      // RD-113: a payment born `voided` has no producer — voiding is a PATCH
+      // transition that carries audit (who/when/why). The schema rejects before
+      // any write, so nothing is left behind.
+      expect(res.status, res.text).toBe(400);
+
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+
+      const payments = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM payment WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(payments[0]!.count).toBe(0);
+    });
+
+    it('omitted payment status defaults to validated and still numbers the receipt (201)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          amountPaid: 100,
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(res.status, res.text).toBe(201);
+
+      // The POST answers the subscription, not the payment: resolve the payment
+      // id from the listing, as the other helpers in this file do.
+      const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
+        query: { limit: '10' },
+      });
+      const paymentId = list.body.data.find((r) => r.id === res.body.id)?.paymentId as number;
+      expect(paymentId).toBeTruthy();
+
+      // RD-113: omission still normalizes to `validated`, and the
+      // validated ⇔ numbered invariant holds.
+      const rows = await testQuery<{ status: string; receipt_number: string | null }>(
+        `SELECT status, receipt_number FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      expect(rows[0]!.status).toBe('validated');
+      expect(rows[0]!.receipt_number).not.toBeNull();
     });
 
     it('honors an ISO date-time paymentDate instead of replacing it with now', async () => {
@@ -450,6 +525,42 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       // `invalid`/`pending` disappeared from the contract: the enum only accepts
       // processing | validated | voided. The schema rejects before the service.
       expect(res.status, res.text).toBe(400);
+    });
+
+    it('refunded is not a patchable status: 400 and the payment row stays intact', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedSubscription(owner, member, plan);
+      expect(paymentId).toBeTruthy();
+
+      const readRow = async () =>
+        (
+          await testQuery<{
+            status: string;
+            receipt_number: string | null;
+            voided_at: string | null;
+            void_reason: string | null;
+          }>(
+            `SELECT status, receipt_number, voided_at, void_reason FROM payment WHERE id = $1`,
+            [paymentId],
+          )
+        )[0]!;
+
+      // RD-113: `refunded` is reserved/display-only — the gym PATCH enum has
+      // never included it and must keep rejecting it.
+      const before = await readRow();
+      expect(before.status).toBe('validated');
+
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'refunded',
+      });
+      expect(res.status, res.text).toBe(400);
+
+      // Rejected at the schema layer: the row is byte-identical (no partial write).
+      const after = await readRow();
+      expect(after.status).toBe(before.status);
+      expect(after.receipt_number).toBe(before.receipt_number);
+      expect(after.voided_at).toBeNull();
+      expect(after.void_reason).toBeNull();
     });
 
     it('rechazar un cobro `processing` (`voided`) deja la suscripción ANULADA con auditoría persistida', async () => {
