@@ -1,10 +1,11 @@
 /**
- * Cliente HTTP de los E2E con **tracking de recursos**.
+ * E2E HTTP client with **resource tracking**.
  *
- * Cada recurso creado desde un test (`create(...)` o `track(...)`) se registra y
- * se borra automáticamente al terminar el test, en orden inverso al de creación
- * — así se respeta la dependencia entre un plan y su suscripción. Reemplaza los
- * `afterAll` manuales que se olvidaban y dejaban basura en la base de desarrollo.
+ * Every resource created from a test (`create(...)` or `track(...)`) is registered
+ * and automatically deleted when the test ends, in reverse creation order
+ * — that way the dependency between a plan and its subscription is respected. It
+ * replaces the manual `afterAll` hooks that were forgotten and left garbage in
+ * the development database.
  */
 import type { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL } from './api';
@@ -14,11 +15,12 @@ import { API_BASE_URL } from './api';
  *
  * `null` = the resource is NOT deleted through the API. That is the case of
  * `subscription`: a financial record (subscription + payment) has no DELETE —
- * it is voided instead. Since RD-120 the member delete is a **soft delete** and
- * the FKs toward `gym_member` are `restrict`, so nothing cascades any more: the
- * plan that billed the subscription is not deletable either, and its disposable
- * is dropped in `dropReferencedPlanDisposable`. Per-test cleanup covers the
- * rest; the tenant wipe (global-setup/teardown) is the safety net.
+ * it is voided instead. Member (RD-120) and plan (RD-142) deletes are both
+ * **soft deletes** (`deleted_at` + `restrict` FKs), so nothing cascades any
+ * more: every per-test row stays inside `e2e-suite` until the tenant wipe
+ * (global-setup/teardown), which is the real safety net. `cleanupDisposables`
+ * stays best-effort: a failing delete warns `(se ignora)` and never fails a
+ * test.
  */
 const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = {
   cmsBlock: (id) => `/api/cms/blocks/${id}`,
@@ -30,7 +32,7 @@ const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = 
   plan: (id) => `/api/plans/${id}`,
   platformOrg: (id) => `/api/platform/organizations/${id}`,
   platformPlan: (id) => `/api/platform/plans/${id}`,
-  // Borra la suscripción SaaS; los pagos cascaddean por FK
+  // Deletes the SaaS subscription; payments cascade by FK
   // (`subscription_id` → `platform_subscription.id` onDelete cascade).
   platformSubscription: (id) => `/api/platform/subscriptions/${id}`,
 };
@@ -50,31 +52,10 @@ export interface ApiClient {
   put<T = any>(path: string, body?: unknown): Promise<T>;
   patch<T = any>(path: string, body?: unknown): Promise<T>;
   delete<T = any>(path: string): Promise<T>;
-  /** Registra un recurso ya creado para borrarlo al terminar el test. */
+  /** Registers an already created resource to delete it when the test ends. */
   track(kind: DisposableKind, id: number | string, label?: string): void;
-  /** Crea y registra en un paso: devuelve la respuesta JSON. */
+  /** Creates and registers in one step: returns the JSON response. */
   create<T = any>(kind: DisposableKind, path: string, body: unknown, label?: string): Promise<T>;
-}
-
-/**
- * A subscription turns its plan into part of the immutable financial record:
- * the API refuses `DELETE /api/plans/:id` while a subscription references it
- * (FK `23503`), which is production-correct — the plan that billed someone is
- * never deleted. Since the subscription has no DELETE either, that disposable
- * can never succeed: it is dropped here instead of issuing a doomed request
- * that logged a scary stack after every test. The tenant wipe removes both rows
- * (`wipeTenant` deletes the org and cascades).
- */
-function dropReferencedPlanDisposable(
-  kind: DisposableKind,
-  body: unknown,
-  disposables: Disposable[],
-): void {
-  if (kind !== 'subscription') return;
-  const planId = (body as { planId?: number | string } | null)?.planId;
-  if (planId === undefined) return;
-  const index = disposables.findIndex((item) => item.kind === 'plan' && item.id === planId);
-  if (index >= 0) disposables.splice(index, 1);
 }
 
 export function createApiClient(context: APIRequestContext, disposables: Disposable[]): ApiClient {
@@ -109,16 +90,13 @@ export function createApiClient(context: APIRequestContext, disposables: Disposa
     async create<T>(kind: DisposableKind, path: string, body: unknown, label?: string): Promise<T> {
       const created = await request<T>('POST', path, { body });
       const id = (created as { id?: number | string })?.id;
-      if (id !== undefined) {
-        dropReferencedPlanDisposable(kind, body, disposables);
-        disposables.push({ kind, id, label: label ?? `${kind}#${id}` });
-      }
+      if (id !== undefined) disposables.push({ kind, id, label: label ?? `${kind}#${id}` });
       return created;
     },
   };
 }
 
-/** Borra lo creado en orden inverso (LIFO), best-effort: nunca falla la suite. */
+/** Deletes what was created in reverse order (LIFO), best-effort: it never fails the suite. */
 export async function cleanupDisposables(
   client: ApiClient,
   disposables: Disposable[],
@@ -134,7 +112,7 @@ export async function cleanupDisposables(
   }
 }
 
-/** Crea un contexto de API autenticado con el `storageState` indicado. */
+/** Creates an authenticated API context with the given `storageState`. */
 export async function newAuthedApiContext(
   playwright: { request: { newContext: (options: any) => Promise<APIRequestContext> } },
   storageState: string,

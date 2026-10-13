@@ -51,10 +51,18 @@ test.describe("Console — Staff", () => {
     await expect(page.locator("#staff-table")).toBeVisible({
       timeout: 20_000,
     });
-    await page
-      .getByPlaceholder("Buscar por nombre o email...")
-      .fill("e2e.test");
-    await expect(page).toHaveURL(/search=e2e\.test/, { timeout: 10_000 });
+
+    const search = page.getByPlaceholder("Buscar por nombre o email...");
+    // The term lives in the URL (URL state over useState, debounced 500ms). A
+    // fill that lands before hydration never fires `onChange`, so the query
+    // string would stay empty forever: retry the interaction until the URL
+    // reflects the term.
+    await expect(async () => {
+      await search.fill("");
+      await search.fill("e2e.test");
+      await expect(page).toHaveURL(/search=e2e\.test/, { timeout: 3_000 });
+    }).toPass({ timeout: 20_000 });
+
     await expect(page.locator("#staff-table")).toBeVisible();
   });
 });
