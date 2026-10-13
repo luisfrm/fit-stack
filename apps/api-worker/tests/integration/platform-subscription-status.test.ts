@@ -1,24 +1,24 @@
 /**
- * Platform subscription status (unificación del modelo de estados de pago).
+ * Platform subscription status (unification of the payment status model).
  *
- * Cubre el contrato SaaS de status computado (no guardado):
- * a. Paridad SQL ↔ helper `computePlatformSubscriptionStatus` en toda la
- *    matriz (trial vigente, validado/processing/voided vigente, gracia 3/7/8/
+ * Covers the SaaS contract of computed (not stored) status:
+ * a. SQL ↔ helper `computePlatformSubscriptionStatus` parity across the whole
+ *    matrix (trial in force, validated/processing/voided in force, grace 3/7/8/
  *    14/15).
- * b. Un pago `voided` se IGNORA: no revoca servicio ni mueve el periodo.
- * c. `processing` sin pago calificado con periodo vigente → `past_due`.
- * d. Gracia escalonada 3/10/20.
- * e. Anular un pago no mueve `currentPeriodEnd` ni reinicia la gracia.
- * f. Punto 7: un alta `processing` NO front-loadea el periodo; validar
- *    extiende UNA sola vez (duración del snapshot) y re-PATCH no re-extiende.
- * g. Punto 5: sin pago calificado con periodo por delante se puede renovar;
- *    con pago calificado vigente sigue bloqueado.
- * h. `hasPendingPayment`: un `voided` no bloquea un nuevo pago; `processing` sí.
+ * b. A `voided` payment is IGNORED: it neither revokes service nor moves the period.
+ * c. `processing` without a qualifying payment and a period in force → `past_due`.
+ * d. Staggered grace 3/10/20.
+ * e. Voiding a payment does not move `currentPeriodEnd` nor restart the grace.
+ * f. Point 7: a `processing` creation does NOT front-load the period; validating
+ *    extends ONCE (snapshot duration) and re-PATCH does not re-extend.
+ * g. Point 5: with no qualifying payment and a period ahead renewal is allowed;
+ *    with a qualifying payment in force it stays blocked.
+ * h. `hasPendingPayment`: a `voided` does not block a new payment; `processing` does.
  *
- * Patrón estándar: HTTP real + Neon branch (`TEST_DATABASE_URL`), skip
- * elegante sin la variable, `truncateAll` por archivo. Los hechos crudos
- * (`current_period_end`, `is_trial`, `cancelled_at`, EXISTS de pago calificado)
- * se leen por SQL para alimentar el helper con la misma verdad que el SQL.
+ * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
+ * skip without the variable, `truncateAll` per file. The raw facts
+ * (`current_period_end`, `is_trial`, `cancelled_at`, EXISTS of a qualifying payment)
+ * are read via SQL to feed the helper with the same truth as the SQL.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
@@ -68,7 +68,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     return res.body;
   }
 
-  /** Alta de suscripción SaaS con status de pago explícito (Fase B aún no aplica el default nuevo). */
+  /** SaaS subscription creation with an explicit payment status (Phase B does not apply the new default yet). */
   async function createSub(
     organizationId: string,
     opts: { paymentStatus?: string; isTrial?: boolean; startDate?: string } = {},
@@ -99,7 +99,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     return { subId: Number(res.body.id), paymentId: Number(rows[0]!.id) };
   }
 
-  /** Mueve `current_period_end` relativo a NOW() de la DB (negativo = vencida). */
+  /** Moves `current_period_end` relative to the DB's NOW() (negative = expired). */
   async function setPeriodEndDays(subId: number, days: number): Promise<void> {
     await testQuery(
       `UPDATE platform_subscription SET current_period_end = NOW() + ($1 || ' days')::interval WHERE id = $2`,
@@ -122,8 +122,8 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
   }
 
   /**
-   * Paridad SQL↔helper: lee los hechos crudos de la fila (los mismos que ve el
-   * CASE SQL) y compara el status expuesto por el detalle con el helper puro.
+   * SQL↔helper parity: reads the raw facts of the row (the same ones the SQL
+   * CASE sees) and compares the status exposed by the detail with the pure helper.
    */
   async function assertParity(subId: number): Promise<PlatformSubscriptionStatus> {
     const [row] = await testQuery<{
@@ -169,9 +169,9 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       { name: 'validado + periodo futuro', expected: STATUS.ACTIVE, paymentStatus: 'validated', days: 10 },
       { name: 'processing + periodo futuro', expected: STATUS.PAST_DUE, paymentStatus: 'processing', days: 10 },
       { name: 'voided + periodo futuro', expected: STATUS.PAST_DUE, paymentStatus: 'voided', days: 10 },
-      // Offsets a medio día para evitar el borde exacto (reloj Node vs
-      // Postgres): la paridad de fronteras exactas se cubre en el unit test
-      // determinista de `computePlatformSubscriptionStatus`.
+      // Half-day offsets to avoid the exact boundary (Node clock vs
+      // Postgres): exact-boundary parity is covered in the deterministic
+      // unit test of `computePlatformSubscriptionStatus`.
       { name: 'vencida 3 días', expected: STATUS.PAST_DUE, paymentStatus: 'validated', days: -3 },
       { name: 'vencida 7.5 días', expected: STATUS.PAST_DUE, paymentStatus: 'validated', days: -7.5 },
       { name: 'vencida 8.5 días', expected: STATUS.READ_ONLY, paymentStatus: 'validated', days: -8.5 },
@@ -185,7 +185,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
         isTrial: c.isTrial,
       });
       await setPeriodEndDays(subId, c.days);
-      // Un `voided` realista trae auditoría (el status no depende de ella).
+      // A realistic `voided` carries audit data (the status does not depend on it).
       if (c.paymentStatus === 'voided') {
         await testQuery(
           `UPDATE platform_subscription_payment
@@ -219,7 +219,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     });
     expect(extra.status, extra.text).toBe(201);
 
-    // El pago nuevo no califica y el validado anterior mantiene el periodo.
+    // The new payment does not qualify and the previous validated one keeps the period.
     expect(await getStatus(subId)).toBe(STATUS.ACTIVE);
     expect(await readPeriodEnd(subId)).toBe(before);
   });
@@ -260,8 +260,8 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     );
     expect(voided.status, voided.text).toBe(200);
 
-    // El void SaaS no cancela la sub ni reancla el periodo: la gracia sigue
-    // corriendo desde el MISMO currentPeriodEnd (no se resetea a ~0 días).
+    // The SaaS void neither cancels the sub nor re-anchors the period: the grace
+    // keeps running from the SAME currentPeriodEnd (it is not reset to ~0 days).
     expect(await readPeriodEnd(subId)).toBe(before);
     expect(await getStatus(subId)).toBe(STATUS.READ_ONLY);
   });
@@ -274,7 +274,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       startDate,
     });
 
-    // `currentPeriodEnd === startDate` (UTC midnight), sin regalar tiempo.
+    // `currentPeriodEnd === startDate` (UTC midnight), without giving away time.
     const startUtc = new Date(`${startDate}T00:00:00.000Z`).getTime();
     expect(await readPeriodEnd(subId)).toBe(startUtc);
 
@@ -286,12 +286,12 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
 
     const afterFirst = await readPeriodEnd(subId);
     expect(afterFirst).toBeGreaterThan(Date.now());
-    // Exactamente una duración de plan (~1 mes), no dos.
+    // Exactly one plan duration (~1 month), not two.
     const delta = afterFirst - Date.now();
     expect(delta).toBeGreaterThan(27 * 24 * 60 * 60 * 1000);
     expect(delta).toBeLessThan(32 * 24 * 60 * 60 * 1000);
 
-    // Re-PATCH a validated es idempotente: no vuelve a extender.
+    // Re-PATCH to validated is idempotent: it does not extend again.
     const second = await admin.client.patch(
       `/api/platform/subscriptions/payments/${paymentId}/status`,
       { status: 'validated' },
@@ -305,16 +305,16 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'validated' });
     await setPeriodEndDays(subId, 10);
 
-    // Anular el único cobro validado: el periodo sigue (void no lo mueve),
-    // pero ya no hay pago calificado que lo sostenga.
+    // Voiding the only validated charge: the period stays (void does not move it),
+    // but there is no longer a qualifying payment to sustain it.
     const voided = await admin.client.patch(
       `/api/platform/subscriptions/payments/${paymentId}/status`,
       { status: 'voided', voidReason: 'Cobro anulado' },
     );
     expect(voided.status, voided.text).toBe(200);
 
-    // El status computado (SQL) es `past_due`: hay periodo por delante pero
-    // NO hay `EXISTS(validated|refunded)`.
+    // The computed status (SQL) is `past_due`: there is a period ahead but
+    // there is NO `EXISTS(validated|refunded)`.
     const statusBefore = await assertParity(subId);
     expect(statusBefore, 'voided-only con periodo futuro debe ser past_due').toBe(STATUS.PAST_DUE);
 
@@ -340,7 +340,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
   });
 
   it('h. `hasPendingPayment`: un `voided` no bloquea; un `processing` sí', async () => {
-    // processing → bloquea la renovación.
+    // processing → blocks renewal.
     const blocked = await createGymTenant('pending-block');
     const { subId: blockedSub } = await createSub(blocked.organization.id, {
       paymentStatus: 'processing',
@@ -353,7 +353,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     expect(blockedRes.status, blockedRes.text).toBe(409);
     expect(blockedRes.body.error).toContain('pendiente');
 
-    // voided → no bloquea.
+    // voided → does not block.
     const free = await createGymTenant('pending-free');
     const { subId: freeSub } = await createSub(free.organization.id, { paymentStatus: 'voided' });
     await setPeriodEndDays(freeSub, -3);

@@ -1,11 +1,11 @@
 /**
  * Features / Free tier integration tests.
  *
- * Covers: /api/platform/features (catálogo), /api/organizations/features
- * (resolución: plan activo → features del plan; sin plan/suspendido + free
- * tier seteado → piso gratuito), /api/organizations/seats (cupos del portal),
- * /api/ai/usage (cuotas), guard de cupos al invitar miembros y snapshot de
- * features en platform_subscription_payment.
+ * Covers: /api/platform/features (catalog), /api/organizations/features
+ * (resolution: active plan → plan features; no plan/suspended + free
+ * tier set → free floor), /api/organizations/seats (portal seats),
+ * /api/ai/usage (quotas), seat guard when inviting members and feature
+ * snapshot in platform_subscription_payment.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { testQuery, assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
@@ -24,7 +24,7 @@ import { ORG_ROLES } from '@workspace/shared';
 const FREE_TIER_KEY = 'feature_flags_free_tier';
 const FREE_TIER_ENABLED_KEY = 'feature_flags_free_tier_enabled';
 
-/** Borra el setting del free tier para aislamiento determinístico entre tests. */
+/** Deletes the free-tier setting for deterministic isolation between tests. */
 async function clearFreeTierSetting(): Promise<void> {
   await testQuery(`DELETE FROM platform_setting WHERE key IN ($1, $2)`, [
     FREE_TIER_KEY,
@@ -38,7 +38,7 @@ const FREE_TIER_SETTING = JSON.stringify({
   ai_chat: { enabled: true, limits: { ai_credits_monthly: 500 } },
 });
 
-/** Habilita el free tier: flag enabled + features. */
+/** Enables the free tier: enabled flag + features. */
 async function enableFreeTier(admin: AuthedUser): Promise<void> {
   await admin.client.post('/api/platform/settings', {
     [FREE_TIER_ENABLED_KEY]: 'true',
@@ -258,7 +258,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       });
       await createPlatformSubscription(admin, organization.id, plan.id);
 
-      // 2 miembros con cuenta vinculada (seats usados)
+      // 2 members with a linked account (used seats)
       const m1 = await createGymMember(owner.client);
       const m2 = await createGymMember(owner.client);
       const linkedUser = await registerUser();
@@ -266,7 +266,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       await testQuery(`UPDATE gym_member SET user_id = $1 WHERE id = $2`, [linkedUser.userId, m2.id]);
       await testQuery(`UPDATE gym_member SET is_active = true WHERE id IN ($1, $2)`, [m1.id, m2.id]);
 
-      // 1 invitación pendiente
+      // 1 pending invitation
       await testQuery(
         `INSERT INTO invitation (id, organization_id, email, role, status, expires_at, inviter_id)
          VALUES ($1, $2, $3, 'member', 'pending', NOW() + INTERVAL '7 days', $4)`,
@@ -290,7 +290,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       });
       await createPlatformSubscription(admin, organization.id, plan.id);
 
-      // 1 pending → used+pending = 1 = limit → siguiente invitación bloqueada
+      // 1 pending → used+pending = 1 = limit → next invitation blocked
       await testQuery(
         `INSERT INTO invitation (id, organization_id, email, role, status, expires_at, inviter_id)
          VALUES ($1, $2, $3, 'member', 'pending', NOW() + INTERVAL '7 days', $4)`,
@@ -349,7 +349,7 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       const plan = await createPlatformPlan(admin);
       await createPlatformSubscription(admin, organization.id, plan.id);
 
-      // Fetch periodStart del ciclo (subscription) para insertar en el período correcto
+      // Fetch the cycle's periodStart (subscription) to insert into the right period
       const quotaBefore = await owner.client.get('/api/ai/usage');
       const periodStart = (quotaBefore.body as any).periodStart ?? new Date().toISOString().slice(0, 10);
 

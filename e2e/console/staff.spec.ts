@@ -13,8 +13,8 @@ test.describe("Console — Staff", () => {
       timeout: 10_000,
     });
     // The setup user is promoted to owner via DB, so at least one row exists.
-    // (No se aserta por badge de rol: con paginación, la fila del owner
-    // puede quedar fuera de la página 1 según los datos del entorno.)
+    // (No assertion is made on the role badge: with pagination, the owner row
+    // may fall outside page 1 depending on the environment data.)
     await expect(page.locator("#staff-table tbody tr").first()).toBeVisible({
       timeout: 10_000,
     });

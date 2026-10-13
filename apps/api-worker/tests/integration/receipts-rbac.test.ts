@@ -1,13 +1,13 @@
 /**
- * Receipts RBAC (Fase 6 — cierre Panel).
+ * Receipts RBAC (Phase 6 — Panel closure).
  *
- * Archivo pequeño y dedicado: `receipts-emission.test.ts` ya es God y no se
- * toca. Cubre los gates negativos que faltaban:
- * - coach → 403 en `GET /:id/receipt` (puerta `SUBSCRIPTIONS.READ`).
- * - member → 403 en `POST /:id/issue` (puerta `SUBSCRIPTIONS.UPDATE`).
+ * Small and dedicated file: `receipts-emission.test.ts` is already God and is
+ * not touched. Covers the missing negative gates:
+ * - coach → 403 on `GET /:id/receipt` (gate `SUBSCRIPTIONS.READ`).
+ * - member → 403 on `POST /:id/issue` (gate `SUBSCRIPTIONS.UPDATE`).
  *
- * Nota: `POST /:id/send-email` es `READ`, no puerta de escritura — no se
- * testea aquí como gate.
+ * Note: `POST /:id/send-email` is `READ`, not a write gate — it is not
+ * tested here as a gate.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -31,7 +31,7 @@ describe.skipIf(skipReason !== null)('Receipts RBAC (Fase 6)', () => {
     await truncateAll();
   });
 
-  /** Tenant + pago `validated` (numerado en el paso 1) vía HTTP. */
+  /** Tenant + `validated` payment (numbered in step 1) via HTTP. */
   async function createNumberedPaymentId() {
     const { owner, organization } = await createGymTenant('rbac');
     const member = await createGymMember(owner.client);

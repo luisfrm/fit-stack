@@ -1,15 +1,15 @@
 /**
- * Global teardown — borra el tenant de la suite.
+ * Global teardown — deletes the tenant of the suite.
  *
- * La suite normal son solo tests: al terminar no queda ni la org (`e2e-suite`,
- * `e2e-empty`), ni los usuarios, ni el plan de plataforma.
+ * The normal suite is tests only: at the end neither the org (`e2e-suite`,
+ * `e2e-empty`), nor the users, nor the platform plan remain.
  *
- * Se ejecuta siempre al terminar (incluso con fallos), salvo que
- * `E2E_KEEP_DATA=1` pida conservarlo para inspección manual. Es best-effort a
- * propósito: un fallo de limpieza no marca la suite como roja (el reset del
- * próximo global-setup lo recoge igual, con los mismos slugs fijos).
+ * It always runs at the end (even with failures), unless
+ * `E2E_KEEP_DATA=1` asks to keep it for manual inspection. It is best-effort on
+ * purpose: a cleanup failure does not mark the suite red (the reset of the
+ * next global-setup picks it up anyway, with the same fixed slugs).
  *
- * La org de demo (`fit-stack`) NUNCA se toca aquí.
+ * The demo org (`fit-stack`) is NEVER touched here.
  */
 import type { FullConfig } from '@playwright/test';
 import { wipeTenant } from './helpers/db';

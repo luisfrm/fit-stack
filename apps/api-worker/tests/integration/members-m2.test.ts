@@ -122,7 +122,7 @@ describe.skipIf(skipReason !== null)('Members M2 — filter and extended stats',
 
     it('returns upcoming birthdays ordered by MM-DD with year wrap', async () => {
       const tenant = await createGymTenant('m2-bday');
-      // Fechas fijas: el orden MM-DD debe respetarse sin importar el año.
+      // Fixed dates: the MM-DD order must be respected regardless of the year.
       await createGymMember(tenant.owner.client, { firstName: 'CumpleA', birthday: '1990-06-15' });
       await createGymMember(tenant.owner.client, { firstName: 'CumpleB', birthday: '1985-01-05' });
       await createGymMember(tenant.owner.client, { firstName: 'SinCumple' });
@@ -133,7 +133,7 @@ describe.skipIf(skipReason !== null)('Members M2 — filter and extended stats',
       expect(Array.isArray(res.body.upcomingBirthdays)).toBe(true);
       expect(res.body.upcomingBirthdays).toHaveLength(2);
 
-      // Regla SQL: tramo futuro (MM-DD >= hoy) primero, luego MM-DD asc.
+      // SQL rule: future range (MM-DD >= today) first, then MM-DD asc.
       const todayMD = new Date().toISOString().slice(5, 10);
       const rank = (md: string) => `${md >= todayMD ? '0' : '1'}${md}`;
       const monthDays = res.body.upcomingBirthdays.map(

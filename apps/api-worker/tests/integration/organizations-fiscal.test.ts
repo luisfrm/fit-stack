@@ -1,10 +1,10 @@
 /**
- * Fiscal por organización (Fase 4): `PATCH /api/organizations/profile`.
+ * Per-organization fiscal data (Phase 4): `PATCH /api/organizations/profile`.
  *
- * Cubre: schema real de `fiscalConfig` (400), RBAC (cashier 403 / manager
- * 200), inmutables (`countryCode`/`primaryCurrency` → 400), fricción de
- * `isFormalTaxpayer` (solo transición false→true exige `confirmed`), merge
- * (no reemplazo ciego), override auditado y gate documental forzado.
+ * Covers: real `fiscalConfig` schema (400), RBAC (cashier 403 / manager
+ * 200), immutables (`countryCode`/`primaryCurrency` → 400), `isFormalTaxpayer`
+ * friction (only the false→true transition requires `confirmed`), merge
+ * (no blind replacement), audited override and forced documentary gate.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -173,7 +173,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     });
     expect(confirmed.status, confirmed.text).toBe(200);
 
-    // Ya formal: un PATCH posterior sin el flag no exige confirmación.
+    // Already formal: a later PATCH without the flag does not require confirmation.
     const noop = await owner.client.patch('/api/organizations/profile', {
       address: 'Av. Principal',
     });
@@ -194,7 +194,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     });
     expect(first.status, first.text).toBe(200);
 
-    // PATCH parcial de taxes[]: no debe borrar disclaimer ni formal.
+    // Partial PATCH of taxes[]: it must not erase the disclaimer nor the formal flag.
     const second = await owner.client.patch('/api/organizations/profile', {
       fiscalConfig: { taxes: [{ name: 'IVA', rate: 0.1, enabled: true }] },
     });
@@ -207,8 +207,8 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
       new RegExp(`^\\d{4}-\\d{6}$`),
     );
 
-    // Paso 2 real: el compose debe reflejar disclaimer custom y etiqueta
-    // forzada ("Comprobante de pago" aunque haya taxId + formal).
+    // Real step 2: the compose must reflect a custom disclaimer and the
+    // forced label ("Comprobante de pago" even with taxId + formal).
     const env = owner.client.env as Record<string, unknown>;
     const jobsEnv: ReceiptHandlerEnv = {
       DATABASE_URL: TEST_DATABASE_URL,
@@ -304,7 +304,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
         slug: `gym-fiscal-${tag}-${uid()}`,
       });
       await setActiveOrganization(user.client, organization.id);
-      // C2: sin declaración de contribuyente formal no hay desglose.
+      // C2: without a formal-taxpayer declaration there is no breakdown.
       const declared = await user.client.patch('/api/organizations/profile', {
         fiscalConfig: { isFormalTaxpayer: true },
         confirmed: true,
@@ -327,9 +327,9 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
   });
 
   /**
-   * C2 — invariante fail-closed (D6): el override solo puede REDUCIR carga
-   * fiscal. Un no-contribuyente no puede activar impuestos (ni por config ni
-   * por el override manual del pago) y un condicional exige confirmación.
+   * C2 — fail-closed invariant (D6): the override can only REDUCE the tax
+   * burden. A non-taxpayer cannot enable taxes (neither via config nor via
+   * the payment's manual override) and a conditional requires confirmation.
    */
   it('activar impuestos sin declararse formal → 400 TAXES_REQUIRE_FORMAL_TAXPAYER', async () => {
     const { owner, organization } = await createGymTenant('fiscal-gate');
@@ -342,7 +342,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
     expect(res.status, res.text).toBe(400);
     expect(res.body).toMatchObject({ code: 'TAXES_REQUIRE_FORMAL_TAXPAYER' });
 
-    // El config almacenado NO cambió (fail-closed antes de persistir).
+    // The stored config did NOT change (fail-closed before persisting).
     const rows = await testQuery<{ fiscal_config: unknown }>(
       `SELECT fiscal_config FROM organization WHERE id = $1`,
       [organization.id],

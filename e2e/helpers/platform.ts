@@ -1,10 +1,10 @@
 /**
- * Provisioning del tenant de la suite (solo lo usan el global-setup y los
- * setups de login; los specs consumen `fixtures.ts`).
+ * Provisioning of the tenant of the suite (only the global-setup and the
+ * login setups use it; the specs consume `fixtures.ts`).
  *
- * Flujo de la suite normal: usuario de consola → crea la org vía el endpoint
- * de plataforma (el mismo camino que la consola) → aprovisiona el owner del
- * panel → siembra. Todo con identidades fijas y check-then-create donde aplica.
+ * Normal suite flow: console user → creates the org via the platform
+ * endpoint (the same path as the console) → provisions the panel owner
+ * → seeds. All with fixed identities and check-then-create where applicable.
  */
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
 import {
@@ -30,7 +30,7 @@ import {
   TEST_PLATFORM_PLAN,
 } from './test-tenant';
 
-/** Definición mínima de org que aceptan los ensures (suite y seed). */
+/** Minimal org definition accepted by the ensure helpers (suite and seed). */
 export interface OrgDef {
   slug: string;
   name: string;
@@ -39,7 +39,7 @@ export interface OrgDef {
   currencyFormat: string;
 }
 
-/** Definición mínima de owner que aceptan los ensures (suite y seed). */
+/** Minimal owner definition accepted by the ensure helpers (suite and seed). */
 export interface OwnerDef {
   email: string;
   password: string;
@@ -48,7 +48,7 @@ export interface OwnerDef {
   lastName: string;
 }
 
-/** Features completas para el plan de plataforma del tenant de pruebas. */
+/** Full features for the platform plan of the test tenant. */
 const ALL_FEATURES = {
   panel: { enabled: true },
   cms: { enabled: true },
@@ -65,7 +65,7 @@ function isoInDays(tz: string, days: number): string {
   return addLocalDays(tz, toLocalDayString(tz), days);
 }
 
-/** Login si el usuario existe, alta si no. Devuelve cookies de sesión. */
+/** Login if the user exists, sign-up if not. Returns session cookies. */
 export async function signInOrRegister(user: {
   email: string;
   password: string;
@@ -76,7 +76,7 @@ export async function signInOrRegister(user: {
     const userId = (await findUserIdByEmail(user.email)) ?? '';
     if (userId) return { userId, cookies, existed: true };
   } catch {
-    // El usuario todavía no existe — se crea abajo.
+    // The user does not exist yet — it is created below.
   }
 
   const created = await registerUser({
@@ -88,7 +88,7 @@ export async function signInOrRegister(user: {
   return { userId: created.userId, cookies, existed: false };
 }
 
-// ── Consola: platform owner ──────────────────────────────────────────────────
+// ── Console: platform owner ──────────────────────────────────────────────────
 
 export interface PlatformTenant {
   userId: string;
@@ -97,9 +97,9 @@ export interface PlatformTenant {
 }
 
 /**
- * Garantiza el platform owner de la consola. La promoción de rol se hace por
- * SQL (el endpoint del admin plugin exige un admin preexistente) y se re-aplica
- * siempre, para que también funcione cuando el usuario viene del entorno.
+ * Ensures the platform owner of the console. Role promotion is done via
+ * SQL (the admin plugin endpoint requires a pre-existing admin) and is re-applied
+ * every time, so it also works when the user comes from the environment.
  */
 export async function ensurePlatformTenant(): Promise<PlatformTenant> {
   const { userId, cookies, existed } = await signInOrRegister(TEST_PLATFORM);
@@ -107,7 +107,7 @@ export async function ensurePlatformTenant(): Promise<PlatformTenant> {
   return { userId, cookies, existed };
 }
 
-// ── Suite: org creada por la consola + owner del panel ───────────────────────
+// ── Suite: console-created org + panel owner ─────────────────────────────────
 
 export interface SuiteTenant {
   userId: string;
@@ -118,9 +118,9 @@ export interface SuiteTenant {
 }
 
 /**
- * Crea la organización a través del endpoint de plataforma
- * (`POST /api/platform/organizations`), como lo haría la consola.
- * Idempotente por slug: si la org ya existe la reutiliza.
+ * Creates the organization through the platform endpoint
+ * (`POST /api/platform/organizations`), the way the console would.
+ * Idempotent by slug: if the org already exists it is reused.
  */
 export async function ensureSuiteOrganization(
   platformCookies: string,
@@ -146,10 +146,10 @@ export async function ensureSuiteOrganization(
 }
 
 /**
- * Aprovisiona el owner del panel en una org creada por consola
- * (`POST /api/platform/organizations/:id/staff` con rol owner): crea el
- * `gym_member` y vincula el usuario existente como `auth_member` owner.
- * Idempotente: si el usuario ya es miembro de la org no hace nada.
+ * Provisions the panel owner in an org created by the console
+ * (`POST /api/platform/organizations/:id/staff` with role owner): creates the
+ * `gym_member` and links the existing user as an `auth_member` owner.
+ * Idempotent: if the user is already a member of the org it does nothing.
  */
 async function provisionOrgOwner(
   platformCookies: string,
@@ -174,9 +174,9 @@ async function provisionOrgOwner(
 }
 
 /**
- * Tenant completo de la suite: consola → org → owner del panel con la org
- * activa. Es el flujo real (la org nace desde la consola, no por Better Auth
- * directo).
+ * Full tenant of the suite: console → org → panel owner with the active
+ * org. It is the real flow (the org is born from the console, not via Better Auth
+ * directly).
  */
 export async function ensureSuiteTenant(
   platform: PlatformTenant,
@@ -198,14 +198,14 @@ export async function ensureSuiteTenant(
   };
 }
 
-// ── Plataforma SaaS: plan + suscripción trial para la org ────────────────────
+// ── SaaS platform: plan + trial subscription for the org ─────────────────────
 
 /**
- * Asegura el plan de plataforma de los tests.
+ * Ensures the platform plan used by the tests.
  *
- * Es idempotente: lo REUTILIZA si ya existe por nombre, porque `platform_plan`
- * es catálogo (no cuelga de la organización y no se borra con ella). Sin esto,
- * cada corrida dejaría un plan nuevo en el listado de la consola.
+ * It is idempotent: it REUSES it if it already exists by name, because `platform_plan`
+ * is catalog (it does not hang from the organization and is not deleted with it).
+ * Without this, every run would leave a new plan in the console listing.
  */
 export async function ensurePlatformPlan(cookies: string): Promise<number> {
   const plans = await apiJson<Array<{ id: number; name: string }>>('/api/platform/plans', {
@@ -232,12 +232,12 @@ export async function ensurePlatformPlan(cookies: string): Promise<number> {
 }
 
 /**
- * Plan de plataforma + suscripción TRIAL para una organización.
+ * Platform plan + TRIAL subscription for an organization.
  *
- * Por qué existe: sin suscripción de plataforma las features resueltas son las
- * del catálogo por defecto (solo `panel`), así que el CMS queda bloqueado y los
- * tests dependían silenciosamente de la configuración de free tier del entorno.
- * Esto hace que el tenant de pruebas sea autosuficiente y determinista.
+ * Why it exists: without a platform subscription the resolved features are the
+ * default catalog ones (only `panel`), so the CMS stays blocked and the
+ * tests silently depended on the free tier configuration of the environment.
+ * This makes the test tenant self-sufficient and deterministic.
  */
 export async function seedPlatformSubscription(
   cookies: string,
@@ -265,7 +265,7 @@ export async function seedPlatformSubscription(
   return { planId, subscriptionId: subscription.id };
 }
 
-// ── Gimnasio: datos mínimos y deterministas ──────────────────────────────────
+// ── Gym: minimal, deterministic data ─────────────────────────────────────────
 
 export interface SeededGymIds {
   planId: number;
@@ -279,9 +279,9 @@ export interface SeededGymIds {
 }
 
 /**
- * Siembra el mínimo que necesitan los journeys: 1 plan, 3 clientes (con
- * suscripción vigente / sin plan / inactivo), 1 clase diaria y 1 página CMS con
- * un bloque hero.
+ * Seeds the minimum the journeys need: 1 plan, 3 clients (with a
+ * current subscription / no plan / inactive), 1 daily class and 1 CMS page with
+ * a hero block.
  */
 export async function seedGymData(cookies: string): Promise<SeededGymIds> {
   const tz = TEST_ORG.timezone;
@@ -369,8 +369,8 @@ export async function seedGymData(cookies: string): Promise<SeededGymIds> {
     },
   });
 
-  // El alta de suscripción devuelve solo la suscripción: el id del pago se
-  // resuelve por el listado (mismo camino que usan los specs).
+  // The subscription creation returns only the subscription: the payment id is
+  // resolved from the listing (the same path the specs use).
   const list = await apiJson<{ data?: Array<{ memberEmail?: string; paymentId?: number }> }>(
     '/api/subscriptions',
     { cookies, query: { limit: 50 } },

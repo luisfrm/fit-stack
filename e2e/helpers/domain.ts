@@ -1,9 +1,9 @@
 /**
- * Helpers de dominio — resuelven el id de un recurso por su nombre/email.
+ * Domain helpers — resolve the id of a resource by its name/email.
  *
- * Sirven para los journeys que crean datos **desde la UI**: cuando el test crea
- * algo haciendo clic, el fixture no puede conocer el id de antemano, así que se
- * busca por API y se registra con `track(...)` para que se borre al terminar.
+ * They serve the journeys that create data **from the UI**: when the test creates
+ * something by clicking, the fixture cannot know the id beforehand, so it is
+ * looked up via the API and registered with `track(...)` so it is deleted at the end.
  */
 import type { ApiClient } from './api-client';
 

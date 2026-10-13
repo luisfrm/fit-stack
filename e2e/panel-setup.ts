@@ -1,16 +1,16 @@
 /**
- * Panel auth setup — SOLO login por UI + storageState.
+ * Panel auth setup — UI login ONLY + storageState.
  *
- * El tenant (usuario + organización + datos) lo crea `global-setup.ts` con
- * identidades fijas. Antes este archivo creaba una organización nueva por
- * corrida y no la borraba: esa era la fuente de las orgs `gym-xxxxxxxx`
- * acumuladas en la base de datos de desarrollo.
+ * The tenant (user + organization + data) is created by `global-setup.ts` with
+ * fixed identities. This file used to create a new organization on every
+ * run and never deleted it: that was the source of the `gym-xxxxxxxx` orgs
+ * piling up in the development database.
  *
- * Escribe DOS sesiones, ambas antes de que el proyecto `panel` cree un solo
- * contexto (por eso viven aquí y no en un `beforeAll` de un spec: un
- * `test.use({ storageState })` apunta a un archivo que debe existir ya):
- * - `panel-user.json` → owner de la org de la suite.
- * - `empty-org-user.json` → owner de la org vacía (`empty-state.spec.ts`).
+ * Writes TWO sessions, both before the `panel` project creates a single
+ * context (that is why they live here and not in a spec `beforeAll`: a
+ * `test.use({ storageState })` points to a file that must already exist):
+ * - `panel-user.json` → owner of the suite org.
+ * - `empty-org-user.json` → owner of the empty org (`empty-state.spec.ts`).
  */
 import { test as setup, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -29,7 +29,7 @@ import {
 } from './helpers/test-tenant';
 
 setup('authenticate as panel user', async ({ page, browser }) => {
-  // Falla temprano y con mensaje claro si el global-setup no sembró el tenant.
+  // Fails early with a clear message if the global-setup did not seed the tenant.
   const state = readTenantState();
   setup.setTimeout(240_000);
   mkdirSync(AUTH_DIR, { recursive: true });
@@ -42,7 +42,7 @@ setup('authenticate as panel user', async ({ page, browser }) => {
 
   await page.waitForURL('**/dashboard', { waitUntil: 'domcontentloaded', timeout: 45_000 });
 
-  // El dashboard renderizado confirma que la org activa quedó en la sesión.
+  // The rendered dashboard confirms the active org was stored in the session.
   await expect(page.locator('h1').filter({ hasText: 'Panel de Control' })).toBeVisible({
     timeout: 45_000,
   });
@@ -53,14 +53,14 @@ setup('authenticate as panel user', async ({ page, browser }) => {
 
   console.log(`[e2e] panel autenticado (org=${state.orgSlug})`);
 
-  // ── Sesión de la org vacía (specs de estado vacío) ────────────────────────
+  // ── Empty org session (empty-state specs) ─────────────────────────────────
   if (state.emptyOrgSlug !== EMPTY_ORG.slug) {
     throw new Error(`state.json no trae la org vacía (slug=${state.emptyOrgSlug})`);
   }
 
-  // Contexto propio: es OTRA organización activa, no puede compartir cookies.
-  // `storageState` vacío explícito: el archivo aún no existe y esta llamada no
-  // debe intentar leerlo.
+  // Own context: it is ANOTHER active organization, it cannot share cookies.
+  // Explicit empty `storageState`: the file does not exist yet and this call
+  // must not try to read it.
   const emptyContext = await browser.newContext({
     baseURL: PANEL_URL,
     storageState: { cookies: [], origins: [] },

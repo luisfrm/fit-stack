@@ -13,9 +13,9 @@ const SUBS = SELECTORS.consoleSubscriptions;
 const AUDIT = SELECTORS.consoleReceipts;
 const TZ = 'America/Caracas';
 
-// El consumer de renders (jobs-worker) no corre en E2E: tras validar, el
-// comprobante queda numerado con PDF pendiente. El spec aserta lo
-// determinista — número global visible sin UUID, estados y reenvío.
+// The render consumer (jobs-worker) does not run in E2E: after validating, the
+// receipt ends up numbered with a pending PDF. The spec asserts the
+// deterministic part — global number visible without UUID, statuses and resend.
 test.describe('Console — Comprobante SaaS', () => {
   test('aprobar pago pendiente muestra FS-N y permite reenviar', async ({
     page,
@@ -31,8 +31,8 @@ test.describe('Console — Comprobante SaaS', () => {
       countryCode: 'VE',
       timezone: TZ,
     });
-    // Owners para el dedupe del reenvío (el pago processing no trae payer):
-    // vincula al platform owner existente, sin crear usuarios residuales.
+    // Owners for the resend dedupe (the processing payment brings no payer):
+    // links to the existing platform owner, without creating leftover users.
     await consoleApi.post(`/api/platform/organizations/${org.id}/staff`, {
       firstName: 'Recibo',
       lastName: 'E2E',
@@ -85,7 +85,7 @@ test.describe('Console — Comprobante SaaS', () => {
 
     const row = page.locator(`[data-testid="subs-row-${sub.id}"]`);
     await expect(row).toBeVisible({ timeout: 30_000 });
-    // El trigger del menú lleva la clase (sin trigger custom en la tabla).
+    // The menu trigger carries the class (no custom trigger in the table).
     await clickMenuItem(page, row.locator(SUBS.rowMenu), 'Ver Pagos');
 
     const dialog = page.getByRole('dialog');
@@ -99,13 +99,13 @@ test.describe('Console — Comprobante SaaS', () => {
       'Marcar como Validado',
     );
 
-    // Tras aprobar, el paso 1 numera: expandir la fila muestra el FS-N.
+    // After approving, step 1 numbers it: expanding the row shows the FS-N.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
     await expect(paymentRow.getByText(CONSOLE_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
 
-    // Reenviar: 202 "se enviará al generarse" (pending, sin consumer).
+    // Resend: 202 "se enviará al generarse" (pending, no consumer).
     await page.getByTestId(`receipt-resend-${paymentId}`).click();
     await expect(
       page.getByText(/comprobante (reenviado|se enviará)/i).first(),
@@ -175,7 +175,7 @@ test.describe('Console — Comprobante SaaS', () => {
       'Anular',
     );
 
-    // El flag ANULADO vive en el bloque expandido, junto al número.
+    // The ANULADO flag lives in the expanded block, next to the number.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
     await expect(paymentRow.getByText(CONSOLE_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
@@ -186,7 +186,7 @@ test.describe('Console — Comprobante SaaS', () => {
   });
 });
 
-// Auditoría del correlativo global (C4): reporte dedicado, espejo del Panel.
+// Audit of the global correlative (C4): dedicated report, mirror of the Panel.
 test.describe('Console — Reporte de comprobantes FS-N', () => {
   test('navega al reporte, muestra FS-N sin UUID y exporta el CSV', async ({
     page,
@@ -194,8 +194,8 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
   }) => {
     const slug = `auditoria-${uid()}`;
     const orgName = `Org Auditoría ${uid()}`;
-    // Método único: el universo del reporte es global, así la fila es
-    // inequívocamente la de este test (los demás specs crean pagos).
+    // Unique method: the universe of the report is global, so the row is
+    // unambiguously the one of this test (the other specs create payments).
     const method = `auditoria-${uid()}`;
     const today = toLocalDayString(TZ);
 
@@ -230,7 +230,7 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
       },
     });
 
-    // Navegación por el sidebar (como un usuario real), no por URL directa.
+    // Navigation through the sidebar (like a real user), not by direct URL.
     await page.goto('/subscriptions', { waitUntil: 'domcontentloaded' });
     await navigateByClick(
       page,
@@ -239,14 +239,14 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
     );
     await expect(page.getByTestId('receipts-report')).toBeVisible({ timeout: 30_000 });
 
-    // Filtro por método: solo nuestra fila.
+    // Filter by method: only our row.
     await page.goto(`/subscriptions/receipts?method=${encodeURIComponent(method)}`, {
       waitUntil: 'domcontentloaded',
     });
     const row = page.locator('tr', { hasText: orgName });
     await expect(row).toBeVisible({ timeout: 30_000 });
     await expect(row.locator('td').first()).toContainText(CONSOLE_RECEIPT_NUMBER_PATTERN);
-    // El UUID técnico del pago nunca se renderiza: solo el número humano.
+    // The technical UUID of the payment is never rendered: only the human number.
     const tableText = await page.locator(AUDIT.table).innerText();
     expect(tableText).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
 

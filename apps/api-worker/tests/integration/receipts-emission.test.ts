@@ -1,5 +1,5 @@
 /**
- * Receipts emission integration tests (Fase 2).
+ * Receipts emission integration tests (Phase 2).
  *
  * Covers: step 1 numbering via HTTP (number + receipt.render, taxes
  * persisted, zero emails), step 2 completion via the real jobs-worker
@@ -73,8 +73,8 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
 
   /**
    * Tenant + member + plan + validated $100.00 USD payment via HTTP.
-   * `declareFormal` deja la sede como contribuyente formal con IVA + IGTF
-   * confirmados (C2: sin declaración no hay desglose).
+   * `declareFormal` leaves the location as a formal taxpayer with VAT + IGTF
+   * confirmed (C2: without a declaration there is no breakdown).
    */
   async function createValidatedPayment(
     declareFormal = false,
@@ -126,8 +126,8 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(payment['receipt_number']).toMatch(
       new RegExp(`^\\d{4}-\\d{6}$`),
     );
-    // C2/D1: sede SIN declararse contribuyente formal → el comprobante no
-    // detalla impuestos (se persiste el total, nunca un IVA que no declaró).
+    // C2/D1: location WITHOUT declaring itself a formal taxpayer → the receipt does not
+    // itemize taxes (the total is persisted, never a VAT it did not declare).
     expect(payment['tax_details']).toEqual([]);
     expect(Number(payment['subtotal'])).toBe(10000);
     expect(Number(payment['tax_total'])).toBe(0);
@@ -156,8 +156,8 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
   it('T1b sede FORMAL: desglose IVA + IGTF con base gross_first y cuadre exacto', async () => {
     const { payment } = await createValidatedPayment(true);
 
-    // VE + USD + IGTF confirmado: IGTF = 3 % de 10000 = 300 (se extrae
-    // primero); resto 9700 → base = round(9700 / 1.16) = 8362 · IVA = 1338.
+    // VE + USD + IGTF confirmed: IGTF = 3 % of 10000 = 300 (extracted
+    // first); remainder 9700 → base = round(9700 / 1.16) = 8362 · VAT = 1338.
     const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
     expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);
     expect(details.find((d) => d.name === 'IGTF')?.amount).toBe(300);
@@ -178,10 +178,10 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     });
     resetSpies(owner.client);
 
-    // `status` es opcional en el contrato y el repo lo normaliza a
-    // `validated`. Decidir la emisión por el payload (como antes) dejaba un
-    // pago VALIDADO sin número, sin render y sin email: solo reparable a mano
-    // con POST /:id/issue (el PATCH a validated no numera si ya lo estaba).
+    // `status` is optional in the contract and the repo normalizes it to
+    // `validated`. Deciding the emission from the payload (as before) left a
+    // VALIDATED payment with no number, no render and no email: only repairable by hand
+    // with POST /:id/issue (the PATCH to validated does not number if it already was).
     const res = await owner.client.post('/api/subscriptions', {
       memberId: member.id,
       planId: plan.id,
@@ -208,7 +208,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       new RegExp(`^\\d{4}-\\d{6}$`),
     );
     expect(rows[0]!['receipt_issued_at']).not.toBeNull();
-    // Snapshot de la duración con la que se calculó el periodo.
+    // Snapshot of the duration used to compute the period.
     expect(Number(rows[0]!['plan_snapshot_duration_value'])).toBe(1);
     expect(rows[0]!['plan_snapshot_duration_unit']).toBe('month');
 
@@ -217,10 +217,10 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
   });
 
   it('T1d referencia del operador con forma de UUID: emite igual (checklist no la juzga)', async () => {
-    // Una referencia bancaria puede coincidir con `8-4-4-4-12` hex. El
-    // checklist caza fugas técnicas del SISTEMA, no el texto del operador: si
-    // la escanea, el render lanza, el mensaje muere en la DLQ y el comprobante
-    // queda sin PDF y sin email para siempre (el sweep lo re-encola cada 10 h).
+    // A bank reference can match `8-4-4-4-12` hex. The
+    // checklist catches technical leaks of the SYSTEM, not the operator's text: if
+    // it scans it, the render throws, the message dies in the DLQ and the receipt
+    // is left with no PDF and no email forever (the sweep re-enqueues it every 10 h).
     const { owner, organization, payment } = await createValidatedPayment(false, [
       { type: 'text', label: 'Referencia', value: '3f2a1b4c-5d6e-4f70-8a9b-0c1d2e3f4a5b' },
     ]);
@@ -363,7 +363,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const paymentId = Number(rows[0]!.id);
     expect(rows[0]!.receipt_pdf_key).toBeNull();
 
-    // Paso 2 completo (PDF en R2 + email encolado + marca de notificado).
+    // Complete step 2 (PDF in R2 + email enqueued + notified flag).
     const event = owner.client.receiptQueue.ofType('receipt.render')[0]!;
     expect(
       await handleReceiptRender(jobsEnv(owner.client), {
@@ -382,24 +382,24 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     )[0]!.receipt_pdf_key;
     expect(owner.client.r2.objects.has(pdfKey)).toBe(true);
 
-    // Simula la notificación perdida: el render quedó hecho pero el email del
-    // paso 2 nunca salió. Hasta C6 esa fila no la recuperaba nadie.
+    // Simulates the lost notification: the render was done but the step-2
+    // email never went out. Until C6 nobody recovered that row.
     await testQuery(
       `UPDATE payment SET receipt_issued_at = now() - interval '45 minutes', receipt_notified_at = NULL WHERE id = $1`,
       [paymentId],
     );
     resetSpies(owner.client);
 
-    // El barrido es global (no filtra por org): puede re-encolar pendientes
-    // de otros tests, así que se aserta por presencia, no por conteo.
+    // The sweep is global (it does not filter by org): it may re-enqueue pending rows
+    // from other tests, so it is asserted by presence, not by count.
     const { requeued } = await sweepPendingReceiptPdfs(sweepEnv(owner.client));
     expect(requeued).toBeGreaterThanOrEqual(1);
     const renders = owner.client.receiptQueue.ofType('receipt.render');
     expect(renders).toContainEqual(expect.objectContaining({ paymentId }));
 
-    // El evento re-encolado NO re-renderiza (el PDF ya existe): si entrara al
-    // render path, repoblaría el objeto en el spy de R2 — que vaciamos a
-    // propósito para poder afirmarlo.
+    // The re-enqueued event does NOT re-render (the PDF already exists): if it entered the
+    // render path, it would repopulate the object in the R2 spy — which we emptied on
+    // purpose to be able to assert it.
     owner.client.r2.reset();
     expect(
       await handleReceiptRender(jobsEnv(owner.client), {
@@ -411,10 +411,10 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       }),
     ).toBe('completed');
     expect(owner.client.r2.objects.size).toBe(0);
-    // Y sí recupera la notificación perdida.
+    // And it does recover the lost notification.
     expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(1);
 
-    // Segundo pase: ya notificado → ESE pago no se vuelve a encolar.
+    // Second pass: already notified → THAT payment is not enqueued again.
     resetSpies(owner.client);
     await sweepPendingReceiptPdfs(sweepEnv(owner.client));
     expect(
@@ -487,7 +487,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(processing.body.code).toBe('NOT_VALIDATED');
 
     const validatedId = await createWithStatus('validated');
-    // Limpia el número auto-asignado para probar el fallback manual.
+    // Clears the auto-assigned number to test the manual fallback.
     await testQuery(
       `UPDATE payment SET receipt_number = NULL, receipt_issued_at = NULL, subtotal = NULL, tax_total = NULL, tax_details = NULL WHERE id = $1`,
       [validatedId],
@@ -506,7 +506,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const again = await owner.client.post(`/api/payments/${validatedId}/issue`);
     expect(again.status).toBe(200);
     expect(again.body.receiptNumber).toBe(issued.body.receiptNumber);
-    // Idempotente: no quema otro número de secuencia.
+    // Idempotent: it does not burn another sequence number.
     const seqAfter = await testQuery<{ last_number: number }>(
       `SELECT last_number FROM organization_document_sequence WHERE organization_id = $1 AND document_type = 'receipt'`,
       [organization.id],
@@ -522,7 +522,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       owner.client.env['RECEIPT_QUEUE'] as Queue,
     );
 
-    // Pago sin número → 409 RECEIPT_NOT_ISSUED.
+    // Payment without a number → 409 RECEIPT_NOT_ISSUED.
     const member = await createGymMember(owner.client);
     const plan = await createPlan(owner.client, { price: 100, currency: 'USD' });
     const res = await owner.client.post('/api/subscriptions', {
@@ -579,7 +579,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       'PAYMENT_NOT_FOUND',
     );
 
-    // Re-void idempotente sin pisar auditoría.
+    // Idempotent re-void without overwriting the audit trail.
     const { payment } = await createValidatedPayment();
     const numberedId = Number(payment['id']);
     const first = await svc.markReceiptVoided({
@@ -611,7 +611,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       status: 'voided',
     });
     expect(patched.status).toBe(200);
-    // C6: el comprobante SÍ se anuló y el body lo dice (no un 200 mudo).
+    // C6: the receipt WAS voided and the body says so (not a mute 200).
     expect(patched.body).toMatchObject({ receiptVoided: true });
     expect(patched.body.receiptVoidReason).toBeUndefined();
 
@@ -650,7 +650,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const patched = await owner.client.patch(`/api/payments/${paymentId}/status`, {
       status: 'voided',
     });
-    // El status cambia igual; lo que se explicita es que NO había comprobante.
+    // The status changes anyway; what is made explicit is that there was NO receipt.
     expect(patched.status, patched.text).toBe(200);
     expect(patched.body).toMatchObject({
       receiptVoided: false,
@@ -678,7 +678,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     );
     await testQuery(`UPDATE gym_member SET email = '' WHERE id = $1`, [member.id]);
 
-    // La emisión ya ocurrió en el POST (paso 1 no exige email).
+    // The emission already happened in the POST (step 1 does not require an email).
     const receipt = await owner.client.get(`/api/payments/${paymentId}/receipt`);
     expect(receipt.status).toBe(202);
 
@@ -695,7 +695,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       'cashier-receipt',
     );
 
-    // Rama pendiente: re-encola render + 202.
+    // Pending branch: re-enqueues render + 202.
     const pending = await testQuery<{ id: number }>(
       `SELECT p.id FROM payment p JOIN subscription s ON s.id = p.subscription_id
        WHERE p.organization_id = $1 AND p.receipt_number IS NOT NULL AND p.receipt_pdf_key IS NULL
@@ -705,7 +705,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     const pendingId = Number(pending[0]!.id);
     resetSpies(owner.client);
     const resend = await owner.client.post(`/api/payments/${pendingId}/send-email`);
-    // El miembro del fixture sí tiene email → re-encola render.
+    // The fixture member does have an email → re-enqueues render.
     expect(resend.status).toBe(202);
     expect(
       owner.client.receiptQueue
@@ -713,8 +713,8 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
         .filter((m) => Number(m['paymentId']) === pendingId),
     ).toHaveLength(1);
 
-    // RBAC: cashier lee (202) y puede emitir (misma permiso UPDATE que
-    // PATCH /:id/status: la matriz da UPDATE de subscriptions a cashier).
+    // RBAC: cashier reads (202) and can issue (same UPDATE permission as
+    // PATCH /:id/status: the matrix gives subscriptions UPDATE to cashier).
     const cashierRead = await cashier.client.get(`/api/payments/${pendingId}/receipt`);
     expect(cashierRead.status).toBe(202);
     const cashierIssue = await cashier.client.post(
@@ -722,7 +722,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     );
     expect(cashierIssue.status).toBe(200);
 
-    // Anónimo: 401.
+    // Anonymous: 401.
     const anon = await owner.client.get(`/api/payments/${pendingId}/receipt`, {
       anonymous: true,
     });

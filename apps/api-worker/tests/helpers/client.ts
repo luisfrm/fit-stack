@@ -83,7 +83,7 @@ export class TestClient {
   private readonly cookies = new Map<string, string>();
   readonly env: Record<string, unknown>;
   readonly queue: QueueSpy;
-  /** Spy de fit-receipt-events (paso 1, issue, re-encolados). */
+  /** Spy for fit-receipt-events (step 1, issue, re-enqueues). */
   readonly receiptQueue: QueueSpy;
   readonly r2: R2Spy;
 

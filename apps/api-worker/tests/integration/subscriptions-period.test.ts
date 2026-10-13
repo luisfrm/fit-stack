@@ -34,7 +34,7 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     await truncateAll();
   });
 
-  /** Tenant con miembro + plan de la duración indicada (precio en centavos). */
+  /** Tenant with member + plan of the given duration (price in cents). */
   async function setupFixture(
     tenant: GymTenant,
     durationValue = 1,
@@ -112,7 +112,7 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     });
     expect(second.status, second.text).toBe(201);
 
-    // El inicio es hoy, pero el fin acumula desde el periodo vigente.
+    // The start is today, but the end accumulates from the period in force.
     expect(toLocalDayString(TZ, new Date(second.body.startDate))).toBe(
       toLocalDayString(TZ, new Date()),
     );
@@ -146,7 +146,7 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     });
     expect(second.status, second.text).toBe(201);
 
-    // Baseline = hoy: el fin se calcula desde el inicio, no desde la vencida.
+    // Baseline = today: the end is computed from the start, not from the expired one.
     const expectedEnd = toLocalDayString(
       TZ,
       addDuration(new Date(second.body.startDate), 1, 'month', TZ),
@@ -209,7 +209,7 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     });
     expect(res.status, res.text).toBe(201);
 
-    // Se usa el endDate explícito y el motivo queda persistido.
+    // The explicit endDate is used and the reason is persisted.
     expect(toLocalDayString(TZ, new Date(res.body.endDate))).toBe(localDay(5, TZ));
     expect(res.body.endDateOverrideReason).toBe(reason);
 
@@ -246,8 +246,8 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     });
     expect(first.status, first.text).toBe(201);
 
-    // Renovación que envía exactamente el fin calculado (acumulativo): no
-    // acorta nada → no exige motivo y no lo persiste.
+    // Renewal that sends exactly the computed end (cumulative): it does not
+    // shorten anything → it does not require a reason and does not persist one.
     const second = await tenant.owner.client.post<CreatedSub>('/api/subscriptions', {
       memberId: member.id,
       planId: plan.id,
@@ -266,8 +266,8 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     const tenant = await createGymTenant('period-h');
     const { member, plan } = await setupFixture(tenant);
 
-    // Sin periodo previo: un periodo de un solo día es legítimo, no hay días
-    // que perder → libre.
+    // No previous period: a one-day period is legitimate, there are no days
+    // to lose → free.
     const res = await tenant.owner.client.post<CreatedSub>('/api/subscriptions', {
       memberId: member.id,
       planId: plan.id,
@@ -291,8 +291,8 @@ describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () 
     });
     expect(first.status, first.text).toBe(201);
 
-    // El mismo día (hoy) es muy anterior al fin vigente → acorta el periodo
-    // vigente y exige motivo.
+    // The same day (today) is far earlier than the end in force → it shortens the
+    // period in force and requires a reason.
     const res = await tenant.owner.client.post('/api/subscriptions', {
       memberId: member.id,
       planId: plan.id,

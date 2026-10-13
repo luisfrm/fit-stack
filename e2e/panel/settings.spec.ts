@@ -54,7 +54,7 @@ test.describe('Panel — Settings', () => {
     const disclaimer = `Aviso fiscal E2E ${uid()}`;
     await section.getByLabel('Disclaimer legal alternativo').fill(disclaimer);
 
-    // Declaración formal con doble confirmación (fricción intencional).
+    // Formal declaration with double confirmation (intentional friction).
     await section.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }).check();
     await section.getByRole('button', { name: 'Guardar facturación' }).click();
     const confirmDialog = page.getByRole('dialog').filter({ hasText: 'Confirmar declaración formal' });
@@ -72,7 +72,7 @@ test.describe('Panel — Settings', () => {
     await expect(
       reloaded.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }),
     ).toBeChecked();
-    // Sin homologación real, la etiqueta aplicada sigue siendo comprobante.
+    // Without real homologation, the applied label is still receipt.
     await expect(reloaded.getByText('Comprobante de pago').first()).toBeVisible();
   });
 
@@ -82,14 +82,14 @@ test.describe('Panel — Settings', () => {
     const slogan = page.getByLabel('Eslogan / Lema');
     await expect(slogan).toBeVisible({ timeout: 30_000 });
 
-    // El eslogan es dato propio de la sede y no lo asertan otros specs.
+    // The slogan is data owned by the branch and other specs do not assert it.
     const value = `Sede E2E ${uid()}`;
     await slogan.fill(value);
     await page.getByRole('button', { name: 'Actualizar Sede' }).click();
 
-    // Regresión C8: el guardado general llamaba a `/api/platform/organizations`
-    // (`requirePlatformAuth`) → 403 para un owner de gym. El toast de éxito es
-    // la señal de que ahora usa el endpoint org-scoped real.
+    // C8 regression: the general save called `/api/platform/organizations`
+    // (`requirePlatformAuth`) → 403 for a gym owner. The success toast is
+    // the signal that it now uses the real org-scoped endpoint.
     await expect(
       page.getByText('Información de la sede actualizada correctamente').first(),
     ).toBeVisible({ timeout: 20_000 });
@@ -98,9 +98,9 @@ test.describe('Panel — Settings', () => {
     await expect(page.getByLabel('Eslogan / Lema')).toHaveValue(value, { timeout: 30_000 });
   });
 
-  // Depende de que el spec "guarda la configuración fiscal…" (arriba) haya
-  // declarado la sede como contribuyente formal: sin esa declaración el
-  // ajuste manual de impuestos ni se ofrece (C2, el override solo reduce).
+  // It depends on the spec "guarda la configuración fiscal…" (above) having
+  // declared the branch as a formal taxpayer: without that declaration the
+  // manual tax override is not even offered (C2, the override only reduces).
   test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NUEVO PAGO' }).click();

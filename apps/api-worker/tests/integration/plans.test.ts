@@ -156,7 +156,7 @@ describe.skipIf(skipReason !== null)('Plans API', () => {
       });
 
       expect(res.status, res.text).toBe(200);
-      // bigint centavos: la API devuelve number, no string 'numeric'.
+      // bigint cents: the API returns a number, not a 'numeric' string.
       expect(res.body.price).toBe(99);
     });
   });

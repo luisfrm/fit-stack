@@ -29,7 +29,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     await truncateAll();
   });
 
-  /** Miembro + plan listos para el alta (precio del plan en centavos). */
+  /** Member + plan ready for creation (plan price in cents). */
   async function setupFixture(tenant: GymTenant) {
     const member = await createGymMember(tenant.owner.client);
     const plan = await createPlan(tenant.owner.client, {
@@ -59,7 +59,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     };
   }
 
-  /** Rompe el perfil fiscal: `resolveFiscalProfile` lanza sin fallback. */
+  /** Breaks the fiscal profile: `resolveFiscalProfile` throws with no fallback. */
   async function breakFiscalCountry(organizationId: string) {
     await testQuery(`UPDATE organization SET country_code = 'XX' WHERE id = $1`, [
       organizationId,
@@ -81,7 +81,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
       '/api/subscriptions',
       subscriptionPayload(member.id, plan.id),
     );
-    // El error original se re-lanza tras compensar: `onError` lo traduce.
+    // The original error is re-thrown after compensating: `onError` translates it.
     expect(res.status, res.text).not.toBe(201);
 
     const payments = await testQuery<{
@@ -103,22 +103,22 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     expect(payments[0]!.voided_by).toBeTruthy();
     expect(payments[0]!.receipt_number).toBeNull();
 
-    // El perfil fiscal se resuelve ANTES de consumir la secuencia: ningún
-    // correlativo quemado → sin hueco en la secuencia anual.
+    // The fiscal profile is resolved BEFORE consuming the sequence: no
+    // burned correlative → no hole in the yearly sequence.
     const seq = await testQuery<{ last_number: number }>(
       `SELECT last_number FROM organization_document_sequence WHERE organization_id = $1`,
       [organization.id],
     );
     expect(seq).toHaveLength(0);
 
-    // El pago `voided` sin número no es comprobante: fuera del reporte.
+    // The `voided` payment without a number is not a receipt: out of the report.
     const report = await owner.client.get('/api/reports/receipts');
     expect(report.status, report.text).toBe(200);
     expect(report.body.rows).toEqual([]);
     expect(report.body.total).toBe(0);
     expect(report.body.gaps).toEqual([]);
 
-    // La suscripción sigue existiendo como ANULADA: nada se borra (regla 6).
+    // The subscription still exists as ANULADA: nothing is deleted (rule 6).
     const list = await owner.client.get<{ data: Array<{ id: number; status: string }> }>(
       '/api/subscriptions',
       { query: { limit: '10' } },
@@ -142,11 +142,11 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
       '/api/subscriptions',
       subscriptionPayload(member.id, plan.id),
     );
-    // El `voided` no bloquea el reintento (el guard solo frena `processing`).
+    // The `voided` does not block the retry (the guard only stops `processing`).
     expect(retry.status, retry.text).toBe(201);
 
-    // Conteo por memberId: 2 filas de suscripción (la compensada se conserva
-    // como auditoría ANULADA) pero exactamente 1 válida y 1 cobro.
+    // Count by memberId: 2 subscription rows (the compensated one is kept
+    // as ANULADA audit) but exactly 1 valid one and 1 charge.
     const subs = await testQuery<{ id: number }>(
       `SELECT id FROM subscription WHERE member_id = $1 AND organization_id = $2`,
       [member.id, organization.id],
@@ -179,8 +179,8 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     const { owner, organization } = await createGymTenant('comp-c');
     const { member, plan } = await setupFixture({ owner, organization });
 
-    // Tasa no numérica: pasa el schema (string) pero la columna
-    // `exchange_rate_applied` es numeric(10,4) → el insert falla en DB.
+    // Non-numeric rate: it passes the schema (string) but the
+    // `exchange_rate_applied` column is numeric(10,4) → the insert fails in the DB.
     const res = await owner.client.post(
       '/api/subscriptions',
       subscriptionPayload(member.id, plan.id, { exchangeRateApplied: 'XX-NOT-A-RATE' }),
@@ -193,10 +193,10 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
       [member.id, organization.id],
     );
     expect(subs).toHaveLength(1);
-    // Huérfana cancelada, nunca borrada (regla 6).
+    // Orphan cancelled, never deleted (rule 6).
     expect(subs[0]!.cancelled_at).not.toBeNull();
 
-    // Ningún pago huérfano: el LEFT JOIN no empareja nada para la suscripción.
+    // No orphan payment: the LEFT JOIN matches nothing for the subscription.
     const orphans = await testQuery<{ id: number }>(
       `SELECT s.id FROM subscription s
          LEFT JOIN payment p ON p.subscription_id = s.id
@@ -227,7 +227,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     expect(res.body.id).toBeDefined();
     expect(res.body.endDate).toBeTruthy();
 
-    // El pago quedó validado y numerado (emisión exitosa).
+    // The payment ended up validated and numbered (successful emission).
     const charges = await testQuery<{ status: string; receipt_number: string | null }>(
       `SELECT status, receipt_number FROM payment
         WHERE member_id = $1 AND organization_id = $2`,

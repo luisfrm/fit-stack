@@ -1,13 +1,13 @@
 /**
- * Org-scoped billing endpoints (fase 2 — renovación autoservicio).
+ * Org-scoped billing endpoints (phase 2 — self-service renewal).
  *
- * Covers: GET /api/organizations/subscription (detalle de la sub de la org),
- * GET /api/organizations/payment-methods (métodos de plataforma expuestos),
- * POST /api/organizations/subscription/renew (snapshot/tasa/monto dictados
- * por el backend — el body no puede hardcodear montos ni tasas), guards de
- * renovación (solo al expirar, sin pagos pendientes, no cancelada, owner/
- * manager) y el flujo de aprobación en console (PATCH status VALIDATED →
- * extiende el periodo).
+ * Covers: GET /api/organizations/subscription (org sub detail),
+ * GET /api/organizations/payment-methods (platform methods exposed),
+ * POST /api/organizations/subscription/renew (snapshot/rate/amount dictated
+ * by the backend — the body cannot hardcode amounts or rates), renewal
+ * guards (only on expiry, no pending payments, not cancelled, owner/
+ * manager) and the approval flow in console (PATCH status VALIDATED →
+ * extends the period).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
@@ -77,7 +77,7 @@ async function latestPayment(subscriptionId: number): Promise<Record<string, any
   return rows[0];
 }
 
-/** Mock del API de tasas (open.er-api.com) para el test cross-currency. */
+/** Mock of the rates API (open.er-api.com) for the cross-currency test. */
 function startRateServer(rates: Record<string, number>): Promise<{ url: string; server: Server }> {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
@@ -110,7 +110,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
     admin = await registerPlatformUser('admin');
     const plan = await createPlatformPlan(admin);
 
-    // tenantA: sub expirada (para renovar)
+    // tenantA: expired sub (to renew)
     tenantA = await createGymTenant('renew-owner');
     subA = await createPlatformSubscription(admin, tenantA.organization.id, plan.id, -60);
     await testQuery(
@@ -118,10 +118,10 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       [subA.id],
     );
 
-    // tenantB: sin suscripción
+    // tenantB: no subscription
     tenantB = await createGymTenant('no-sub-owner');
 
-    // tenantC: sub vigente (no expirada)
+    // tenantC: sub in force (not expired)
     tenantC = await createGymTenant('fresh-owner');
     subC = await createPlatformSubscription(admin, tenantC.organization.id, plan.id, -5);
 
@@ -226,7 +226,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
     });
 
     it('creates a processing payment from the server-side snapshot, ignoring tampered body fields', async () => {
-      // Body intenta hardcodear monto, tasa y status — el backend los ignora.
+      // The body tries to hardcode amount, rate and status — the backend ignores them.
       const res = await tenantA.owner.client.post('/api/organizations/subscription/renew', {
         paymentMethod: 'Binance',
         currencyPaid: 'USD',
@@ -250,7 +250,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       expect(Number(payment.plan_snapshot_price)).toBe(5000);
       expect(payment.payment_method).toBe('Binance');
 
-      // El periodo NO se extiende con un pago en revisión
+      // The period is NOT extended with a payment under review
       const sub = await testQuery<{ current_period_end: string }>(
         `SELECT current_period_end FROM platform_subscription WHERE id = $1`,
         [subA.id],
@@ -268,7 +268,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
     });
 
     it('computes rate and amount server-side for cross-currency payments', async () => {
-      // tenantB no tiene sub; reusamos tenantC: expiramos su sub (nadie renovó ahí).
+      // tenantB has no sub; we reuse tenantC: we expire its sub (nobody renewed there).
       await testQuery(
         `UPDATE platform_subscription SET current_period_end = NOW() - INTERVAL '3 days' WHERE id = $1`,
         [subC.id],
@@ -304,7 +304,7 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
       );
       expect(new Date(sub[0].current_period_end).getTime()).toBeGreaterThan(Date.now());
 
-      // La org vuelve a leer su sub como activa
+      // The org reads its sub as active again
       const orgSub = await tenantA.owner.client.get('/api/organizations/subscription');
       expect(orgSub.status, orgSub.text).toBe(200);
       expect(orgSub.body.subscription.status).toBe('active');
@@ -313,8 +313,8 @@ describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autose
 
   describe('POST /api/organizations/subscription/renew — emails', () => {
     it('enqueues email.org_payment_received with the payer from the session', async () => {
-      // tenantC fue renovada en el test cross-currency (pago processing vigente);
-      // para este test expiramos de nuevo y la renovamos.
+      // tenantC was renewed in the cross-currency test (processing payment in force);
+      // for this test we expire it again and renew it.
       await testQuery(
         `UPDATE platform_subscription_payment SET status = 'validated' WHERE subscription_id = $1`,
         [subC.id],

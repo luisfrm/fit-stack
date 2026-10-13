@@ -1,23 +1,23 @@
 /**
- * Seed de demo — rellena la org fija `Fit Stack` / `fit-stack`.
+ * Demo seed — fills the fixed org `Fit Stack` / `fit-stack`.
  *
- * NO es un test: es un relleno de datos para simular una org activa y poder
- * verificar todo a mano en el panel. Se ejecuta con:
+ * It is NOT a test: it is data filling to simulate an active org so everything
+ * can be checked by hand in the panel. It runs with:
  *
  *   pnpm seed:e2e
  *
- * Reglas:
- * - Idempotente: cada pieza se busca por su identificador natural (slug de org,
- *   email de miembro, nombre de plan/clase, slug de página CMS) y solo se crea
- *   lo que falta. Re-correr no duplica. La org NUNCA se borra.
- * - Fechas relativas, nunca fijas: cohortes por mes (`monthsAgo` 5..0) con las
- *   utilidades de `@workspace/shared` en la timezone de la org, para que
- *   crecimiento 6M, revenue y KPIs siempre tengan forma.
- * - Todo por API real salvo el `created_at` de miembros (la API no acepta fecha
- *   de alta: se retrofecha por SQL; excepción solo del seed, los tests jamás
- *   tocan la DB para fechas).
+ * Rules:
+ * - Idempotent: every piece is looked up by its natural identifier (org slug,
+ *   member email, plan/class name, CMS page slug) and only what is missing
+ *   gets created. Re-running does not duplicate. The org is NEVER deleted.
+ * - Relative dates, never fixed: monthly cohorts (`monthsAgo` 5..0) with the
+ *   `@workspace/shared` utilities in the org timezone, so that
+ *   the 6M growth, revenue and KPIs always have shape.
+ * - Everything through the real API except the members `created_at` (the API
+ *   does not accept a join date: it is backdated via SQL; an exception only of
+ *   the seed, the tests never touch the DB for dates).
  *
- * Requiere el api-worker dev corriendo (`pnpm --filter api-worker dev`).
+ * Requires the api-worker dev server running (`pnpm --filter api-worker dev`).
  */
 import { addLocalDays, localMonthStartUtc, toLocalDayString } from '@workspace/shared';
 import { API_BASE_URL, apiJson, setActiveOrganization } from './helpers/api';
@@ -56,7 +56,7 @@ const SEED_PLANS = [
   { name: 'Plan Seed Diario', price: 5, currency: 'USD', durationValue: 1, durationUnit: 'day', isPopular: false },
 ] as const;
 
-// 30 nombres deterministas (5 por cohorte × 6 meses).
+// 30 deterministic names (5 per cohort × 6 months).
 const SEED_NAMES: Array<[string, string]> = [
   ['Lucía', 'Fernández'], ['Miguel', 'Torres'], ['Sofía', 'Ramírez'], ['Diego', 'Morales'], ['Valentina', 'Castillo'],
   ['Andrés', 'Vargas'], ['Camila', 'Rojas'], ['Javier', 'Silva'], ['Mariana', 'Navarro'], ['Carlos', 'Mendoza'],
@@ -129,7 +129,7 @@ async function assertApiAlive(): Promise<void> {
   }
 }
 
-/** Día 15 del mes `monthsAgo` en la tz de la org (para pagos históricos). */
+/** Day 15 of the `monthsAgo` month in the org tz (for historical payments). */
 function monthDay(tz: string, monthsAgo: number, day: number): string {
   const monthStart = toLocalDayString(tz, localMonthStartUtc(tz, monthsAgo));
   return addLocalDays(tz, monthStart, day - 1);
@@ -166,9 +166,9 @@ interface SeededMember {
 }
 
 /**
- * 5 miembros por cohorte mensual (4 activos + 1 inactivo), con `created_at`
- * retrofechado al día 1 de su mes. Sin portal: vincular `userId` exige el flujo
- * de invitación (token), fuera del alcance del seed v1.
+ * 5 members per monthly cohort (4 active + 1 inactive), with `created_at`
+ * backdated to day 1 of their month. No portal: linking `userId` requires the
+ * invitation flow (token), out of the scope of seed v1.
  */
 async function ensureMembers(
   cookies: string,
@@ -210,7 +210,7 @@ async function ensureMembers(
       members.push({ id: created.id, email, monthsAgo });
       counter.created += 1;
     }
-    // Retrofecha solo los recién creados de la cohorte al día 1 de su mes.
+    // Backdates only the newly created members of the cohort to day 1 of their month.
     if (cohortIds.length > 0) {
       const at = localMonthStartUtc(TZ, monthsAgo);
       await e2eQuery(
@@ -220,8 +220,8 @@ async function ensureMembers(
     }
   }
 
-  // Cumpleaños próximos (siempre dentro de 7 días, año fijo 1990): alimenta el
-  // widget de cumpleaños en cualquier fecha de ejecución.
+  // Upcoming birthdays (always within 7 days, fixed year 1990): feeds the
+  // birthday widget on any run date.
   const today = toLocalDayString(TZ);
   const targets = members.slice(0, 4);
   for (let k = 0; k < targets.length; k += 1) {
@@ -251,15 +251,15 @@ async function ensureSubscriptions(
   let processingLeft = 3;
   for (let pos = 0; pos < members.length; pos += 1) {
     const member = members[pos]!;
-    // El 5to de cada cohorte (inactivo) queda sin suscripción a propósito
-    // para alimentar el KPI "sin plan".
+    // The 5th of each cohort (inactive) is left without a subscription on purpose
+    // to feed the "sin plan" KPI.
     if (pos % 5 === 4) continue;
     if (withSub.has(member.email)) {
       counter.reused += 1;
       continue;
     }
-    // Cohort actual (mes 0): mezcla de validadas + processing (accionable).
-    // Cohortes viejas: validadas históricas (vencidas o vigentes según el mes).
+    // Current cohort (month 0): mix of validated + processing (actionable).
+    // Old cohorts: historical validated ones (expired or current depending on the month).
     const status = member.monthsAgo === 0 && processingLeft > 0 ? 'processing' : 'validated';
     if (status === 'processing') processingLeft -= 1;
 
@@ -359,16 +359,16 @@ function line(label: string, counter: Counter): void {
 async function main(): Promise<void> {
   await assertApiAlive();
 
-  // 1) Consola + org fija (si no existe se crea, si existe se rellena).
+  // 1) Console + fixed org (created if it does not exist, filled if it does).
   const platform = await ensurePlatformTenant();
   const suite = await ensureSuiteTenant(platform, SEED_ORG, SEED_OWNER);
   await setActiveOrganization(suite.cookies, suite.organization.id);
   console.log(`[seed] org "${SEED_ORG.slug}" lista (id=${suite.organization.id})`);
 
-  // 2) Suscripción de plataforma para features completas.
+  // 2) Platform subscription for full features.
   line('suscripción plataforma', await ensureOrgSubscription(platform, suite.organization.id));
 
-  // 3) Catálogo + miembros por cohorte + suscripciones + clases + CMS.
+  // 3) Catalog + members per cohort + subscriptions + classes + CMS.
   const { ids: planIds, counter: plansCounter } = await ensurePlans(suite.cookies);
   line('planes', plansCounter);
 

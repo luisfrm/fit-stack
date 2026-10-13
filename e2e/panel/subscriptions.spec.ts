@@ -4,9 +4,9 @@ import { SELECTORS } from '../helpers/selectors';
 import { TEST_CLASS, TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString, getVoidKind } from '@workspace/shared';
 
-// Fixture por test con limpieza automática (fixture `panelApi` → LIFO al
-// terminar, incluso si el test falla). La org de la suite se borra completa en
-// el teardown global, así que ningún residuo sobrevive a la corrida.
+// Per-test fixture with automatic cleanup (fixture `panelApi` → LIFO at the
+// end, even if the test fails). The org of the suite is wiped entirely in
+// the global teardown, so no residue survives the run.
 test.describe('Panel — Pago pendiente accionable', () => {
   test('validar desde la lista quita el pendiente y refresca tabla + KPIs', async ({
     page,
@@ -16,9 +16,9 @@ test.describe('Panel — Pago pendiente accionable', () => {
     const tz = TEST_ORG.timezone;
     const today = toLocalDayString(tz);
 
-    // Fixture del test: plan → cliente → suscripción con pago `processing`.
-    // Todo registrado en el cliente de API, así que se borra al terminar
-    // (LIFO: suscripción → cliente → plan), incluso si el test falla.
+    // Test fixture: plan → client → subscription with a `processing` payment.
+    // Everything registered in the API client, so it is deleted at the end
+    // (LIFO: subscription → client → plan), even if the test fails.
     const plan = await panelApi.create<any>('plan', '/api/plans', {
       name: `Plan Pendiente ${uid()}`,
       price: 50,
@@ -63,7 +63,7 @@ test.describe('Panel — Pago pendiente accionable', () => {
       0;
     expect(paymentId, 'el fixture de pago processing debe aparecer en el listado').toBeTruthy();
 
-    // Primera visita a /payments de este worker: MISS de cache garantizado.
+    // First visit to /payments for this worker: guaranteed cache MISS.
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
 
     const item = page.locator(SELECTORS.subscriptions.pendingItem(paymentId));
@@ -72,7 +72,7 @@ test.describe('Panel — Pago pendiente accionable', () => {
     await item.locator('.pending-validate').click();
     await expect(item).toBeHidden({ timeout: 20_000 });
 
-    // La tabla y los KPIs siguen visibles tras el refresh.
+    // The table and the KPIs are still visible after the refresh.
     await expect(page.locator(SELECTORS.common.table).first()).toBeVisible({ timeout: 20_000 });
   });
 
@@ -131,11 +131,11 @@ test.describe('Panel — Pago pendiente accionable', () => {
     await expect(item).toBeVisible({ timeout: 30_000 });
 
     await item.locator('.pending-reject').click();
-    // Rechazar = `voided`: sale de la lista de trabajo (`processing`).
+    // Rejecting = `voided`: it leaves the work list (`processing`).
     await expect(item).toBeHidden({ timeout: 20_000 });
 
-    // La fila persiste como ANULADA; el cobro sin comprobante se etiqueta
-    // "Rechazado" (no "Anulado"), derivado con `getVoidKind`.
+    // The row persists as ANULADA; the charge without a receipt is labeled
+    // "Rechazado" (not "Anulado"), derived with `getVoidKind`.
     const paymentLabel =
       getVoidKind({ receiptNumber: row?.receiptNumber ?? null }) === 'rejected'
         ? 'Rechazado'
@@ -176,8 +176,8 @@ test.describe('Panel — Suscripciones y pagos', () => {
   });
 });
 
-// Se mantiene el nombre de la clase sembrada en el fixture para que este spec
-// falle si el setup dejó de sembrar el catálogo del gimnasio.
+// The class name seeded in the fixture is kept so this spec
+// fails if the setup stops seeding the gym catalog.
 test.describe('Panel — Catálogo sembrado', () => {
   test('las clases sembradas aparecen en el calendario', async ({ page }) => {
     await page.goto('/classes', { waitUntil: 'domcontentloaded' });
