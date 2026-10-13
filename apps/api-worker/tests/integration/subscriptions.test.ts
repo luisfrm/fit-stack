@@ -106,7 +106,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(res.status, res.text).toBe(201);
 
-      // Paso 1: número + render encolado; el email lo encola el paso 2 (Fase 2).
+      // Step 1: number + render enqueued; step 2 enqueues the email (Phase 2).
       const renders = owner.client.receiptQueue.ofType('receipt.render');
       expect(renders).toHaveLength(1);
       expect(renders[0]!.organizationId).toBe(organization.id);
@@ -316,8 +316,8 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         memberId: member.id,
         planId: plan.id,
         startDate: isoDate(31),
-        // B3.3: el fin lo calcula el servidor; el endDate de cliente
-        // (isoDate(61)) contradice la autoridad y se rechazaría con 422.
+        // B3.3: the end is computed by the server; the client endDate
+        // (isoDate(61)) contradicts the authority and would be rejected with 422.
         payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
@@ -325,6 +325,32 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.status, res.text).toBe(200);
       expect(res.body.data.length).toBeGreaterThanOrEqual(2);
       expect(res.body).toHaveProperty('total');
+    });
+
+    it('keeps a soft-deleted plan searchable by name (history is findable)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+      });
+
+      const del = await owner.client.delete(`/api/plans/${plan.id}`);
+      expect(del.status, del.text).toBe(200);
+
+      // Decision under test (RD-142): the panel search matches the plan the
+      // member actually bought, even after the plan is hidden from the catalog.
+      const res = await owner.client.get('/api/subscriptions', {
+        query: { query: plan.name, limit: '50' },
+      });
+
+      expect(res.status, res.text).toBe(200);
+      const row = res.body.data.find((r: { planId: number }) => r.planId === plan.id);
+      expect(row, 'the subscription must still be found by the deleted plan name').toBeDefined();
+      expect(row.planName).toBe(plan.name);
     });
 
     it('returns recent subscriptions', async () => {
@@ -369,7 +395,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
   });
 
   describe('Estado derivado (anulada vs revocada)', () => {
-    /** Crea una sub con pago `validated` y devuelve su id + el del pago. */
+    /** Creates a sub with a `validated` payment and returns its id + the payment's id. */
     async function seedSubscription(owner: AuthedUser, member: any, plan: any) {
       const created = await owner.client.post('/api/subscriptions', {
         memberId: member.id,
@@ -409,7 +435,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(voided.status, voided.text).toBe(200);
 
-      // Anulada ≠ cancelada: el registro es inválido, no es una revocación.
+      // Voided ≠ cancelled: the record is invalid, it is not a revocation.
       expect(await readStatus(owner, subId)).toBe('voided');
     });
 
@@ -421,15 +447,15 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         status: 'invalid',
       });
 
-      // `invalid`/`pending` desaparecieron del contrato: el enum solo acepta
-      // processing | validated | voided. El schema rechaza antes del servicio.
+      // `invalid`/`pending` disappeared from the contract: the enum only accepts
+      // processing | validated | voided. The schema rejects before the service.
       expect(res.status, res.text).toBe(400);
     });
 
     it('rechazar un cobro `processing` (`voided`) deja la suscripción ANULADA con auditoría persistida', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
 
-      // Alta con pago `processing`: no emite comprobante (queda en revisión).
+      // Creation with a `processing` payment: it does not issue a receipt (it stays under review).
       const created = await owner.client.post('/api/subscriptions', {
         memberId: member.id,
         planId: plan.id,
@@ -457,16 +483,16 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         voidReason: 'Comprobante ilegible',
       });
       expect(voided.status, voided.text).toBe(200);
-      // C6: rechazar sin comprobante emitido responde 200 y lo dice.
+      // C6: rejecting without an issued receipt answers 200 and says so.
       expect(voided.body).toMatchObject({
         receiptVoided: false,
         receiptVoidReason: 'not_issued',
       });
 
-      // El status derivado es ANULADA (registro inválido), no cancelada.
+      // The derived status is ANULADA (invalid record), not cancelled.
       expect(await readStatus(owner, created.body.id)).toBe('voided');
 
-      // La auditoría se persiste SIEMPRE al anular, haya o no comprobante.
+      // The audit trail is ALWAYS persisted when voiding, whether or not there is a receipt.
       const rows = await testQuery<{
         status: string;
         void_reason: string | null;
@@ -509,8 +535,8 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
 
   describe('Guards de transición de pago (invariante validado ⇔ numerado)', () => {
     /**
-     * Alta con el status de pago indicado. Devuelve el `paymentId` resuelto
-     * desde el listado (el POST responde la suscripción, no el pago).
+     * Creation with the given payment status. Returns the `paymentId` resolved
+     * from the listing (the POST answers the subscription, not the payment).
      */
     async function seedWithPaymentStatus(
       owner: AuthedUser,
@@ -560,8 +586,8 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(voided.status, voided.text).toBe(200);
 
-      // Re-validar dejaría un `validated` sin periodo que lo sostenga (el void
-      // ya canceló la suscripción): se rechaza por CÓDIGO, antes de escribir.
+      // Re-validating would leave a `validated` with no period to sustain it (the void
+      // already cancelled the subscription): it is rejected by CODE, before writing.
       const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'validated',
       });
@@ -582,8 +608,8 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(revoked.status, revoked.text).toBe(200);
 
-      // Sin el guard quedaría un `validated` numerado sobre un periodo
-      // revocado: incoherencia silenciosa. Fail-closed ANTES del write.
+      // Without the guard a numbered `validated` would remain over a revoked
+      // period: silent incoherence. Fail-closed BEFORE the write.
       const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'validated',
       });
@@ -603,11 +629,11 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         status: 'validated',
       });
       expect(first.status, first.text).toBe(200);
-      // Numeración per-org anual: `{slug}-{año}-{secuencia}`.
+      // Per-org yearly numbering: `{slug}-{year}-{sequence}`.
       const numbered = (await readPayment(paymentId)).receipt_number;
       expect(numbered).toMatch(/\d{4}-\d+$/);
 
-      // Re-PATCH idempotente: no re-numera ni revienta (no es una transición).
+      // Idempotent re-PATCH: it does not renumber nor blow up (it is not a transition).
       const second = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'validated',
       });
@@ -631,7 +657,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       const res = await owner.client.delete(`/api/subscriptions/${created.body.id}`);
       expect(res.status, res.text).toBe(404);
 
-      // La suscripción sigue existiendo.
+      // The subscription still exists.
       const list = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
         query: { limit: '10' },
       });
