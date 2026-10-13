@@ -243,7 +243,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract (C3)', () => {
   });
 
   it('resend sin destinatarios: 422 PAYER_EMAIL_MISSING', async () => {
-    // Tenant dedicado: borrar sus owners deja el pago sin recipients.
+    // Dedicated tenant: deleting its owners leaves the payment with no recipients.
     const lonely = await createGymTenant('c3-lonely');
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: lonely.organization.id,
@@ -279,8 +279,8 @@ describe.skipIf(skipReason !== null)('Platform receipts contract (C3)', () => {
 
   it('RBAC: support lee (GET 200) pero no reenvía (403); sin sesión 401', async () => {
     const { paymentId } = await approveAndComplete();
-    // Pago pendiente aparte: el R2 spy es por-cliente, así que el 404 aquí
-    // prueba permiso (no 403) sin depender del objeto de otro spy.
+    // Separate pending payment: the R2 spy is per-client, so the 404 here
+    // proves permission (not 403) without depending on another spy's object.
     const pendingId = await createProcessingPayment();
     await approvePayment(pendingId);
     const support = await registerPlatformUser('support');

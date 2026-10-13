@@ -115,7 +115,7 @@ export async function createOrganization(
   const name = overrides.name ?? `Gym ${slug}`;
   const countryCode = overrides.countryCode ?? 'VE';
 
-  // Obligatorios de la org (columnas NOT NULL, sin defaults silenciosos).
+  // Required org fields (NOT NULL columns, no silent defaults).
   const res = await client.post('/api/auth/organization/create', {
     name,
     slug,

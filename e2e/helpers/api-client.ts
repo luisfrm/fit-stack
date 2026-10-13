@@ -1,21 +1,26 @@
 /**
- * Cliente HTTP de los E2E con **tracking de recursos**.
+ * E2E HTTP client with **resource tracking**.
  *
- * Cada recurso creado desde un test (`create(...)` o `track(...)`) se registra y
- * se borra automáticamente al terminar el test, en orden inverso al de creación
- * — así se respeta la dependencia entre un plan y su suscripción. Reemplaza los
- * `afterAll` manuales que se olvidaban y dejaban basura en la base de desarrollo.
+ * Every resource created from a test (`create(...)` or `track(...)`) is registered
+ * and automatically deleted when the test ends, in reverse creation order
+ * — that way the dependency between a plan and its subscription is respected. It
+ * replaces the manual `afterAll` hooks that were forgotten and left garbage in
+ * the development database.
  */
 import type { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL } from './api';
 
 /**
- * Endpoint de borrado por tipo de recurso creado desde los tests.
+ * Delete endpoint per resource kind created from the tests.
  *
- * `null` = el recurso NO se borra por API. Es el caso de `subscription`: un
- * registro financiero (suscripción + pago) no tiene DELETE — se anula. La
- * limpieza sigue siendo completa porque el borrado del **miembro** lo arrastra
- * por FK (`member_id` → ON DELETE CASCADE) y se ejecuta después (LIFO).
+ * `null` = the resource is NOT deleted through the API. That is the case of
+ * `subscription`: a financial record (subscription + payment) has no DELETE —
+ * it is voided instead. Member (RD-120) and plan (RD-142) deletes are both
+ * **soft deletes** (`deleted_at` + `restrict` FKs), so nothing cascades any
+ * more: every per-test row stays inside `e2e-suite` until the tenant wipe
+ * (global-setup/teardown), which is the real safety net. `cleanupDisposables`
+ * stays best-effort: a failing delete warns `(se ignora)` and never fails a
+ * test.
  */
 const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = {
   cmsBlock: (id) => `/api/cms/blocks/${id}`,
@@ -27,7 +32,7 @@ const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = 
   plan: (id) => `/api/plans/${id}`,
   platformOrg: (id) => `/api/platform/organizations/${id}`,
   platformPlan: (id) => `/api/platform/plans/${id}`,
-  // Borra la suscripción SaaS; los pagos cascaddean por FK
+  // Deletes the SaaS subscription; payments cascade by FK
   // (`subscription_id` → `platform_subscription.id` onDelete cascade).
   platformSubscription: (id) => `/api/platform/subscriptions/${id}`,
 };
@@ -47,9 +52,9 @@ export interface ApiClient {
   put<T = any>(path: string, body?: unknown): Promise<T>;
   patch<T = any>(path: string, body?: unknown): Promise<T>;
   delete<T = any>(path: string): Promise<T>;
-  /** Registra un recurso ya creado para borrarlo al terminar el test. */
+  /** Registers an already created resource to delete it when the test ends. */
   track(kind: DisposableKind, id: number | string, label?: string): void;
-  /** Crea y registra en un paso: devuelve la respuesta JSON. */
+  /** Creates and registers in one step: returns the JSON response. */
   create<T = any>(kind: DisposableKind, path: string, body: unknown, label?: string): Promise<T>;
 }
 
@@ -91,7 +96,7 @@ export function createApiClient(context: APIRequestContext, disposables: Disposa
   };
 }
 
-/** Borra lo creado en orden inverso (LIFO), best-effort: nunca falla la suite. */
+/** Deletes what was created in reverse order (LIFO), best-effort: it never fails the suite. */
 export async function cleanupDisposables(
   client: ApiClient,
   disposables: Disposable[],
@@ -107,7 +112,7 @@ export async function cleanupDisposables(
   }
 }
 
-/** Crea un contexto de API autenticado con el `storageState` indicado. */
+/** Creates an authenticated API context with the given `storageState`. */
 export async function newAuthedApiContext(
   playwright: { request: { newContext: (options: any) => Promise<APIRequestContext> } },
   storageState: string,

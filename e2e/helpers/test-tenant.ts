@@ -1,32 +1,32 @@
 /**
- * Tenant de pruebas de la suite normal — identidades FIJAS y deterministas.
+ * Test tenant of the normal suite — FIXED, deterministic identities.
  *
- * Regla del proyecto E2E: los tests usan datos literales (nombres, emails,
- * slugs), nunca uuid aleatorios. El global-setup BORRA y recrea este tenant en
- * cada corrida (`e2e-suite` + `e2e-empty`), y el global-teardown lo borra al
- * final: la suite no deja evidencias.
+ * E2E project rule: the tests use literal data (names, emails,
+ * slugs), never random uuids. The global-setup DELETES and recreates this tenant
+ * on every run (`e2e-suite` + `e2e-empty`), and the global-teardown deletes it
+ * at the end: the suite leaves no evidence.
  *
- * Esto NO es el seed de datos de demo (org `Fit Stack` / `fit-stack`, que
- * rellena `pnpm seed:e2e` y nunca se borra). No confundir ambos mundos.
+ * This is NOT the demo data seed (org `Fit Stack` / `fit-stack`, which
+ * `pnpm seed:e2e` fills and is never deleted). Do not confuse both worlds.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TEST_PASSWORD } from './api';
 
-// ── URLs de las apps (única fuente: también las usa playwright.config.ts) ────
+// ── App URLs (single source: playwright.config.ts also uses them) ────────────
 export const PANEL_URL = process.env.PANEL_URL ?? 'http://localhost:3001';
 export const CONSOLE_URL = process.env.CONSOLE_URL ?? 'http://localhost:3000';
 export const API_URL = process.env.API_BASE_URL ?? 'http://localhost:8788';
 
-// ── Rutas de estado ──────────────────────────────────────────────────────────
+// ── State paths ──────────────────────────────────────────────────────────────
 export const AUTH_DIR = join(process.cwd(), 'e2e', '.auth');
 export const STATE_PATH = join(AUTH_DIR, 'state.json');
 export const PANEL_STATE_PATH = join(AUTH_DIR, 'panel-user.json');
 export const CONSOLE_STATE_PATH = join(AUTH_DIR, 'console-user.json');
-/** Sesión del owner de la org VACÍA (`e2e-empty`) — ver `empty-state.spec.ts`. */
+/** Session of the owner of the EMPTY org (`e2e-empty`) — see `empty-state.spec.ts`. */
 export const EMPTY_STATE_PATH = join(AUTH_DIR, 'empty-org-user.json');
 
-// ── Organización de la suite (propia, efímera: se crea y se borra) ──────────
+// ── Suite organization (own, ephemeral: created and deleted) ────────────────
 export const TEST_ORG = {
   slug: 'e2e-suite',
   name: 'Gym E2E Suite',
@@ -36,7 +36,7 @@ export const TEST_ORG = {
   currencyFormat: 'latam',
 } as const;
 
-// ── Organización vacía (para los specs de empty-state; también efímera) ─────
+// ── Empty organization (for the empty-state specs; also ephemeral) ──────────
 export const EMPTY_ORG = {
   slug: 'e2e-empty',
   name: 'Gym E2E Vacía',
@@ -46,7 +46,7 @@ export const EMPTY_ORG = {
   currencyFormat: 'latam',
 } as const;
 
-// ── Usuarios reservados ──────────────────────────────────────────────────────
+// ── Reserved users ───────────────────────────────────────────────────────────
 export const TEST_OWNER = {
   email: 'e2e-suite-owner@e2e.test',
   password: TEST_PASSWORD,
@@ -69,13 +69,13 @@ export const TEST_PLATFORM = {
   name: 'Platform E2E',
 } as const;
 
-/** Emails que el reset/teardown borra siempre (lista explícita, no `%pattern`). */
+/** Emails the reset/teardown always deletes (explicit list, not `%pattern`). */
 export const RESERVED_EMAILS = [TEST_OWNER.email, EMPTY_OWNER.email, TEST_PLATFORM.email] as const;
 
-/** Slugs de orgs que el reset/teardown borra siempre. */
+/** Org slugs the reset/teardown always deletes. */
 export const SUITE_ORG_SLUGS = [TEST_ORG.slug, EMPTY_ORG.slug] as const;
 
-// ── Datos sembrados por el global-setup (literales para las aserciones) ──────
+// ── Data seeded by the global-setup (literals for the assertions) ────────────
 export const TEST_PLAN = {
   name: 'Plan E2E Mensual',
   price: 50,
@@ -87,7 +87,7 @@ export const TEST_PLAN = {
 
 export const TEST_PLATFORM_PLAN = {
   name: 'Plan Plataforma E2E',
-  price: 9900, // centavos
+  price: 9900, // cents
   currency: 'USD',
   durationValue: 1,
   durationUnit: 'month',
@@ -122,8 +122,8 @@ export const TEST_CLASS = {
   startTime: '18:00',
   endTime: '19:00',
   frequencyType: 'weekly' as const,
-  // Todos los días: garantiza que siempre exista una "próxima clase" y que el
-  // calendario semanal tenga contenido en cualquier día de la corrida.
+  // Every day: guarantees that a "next class" always exists and that the
+  // weekly calendar has content on any day of the run.
   daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
   location: 'Sala principal',
 } as const;
@@ -146,17 +146,17 @@ export const TEST_CMS_BLOCK = {
   },
 } as const;
 
-// ── Estado persistido entre global-setup → setups → specs ────────────────────
+// ── State persisted between global-setup → setups → specs ────────────────────
 export interface TestTenantState {
   orgId: string;
   orgSlug: string;
   ownerUserId: string;
   platformUserId: string;
-  /** Org vacía de los specs de empty-state (misma corrida, también efímera). */
+  /** Empty org of the empty-state specs (same run, also ephemeral). */
   emptyOrgId: string;
   emptyOrgSlug: string;
   emptyOwnerEmail: string;
-  /** Ids de los fixtures sembrados por el global-setup. */
+  /** Ids of the fixtures seeded by the global-setup. */
   ids: {
     planId: number;
     memberId: number;
@@ -170,9 +170,9 @@ export interface TestTenantState {
     platformSubscriptionId: number;
   };
   /**
-   * true cuando el setup reutilizó usuarios ya existentes (p. ej. corrida con
-   * `E2E_KEEP_DATA=1` previa cuyo teardown se saltó). Los servidores dev
-   * siempre se reutilizan en local (`reuseExistingServer`).
+   * true when the setup reused already existing users (e.g. a previous run with
+   * `E2E_KEEP_DATA=1` whose teardown was skipped). The dev servers
+   * are always reused locally (`reuseExistingServer`).
    */
   reusedExisting: boolean;
   createdAt: string;
@@ -192,16 +192,16 @@ export function readTenantState(): TestTenantState {
   return JSON.parse(readFileSync(STATE_PATH, 'utf8')) as TestTenantState;
 }
 
-// ── Flags de entorno ─────────────────────────────────────────────────────────
+// ── Environment flags ────────────────────────────────────────────────────────
 /**
- * `E2E_KEEP_DATA=1` omite el teardown para poder inspeccionar el tenant después
- * de la corrida. No cambia el arranque: la corrida siguiente resetea igual,
- * así que nunca se acumulan organizaciones.
+ * `E2E_KEEP_DATA=1` skips the teardown to be able to inspect the tenant after
+ * the run. It does not change the startup: the next run resets anyway,
+ * so organizations never pile up.
  */
 export const KEEP_DATA = process.env.E2E_KEEP_DATA === '1';
 
-/** Rutas que se visitan una vez tras el login para sacar la compilación de Next
- * (Turbopack) del tiempo de los tests. */
+/** Routes visited once after login to take the Next (Turbopack) compile
+ * out of the test time. */
 export const PANEL_PREWARM_ROUTES = [
   '/dashboard',
   '/members',
@@ -214,8 +214,8 @@ export const PANEL_PREWARM_ROUTES = [
   '/settings/general',
 ] as const;
 
-/** Rutas que necesita la org vacía: se precalientan con su propia sesión para
- * que los specs de estado vacío no absorban la compilación en frío. */
+/** Routes the empty org needs: they are prewarmed with their own session so
+ * that the empty-state specs do not absorb the cold compile. */
 export const EMPTY_PANEL_PREWARM_ROUTES = ['/members', '/content'] as const;
 
 export const CONSOLE_PREWARM_ROUTES = [

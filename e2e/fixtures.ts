@@ -1,15 +1,15 @@
 /**
- * Fixtures compartidas de los E2E.
+ * Shared fixtures of the E2E suite.
  *
- * Los specs importan `test` y `expect` desde aquí (no desde `@playwright/test`)
- * y reciben:
+ * Specs import `test` and `expect` from here (not from `@playwright/test`)
+ * and receive:
  *
- * - `tenant`     → estado del tenant sembrado por el global-setup (org + ids).
- * - `panelApi`   → API del api-worker autenticada como OWNER del gimnasio.
- * - `consoleApi` → API autenticada como platform owner (specs de consola).
+ * - `tenant`     → state of the tenant seeded by the global-setup (org + ids).
+ * - `panelApi`   → api-worker API authenticated as the gym OWNER.
+ * - `consoleApi` → API authenticated as platform owner (console specs).
  *
- * Ambos clientes borran automáticamente lo que el test cree (ver
- * `helpers/api-client.ts`), así que un test fallido no deja datos atrás.
+ * Both clients automatically delete whatever the test creates (see
+ * `helpers/api-client.ts`), so a failing test leaves no data behind.
  */
 import {
   test as base,
@@ -45,7 +45,7 @@ async function buildApi(
 }
 
 export const test = base.extend<Fixtures>({
-  // `tenant` es de solo lectura: no necesita aislamiento por test.
+  // `tenant` is read-only: it needs no per-test isolation.
   tenant: async ({}, use) => {
     await use(readTenantState());
   },

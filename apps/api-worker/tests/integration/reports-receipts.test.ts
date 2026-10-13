@@ -1,9 +1,9 @@
 /**
- * Reporte de comprobantes (Fase 5): clasificación, gaps, totales por moneda,
- * RBAC y filtros de día local.
+ * Receipt report (Phase 5): classification, gaps, totals per currency,
+ * RBAC and local-day filters.
  *
- * Patrón estándar: HTTP real + Neon branch (`TEST_DATABASE_URL`), skip
- * elegante sin la variable, `truncateAll` por archivo.
+ * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
+ * skip without the variable, `truncateAll` per file.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -38,7 +38,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     await truncateAll();
   });
 
-  /** Tenant + plan + miembro + pago `validated` (numerado al instante). */
+  /** Tenant + plan + member + `validated` payment (numbered instantly). */
   async function createNumberedPayment(
     client: ReturnType<typeof createClient>,
     overrides: Record<string, unknown> = {},
@@ -68,7 +68,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     return { member, plan, payment: rows[0]! };
   }
 
-  /** Pago `validated` anterior al sistema (sin número): solo vía SQL. */
+  /** `validated` payment predating the system (no number): via SQL only. */
   async function createLegacyPayment(
     organizationId: string,
     client: ReturnType<typeof createClient>,
@@ -92,7 +92,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     const { payment } = await createNumberedPayment(owner.client);
     await createLegacyPayment(organization.id, owner.client);
 
-    // Paso 2 real: el numerado queda emitido (no solo pendiente de PDF).
+    // Real step 2: the numbered one ends up issued (not just pending PDF).
     const env = owner.client.env as Record<string, unknown>;
     const jobsEnv = {
       DATABASE_URL: TEST_DATABASE_URL,
@@ -127,7 +127,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     expect(body.totals).toEqual([
       expect.objectContaining({ currency: 'USD', amount: 10000 }),
     ]);
-    // Sin huecos: secuencia 1:1 con lo emitido.
+    // No holes: 1:1 sequence with what was issued.
     expect(body.gaps).toEqual([]);
   });
 
@@ -142,7 +142,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     });
     expect(voided.status, voided.text).toBe(200);
 
-    // Salto artificial de secuencia (+5): los intermedios son huecos reales.
+    // Artificial sequence jump (+5): the in-between ones are real holes.
     const year = new Date(
       new Date().toLocaleString('en-US', { timeZone: 'America/Caracas' }),
     ).getFullYear();
@@ -172,7 +172,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
 
     const anulados = body.gaps.filter((g) => g.kind === 'anulado');
     const huecos = body.gaps.filter((g) => g.kind === 'hueco');
-    // Seq 2 anulado con motivo; seqs 3..7 huecos; seq 8 = tercer pago.
+    // Seq 2 voided with a reason; seqs 3..7 holes; seq 8 = third payment.
     expect(anulados).toHaveLength(1);
     expect(anulados[0]).toMatchObject({
       seq: 2,
@@ -182,7 +182,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     expect(huecos.map((g) => g.seq)).toEqual([3, 4, 5, 6, 7]);
     expect(thirdNumber).toMatch(new RegExp(`^${year}-0*8$`));
 
-    // El filtro voided devuelve solo el anulado; anular no renumera.
+    // The voided filter returns only the voided one; voiding does not renumber.
     const voidedRes = await owner.client.get('/api/reports/receipts', {
       query: { status: 'voided' },
     });
@@ -223,13 +223,13 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     const { owner, organization } = await createGymTenant('report-tz');
     const { payment } = await createNumberedPayment(owner.client);
     const paymentId = Number(payment['id']);
-    // 2026-01-02 01:00 UTC = 2026-01-01 21:00 en Caracas. Se fija por SQL
-    // porque la emisión siempre ocurre "ahora" por API.
+    // 2026-01-02 01:00 UTC = 2026-01-01 21:00 in Caracas. It is fixed via SQL
+    // because the emission always happens "now" through the API.
     await testQuery(`UPDATE payment SET receipt_issued_at = $1 WHERE id = $2`, [
       '2026-01-02T01:00:00.000Z',
       paymentId,
     ]);
-    // Paso 2 para que el numerado quede emitido (no pendiente de PDF).
+    // Step 2 so the numbered one ends up issued (not pending PDF).
     const env = owner.client.env as Record<string, unknown>;
     const rendered = await handleReceiptRender(
       {
@@ -261,7 +261,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
     });
     expect(jan1.status, jan1.text).toBe(200);
     const jan1Body = jan1.body as { rows: Array<{ state: string }> };
-    // Numerado (por receipt_issued_at) + pre_system (por payment_date).
+    // Numbered (by receipt_issued_at) + pre_system (by payment_date).
     expect(jan1Body.rows.map((r) => r.state).sort()).toEqual([
       'issued',
       'pre_system',
@@ -276,7 +276,7 @@ describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
 
   it('issued excluye pendientes; method y límites se validan', async () => {
     const { owner } = await createGymTenant('report-filters2');
-    // Numerado sin paso 2 = pendiente de PDF (subconjunto propio de issued).
+    // Numbered without step 2 = pending PDF (a proper subset of issued).
     await createNumberedPayment(owner.client);
 
     const issued = await owner.client.get('/api/reports/receipts', {

@@ -11,7 +11,7 @@
  * The PDF renderer is stubbed (`vi.mock` on jobs-worker's receipt-pdf):
  * render fidelity is covered by jobs-worker's own smoke test; here we
  * assert the step-2 LOGIC. Everything else (DB, queues, R2) is real via
- * spies. Mirror of receipts-emission.test.ts (Panel, Fase 2).
+ * spies. Mirror of receipts-emission.test.ts (Panel, Phase 2).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -99,7 +99,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
 
   /** Platform subscription with a `processing` payment via HTTP. */
   async function createProcessingPayment(): Promise<number> {
-    // Resetea spies ANTES del POST: cada test mide solo lo que él produce.
+    // Resets the spies BEFORE the POST: each test measures only what it produces.
     resetSpies(admin.client);
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
@@ -119,7 +119,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     expect(res.status, res.text).toBe(201);
     const rows = await testQuery<{ id: number }>(
       `SELECT id FROM platform_subscription_payment WHERE subscription_id = $1 ORDER BY id DESC LIMIT 1`,
-      // POST retorna el detalle (con `id` de suscripción).
+      // POST returns the detail (with the subscription `id`).
       [res.body.id],
     );
     return Number(rows[0]!.id);
@@ -153,7 +153,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     const paymentId = await createProcessingPayment();
     resetSpies(admin.client);
 
-    // Legacy/pre-sistema: sin número antes de aprobar.
+    // Legacy/pre-system: no number before approving.
     expect((await readPayment(paymentId))['receipt_number']).toBeNull();
 
     const res = await approvePayment(paymentId);
@@ -161,9 +161,9 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
 
     const payment = await readPayment(paymentId);
     expect(payment['receipt_number']).toMatch(/^FS-\d{7,}$/);
-    // C2/D1: el emisor plataforma (FitStack) no está declarado como
-    // contribuyente formal en ningún lado → el comprobante SaaS no detalla
-    // impuestos: se persiste el total cobrado, sin desglose inventado.
+    // C2/D1: the platform issuer (FitStack) is not declared as a
+    // formal taxpayer anywhere → the SaaS receipt does not itemize
+    // taxes: the total charged is persisted, with no invented breakdown.
     expect(payment['tax_details']).toEqual([]);
     expect(Number(payment['subtotal'])).toBe(5000);
     expect(Number(payment['tax_total'])).toBe(0);
@@ -200,8 +200,8 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
   });
 
   it('T3 entrega duplicada: sin segundo email ni segundo completado', async () => {
-    // Sin reset entre ambas llamadas a propósito: el 2º debe ver el gate
-    // de DB (`already-done`), no un spy limpio.
+    // No reset between both calls on purpose: the 2nd must see the DB
+    // gate (`already-done`), not a clean spy.
     const paymentId = await createProcessingPayment();
     await approvePayment(paymentId);
     const payment = await readPayment(paymentId);
@@ -226,8 +226,8 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     resetSpies(admin.client);
     const oldId = await numberedBackdated(20);
     const recentId = await numberedBackdated(2);
-    // Este reset descarta los renders del paso 1: el assert mide SOLO lo
-    // que re-encola el sweep.
+    // This reset discards the step-1 renders: the assert measures ONLY what
+    // the sweep re-enqueues.
     resetSpies(admin.client);
 
     const { requeued } = await sweepPendingReceiptPdfs(sweepEnv(admin.client));
@@ -248,8 +248,8 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     );
     const receiptNumber = numbered[0]!.receipt_number;
 
-    // Estado simulado: PDF ya renderizado, notificación sin marcar y emisión
-    // hace 45 min → el 2.º predicado del barrido (C6) es el único que lo cubre.
+    // Simulated state: PDF already rendered, notification unmarked and emission
+    // 45 min ago → the sweep's 2nd predicate (C6) is the only one that covers it.
     await testQuery(
       `UPDATE platform_subscription_payment
          SET receipt_pdf_key = $2, receipt_notified_at = NULL,
@@ -259,8 +259,8 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     );
     resetSpies(admin.client);
 
-    // Barrido global: se aserta por presencia (puede arrastrar pendientes de
-    // otros tests del archivo).
+    // Global sweep: asserted by presence (it may drag in pending rows from
+    // other tests in the file).
     const { requeued } = await sweepPendingReceiptPdfs(sweepEnv(admin.client));
     expect(requeued).toBeGreaterThanOrEqual(1);
     const renders = admin.client.receiptQueue.ofType('receipt.render');
@@ -311,7 +311,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     const res = await approvePayment(paymentId);
     expect(res.status, res.text).toBe(200);
     expect((await readPayment(paymentId))['receipt_number']).toBe(first);
-    // Sin serie quemada de más: ningún render nuevo.
+    // No extra burned series number: no new render.
     expect(admin.client.receiptQueue.ofType('receipt.render')).toHaveLength(0);
   });
 
@@ -336,7 +336,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
        WHERE p.id = $1`,
       [paymentId],
     );
-    // Sub creada hace 60 días con plan mensual: aprobar extiende el periodo.
+    // Sub created 60 days ago with a monthly plan: approving extends the period.
     expect(new Date(after[0]!.current_period_end) > new Date(before[0]!.current_period_end)).toBe(true);
     expect((await readPayment(paymentId))['receipt_number']).toMatch(/^FS-\d{7,}$/);
   });

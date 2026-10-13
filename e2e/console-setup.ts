@@ -1,9 +1,9 @@
 /**
- * Console auth setup — SOLO login por UI + storageState.
+ * Console auth setup — UI login ONLY + storageState.
  *
- * El usuario de plataforma lo crea `global-setup.ts` (sign-up + promoción de rol
- * por SQL, que se repite en cada corrida para que el rol nunca dependa del
- * estado previo del entorno).
+ * The platform user is created by `global-setup.ts` (sign-up + role promotion
+ * via SQL, repeated on every run so the role never depends on the
+ * previous state of the environment).
  */
 import { test as setup, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
@@ -17,7 +17,7 @@ import {
 } from './helpers/test-tenant';
 
 setup('authenticate as console user', async ({ page }) => {
-  // Falla temprano y con mensaje claro si el global-setup no sembró el tenant.
+  // Fails early with a clear message if the global-setup did not seed the tenant.
   const state = readTenantState();
   setup.setTimeout(240_000);
   mkdirSync(AUTH_DIR, { recursive: true });

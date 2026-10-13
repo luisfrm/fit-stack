@@ -6,14 +6,39 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
-import { assertSchemaReady, skipReason, truncateAll } from '../helpers/db';
+import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
 import {
   createGymTenant,
   addUserToOrganization,
+  createGymMember,
   createPlan,
+  isoDate,
   uid,
+  type GymTenant,
 } from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
+
+async function createSubscription(
+  tenant: GymTenant,
+  memberId: number,
+  planId: number,
+  endOffsetDays = 30,
+) {
+  return tenant.owner.client.post('/api/subscriptions', {
+    memberId,
+    planId,
+    startDate: isoDate(0),
+    endDate: isoDate(endOffsetDays),
+    payment: {
+      amountPaid: 100,
+      currencyPaid: 'USD',
+      paymentMethod: 'cash',
+      paymentMethodDetails: [],
+      status: 'validated',
+      paymentDate: isoDate(0),
+    },
+  });
+}
 
 describe.skipIf(skipReason !== null)('Plans API', () => {
   beforeAll(async () => {
@@ -131,22 +156,102 @@ describe.skipIf(skipReason !== null)('Plans API', () => {
       });
 
       expect(res.status, res.text).toBe(200);
-      // bigint centavos: la API devuelve number, no string 'numeric'.
+      // bigint cents: the API returns a number, not a 'numeric' string.
       expect(res.body.price).toBe(99);
     });
   });
 
   describe('DELETE /api/plans/:id', () => {
-    it('deletes a plan', async () => {
-      const { owner } = await createGymTenant();
+    it('soft-deletes a plan: row persists, hidden from GET and listing', async () => {
+      const { owner } = await createGymTenant('plan-del-soft');
       const plan = await createPlan(owner.client);
 
       const del = await owner.client.delete(`/api/plans/${plan.id}`);
       expect(del.status, del.text).toBe(200);
+      expect(del.body).toEqual({ success: true });
 
-      // Verify it's gone — GET /:id returns 404 for deleted plan
+      // GET /:id returns 404 for a soft-deleted plan.
       const get = await owner.client.get(`/api/plans/${plan.id}`);
       expect(get.status, get.text).toBe(404);
+
+      // The row still exists; only `deleted_at` is set.
+      const rows = await testQuery<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM membership_plan WHERE id = $1`,
+        [plan.id],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.deleted_at).not.toBeNull();
+
+      // Absent from the listing.
+      const list = await owner.client.get('/api/plans');
+      const plans = Array.isArray(list.body) ? list.body : list.body.data;
+      expect(plans.map((p: { id: number }) => p.id)).not.toContain(plan.id);
+    });
+
+    it('is idempotent: re-deleting an already-deleted plan returns 200', async () => {
+      const { owner } = await createGymTenant('plan-del-idem');
+      const plan = await createPlan(owner.client);
+
+      const first = await owner.client.delete(`/api/plans/${plan.id}`);
+      expect(first.status, first.text).toBe(200);
+      const second = await owner.client.delete(`/api/plans/${plan.id}`);
+      expect(second.status, second.text).toBe(200);
+      expect(second.body).toEqual({ success: true });
+    });
+
+    it('returns 404 when the plan does not exist', async () => {
+      const { owner } = await createGymTenant('plan-del-missing');
+      const res = await owner.client.delete('/api/plans/999999999');
+      expect(res.status, res.text).toBe(404);
+    });
+
+    it('soft-deletes a plan with subscriptions: no FK error, history preserved', async () => {
+      const tenant = await createGymTenant('plan-del-history');
+      const member = await createGymMember(tenant.owner.client);
+      const plan = await createPlan(tenant.owner.client, { price: 100, currency: 'USD' });
+      const sub = await createSubscription(tenant, member.id, plan.id);
+      expect(sub.status, sub.text).toBe(201);
+
+      const del = await tenant.owner.client.delete(`/api/plans/${plan.id}`);
+      expect(del.status, del.text).toBe(200);
+
+      // Financial history is intact.
+      const subs = await testQuery(`SELECT id FROM subscription WHERE plan_id = $1`, [plan.id]);
+      const pays = await testQuery(`SELECT id FROM payment WHERE subscription_id = $1`, [sub.body.id]);
+      expect(subs).toHaveLength(1);
+      expect(pays).toHaveLength(1);
+
+      // Historical JOIN still resolves the plan name.
+      const list = await tenant.owner.client.get('/api/subscriptions', { query: { limit: '50' } });
+      expect(list.status, list.text).toBe(200);
+      const row = list.body.data.find((r: { id: number }) => r.id === sub.body.id);
+      expect(row).toBeDefined();
+      expect(row.planName).toBe(plan.name);
+    });
+
+    it('keeps an inactive (draft) plan visible with its badge state', async () => {
+      const { owner } = await createGymTenant('plan-del-inactive');
+      const plan = await createPlan(owner.client, { isActive: false });
+
+      const get = await owner.client.get(`/api/plans/${plan.id}`);
+      expect(get.status, get.text).toBe(200);
+      expect(get.body.isActive).toBe(false);
+
+      const list = await owner.client.get('/api/plans');
+      const plans = Array.isArray(list.body) ? list.body : list.body.data;
+      expect(plans.map((p: { id: number }) => p.id)).toContain(plan.id);
+    });
+
+    it('database rejects a direct hard delete of a plan with subscriptions (restrict)', async () => {
+      const tenant = await createGymTenant('plan-del-restrict');
+      const member = await createGymMember(tenant.owner.client);
+      const plan = await createPlan(tenant.owner.client, { price: 100, currency: 'USD' });
+      const sub = await createSubscription(tenant, member.id, plan.id);
+      expect(sub.status, sub.text).toBe(201);
+
+      await expect(
+        testQuery(`DELETE FROM membership_plan WHERE id = $1`, [plan.id]),
+      ).rejects.toThrow();
     });
 
     it('rejects delete by member without PLANS.DELETE', async () => {

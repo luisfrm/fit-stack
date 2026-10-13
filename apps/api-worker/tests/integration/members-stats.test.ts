@@ -23,10 +23,10 @@ async function createSubscription(
   tenant: GymTenant,
   memberId: number,
   planId: number,
-  // B3.3: el periodo lo calcula el servidor — `null` omite el fin explícito
-  // y el servidor lo computa desde `startDate` + duración del plan (así se
-  // siembran periodos ya vencidos: un `endDate` explícito invertido se
-  // rechaza con 422 END_DATE_BEFORE_START).
+  // B3.3: the server computes the period — `null` omits the explicit end
+  // and the server computes it from `startDate` + plan duration (this is how
+  // already-expired periods are seeded: an explicit inverted `endDate` is
+  // rejected with 422 END_DATE_BEFORE_START).
   endOffsetDays: number | null,
   status: 'validated' | 'processing' = 'validated',
   startOffsetDays = 0,
@@ -103,7 +103,7 @@ describe.skipIf(skipReason !== null)('Members stats API', () => {
       await createSubscription(tenant, validated.id, plan.id, 30, 'validated');
       // `processing` counts as gym-active: access not revoked yet.
       await createSubscription(tenant, processing.id, plan.id, 30, 'processing');
-      // Vencida hace ~10 días: inicio hace 40 + plan mensual → fin calculado en el pasado.
+      // Expired ~10 days ago: start 40 days ago + monthly plan → end computed in the past.
       await createSubscription(tenant, expired.id, plan.id, null, 'validated', -40);
 
       const res = await tenant.owner.client.get('/api/members/stats');

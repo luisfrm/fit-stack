@@ -1,0 +1,2 @@
+CREATE INDEX "idx_membership_plan_org_deleted" ON "membership_plan" USING btree ("organization_id","deleted_at");--> statement-breakpoint
+CREATE INDEX "idx_subscription_plan_end" ON "subscription" USING btree ("plan_id","end_date");

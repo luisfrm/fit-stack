@@ -1,8 +1,8 @@
 /**
- * `mergeFiscalConfig`: merge, no reemplazo ciego.
+ * `mergeFiscalConfig`: merge, not blind replacement.
  *
- * Unit puro (sin DB): la integración (`organizations-fiscal.test.ts`) cubre
- * el endpoint; aquí se congelan las reglas del merge.
+ * Pure unit (no DB): the integration (`organizations-fiscal.test.ts`) covers
+ * the endpoint; here the merge rules are frozen.
  */
 import { describe, expect, it } from 'vitest';
 import { mergeFiscalConfig } from '../../src/services/organizations.service';

@@ -27,11 +27,11 @@ export function uid(prefix = ''): string {
 }
 
 /**
- * Solo para fixtures desechables dentro de un test de la suite (nunca para el
- * tenant compartido, que usa identidades fijas en `test-tenant.ts`, ni para la
- * org de demo `fit-stack` del seed). Todo lo creado vive en la org de la suite
- * (`e2e-suite`), que el teardown global borra completa — además el fixture
- * `panelApi` lo borra al terminar cada test.
+ * Only for disposable fixtures inside a test of the suite (never for the
+ * shared tenant, which uses fixed identities in `test-tenant.ts`, nor for the
+ * demo org `fit-stack` of the seed). Everything created lives in the suite org
+ * (`e2e-suite`), which the global teardown wipes entirely — besides, the fixture
+ * `panelApi` deletes it when each test ends.
  */
 export function uniqueEmail(label = 'user'): string {
   return `${label}-${uid()}@e2e.test`;
@@ -198,11 +198,11 @@ export interface GymTenant {
 }
 
 /**
- * Crea un tenant de gimnasio desechable: usuario + organización + sesión.
+ * Creates a disposable gym tenant: user + organization + session.
  *
- * Utilidad genérica (hoy sin uso en los specs: la suite usa `e2e-suite` y los
- * vacíos usan `e2e-empty`, ambas del global-setup). Si se usa, la org creada
- * debe borrarse con `wipeTenant` en `afterAll`.
+ * Generic utility (currently unused in the specs: the suite uses `e2e-suite` and the
+ * empty ones use `e2e-empty`, both from the global-setup). If it is used, the org
+ * created must be deleted with `wipeTenant` in `afterAll`.
  */
 export async function createGymTenant(label = 'owner'): Promise<GymTenant> {
   const user = await registerUser({ email: uniqueEmail(label) });

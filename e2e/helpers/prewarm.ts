@@ -1,13 +1,13 @@
 /**
- * Prewarm de rutas — visita las páginas principales una vez después del login
- * para que Next.js (Turbopack) las compile ANTES de que empiecen los tests.
+ * Route prewarm — visits the main pages once after login
+ * so Next.js (Turbopack) compiles them BEFORE the tests start.
  *
- * Motivo: el primer request a cada ruta en dev compila on-demand y puede tardar
- * decenas de segundos. Sacarlo del tiempo de los tests es lo que permite correr
- * la suite con `workers: 1` sin que cada journey absorba una compilación en frío.
+ * Reason: the first request to each route in dev compiles on-demand and can take
+ * tens of seconds. Taking it out of the test time is what allows running
+ * the suite with `workers: 1` without every journey absorbing a cold compile.
  *
- * Es best-effort: si una ruta falla o redirige (por ejemplo un guard de
- * features), se avisa por consola y se continúa.
+ * It is best-effort: if a route fails or redirects (for example a feature
+ * guard), a warning is printed to the terminal and the run continues.
  */
 import type { Page } from '@playwright/test';
 

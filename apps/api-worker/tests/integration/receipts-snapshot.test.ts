@@ -1,14 +1,14 @@
 /**
- * Snapshot del emisor (C1) + trazabilidad de emisión (C5).
+ * Issuer snapshot (C1) + emission traceability (C5).
  *
- * C1: `GET /:id/receipt` debe devolver SIEMPRE lo emitido. El test emite,
- * cambia el perfil del emisor (nombre legal, RIF, dirección, país y
- * `fiscalConfig`) y vuelve a pedir el comprobante: tiene que ser idéntico.
- * C5: `issued_by` es el actor de sesión que numeró; el paso 2 (consumer, sin
- * sesión) nunca lo pisa ni inventa uno.
+ * C1: `GET /:id/receipt` must ALWAYS return what was issued. The test issues,
+ * changes the issuer profile (legal name, RIF, address, country and
+ * `fiscalConfig`) and requests the receipt again: it has to be identical.
+ * C5: `issued_by` is the session actor that numbered it; step 2 (consumer, with no
+ * session) never overwrites it nor invents one.
  *
- * Patrón estándar: HTTP real + Neon branch (`TEST_DATABASE_URL`), skip
- * elegante sin la variable, `truncateAll` por archivo.
+ * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
+ * skip without the variable, `truncateAll` per file.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -54,7 +54,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     };
   }
 
-  /** Pago `validated` por API (numera en la misma request) + paso 2 real. */
+  /** `validated` payment via API (numbers in the same request) + real step 2. */
   async function emitReceipt(): Promise<{ paymentId: number; receiptNumber: string }> {
     const member = await createGymMember(tenant.owner.client);
     const plan = await createPlan(tenant.owner.client, { price: 10000, currency: 'USD' });
@@ -107,8 +107,8 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     const { paymentId } = await emitReceipt();
     const asIssued = await getReceipt(paymentId);
 
-    // El gym cambia TODO lo que antes se leía en vivo: nombre legal, RIF,
-    // dirección, país y declaración fiscal (con desglose activado).
+    // The gym changes EVERYTHING that used to be read live: legal name, RIF,
+    // address, country and fiscal declaration (with the breakdown enabled).
     await testQuery(
       `UPDATE organization
        SET legal_name = 'Otro Nombre C.A.',
@@ -125,7 +125,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     expect(after.receipt.footer.disclaimer).toEqual(asIssued.receipt.footer.disclaimer);
     expect(after.receipt.document.label).toBe(asIssued.receipt.document.label);
     expect(after.receipt.recipient.docLabel).toBe(asIssued.receipt.recipient.docLabel);
-    // Sanity: la fila viva SÍ cambió (el snapshot es lo que congela el JSON).
+    // Sanity: the live row DID change (the snapshot is what freezes the JSON).
     const [org] = await testQuery<{ legal_name: string }>(
       `SELECT legal_name FROM organization WHERE id = $1`,
       [tenant.organization.id],
@@ -137,12 +137,12 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
       [paymentId],
     );
     expect(row!.emitter_snapshot).not.toBeNull();
-    // C5: el actor de sesión que emitió.
+    // C5: the session actor that issued it.
     expect(row!.issued_by).toBe(tenant.owner.userId);
   });
 
   it('C5: la emisión manual también deja actor', async () => {
-    // Pago validado SIN número (legacy): `POST /:id/issue` numera y deja actor.
+    // Validated payment WITHOUT a number (legacy): `POST /:id/issue` numbers it and sets the actor.
     const member = await createGymMember(tenant.owner.client);
     const rows = await testQuery<{ id: number }>(
       `INSERT INTO payment
@@ -173,7 +173,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
       [paymentId],
     );
 
-    // Re-entrega del render (equivale al re-encolado del barrido): sin sesión.
+    // Re-delivery of the render (equivalent to the sweep's re-enqueue): no session.
     const [row] = await testQuery<{ receipt_number: string }>(
       `SELECT receipt_number FROM payment WHERE id = $1`,
       [paymentId],

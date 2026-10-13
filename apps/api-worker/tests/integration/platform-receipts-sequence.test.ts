@@ -3,7 +3,7 @@
  *
  * Covers: atomic global allocation under concurrency (including the
  * first-receipt race with no prior row), `FS-0000001` formatting from
- * shared (Fase 0), idempotent attach (`WHERE receipt_number IS NULL`),
+ * shared (Phase 0), idempotent attach (`WHERE receipt_number IS NULL`),
  * global uniqueness of receipt_number, NULL legacy payments coexisting,
  * and invalid input errors.
  *
@@ -67,9 +67,9 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
     return res.body;
   }
 
-  /** Platform subscription with a `processing` payment via HTTP (el repo
-   *  attach no exige estado; `processing` evita el paso 1 automático de C2
-   *  para probar el repo en aislamiento). */
+  /** Platform subscription with a `processing` payment via HTTP (the attach
+   *  repo does not require a status; `processing` avoids C2's automatic step 1
+   *  to test the repo in isolation). */
   async function createPaidPlatformPayment(): Promise<number> {
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
@@ -112,7 +112,7 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
   });
 
   it('attach numbers a payment and re-attach is idempotent (no renumber)', async () => {
-    // 101+ deliberado: fuera del rango 1..N del test de concurrencia.
+    // 101+ deliberate: outside the 1..N range of the concurrency test.
     const repo = platformRepo();
     const paymentId = await createPaidPlatformPayment();
 

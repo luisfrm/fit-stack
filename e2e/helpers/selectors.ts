@@ -182,7 +182,7 @@ export const SELECTORS = {
     detailModal: ".subs-detail-modal",
   },
 
-  // Console — reporte de comprobantes (auditoría del correlativo FS-N)
+  // Console — receipt report (audit of the FS-N correlative)
   consoleReceipts: {
     report: '[data-testid="receipts-report"]',
     exportCsv: '[data-testid="receipts-export-csv"]',

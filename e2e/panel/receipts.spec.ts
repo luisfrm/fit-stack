@@ -7,10 +7,10 @@ import { TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
 import type { IPaginatedResult, ISubscription } from '@workspace/shared';
 
-// El consumer de renders (jobs-worker) no corre en E2E: tras validar, el
-// comprobante queda numerado con PDF pendiente. El spec aserta lo
-// determinista — número correlativo visible sin UUID, estados y reenvío —
-// y tolera `ready` si un jobs-worker manual lo renderizó a mitad del test.
+// The render consumer (jobs-worker) does not run in E2E: after validating, the
+// receipt ends up numbered with a pending PDF. The spec asserts the
+// deterministic part — correlative number visible without UUID, statuses and
+// resend — and tolerates `ready` if a manual jobs-worker rendered it mid-test.
 test.describe('Panel — Comprobante de pago', () => {
   test('abrir comprobante muestra número correlativo sin UUID y permite reenviar', async ({
     page,
@@ -21,8 +21,8 @@ test.describe('Panel — Comprobante de pago', () => {
     const tz = TEST_ORG.timezone;
     const today = toLocalDayString(tz);
 
-    // Fixture: plan → cliente con email → suscripción con pago `validated`
-    // (el paso 1 asigna el número en el propio POST).
+    // Fixture: plan → client with email → subscription with a `validated` payment
+    // (step 1 assigns the number in the POST itself).
     const plan = await panelApi.create<any>('plan', '/api/plans', {
       name: `Plan Recibo ${uid()}`,
       price: 5000,
@@ -65,25 +65,25 @@ test.describe('Panel — Comprobante de pago', () => {
 
     const row = page.locator('table tbody tr', { hasText: lastName }).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
-    // Con número asignado la acción es reimpresión (prueba el select 3B-1).
+    // With a number assigned the action is reprint (it tests the 3B-1 select).
     await clickMenuItem(page, row.getByRole('button'), /reimprimir comprobante/i);
 
     const dialog = page.locator(SELECTORS.common.modal);
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
-    // Número correlativo humano, nunca el UUID técnico.
+    // Human correlative number, never the technical UUID.
     await expect(dialog.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
     await expect(dialog.getByText('Operación #')).toHaveCount(0);
 
-    // `pending` (sin consumer) o `ready`: ambos muestran el número.
+    // `pending` (no consumer) or `ready`: both show the number.
     const pendingNote = dialog.getByText('PDF en preparación');
     const downloadBtn = dialog.getByRole('button', { name: 'PDF' });
     await expect(pendingNote.or(downloadBtn)).toBeVisible({ timeout: 20_000 });
 
-    // Reenviar: 202 "se enviará al generarse" (pending) o email con
-    // adjunto (ready). Ambos son toast de éxito.
+    // Resend: 202 "se enviará al generarse" (pending) or an email with an
+    // attachment (ready). Both are success toasts.
     await dialog.getByRole('button', { name: 'Enviar' }).click();
     await expect(
       page.getByText(/Comprobante (enviado|en preparación)/).first(),
@@ -135,7 +135,7 @@ test.describe('Panel — Comprobante de pago', () => {
       },
     });
 
-    // paymentId desde el listado (ISubscription lo incluye) y anulación.
+    // paymentId from the listing (ISubscription includes it) and voiding.
     const list = await panelApi.get<IPaginatedResult<ISubscription>>(
       '/api/subscriptions',
       { search: lastName },
@@ -152,7 +152,7 @@ test.describe('Panel — Comprobante de pago', () => {
 
     const row = page.locator('table tbody tr', { hasText: lastName }).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
-    // Badge de estado en la tabla (determinista: no depende del PDF).
+    // Status badge in the table (deterministic: it does not depend on the PDF).
     await expect(row.getByText('Anulado').first()).toBeVisible({
       timeout: 20_000,
     });
@@ -161,7 +161,7 @@ test.describe('Panel — Comprobante de pago', () => {
     const dialog = page.locator(SELECTORS.common.modal);
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
-    // El número se conserva tras anular; nunca el UUID técnico.
+    // The number is kept after voiding; never the technical UUID.
     await expect(dialog.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });

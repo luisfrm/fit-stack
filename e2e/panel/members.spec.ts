@@ -14,7 +14,7 @@ test.describe('Panel — Clientes', () => {
     await expect(page.locator('h1').filter({ hasText: 'Clientes' })).toBeVisible({
       timeout: 20_000,
     });
-    // El tenant de pruebas ya trae 3 clientes fijos (ver test-tenant.ts).
+    // The test tenant already brings 3 fixed clients (see test-tenant.ts).
     await expect(page.getByText('Ana E2E Activa')).toBeVisible({ timeout: 20_000 });
   });
 
@@ -71,8 +71,8 @@ test.describe('Panel — Clientes', () => {
     await page.getByPlaceholder('Buscar por nombre, email...').fill(email);
     await expect(page.getByText(`Nadia ${lastName}`)).toBeVisible({ timeout: 20_000 });
 
-    // El cliente se creó por UI: se resuelve su id y se registra para que el
-    // fixture lo borre al terminar el test.
+    // The client was created through the UI: its id is resolved and registered so
+    // the fixture deletes it when the test ends.
     const created = await findMemberByEmail(panelApi, email);
     panelApi.track('member', created.id, `member UI ${email}`);
   });
@@ -80,7 +80,7 @@ test.describe('Panel — Clientes', () => {
   test('el modal de creación no envía sin los campos obligatorios', async ({ page }) => {
     const modal = await openModal(page, page.getByRole('button', { name: 'NUEVO CLIENTE' }));
     await modal.getByRole('button', { name: 'CREAR CLIENTE' }).click();
-    // Sin nombre/apellido/email el formulario no se cierra.
+    // Without name/last name/email the form does not close.
     await expect(modal).toBeVisible();
   });
 

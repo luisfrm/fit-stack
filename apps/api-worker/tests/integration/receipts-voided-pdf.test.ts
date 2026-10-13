@@ -1,19 +1,19 @@
 /**
- * Comprobante ANULADO descargable (B2) — integración.
+ * Downloadable VOIDED receipt (B2) — integration.
  *
- * El bug que cubre: `receipt_voided` marcaba el comprobante en DB y el panel
- * mostraba "Anulado", pero el PDF en R2 seguía siendo el de emisión, así que
- * `GET /api/payments/:id/receipt/pdf` entregaba un documento sin sello —
- * exactamente el artefacto que da validez probatoria.
+ * The bug it covers: `receipt_voided` flagged the receipt in the DB and the panel
+ * showed "Anulado", but the PDF in R2 was still the emission one, so
+ * `GET /api/payments/:id/receipt/pdf` delivered a document without the seal —
+ * exactly the artifact that gives probative validity.
  *
- * Regla implementada (fail-closed): un comprobante anulado entrega SOLO su PDF
- * con sello (`<numero>-anulado.pdf`, columna `receipt_voided_pdf_key`); hasta
- * que ese render exista, el contrato responde `pending` y el original NO se
- * sirve. El PDF de emisión nunca se reescribe (write-once).
+ * Implemented rule (fail-closed): a voided receipt delivers ONLY its stamped
+ * PDF (`<numero>-anulado.pdf`, column `receipt_voided_pdf_key`); until
+ * that render exists, the contract answers `pending` and the original is NOT
+ * served. The emission PDF is never rewritten (write-once).
  *
- * El paso 2 se ejecuta real (`handleReceiptRender` de jobs-worker, con el
- * renderer stubbeado): es la única forma de afirmar que el sidecar se escribe
- * con su gate y sin email.
+ * Step 2 runs for real (`handleReceiptRender` from jobs-worker, with the
+ * renderer stubbed): it is the only way to assert that the sidecar is written
+ * with its gate and without an email.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -74,8 +74,8 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
   }
 
   /**
-   * Tenant + pago validado (paso 1 por HTTP) + paso 2 REAL: deja el
-   * comprobante con número y PDF de emisión en R2, listo para anular.
+   * Tenant + validated payment (step 1 via HTTP) + REAL step 2: leaves the
+   * receipt with a number and the emission PDF in R2, ready to void.
    */
   async function createReadyReceipt() {
     const { owner, organization } = await createGymTenant();
@@ -123,7 +123,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     return { owner, organization, member, paymentId, receiptNumber, originalKey };
   }
 
-  /** Anula por el endpoint real y devuelve el body. */
+  /** Voids via the real endpoint and returns the body. */
   async function voidPayment(
     owner: { client: ReturnType<typeof createClient> },
     paymentId: number,
@@ -142,8 +142,8 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(patched.status, patched.text).toBe(200);
     expect(patched.body).toMatchObject({ receiptVoided: true });
 
-    // El número se conserva (nunca se libera ni se reusa) y el void encola el
-    // render del artefacto con sello.
+    // The number is preserved (never released nor reused) and the void enqueues the
+    // render of the stamped artifact.
     const payment = await readPayment(paymentId);
     expect(payment['receipt_number']).toBe(receiptNumber);
     expect(payment['receipt_voided']).toBe(true);
@@ -154,7 +154,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(renders).toHaveLength(1);
     expect(renders[0]).toMatchObject({ paymentId, receiptNumber });
 
-    // LA REGRESIÓN: con el PDF de emisión presente, el contrato NO lo entrega.
+    // THE REGRESSION: with the emission PDF present, the contract does NOT deliver it.
     const receipt = await owner.client.get(`/api/payments/${paymentId}/receipt`);
     expect(receipt.status).toBe(202);
     expect(receipt.body).toMatchObject({
@@ -173,8 +173,8 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
 
     const patched = await voidPayment(owner, paymentId);
     expect(patched.status, patched.text).toBe(200);
-    // Se limpian las colas (el paso 2 del fixture ya encoló su email) pero NO
-    // R2: afirmar que el PDF de emisión sigue intacto requiere verlo.
+    // The queues are cleared (the fixture's step 2 already enqueued its email) but NOT
+    // R2: asserting that the emission PDF is still intact requires seeing it.
     owner.client.queue.reset();
     owner.client.receiptQueue.reset();
 
@@ -187,7 +187,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     };
     expect(await handleReceiptRender(jobsEnv(owner.client), event)).toBe('completed');
 
-    // Artefacto NUEVO: el de emisión sigue intacto en R2 (write-once).
+    // NEW artifact: the emission one stays intact in R2 (write-once).
     const payment = await readPayment(paymentId);
     const voidedKey = payment['receipt_voided_pdf_key'] as string;
     expect(voidedKey).toMatch(/-anulado\.pdf$/);
@@ -197,10 +197,10 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(owner.client.r2.objects.has(voidedKey)).toBe(true);
     expect(owner.client.r2.objects.get(voidedKey)?.contentType).toBe('application/pdf');
 
-    // La anulación no notifica: el comprobante válido ya se envió.
+    // Voiding does not notify: the valid receipt was already sent.
     expect(owner.client.queue.ofType('email.payment_receipt')).toHaveLength(0);
 
-    // Ahora sí: contrato `ready` y descarga del documento con sello.
+    // Now yes: `ready` contract and download of the stamped document.
     const receipt = await owner.client.get(`/api/payments/${paymentId}/receipt`);
     expect(receipt.status).toBe(200);
     expect(receipt.body).toMatchObject({ available: true, pdfStatus: 'ready', receiptNumber });
@@ -210,7 +210,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(pdf.status).toBe(200);
     expect(pdf.headers.get('content-type')).toContain('application/pdf');
 
-    // Reentrega: no re-renderiza (el gate del sidecar ya está tomado).
+    // Re-delivery: it does not re-render (the sidecar gate is already taken).
     resetSpies(owner.client);
     expect(await handleReceiptRender(jobsEnv(owner.client), event)).toBe('already-done');
     expect(owner.client.r2.objects.size).toBe(0);
@@ -224,7 +224,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(send.status).toBe(409);
     expect(send.body.code).toBe('RECEIPT_VOIDED');
 
-    // Un pago vigente con PDF sigue reenviando igual (sin regresión).
+    // A payment in force with a PDF still resends the same (no regression).
     const fresh = await createReadyReceipt();
     resetSpies(fresh.owner.client);
     const ok = await fresh.owner.client.post(`/api/payments/${fresh.paymentId}/send-email`);
@@ -243,11 +243,11 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     expect(second.status).toBe(200);
     expect(second.body).toMatchObject({ receiptVoided: true });
 
-    // Ya anulado con el sello pendiente: se re-encola UNA vez (reparación),
-    // nunca dos por request.
+    // Already voided with the seal pending: it is re-enqueued ONCE (repair),
+    // never twice per request.
     expect(owner.client.receiptQueue.ofType('receipt.render')).toHaveLength(1);
 
-    // Con el sello ya escrito, un re-void no vuelve a encolar nada.
+    // With the seal already written, a re-void does not enqueue anything again.
     const payment = await readPayment(paymentId);
     await testQuery(`UPDATE payment SET receipt_voided_pdf_key = $1 WHERE id = $2`, [
       `${payment['receipt_number'] as string}-anulado.pdf`,
@@ -263,7 +263,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
     const { owner, paymentId } = await createReadyReceipt();
     await voidPayment(owner, paymentId);
 
-    // Simula el render perdido: el void quedó viejo y el sidecar nunca llegó.
+    // Simulates the lost render: the void went stale and the sidecar never arrived.
     await testQuery(
       `UPDATE payment SET voided_at = now() - interval '20 minutes' WHERE id = $1`,
       [paymentId],
@@ -278,7 +278,7 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
         .map((m) => Number(m['paymentId'])),
     ).toContain(paymentId);
 
-    // Y el barrido no afloja la regla fail-closed.
+    // And the sweep does not loosen the fail-closed rule.
     const pdf = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
     expect(pdf.status).toBe(404);
   });

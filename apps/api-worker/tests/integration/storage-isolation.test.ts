@@ -1,18 +1,18 @@
 /**
  * Storage isolation tests — the two halves of the file policy:
  *
- *  1. ESCRITURA (org-scoped): `/api/upload/*` resuelve la organización desde la
- *     sesión (nunca por query/body), exige permiso de organización y valida que
- *     la key caiga bajo `<orgId>/`. `/api/platform/organizations/:orgId/upload/*`
- *     recibe la org por PATH con permiso de plataforma.
- *  2. LECTURA pública: `/api/public/files/*` sirve SOLO los assets del sitio
- *     (`<orgId>/cms/…`) y el branding de la plataforma. Todo lo demás responde
- *     404 y se entrega por las rutas autenticadas (`/api/upload/file`).
+ *  1. WRITE (org-scoped): `/api/upload/*` resolves the organization from the
+ *     session (never via query/body), requires organization permission and validates that
+ *     the key falls under `<orgId>/`. `/api/platform/organizations/:orgId/upload/*`
+ *     receives the org via PATH with platform permission.
+ *  2. Public READ: `/api/public/files/*` serves ONLY the site assets
+ *     (`<orgId>/cms/…`) and the platform branding. Everything else answers
+ *     404 and is delivered through the authenticated routes (`/api/upload/file`).
  *
- * Nota sobre los spies: cada `TestClient` tiene su propio `Env` (y por tanto su
- * propio bucket de R2). Las lecturas "públicas" se hacen con el MISMO cliente
- * que subió el archivo, pero `anonymous: true` — así la única diferencia con la
- * petición autenticada es la ausencia de cookie.
+ * Note on the spies: each `TestClient` has its own `Env` (and therefore its
+ * own R2 bucket). The "public" reads are made with the SAME client
+ * that uploaded the file, but `anonymous: true` — so the only difference from the
+ * authenticated request is the absence of a cookie.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { TestClient } from '../helpers/client';
@@ -41,8 +41,8 @@ describe.skipIf(skipReason !== null)('Storage isolation (org scope + public poli
     await assertSchemaReady();
     await truncateAll();
 
-    // Un tenant por organización: el aislamiento es entre organizaciones, no
-    // entre roles (esa matriz la completa guards.test.ts).
+    // One tenant per organization: isolation is between organizations, not
+    // between roles (guards.test.ts completes that matrix).
     tenantA = await createGymTenant('storage-a');
     tenantB = await createGymTenant('storage-b');
 
@@ -54,12 +54,12 @@ describe.skipIf(skipReason !== null)('Storage isolation (org scope + public poli
     platformSupport = await registerPlatformUser('support');
   }, 120_000);
 
-  /** Sin sesión, sobre el mismo `Env` (mismo bucket): ¿esto es público? */
+  /** Without a session, on the same `Env` (same bucket): is this public? */
   function publicGet(client: TestClient, path: string) {
     return client.get(path, { anonymous: true });
   }
 
-  /** Sube un archivo por el flujo real (presigned + direct) y devuelve su key. */
+  /** Uploads a file through the real flow (presigned + direct) and returns its key. */
   async function uploadVia(client: TestClient, folder: string | undefined): Promise<string> {
     const presigned = await client.post('/api/upload/presigned', {
       filename: 'foto.png',
@@ -92,8 +92,8 @@ describe.skipIf(skipReason !== null)('Storage isolation (org scope + public poli
         new RegExp(`^${tenantA.organization.id}/cms/foto_[a-f0-9]+\\.png$`),
       );
 
-      // Un cliente viejo que intente apuntar a otra organización no puede
-      // hacerlo ni en silencio: el parámetro no existe.
+      // An old client trying to point at another organization cannot
+      // do it, not even silently: the parameter does not exist.
       const withOrgParam = await tenantA.owner.client.post('/api/upload/presigned', {
         filename: 'foto.png',
         contentType: 'image/png',
@@ -161,7 +161,7 @@ describe.skipIf(skipReason !== null)('Storage isolation (org scope + public poli
       });
 
       expect(res.status, res.text).toBe(200);
-      // La carpeta se sanea: la key sigue viviendo dentro de la organización.
+      // The folder is sanitized: the key still lives inside the organization.
       expect(res.body.key.startsWith(`${tenantA.organization.id}/`)).toBe(true);
       expect(res.body.key).not.toContain('..');
     });
@@ -183,14 +183,14 @@ describe.skipIf(skipReason !== null)('Storage isolation (org scope + public poli
         const res = await publicGet(tenantA.owner.client, `/api/public/files/${key}`);
         expect(res.status, `key=${key}`).toBe(404);
 
-        // …pero la organización sí los ve por la ruta autenticada.
+        // …but the organization does see them through the authenticated route.
         const authed = await tenantA.owner.client.get('/api/upload/file', { query: { key } });
         expect(authed.status, authed.text).toBe(200);
       }
     });
 
     it('no expone comprobantes (org ni SaaS) ni claves legacy `cms/<orgId>/…`', async () => {
-      // Los comprobantes los escribe el renderer directamente en R2.
+      // Receipts are written by the renderer directly to R2.
       const bucket = tenantA.owner.client.r2.objects;
       bucket.set(`${tenantA.organization.id}/receipts/2026/1.pdf`, { body: 'pdf' });
       bucket.set('receipts/legacy-gym/2026/1.pdf', { body: 'pdf' });

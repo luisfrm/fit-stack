@@ -71,9 +71,9 @@ describe.skipIf(skipReason !== null)('Guards (route-handler middlewares)', () =>
         query: { organizationId: `gym-${uid()}` },
       });
 
-      // `requireAuth` passed with a bare session — el 400 lo emite
-      // `requireOrgPermission`: `/api/upload` es org-scoped y la organización
-      // sale de la sesión (el `organizationId` del query se ignora).
+      // `requireAuth` passed with a bare session — the 400 comes from
+      // `requireOrgPermission`: `/api/upload` is org-scoped and the organization
+      // comes from the session (the `organizationId` in the query is ignored).
       expect(res.status, res.text).toBe(400);
       expect(res.body).toHaveProperty('error');
     });

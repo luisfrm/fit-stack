@@ -275,6 +275,8 @@ export interface IMembershipPlan {
   isPopular: boolean;
   isActive: boolean;
   isVisibleOnSite: boolean;
+  /** Soft-delete marker. Non-null means removed from active views (history preserved). */
+  deletedAt?: Date | null;
   createdAt?: string;
   activeMembersCount?: number;
 }

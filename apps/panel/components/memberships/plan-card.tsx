@@ -167,7 +167,7 @@ export function PlanCard({ plan, activeMembersCount = 0, refreshPlans }: PlanCar
           >
             <div className="py-2">
               <Text size="sm" variant="muted">
-                Esta acción es irreversible y afectará a los miembros asociados.
+                Se ocultará el plan de los listados y ya no podrá venderse. El historial de suscripciones y pagos que lo usan se conservará.
               </Text>
             </div>
           </Modal>

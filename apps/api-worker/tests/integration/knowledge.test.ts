@@ -1,13 +1,13 @@
 /**
  * Knowledge Base (RAG) integration tests — /api/platform/knowledge.
  *
- * Cubre: guards de auth (401/403), validaciones Zod, degradación 503 sin
- * credenciales Workers AI, PATCH sin re-embed (título/isActive), DELETE con
- * cascade y visibilidad plataforma-vs-org en el listado.
+ * Covers: auth guards (401/403), Zod validations, 503 degradation without
+ * Workers AI credentials, PATCH without re-embed (title/isActive), DELETE with
+ * cascade and platform-vs-org visibility in the listing.
  *
- * El env de tests no incluye CLOUDFLARE_AI ni OPENROUTER a propósito
- * (helpers/env.ts), así que los flujos que requieren embeddings reales se
- * validan como 503 — determinista y sin deps externas.
+ * The test env deliberately does not include CLOUDFLARE_AI or OPENROUTER
+ * (helpers/env.ts), so the flows that require real embeddings are
+ * validated as 503 — deterministic and with no external deps.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { testQuery, skipReason, truncateAll, TEST_DATABASE_URL } from '../helpers/db';

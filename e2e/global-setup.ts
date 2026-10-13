@@ -1,19 +1,19 @@
 /**
- * Global setup — ciclo de vida del tenant de la suite normal.
+ * Global setup — lifecycle of the tenant of the normal suite.
  *
- * Flujo (solo tests, sin evidencias al final):
- *   1. Reset: borra las orgs de la suite (`e2e-suite`, `e2e-empty`) y los
- *      usuarios reservados. Si una corrida anterior murió a medias, el residuo
- *      se borra aquí: el peor caso es "existen las orgs de la suite", nunca
- *      acumulación. El plan de plataforma (catálogo compartido) se reutiliza,
- *      no se borra.
- *   2. Usuario de consola (platform owner).
- *   3. La consola crea la org de la suite (endpoint de plataforma, como en prod).
- *   4. La consola aprovisiona el owner del panel + suscripción trial + seed gym.
- *   5. Org vacía `e2e-empty` para los specs de empty-state (misma mecánica).
+ * Flow (tests only, no evidence left behind):
+ *   1. Reset: deletes the suite orgs (`e2e-suite`, `e2e-empty`) and the
+ *      reserved users. If a previous run died halfway, the residue
+ *      is deleted here: the worst case is "the suite orgs exist", never
+ *      accumulation. The platform plan (shared catalog) is reused,
+ *      it is not deleted.
+ *   2. Console user (platform owner).
+ *   3. The console creates the suite org (platform endpoint, as in prod).
+ *   4. The console provisions the panel owner + trial subscription + gym seed.
+ *   5. Empty org `e2e-empty` for the empty-state specs (same mechanics).
  *
- * La org de demo (`Fit Stack` / `fit-stack`) NO se toca aquí: la rellena
- * `pnpm seed:e2e` y nunca se borra.
+ * The demo org (`Fit Stack` / `fit-stack`) is NOT touched here: it is filled by
+ * `pnpm seed:e2e` and never deleted.
  */
 import type { FullConfig } from '@playwright/test';
 import { wipeTenant } from './helpers/db';
@@ -37,23 +37,23 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const started = Date.now();
   console.log('[e2e] reset del tenant de la suite…');
 
-  // 1) Reset crash-safe: slugs y emails fijos, siempre los mismos.
-  //    El plan de plataforma no se borra (catálogo compartido, ver db.ts).
+  // 1) Crash-safe reset: fixed slugs and emails, always the same ones.
+  //    The platform plan is not deleted (shared catalog, see db.ts).
   await wipeTenant({
     orgSlugs: SUITE_ORG_SLUGS,
     emails: RESERVED_EMAILS,
   });
 
-  // 2) Consola: platform owner (promoción de rol por SQL).
+  // 2) Console: platform owner (role promotion via SQL).
   const platform = await ensurePlatformTenant();
 
-  // 3-4) Suite: org creada por consola + owner + trial + seed mínimo.
+  // 3-4) Suite: org created by the console + owner + trial + minimal seed.
   const suite = await ensureSuiteTenant(platform, TEST_ORG, TEST_OWNER);
   const platformBilling = await seedPlatformSubscription(platform.cookies, suite.organization.id);
   const gym = await seedGymData(suite.cookies);
 
-  // 5) Org vacía para los specs de empty-state (sin seed de gimnasio, pero con
-  //    suscripción de plataforma para que el CMS no redirija al dashboard).
+  // 5) Empty org for the empty-state specs (no gym seed, but with a
+  //    platform subscription so the CMS does not redirect to the dashboard).
   const empty = await ensureSuiteTenant(platform, EMPTY_ORG, EMPTY_OWNER);
   await seedPlatformSubscription(platform.cookies, empty.organization.id);
 

@@ -1,15 +1,15 @@
 /**
- * Estados vacíos — organización `e2e-empty` creada por el global-setup.
+ * Empty states — `e2e-empty` organization created by the global-setup.
  *
- * Por qué un archivo aparte: el tenant de la suite (`e2e-suite`) tiene datos
- * sembrados a propósito, así que las aserciones de "no hay clientes / no hay
- * páginas" no pueden convivir con él. Esta org nace vacía en el setup y se
- * borra en el teardown global — este spec no crea ni borra nada.
+ * Why a separate file: the tenant of the suite (`e2e-suite`) has data
+ * seeded on purpose, so the assertions of "no hay clientes / no hay
+ * páginas" cannot coexist with it. This org is born empty in the setup and
+ * is deleted in the global teardown — this spec creates and deletes nothing.
  *
- * El `storageState` es propio (otra org = otra sesión) y lo escribe
- * `panel-setup` antes de que este proyecto cree cualquier contexto. El fixture
- * `panelApi` seguiría apuntando a `e2e-suite`, así que este archivo solo usa
- * `page`; si algún día necesita API, deberá autenticarse contra la org vacía.
+ * The `storageState` is its own (another org = another session) and it is written
+ * by `panel-setup` before this project creates any context. The fixture
+ * `panelApi` would still point to `e2e-suite`, so this file only uses
+ * `page`; if it ever needs the API, it must authenticate against the empty org.
  */
 import { test, expect } from '../fixtures';
 import { EMPTY_STATE_PATH } from '../helpers/test-tenant';

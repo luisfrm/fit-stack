@@ -1,9 +1,9 @@
 /**
- * Snapshot del emisor SaaS (C1) + `issued_by` (C5) — espejo del Panel.
+ * SaaS issuer snapshot (C1) + `issued_by` (C5) — mirror of the Panel.
  *
- * El emisor es FitStack (`platform_setting`) y el receptor la organización.
- * Emitir, cambiar la identidad del emisor y la config del receptor, y volver
- * a pedir el comprobante: tiene que seguir siendo el emitido.
+ * The issuer is FitStack (`platform_setting`) and the recipient is the organization.
+ * Issue, change the issuer identity and the recipient config, and request the
+ * receipt again: it must still be the one issued.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -71,7 +71,7 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
     };
   }
 
-  /** Alta SaaS con pago validado (numera `FS-N`) + paso 2 real (PDF). */
+  /** SaaS creation with a validated payment (numbers `FS-N`) + real step 2 (PDF). */
   async function emitReceipt(): Promise<{ paymentId: number; receiptNumber: string }> {
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
@@ -125,7 +125,7 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
     const asIssued = await getReceipt(paymentId);
     expect(asIssued.receipt.emitter.name).toBe('FitStack');
 
-    // Cambia el emisor (settings) y el receptor (país/tz).
+    // Changes the issuer (settings) and the recipient (country/tz).
     await testQuery(
       `INSERT INTO platform_setting (key, value) VALUES ('fitstack_legal_name', 'FitStack Colombia S.A.S.')
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
@@ -157,14 +157,14 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
 
   it('C1: pago legacy (snapshot NULL) sigue componiendo en vivo', async () => {
     const { paymentId } = await emitReceipt();
-    // Pre-C1: se fuerza el estado terminal documentado.
+    // Pre-C1: the documented terminal state is forced.
     await testQuery(
       `UPDATE platform_subscription_payment SET emitter_snapshot = NULL WHERE id = $1`,
       [paymentId],
     );
 
     const data = await getReceipt(paymentId);
-    // El emisor vivo ya es el de Colombia (settings del test anterior).
+    // The live issuer is already the Colombian one (settings from the previous test).
     expect(data.receipt.emitter.name).toBe('FitStack Colombia S.A.S.');
     expect(data.receipt.emitter.countryCode).toBe('CO');
   });

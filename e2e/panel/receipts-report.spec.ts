@@ -6,9 +6,9 @@ import { TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
 import { readFileSync } from 'node:fs';
 
-// Sin jobs-worker en E2E: lo validado queda numerado con PDF pendiente.
-// Los filtros viven en la URL: se prueban navegando con query params
-// (determinista, sin depender del select custom).
+// No jobs-worker in E2E: what is validated stays numbered with a pending PDF.
+// The filters live in the URL: they are tested by navigating with query params
+// (deterministic, without depending on the custom select).
 test.describe('Panel — Reporte de comprobantes', () => {
   async function createSubscription(
     panelApi: ApiClient,
@@ -62,7 +62,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
-    // Sin consumer: numerado con PDF pendiente (nunca UUID).
+    // No consumer: numbered with a pending PDF (never UUID).
     await expect(page.getByText('PDF pendiente').first()).toBeVisible();
     await expect(page.getByText(lastName).first()).toBeVisible();
     await expect(page.getByText('Operación #')).toHaveCount(0);
@@ -101,8 +101,8 @@ test.describe('Panel — Reporte de comprobantes', () => {
     await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
-    // Reintento: si el clic cae antes de la hidratación del cliente,
-    // el onClick no corre y no hay download (misma race que modal.ts).
+    // Retry: if the click lands before client hydration,
+    // the onClick does not run and there is no download (same race as modal.ts).
     let download: Download | null = null;
     for (let attempt = 0; attempt < 3 && !download; attempt++) {
       const downloadPromise = page
@@ -125,13 +125,13 @@ test.describe('Panel — Reporte de comprobantes', () => {
   }) => {
     const { email, lastName } = await createSubscription(panelApi, 'processing');
 
-    // Aún sin comprobante: no aparece en el reporte.
+    // Still without a receipt: it does not appear in the report.
     await page.goto('/reports/receipts', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('table').first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(lastName)).toHaveCount(0);
 
-    // Validar por API: aquí se prueba la invalidación del reporte, no el
-    // accionable (ese flujo lo cubre `subscriptions.spec.ts` desde la UI).
+    // Validate via the API: this tests the invalidation of the report, not the
+    // actionable list (that flow is covered by `subscriptions.spec.ts` from the UI).
     const list = await panelApi.get<{ data?: Array<{ memberEmail?: string; paymentId?: number }> }>(
       '/api/subscriptions',
       { status: 'processing', limit: 50 },
@@ -141,7 +141,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     expect(paymentId, 'el fixture processing debe aparecer en el listado').toBeTruthy();
     await panelApi.patch(`/api/payments/${paymentId}/status`, { status: 'validated' });
 
-    // El reporte ya muestra el comprobante numerado (caché invalidada).
+    // The report already shows the numbered receipt (cache invalidated).
     await page.goto('/reports/receipts', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,

@@ -1,18 +1,18 @@
 /**
  * SaaS compensation when the emission fails.
  *
- * Los 4 flujos SaaS commitean sin red (Neon HTTP no tiene `db.transaction()`):
- * el `catch` compensa por relectura con el helper de fase-2. Semántica SaaS:
- * el alta que queda sin pago válido también se anula con `cancel()` — nunca
- * `delete()` (un `voided` se ignora en el cómputo SaaS y dejaría un periodo
- * front-loadeado sin cobro que lo sostenga); renovación/registro/transición
- * anulan el pago y REVIERTEN el periodo movido al valor leído antes de
- * extender. Un pago compensado (`voided`) no puede re-validarse para volver a
- * extender (guard anti doble-extensión).
+ * The 4 SaaS flows commit without a transaction (Neon HTTP has no `db.transaction()`):
+ * the `catch` compensates by re-reading with the phase-2 helper. SaaS semantics:
+ * a creation left without a valid payment is also voided with `cancel()` — never
+ * `delete()` (a `voided` is ignored in the SaaS computation and would leave a
+ * front-loaded period with no charge to sustain it); renewal/registration/transition
+ * void the payment and REVERT the moved period to the value read before
+ * extending. A compensated payment (`voided`) cannot be re-validated to extend
+ * again (anti double-extension guard).
  *
- * El fallo se induce rompiendo el país fiscal (`XX`): `resolveFiscalProfile`
- * lanza `FISCAL_PROFILE_UNKNOWN` ANTES de consumir la secuencia `FS-N`.
- * Todo dinero en centavos enteros.
+ * The failure is induced by breaking the fiscal country (`XX`): `resolveFiscalProfile`
+ * throws `FISCAL_PROFILE_UNKNOWN` BEFORE consuming the `FS-N` sequence.
+ * All money in integer cents.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
@@ -78,7 +78,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     };
   }
 
-  /** Rompe el perfil fiscal: la emisión lanza sin consumir la serie `FS-N`. */
+  /** Breaks the fiscal profile: the emission throws without consuming the `FS-N` series. */
   async function breakFiscalCountry(organizationId: string) {
     await testQuery(`UPDATE organization SET country_code = 'XX' WHERE id = $1`, [
       organizationId,
@@ -128,7 +128,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     return rows[0]?.next_number ?? 0;
   }
 
-  /** Garantía visible: ningún cobro válido sin comprobante (salvo $0 `pre_system` por diseño). */
+  /** Visible guarantee: no valid charge without a receipt (except $0 `pre_system` by design). */
   async function expectNoValidChargeWithoutReceipt(organizationId: string) {
     const orphans = await testQuery<{ id: number }>(
       `SELECT id FROM platform_subscription_payment
@@ -150,7 +150,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
       '/api/platform/subscriptions',
       altaPayload(orgId, plan.id),
     );
-    // El error original se re-lanza tras compensar: `onError` lo traduce.
+    // The original error is re-thrown after compensating: `onError` translates it.
     expect(failed.status, failed.text).not.toBe(201);
 
     const payments = await readPayments(orgId);
@@ -161,19 +161,19 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     expect(payments[0]!.voided_by).toBeTruthy();
     expect(payments[0]!.receipt_number).toBeNull();
 
-    // Alta sin pago válido: cancelada, nunca borrada (regla 6, la serie
-    // `FS-N` no se vacía vía `DELETE /api/platform/subscriptions/:id`).
+    // Creation without a valid payment: cancelled, never deleted (rule 6, the
+    // `FS-N` series is not emptied via `DELETE /api/platform/subscriptions/:id`).
     const subs = await readSubs(orgId);
     expect(subs).toHaveLength(1);
     expect(subs[0]!.cancelled_at).not.toBeNull();
 
-    // El perfil fiscal se resuelve ANTES de consumir la secuencia global.
+    // The fiscal profile is resolved BEFORE consuming the global sequence.
     expect(await readSequence()).toBe(seqBefore);
 
     await expectNoValidChargeWithoutReceipt(orgId);
 
-    // Reintento con fiscal corregido: 201, sin duplicar (el `voided` no
-    // bloquea: el guard solo frena `processing`).
+    // Retry with fixed fiscal data: 201, no duplication (the `voided` does not
+    // block: the guard only stops `processing`).
     await fixFiscalCountry(orgId);
     const retry = await admin.client.post(
       '/api/platform/subscriptions',
@@ -204,7 +204,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     const orgId = organization.id;
     const plan = await createPlatformPlan();
 
-    // Alta sana: periodo front-loadeado (inicio + 1 mes del plan).
+    // Healthy creation: front-loaded period (start + 1 month of the plan).
     const alta = await admin.client.post(
       '/api/platform/subscriptions',
       altaPayload(orgId, plan.id),
@@ -228,9 +228,9 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     expect(renewal.voided_by).toBeTruthy();
     expect(renewal.receipt_number).toBeNull();
 
-    // El periodo se movió antes del fallo y se REVIERTE al valor previo: sin
-    // transacción, el write compensatorio es honesto (`currentPeriodEnd` se
-    // leyó antes de extender). Sin `cancelParent`: la suscripción preexiste.
+    // The period was moved before the failure and is REVERTED to the previous value:
+    // with no transaction, the compensating write is honest (`currentPeriodEnd` was
+    // read before extending). No `cancelParent`: the subscription already existed.
     const subs = await readSubs(orgId);
     expect(subs[0]!.cancelled_at).toBeNull();
     const periodAfter = new Date(subs[0]!.current_period_end);
@@ -238,9 +238,9 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
 
     await expectNoValidChargeWithoutReceipt(orgId);
 
-    // Reintento con fiscal corregido: 200 con un único cobro nuevo (el
-    // `voided` no bloquea el guard); el periodo acumula desde lo revertido
-    // (base = periodBefore), no desde un periodo movido dos veces.
+    // Retry with fixed fiscal data: 200 with a single new charge (the
+    // `voided` does not block the guard); the period accumulates from the reverted
+    // value (base = periodBefore), not from a period moved twice.
     await fixFiscalCountry(orgId);
     const retry = await admin.client.post(`/api/platform/subscriptions/${subId}/renew`, {
       payment: validatedPayment(),
@@ -255,7 +255,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     expect(valid[1]!.receipt_number).toMatch(/^FS-\d{7,}$/);
     await expectNoValidChargeWithoutReceipt(orgId);
 
-    // Un solo periodo extra por un solo pago: el fallido no regala días.
+    // A single extra period for a single payment: the failed one does not give away days.
     const periodFinal = new Date((await readSubs(orgId))[0]!.current_period_end);
     expect(periodFinal.getTime()).toBe(addDuration(periodBefore, 1, 'month', 'UTC').getTime());
   });
@@ -265,7 +265,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     const orgId = organization.id;
     const plan = await createPlatformPlan();
 
-    // Alta `processing`: sin emisión, periodo = inicio (60 días atrás).
+    // `processing` creation: no emission, period = start (60 days ago).
     const alta = await admin.client.post('/api/platform/subscriptions', {
       ...altaPayload(orgId, plan.id, isoDate(-60)),
       payment: { ...validatedPayment(), status: 'processing', paymentDate: isoDate(-60) },
@@ -294,17 +294,17 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     expect(payments[0]!.voided_by).toBeTruthy();
     expect(payments[0]!.receipt_number).toBeNull();
 
-    // La transición extendió el periodo antes de fallar y se REVIERTE al
-    // valor previo; la suscripción no se cancela (preexiste).
+    // The transition extended the period before failing and is REVERTED to
+    // the previous value; the subscription is not cancelled (it already existed).
     const subs = await readSubs(orgId);
     expect(subs[0]!.cancelled_at).toBeNull();
     expect(new Date(subs[0]!.current_period_end).getTime()).toBe(periodBefore.getTime());
 
     await expectNoValidChargeWithoutReceipt(orgId);
 
-    // Guard anti doble-extensión: re-PATCH del pago compensado a `validated`
-    // se rechaza por código (un `voided` no puede re-validarse: no hay cobro
-    // válido y la invariante validado ⇔ numerado lo prohíbe).
+    // Anti double-extension guard: re-PATCH of the compensated payment to `validated`
+    // is rejected by code (a `voided` cannot be re-validated: there is no valid
+    // charge and the validated ⇔ numbered invariant forbids it).
     const rePatch = await admin.client.patch(
       `/api/platform/subscriptions/payments/${paymentId}/status`,
       { status: 'validated' },
@@ -317,8 +317,8 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
       periodBefore.getTime(),
     );
 
-    // Reintento limpio: un pago nuevo tras corregir el fiscal (el `voided`
-    // no bloquea el guard de pendientes); un solo cobro válido numerado.
+    // Clean retry: a new payment after fixing the fiscal data (the `voided`
+    // does not block the pending guard); a single valid numbered charge.
     await fixFiscalCountry(orgId);
     const retry = await admin.client.post(
       `/api/platform/subscriptions/${subId}/payments`,
@@ -339,7 +339,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     const orgId = organization.id;
     const plan = await createPlatformPlan();
 
-    // Alta `processing` (sin emisión) y luego cancelación de la suscripción.
+    // `processing` creation (no emission) and then cancellation of the subscription.
     const alta = await admin.client.post('/api/platform/subscriptions', {
       ...altaPayload(orgId, plan.id),
       payment: { ...validatedPayment(), status: 'processing' },
@@ -352,15 +352,15 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
     );
     const paymentId = Number(paymentRows[0]!.id);
 
-    // Cancelación lógica (no `DELETE`, que borra en duro y se lleva el pago
-    // por cascada): fija `cancelled_at` y el pago `processing` sobrevive.
+    // Logical cancellation (not `DELETE`, which hard-deletes and takes the payment
+    // via cascade): it sets `cancelled_at` and the `processing` payment survives.
     const cancel = await admin.client.post(`/api/platform/subscriptions/${subId}/cancel`, {
       reason: 'Cancelación de prueba (d)',
     });
     expect(cancel.status, cancel.text).toBe(200);
 
-    // El pago `processing` de una suscripción cancelada NO se valida: sin este
-    // guard quedaría un `validated` sin número (invariante validado ⇔ numerado).
+    // The `processing` payment of a cancelled subscription is NOT validated: without this
+    // guard a `validated` with no number would remain (validated ⇔ numbered invariant).
     const attempt = await admin.client.patch(
       `/api/platform/subscriptions/payments/${paymentId}/status`,
       { status: 'validated' },

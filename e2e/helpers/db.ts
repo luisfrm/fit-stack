@@ -102,19 +102,19 @@ export async function isOrgAuthMember(userId: string, organizationId: string): P
 }
 
 /**
- * Borra un tenant completo por SQL directo: organización (arrastra members,
- * subs, pagos, clases, CMS y suscripciones SaaS vía cascada) + usuarios por
- * email (arrastra session/account/member) + residuos de verification/invitation.
+ * Deletes a whole tenant with direct SQL: organization (drags members,
+ * subs, payments, classes, CMS and SaaS subscriptions via cascade) + users by
+ * email (drags session/account/member) + verification/invitation leftovers.
  *
- * Se usa SQL (y no el endpoint `DELETE /api/platform/organizations/:id`) para
- * que el reset del global-setup no dependa de una sesión de platform owner que
- * quizá acabamos de borrar — evita el problema del huevo y la gallina.
+ * SQL is used (and not the `DELETE /api/platform/organizations/:id` endpoint) so
+ * that the reset of the global-setup does not depend on a platform owner session
+ * that we may have just deleted — avoids the chicken and egg problem.
  *
- * El plan de plataforma NO se borra aquí: es catálogo compartido y otras orgs
- * (p. ej. la demo `fit-stack` del seed) pueden tener suscripciones que lo
- * referencian — borrarlo rompería la FK `platform_subscription.plan_id`.
- * El setup lo reutiliza por nombre (`ensurePlatformPlan`), así que es una sola
- * fila estable, no evidencia.
+ * The platform plan is NOT deleted here: it is a shared catalog and other orgs
+ * (e.g. the seed demo `fit-stack`) may have subscriptions that
+ * reference it — deleting it would break the FK `platform_subscription.plan_id`.
+ * The setup reuses it by name (`ensurePlatformPlan`), so it is a single
+ * stable row, not evidence.
  */
 export async function wipeTenant(options: {
   orgSlugs?: readonly string[];
@@ -122,8 +122,8 @@ export async function wipeTenant(options: {
 }): Promise<void> {
   const { orgSlugs = [], emails = [] } = options;
 
-  // Borrar la organización arrastra en cascada sus `platform_subscription`
-  // (que referencian al plan del catálogo, que NO se toca).
+  // Deleting the organization cascades its `platform_subscription` rows
+  // (which reference the catalog plan, which is NOT touched).
   if (orgSlugs.length > 0) {
     await query(`DELETE FROM organization WHERE slug = ANY($1::text[])`, [[...orgSlugs]]);
   }

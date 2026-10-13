@@ -19,10 +19,10 @@ import {
 
 /** Sub window relative to today (endpoint computes against `new Date()`).
  *
- * B3.3: el periodo lo calcula el servidor — `endOffsetDays: null` omite el
- * fin explícito y el servidor lo computa desde `startDate` + duración del
- * plan (así se siembran periodos ya vencidos: un `endDate` explícito pasado e
- * invertido se rechaza con 422 END_DATE_BEFORE_START). */
+ * B3.3: the server computes the period — `endOffsetDays: null` omits the
+ * explicit end and the server computes it from `startDate` + plan duration
+ * (this is how already-expired periods are seeded: an explicit `endDate` in the
+ * past and inverted is rejected with 422 END_DATE_BEFORE_START). */
 function subWindow(startOffsetDays: number, endOffsetDays: number | null) {
   return {
     startDate: isoDate(startOffsetDays),
@@ -85,7 +85,7 @@ describe.skipIf(skipReason !== null)('Dashboard action-items API', () => {
       const row = res.body.expiring.find(
         (i: { memberId: number }) => i.memberId === expiring.id,
       );
-      expect(row.days).toBeGreaterThanOrEqual(4); // ~5 días, margen por timing
+      expect(row.days).toBeGreaterThanOrEqual(4); // ~5 days, timing margin
       expect(row.days).toBeLessThanOrEqual(6);
       expect(row.memberName).toContain('Ana');
       expect(row.planName).toBe(plan.name);
@@ -99,10 +99,10 @@ describe.skipIf(skipReason !== null)('Dashboard action-items API', () => {
       const expired = await createGymMember(tenant.owner.client);
       const renewed = await createGymMember(tenant.owner.client);
 
-      // Venció hace 3 días: inicio hace 8 + plan de 5 días → el servidor
-      // computa fin hace 3 (un endDate explícito invertido sería 422).
+      // Expired 3 days ago: start 8 days ago + 5-day plan → the server
+      // computes the end 3 days ago (an explicit inverted endDate would be 422).
       await createSubscription(tenant, expired.id, plan.id, null, 'validated', -8);
-      // Venció y renovó: primera vencida (fin hace 5) + segunda activa → NO debe aparecer.
+      // Expired and renewed: first expired (end 5 days ago) + second active → must NOT show up.
       await createSubscription(tenant, renewed.id, plan.id, null, 'validated', -10);
       await createSubscription(tenant, renewed.id, plan.id, 30);
 
@@ -116,7 +116,7 @@ describe.skipIf(skipReason !== null)('Dashboard action-items API', () => {
       const row = res.body.recentlyExpired.find(
         (i: { memberId: number }) => i.memberId === expired.id,
       );
-      expect(row.days).toBeLessThanOrEqual(-3); // negativo = venció hace N días
+      expect(row.days).toBeLessThanOrEqual(-3); // negative = expired N days ago
       expect(row.days).toBeGreaterThanOrEqual(-4);
     });
 

@@ -113,12 +113,10 @@ export const planRoutes = new Hono<AppEnv>()
     const plansRepo = createPlansRepository(c.get('db'));
     const plansService = createPlansService(plansRepo);
 
-    const plan = await plansService.findById(orgId, id);
-    if (!plan) {
+    const result = await plansService.deletePlan(orgId, id);
+    if (!result) {
       return c.json({ error: 'Plan no encontrado' }, 404);
     }
-
-    await plansService.delete(orgId, id);
     await cache.invalidate(`org:${orgId}:plans:*`);
     return c.json({ success: true });
   });
