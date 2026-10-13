@@ -287,12 +287,7 @@ export const platformSubscriptionPayment = pgTable(
 export const platformDocumentSequence = pgTable('platform_document_sequence', {
   // 'receipt' | 'invoice' (validated by Zod; currently only 'receipt' effective). No pgEnum.
   documentType: text('document_type').primaryKey(),
-  // NOTE: `next_number` stores the LAST allocated number, not the next one
-  // (same meaning as `organizationDocumentSequence.last_number`). The
-  // name is cosmetic; renaming to `last_number` requires a migration and will
-  // be batched with the next migration generated for another reason
-  // (tracked in Linear, RD-103).
-  nextNumber: integer('next_number').notNull().default(0),
+  lastNumber: integer('last_number').notNull().default(0),
 });
 
 // ── AI USAGE (AI chat rate-limit per period) ──

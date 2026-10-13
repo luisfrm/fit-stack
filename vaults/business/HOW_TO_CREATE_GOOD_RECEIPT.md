@@ -26,10 +26,10 @@ Una **única secuencia global**, porque FitStack es un solo emisor para toda la 
 ```
 platform_document_sequence
  ├─ document_type   -- 'receipt' | 'invoice'
- └─ next_number     -- guarda el ÚLTIMO número entregado (sin año). El nombre es cosmético
+ └─ last_number     -- guarda el ÚLTIMO número entregado (sin año)
 ```
 
-La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `next_number` guarda el **último** número entregado, no el siguiente (ver el backlog en Linear — proyecto «Fit Stack»).
+La asignación es una **única sentencia atómica** `INSERT … ON CONFLICT DO UPDATE … RETURNING` (sin transacción interactiva ni `SELECT … FOR UPDATE`), y `last_number` guarda el **último** número entregado, no el siguiente.
 
 Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin componente de org).
 

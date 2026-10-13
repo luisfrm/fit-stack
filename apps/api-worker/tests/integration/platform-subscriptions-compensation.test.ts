@@ -122,10 +122,10 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 
   }
 
   async function readSequence(): Promise<number> {
-    const rows = await testQuery<{ next_number: number }>(
-      `SELECT next_number FROM platform_document_sequence WHERE document_type = 'receipt'`,
+    const rows = await testQuery<{ last_number: number }>(
+      `SELECT last_number FROM platform_document_sequence WHERE document_type = 'receipt'`,
     );
-    return rows[0]?.next_number ?? 0;
+    return rows[0]?.last_number ?? 0;
   }
 
   /** Visible guarantee: no valid charge without a receipt (except $0 `pre_system` by design). */
