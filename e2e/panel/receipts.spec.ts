@@ -1,5 +1,7 @@
 import { test, expect } from '../fixtures';
 import { uid, uniqueEmail } from '../helpers/api';
+import { clickMenuItem } from '../helpers/interactions';
+import { PANEL_RECEIPT_NUMBER_PATTERN } from '../helpers/receipts';
 import { SELECTORS } from '../helpers/selectors';
 import { TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
@@ -63,15 +65,14 @@ test.describe('Panel — Comprobante de pago', () => {
 
     const row = page.locator('table tbody tr', { hasText: lastName }).first();
     await expect(row).toBeVisible({ timeout: 30_000 });
-    await row.getByRole('button').click();
     // Con número asignado la acción es reimpresión (prueba el select 3B-1).
-    await page.getByRole('menuitem', { name: /reimprimir comprobante/i }).click();
+    await clickMenuItem(page, row.getByRole('button'), /reimprimir comprobante/i);
 
     const dialog = page.locator(SELECTORS.common.modal);
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
     // Número correlativo humano, nunca el UUID técnico.
-    await expect(dialog.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(dialog.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
     await expect(dialog.getByText('Operación #')).toHaveCount(0);
@@ -155,14 +156,13 @@ test.describe('Panel — Comprobante de pago', () => {
     await expect(row.getByText('Anulado').first()).toBeVisible({
       timeout: 20_000,
     });
-    await row.getByRole('button').click();
-    await page.getByRole('menuitem', { name: /ver comprobante \(anulado\)/i }).click();
+    await clickMenuItem(page, row.getByRole('button'), /ver comprobante \(anulado\)/i);
 
     const dialog = page.locator(SELECTORS.common.modal);
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
     // El número se conserva tras anular; nunca el UUID técnico.
-    await expect(dialog.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(dialog.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
     await expect(dialog.getByText('Operación #')).toHaveCount(0);

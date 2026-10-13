@@ -10,12 +10,15 @@ import type { APIRequestContext } from '@playwright/test';
 import { API_BASE_URL } from './api';
 
 /**
- * Endpoint de borrado por tipo de recurso creado desde los tests.
+ * Delete endpoint per resource kind created from the tests.
  *
- * `null` = el recurso NO se borra por API. Es el caso de `subscription`: un
- * registro financiero (suscripción + pago) no tiene DELETE — se anula. La
- * limpieza sigue siendo completa porque el borrado del **miembro** lo arrastra
- * por FK (`member_id` → ON DELETE CASCADE) y se ejecuta después (LIFO).
+ * `null` = the resource is NOT deleted through the API. That is the case of
+ * `subscription`: a financial record (subscription + payment) has no DELETE —
+ * it is voided instead. Since RD-120 the member delete is a **soft delete** and
+ * the FKs toward `gym_member` are `restrict`, so nothing cascades any more: the
+ * plan that billed the subscription is not deletable either, and its disposable
+ * is dropped in `dropReferencedPlanDisposable`. Per-test cleanup covers the
+ * rest; the tenant wipe (global-setup/teardown) is the safety net.
  */
 const DELETE_ROUTES: Record<string, ((id: number | string) => string) | null> = {
   cmsBlock: (id) => `/api/cms/blocks/${id}`,
@@ -53,6 +56,27 @@ export interface ApiClient {
   create<T = any>(kind: DisposableKind, path: string, body: unknown, label?: string): Promise<T>;
 }
 
+/**
+ * A subscription turns its plan into part of the immutable financial record:
+ * the API refuses `DELETE /api/plans/:id` while a subscription references it
+ * (FK `23503`), which is production-correct — the plan that billed someone is
+ * never deleted. Since the subscription has no DELETE either, that disposable
+ * can never succeed: it is dropped here instead of issuing a doomed request
+ * that logged a scary stack after every test. The tenant wipe removes both rows
+ * (`wipeTenant` deletes the org and cascades).
+ */
+function dropReferencedPlanDisposable(
+  kind: DisposableKind,
+  body: unknown,
+  disposables: Disposable[],
+): void {
+  if (kind !== 'subscription') return;
+  const planId = (body as { planId?: number | string } | null)?.planId;
+  if (planId === undefined) return;
+  const index = disposables.findIndex((item) => item.kind === 'plan' && item.id === planId);
+  if (index >= 0) disposables.splice(index, 1);
+}
+
 export function createApiClient(context: APIRequestContext, disposables: Disposable[]): ApiClient {
   async function request<T>(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -85,7 +109,10 @@ export function createApiClient(context: APIRequestContext, disposables: Disposa
     async create<T>(kind: DisposableKind, path: string, body: unknown, label?: string): Promise<T> {
       const created = await request<T>('POST', path, { body });
       const id = (created as { id?: number | string })?.id;
-      if (id !== undefined) disposables.push({ kind, id, label: label ?? `${kind}#${id}` });
+      if (id !== undefined) {
+        dropReferencedPlanDisposable(kind, body, disposables);
+        disposables.push({ kind, id, label: label ?? `${kind}#${id}` });
+      }
       return created;
     },
   };

@@ -1,6 +1,7 @@
 import { test, expect, type ApiClient } from '../fixtures';
 import type { Download } from '@playwright/test';
 import { uid, uniqueEmail } from '../helpers/api';
+import { PANEL_RECEIPT_NUMBER_PATTERN } from '../helpers/receipts';
 import { TEST_ORG } from '../helpers/test-tenant';
 import { addLocalDays, toLocalDayString } from '@workspace/shared';
 import { readFileSync } from 'node:fs';
@@ -58,7 +59,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     const { lastName } = await createSubscription(panelApi, 'validated');
 
     await page.goto('/reports/receipts', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
     // Sin consumer: numerado con PDF pendiente (nunca UUID).
@@ -73,7 +74,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     await page.goto(`/reports/receipts?from=${today}&to=${today}`, {
       waitUntil: 'domcontentloaded',
     });
-    await expect(page.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
 
@@ -97,7 +98,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     });
 
     await page.goto('/reports/receipts', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
     // Reintento: si el clic cae antes de la hidratación del cliente,
@@ -115,7 +116,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
     expect(path).toBeTruthy();
     const content = readFileSync(path!, 'utf8');
     expect(content).toMatch(/comprobante,estado,miembro/);
-    expect(content).toMatch(/e2e-suite-\d{4}-\d+/);
+    expect(content).toMatch(PANEL_RECEIPT_NUMBER_PATTERN);
   });
 
   test('validar un pendiente lo refleja en el reporte (invalidación)', async ({
@@ -142,7 +143,7 @@ test.describe('Panel — Reporte de comprobantes', () => {
 
     // El reporte ya muestra el comprobante numerado (caché invalidada).
     await page.goto('/reports/receipts', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/e2e-suite-\d{4}-\d+/).first()).toBeVisible({
+    await expect(page.getByText(PANEL_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.getByText('PDF pendiente').first()).toBeVisible();
