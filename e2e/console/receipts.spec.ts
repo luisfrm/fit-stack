@@ -1,7 +1,10 @@
 import fs from 'node:fs';
+import type { Download } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { uid } from '../helpers/api';
+import { clickMenuItem } from '../helpers/interactions';
 import { navigateByClick } from '../helpers/nav';
+import { CONSOLE_RECEIPT_NUMBER_PATTERN } from '../helpers/receipts';
 import { SELECTORS } from '../helpers/selectors';
 import { TEST_PLATFORM } from '../helpers/test-tenant';
 import { toLocalDayString } from '@workspace/shared';
@@ -83,20 +86,22 @@ test.describe('Console — Comprobante SaaS', () => {
     const row = page.locator(`[data-testid="subs-row-${sub.id}"]`);
     await expect(row).toBeVisible({ timeout: 30_000 });
     // El trigger del menú lleva la clase (sin trigger custom en la tabla).
-    await row.locator(SUBS.rowMenu).click();
-    await page.getByRole('menuitem', { name: 'Ver Pagos' }).click();
+    await clickMenuItem(page, row.locator(SUBS.rowMenu), 'Ver Pagos');
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 20_000 });
 
     const paymentRow = page.locator(`[data-testid="subs-payment-${paymentId}"]`);
     await expect(paymentRow).toBeVisible({ timeout: 20_000 });
-    await paymentRow.getByRole('button', { name: 'Acciones de pago' }).click();
-    await page.getByRole('menuitem', { name: 'Marcar como Validado' }).click();
+    await clickMenuItem(
+      page,
+      paymentRow.getByRole('button', { name: 'Acciones de pago' }),
+      'Marcar como Validado',
+    );
 
     // Tras aprobar, el paso 1 numera: expandir la fila muestra el FS-N.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
-    await expect(paymentRow.getByText(/FS-\d{7,}/).first()).toBeVisible({
+    await expect(paymentRow.getByText(CONSOLE_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
 
@@ -160,17 +165,19 @@ test.describe('Console — Comprobante SaaS', () => {
 
     const row = page.locator(`[data-testid="subs-row-${sub.id}"]`);
     await expect(row).toBeVisible({ timeout: 30_000 });
-    await row.locator(SUBS.rowMenu).click();
-    await page.getByRole('menuitem', { name: 'Ver Pagos' }).click();
+    await clickMenuItem(page, row.locator(SUBS.rowMenu), 'Ver Pagos');
 
     const paymentRow = page.locator(`[data-testid="subs-payment-${paymentId}"]`);
     await expect(paymentRow).toBeVisible({ timeout: 20_000 });
-    await paymentRow.getByRole('button', { name: 'Acciones de pago' }).click();
-    await page.getByRole('menuitem', { name: 'Anular' }).click();
+    await clickMenuItem(
+      page,
+      paymentRow.getByRole('button', { name: 'Acciones de pago' }),
+      'Anular',
+    );
 
     // El flag ANULADO vive en el bloque expandido, junto al número.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
-    await expect(paymentRow.getByText(/FS-\d{7,}/).first()).toBeVisible({
+    await expect(paymentRow.getByText(CONSOLE_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({
       timeout: 20_000,
     });
     await expect(
@@ -238,17 +245,24 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
     });
     const row = page.locator('tr', { hasText: orgName });
     await expect(row).toBeVisible({ timeout: 30_000 });
-    await expect(row.locator('td').first()).toContainText(/FS-\d{7,}/);
+    await expect(row.locator('td').first()).toContainText(CONSOLE_RECEIPT_NUMBER_PATTERN);
     // El UUID técnico del pago nunca se renderiza: solo el número humano.
     const tableText = await page.locator(AUDIT.table).innerText();
     expect(tableText).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
 
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByTestId('receipts-export-csv').click(),
-    ]);
-    expect(download.suggestedFilename()).toBe('comprobantes-fs.csv');
-    const csv = fs.readFileSync((await download.path())!, 'utf8');
+    // Reintento: si el clic cae antes de la hidratación del cliente, el onClick
+    // no corre y no hay download (misma race que el resto de la suite).
+    let download: Download | null = null;
+    for (let attempt = 0; attempt < 3 && !download; attempt++) {
+      const downloadPromise = page
+        .waitForEvent('download', { timeout: 15_000 })
+        .catch(() => null);
+      await page.getByTestId('receipts-export-csv').click();
+      download = await downloadPromise;
+    }
+    expect(download, 'la exportación CSV debe descargar el archivo').toBeTruthy();
+    expect(download!.suggestedFilename()).toBe('comprobantes-fs.csv');
+    const csv = fs.readFileSync((await download!.path())!, 'utf8');
     expect(csv.split('\n')[0]).toContain('comprobante');
     expect(csv).toContain(orgName);
   });

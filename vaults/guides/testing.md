@@ -91,6 +91,8 @@ e2e/
 │   ├── prewarm.ts         # Route prewarm (Turbopack compile out of test time)
 │   ├── modal.ts           # openModal(): robust click vs hydration race
 │   ├── nav.ts             # navigateByClick(): robust navigation vs hydration race
+│   ├── interactions.ts    # clickMenuItem/selectOption/checkSwitch: same hydration-race retries for menus, comboboxes and switches
+│   ├── receipts.ts        # Receipt correlative text patterns (panel `{year}-{seq}` since RD-119, console `FS-{seq}`)
 │   └── selectors.ts       # Common design-system selectors (data-testid > role > text > CSS)
 ├── panel/
 │   ├── auth.spec.ts       # Login, session, redirect, error toast
@@ -116,7 +118,7 @@ e2e/
 
 **Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
 
-**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`): the member delete (later in LIFO) cascades it away by FK, so the cleanup is still complete and the FK warning noise is gone. The suite-org wipe + global teardown are the safety net — no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
+**Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`). Since RD-120 the member delete is a **soft delete** (`deleted_at`) and the FKs toward `gym_member` are `restrict`, so nothing cascades any more: the tracked `plan` delete fails with FK `23503` (`still referenced from "subscription"`) and `cleanupDisposables` logs it as best-effort (`se ignora`) instead of failing the test. Those per-test orphans live only inside `e2e-suite` and are removed by the suite-org wipe + global teardown — that safety net is what keeps the DB clean, no manual `afterAll` needed. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
 
 **Setup sessions**: `panel-setup` writes **two** storage states before the `panel` project creates any context — `panel-user.json` (suite org) and `empty-org-user.json` (org `e2e-empty`, used by `empty-state.spec.ts` via `test.use`). A `test.use({ storageState })` path must exist *before* the project runs, so it can never be created in a spec's `beforeAll`.
 

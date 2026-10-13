@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { navigateByClick } from '../helpers/nav';
+import { checkSwitch, selectOption } from '../helpers/interactions';
 import { uid } from '../helpers/api';
 import { TEST_MEMBERS, TEST_PLAN } from '../helpers/test-tenant';
 
@@ -116,7 +117,20 @@ test.describe('Panel — Settings', () => {
     await dialog.getByText(TEST_MEMBERS.withoutPlan.email).first().click();
     await dialog.getByRole('button', { name: new RegExp(TEST_PLAN.name, 'i') }).click();
 
-    await dialog.getByRole('switch', { name: 'Ajuste manual de impuestos' }).click();
+    // El método de pago es obligatorio: sin él, la validación de pago corta
+    // antes de evaluar el ajuste de impuestos y el toast asertado sería otro.
+    // El combobox no expone nombre accesible (el Label del `SimpleSelect` no
+    // está asociado), así que se identifica por su placeholder renderizado.
+    await selectOption(
+      page,
+      dialog.getByRole('combobox').filter({ hasText: 'Seleccionar Método' }),
+      'Otro / Personalizado',
+    );
+    await dialog.locator('#other-method-details').fill('Efectivo E2E');
+
+    await checkSwitch(
+      dialog.getByRole('switch', { name: 'Ajuste manual de impuestos' }),
+    );
     await dialog.getByRole('button', { name: 'GENERAR SUSCRIPCIÓN' }).click();
 
     await expect(
