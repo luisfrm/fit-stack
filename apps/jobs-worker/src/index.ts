@@ -5,38 +5,10 @@ import { clearReceiptNotifiedMarkForEvent } from './handlers/notify-mark';
 import {
   isFinalDeliveryAttempt,
   TASK_QUEUE_MAX_RETRIES,
+  isFitTaskEvent,
+  type FitTaskEvent,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
-
-export type FitTaskEvent =
-  | {
-      type: 'email.registration_invite';
-      email: string;
-      token: string;
-      /** Which app the registration link must point to. Defaults to 'panel'. */
-      target?: 'panel' | 'console';
-      /** Platform role to assign on sign-up (console invites only). */
-      role?: string;
-    }
-  | { type: 'email.org_invite'; email: string; orgName: string; inviterName: string; inviteLink: string }
-  | {
-      type: 'email.payment_receipt';
-      paymentId: number;
-      organizationId: string;
-      /**
-       * Correlative number (display hint; source of truth lives in DB).
-       * Optional = backward compatibility with in-flight events missing the field.
-       */
-      receiptNumber?: string;
-    }
-  | {
-      type: 'email.org_payment_received';
-      paymentId: number;
-      organizationId: string;
-      /** User who registered the payment (session). Receives confirmation + owners dedupe. */
-      payerEmail?: string;
-      payerName?: string;
-    };
 
 export interface Env {
   DATABASE_URL: string;
@@ -93,6 +65,11 @@ async function processReceiptBatch(
  * Processes a single batch of task events from fit-task-events.
  * Routes by event type, acks on success, retries on failure.
  *
+ * A body that does not satisfy the shared `fitTaskEvent` contract is a poison
+ * message (drifted producer): it is acked WITHOUT retry and logged with the
+ * raw type — the default branch below is only defense-in-depth for a drift
+ * between the guard and the switch.
+ *
  * On the final failed delivery (the one that dead-letters the message), the
  * receipt notified mark is cleared first so the sweep's second predicate can
  * recover the payment — see `clearReceiptNotifiedMarkForEvent`.
@@ -104,7 +81,16 @@ async function processTaskBatch(
   console.log(`[jobs-worker] task event batch — ${batch.messages.length} message(s)`);
   for (const message of batch.messages) {
     const event = message.body;
-    console.log(`[jobs-worker] processing task event type="${event.type}" attempt=${message.attempts}`);
+    if (!isFitTaskEvent(event)) {
+      console.error(
+        '[jobs-worker] unsupported task event — ack without retry (poison message; contract: @workspace/shared fit-task-events)',
+        { rawType: (event as { type?: unknown }).type },
+      );
+      message.ack();
+      continue;
+    }
+    const eventType: string = event.type;
+    console.log(`[jobs-worker] processing task event type="${eventType}" attempt=${message.attempts}`);
     try {
       switch (event.type) {
         case 'email.registration_invite':
@@ -126,12 +112,12 @@ async function processTaskBatch(
           await handleOrgPaymentReceived(env, event);
           break;
         default:
-          console.warn(`[jobs-worker] unknown event type: ${(event as any).type}`);
+          console.error(`[jobs-worker] unknown task event type: ${eventType}`);
       }
       console.log(`[jobs-worker] task event done — type="${event.type}"`);
       message.ack();
     } catch (error) {
-      console.error(`[jobs-worker] task event FAILED — type="${(event as any).type}" attempt=${message.attempts}:`, error);
+      console.error(`[jobs-worker] task event FAILED — type="${event.type}" attempt=${message.attempts}:`, error);
       // Final failed delivery: the message is about to be dead-lettered.
       // Clear the receipt notified mark so the sweep can recover the payment
       // (best-effort; a cleanup failure never interrupts the retry below).

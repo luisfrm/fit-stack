@@ -4,6 +4,7 @@ import {
   type AttachPlatformReceiptInput,
 } from '@workspace/database/repositories/platform-receipts';
 import {
+  buildOrgPaymentReceivedEvent,
   buildPlatformEmitterSnapshot,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
@@ -394,14 +395,14 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         );
       }
       if (composed.payment.receiptPdfKey) {
-        await taskQueue.send({
-          type: 'email.org_payment_received',
-          paymentId,
-          organizationId: composed.organization.id,
-          ...(payerEmail
-            ? { payerEmail, payerName: composed.payment.payerName?.trim() || '' }
-            : {}),
-        });
+        await taskQueue.send(
+          buildOrgPaymentReceivedEvent({
+            paymentId,
+            organizationId: composed.organization.id,
+            payerEmail: composed.payment.payerEmail?.trim() || null,
+            payerName: composed.payment.payerName?.trim() || '',
+          }),
+        );
         return { kind: 'queued', attachment: true };
       }
       // PDF not yet rendered — re-queue render so step 2 sends the email.

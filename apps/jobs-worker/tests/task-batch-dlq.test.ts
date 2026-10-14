@@ -44,7 +44,8 @@ vi.mock('../src/handlers/pdf.handler', () => ({
   handleOrgPaymentReceived: handleOrgPaymentReceivedMock,
 }));
 
-import worker, { type Env, type FitTaskEvent } from '../src/index';
+import worker, { type Env } from '../src/index';
+import type { FitTaskEvent } from '@workspace/shared';
 
 const ackMock = vi.fn();
 const retryMock = vi.fn();
@@ -54,8 +55,13 @@ function env(): Env {
 }
 
 function makeBatch(event: FitTaskEvent, attempts: number) {
+  return makeRawBatch(event, attempts);
+}
+
+/** Raw (untyped) body: poison messages violate the contract on purpose. */
+function makeRawBatch(body: unknown, attempts: number) {
   const message = {
-    body: event,
+    body,
     attempts,
     ack: ackMock,
     retry: retryMock,
@@ -178,5 +184,42 @@ describe('processTaskBatch — dead-letter threshold', () => {
     expect(clearReceiptNotifiedMock).toHaveBeenCalledTimes(1);
     expect(retryMock).toHaveBeenCalledTimes(1);
     expect(ackMock).not.toHaveBeenCalled();
+  });
+
+  it('poison message (valid type, mistyped field) is acked without handler, retry or mark cleanup', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await worker.queue(
+      makeRawBatch({ type: 'email.payment_receipt', paymentId: '42', organizationId: 'org-1' }, 1),
+      env(),
+    );
+
+    expect(handlePaymentReceiptMock).not.toHaveBeenCalled();
+    expect(handleOrgPaymentReceivedMock).not.toHaveBeenCalled();
+    expect(ackMock).toHaveBeenCalledTimes(1);
+    expect(retryMock).not.toHaveBeenCalled();
+    expect(clearReceiptNotifiedMock).not.toHaveBeenCalled();
+    expect(clearPlatformReceiptNotifiedMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unsupported task event'),
+      expect.objectContaining({ rawType: 'email.payment_receipt' }),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('unknown event type is acked with an error log, never retried', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await worker.queue(makeRawBatch({ type: 'email.totally_new' }, 1), env());
+
+    expect(handleRegistrationInviteMock).not.toHaveBeenCalled();
+    expect(handlePaymentReceiptMock).not.toHaveBeenCalled();
+    expect(ackMock).toHaveBeenCalledTimes(1);
+    expect(retryMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('unsupported task event'),
+      expect.objectContaining({ rawType: 'email.totally_new' }),
+    );
+    errorSpy.mockRestore();
   });
 });

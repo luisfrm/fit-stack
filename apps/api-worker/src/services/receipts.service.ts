@@ -6,6 +6,7 @@ import {
 import {
   applyTaxOverride,
   buildEmitterSnapshot,
+  buildPaymentReceiptEvent,
   buildReceiptRenderEvent,
   computeInclusiveTaxes,
   composePanelReceipt,
@@ -390,20 +391,22 @@ export function createReceiptsService(
       }
       if (!composed.payment.receiptNumber) {
         console.log(`[api-worker] receipts: queuing email (no number) — paymentId=${paymentId}`);
-        await taskQueue.send({
-          type: 'email.payment_receipt',
-          paymentId,
-          organizationId: orgId,
-        });
+        await taskQueue.send(
+          buildPaymentReceiptEvent({
+            paymentId,
+            organizationId: orgId,
+          }),
+        );
         return { kind: 'queued', attachment: false };
       }
       if (composed.payment.receiptPdfKey) {
         console.log(`[api-worker] receipts: queuing email (with PDF) — paymentId=${paymentId}`);
-        await taskQueue.send({
-          type: 'email.payment_receipt',
-          paymentId,
-          organizationId: orgId,
-        });
+        await taskQueue.send(
+          buildPaymentReceiptEvent({
+            paymentId,
+            organizationId: orgId,
+          }),
+        );
         return { kind: 'queued', attachment: true };
       }
       // PDF not yet rendered — re-queue render so step 2 sends the email.

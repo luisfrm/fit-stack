@@ -26,6 +26,8 @@ import {
   type PlatformReceiptComposedData,
 } from '@workspace/database/repositories/platform-receipts';
 import {
+  buildOrgPaymentReceivedEvent,
+  buildPaymentReceiptEvent,
   checklistPrePdf,
   composePanelReceipt,
   composePlatformReceipt,
@@ -35,10 +37,10 @@ import {
   platformReceiptKey,
   platformVoidedReceiptKey,
   type CurrencyFormat,
+  type FitTaskEvent,
   type ReceiptData,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
-import type { FitTaskEvent } from '../index';
 
 /**
  * Bindings the shared core needs. The database is injected per profile (the
@@ -320,7 +322,7 @@ export function createPanelRenderProfile(db: Db): RenderProfile<ReceiptComposedD
     },
 
     buildEmailEvent(_rows, orgId, paymentId) {
-      return { type: 'email.payment_receipt', paymentId, organizationId: orgId };
+      return buildPaymentReceiptEvent({ paymentId, organizationId: orgId });
     },
   };
 }
@@ -335,21 +337,6 @@ function platformPayer(rows: PlatformReceiptComposedData): {
   return {
     payerEmail: rows.payment.payerEmail?.trim() || null,
     payerName: rows.payment.payerName?.trim() || '',
-  };
-}
-
-/** Org payment email event: payer included only when persisted. */
-function platformEmailEvent(
-  paymentId: number,
-  orgId: string,
-  payerEmail: string | null,
-  payerName: string,
-): FitTaskEvent {
-  return {
-    type: 'email.org_payment_received',
-    paymentId,
-    organizationId: orgId,
-    ...(payerEmail ? { payerEmail, payerName } : {}),
   };
 }
 
@@ -411,7 +398,12 @@ export function createPlatformRenderProfile(
           `receipt.render: ${issuerLabel} ${paymentId} sin payer persistido (payer-missing); se notifica solo a owners.`,
         );
       }
-      return platformEmailEvent(paymentId, orgId, payerEmail, payerName);
+      return buildOrgPaymentReceivedEvent({
+        paymentId,
+        organizationId: orgId,
+        payerEmail,
+        payerName,
+      });
     },
   };
 }

@@ -1,7 +1,7 @@
 import { createDb } from '@workspace/database/factory';
 import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
-import type { FitTaskEvent } from '../index';
+import type { FitTaskEvent } from '@workspace/shared';
 
 export interface NotifyMarkEnv {
   DATABASE_URL: string;
