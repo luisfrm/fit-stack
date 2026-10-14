@@ -128,7 +128,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report (C4)', () => {
 
     // Artificial sequence jump (+5): the in-between ones are real holes.
     await testQuery(
-      `UPDATE platform_document_sequence SET next_number = next_number + 5 WHERE document_type = 'receipt'`,
+      `UPDATE platform_document_sequence SET last_number = last_number + 5 WHERE document_type = 'receipt'`,
     );
 
     // C: numbered, PDF pending (no consumer in tests).
