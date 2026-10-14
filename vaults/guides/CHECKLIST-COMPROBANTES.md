@@ -57,7 +57,6 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [ ] **§11** Los comprobantes emitidos antes de C1 recomponen en vivo (limitación documentada, sin backfill inventado).
 - [ ] **§10 → RD-139** Universo de `gaps[]` a escala (disparador de performance).
 - [ ] **§8** Disclaimer de Console con país proxy hasta configurar `fitstack_country_code`.
-- [ ] **§15** Naming `platform_document_sequence.next_number` → `last_number` (cosmético, requiere migración; agrupar).
 - [ ] **§16 → RD-140** Claim-then-number para cerrar la carrera de correlativo (disparador: hueco no explicado en `gaps[]`).
 - [ ] **RD-141** Mostrar `receiptVoided` en el estado `pending` del diálogo.
 

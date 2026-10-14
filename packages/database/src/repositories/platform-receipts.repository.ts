@@ -81,18 +81,18 @@ export function createPlatformReceiptsRepository(db: Db) {
 
       const [row] = await db
         .insert(platformDocumentSequence)
-        .values({ documentType: type, nextNumber: 1 })
+        .values({ documentType: type, lastNumber: 1 })
         .onConflictDoUpdate({
           target: [platformDocumentSequence.documentType],
-          set: { nextNumber: sql`${platformDocumentSequence.nextNumber} + 1` },
+          set: { lastNumber: sql`${platformDocumentSequence.lastNumber} + 1` },
         })
-        .returning({ nextNumber: platformDocumentSequence.nextNumber });
+        .returning({ lastNumber: platformDocumentSequence.lastNumber });
       // INSERT ... RETURNING always returns a row (created or updated).
       // No silent fallback: fabricating 1 would duplicate correlative numbers.
       if (!row) {
         throw new Error('nextPlatformDocumentNumber: INSERT ... RETURNING no devolvió fila.');
       }
-      return row.nextNumber;
+      return row.lastNumber;
     },
 
     /**
@@ -101,7 +101,7 @@ export function createPlatformReceiptsRepository(db: Db) {
      * `attachPlatformReceipt` (another execution already numbered the payment).
      *
      * Only reverts if we are still the latest consumer
-     * (`next_number = seq`): decrementing with newer consumers would
+     * (`last_number = seq`): decrementing with newer consumers would
      * reassign a live number — prohibited. Otherwise `released: false`
      * and the number remains as an audited gap.
      */
@@ -116,14 +116,14 @@ export function createPlatformReceiptsRepository(db: Db) {
 
       const [row] = await db
         .update(platformDocumentSequence)
-        .set({ nextNumber: sql`${platformDocumentSequence.nextNumber} - 1` })
+        .set({ lastNumber: sql`${platformDocumentSequence.lastNumber} - 1` })
         .where(
           and(
             eq(platformDocumentSequence.documentType, type),
-            eq(platformDocumentSequence.nextNumber, seq),
+            eq(platformDocumentSequence.lastNumber, seq),
           ),
         )
-        .returning({ nextNumber: platformDocumentSequence.nextNumber });
+        .returning({ lastNumber: platformDocumentSequence.lastNumber });
       return { released: row !== undefined };
     },
 
@@ -131,7 +131,6 @@ export function createPlatformReceiptsRepository(db: Db) {
      * Global sequence status + issued numbers in the universe, for Console
      * gap audits. Mirrors `payments.repository.getReceiptSequenceState` (Panel)
      * without year or org: `FS-N` is a single continuous sequence.
-     * NOTE: `next_number` stores the LAST allocated number (not the next one).
      */
     async getPlatformReceiptSequenceState(type: ReceiptDocumentType): Promise<{
       lastNumber: number;
@@ -146,7 +145,7 @@ export function createPlatformReceiptsRepository(db: Db) {
       assertDocumentType(type, 'getPlatformReceiptSequenceState');
 
       const [seq] = await db
-        .select({ nextNumber: platformDocumentSequence.nextNumber })
+        .select({ lastNumber: platformDocumentSequence.lastNumber })
         .from(platformDocumentSequence)
         .where(eq(platformDocumentSequence.documentType, type));
 
@@ -161,7 +160,7 @@ export function createPlatformReceiptsRepository(db: Db) {
         .from(platformSubscriptionPayment)
         .where(isNotNull(platformSubscriptionPayment.receiptNumber));
 
-      return { lastNumber: seq?.nextNumber ?? 0, numbers };
+      return { lastNumber: seq?.lastNumber ?? 0, numbers };
     },
 
     /**
