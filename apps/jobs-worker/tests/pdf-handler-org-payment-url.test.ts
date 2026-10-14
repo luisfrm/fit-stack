@@ -96,9 +96,17 @@ describe('handleOrgPaymentReceived — PANEL_URL resolution', () => {
     await handleOrgPaymentReceived(env({ PANEL_URL: '  https://panel.example.com  ' }), payload);
 
     expect(sendEmailMock).toHaveBeenCalledTimes(2);
-    const [firstEnv, message] = sendEmailMock.mock.calls[0] as [PdfHandlerEnv, { html: string }];
-    expect(firstEnv.PANEL_URL).toBe('  https://panel.example.com  ');
-    expect(message.html).toContain('https://panel.example.com');
+    const message = sendEmailMock.mock.calls[0]?.[1] as { to: string; html: string };
+    // Both recipients addressed, payer first (the Set keeps insertion order).
+    expect(sendEmailMock.mock.calls.map(([, m]) => (m as { to: string }).to)).toEqual([
+      'payer@example.com',
+      'owner@example.com',
+    ]);
+    expect(message.to).toBe('payer@example.com');
+    // Trimmed form pinned exactly: the href must carry no padding, so a
+    // regression to `env.PANEL_URL` (untrimmed) fails this assertion.
+    expect(message.html).toContain('href="https://panel.example.com"');
+    expect(message.html).not.toContain('  https://panel.example.com');
     expect(message.html).not.toContain('localhost');
   });
 });
