@@ -16,11 +16,6 @@ export type Env = {
   UPSTASH_REDIS_REST_TOKEN?: string;
   R2_PUBLIC_URL?: string;
 
-
-  // Resend Email Services
-  RESEND_API_KEY?: string;
-  RESEND_FROM_EMAIL?: string;
-
   // Cloudflare Worker Environment Variables
   BETTER_AUTH_URL: string;
   PANEL_URL?: string;

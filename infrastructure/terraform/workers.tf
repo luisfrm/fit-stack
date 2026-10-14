@@ -40,8 +40,6 @@ module "api_worker" {
     var.console_url != "" ? [{ name = "CONSOLE_URL", text = var.console_url }] : [],
     var.upstash_redis_rest_url != "" ? [{ name = "UPSTASH_REDIS_REST_URL", text = var.upstash_redis_rest_url }] : [],
     var.upstash_redis_rest_token != "" ? [{ name = "UPSTASH_REDIS_REST_TOKEN", text = var.upstash_redis_rest_token }] : [],
-    var.resend_api_key != "" ? [{ name = "RESEND_API_KEY", text = var.resend_api_key }] : [],
-    var.resend_from_email != "" ? [{ name = "RESEND_FROM_EMAIL", text = var.resend_from_email }] : [],
     var.ai_gateway_url != "" ? [{ name = "AI_GATEWAY_URL", text = var.ai_gateway_url }] : [],
     var.openrouter_api_key != "" ? [{ name = "OPENROUTER_API_KEY", text = var.openrouter_api_key }] : []
   )

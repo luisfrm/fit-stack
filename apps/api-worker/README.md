@@ -14,7 +14,7 @@ API REST primaria de Fit-Stack. Hono sobre Cloudflare Workers con autenticación
 
 - Node.js >= 20, pnpm 10+
 - Neon Postgres (`DATABASE_URL`)
-- (Opcional) Upstash Redis para caché, Resend para correos
+- (Opcional) Upstash Redis para caché
 
 ### Environment variables
 
@@ -252,8 +252,6 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 | `UPSTASH_REDIS_REST_URL` | ❌ | Caché Upstash. Sin ella el worker funciona sin caché (degrade) |
 | `UPSTASH_REDIS_REST_TOKEN` | ❌ | Token de Upstash |
 | `R2_PUBLIC_URL` | ❌ | URL pública de archivos. Default dev: `http://localhost:8788/api/public/files` |
-| `RESEND_API_KEY` | ❌ | Declarado en `Env` pero **no consumido por este worker** — los emails se encolan en `TASK_QUEUE` y los envía el `jobs-worker` |
-| `RESEND_FROM_EMAIL` | ❌ | Ídem |
 | `PANEL_URL` | ❌ | Base URL del panel para links de invitación (default `http://localhost:3001`) |
 | `CONSOLE_URL` | ❌ | Base URL del console para links de invitación de staff (default `http://localhost:3000`) |
 

@@ -304,8 +304,8 @@ Todos los valores se configuran **a nivel de environment** en GitHub (no a nivel
 - `COOKIE_DOMAIN`
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
+- `RESEND_API_KEY` (jobs-worker only)
+- `RESEND_FROM_EMAIL` (jobs-worker only)
 - `EMAIL_PROVIDER` (`resend` o `gmail` — jobs-worker)
 - `SMTP_USER`
 - `SMTP_PASS`

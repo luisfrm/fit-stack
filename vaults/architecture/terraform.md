@@ -60,8 +60,8 @@ Todos los secrets se configuran **dentro del environment** (no a nivel de reposi
 | `COOKIE_DOMAIN` | Dominio de cookies (ej: `.fit-stack.com`) |
 | `UPSTASH_REDIS_REST_URL` | URL de Upstash Redis |
 | `UPSTASH_REDIS_REST_TOKEN` | Token de Upstash Redis |
-| `RESEND_API_KEY` | API Key de Resend |
-| `RESEND_FROM_EMAIL` | Email de envío |
+| `RESEND_API_KEY` | API Key de Resend (jobs-worker) |
+| `RESEND_FROM_EMAIL` | Email de envío (jobs-worker) |
 | `PANEL_URL` | URL del panel de tenants (ej: `https://fitstack-panel.luisrivas.site`) |
 | `CONSOLE_URL` | URL del console SaaS (ej: `https://fitstack-console.luisrivas.site`) |
 | `EMAIL_PROVIDER` | `resend` o `gmail` (jobs-worker) |

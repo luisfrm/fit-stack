@@ -6,13 +6,14 @@ import {
   authMember,
   user,
 } from '@workspace/database/schema';
-import { sendEmail, type EmailHandlerEnv } from './email.handler';
+import { sendEmail } from './email.handler';
+import { type EmailConfigEnv, resolveBaseUrl } from './email-config';
 import { renderPaymentReceiptShort } from '../templates/payment-receipt-short';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
 import { formatCents, type CurrencyFormat, type PaymentReceiptEvent } from '@workspace/shared';
 import { and, eq } from 'drizzle-orm';
 
-export interface PdfHandlerEnv extends EmailHandlerEnv {
+export interface PdfHandlerEnv extends EmailConfigEnv {
   DATABASE_URL: string;
   FILES_BUCKET: R2Bucket;
 }
@@ -265,12 +266,7 @@ export async function handleOrgPaymentReceived(
   // Today all recipients are staff (payer + owners) → panel.
   // Future extension (portal app for member/trainer): target will be
   // `env.PORTAL_URL` + `target: 'portal'` in invite contract.
-  const panelUrl = env.PANEL_URL?.trim();
-  if (!panelUrl) {
-    throw new Error(
-      `Platform payment ${payload.paymentId}: PANEL_URL ausente; no se puede construir el CTA "Ir al Panel" (sin fallback a localhost).`,
-    );
-  }
+  const panelUrl = resolveBaseUrl(env, 'PANEL_URL', '(org payment received CTA target=panel)');
 
   const { subject, html } = renderOrgPaymentReceived({
     orgName: paymentData.org.name || 'tu organización',

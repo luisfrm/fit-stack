@@ -1,4 +1,5 @@
 import { handleRegistrationInvite, handleOrgInvite } from './handlers/email.handler';
+import { type EmailConfigEnv } from './handlers/email-config';
 import { handlePaymentReceipt, handleOrgPaymentReceived } from './handlers/pdf.handler';
 import { handleReceiptRender, sweepPendingReceiptPdfs } from './handlers/receipt.handler';
 import { clearReceiptNotifiedMarkForEvent } from './handlers/notify-mark';
@@ -10,15 +11,8 @@ import {
   type ReceiptRenderEvent,
 } from '@workspace/shared';
 
-export interface Env {
+export interface Env extends EmailConfigEnv {
   DATABASE_URL: string;
-  EMAIL_PROVIDER?: string;
-  RESEND_API_KEY?: string;
-  RESEND_FROM_EMAIL?: string;
-  SMTP_USER?: string;
-  SMTP_PASS?: string;
-  PANEL_URL?: string;
-  CONSOLE_URL?: string;
   FILES_BUCKET: R2Bucket;
   /** Producer for fit-task-events (step 2 enqueues gated emails here). */
   TASK_QUEUE: Queue;
