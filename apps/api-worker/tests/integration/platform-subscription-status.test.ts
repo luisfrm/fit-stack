@@ -15,6 +15,9 @@
  *    with a qualifying payment in force it stays blocked.
  * h. `hasPendingPayment`: a `voided` does not block a new payment; `processing` does.
  *
+ * RD-113: the PATCH enum is narrowed to processing|validated|voided (no
+ * `refunded`), while create/registerPayment keep the full enum.
+ *
  * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
  * skip without the variable, `truncateAll` per file. The raw facts
  * (`current_period_end`, `is_trial`, `cancelled_at`, EXISTS of a qualifying payment)
@@ -221,6 +224,49 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
 
     // The new payment does not qualify and the previous validated one keeps the period.
     expect(await getStatus(subId)).toBe(STATUS.ACTIVE);
+    expect(await readPeriodEnd(subId)).toBe(before);
+  });
+
+  it('RD-113: `refunded` stays accepted at creation (201) — the full enum is only narrowed on PATCH', async () => {
+    const { organization } = await createGymTenant('refunded-create');
+    // `createSub` throws unless the POST answers 201: this pins that the
+    // narrowed PATCH enum did NOT leak into create/registerPayment.
+    const { paymentId } = await createSub(organization.id, { paymentStatus: 'refunded' });
+
+    const [row] = await testQuery<{ status: string }>(
+      `SELECT status FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(row!.status).toBe('refunded');
+  });
+
+  it('RD-113: `refunded` is not a patchable status (400) and the payment row stays intact', async () => {
+    const { organization } = await createGymTenant('refunded-patch');
+    const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'processing' });
+    const before = await readPeriodEnd(subId);
+
+    const res = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'refunded' },
+    );
+    expect(res.status, res.text).toBe(400);
+
+    // Rejected at the schema layer: no refund flow, no receipt, no period move.
+    const [row] = await testQuery<{
+      status: string;
+      receipt_number: string | null;
+      voided_at: string | null;
+      void_reason: string | null;
+    }>(
+      `SELECT status, receipt_number, voided_at, void_reason
+         FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(row!.status).toBe('processing');
+    expect(row!.receipt_number).toBeNull();
+    expect(row!.voided_at).toBeNull();
+    expect(row!.void_reason).toBeNull();
+
     expect(await readPeriodEnd(subId)).toBe(before);
   });
 

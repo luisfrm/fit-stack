@@ -45,7 +45,10 @@ const createSubSchema = z.object({
     exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: paymentMethodSchema,
     paymentMethodDetails: paymentMethodDetailsSchema,
-    status: z.enum(['processing', 'validated', 'voided']).optional(),
+    // RD-113: creation only accepts `processing`/`validated` (an omitted status
+    // normalizes to `validated` in the service). Voiding is a PATCH transition
+    // with its own audit trail, so a payment cannot be born `voided`.
+    status: z.enum(['processing', 'validated']).optional(),
     paymentDate: z.string().optional(),
     // Fiscal breakdown in integer cents (Phase 0: open schema;
     // service calculates it by default and only accepts override with

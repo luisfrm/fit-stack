@@ -22,6 +22,17 @@ const paymentStatusEnum = z.enum([
   PAYMENT_STATUSES.REFUNDED,
 ]);
 
+/**
+ * RD-113: `refunded` is a reserved/display-only status. No issuer may PATCH a
+ * payment to it (there is no refund flow, no UI and no receipt behind it).
+ * The full enum above keeps feeding create/renew/registerPayment unchanged.
+ */
+const updatePaymentStatusEnum = z.enum([
+  PAYMENT_STATUSES.PROCESSING,
+  PAYMENT_STATUSES.VALIDATED,
+  PAYMENT_STATUSES.VOIDED,
+]);
+
 const paymentSchema = z.object({
   amountPaidCents: z.number().int().nonnegative(),
   currencyPaid: z.string().min(1),
@@ -47,7 +58,7 @@ const renewSchema = z.object({
 });
 
 const updatePaymentStatusSchema = z.object({
-  status: paymentStatusEnum,
+  status: updatePaymentStatusEnum,
   voidReason: z.string().min(1).optional(),
 });
 
