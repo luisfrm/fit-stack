@@ -2,7 +2,12 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth, requireOrg, requireOrgPermission } from '../lib/route-handler';
-import { PERMISSION_MODULES, PERMISSION_ACTIONS, type IPaymentMethodConfig } from '@workspace/shared';
+import {
+  PERMISSION_MODULES,
+  PERMISSION_ACTIONS,
+  buildOrgPaymentReceivedEvent,
+  type IPaymentMethodConfig,
+} from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
@@ -270,13 +275,14 @@ export const organizationRoutes = new Hono<AppEnv>()
 
         // Confirmation to payer + org owners (jobs-worker deduplicates)
         if (c.env.TASK_QUEUE) {
-          await c.env.TASK_QUEUE.send({
-            type: 'email.org_payment_received',
-            paymentId,
-            organizationId: activeOrganizationId,
-            payerEmail: user.email,
-            payerName: user.name,
-          });
+          await c.env.TASK_QUEUE.send(
+            buildOrgPaymentReceivedEvent({
+              paymentId,
+              organizationId: activeOrganizationId,
+              payerEmail: user.email,
+              payerName: user.name,
+            }),
+          );
         }
 
         return c.json({ success: true, paymentId }, 201);

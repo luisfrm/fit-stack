@@ -8,6 +8,7 @@ export * from './permissions';
 export * from './features/catalog';
 export * from './content';
 export * from './documents';
+export * from './queues';
 export * from './formatting';
 export * from './date';
 export * from './subscription-period';

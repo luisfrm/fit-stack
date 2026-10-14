@@ -5,14 +5,14 @@
 
 Emails and PDF generation are processed **asynchronously** via Cloudflare Queues: the `api-worker` produces events in the `TASK_QUEUE` binding (`fit-task-events`, DLQ `fit-task-events-dlq`) and `apps/jobs-worker` consumes them.
 
-**Event contract** (`FitTaskEvent` — `apps/jobs-worker/src/index.ts`):
+**Event contract** (`FitTaskEvent` — `@workspace/shared`, `packages/shared/src/queues/fit-task-events.ts`; never declared in an app): every producer send site builds the event with a validated builder (`buildRegistrationInviteEvent`, `buildOrgInviteEvent`, `buildPaymentReceiptEvent`, `buildOrgPaymentReceivedEvent`) that throws on an invalid payload, and the consumer narrows `unknown` with `isFitTaskEvent` — an off-contract body is a poison message: error log + **ack without retry**, never a silent fall-through.
 
 | Type                         | Payload                                                  | Producer                                                                                                                                                                                                   |
 | ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `email.registration_invite`  | `{ email, token, target?: 'panel' \| 'console', role? }` | `members.service.ts` (invite member without account → panel) + `/api/platform/staff` (console invitations)                                                                                                 |
 | `email.org_invite`           | `{ email, orgName, inviterName, inviteLink }`            | Better Auth `sendInvitationEmail` hook in `lib/auth.ts` (invite a member with an account)                                                                                                                  |
-| `email.payment_receipt`      | `{ paymentId, organizationId }`                          | `subscriptions.service.ts` — automatic: when creating a sub with `validated` payment and when approving a `processing` payment (PATCH status); also in manual resend (`POST /api/payments/:id/send-email`) |
-| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal, processing, payer+owners) + step 2 platform (PDF ready, payer from DB or owners-only) + manual resend |
+| `email.payment_receipt`      | `{ paymentId, organizationId }` (the persisted `receiptNumber` is DB-owned, never part of the event) | `receipts.service.ts` (manual resend `POST /api/payments/:id/send-email`) + step 2 panel (`render-profile.ts`, numbered payment with PDF ready) |
+| `email.org_payment_received` | `{ paymentId, organizationId, payerEmail?, payerName? }` | `organizations.route.ts` (POST `/subscription/renew` — self-service renewal, processing, payer+owners) + `platform-receipts.service.ts` (manual resend) + step 2 platform (PDF ready, payer from DB or owners-only) |
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
 

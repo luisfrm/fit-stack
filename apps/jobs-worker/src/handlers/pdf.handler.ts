@@ -9,7 +9,7 @@ import {
 import { sendEmail, type EmailHandlerEnv } from './email.handler';
 import { renderPaymentReceiptShort } from '../templates/payment-receipt-short';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
-import { formatCents, type CurrencyFormat } from '@workspace/shared';
+import { formatCents, type CurrencyFormat, type PaymentReceiptEvent } from '@workspace/shared';
 import { and, eq } from 'drizzle-orm';
 
 export interface PdfHandlerEnv extends EmailHandlerEnv {
@@ -43,12 +43,13 @@ function formatDate(date: Date, timezone: string): string {
  */
 export async function handlePaymentReceipt(
   env: PdfHandlerEnv,
-  payload: { paymentId: number; organizationId: string; receiptNumber?: string }
+  payload: PaymentReceiptEvent
 ) {
   const db = createDb(env.DATABASE_URL);
   // Org-scoped read by construction (filters payment + member by org;
-  // `undefined` if payment belongs to another org). `receiptNumber?` on the
-  // event is only an observability hint: source of truth is in DB.
+  // `undefined` if payment belongs to another org). The persisted number is
+  // the source of truth: the event carries no number (legacy in-flight
+  // events may carry a `receiptNumber` extra key — ignored on purpose).
   const composed = await createReceiptsRepository(db).getReceiptComposedData(
     payload.organizationId,
     payload.paymentId,
@@ -111,15 +112,13 @@ export async function handlePaymentReceipt(
 
   // Shared resolver (same one used by the org payment branch): `null` =
   // pre-system (send without attachment), `undefined` = PDF not ready (log +
-  // ack; the sweep repairs it). The event number is an observability hint only
-  // (in-flight events may lack it — `—` then).
+  // ack; the sweep repairs it). The persisted number is the source of truth.
   const attachments = await resolveReceiptAttachment(
     env,
     'Payment',
     payload.paymentId,
     receiptNumber,
     receiptPdfKey,
-    payload.receiptNumber ?? '—',
   );
   if (attachments === undefined) {
     return;
@@ -149,8 +148,8 @@ type PdfAttachment = { filename: string; content: Uint8Array; contentType: strin
  * - `undefined`: abort the send (PDF not yet ready; the sweep repairs it).
  * - `PdfAttachment[]`: the bytes as stored, named `<number>.pdf`.
  *
- * `eventReceiptNumber` is the number carried by the event (observability hint
- * only; platform events never carry one and omit it).
+ * `receiptNumber` is always the PERSISTED number of the row, never one carried
+ * by the event (the queue contract has no number field).
  */
 async function resolveReceiptAttachment(
   env: PdfHandlerEnv,
@@ -158,14 +157,12 @@ async function resolveReceiptAttachment(
   paymentId: number,
   receiptNumber: string | null | undefined,
   receiptPdfKey: string | null | undefined,
-  eventReceiptNumber?: string,
 ): Promise<PdfAttachment[] | null | undefined> {
   if (!receiptNumber) return null; // No-number path: send without attachment.
 
-  const eventHint = eventReceiptNumber ? ` (evento: ${eventReceiptNumber})` : '';
   if (!receiptPdfKey) {
     console.error(
-      `${logPrefix} ${paymentId}: número ${receiptNumber}${eventHint} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
+      `${logPrefix} ${paymentId}: número ${receiptNumber} sin PDF (evento fuera de orden); ack sin enviar, el barrido re-encolará.`,
     );
     return undefined; // Signal: abort send.
   }
@@ -173,7 +170,7 @@ async function resolveReceiptAttachment(
   const bytes = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
   if (!bytes) {
     console.error(
-      `${logPrefix} ${paymentId}: número ${receiptNumber}${eventHint} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
+      `${logPrefix} ${paymentId}: número ${receiptNumber} con receipt_pdf_key sin objeto en R2, envío omitido (el barrido lo repara).`,
     );
     return undefined; // Signal: abort send.
   }
