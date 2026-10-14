@@ -36,7 +36,7 @@ organization_document_sequence
  ├─ organization_id
  ├─ document_type      -- 'receipt' | 'invoice'
  ├─ year               -- año local del emisor (reinicio anual)
- └─ last_number        -- ÚLTIMO número entregado (el nombre `next_number` es cosmético en la gemela SaaS)
+ └─ last_number        -- ÚLTIMO número entregado
 ```
 
 Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 (al validar el pago)**, no al crear el registro ni al generar el PDF (evita huecos si un pago se anula sin emitir comprobante). La asignación es una única sentencia atómica `INSERT … ON CONFLICT DO UPDATE … RETURNING`, sin transacción interactiva ni `SELECT … FOR UPDATE`. El PDF es el **paso 2** (render asíncrono en `jobs-worker`), no asigna número.

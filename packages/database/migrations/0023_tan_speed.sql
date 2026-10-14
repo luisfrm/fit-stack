@@ -1,0 +1,1 @@
+ALTER TABLE "platform_document_sequence" RENAME COLUMN "next_number" TO "last_number";
