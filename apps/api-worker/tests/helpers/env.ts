@@ -142,7 +142,7 @@ export function createTestEnv(baseUrl = 'http://localhost:8788'): TestEnv {
     CONSOLE_URL: 'http://localhost:3000',
     R2_PUBLIC_URL: 'http://localhost:8788/api/public/files',
 
-    // Deliberately absent: UPSTASH_* (cache no-ops), RESEND_* (jobs-worker's job),
+    // Deliberately absent: UPSTASH_* (cache no-ops),
     // CLOUDFLARE_AI_* / OPENROUTER_API_KEY (AI routes assert their own 503s).
 
     FILES_BUCKET: r2.binding,

@@ -31,8 +31,6 @@
         "EMAIL_PROVIDER",
         "SMTP_USER",
         "SMTP_PASS",
-        "RESEND_API_KEY",
-        "RESEND_FROM_EMAIL",
         "APP_ENV",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",

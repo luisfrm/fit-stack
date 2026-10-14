@@ -17,6 +17,7 @@ src/
 ├── index.ts                    # default export: queue() + scheduled(); Env
 ├── receipt-pdf.ts                # render del PDF con pdf-lib (JS puro, sin WASM, compatible con workerd; lazy)
 ├── handlers/
+│   ├── email-config.ts         # resolución de la config de email (fallo visible, sin fallback)
 │   ├── email.handler.ts        # TRANSPORTE de email (Resend / Gmail SMTP)
 │   ├── pdf.handler.ts          # emails con comprobante adjunto (lee el PDF de R2)
 │   ├── receipt.handler.ts      # paso 2: selección de perfil por scope + sweepPendingReceiptPdfs
@@ -73,14 +74,16 @@ Los tres son seguros de re-encolar porque cada artefacto tiene su propio gate id
 
 ## Env vars
 
-| Var | Descripción |
-|---|---|
-| `DATABASE_URL` | Neon Postgres (driver HTTP) |
-| `EMAIL_PROVIDER` | `resend` o `gmail` (SMTP) |
-| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | credenciales de Resend |
-| `SMTP_USER` / `SMTP_PASS` | credenciales de Gmail SMTP |
-| `PANEL_URL` | Base URL del panel. **Requerida** para `email.org_payment_received` (CTA "Ir al Panel"): el handler falla visible si falta, sin fallback a localhost. |
-| `CONSOLE_URL` | Base URL de la consola (invitaciones de plataforma). |
+Copia `.dev.vars.example` a `.dev.vars` para el dev local (`.dev.vars` no se versiona). Cada variable que el transporte seleccionado necesita es **requerida**: si falta o viene en blanco, el envío falla visiblemente nombrando la variable (sin fallback).
+
+| Var | Requerida | Descripción |
+|---|---|---|
+| `DATABASE_URL` | ✅ | Neon Postgres (driver HTTP) |
+| `EMAIL_PROVIDER` | ✅ | `resend` o `gmail`. Ausente/en blanco o con valor desconocido → falla visible al enviar |
+| `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | ✅ si `EMAIL_PROVIDER=resend` | credenciales de Resend |
+| `SMTP_USER` / `SMTP_PASS` | ✅ si `EMAIL_PROVIDER=gmail` | credenciales de Gmail SMTP |
+| `PANEL_URL` | ✅ para invitaciones `target=panel` y `email.org_payment_received` (CTA "Ir al Panel") | el handler falla visible si falta, sin fallback a localhost. |
+| `CONSOLE_URL` | ✅ para invitaciones `target=console` (plataforma) | el handler falla visible si falta, sin fallback a localhost. |
 
 > **CTA target-based**: el URL lo decide quién es el destinatario, nunca el template. Hoy el único target es el panel (destinatarios staff). Cuando exista la app de portal (member/trainer) su target será `PORTAL_URL` + `target: 'portal'` en el contrato de invitación; hasta entonces no hay binding ni fallback.
 

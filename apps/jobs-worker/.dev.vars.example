@@ -1,0 +1,20 @@
+# Copy to `.dev.vars` for local development (`.dev.vars` is gitignored).
+# Every value the selected transport needs is REQUIRED: a missing/blank var
+# fails visibly when an email is sent (no silent fallback).
+
+DATABASE_URL=
+
+# 'resend' | 'gmail' (local dev typically uses gmail + SMTP)
+EMAIL_PROVIDER=resend
+
+# Required when EMAIL_PROVIDER=resend
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=your_verified_sender@example.com
+
+# Required when EMAIL_PROVIDER=gmail
+SMTP_USER=
+SMTP_PASS=
+
+# Required to build registration invite links (target-based)
+PANEL_URL=http://localhost:3001
+CONSOLE_URL=http://localhost:3000

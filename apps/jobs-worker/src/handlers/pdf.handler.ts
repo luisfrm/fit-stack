@@ -6,13 +6,14 @@ import {
   authMember,
   user,
 } from '@workspace/database/schema';
-import { sendEmail, type EmailHandlerEnv } from './email.handler';
+import { sendEmail } from './email.handler';
+import { type EmailConfigEnv } from './email-config';
 import { renderPaymentReceiptShort } from '../templates/payment-receipt-short';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
 import { formatCents, type CurrencyFormat, type PaymentReceiptEvent } from '@workspace/shared';
 import { and, eq } from 'drizzle-orm';
 
-export interface PdfHandlerEnv extends EmailHandlerEnv {
+export interface PdfHandlerEnv extends EmailConfigEnv {
   DATABASE_URL: string;
   FILES_BUCKET: R2Bucket;
 }
