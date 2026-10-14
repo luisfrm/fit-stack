@@ -1,6 +1,7 @@
 /**
  * Pure config resolution for the email transport (`resolveEmailTransport`) and
- * registration invite base URLs (`resolveInviteBaseUrl`).
+ * app base URLs (`resolveBaseUrl`, plus the invite wrapper
+ * `resolveInviteBaseUrl`).
  *
  * Covers the visible-failure contract (§10): every missing/unknown value
  * throws an error that NAMES the offending variable, and no hardcoded
@@ -8,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  resolveBaseUrl,
   resolveEmailTransport,
   resolveInviteBaseUrl,
   type EmailConfigEnv,
@@ -122,5 +124,47 @@ describe('resolveInviteBaseUrl', () => {
     expect(() => resolveInviteBaseUrl({}, 'console')).toThrow(
       'Missing required env var CONSOLE_URL (registration invite target=console).',
     );
+  });
+});
+
+describe('resolveBaseUrl', () => {
+  it('returns the trimmed PANEL_URL for an arbitrary context', () => {
+    expect(
+      resolveBaseUrl(
+        { PANEL_URL: '  http://localhost:3001  ' },
+        'PANEL_URL',
+        '(org payment received CTA target=panel)',
+      ),
+    ).toBe('http://localhost:3001');
+  });
+
+  it('returns the trimmed CONSOLE_URL for an arbitrary context', () => {
+    expect(
+      resolveBaseUrl({ CONSOLE_URL: '  https://console.example.com  ' }, 'CONSOLE_URL', '(x)'),
+    ).toBe('https://console.example.com');
+  });
+
+  it('throws the exact org-payment CTA message when PANEL_URL is missing', () => {
+    expect(() =>
+      resolveBaseUrl({}, 'PANEL_URL', '(org payment received CTA target=panel)'),
+    ).toThrow('Missing required env var PANEL_URL (org payment received CTA target=panel).');
+  });
+
+  it('throws when the variable is present but blank', () => {
+    expect(() => resolveBaseUrl({ PANEL_URL: '   ' }, 'PANEL_URL', '(x)')).toThrow(
+      'Missing required env var PANEL_URL (x).',
+    );
+  });
+
+  it('never falls back to a hardcoded localhost URL', () => {
+    let message = '';
+    try {
+      resolveBaseUrl({}, 'CONSOLE_URL', '(x)');
+      throw new Error('resolveBaseUrl should have thrown for a missing CONSOLE_URL');
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toBe('Missing required env var CONSOLE_URL (x).');
+    expect(message).not.toContain('localhost');
   });
 });

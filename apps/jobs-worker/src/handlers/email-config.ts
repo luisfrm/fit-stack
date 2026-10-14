@@ -6,10 +6,10 @@
  * variable, so a misconfigured deployment fails visibly instead of quietly
  * sending through a hardcoded default (e.g. a sandbox sender).
  *
- * Resolution is LAZY: `resolveEmailTransport` / `resolveInviteBaseUrl` are
- * called only at the moment an email is sent. The render-only path (building
- * the PDF) never resolves email config, so a missing provider does not break
- * receipt rendering.
+ * Resolution is LAZY: `resolveEmailTransport` / `resolveBaseUrl` /
+ * `resolveInviteBaseUrl` are called only at the moment an email is sent. The
+ * render-only path (building the PDF) never resolves email config, so a missing
+ * provider does not break receipt rendering.
  */
 
 /** Raw email-related bindings as they arrive from the Worker `env`. */
@@ -73,12 +73,26 @@ export function resolveEmailTransport(env: EmailConfigEnv): EmailTransport {
 }
 
 /**
+ * Resolves the base URL of one of the public apps (panel/console) from the
+ * Worker `env`, for the given resolution `context` (part of the error message
+ * so the failure points at the exact call site). Throws — naming the missing
+ * variable — instead of falling back to a hardcoded URL.
+ */
+export function resolveBaseUrl(
+  env: EmailConfigEnv,
+  varName: 'PANEL_URL' | 'CONSOLE_URL',
+  context: string,
+): string {
+  return requiredVar(varName, env[varName], context);
+}
+
+/**
  * Resolves the base URL used to build registration invite links for the given
- * target. Throws — naming the missing variable — instead of falling back to a
- * hardcoded localhost URL.
+ * target. Thin wrapper over `resolveBaseUrl` that pins the invite context, so
+ * invite errors and any other CTA keep distinct, non-misleading messages.
  */
 export function resolveInviteBaseUrl(env: EmailConfigEnv, target: 'panel' | 'console'): string {
   return target === 'console'
-    ? requiredVar('CONSOLE_URL', env.CONSOLE_URL, '(registration invite target=console)')
-    : requiredVar('PANEL_URL', env.PANEL_URL, '(registration invite target=panel)');
+    ? resolveBaseUrl(env, 'CONSOLE_URL', '(registration invite target=console)')
+    : resolveBaseUrl(env, 'PANEL_URL', '(registration invite target=panel)');
 }
