@@ -2,7 +2,7 @@
 description: "Implementa y corrige código de Fit-Stack de punta a punta (esquema Drizzle, backend Hono/Workers, frontend Next.js 16, tests). Delegar aquí cuando ya existe una issue de Linear; pasar su id (RD-NN) o una tarea precisa."
 mode: subagent
 agent: build
-steps: 40
+steps: 80
 permissions:
   - {action: edit, resource: "*", effect: allow}
   - {action: shell, resource: "*", effect: deny}
