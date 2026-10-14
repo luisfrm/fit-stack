@@ -16,8 +16,9 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 
 **Handlers** (`apps/jobs-worker/src/handlers/`):
 
-- `email.handler.ts` — email TRANSPORT ONLY (**Resend** with `EMAIL_PROVIDER=resend` or **Gmail SMTP** with `EMAIL_PROVIDER=gmail` + `SMTP_USER`/`SMTP_PASS`); the HTML is composed by the templates.
-- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation); both branches resolve the R2 attachment through the shared `resolveReceiptAttachment` (bytes read as stored, never regenerated).
+- `email-config.ts` — pure config resolver: exports `EmailConfigEnv`, `EmailTransport`, `resolveEmailTransport(env)`, `resolveInviteBaseUrl(env, target)`. `requiredVar` trims and throws `Missing required env var <NAME> ...` naming the variable; unknown `EMAIL_PROVIDER` throws `Invalid EMAIL_PROVIDER value "<x>" ...`. Resolution is **lazy** (at send time) so the render-only code path never touches email config.
+- `email.handler.ts` — email TRANSPORT ONLY; **consumes `email-config.ts` resolver** inside `sendEmail` with exhaustive `switch` + `assertNever`; no silent fallbacks (`|| 'gmail'`, `|| 'onboarding@resend.dev'` removed); **Gmail SMTP + nodemailer retained deliberately** as the local-dev transport. HTML composed by templates.
+- `pdf.handler.ts` — payment receipts (gym membership + org SaaS payment confirmation); both branches resolve the R2 attachment through the shared `resolveReceiptAttachment` (bytes read as stored, never regenerated). Env type `PdfHandlerEnv extends EmailConfigEnv`; existing `PANEL_URL` throw unchanged.
 - `receipt.handler.ts` — step-2 entry point: validates the render event, selects the issuer render profile by `event.scope` and keeps `sweepPendingReceiptPdfs` (the sweep cron).
 - `render-profile.ts` — step-2 core, ONCE for both issuers: load composed rows → voided-pending check → render + R2 put → notify gate → dispatch email. Issuer divergences are tiny profiles (`createPanelRenderProfile` / `createPlatformRenderProfile`); the R2 key year stays per issuer on purpose (Panel: local year of the persisted number; Console: UTC year of `receiptIssuedAt`).
 
@@ -26,7 +27,7 @@ Emails and PDF generation are processed **asynchronously** via Cloudflare Queues
 - `layout.ts` — base shells: `renderDarkShell` (invitations, dark background) and `renderLightShell` (receipts, yellow-receipt style) + `escapeHtml`.
 - `send-invitation.ts`, `org-invite.ts`, `payment-receipt-short.ts`, `org-payment-received.ts` — each exports `renderX(data): { subject, html }`.
 
-**Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `SMTP_USER`, `SMTP_PASS`, `PANEL_URL`, `CONSOLE_URL`.
+**Env vars (jobs-worker)**: `DATABASE_URL`, `EMAIL_PROVIDER` (required at send time: `resend` → `RESEND_API_KEY`+`RESEND_FROM_EMAIL`; `gmail` → `SMTP_USER`+`SMTP_PASS`), `PANEL_URL`/`CONSOLE_URL` (required for invitations). Missing variable = **named throw**, never a default.
 
 > **Rule**: never couple api-worker to synchronous email/PDF sends — always enqueue in `TASK_QUEUE` and let jobs-worker process it.
 
