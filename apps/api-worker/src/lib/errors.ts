@@ -59,6 +59,28 @@ function unwrapDbError(err: unknown): {
 }
 
 /**
+ * True when the error (or its deep cause) is a Postgres FOREIGN KEY violation
+ * (SQLSTATE `23503`). Pass `constraint` to narrow it to one constraint name;
+ * Postgres truncates identifiers to 63 chars, so the check is a `includes`.
+ *
+ * Used by write paths whose DB-level `RESTRICT` FK is the source of truth: the
+ * app-level pre-check has a TOCTOU window, so the constraint violation is
+ * translated to the same business error instead of leaking as a 500.
+ */
+export function isPostgresForeignKeyViolation(
+  err: unknown,
+  constraint?: string,
+): boolean {
+  const cause = getDeepCause(err);
+  if (!cause || typeof cause !== 'object') return false;
+  const e = cause as Record<string, unknown>;
+  if (e.code !== '23503') return false;
+  if (!constraint) return true;
+  const name = typeof e.constraint === 'string' ? e.constraint : '';
+  return name.includes(constraint);
+}
+
+/**
  * Global error handler for Hono application.
  * Formats errors into a unified response envelope: { error: string, details?: unknown }
  */

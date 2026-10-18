@@ -23,6 +23,7 @@ import {
   COMPENSATION_VOID_REASON,
   compensateFailedEmission,
 } from '../lib/subscription-compensation';
+import { isPostgresForeignKeyViolation } from '../lib/errors';
 
 /** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
 const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
@@ -31,6 +32,23 @@ const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
     throw new Error('Rate provider not configured');
   },
 };
+
+/**
+ * A SaaS subscription with payments is financial history: it is cancelled,
+ * never deleted. One contract for both the app-level pre-check and the
+ * DB-level backstop, so the console toast keeps resolving by `code`.
+ */
+const subscriptionHasPaymentsError = () =>
+  new HTTPException(409, {
+    res: new Response(
+      JSON.stringify({
+        error:
+          'La suscripción tiene pagos asociados; cancelarla en lugar de borrarla.',
+        code: 'SUBSCRIPTION_HAS_PAYMENTS',
+      }),
+      { status: 409, headers: { 'content-type': 'application/json' } },
+    ),
+  });
 
 export interface CreatePlatformSubscriptionPayload {
   organizationId: string;
@@ -528,18 +546,19 @@ export function createPlatformSubscriptionsService(
       if (payments > 0) {
         // Financial history: a subscription with payments is cancelled, never
         // deleted. The DB-level `RESTRICT` FK is the backstop against races.
-        throw new HTTPException(409, {
-          res: new Response(
-            JSON.stringify({
-              error:
-                'La suscripción tiene pagos asociados; cancelarla en lugar de borrarla.',
-              code: 'SUBSCRIPTION_HAS_PAYMENTS',
-            }),
-            { status: 409, headers: { 'content-type': 'application/json' } },
-          ),
-        });
+        throw subscriptionHasPaymentsError();
       }
-      return platformSubsRepo.delete(id);
+      try {
+        return await platformSubsRepo.delete(id);
+      } catch (err) {
+        // TOCTOU backstop: a payment may land between the count and the delete.
+        // The `RESTRICT` FK (migrations 0024/0025) is the source of truth, so
+        // its violation is surfaced as the SAME business error, never a 500.
+        if (isPostgresForeignKeyViolation(err, 'subscription_id')) {
+          throw subscriptionHasPaymentsError();
+        }
+        throw err;
+      }
     },
 
     /* ── Payments ── */
