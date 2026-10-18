@@ -31,13 +31,13 @@ import { FiscalConfigSchema } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { IOrganization } from "@workspace/shared/types";
+import { IOrganization, IPlatformOrganization } from "@workspace/shared/types";
 import type { OwnerData } from "./organization-form-types";
 
 export type { OwnerData };
 
 interface OrganizationFormProps {
-  readonly initialData?: IOrganization;
+  readonly initialData?: IPlatformOrganization;
   readonly onSubmit: (
     orgData: Partial<IOrganization>,
     ownerData?: OwnerData,
@@ -47,9 +47,33 @@ interface OrganizationFormProps {
   readonly isLoading?: boolean;
 }
 
-function deriveActiveCurrencies(countryCode?: string | null): string[] {
-  const primary = (countryCode && COUNTRIES[countryCode]?.currency) || "USD";
-  return [...new Set([primary, "USD"])];
+/**
+ * Active currencies suggested by the country, preserving the chosen primary
+ * (`RD-146`): the primary is explicit and must always be active. USD stays as
+ * the operating currency of the platform (existing behavior).
+ */
+function deriveActiveCurrencies(
+  countryCode?: string | null,
+  primaryCurrency?: string | null,
+): string[] {
+  const countryCurrency = countryCode ? COUNTRIES[countryCode]?.currency : undefined;
+  const primary = primaryCurrency || countryCurrency;
+  return [...new Set([primary, countryCurrency, "USD"].filter(Boolean) as string[])];
+}
+
+/** Reads the stored `active_currencies` JSON (tolerant: invalid → `null`). */
+function parseStoredActiveCurrencies(settings?: Record<string, string> | null): string[] | null {
+  const raw = settings?.active_currencies;
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((c) => typeof c === "string")) {
+      return parsed as string[];
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 interface Step1Props {
@@ -83,7 +107,9 @@ function OrganizationStep1({
   slugError,
 }: Step1Props) {
   const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
-  const primaryCurrency = countryConfig?.currency ?? "";
+  // Explicit primary currency (editable). Never derived silently at render time:
+  // an empty value blocks the step with a visible error.
+  const primaryCurrency = formData.primaryCurrency ?? "";
   const getSlugInputState = () => {
     if (slugStatus === "error") return "error";
     if (slugStatus === "valid") return "success";
@@ -161,11 +187,15 @@ function OrganizationStep1({
           countries={COUNTRY_LIST}
         />
 
-        <Input
-          label="Moneda principal)"
+        <SimpleSelect
+          label="Moneda principal *"
+          required
           value={primaryCurrency}
-          disabled
-          hint="Bloqueada al país de operación. No editable."
+          onChange={(val) => onChange("primaryCurrency", val)}
+          options={(primaryCurrency && !activeCurrencies.includes(primaryCurrency)
+            ? [primaryCurrency, ...activeCurrencies]
+            : activeCurrencies
+          ).map((code) => ({ value: code, label: code }))}
         />
       </div>
 
@@ -177,8 +207,8 @@ function OrganizationStep1({
         disabled={isEdit}
         hint={
           isEdit
-            ? "Las activas de una sede existente se gestionan desde su panel de Monedas."
-            : "La principal siempre está incluida. El backend la deriva del país."
+            ? "Las activas de una sede existente se gestionan desde su panel de Monedas. La principal debe pertenecer a esta lista."
+            : "La principal se sugiere desde el país y siempre se incluye junto con la moneda del país (ej. USD en VE)."
         }
       />
 
@@ -355,6 +385,12 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     logo: initialData?.logo ?? "",
     slogan: initialData?.slogan ?? "",
     countryCode: initialData?.countryCode ?? "VE",
+    // Primary currency is explicit and editable (Console preselects the country
+    // currency). It must belong to `active_currencies`.
+    primaryCurrency:
+      initialData?.primaryCurrency ??
+      COUNTRIES[initialData?.countryCode ?? "VE"]?.currency ??
+      "",
     taxId: initialData?.taxId ?? "",
     legalName: initialData?.legalName ?? "",
     address: initialData?.address ?? "",
@@ -362,9 +398,19 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     currencyFormat: initialData?.currencyFormat ?? "latam",
   });
 
-  const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() =>
-    deriveActiveCurrencies(initialData?.countryCode ?? "VE"),
-  );
+  const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() => {
+    // Existing org: the stored list is the authority (also used by the API to
+    // validate the primary). New org: derive country currency + the suggested
+    // primary. An inconsistent legacy list is preserved, never "fixed" silently.
+    const stored = parseStoredActiveCurrencies(initialData?.settings);
+    return (
+      stored ??
+      deriveActiveCurrencies(
+        initialData?.countryCode ?? "VE",
+        initialData?.primaryCurrency ?? null,
+      )
+    );
+  });
 
   // Fiscal regime: platform-owned. Stored config is parsed with the STRICT
   // shared contract (legacy `taxes`/`confirmedTaxes` rows are ignored here,
@@ -437,19 +483,30 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       setSlugStatus("idle");
       setSlugError(null);
     }
-    // Changing country re-suggests timezone and re-derives primary currency in active list
-    // (preserving any extras the user already selected).
+    // Changing country re-suggests the timezone and the country currency, but
+    // only while the primary is still the suggested one: an explicit choice
+    // (e.g. USD in VE) is never overwritten silently.
     if (field === "countryCode" && typeof value === "string") {
       const config = COUNTRY_LIST.find((c) => c.code === value);
-      const prevPrimary =
+      const prevCountryCurrency =
         formData.countryCode != null ? COUNTRIES[formData.countryCode]?.currency : undefined;
-      const nextPrimary = config?.currency ?? "USD";
+      const nextCountryCurrency = config?.currency;
+      const prevPrimary = formData.primaryCurrency;
+      const nextPrimary =
+        !prevPrimary || prevPrimary === prevCountryCurrency
+          ? nextCountryCurrency
+          : prevPrimary;
       setActiveCurrencies((prev) => [
-        ...new Set([nextPrimary, "USD", ...prev.filter((c) => c !== prevPrimary)]),
+        ...new Set([
+          ...(nextPrimary ? [nextPrimary] : []),
+          ...(nextCountryCurrency ? [nextCountryCurrency] : []),
+          ...prev.filter((c) => c !== prevCountryCurrency),
+        ]),
       ]);
       setFormData((prev) => ({
         ...prev,
         countryCode: value,
+        ...(nextPrimary ? { primaryCurrency: nextPrimary } : {}),
         ...(config ? { timezone: config.timezone } : {}),
       }));
       return;
@@ -482,11 +539,9 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       toast.error("Completa nombre, país y zona horaria para continuar.");
       return false;
     }
-    const primary = formData.countryCode
-      ? COUNTRIES[formData.countryCode]?.currency
-      : undefined;
+    const primary = formData.primaryCurrency;
     if (!primary || !activeCurrencies.includes(primary)) {
-      toast.error("Las monedas activas deben incluir la principal.");
+      toast.error("La moneda principal debe estar entre las monedas activas.");
       return false;
     }
     if (slugStatus === "error") {

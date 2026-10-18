@@ -71,7 +71,7 @@ Server First (`"use client"` only at leaf nodes; fetch server-side). URL state o
 
 ### 5. Security & Authentication Architecture
 
-Better Auth; client **MUST** use `useAuth()` (never `useSession()` directly); server uses `sessionService`/`getSession()`. Name/Logo SSOT = the `organization` table (`authClient.organization.update()`); tenant identity → `PATCH /api/organizations/profile`; the panel **never** calls `/api/platform/*` from a tenant form; `countryCode`/`primaryCurrency` immutable post-creation. **CORS is code-only** (`apps/api-worker/src/lib/cors.ts`). Public routes skip auth: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`.
+Better Auth; client **MUST** use `useAuth()` (never `useSession()` directly); server uses `sessionService`/`getSession()`. Name/Logo SSOT = the `organization` table (`authClient.organization.update()`); tenant identity → `PATCH /api/organizations/profile`; the panel **never** calls `/api/platform/*` from a tenant form; `countryCode` immutable post-creation; `primaryCurrency` editable only inside `active_currencies` (Console picks it at creation, preselected from the country). **CORS is code-only** (`apps/api-worker/src/lib/cors.ts`). Public routes skip auth: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`.
 
 ### 6. Route Handler Pattern (`apps/api-worker/src/lib/route-handler.ts`)
 
@@ -102,7 +102,7 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ### 10. Explicit Configuration Without Silent Fallbacks
 
-**NEVER** invent silent fallbacks (`|| "USD"`, `|| "latam"`, `|| "openrouter"`); missing config = visible error. Required (no default): `timezone`/`countryCode`/`primaryCurrency`/`currencyFormat`; extensible → KV `gym_setting` (only fallback `[]`). Org creation derives currency; `POST /api/settings` rejects primary/format (400); no zod `.default()` (defaults in `@workspace/shared/defaults.ts`); UI reads currency/format from the org.
+**NEVER** invent silent fallbacks (`|| "USD"`, `|| "latam"`, `|| "openrouter"`); missing config = visible error. Required (no default): `timezone`/`countryCode`/`primaryCurrency`/`currencyFormat`; extensible → KV `gym_setting` (only fallback `[]`). Org creation derives `primaryCurrency` from the country **only when absent** (Console preselects it but allows another active currency); `active_currencies` always contains the primary, the country currency **and `USD`** (platform operating currency); `POST /api/settings` rejects primary/format (400); no zod `.default()` (defaults in `@workspace/shared/defaults.ts`); UI reads currency/format from the org.
 
 ### 11. Money Convention (integer cents)
 

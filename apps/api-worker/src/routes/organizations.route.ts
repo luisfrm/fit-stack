@@ -55,9 +55,11 @@ const orgRenewSchema = z.object({
  * `403 FISCAL_CONFIG_PLATFORM_ONLY` (see `TENANT_FORBIDDEN_FISCAL_KEYS`).
  * Taxes are not configurable at all: `COUNTRIES` is their SSOT.
  *
- * `countryCode`/`primaryCurrency` are immutable from here (required at
- * creation): rejected with 400 if provided. Changing country would recalculate
- * primary currency - platform-level operation, not tenant.
+ * `countryCode` is immutable from here (required at creation): rejected with
+ * 400 if provided. `primaryCurrency` IS editable, but only inside the
+ * organization's `active_currencies` (service answers 400 otherwise, no partial
+ * write). Changing country would recalculate localization - platform-level
+ * operation, not tenant.
  *
  * `.passthrough()` (not `.strict()`) is deliberate: allows DETECTING prohibited
  * keys (top-level and inside `fiscalConfig`) to return an explicit error.
@@ -72,6 +74,8 @@ const orgProfileSchema = z
     slogan: z.string().nullable().optional(),
     timezone: z.string().min(1, 'La zona horaria es requerida').optional(),
     currencyFormat: z.enum(['latam', 'usa']).optional(),
+    // Editable, always inside the org's `active_currencies` (service validates).
+    primaryCurrency: z.string().min(1).optional(),
     legalName: z.string().min(1).nullable().optional(),
     taxId: z.string().min(1).nullable().optional(),
     address: z.string().min(1).nullable().optional(),
@@ -79,7 +83,7 @@ const orgProfileSchema = z
   })
   .passthrough();
 
-const FORBIDDEN_PROFILE_KEYS = ['countryCode', 'primaryCurrency'] as const;
+const FORBIDDEN_PROFILE_KEYS = ['countryCode'] as const;
 
 type OrgProfileInput = z.infer<typeof orgProfileSchema>;
 
@@ -92,6 +96,7 @@ const PROFILE_SCALAR_KEYS: readonly ProfileScalarKey[] = [
   'slogan',
   'timezone',
   'currencyFormat',
+  'primaryCurrency',
   'legalName',
   'taxId',
   'address',
@@ -315,8 +320,8 @@ export const organizationRoutes = new Hono<AppEnv>()
   // identity + fiscalConfig. Endpoint used by panel for
   // organization form: NEVER call `/api/platform/*` from panel
   // (gym owner does not have platform role -> 403). Org-scoped:
-  // owner/manager (ORGANIZATION.UPDATE). `countryCode` and `primaryCurrency`
-  // are immutable post-creation (400 if passed).
+  // owner/manager (ORGANIZATION.UPDATE). `countryCode` is immutable
+  // post-creation (400); `primaryCurrency` must be an active currency.
   .patch(
     '/profile',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -331,7 +336,7 @@ export const organizationRoutes = new Hono<AppEnv>()
       if (forbidden.length > 0) {
         return c.json(
           {
-            error: 'El país y la moneda principal se definen al crear la organización.',
+            error: 'El país de operación se define al crear la organización.',
             code: 'IMMUTABLE_FIELD',
             fields: forbidden,
           },

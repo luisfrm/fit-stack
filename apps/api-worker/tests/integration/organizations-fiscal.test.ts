@@ -105,14 +105,16 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     expect(allowed.status, allowed.text).toBe(200);
   });
 
-  it('countryCode/primaryCurrency son inmutables (400 IMMUTABLE_FIELD)', async () => {
+  it('countryCode es inmutable (400 IMMUTABLE_FIELD); primaryCurrency ya no lo es', async () => {
     const { owner } = await createGymTenant('fiscal-immutable');
     const res = await owner.client.patch('/api/organizations/profile', {
       countryCode: 'PE',
-      primaryCurrency: 'PEN',
     });
     expect(res.status, res.text).toBe(400);
-    expect(res.body).toMatchObject({ code: 'IMMUTABLE_FIELD' });
+    expect(res.body).toMatchObject({
+      code: 'IMMUTABLE_FIELD',
+      fields: ['countryCode'],
+    });
   });
 
   it('identidad de sede org-scoped: el owner guarda y persiste el set general', async () => {

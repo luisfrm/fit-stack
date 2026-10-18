@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Modal, toast } from "@workspace/ui/components";
+import { Modal, toast, Skeleton } from "@workspace/ui/components";
 import { OrganizationForm } from "./organization-form";
 import type { OwnerData } from "./organization-form-types";
 import { organizationsService } from "@/lib/services/organizations-service";
@@ -43,6 +43,37 @@ export function OrganizationModal({
   };
 
   const isEdit = !!initialData?.id;
+
+  // Edit mode: hydrate the organization detail (it carries `settings`,
+  // including `active_currencies`) before rendering the form, so the primary
+  // currency select offers exactly the currencies the API will accept.
+  const [detail, setDetail] = React.useState<IPlatformOrganization | null>(null);
+
+  React.useEffect(() => {
+    if (!open) {
+      // Reset so the next open refetches and remounts the form with fresh data.
+      setDetail(null);
+      return;
+    }
+    if (!isEdit || !initialData?.id) return;
+
+    let cancelled = false;
+    organizationsService
+      .getById(initialData.id)
+      .then((org) => {
+        if (!cancelled) setDetail({ ...initialData, ...org });
+      })
+      .catch((error: unknown) => {
+        // Never block editing on an analytics/detail failure: fall back to the
+        // row data (the API still validates the primary currency server-side).
+        console.error("Error fetching organization detail:", error);
+        if (!cancelled) setDetail(initialData);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isEdit, initialData]);
 
   const handleLogoUpload = async (orgId: string, logoFile: File) => {
     try {
@@ -146,10 +177,17 @@ export function OrganizationModal({
       isScrollable={true}
       size="lg"
     >
-      <OrganizationForm
-        initialData={initialData}
-        onSubmit={handleSubmit}
-      />
-    </Modal>
+      {isEdit && !detail ? (
+        <div className="space-y-4 py-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : (
+        <OrganizationForm
+          initialData={detail ?? initialData}
+          onSubmit={handleSubmit}
+        />
+      )}    </Modal>
   );
 }

@@ -2,11 +2,15 @@ import { HTTPException } from 'hono/http-exception';
 import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } from '../repositories/organizations.repository';
 import type { SettingsRepository } from '../repositories/settings.repository';
 import {
+  COUNTRY_INDEX,
   buildDefaultOrgSettings,
   parseStoredFiscalConfig,
   primaryCurrencyForCountry,
 } from '@workspace/shared';
 import type { FiscalConfig } from '@workspace/shared';
+
+/** `gym_setting` key holding the JSON list of currencies the org can charge in. */
+export const ACTIVE_CURRENCIES_SETTING = 'active_currencies';
 
 const slugTakenError = (message: string) =>
   new HTTPException(409, {
@@ -16,6 +20,96 @@ const slugTakenError = (message: string) =>
       headers: { 'content-type': 'application/json' },
     }),
   });
+
+/**
+ * Explicit 400: the currency is outside the supported universe
+ * (`COUNTRY_INDEX.currencies`, derived from `COUNTRIES`). Never a silent
+ * default: an unknown primary currency is a visible configuration error.
+ */
+const unsupportedCurrencyError = (currency: string) => {
+  const message = `La moneda principal "${currency}" no está soportada.`;
+  return new HTTPException(400, {
+    message,
+    res: new Response(
+      JSON.stringify({
+        error: message,
+        code: 'UNSUPPORTED_CURRENCY',
+        fields: ['primaryCurrency'],
+        supportedCurrencies: COUNTRY_INDEX.currencies,
+      }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
+};
+
+/**
+ * Explicit 400: the organization has no valid `active_currencies` row. The
+ * list is the authority for which currencies the org may charge in, so an
+ * absent/malformed value can never be guessed (no fallback).
+ */
+const activeCurrenciesNotConfiguredError = () => {
+  const message =
+    'La organización no tiene monedas activas válidas configuradas; define las monedas activas antes de cambiar la moneda principal.';
+  return new HTTPException(400, {
+    message,
+    res: new Response(
+      JSON.stringify({ error: message, code: 'ACTIVE_CURRENCIES_NOT_CONFIGURED', fields: ['active_currencies'] }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
+};
+
+/** Explicit 400: the chosen primary must be one of the organization's active currencies. */
+const primaryCurrencyNotActiveError = (currency: string, active: string[]) => {
+  const message = `La moneda principal "${currency}" no está entre las monedas activas de la organización (${active.join(', ')}).`;
+  return new HTTPException(400, {
+    message,
+    res: new Response(
+      JSON.stringify({
+        error: message,
+        code: 'PRIMARY_CURRENCY_NOT_ACTIVE',
+        fields: ['primaryCurrency'],
+        activeCurrencies: active,
+      }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
+};
+
+/** Validates the currency against the `COUNTRIES` universe (visible 400 otherwise). */
+export function assertSupportedCurrency(currency: string): void {
+  if (!COUNTRY_INDEX.currencies.includes(currency)) {
+    throw unsupportedCurrencyError(currency);
+  }
+}
+
+/**
+ * Parses a stored `active_currencies` value (JSON array of currency codes).
+ * `undefined` (row absent) → `null`; malformed JSON or invalid entries → the
+ * explicit configuration error (never an empty list that silently widens).
+ */
+export function parseActiveCurrencies(raw: string | undefined): string[] | null {
+  if (raw === undefined) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.every((code) => typeof code === 'string' && code.trim().length > 0)
+    ) {
+      return parsed;
+    }
+  } catch {
+    // Falls through to the explicit error below.
+  }
+  throw activeCurrenciesNotConfiguredError();
+}
+
+function assertPrimaryCurrencyActive(currency: string, active: string[]): void {
+  if (!active.includes(currency)) {
+    throw primaryCurrencyNotActiveError(currency, active);
+  }
+}
 
 /** Issuer identity columns that must be complete before declaring the org a formal taxpayer. */
 const FISCAL_IDENTITY_FIELDS = ['legalName', 'taxId', 'address'] as const;
@@ -116,15 +210,30 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         throw slugTakenError('El slug o subdominio ya está en uso por otra organización');
       }
 
+      // Primary currency is explicit: Console preselects the country currency
+      // but the operator may choose another supported one (e.g. USD in VE).
+      // Absent → derived from the country (creation only); unknown → 400.
+      const countryCurrency = primaryCurrencyForCountry(data.countryCode);
+      const requestedPrimary = data.primaryCurrency ?? countryCurrency;
+      assertSupportedCurrency(requestedPrimary);
+
+      // Explicit active currencies (Console form) must already contain the
+      // primary: a primary outside the active list is an explicit error, never
+      // an implicit widening.
+      const explicitActive =
+        data.settings?.active_currencies !== undefined
+          ? parseActiveCurrencies(data.settings.active_currencies)
+          : null;
+      if (explicitActive) assertPrimaryCurrencyActive(requestedPrimary, explicitActive);
+
       // Everything required goes into the same insert: currency derives from country,
       // format is explicit (or 'latam' as write default).
       const { currencyFormat, settings, ...rest } = data;
-      const primaryCurrency = primaryCurrencyForCountry(data.countryCode);
       const newOrgData: NewDbOrganization = {
         ...rest,
         id: crypto.randomUUID(),
         slug,
-        primaryCurrency,
+        primaryCurrency: requestedPrimary,
         currencyFormat: currencyFormat ?? 'latam',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -147,7 +256,14 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       }
 
       // Only extensible settings seeded in gym_setting ({...defaults, ...rest}).
-      const defaults = { ...buildDefaultOrgSettings(data.countryCode), ...settings };
+      // The active list always keeps BOTH the chosen primary and the country
+      // currency (cross-currency org, e.g. USD primary in VE → USD + VES).
+      const defaults = { ...buildDefaultOrgSettings(data.countryCode, requestedPrimary), ...settings };
+      if (explicitActive) {
+        defaults.active_currencies = JSON.stringify(
+          Array.from(new Set([...explicitActive, countryCurrency])),
+        );
+      }
       for (const [key, value] of Object.entries(defaults)) {
         await settingsRepo.upsert(created.id, key, value);
       }
@@ -165,10 +281,23 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         }
       }
 
-      // Changing country recalculates primary currency (locked to country).
-      if (data.countryCode) {
-        (data as Partial<NewDbOrganization>).primaryCurrency = primaryCurrencyForCountry(data.countryCode);
+      // Primary currency is editable, but only within the organization's active
+      // currencies (`gym_setting.active_currencies` is the authority). All
+      // validation happens BEFORE the single update statement: no partial write.
+      // Unchanged value is an idempotent no-op (no re-validation of legacy rows).
+      if (
+        data.primaryCurrency !== undefined &&
+        data.primaryCurrency !== current.primaryCurrency
+      ) {
+        assertSupportedCurrency(data.primaryCurrency);
+        const storedActive = await settingsRepo.findByKey(id, ACTIVE_CURRENCIES_SETTING);
+        const active = parseActiveCurrencies(storedActive);
+        if (!active) throw activeCurrenciesNotConfiguredError();
+        assertPrimaryCurrencyActive(data.primaryCurrency, active);
       }
+
+      // Country and primary currency are INDEPENDENT settings now: changing the
+      // country never rewrites the primary silently (the currency is explicit).
 
       // `fiscalConfig` (jsonb) merges over stored, never blind replacement:
       // partial PATCH of `disclaimerOverride` must not drop `isFormalTaxpayer`.
