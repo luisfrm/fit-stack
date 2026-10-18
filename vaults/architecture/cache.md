@@ -38,7 +38,8 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:subscription-status`         | 1 min  | Org billing status                                                                                |
 | `org:${orgId}:subscription`                | 1 min  | Org SaaS sub with plan details (self-service renewal)                                             |
 | `org:${orgId}:payment-methods`             | 1 h    | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
-| `rates:${base}`                            | 1 hr   | Server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`)  |
+| `rates:${base}`                            | 1 hr   | Fresh server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`) |
+| `rates:last:${base}`                       | 30 d   | Last successful response per base currency; read ONLY when the provider fails (logged, never a silent `?? 1`) |
 | `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
 | `org:${orgId}:reports:revenue:12m`         | 1 hr   | Monthly revenue reports                                                                           |
 | `org:${orgId}:reports:receipts:*`          | 5 min  | Receipts audit report (invalidated on-write in issue/status/subscription writes)                  |

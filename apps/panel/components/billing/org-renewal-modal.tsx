@@ -8,9 +8,14 @@ import { OrgPaymentSection } from "./org-payment-section";
 import { renewOrgSubscription, type OrgPaymentMethodsResponse, type OrgSubscriptionInfo } from "@/lib/services/org-billing";
 import { mutationError } from "@/lib/errors";
 import { uploadService } from "@/lib/services/upload-service";
-import { getExchangeRates } from "@/lib/api/exchange-rates";
+import { getExchangeRateSnapshot } from "@/lib/api/exchange-rates";
 import { toLocalDayString } from "@workspace/shared/date";
-import { centsToUnits } from "@workspace/shared";
+import {
+  paymentConversionView,
+  type CurrencyFormat,
+  type ExchangeRateLoadStatus,
+  type ExchangeRateSnapshot,
+} from "@workspace/shared";
 import type { IPaymentMethodDetails } from "@workspace/shared/types";
 
 interface OrgRenewalModalProps {
@@ -41,9 +46,12 @@ export function OrgRenewalModal({
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [paymentDate, setPaymentDate] = React.useState(() => toLocalDayString(activeOrganization?.timezone));
-  const [referenceRate, setReferenceRate] = React.useState(1);
-  const [referenceAmount, setReferenceAmount] = React.useState(centsToUnits(subscription.planPrice));
+  const [rateSnapshot, setRateSnapshot] = React.useState<ExchangeRateSnapshot | null>(null);
+  const [rateStatus, setRateStatus] = React.useState<ExchangeRateLoadStatus>('idle');
+  const [rateReloadToken, setRateReloadToken] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
   const activeCurrencies = paymentMethods?.activeCurrencies ?? [subscription.planCurrency];
   const activePaymentMethods = React.useMemo(
@@ -64,30 +72,52 @@ export function OrgRenewalModal({
 
   React.useEffect(() => {
     if (paymentCurrency === subscription.planCurrency) {
-      setReferenceRate(1);
-      setReferenceAmount(centsToUnits(subscription.planPrice));
+      setRateSnapshot(null);
+      setRateStatus('ready');
       return;
     }
+
     let cancelled = false;
-    getExchangeRates(subscription.planCurrency)
-      .then((rates) => {
+    setRateSnapshot(null);
+    setRateStatus('loading');
+
+    getExchangeRateSnapshot(subscription.planCurrency)
+      .then((snapshot) => {
         if (cancelled) return;
-        const rate = rates[paymentCurrency] ?? 0;
-        setReferenceRate(rate);
-        setReferenceAmount(centsToUnits(subscription.planPrice) * rate);
+        setRateSnapshot(snapshot);
+        const rate = snapshot.rates[paymentCurrency];
+        const isValidRate =
+          typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+        // Missing currency in the response: never assume a rate.
+        setRateStatus(isValidRate ? 'ready' : 'error');
       })
-      .catch(() => {
-        if (!cancelled) {
-          setReferenceRate(0);
-          setReferenceAmount(0);
-        }
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error fetching exchange rates for org renewal', error);
+        setRateStatus('error');
       });
+
     return () => {
       cancelled = true;
     };
-  }, [paymentCurrency, subscription.planCurrency, subscription.planPrice]);
+  }, [paymentCurrency, subscription.planCurrency, rateReloadToken]);
+
+  const conversion = React.useMemo(
+    () =>
+      paymentConversionView(
+        subscription.planCurrency,
+        paymentCurrency,
+        rateSnapshot,
+        rateStatus,
+      ),
+    [subscription.planCurrency, paymentCurrency, rateSnapshot, rateStatus],
+  );
 
   const validate = (): boolean => {
+    if (paymentCurrency !== subscription.planCurrency && !conversion.canSubmit) {
+      toast.error("La tasa de cambio aún no está disponible. El pago está bloqueado hasta que cargue.");
+      return false;
+    }
     if (!paymentMethodId) {
       toast.error("Selecciona un método de pago");
       return false;
@@ -212,8 +242,10 @@ export function OrgRenewalModal({
           selectedPaymentConfig={selectedPaymentConfig}
           dynamicFieldValues={dynamicFieldValues}
           onDynamicChange={(id, value) => setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))}
-          referenceRate={referenceRate}
-          referenceAmount={referenceAmount}
+          conversion={conversion}
+          rateStatus={rateStatus}
+          onRetryRate={() => setRateReloadToken((value) => value + 1)}
+          currencyFormat={currencyFormat}
           paymentDate={paymentDate}
           onPaymentDateChange={setPaymentDate}
           onCurrencyChange={setPaymentCurrency}
@@ -234,7 +266,12 @@ export function OrgRenewalModal({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={isSubmitting} disabled={isSubmitting}>
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            loading={isSubmitting}
+            disabled={isSubmitting || !conversion.canSubmit}
+          >
             Enviar Pago
           </Button>
         </div>

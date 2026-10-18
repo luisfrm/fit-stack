@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Calculator, CircleDollarSign, CreditCard, Eye } from "lucide-react";
 import {
+  Button,
   Card,
   Text,
   Label,
@@ -18,7 +19,14 @@ import {
   type IPaymentMethodField,
 } from "@/types/dashboard";
 import { sortPaymentMethodFields } from "@workspace/shared";
-import { ValueConverter, type CurrencyFormat, type ITaxDetail } from "@workspace/shared";
+import {
+  ValueConverter,
+  formatShortDate,
+  type CurrencyFormat,
+  type ExchangeRateLoadStatus,
+  type ITaxDetail,
+  type PaymentConversionView,
+} from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { TaxBlock } from "./tax-block";
 
@@ -80,12 +88,12 @@ interface PaymentSectionProps {
   readonly selectedPaymentConfig?: IPaymentMethodConfig;
   readonly dynamicFieldValues: Record<string, any>;
   readonly onDynamicChange: (id: string, value: any) => void;
-  readonly exchangeRate: number;
-  readonly rateFocus: boolean;
+  /** API rate (read-only) and whether the converted amount can be shown. */
+  readonly conversion: PaymentConversionView;
+  readonly rateStatus: ExchangeRateLoadStatus;
+  readonly onRetryRate: () => void;
   readonly amountFocus: boolean;
-  readonly onRateFocus: (focused: boolean) => void;
   readonly onAmountFocus: (focused: boolean) => void;
-  readonly onRateChange: (value: number) => void;
   readonly onAmountChange: (value: number) => void;
   readonly onCurrencyChange: (value: string) => void;
   readonly onMethodChange: (value: string) => void;
@@ -114,12 +122,11 @@ export function PaymentSection({
   selectedPaymentConfig,
   dynamicFieldValues,
   onDynamicChange,
-  exchangeRate,
-  rateFocus,
+  conversion,
+  rateStatus,
+  onRetryRate,
   amountFocus,
-  onRateFocus,
   onAmountFocus,
-  onRateChange,
   onAmountChange,
   onCurrencyChange,
   onMethodChange,
@@ -183,48 +190,82 @@ export function PaymentSection({
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
-          {paymentCurrency !== selectedPlan.currency && (
+        {conversion.conversionBlock === "readonly" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
             <div className="space-y-2">
               <Label htmlFor="exchange-rate" className="text-xs font-semibold text-muted-foreground uppercase">
                 Tasa ({selectedPlan.currency} {"\u2192"} {paymentCurrency})
               </Label>
               <Input
                 id="exchange-rate"
-                type={rateFocus ? "number" : "text"}
-                step="0.01"
-                value={rateFocus ? exchangeRate : ValueConverter.format(exchangeRate, "", currencyFormat)}
-                onFocus={() => onRateFocus(true)}
-                onBlur={() => onRateFocus(false)}
-                onChange={(e) => onRateChange(ValueConverter.parse(e.target.value, currencyFormat))}
+                value={conversion.rate === null ? "" : ValueConverter.format(conversion.rate, "", currencyFormat)}
+                placeholder={rateStatus === "loading" ? "Consultando..." : "No disponible"}
+                readOnly
                 variant="default"
                 leftIcon={<CircleDollarSign size={16} />}
                 disabled={disabled}
+                aria-describedby="exchange-rate-status"
               />
+              {rateStatus === "loading" && (
+                <Text id="exchange-rate-status" size="xs" variant="muted">
+                  Consultando la tasa oficial de cambio...
+                </Text>
+              )}
+              {rateStatus === "error" && (
+                <Text
+                  as="div"
+                  id="exchange-rate-status"
+                  size="xs"
+                  variant="danger"
+                  role="alert"
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span>No se pudo obtener la tasa de cambio. El pago está bloqueado.</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={onRetryRate}
+                    disabled={disabled}
+                  >
+                    Reintentar
+                  </Button>
+                </Text>
+              )}
+              {conversion.stale && (
+                <Text size="xs" variant="muted">
+                  Tasa no actualizada: se usa la última disponible del proveedor
+                  {conversion.providerUpdatedAt
+                    ? ` (${formatShortDate(new Date(conversion.providerUpdatedAt))})`
+                    : ""}.
+                </Text>
+              )}
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="final-amount" className="text-xs font-semibold text-muted-foreground uppercase">Monto Total a Recibir</Label>
-            <Input
-              id="final-amount"
-              type={amountFocus ? "number" : "text"}
-              step="0.01"
-              value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
-              onFocus={() => onAmountFocus(true)}
-              onBlur={() => onAmountFocus(false)}
-              onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
-              readOnly={!allowPriceOverride}
-              variant="default"
-              className={allowPriceOverride ? "" : "opacity-70"}
-              leftIcon={<CreditCard size={16} />}
-              disabled={disabled}
-            />
-            {!allowPriceOverride && (
-              <p className="text-[10px] text-muted-foreground italic">Basado en el plan. No editable.</p>
+            {conversion.rate !== null && (
+              <div className="space-y-2">
+                <Label htmlFor="final-amount" className="text-xs font-semibold text-muted-foreground uppercase">Monto Total a Recibir</Label>
+                <Input
+                  id="final-amount"
+                  type={amountFocus ? "number" : "text"}
+                  step="0.01"
+                  value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
+                  onFocus={() => onAmountFocus(true)}
+                  onBlur={() => onAmountFocus(false)}
+                  onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
+                  readOnly={!allowPriceOverride}
+                  variant="default"
+                  className={allowPriceOverride ? "" : "opacity-70"}
+                  leftIcon={<CreditCard size={16} />}
+                  disabled={disabled}
+                />
+                {!allowPriceOverride && (
+                  <p className="text-[10px] text-muted-foreground italic">Basado en la tasa oficial. No editable.</p>
+                )}
+              </div>
             )}
           </div>
-        </div>
+        )}
       </div>
       {taxPreview && (
         <TaxBlock

@@ -11,7 +11,7 @@ Puedes tener varias monedas activas a la vez y un cliente puede pagar hoy en bol
 
 ## Tipos de cambio en tiempo real
 
-- Al registrar un pago en moneda local, el panel consulta en ese instante la tasa de cambio desde una fuente pública confiable. Ves la tasa sugerida antes de confirmar.
+- Al registrar un pago en moneda local, el panel consulta en ese instante la tasa de cambio desde una fuente pública confiable. La tasa se muestra en **solo lectura** (nadie la escribe a mano) y el monto convertido se calcula con ella. Si la fuente no responde, el sistema usa la última tasa conocida de esa moneda (indicándolo) o bloquea el cobro: nunca se asume una tasa.
 - **Cada pago guarda la tasa exacta aplicada ese día** en su registro. Si el dólar sube mañana, tus pagos históricos conservan su tasa original; la auditoría queda limpia y comparable.
 - El equivalente en moneda base se calcula y guarda junto al pago para que los reportes no tengan que recalcular con tasas volátiles.
 - El formato de números y fechas se adapta por país: separadores, símbolo de moneda y presentación según Venezuela, Colombia, México, Argentina, Chile, Perú, España o Estados Unidos.

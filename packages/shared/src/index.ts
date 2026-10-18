@@ -13,6 +13,7 @@ export * from './formatting';
 export * from './date';
 export * from './subscription-period';
 export * from './settings';
+export * from './exchange-rates';
 export * from './storage';
 export * from './defaults';
 

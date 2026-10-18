@@ -13,7 +13,7 @@ import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
 import { plansService } from "@/lib/services/plans-service";
 import { settingsService } from "@/lib/services/settings-service";
-import { getExchangeRates } from "@/lib/api/exchange-rates";
+import { getExchangeRateSnapshot } from "@/lib/api/exchange-rates";
 import {
   Input,
   Button,
@@ -25,6 +25,12 @@ import {
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { addDuration, toLocalDayString } from "@workspace/shared/date";
+import {
+  exchangeRateAppliedValue,
+  paymentConversionView,
+  type ExchangeRateLoadStatus,
+  type ExchangeRateSnapshot,
+} from "@workspace/shared";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { apiCode } from "@/lib/errors";
@@ -152,7 +158,9 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Payment States
   const [paymentCurrency, setPaymentCurrency] = React.useState<string>('USD');
-  const [exchangeRate, setExchangeRate] = React.useState(1);
+  const [rateSnapshot, setRateSnapshot] = React.useState<ExchangeRateSnapshot | null>(null);
+  const [rateStatus, setRateStatus] = React.useState<ExchangeRateLoadStatus>('idle');
+  const [rateReloadToken, setRateReloadToken] = React.useState(0);
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState<string>('');
   const [paymentDetails, setPaymentDetails] = React.useState("");
@@ -163,7 +171,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
-  const [rateFocus, setRateFocus] = React.useState(false);
 
   const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
@@ -297,31 +304,64 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [fiscalProfile, finalAmount, paymentCurrency]);
 
-  // Fetch Exchange Rate and Calculate Amount
+  // Exchange rate and converted amount. The rate is READ-ONLY and comes from
+  // the exchange-rates API: it is never editable here.
   React.useEffect(() => {
-    const updateFinance = async () => {
-      if (!selectedPlan) {
-        setFinalAmount(0);
-        setExchangeRate(1);
-        return;
-      }
+    if (!selectedPlan) {
+      setRateSnapshot(null);
+      setRateStatus('idle');
+      setFinalAmount(0);
+      return;
+    }
 
-      let rate = 1;
-      if (paymentCurrency !== selectedPlan.currency) {
-        try {
-          const rates = await getExchangeRates(selectedPlan.currency);
-          rate = rates[paymentCurrency] ?? 1;
-        } catch {
-          rate = 1;
+    if (paymentCurrency === selectedPlan.currency) {
+      setRateSnapshot(null);
+      setRateStatus('ready');
+      setFinalAmount(centsToUnits(selectedPlan.price));
+      return;
+    }
+
+    let cancelled = false;
+    setRateSnapshot(null);
+    setRateStatus('loading');
+    setFinalAmount(0);
+
+    getExchangeRateSnapshot(selectedPlan.currency)
+      .then((snapshot) => {
+        if (cancelled) return;
+        setRateSnapshot(snapshot);
+        const rate = snapshot.rates[paymentCurrency];
+        const isValidRate =
+          typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+        if (!isValidRate) {
+          // Provider responded but without this currency: never assume a rate.
+          setRateStatus('error');
+          return;
         }
-      }
+        setRateStatus('ready');
+        setFinalAmount(centsToUnits(selectedPlan.price * rate));
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error fetching exchange rates', error);
+        setRateStatus('error');
+      });
 
-      setExchangeRate(rate);
-      setFinalAmount(centsToUnits(selectedPlan.price * rate));
+    return () => {
+      cancelled = true;
     };
+  }, [selectedPlan, paymentCurrency, rateReloadToken]);
 
-    updateFinance();
-  }, [selectedPlan, paymentCurrency]);
+  const conversion = React.useMemo(
+    () =>
+      paymentConversionView(
+        selectedPlan?.currency ?? '',
+        paymentCurrency,
+        rateSnapshot,
+        rateStatus,
+      ),
+    [selectedPlan, paymentCurrency, rateSnapshot, rateStatus],
+  );
 
   // Dynamically search members
   React.useEffect(() => {
@@ -355,6 +395,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   // Helper to validate payment fields
   const validatePaymentFields = () => {
     if (!memberId || !planId) return false;
+
+    if (selectedPlan && !conversion.canSubmit) {
+      toast.error("La tasa de cambio aún no está disponible. El pago está bloqueado hasta que cargue.");
+      return false;
+    }
 
     // Simple Date Validation
     const start = parseDateAsConfigTimezone(startDate, timezone);
@@ -415,7 +460,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       payment: {
         amountPaid: unitsToCents(finalAmount),
         currencyPaid: paymentCurrency,
-        exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
+        exchangeRateApplied: exchangeRateAppliedValue(conversion),
         paymentMethod,
         paymentMethodDetails: finalPaymentMethodDetails,
         status: paymentValidated ? "validated" : "processing",
@@ -574,15 +619,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           selectedPaymentConfig={selectedPaymentConfig}
           dynamicFieldValues={dynamicFieldValues}
           onDynamicChange={(id, value) => setDynamicFieldValues(prev => ({ ...prev, [id]: value }))}
-          exchangeRate={exchangeRate}
-          rateFocus={rateFocus}
+          conversion={conversion}
+          rateStatus={rateStatus}
+          onRetryRate={() => setRateReloadToken((value) => value + 1)}
           amountFocus={amountFocus}
-          onRateFocus={setRateFocus}
           onAmountFocus={setAmountFocus}
-          onRateChange={(val) => {
-            setExchangeRate(val);
-            setFinalAmount(centsToUnits(selectedPlan.price * val));
-          }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
@@ -636,7 +677,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
       <Button
         type="submit"
-        disabled={isLoading || isProcessingUploads || !memberId || !planId || isPendingPayment}
+        disabled={isLoading || isProcessingUploads || !memberId || !planId || isPendingPayment || !conversion.canSubmit}
         className="w-full h-12 uppercase tracking-widest font-bold shadow-xl shadow-primary/5"
       >
         {isLoading || isProcessingUploads ? "PROCESANDO..." : "GENERAR SUSCRIPCIÓN"}
