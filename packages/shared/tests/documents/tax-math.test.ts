@@ -142,4 +142,26 @@ describe('computeInclusiveTaxes', () => {
     ];
     expect(() => computeInclusiveTaxes(1000, taxes)).toThrow();
   });
+
+  it('reparte el polvo entre líneas inclusive sin dejar importes negativos', () => {
+    // total=4: subtotal=round(4/1.51)=3, lines 2 and 0, taxTotal=1.
+    // The old "last line absorbs everything" moved the last line to -1.
+    const result = computeInclusiveTaxes(4, [
+      { name: 'A', rate: 0.5, enabled: true },
+      { name: 'B', rate: 0.01, enabled: true },
+    ]);
+
+    expect(result.subtotal).toBe(3);
+    expect(result.taxTotal).toBe(1);
+    expect(result.taxDetails.every((line) => line.amount >= 0)).toBe(true);
+    expect(result.taxDetails.reduce((sum, line) => sum + line.amount, 0)).toBe(
+      result.taxTotal,
+    );
+    expect(result.subtotal + result.taxTotal).toBe(result.total);
+    // The correction is drained from the previous line when the last is 0.
+    expect(result.taxDetails).toEqual([
+      { name: 'A', rate: 0.5, amount: 1 },
+      { name: 'B', rate: 0.01, amount: 0 },
+    ]);
+  });
 });
