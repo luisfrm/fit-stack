@@ -19,6 +19,61 @@ const FRESH_TTL_SECONDS = 3600;
 const LAST_KNOWN_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 /**
+ * Provider unreachable (no fresh response AND no last-known one for the base).
+ * A rate is never assumed: callers must block the operation. Routes map it to
+ * `503 EXCHANGE_RATE_UNAVAILABLE`.
+ */
+export class ExchangeRateUnavailableError extends Error {
+  readonly code = 'EXCHANGE_RATE_UNAVAILABLE' as const;
+  constructor(base: string) {
+    super(`Exchange rate API unavailable for base ${base}`);
+    this.name = 'ExchangeRateUnavailableError';
+  }
+}
+
+/**
+ * Provider reachable but the requested target currency is missing from its
+ * response: the caller chose a currency the provider does not cover. Routes map
+ * it to `400 PAYMENT_CURRENCY_UNSUPPORTED`.
+ */
+export class UnsupportedPaymentCurrencyError extends Error {
+  readonly code = 'PAYMENT_CURRENCY_UNSUPPORTED' as const;
+  constructor(base: string, target: string) {
+    super(`No exchange rate for ${base} -> ${target}`);
+    this.name = 'UnsupportedPaymentCurrencyError';
+  }
+}
+
+/**
+ * HTTP mapping of the typed rate failures. Single place so every route that
+ * surfaces the provider answers the same way: the message is a human fallback,
+ * the client resolves by `code`. `null` = not a rate failure (rethrow).
+ */
+export function exchangeRateErrorResponse(
+  err: unknown,
+): { status: 400 | 503; body: { error: string; code: string } } | null {
+  if (err instanceof ExchangeRateUnavailableError) {
+    return {
+      status: 503,
+      body: {
+        error: 'Servicio de tasas de cambio no disponible, intente nuevamente',
+        code: err.code,
+      },
+    };
+  }
+  if (err instanceof UnsupportedPaymentCurrencyError) {
+    return {
+      status: 400,
+      body: {
+        error: 'Moneda de pago no soportada por el proveedor de tasas',
+        code: err.code,
+      },
+    };
+  }
+  return null;
+}
+
+/**
  * Server-side exchange rates provider (open.er-api.com, same provider
  * used by frontend). Exchange rates for renewals are calculated by backend —
  * NEVER accepted from request body — and cached in Redis (`rates:{base}`, 1h).
@@ -42,11 +97,12 @@ export function createExchangeRateProvider(env: Env) {
         try {
           data = await ofetch<ExchangeRatesResponse>(`${baseUrl}/${baseCurrency}`);
         } catch {
-          // Normalized so the routes can map provider outages to 503.
-          throw new Error('Exchange rate API unavailable');
+          // Typed so the routes map provider outages to 503 by class, never by
+          // matching the message.
+          throw new ExchangeRateUnavailableError(baseCurrency);
         }
         if (data?.result !== 'success' || !data.rates) {
-          throw new Error('Exchange rate API unavailable');
+          throw new ExchangeRateUnavailableError(baseCurrency);
         }
         return {
           rates: data.rates,
@@ -71,7 +127,7 @@ export function createExchangeRateProvider(env: Env) {
       const snapshot = await loadSnapshot(base);
       const rate = snapshot.rates[target];
       if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) {
-        throw new Error(`No exchange rate for ${base} -> ${target}`);
+        throw new UnsupportedPaymentCurrencyError(base, target);
       }
 
       if (snapshot.stale) {

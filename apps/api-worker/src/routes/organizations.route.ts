@@ -13,7 +13,10 @@ import { createPlatformPlansRepository } from '../repositories/platform-plans.re
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
-import { createExchangeRateProvider } from '../lib/exchange-rates';
+import {
+  createExchangeRateProvider,
+  exchangeRateErrorResponse,
+} from '../lib/exchange-rates';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
@@ -404,12 +407,10 @@ export const organizationRoutes = new Hono<AppEnv>()
 
         return c.json({ success: true, paymentId }, 201);
       } catch (err) {
-        if (err instanceof Error && err.message === 'Exchange rate API unavailable') {
-          return c.json({ error: 'Servicio de tasas de cambio no disponible, intente nuevamente' }, 503);
-        }
-        if (err instanceof Error && err.message.startsWith('No exchange rate for')) {
-          return c.json({ error: 'Moneda de pago no soportada por el proveedor de tasas' }, 400);
-        }
+        // Rate failures are typed (`lib/exchange-rates.ts`), so the mapping is
+        // by class, never by message text (single shared mapper).
+        const rateFailure = exchangeRateErrorResponse(err);
+        if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
         throw err;
       }
     }
