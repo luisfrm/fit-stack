@@ -388,6 +388,7 @@ function basePlatformRows(): PlatformReceiptComposedRows {
       name: 'Gym Demo',
       legalName: 'Gimnasio Demo C.A.',
       taxId: 'J-999',
+      address: 'Av. Libertador, Torre Demo, Caracas',
       countryCode: 'VE',
       timezone: 'America/Caracas',
     },
@@ -550,10 +551,30 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
 /* ── Platform issuer (FitStack, SaaS) ──────────────────────────────────── */
 
 describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
-  function expectPlatformParity(rows: PlatformReceiptComposedRows): void {
-    expect(composePlatformReceipt(rows)).toEqual(
-      legacyBuildPlatformReceiptDataFromComposed(legacyPlatformRowsToInput(rows)),
+  /**
+   * Expected `ReceiptData` of the platform issuer: the frozen legacy oracle
+   * plus the RD-150 contract evolution — the SaaS receptor is an
+   * ORGANIZATION, so the recipient carries the structural marker and the
+   * fiscal address. The legacy oracle itself stays untouched.
+   */
+  function platformExpected(
+    rows: PlatformReceiptComposedRows,
+  ): ReceiptData {
+    const legacy = legacyBuildPlatformReceiptDataFromComposed(
+      legacyPlatformRowsToInput(rows),
     );
+    return {
+      ...legacy,
+      recipient: {
+        ...legacy.recipient,
+        kind: 'organization',
+        address: rows.organization.address?.trim() || null,
+      },
+    };
+  }
+
+  function expectPlatformParity(rows: PlatformReceiptComposedRows): void {
+    expect(composePlatformReceipt(rows)).toEqual(platformExpected(rows));
   }
 
   it('happy path: FitStack emitter from settings, org receptor', () => {

@@ -41,6 +41,7 @@ function baseInput(): PlatformComposeReceiptInput {
       name: 'Gym Demo',
       legalName: 'Gimnasio Demo C.A.',
       taxId: 'J-999',
+      address: 'Av. Libertador, Torre Demo, Caracas',
       countryCode: 'VE',
       timezone: 'America/Caracas',
     },
@@ -139,6 +140,51 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(data.sale.periodStart).toBe('2026-09-14T10:00:00.000Z');
     expect(data.sale.periodEnd).toBe('2026-09-14T10:00:00.000Z');
     expect(data.voided).toBe(true);
+  });
+
+  /* ── Receptor B2B (RD-150): etiqueta fiscal y dirección ── */
+
+  it('receptor organización marca B2B y usa el taxLabel del país (R.I.F. en VE)', () => {
+    const data = buildPlatformReceiptDataFromComposed(baseInput());
+    expect(data.recipient.kind).toBe('organization');
+    expect(data.recipient.docLabel).toBe('R.I.F.');
+    expect(data.recipient.docLabel).not.toBe('C.I.');
+    expect(data.recipient.address).toBe('Av. Libertador, Torre Demo, Caracas');
+  });
+
+  it('receptor en CO usa NIT y sin dirección compone null (la línea se omite)', () => {
+    const input = baseInput();
+    input.receptor = {
+      ...input.receptor,
+      countryCode: 'CO',
+      timezone: 'America/Bogota',
+      address: null,
+    };
+    const data = buildPlatformReceiptDataFromComposed(input);
+    expect(data.recipient.kind).toBe('organization');
+    expect(data.recipient.docLabel).toBe('NIT');
+    expect(data.recipient.address).toBeNull();
+  });
+
+  it('snapshot previo con docLabel se respeta tal cual (estado terminal, C1)', () => {
+    const input = baseInput();
+    // Snapshot emitted BEFORE RD-150: it froze the person-natural label.
+    input.emitterSnapshot = {
+      ...buildPlatformEmitterSnapshot(
+        {
+          receptor: input.receptor,
+          emitter: input.emitter,
+          currency: input.payment.planSnapshotCurrency,
+        },
+        resolveFiscalProfile('VE', undefined),
+      ),
+      recipientDocLabel: 'C.I.',
+    };
+    const data = buildPlatformReceiptDataFromComposed(input);
+    // The frozen label is NOT rewritten (reproducibility)…
+    expect(data.recipient.docLabel).toBe('C.I.');
+    // …but the structural marker still removes "Socio / Cliente" wording.
+    expect(data.recipient.kind).toBe('organization');
   });
 
   /* ── Snapshot del emisor ── */

@@ -30,10 +30,27 @@ export interface ReceiptEmitter {
   currency: string;
 }
 
+/**
+ * Nature of the recipient. `'organization'` = B2B document (SaaS receipt to
+ * an organization): the renderer prints fiscal labels (`taxLabel`, e.g.
+ * `R.I.F.`) and never the person-natural wording ("Socio / Cliente").
+ * Omitted = individual, which keeps the Panel (gym member) rendering intact.
+ */
+export type ReceiptRecipientKind = 'individual' | 'organization';
+
 export interface ReceiptRecipient {
   name: string;
+  /** Omitted = `'individual'` (Panel member). Set by the platform composer. */
+  kind?: ReceiptRecipientKind;
   documentId?: string | null;
+  /**
+   * Label printed next to `documentId`: `taxLabel` for organizations
+   * (`R.I.F.`, `NIT`), `docLabel` for individuals (`C.I.`, `C.C.`).
+   * Snapshot-frozen at issuance.
+   */
   docLabel?: string | null;
+  /** Fiscal address; the line is OMITTED when absent (never a placeholder). */
+  address?: string | null;
 }
 
 /** Tax as applied upon issuance (calculation audit, not country live config). */
@@ -58,7 +75,13 @@ export interface ReceiptEmitterSnapshot {
   emitter: ReceiptEmitter;
   /** Label applied by `resolveDocumentLabel` upon issuance. */
   documentLabel: string;
-  /** Recipient document label (`FiscalProfile.docLabel`). */
+  /**
+   * Label attached to the recipient document at issuance: `taxLabel` when
+   * the recipient is an organization (SaaS/Console), `docLabel` for an
+   * individual (Panel member). FROZEN: snapshots issued before this
+   * distinction was applied keep their persisted `docLabel` (terminal state,
+   * the issued document is never re-labelled).
+   */
   recipientDocLabel: string;
   /** Applied legal disclaimer (emitter country or custom `disclaimerOverride`). */
   disclaimer: string[];
@@ -156,6 +179,7 @@ function placeholderViolations(data: ReceiptData): string[] {
     { label: 'identificación fiscal del emisor', value: data.emitter.taxId },
     { label: 'dirección del emisor', value: data.emitter.address },
     { label: 'documento del receptor', value: data.recipient.documentId },
+    { label: 'dirección del receptor', value: data.recipient.address },
   ];
   return optionalFields
     .filter((field) => field.value?.trim() === MISSING_VALUE_PLACEHOLDER)
@@ -195,6 +219,7 @@ export function checklistPrePdf(data: ReceiptData): ReceiptChecklist {
     data.emitter.address ?? '',
     data.recipient.name,
     data.recipient.documentId ?? '',
+    data.recipient.address ?? '',
     data.sale.planName,
     data.method.name,
   ];

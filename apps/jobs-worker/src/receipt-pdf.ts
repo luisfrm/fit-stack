@@ -271,6 +271,11 @@ export async function renderReceiptPdfBytes(
   const columnsTop = ctx.y;
   const gutter = 40;
   const colWidth = (CONTENT_WIDTH - gutter) / 2;
+  const recipientX = MARGIN + colWidth + gutter;
+  // Structural issuer distinction (set by the platform composer), never a
+  // text heuristic: an organization recipient gets fiscal wording instead of
+  // the person-natural "Socio / Cliente".
+  const isOrganizationRecipient = recipient.kind === 'organization';
   if (emitter.address) {
     drawLine(ctx, 'Datos del Emisor', {
       size: 9,
@@ -293,36 +298,71 @@ export async function renderReceiptPdfBytes(
     size: 9,
     font: bold,
     color: MUTED,
-    x: MARGIN + colWidth + gutter,
+    x: recipientX,
     maxWidth: colWidth,
   });
-  drawLine(ctx, 'Socio / Cliente'.toUpperCase(), {
-    size: 7,
-    font: bold,
-    color: FAINT,
-    x: MARGIN + colWidth + gutter,
-    maxWidth: colWidth,
-    gapAfter: 2,
-  });
-  drawLine(ctx, recipient.name, {
-    size: 10,
-    font: bold,
-    x: MARGIN + colWidth + gutter,
-    maxWidth: colWidth,
-  });
-  if (recipient.documentId) {
-    drawLine(ctx, `${recipient.docLabel ?? 'Doc.'} del Socio`.toUpperCase(), {
+  if (isOrganizationRecipient) {
+    // B2B: fiscal identity only (`R.I.F.`, `NIT`); no "Socio / Cliente".
+    drawLine(ctx, recipient.name, {
+      size: 10,
+      font: bold,
+      x: recipientX,
+      maxWidth: colWidth,
+    });
+    if (recipient.documentId) {
+      const docLabel = recipient.docLabel?.trim();
+      drawLine(
+        ctx,
+        docLabel ? `${docLabel}: ${recipient.documentId}` : recipient.documentId,
+        { size: 8, color: MUTED, x: recipientX, maxWidth: colWidth },
+      );
+    }
+  } else {
+    drawLine(ctx, 'Socio / Cliente'.toUpperCase(), {
       size: 7,
       font: bold,
       color: FAINT,
-      x: MARGIN + colWidth + gutter,
+      x: recipientX,
       maxWidth: colWidth,
       gapAfter: 2,
     });
-    drawLine(ctx, recipient.documentId, {
+    drawLine(ctx, recipient.name, {
       size: 10,
       font: bold,
-      x: MARGIN + colWidth + gutter,
+      x: recipientX,
+      maxWidth: colWidth,
+    });
+    if (recipient.documentId) {
+      drawLine(ctx, `${recipient.docLabel ?? 'Doc.'} del Socio`.toUpperCase(), {
+        size: 7,
+        font: bold,
+        color: FAINT,
+        x: recipientX,
+        maxWidth: colWidth,
+        gapAfter: 2,
+      });
+      drawLine(ctx, recipient.documentId, {
+        size: 10,
+        font: bold,
+        x: recipientX,
+        maxWidth: colWidth,
+      });
+    }
+  }
+  // Fiscal address of the recipient: printed only when registered.
+  if (recipient.address) {
+    drawLine(ctx, 'Dirección Fiscal'.toUpperCase(), {
+      size: 7,
+      font: bold,
+      color: FAINT,
+      x: recipientX,
+      maxWidth: colWidth,
+      gapAfter: 2,
+    });
+    drawLine(ctx, recipient.address, {
+      size: 10,
+      font: bold,
+      x: recipientX,
       maxWidth: colWidth,
     });
   }

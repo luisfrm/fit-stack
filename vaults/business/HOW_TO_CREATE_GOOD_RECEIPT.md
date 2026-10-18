@@ -38,7 +38,7 @@ Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin comp
 | Sección | Campo | Origen |
 |---|---|---|
 | Emisor | Nombre legal, RIF | Config fija de FitStack (cuando exista) |
-| Receptor | `organization.legalName` / `name`, `organization.taxId` | tabla `organization` |
+| Receptor | `organization.legalName` / `name`, `organization.taxId` (con `taxLabel` del país: `R.I.F.`, `NIT`), `organization.address` | tabla `organization` |
 | Identificación | `receiptNumber` (o `invoiceNumber`) | `platform_document_sequence` |
 | Detalle | `planSnapshotName`, `planSnapshotPrice`, `planSnapshotCurrency`, `planSnapshotDurationValue/Unit` | `platformSubscriptionPayment` (snapshot, no `platformPlan` en vivo) |
 | Periodo cubierto | derivar de `platformSubscription.startDate` + duración snapshot | `platformSubscription` |
