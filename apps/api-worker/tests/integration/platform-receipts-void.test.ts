@@ -1,14 +1,14 @@
 /**
- * Platform receipts void tests (follow-up C3 — SaaS voiding).
+ * Platform receipts void tests (SaaS voiding).
  *
  * Covers: voiding a numbered payment preserves number+PDF and sets the
  * ANULADO flag; void without a number → **200 with `receiptVoided:false` +
  * `receiptVoidReason:'not_issued'`** (the payment status does change; the code
- * `RECEIPT_NOT_ISSUED` is an internal service contract, C6); re-void is
+ * `RECEIPT_NOT_ISSUED` is an internal service contract); re-void is
  * idempotent (audit intact); support 403 (inherited from `requirePlatformAuth`);
  * void neither cancels the subscription nor reverts the cumulative period.
  *
- * B2: voiding enqueues the render of the stamped PDF and until that artifact
+ * Voiding enqueues the render of the stamped PDF and until that artifact
  * exists (`receipt_voided_pdf_key`) the contract does NOT deliver the emission
  * PDF (202 + 404): a voided receipt never travels without its seal. Neither is
  * it resent by email (409 `RECEIPT_VOIDED`).
@@ -148,7 +148,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
 
     const res = await setStatus(paymentId, 'voided');
     expect(res.status, res.text).toBe(200);
-    // C6: the body confirms the receipt was left ANULADO.
+    // The body confirms the receipt was left ANULADO.
     expect(res.body).toMatchObject({ receiptVoided: true });
 
     const after = await readPayment(paymentId);
@@ -168,7 +168,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       new Date(subBefore[0]!.current_period_end).getTime(),
     );
 
-    // B2/step 1-bis: the void enqueued the render of the stamped artifact.
+    // The void also enqueued the render of the stamped artifact.
     expect(
       admin.client.receiptQueue
         .ofType('receipt.render')
@@ -237,7 +237,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
   it('void sin número: 200 con receiptVoided false + motivo (el status cambia igual)', async () => {
     const paymentId = await createProcessingPayment();
     // There is no receipt to void; the payment status change is NOT
-    // reverted and the response says so explicitly (C6) instead of hiding it.
+    // reverted and the response says so explicitly instead of hiding it.
     const res = await setStatus(paymentId, 'voided');
     expect(res.status, res.text).toBe(200);
     expect(res.body).toMatchObject({

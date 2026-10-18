@@ -3,7 +3,7 @@
    lives here because TWO runtimes (api-worker step 1, jobs-worker step 2
    + sweep) require IDENTICAL implementations — the atomic statement and
    WHERE conditions are the core guarantee against duplicates.
-   Moved from api-worker in C2 (precedent: Phase 1 addendum `77a7d8b`).
+   Moved from api-worker (precedent: the earlier platform-emission work, `77a7d8b`).
    Pure factory: receives `Db` parameter (per-request, without process.env).
    ─────────────────────────────────────────────────────────────────────── */
 
@@ -31,21 +31,21 @@ export interface PlatformReceiptComposedData {
   payment: DbPlatformPayment;
   subscription: DbPlatformSubscription | null;
   organization: DbPlatformOrganization;
-  /** Full `platform_setting` map (FitStack emitter keys, C1). */
+  /** Full `platform_setting` map (FitStack emitter keys). */
   emitter: Record<string, string>;
 }
 
 export interface AttachPlatformReceiptInput {
-  /** `FS-0000001` (Console format, validated Phase 0). */
+  /** `FS-0000001` (Console format, validated). */
   receiptNumber: string;
   receiptIssuedAt: Date;
   /** Integer cents; step 1 always persists them alongside the number. */
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
-  /** Emitter identity (FitStack) frozen upon issuance (C1). */
+  /** Emitter identity (FitStack) frozen upon issuance. */
   emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Issuing actor (C5). Missing during sweep: remains `null`. */
+  /** Issuing actor. Missing during sweep: remains `null`. */
   issuedBy?: string | null;
 }
 
@@ -187,7 +187,7 @@ export function createPlatformReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
-          // C1/C5: frozen identity + actor, in the same statement as
+          // Frozen identity + actor, in the same statement as
           // the number (receipt is reproducible upon birth).
           emitterSnapshot: input.emitterSnapshot ?? null,
           issuedBy: input.issuedBy ?? null,

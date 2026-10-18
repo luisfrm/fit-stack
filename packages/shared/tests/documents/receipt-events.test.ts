@@ -40,7 +40,7 @@ describe('isReceiptRenderEvent', () => {
     expect(isReceiptRenderEvent(buildReceiptRenderEvent(VALID))).toBe(true);
   });
 
-  it('scope platform acepta el correlativo global FS-N (C2)', () => {
+  it('scope platform acepta el correlativo global FS-N', () => {
     const evt = buildReceiptRenderEvent({
       ...VALID,
       scope: 'platform',

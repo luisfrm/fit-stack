@@ -19,7 +19,7 @@ import {
 
 /** Sub window relative to today (endpoint computes against `new Date()`).
  *
- * B3.3: the server computes the period — `endOffsetDays: null` omits the
+ * The server computes the period — `endOffsetDays: null` omits the
  * explicit end and the server computes it from `startDate` + plan duration
  * (this is how already-expired periods are seeded: an explicit `endDate` in the
  * past and inverted is rejected with 422 END_DATE_BEFORE_START). */

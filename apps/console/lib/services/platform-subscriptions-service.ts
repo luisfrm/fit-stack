@@ -266,7 +266,7 @@ export const platformSubscriptionsService = {
    *
    * Returns the outcome of the receipt voiding attempt: with
    * `voided` without an issued receipt, `receiptVoided` is `false` and
-   * `receiptVoidReason` is `'not_issued'` (C6).
+   * `receiptVoidReason` is `'not_issued'`.
    */
   async updatePaymentStatus(
     paymentId: number,
@@ -279,7 +279,7 @@ export const platformSubscriptionsService = {
     );
   },
 
-  /* ── Correlative sequence audit (C4) ── */
+  /* ── Correlative sequence audit ── */
 
   /**
    * `FS-N` receipts report: rows, summary, totals per currency and
@@ -304,7 +304,7 @@ export const platformSubscriptionsService = {
     });
   },
 
-  /* ── SaaS Receipts (C3) ── */
+  /* ── SaaS Receipts ── */
 
   /**
    * Downloads receipt PDF (`FS-N.pdf`). Throws if not ready.

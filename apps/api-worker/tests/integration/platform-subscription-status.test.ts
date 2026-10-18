@@ -71,7 +71,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     return res.body;
   }
 
-  /** SaaS subscription creation with an explicit payment status (Phase B does not apply the new default yet). */
+  /** SaaS subscription creation with an explicit payment status (the new default is not applied yet). */
   async function createSub(
     organizationId: string,
     opts: { paymentStatus?: string; isTrial?: boolean; startDate?: string } = {},

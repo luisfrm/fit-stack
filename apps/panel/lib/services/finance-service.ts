@@ -49,7 +49,7 @@ type RevenueRow = {
  * Service to handle financial operations: exchange rate fetching,
  * payment status mutations, and analytics/revenue aggregations.
  */
-/** Response of `PATCH /payments/:id/status` (see C6 in `vaults/business/PAYMENT_STATUSES.md`). */
+/** Response of `PATCH /payments/:id/status` (see `vaults/business/PAYMENT_STATUSES.md`). */
 export interface PaymentStatusResult {
   receiptVoided: boolean;
   receiptVoidReason?: "not_issued";
@@ -62,7 +62,7 @@ export const financeService = {
    *
    * Returns the receipt voiding attempt result: with
    * `voided` without an issued receipt, `receiptVoided` is `false` and
-   * `receiptVoidReason` is `'not_issued'` (C6) — the UI states this explicitly.
+   * `receiptVoidReason` is `'not_issued'` — the UI states this explicitly.
    */
   async updatePaymentStatus(
     paymentId: number,

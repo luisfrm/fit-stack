@@ -221,7 +221,7 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'Fecha de inicio inválida' });
       }
 
-      // 3. Period calculated from cumulative baseline (Phase 1, local day).
+      // 3. Period calculated from cumulative baseline (local day).
       const computed = computeSubscriptionPeriod({
         startDate,
         latestEndDate: latest?.endDate ?? null,
@@ -289,7 +289,7 @@ export function createSubscriptionsService(
       }
 
       // 6. Persist with reason (column 0019) and proceed with payment + issuance
-      // + phase-2 compensation without changes.
+      // + compensation without changes.
       const subscription = await subsRepo.create(organizationId, {
         memberId: payload.memberId,
         planId: payload.planId,
@@ -440,7 +440,7 @@ export function createSubscriptionsService(
       }
       // Void with issued number: preserves number + PDF and marks VOIDED.
       // Without issued receipt there is nothing to void, but the result is
-      // reported explicitly (C6) rather than swallowing internal error code.
+      // reported explicitly rather than swallowing internal error code.
       let receiptVoided = false;
       let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
       if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {

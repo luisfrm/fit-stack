@@ -87,7 +87,7 @@ test.describe('Panel — Settings', () => {
     await slogan.fill(value);
     await page.getByRole('button', { name: 'Actualizar Sede' }).click();
 
-    // C8 regression: the general save called `/api/platform/organizations`
+    // Regression: the general save called `/api/platform/organizations`
     // (`requirePlatformAuth`) → 403 for a gym owner. The success toast is
     // the signal that it now uses the real org-scoped endpoint.
     await expect(
@@ -100,7 +100,7 @@ test.describe('Panel — Settings', () => {
 
   // It depends on the spec "guarda la configuración fiscal…" (above) having
   // declared the branch as a formal taxpayer: without that declaration the
-  // manual tax override is not even offered (C2, the override only reduces).
+  // manual tax override is not even offered (the override only reduces).
   test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NUEVO PAGO' }).click();

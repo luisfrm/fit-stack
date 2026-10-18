@@ -76,7 +76,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     await cache.invalidate(`org:${orgId}:dashboard:action-items`);
     await cache.invalidate(`org:${orgId}:reports:revenue*`);
     await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    // C6: receipt voiding attempt is reported explicitly
+    // Receipt voiding attempt is reported explicitly
     // (200 with `receiptVoided: false` + reason), never silently.
     return c.json({
       ...payment,
@@ -147,7 +147,7 @@ export const paymentRoutes = new Hono<AppEnv>()
       orgId,
       paymentId: id,
       timezone,
-      // C5: manual emission also keeps actor audit trail.
+      // Manual emission also keeps actor audit trail.
       actor: c.get('user')?.id,
     });
     // Manual emission advances sequence: invalidates report cache.

@@ -1,7 +1,7 @@
 /**
- * Receipt correlative integrity (C0).
+ * Receipt correlative integrity.
  *
- * Covers the regression that motivated C0: a failure in step 1 AFTER consuming
+ * Covers the regression this suite guards: a failure in step 1 AFTER consuming
  * the sequence burned a correlative → a permanent, unexplained hole in the
  * audit report. And the double-emission race (two concurrent PATCHes
  * on the same payment) had to ALWAYS leave a single persisted number.
@@ -30,7 +30,7 @@ import { createReceiptsRepository } from '@workspace/database/repositories/recei
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { toLocalDayString } from '@workspace/shared';
 
-describe.skipIf(skipReason !== null)('Receipts correlative integrity (C0)', () => {
+describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
@@ -150,7 +150,7 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity (C0)', () =
     const res = await owner.client.post(`/api/payments/${paymentId}/issue`, {});
     expect(res.status).toBeGreaterThanOrEqual(400);
 
-    // The point of C0: not a consumed number nor a hole in the audit.
+    // The point: not a consumed number nor a hole in the audit.
     expect(await sequenceState(organization.id)).toBe(0);
     const rows = await testQuery<{ receipt_number: string | null }>(
       `SELECT receipt_number FROM payment WHERE id = $1`,

@@ -27,8 +27,8 @@ interface TaxBlockProps {
   readonly disabled?: boolean;
   /**
    * Declaración de contribuyente formal del emisor (`resolveFiscalProfile`).
-   * `false` → el comprobante NO detalla impuestos (D1) y el ajuste manual
-   * queda deshabilitado: el override solo puede reducir carga fiscal (D6).
+   * `false` → el comprobante NO detalla impuestos y el ajuste manual
+   * queda deshabilitado: el override solo puede reducir carga fiscal.
    */
   readonly emitterIsFormal: boolean;
 }

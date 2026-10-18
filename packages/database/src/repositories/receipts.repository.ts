@@ -47,9 +47,9 @@ export interface AttachReceiptInput {
   subtotal?: number | null;
   taxTotal?: number | null;
   taxDetails?: unknown;
-  /** Emitter identity frozen upon issuance (C1). */
+  /** Emitter identity frozen upon issuance. */
   emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Issuing actor (C5). Missing during sweep: remains `null`, never fabricated. */
+  /** Issuing actor. Missing during sweep: remains `null`, never fabricated. */
   issuedBy?: string | null;
 }
 
@@ -185,7 +185,7 @@ export function createReceiptsRepository(db: Db) {
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,
-          // C1/C5: frozen identity + actor. Written in the SAME
+          // Frozen identity + actor. Written in the SAME
           // statement as the number: receipt is reproducible upon birth.
           emitterSnapshot: input.emitterSnapshot ?? null,
           issuedBy: input.issuedBy ?? null,

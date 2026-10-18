@@ -57,7 +57,7 @@ export function createR2Service(env: Env) {
 
     /**
      * Stores bytes under a deterministic key (overwrite = idempotent).
-     * Used for immutable receipt PDFs (Fase 2); the key comes from
+     * Used for immutable receipt PDFs; the key comes from
      * `panelReceiptKey` (shared), never random.
      */
     async putFile(

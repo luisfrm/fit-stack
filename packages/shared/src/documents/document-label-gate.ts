@@ -11,14 +11,14 @@ export type DocumentLabel = 'Comprobante de pago' | 'Factura';
 /**
  * Currently NO real fiscal homologation is connected (no SENIAT, DIAN, SAT…).
  * Explicit constant — not silent: gate returns "Comprobante de pago" by
- * construction until a future phase wires real configuration.
+ * construction until real fiscal configuration is wired.
  */
 export const HAS_FISCAL_HOMOLOGATION = false as const;
 
 export interface DocumentLabelGateInput {
   /** RIF/NIT/RUC/CUIT… of emitter. Empty or whitespace = missing. */
   taxId?: string | null;
-  /** Explicit formal taxpayer declaration (Phase 4, with UX friction). */
+  /** Explicit formal taxpayer declaration (with UX friction). */
   isFormalTaxpayer?: boolean;
   /**
    * Real connected fiscal homologation. If omitted, defaults to

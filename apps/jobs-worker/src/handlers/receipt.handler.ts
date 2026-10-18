@@ -115,7 +115,7 @@ export async function sweepPendingReceiptPdfs(
     }
   }
 
-  // C2: same mechanism for FitStack emitter (uses partial index
+  // Same mechanism for the FitStack emitter (uses the partial index
   // `idx_psp_receipt_pending`; payer is resolved in step 2 from
   // DB — sweep does not know payer and notifies only owners).
   const platformRows = (await sql.query(

@@ -2,7 +2,7 @@
    `receipt.render` event of `fit-receipt-events`. Types-ONLY (no I/O,
    edge-safe): imported by api-worker (producer step 1 + issue) and
    jobs-worker (sweep + consumer) from `@workspace/shared` — neither app
-   imports types from the other. A single type with `scope`: C2 reuses it
+   imports types from the other. A single type with `scope` serves both issuers
    without duplicating registration.
    ─────────────────────────────────────────────────────────────────────── */
 
@@ -10,13 +10,13 @@ import { isValidConsoleReceiptNumber, isValidPanelReceiptNumber } from './receip
 
 export const RECEIPT_RENDER_EVENT_TYPE = 'receipt.render' as const;
 
-/** Receipt issuer: gym (panel) or FitStack (platform, C2 reserved). */
+/** Receipt issuer: gym (panel) or FitStack (platform). */
 export type ReceiptScope = 'panel' | 'platform';
 
 export interface ReceiptRenderEvent {
   type: typeof RECEIPT_RENDER_EVENT_TYPE;
   scope: ReceiptScope;
-  /** Panel: `payment.id`. Platform (C2): `platform_subscription_payment.id`. */
+  /** Panel: `payment.id`. Platform: `platform_subscription_payment.id`. */
   paymentId: number;
   organizationId: string;
   /** Human correlative already allocated (validated Panel format). */
@@ -27,7 +27,7 @@ export interface BuildReceiptRenderEventInput {
   paymentId: number;
   organizationId: string;
   receiptNumber: string;
-  /** Default `'panel'`. Current phase never emits `'platform'` (C2 reserved). */
+  /** Default `'panel'`; platform emission passes `'platform'` explicitly. */
   scope?: ReceiptScope;
 }
 

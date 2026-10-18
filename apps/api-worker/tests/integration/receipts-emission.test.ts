@@ -1,5 +1,5 @@
 /**
- * Receipts emission integration tests (Phase 2).
+ * Receipts emission integration tests.
  *
  * Covers: step 1 numbering via HTTP (number + receipt.render, taxes
  * persisted, zero emails), step 2 completion via the real jobs-worker
@@ -43,7 +43,7 @@ import {
 import { createReceiptsService } from '../../src/services/receipts.service';
 import { ORG_ROLES } from '@workspace/shared';
 
-describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
+describe.skipIf(skipReason !== null)('Receipts emission', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
@@ -74,7 +74,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
   /**
    * Tenant + member + plan + validated $100.00 USD payment via HTTP.
    * `declareFormal` leaves the location as a formal taxpayer with VAT + IGTF
-   * confirmed (C2: without a declaration there is no breakdown).
+   * confirmed (without a declaration there is no breakdown).
    */
   async function createValidatedPayment(
     declareFormal = false,
@@ -126,7 +126,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(payment['receipt_number']).toMatch(
       new RegExp(`^\\d{4}-\\d{6}$`),
     );
-    // C2/D1: location WITHOUT declaring itself a formal taxpayer → the receipt does not
+    // Location WITHOUT declaring itself a formal taxpayer → the receipt does not
     // itemize taxes (the total is persisted, never a VAT it did not declare).
     expect(payment['tax_details']).toEqual([]);
     expect(Number(payment['subtotal'])).toBe(10000);
@@ -335,7 +335,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(renders).not.toContainEqual(expect.objectContaining({ paymentId: recentId }));
   });
 
-  it('T4b barrido: PDF listo sin notificar se recupera y no re-renderiza (C6)', async () => {
+  it('T4b barrido: PDF listo sin notificar se recupera y no re-renderiza', async () => {
     const { owner, organization } = await createGymTenant();
     const member = await createGymMember(owner.client);
     const plan = await createPlan(owner.client, { price: 500, currency: 'USD' });
@@ -383,7 +383,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(owner.client.r2.objects.has(pdfKey)).toBe(true);
 
     // Simulates the lost notification: the render was done but the step-2
-    // email never went out. Until C6 nobody recovered that row.
+    // email never went out. The sweep is the only thing that recovers that row.
     await testQuery(
       `UPDATE payment SET receipt_issued_at = now() - interval '45 minutes', receipt_notified_at = NULL WHERE id = $1`,
       [paymentId],
@@ -611,7 +611,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
       status: 'voided',
     });
     expect(patched.status).toBe(200);
-    // C6: the receipt WAS voided and the body says so (not a mute 200).
+    // The receipt WAS voided and the body says so (not a mute 200).
     expect(patched.body).toMatchObject({ receiptVoided: true });
     expect(patched.body.receiptVoidReason).toBeUndefined();
 
@@ -623,7 +623,7 @@ describe.skipIf(skipReason !== null)('Receipts emission (Fase 2)', () => {
     expect(rows[0]!['receipt_voided']).toBe(true);
   });
 
-  it('T8b void sin comprobante: 200 con receiptVoided false + motivo (C6)', async () => {
+  it('T8b void sin comprobante: 200 con receiptVoided false + motivo', async () => {
     const { owner } = await createGymTenant();
     const member = await createGymMember(owner.client);
     const plan = await createPlan(owner.client, { price: 100, currency: 'USD' });

@@ -225,35 +225,35 @@ export const platformSubscriptionPayment = pgTable(
     paidAt: timestamp('paid_at', { withTimezone: true }),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
-    // Correlative receipt (C1). NULL = prior to system (pre_system).
+    // Correlative receipt. NULL = prior to system (pre_system).
     // Continuous GLOBAL sequence (single issuer: FitStack), without year.
     receiptNumber: text('receipt_number').unique(),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
-    // PDF with VOIDED stamp (C6+). The original PDF is NO LONGER served when
+    // PDF with the VOIDED stamp. The original PDF is NO LONGER served when
     // `receipt_voided` is true: the only downloadable document for a voided
     // receipt is this one. NULL = voided without rendering yet
     // (download responds `pending`, never the unstamped original).
     receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
-    // Tax breakdown persisted by step 1 (C2). Step 2 never
-    // recalculates: it reads them (NULL = legacy/pre-C2). Integer cents.
+    // Tax breakdown persisted by step 1. Step 2 never
+    // recalculates: it reads them (NULL = legacy). Integer cents.
     subtotal: bigint('subtotal', { mode: 'number' }),
     taxTotal: bigint('tax_total', { mode: 'number' }),
     taxDetails: jsonb('tax_details'),
-    // Notification gate (C2, Panel mirror): email enqueued only after PDF.
+    // Notification gate (Panel mirror): email enqueued only after PDF.
     receiptNotifiedAt: timestamp('receipt_notified_at', { withTimezone: true }),
-    // Payer (C2): only written upon `processing` creation (renewing org session);
+    // Payer: only written upon `processing` creation (renewing org session);
     // on validation SET only if IS NULL, never overwritten.
     payerEmail: text('payer_email'),
     payerName: text('payer_name'),
-    // VOIDED (C2, Panel mirror): preserves number and PDF, never reused.
+    // VOIDED (Panel mirror): preserves number and PDF, never reused.
     receiptVoided: boolean('receipt_voided').notNull().default(false),
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
-    // Issuer identity FROZEN upon issue (C1, Panel mirror).
+    // Issuer identity FROZEN upon issue (Panel mirror).
     emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
-    // Issuing actor (C5, Panel mirror).
+    // Issuing actor (Panel mirror).
     issuedBy: text('issued_by'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -262,7 +262,7 @@ export const platformSubscriptionPayment = pgTable(
     index('idx_psp_subscription_id').on(table.subscriptionId),
     index('idx_psp_payment_date').on(table.paymentDate),
     index('idx_psp_subscription_status').on(table.subscriptionId, table.status),
-    // Sweep of pending PDFs (C2): numbered without PDF.
+    // Sweep of pending PDFs: numbered without PDF.
     index('idx_psp_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
@@ -273,7 +273,7 @@ export const platformSubscriptionPayment = pgTable(
   ]
 );
 
-// ── PLATFORM RECEIPT SEQUENCE (C1) ──
+// ── PLATFORM RECEIPT SEQUENCE ──
 
 /**
  * Continuous GLOBAL correlative sequence for issuer FitStack (single legal issuer).
@@ -520,12 +520,12 @@ export const payment = pgTable(
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 
-    // Correlative receipt (Phase 1). NULL = prior to system (pre_system).
+    // Correlative receipt. NULL = prior to system (pre_system).
     receiptNumber: text('receipt_number'),
     documentType: text('document_type').notNull().default('receipt'),
     receiptIssuedAt: timestamp('receipt_issued_at', { withTimezone: true }),
     receiptPdfKey: text('receipt_pdf_key'),
-    // PDF with VOIDED stamp (C6+). The original is no longer served once
+    // PDF with the VOIDED stamp. The original is no longer served once
     // `receipt_voided` is true: a voided receipt is only downloaded with
     // its stamp. NULL = voided without rendering yet (download `pending`).
     receiptVoidedPdfKey: text('receipt_voided_pdf_key'),
@@ -536,10 +536,10 @@ export const payment = pgTable(
     voidedBy: text('voided_by'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     voidReason: text('void_reason'),
-    // Issuer identity FROZEN upon issue (C1). NULL = issue prior
+    // Issuer identity FROZEN upon issue. NULL = issue prior
     // to snapshot: composed live (terminal state, never rewritten).
     emitterSnapshot: jsonb('emitter_snapshot').$type<ReceiptEmitterSnapshot | null>(),
-    // Issuing actor (C5). NULL = historical issue or reconstructed by
+    // Issuing actor. NULL = historical issue or reconstructed by
     // sweep (actor is never fabricated).
     issuedBy: text('issued_by'),
   },
@@ -551,10 +551,10 @@ export const payment = pgTable(
     uniqueIndex('idx_payment_org_receipt_number')
       .on(table.organizationId, table.receiptNumber)
       .where(sql`${table.receiptNumber} IS NOT NULL`),
-    // Gap report (Phase 5): range by issue date.
+    // Gap report: range by issue date.
     index('idx_payment_org_issued_at')
       .on(table.organizationId, table.receiptIssuedAt),
-    // Sweep of pending PDFs (Phase 2): numbered without PDF.
+    // Sweep of pending PDFs: numbered without PDF.
     index('idx_payment_receipt_pending')
       .on(table.receiptIssuedAt)
       .where(sql`${table.receiptNumber} IS NOT NULL AND ${table.receiptPdfKey} IS NULL`),
@@ -565,7 +565,7 @@ export const payment = pgTable(
   ]
 );
 
-// ── RECEIPT SEQUENCES (Phase 1) ──
+// ── RECEIPT SEQUENCES ──
 
 /**
  * Correlative per organization / document type / year (annual reset

@@ -86,7 +86,7 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
     },
 
     /**
-     * Receipt report (Phase 5). Reads persisted taxes, never
+     * Receipt report. Reads persisted taxes, never
      * recalculates. Totals only over issued non-voided, by currency.
      */
     async getReceiptsReport(

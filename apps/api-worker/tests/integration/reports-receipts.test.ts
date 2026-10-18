@@ -1,5 +1,5 @@
 /**
- * Receipt report (Phase 5): classification, gaps, totals per currency,
+ * Receipt report: classification, gaps, totals per currency,
  * RBAC and local-day filters.
  *
  * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
@@ -32,7 +32,7 @@ import {
   type ReceiptHandlerEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Receipts report (Fase 5)', () => {
+describe.skipIf(skipReason !== null)('Receipts report', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();

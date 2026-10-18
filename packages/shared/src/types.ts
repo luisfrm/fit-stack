@@ -325,7 +325,7 @@ export interface ISubscription {
   paymentStatus?: PaymentStatus;
   paymentDate?: string;
 
-  // Correlative receipt (real columns from Phase 1; see IPayment)
+  // Correlative receipt (real columns; see IPayment)
   receiptNumber?: string | null;
   receiptIssuedAt?: string | null;
   documentType?: 'receipt' | 'invoice';
@@ -378,7 +378,7 @@ export interface ITaxDetail {
 }
 
 /**
- * Contracts from `documents/` module (Phase 0). Re-exported here so
+ * Contracts from the `documents/` module. Re-exported here so
  * consumers importing from `@workspace/shared` (types) find them without
  * deep path imports. Canonical implementation lives in `src/documents/` — never duplicate.
  */
@@ -433,7 +433,7 @@ export interface IPayment {
   taxTotal?: number;
   taxDetails?: ITaxDetail[] | null;
 
-  // Correlative receipt (Phase 0: types; real DB columns in Phase 1)
+  // Correlative receipt (real DB columns)
   receiptNumber?: string | null;
   receiptIssuedAt?: string | null;
   receiptPdfKey?: string | null;
@@ -448,7 +448,7 @@ export interface IPayment {
   createdAt?: string;
 }
 
-/* ── Receipts report (Phase 5) ── */
+/* ── Receipts report ── */
 
 /** Audit state of a report row (never confuses voided with gap). */
 export type ReceiptReportState = 'issued' | 'pending' | 'voided' | 'pre_system';
@@ -488,9 +488,9 @@ export interface IReceiptReportRow {
   voidedBy?: string | null;
   voidedAt?: string | null;
   voidReason?: string | null;
-  /** Actor that issued (`issued_by`, C5); `null` on historical records or sweep. */
+  /** Actor that issued (`issued_by`); `null` on historical records or sweep. */
   issuedBy?: string | null;
-  /** Emitter frozen in snapshot (`emitter.name`, C1); `null` pre-C1. */
+  /** Emitter frozen in snapshot (`emitter.name`); `null` on records issued before snapshots. */
   emitterName?: string | null;
 }
 
@@ -644,7 +644,7 @@ export interface IPlatformSubscriptionPayment {
   // Status
   status: PaymentStatus;
 
-  // SaaS receipt (C1-C3). NULL = prior to system / $0 SKIP.
+  // SaaS receipt. NULL = prior to system / $0 SKIP.
   receiptNumber?: string | null;
   receiptIssuedAt?: string | Date | null;
   receiptPdfKey?: string | null;

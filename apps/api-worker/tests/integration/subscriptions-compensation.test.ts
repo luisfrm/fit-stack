@@ -23,7 +23,7 @@ import { COMPENSATION_VOID_REASON } from '../../src/lib/subscription-compensatio
 
 const AMOUNT_CENTS = 10000;
 
-describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () => {
+describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
@@ -212,7 +212,7 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation (fase 2)', () =
     expect(payments).toHaveLength(0);
   });
 
-  it('(d) alta exitosa con la invalidación en finally → 201 intacto (sin regresión de C2)', async () => {
+  it('(d) alta exitosa con la invalidación en finally → 201 intacto', async () => {
     // The compensation wrapped `service + invalidation` in try/finally: on the
     // happy path the result must stay intact (the invalidation still runs,
     // Redis is a no-op in tests, but the 201 and the body must be unchanged).

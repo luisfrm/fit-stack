@@ -155,7 +155,7 @@ export function PlatformPaymentHistoryModal({
         status,
         voidReason,
       );
-      // C6: voiding without an issued receipt is not an error, but it is stated
+      // Voiding without an issued receipt is not an error, but it is stated
       // explicitly rather than using an ambiguous "marked as voided".
       if (status === PAYMENT_STATUSES.VOIDED) {
         const rejected = voidReason === 'Pago rechazado';

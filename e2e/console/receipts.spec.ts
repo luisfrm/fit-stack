@@ -186,7 +186,7 @@ test.describe('Console — Comprobante SaaS', () => {
   });
 });
 
-// Audit of the global correlative (C4): dedicated report, mirror of the Panel.
+// Audit of the global correlative: dedicated report, mirror of the Panel.
 test.describe('Console — Reporte de comprobantes FS-N', () => {
   test('navega al reporte, muestra FS-N sin UUID y exporta el CSV', async ({
     page,

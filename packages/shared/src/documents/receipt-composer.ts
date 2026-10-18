@@ -45,7 +45,7 @@ export interface PanelReceiptPaymentRow {
   /** Plan snapshot frozen at payment time (source of plan name/currency). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
-  /** Emitter identity frozen at issuance (C1); `null` = legacy, live compose. */
+  /** Emitter identity frozen at issuance; `null` = legacy, live compose. */
   emitterSnapshot?: unknown;
 }
 
@@ -126,7 +126,7 @@ export interface PlatformReceiptComposedRows {
   payment: PlatformReceiptPaymentRow;
   subscription: PlatformReceiptSubscriptionRow | null;
   organization: PlatformReceiptOrganizationRow;
-  /** `platform_setting` rows keyed by `key` (FitStack emitter identity, C1). */
+  /** `platform_setting` rows keyed by `key` (FitStack emitter identity). */
   emitter: Record<string, string>;
 }
 
@@ -193,7 +193,7 @@ export function composePanelReceipt(rows: PanelReceiptComposedRows): ReceiptData
           endDate: subscription.endDate,
         }
       : null,
-    // C1: identity frozen at issuance (null = pre-snapshot, live compose).
+    // Identity frozen at issuance (null = pre-snapshot, live compose).
     emitterSnapshot: payment.emitterSnapshot,
   });
 }
@@ -246,7 +246,7 @@ export function composePlatformReceipt(rows: PlatformReceiptComposedRows): Recei
       timezone: organization.timezone,
     },
     emitter: platformEmitterFromSettings(emitter),
-    // C1: identity frozen at issuance (null = pre-snapshot, live compose).
+    // Identity frozen at issuance (null = pre-snapshot, live compose).
     emitterSnapshot: payment.emitterSnapshot,
   });
 }

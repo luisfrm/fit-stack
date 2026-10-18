@@ -306,7 +306,7 @@ export function ReceiptsReportClient({
                 row.voided ? "SI" : "NO",
                 row.voidReason ?? "",
                 row.taxOverrideReason ?? "",
-                // C1/C5: emisor congelado + actor (libro exportable).
+                // Emisor congelado + actor (libro exportable).
                 row.emitterName ?? "",
                 row.issuedBy ?? "",
               ]

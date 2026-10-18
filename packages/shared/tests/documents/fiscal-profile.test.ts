@@ -1,6 +1,6 @@
 /**
  * Perfil fiscal: defaults del país + override de la org, sin hardcode.
- * C2: los impuestos solo se activan si el emisor DECLARÓ ser contribuyente
+ * Los impuestos solo se activan si el emisor DECLARÓ ser contribuyente
  * formal, y los condicionales (IGTF) además exigen confirmación explícita.
  */
 import { describe, expect, it } from 'vitest';
@@ -72,7 +72,7 @@ describe('resolveFiscalProfile', () => {
     });
   });
 
-  it('IGTF sin confirmar NO se aplica aunque `enabled: true` (fail-closed D2)', () => {
+  it('IGTF sin confirmar NO se aplica aunque `enabled: true` (fail-closed)', () => {
     const profile = resolveFiscalProfile('VE', {
       isFormalTaxpayer: true,
       taxes: [{ name: 'IGTF', rate: 0.03, enabled: true }],
@@ -142,7 +142,7 @@ describe('resolveFiscalProfile', () => {
   });
 });
 
-describe('findFiscalWriteViolation (validación en escritura, D6)', () => {
+describe('findFiscalWriteViolation (validación en escritura)', () => {
   it('activar un impuesto sin declararse formal → TAXES_REQUIRE_FORMAL_TAXPAYER', () => {
     expect(
       findFiscalWriteViolation('VE', { taxes: [{ name: 'IVA', rate: 0.16, enabled: true }] }),

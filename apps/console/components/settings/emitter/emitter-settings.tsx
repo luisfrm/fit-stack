@@ -19,7 +19,7 @@ interface PlatformEmitterSettingsProps {
 }
 
 /**
- * Identidad legal del emisor FitStack (C1, comprobantes Console).
+ * Identidad legal del emisor FitStack (comprobantes Console).
  * Todos los campos son opcionales: vacíos = emisor genérico "FitStack" +
  * gate "Comprobante de pago" (nunca "Factura"). Sin nota de obligatorios.
  */

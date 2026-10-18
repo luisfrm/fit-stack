@@ -23,7 +23,7 @@ async function createSubscription(
   tenant: GymTenant,
   memberId: number,
   planId: number,
-  // B3.3: the server computes the period — `null` omits the explicit end
+  // The server computes the period — `null` omits the explicit end
   // and the server computes it from `startDate` + plan duration (this is how
   // already-expired periods are seeded: an explicit inverted `endDate` is
   // rejected with 422 END_DATE_BEFORE_START).
