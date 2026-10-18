@@ -448,6 +448,19 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       await db.delete(platformSubscription).where(eq(platformSubscription.id, id));
     },
 
+    /**
+     * Number of SaaS payment rows attached to a subscription. Used before a
+     * hard delete: with payments the record is financial history and must be
+     * cancelled instead (the FK is `RESTRICT` as the DB-level backstop).
+     */
+    async countPaymentsBySubscription(subscriptionId: number): Promise<number> {
+      const [row] = await db
+        .select({ total: count() })
+        .from(platformSubscriptionPayment)
+        .where(eq(platformSubscriptionPayment.subscriptionId, subscriptionId));
+      return Number(row?.total ?? 0);
+    },
+
     /* ── PAYMENTS ── */
 
     async createPayment(data: NewPlatformPaymentData): Promise<{ id: number }> {

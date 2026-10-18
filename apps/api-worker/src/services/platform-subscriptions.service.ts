@@ -524,6 +524,21 @@ export function createPlatformSubscriptionsService(
     },
 
     async deleteSubscription(id: number) {
+      const payments = await platformSubsRepo.countPaymentsBySubscription(id);
+      if (payments > 0) {
+        // Financial history: a subscription with payments is cancelled, never
+        // deleted. The DB-level `RESTRICT` FK is the backstop against races.
+        throw new HTTPException(409, {
+          res: new Response(
+            JSON.stringify({
+              error:
+                'La suscripción tiene pagos asociados; cancelarla en lugar de borrarla.',
+              code: 'SUBSCRIPTION_HAS_PAYMENTS',
+            }),
+            { status: 409, headers: { 'content-type': 'application/json' } },
+          ),
+        });
+      }
       return platformSubsRepo.delete(id);
     },
 

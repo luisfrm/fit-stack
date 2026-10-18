@@ -46,6 +46,17 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 - **Note**: The `/no-subscription` page is OUTSIDE the `(protected)` layout to prevent infinite redirect loops.
 
+### Subscription deletion (RD-153)
+
+`DELETE /api/platform/subscriptions/:id` is a hard delete and exists only for a
+subscription with **zero** payment rows (e.g. a misplaced record). With any
+`platform_subscription_payment` row the endpoint answers **409
+`SUBSCRIPTION_HAS_PAYMENTS`** and deletes zero rows: the record is financial
+history and must be **cancelled** instead. The FK
+`platform_subscription_payment.subscription_id → platform_subscription.id` is
+`ON DELETE RESTRICT` as the DB-level backstop (no cascade, so `FS-N` numbers are
+never silently destroyed and `gaps[]` cannot report them as holes).
+
 ### Self-service renewal (phase 2 — org pays from the panel)
 
 Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → support approves/rejects it in console (badge "Pending payment" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VIEW SCREENSHOT" links to R2) → once validated, the period is extended automatically.
