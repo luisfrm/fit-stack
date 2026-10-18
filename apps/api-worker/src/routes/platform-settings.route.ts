@@ -6,9 +6,18 @@ import { createSettingsRepository } from '../repositories/settings.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createSettingsService } from '../services/settings.service';
 import { createCache } from '../lib/cache';
+import { documentIdTypeViolation } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 const settingsSchema = z.record(z.string(), z.string());
+
+/**
+ * Emitter identity keys (`platform_setting`), same wire names the SaaS
+ * receipt composer reads (`receipt-compose.ts`). Declared here because they
+ * are only relevant to this write path.
+ */
+const EMITTER_TAX_ID_KEY = 'fitstack_tax_id';
+const EMITTER_COUNTRY_CODE_KEY = 'fitstack_country_code';
 
 export const platformSettingsRoutes = new Hono<AppEnv>()
   // GET /api/platform/settings
@@ -34,6 +43,20 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
   .post('/', requirePlatformAuth(), zValidator('json', settingsSchema), async (c) => {
     const body = c.req.valid('json');
     const cache = createCache(c.env);
+
+    // RD-148: the emitter identity issues the SaaS receipts, so its tax id
+    // prefix must belong to the emitter country. Only checked when the tax id
+    // is part of this write (the emitter form sends both keys together); an
+    // absent country has no catalog to enforce.
+    const emitterTaxId = body[EMITTER_TAX_ID_KEY];
+    if (emitterTaxId) {
+      const violation = documentIdTypeViolation(
+        emitterTaxId,
+        body[EMITTER_COUNTRY_CODE_KEY] ?? null,
+        EMITTER_TAX_ID_KEY,
+      );
+      if (violation) return c.json(violation, 400);
+    }
 
     const settingsRepo = createSettingsRepository(c.get('db'));
     const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));

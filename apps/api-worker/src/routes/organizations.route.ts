@@ -19,7 +19,11 @@ import {
 } from '../lib/exchange-rates';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  documentIdTypeViolation,
+} from '../lib/schemas';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
@@ -483,6 +487,14 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       const current = await service.findOrganizationById(orgId);
       if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
+
+      // RD-148: the tax id prefix must belong to the organization's country.
+      const identityViolation = documentIdTypeViolation(
+        body.taxId,
+        current.countryCode,
+        'taxId',
+      );
+      if (identityViolation) return c.json(identityViolation, 400);
 
       // Only present fields: body without persistable fields is an
       // idempotent no-op, never a Drizzle 500 ("No values to set").

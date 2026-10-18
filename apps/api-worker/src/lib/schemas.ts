@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UUID_PATTERN } from '@workspace/shared';
+import { UUID_PATTERN, isDocumentIdAllowedForCountry } from '@workspace/shared';
 
 /**
  * Canonical paymentMethod schema.
@@ -39,3 +39,23 @@ export const paymentMethodDetailsSchema = z
  * breakdown is always computed at emission time.
  */
 export { FiscalConfigSchema } from '@workspace/shared';
+
+/**
+ * RD-148 write guard for an identification (`"<type>-<number>"`): the prefix
+ * must be a `docType` of the issuer's country (`COUNTRIES` = SSOT). Returns the
+ * `400` payload (business code, so the UI resolves by code) or `null` when the
+ * value is acceptable. See `isDocumentIdAllowedForCountry` for the tolerance
+ * rules — legacy values are never blocked by this check.
+ */
+export function documentIdTypeViolation(
+  value: string | null | undefined,
+  countryCode: string | null | undefined,
+  field: string,
+): { error: string; code: string; fields: string[] } | null {
+  if (isDocumentIdAllowedForCountry(value, countryCode)) return null;
+  return {
+    error: 'El tipo de documento no es válido para el país de la organización.',
+    code: 'DOCUMENT_TYPE_INVALID',
+    fields: [field],
+  };
+}

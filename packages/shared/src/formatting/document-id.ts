@@ -100,3 +100,52 @@ export function defaultTaxDocumentType(
   if (!first) return '';
   return identity.docTypes.includes(identity.taxLabel) ? identity.taxLabel : first;
 }
+
+/**
+ * Every prefix any supported country defines. A token in this set IS a
+ * document type, so it must belong to the issuer's country.
+ */
+const ALL_KNOWN_DOC_TYPES: ReadonlySet<string> = new Set(
+  Object.values(COUNTRIES).flatMap((country) => country.docType),
+);
+
+/**
+ * Server-side WRITE guard for an identification (`"<type>-<number>"`): the
+ * prefix must be a `docType` of the issuer's country (`COUNTRIES` = SSOT).
+ * Defense-in-depth — the UI constrains the selector, the API never trusts it.
+ *
+ * Tolerant by design, so plain data entry is never blocked by legacy rows:
+ * - empty/absent value → allowed (the column is nullable);
+ * - no `-` → allowed (there is no prefix to check);
+ * - an UNKNOWN token → allowed: indistinguishable from a legacy value that
+ *   carries a hyphen inside the number (`"12-3456789"`), which
+ *   `parseDocumentId` also keeps whole instead of inventing a prefix;
+ * - a token defined by ANOTHER country (e.g. `C.C.`/`NIT` on a VE issuer) →
+ *   REJECTED: that is exactly the wrong-country document type;
+ * - a trailing `-` with no number (`"V-"`) → REJECTED (never composed by
+ *   `formatDocumentId`).
+ *
+ * An unknown/absent country has no catalog to enforce, so it is allowed here:
+ * the fiscal layer already fails closed on issuance (`resolveFiscalProfile`).
+ */
+export function isDocumentIdAllowedForCountry(
+  value: string | null | undefined,
+  countryCode?: string | null,
+): boolean {
+  const raw = (value ?? '').trim();
+  if (raw.length === 0) return true;
+
+  const separator = raw.indexOf('-');
+  if (separator <= 0) return true;
+
+  const type = raw.slice(0, separator).trim();
+  const number = raw.slice(separator + 1).trim();
+  if (type.length === 0) return true;
+  if (number.length === 0) return false;
+
+  const identity = getCountryIdentity(countryCode);
+  if (!identity) return true;
+  if (identity.docTypes.includes(type)) return true;
+
+  return !ALL_KNOWN_DOC_TYPES.has(type);
+}

@@ -19,7 +19,12 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
 import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
-import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  FiscalConfigSchema,
+  documentIdTypeViolation,
+} from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import { DEFAULT_ORG_STAFF_VALUES, isOrgStorageKey } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
@@ -161,6 +166,10 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
+    // RD-148: the tax id prefix must belong to the organization's country.
+    const violation = documentIdTypeViolation(data.taxId, data.countryCode, 'taxId');
+    if (violation) return c.json(violation, 400);
+
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
@@ -178,6 +187,15 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
+    // RD-148: the tax id prefix must belong to the stored country when the
+    // payload does not restate it.
+    if (data.taxId) {
+      const countryCode =
+        data.countryCode ?? (await service.findOrganizationById(id))?.countryCode;
+      const violation = documentIdTypeViolation(data.taxId, countryCode, 'taxId');
+      if (violation) return c.json(violation, 400);
+    }
+
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
     await cache.invalidateExact(`org:${id}:profile`);
@@ -192,6 +210,15 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+
+    // RD-148: the tax id prefix must belong to the stored country when the
+    // payload does not restate it.
+    if (data.taxId) {
+      const countryCode =
+        data.countryCode ?? (await service.findOrganizationById(id))?.countryCode;
+      const violation = documentIdTypeViolation(data.taxId, countryCode, 'taxId');
+      if (violation) return c.json(violation, 400);
+    }
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');

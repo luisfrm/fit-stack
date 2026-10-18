@@ -117,6 +117,38 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     });
   });
 
+  it('tipo de documento de otro país → 400 DOCUMENT_TYPE_INVALID (RD-148)', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-doctype');
+
+    const before = await testQuery<{ tax_id: string | null }>(
+      `SELECT tax_id FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+
+    // VE tenant: `C.C.` is a CO prefix, never part of the VE catalog.
+    const res = await owner.client.patch('/api/organizations/profile', {
+      taxId: 'C.C.-12345678',
+    });
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({
+      code: 'DOCUMENT_TYPE_INVALID',
+      fields: ['taxId'],
+    });
+
+    // Rejected before any write.
+    const after = await testQuery<{ tax_id: string | null }>(
+      `SELECT tax_id FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(after[0]!.tax_id).toBe(before[0]!.tax_id);
+
+    // A prefix of the org country is accepted.
+    const ok = await owner.client.patch('/api/organizations/profile', {
+      taxId: 'J-12345678-9',
+    });
+    expect(ok.status, ok.text).toBe(200);
+  });
+
   it('identidad de sede org-scoped: el owner guarda y persiste el set general', async () => {
     const { owner, organization } = await createGymTenant('org-identity');
 

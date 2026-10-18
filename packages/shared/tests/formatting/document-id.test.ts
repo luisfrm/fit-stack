@@ -11,6 +11,7 @@ import {
   defaultTaxDocumentType,
   formatDocumentId,
   getCountryIdentity,
+  isDocumentIdAllowedForCountry,
   parseDocumentId,
 } from '../../src/formatting/document-id';
 
@@ -138,6 +139,56 @@ describe('defaultTaxDocumentType', () => {
   it('is empty for an unknown country', () => {
     expect(defaultTaxDocumentType('XX')).toBe('');
     expect(defaultTaxDocumentType(null)).toBe('');
+  });
+});
+
+describe('isDocumentIdAllowedForCountry (RD-148 write guard)', () => {
+  it('accepts every prefix of the organization country', () => {
+    for (const type of VE_TYPES) {
+      expect(isDocumentIdAllowedForCountry(`${type}-12345678`, 'VE')).toBe(true);
+    }
+    for (const type of CO_TYPES) {
+      expect(isDocumentIdAllowedForCountry(`${type}-12345678`, 'CO')).toBe(true);
+    }
+  });
+
+  it('rejects a prefix defined by ANOTHER country (wrong-country document type)', () => {
+    expect(isDocumentIdAllowedForCountry('C.C.-12345678', 'VE')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('NIT-9001', 'VE')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('T.I.-123', 'VE')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('V-12345678', 'CO')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('E-12345678', 'CO')).toBe(false);
+  });
+
+  it('allows an empty/absent value (nullable column)', () => {
+    expect(isDocumentIdAllowedForCountry(null, 'VE')).toBe(true);
+    expect(isDocumentIdAllowedForCountry(undefined, 'VE')).toBe(true);
+    expect(isDocumentIdAllowedForCountry('   ', 'VE')).toBe(true);
+  });
+
+  it('allows a legacy value without a prefix token', () => {
+    expect(isDocumentIdAllowedForCountry('12345678', 'VE')).toBe(true);
+    expect(isDocumentIdAllowedForCountry('-1234', 'VE')).toBe(true);
+  });
+
+  it('tolerates an unknown token: it is a legacy hyphen-inside-number value', () => {
+    expect(isDocumentIdAllowedForCountry('12-3456789', 'VE')).toBe(true);
+    expect(isDocumentIdAllowedForCountry('TAX-9001', 'VE')).toBe(true);
+  });
+
+  it('allows a hyphen that belongs to the number of a valid type', () => {
+    expect(isDocumentIdAllowedForCountry('J-12345678-9', 'VE')).toBe(true);
+  });
+
+  it('rejects a dangling prefix with no number (never composed by the UI)', () => {
+    expect(isDocumentIdAllowedForCountry('V-', 'VE')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('NIT-', 'CO')).toBe(false);
+  });
+
+  it('allows anything when the country has no catalog (nothing to enforce)', () => {
+    expect(isDocumentIdAllowedForCountry('NIT-9001', 'XX')).toBe(true);
+    expect(isDocumentIdAllowedForCountry('NIT-9001', null)).toBe(true);
+    expect(isDocumentIdAllowedForCountry('NIT-9001', undefined)).toBe(true);
   });
 });
 
