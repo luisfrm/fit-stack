@@ -143,7 +143,7 @@ describe('computeInclusiveTaxes', () => {
     expect(() => computeInclusiveTaxes(1000, taxes)).toThrow();
   });
 
-  it('reparte el polvo entre líneas inclusive sin dejar importes negativos', () => {
+  it('spreads the dust across inclusive lines without leaving negative amounts', () => {
     // total=4: subtotal=round(4/1.51)=3, lines 2 and 0, taxTotal=1.
     // The old "last line absorbs everything" moved the last line to -1.
     const result = computeInclusiveTaxes(4, [

@@ -105,7 +105,7 @@ function absorbInclusiveDust(
   if (inclusiveRows.length === 0) {
     // With only gross_first lines `subtotal = remaining`, so dust is always 0.
     throw new Error(
-      'computeInclusiveTaxes: polvo de redondeo sin líneas inclusive que absorber.',
+      'computeInclusiveTaxes: rounding dust without inclusive lines to absorb it.',
     );
   }
 
@@ -129,7 +129,7 @@ function absorbInclusiveDust(
   }
   if (pending > 0) {
     throw new Error(
-      'computeInclusiveTaxes: no se pudo absorber el polvo de redondeo sin importes negativos.',
+      'computeInclusiveTaxes: rounding dust could not be absorbed without negative amounts.',
     );
   }
 }
