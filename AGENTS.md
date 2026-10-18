@@ -82,6 +82,7 @@ Centralized middleware — never write auth/error boilerplate manually.
 | `requireOrgPermission(module, action)` | Org-scoped CRUD | Session + orgId + permission (`hasPermission`, `can()` fallback); sets `orgId` |
 | `requireOrg()` | Org-scoped, no permission | Session + active org; sets `orgId` |
 | `requireOrgTimezone()` | Routes by local date | Validates tz (500 if missing); sets `orgTimezone` |
+| `requireOrgCurrency()` | Money normalized to the primary currency | Validates `primaryCurrency` (500 if missing); sets `orgCurrency` |
 | `requireAuth()` | General authenticated | Session + user |
 | `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
 | `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |

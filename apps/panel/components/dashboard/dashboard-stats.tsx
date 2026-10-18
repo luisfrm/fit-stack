@@ -10,6 +10,9 @@ interface TodayIncome {
   /** Monto normalizado a la divisa primaria, en unidades mayores */
   readonly amount: number | null;
   readonly currency: string;
+  /** True when at least one payment had no exact persisted rate. */
+  readonly incomplete: boolean;
+  readonly unconvertedCount: number;
 }
 
 interface DashboardStatsViewProps {
@@ -57,7 +60,12 @@ export function DashboardStatsView({ stats, todayIncome, pendingPayments }: Dash
           />
         ),
         icon: "wallet" as const,
-        trend: { value: "Hoy", direction: "up" as const },
+        trend: todayIncome?.incomplete
+          ? {
+              value: `Parcial · ${todayIncome.unconvertedCount} sin tasa`,
+              direction: "neutral" as const,
+            }
+          : { value: "Hoy", direction: "up" as const },
       },
       {
         label: "Pagos Pendientes",

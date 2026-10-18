@@ -1,12 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMonthlyCsv,
+  hasUnconvertedRevenue,
   lastSixMonths,
+  summarizeTodayIncome,
   type MonthlyRevenueRow,
 } from '../../lib/dashboard/revenue-summary';
 
-function row(month: string, normalizedAmount: number, currency = 'USD'): MonthlyRevenueRow {
-  return { month, currency, amount: normalizedAmount, normalizedAmount, originalExchangeRate: '1' };
+function row(
+  month: string,
+  normalizedAmount: number,
+  currency = 'USD',
+  unconvertedAmount = 0,
+  unconvertedCount = 0,
+): MonthlyRevenueRow {
+  return {
+    month,
+    currency,
+    amount: normalizedAmount + unconvertedAmount,
+    normalizedAmount,
+    unconvertedAmount,
+    unconvertedCount,
+    originalExchangeRate: null,
+  };
 }
 
 describe('lastSixMonths', () => {
@@ -37,15 +53,90 @@ describe('lastSixMonths', () => {
   });
 });
 
+describe('hasUnconvertedRevenue', () => {
+  it('is false when every row is fully normalized', () => {
+    expect(hasUnconvertedRevenue([row('2026-09', 200)])).toBe(false);
+  });
+
+  it('is true when a row has payments without an exact rate', () => {
+    expect(hasUnconvertedRevenue([row('2026-09', 200, 'USD', 5000, 2)])).toBe(true);
+  });
+});
+
+describe('summarizeTodayIncome', () => {
+  it('returns zero for no rows', () => {
+    expect(summarizeTodayIncome([], 'USD')).toEqual({
+      amount: 0,
+      currency: 'USD',
+      incomplete: false,
+      unconvertedCount: 0,
+    });
+  });
+
+  it('sums the API-normalized cents and converts to major units', () => {
+    expect(
+      summarizeTodayIncome(
+        [
+          {
+            currency: 'USD',
+            amount: 10000,
+            normalizedAmount: 10000,
+            unconvertedAmount: 0,
+            unconvertedCount: 0,
+          },
+        ],
+        'USD',
+      ),
+    ).toEqual({
+      amount: 100,
+      currency: 'USD',
+      incomplete: false,
+      unconvertedCount: 0,
+    });
+  });
+
+  it('never presents a partial total as complete', () => {
+    expect(
+      summarizeTodayIncome(
+        [
+          {
+            currency: 'VES',
+            amount: 3650,
+            normalizedAmount: 100,
+            unconvertedAmount: 0,
+            unconvertedCount: 0,
+          },
+          {
+            currency: 'VES',
+            amount: 5000,
+            normalizedAmount: 0,
+            unconvertedAmount: 5000,
+            unconvertedCount: 1,
+          },
+        ],
+        'USD',
+      ),
+    ).toEqual({
+      amount: null,
+      currency: 'USD',
+      incomplete: true,
+      unconvertedCount: 1,
+    });
+  });
+});
+
 describe('buildMonthlyCsv', () => {
-  it('builds header plus one line per row', () => {
-    const csv = buildMonthlyCsv([row('2026-09', 200, 'USD')], 'USD');
+  it('builds header plus one line per row, including unconverted amounts', () => {
+    const csv = buildMonthlyCsv([row('2026-09', 200, 'USD', 5000, 1)], 'USD');
     expect(csv).toBe(
-      'mes,moneda,monto,monto_normalizado,moneda_base\n2026-09,USD,200,200,USD',
+      'mes,moneda,monto,monto_normalizado,no_convertido,pagos_sin_tasa,moneda_base\n' +
+        '2026-09,USD,5200,200,5000,1,USD',
     );
   });
 
   it('builds header only for empty rows', () => {
-    expect(buildMonthlyCsv([], 'VES')).toBe('mes,moneda,monto,monto_normalizado,moneda_base');
+    expect(buildMonthlyCsv([], 'VES')).toBe(
+      'mes,moneda,monto,monto_normalizado,no_convertido,pagos_sin_tasa,moneda_base',
+    );
   });
 });

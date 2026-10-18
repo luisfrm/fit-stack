@@ -20,7 +20,7 @@ import type { AppEnv } from '../lib/env';
 async function invalidateSubscriptionDependentCaches(cache: Cache, orgId: string): Promise<void> {
   await cache.invalidate(`org:${orgId}:subscriptions*`);
   await cache.invalidateExact(`org:${orgId}:subscription-status`);
-  await cache.invalidateExact(`org:${orgId}:payments:analytics`);
+  await cache.invalidate(`org:${orgId}:payments:analytics*`);
   // `withoutActiveSubscription` from members:stats depends on subs/payments.
   await cache.invalidateExact(`org:${orgId}:members:stats`);
   await cache.invalidate(`org:${orgId}:dashboard:stats:*`);

@@ -3,6 +3,65 @@ import { payment, gymMember, organizationDocumentSequence } from '@workspace/dat
 import type { IPaymentMethodDetails } from '@workspace/shared';
 import type { OrganizationDateManager } from '../lib/date-manager';
 
+/**
+ * True when a payment can be exactly normalized to the organization primary
+ * currency with the persisted `exchange_rate_applied`.
+ *
+ * `exchange_rate_applied` reads "1 {plan_snapshot_currency} = rate
+ * {currency_paid}" (same semantic the receipt composer uses). Therefore the
+ * only exact one-hop cases are:
+ *   1. the payment is already in the primary currency, or
+ *   2. the plan currency IS the primary currency and the payment is in another
+ *      currency with a valid persisted rate.
+ *
+ * It is never safe to divide when the plan currency differs from the primary
+ * currency: the result would be expressed in the plan currency, and the
+ * historical plan→primary rate is not persisted. Those rows stay unconverted.
+ */
+function normalizedToPrimaryCondition(primaryCurrency: string) {
+  return sql`(
+    ${payment.currencyPaid} = ${primaryCurrency}
+    OR (
+      ${payment.planSnapshotCurrency} = ${primaryCurrency}
+      AND ${payment.currencyPaid} <> ${payment.planSnapshotCurrency}
+      AND ${payment.exchangeRateApplied} IS NOT NULL
+      AND ${payment.exchangeRateApplied} > 0
+    )
+  )`;
+}
+
+/** Exact normalized cents, rounded PER PAYMENT (receipt semantics). */
+function normalizedAmountSql(primaryCurrency: string) {
+  return sql<number>`COALESCE(SUM(
+    CASE
+      WHEN ${normalizedToPrimaryCondition(primaryCurrency)} THEN
+        CASE
+          WHEN ${payment.currencyPaid} = ${primaryCurrency} THEN ${payment.amountPaid}
+          ELSE ROUND(${payment.amountPaid}::numeric / ${payment.exchangeRateApplied})::bigint
+        END
+    END
+  ), 0)`.mapWith(Number);
+}
+
+/** Raw cents that could NOT be normalized (never assumed to be 1:1). */
+function unconvertedAmountSql(primaryCurrency: string) {
+  return sql<number>`COALESCE(SUM(
+    CASE WHEN NOT ${normalizedToPrimaryCondition(primaryCurrency)}
+      THEN ${payment.amountPaid}
+      ELSE 0
+    END
+  ), 0)`.mapWith(Number);
+}
+
+function unconvertedCountSql(primaryCurrency: string) {
+  return sql<number>`COALESCE(SUM(
+    CASE WHEN NOT ${normalizedToPrimaryCondition(primaryCurrency)}
+      THEN 1
+      ELSE 0
+    END
+  ), 0)`.mapWith(Number);
+}
+
 export interface IPayment {
   id?: number;
   organizationId: string;
@@ -171,12 +230,20 @@ export function createPaymentsRepository(db: Db) {
       return updated[0] as unknown as IPayment | undefined;
     },
 
-    async getAggregatedPayments(organizationId: string, startDate: Date, dateManager: OrganizationDateManager) {
+    async getAggregatedPayments(
+      organizationId: string,
+      startDate: Date,
+      dateManager: OrganizationDateManager,
+      primaryCurrency: string,
+    ) {
       return db
         .select({
           day: dateManager.formatDaySql(payment.paymentDate),
           currency: payment.currencyPaid,
           amount: sql<number>`SUM(${payment.amountPaid})`.mapWith(Number),
+          normalizedAmount: normalizedAmountSql(primaryCurrency),
+          unconvertedAmount: unconvertedAmountSql(primaryCurrency),
+          unconvertedCount: unconvertedCountSql(primaryCurrency),
           exchangeRate: payment.exchangeRateApplied,
         })
         .from(payment)
@@ -191,12 +258,20 @@ export function createPaymentsRepository(db: Db) {
         .orderBy(sql`1`);
     },
 
-    async getAggregatedPaymentsMonthly(organizationId: string, startDate: Date, dateManager: OrganizationDateManager) {
+    async getAggregatedPaymentsMonthly(
+      organizationId: string,
+      startDate: Date,
+      dateManager: OrganizationDateManager,
+      primaryCurrency: string,
+    ) {
       return db
         .select({
           month: dateManager.formatMonthSql(payment.paymentDate),
           currency: payment.currencyPaid,
           amount: sql<number>`SUM(${payment.amountPaid})`.mapWith(Number),
+          normalizedAmount: normalizedAmountSql(primaryCurrency),
+          unconvertedAmount: unconvertedAmountSql(primaryCurrency),
+          unconvertedCount: unconvertedCountSql(primaryCurrency),
           exchangeRate: payment.exchangeRateApplied,
         })
         .from(payment)

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, SimpleChart, ChartConfig, ChartHeader, useChartPagination, Spinner } from "@workspace/ui";
+import { Text } from "@workspace/ui/components/text";
 import { CurrencyFormat, centsToUnits, formatCents } from "@workspace/shared";
 
 // Helper function extracted to prevent unstable nested components warning
@@ -20,24 +21,32 @@ function customTooltipFormatter(
   if (finalValue === undefined || finalName === undefined || !item.payload) return null;
 
   const rawVal = item.payload?.[`${finalName}_raw`];
+  const unconverted = item.payload?.[`${finalName}_unconverted`];
   const showConversion = finalName !== baseCurrency;
 
   return (
-    <div className="flex w-full items-center justify-between gap-4">
-      <div className="flex items-center gap-1.5">
-        <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: item.color }} />
-        <span className="text-muted-foreground font-medium">{finalName}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5 ml-auto">
-        <span className="font-mono font-medium text-foreground">
-          {formatCents(rawVal as number, String(finalName), currencyFormat)}
-        </span>
-        {showConversion && (
-          <span className="text-[10px] text-muted-foreground/80 font-mono">
-            (Eq: {formatCents(Number(finalValue), baseCurrency, currencyFormat)})
+    <div className="flex w-full flex-col gap-1">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5">
+          <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: item.color }} />
+          <span className="text-muted-foreground font-medium">{finalName}</span>
+        </div>
+        <div className="flex items-baseline gap-1.5 ml-auto">
+          <span className="font-mono font-medium text-foreground">
+            {formatCents(rawVal as number, String(finalName), currencyFormat)}
           </span>
-        )}
+          {showConversion && (
+            <span className="text-[10px] text-muted-foreground/80 font-mono">
+              (Eq: {formatCents(Number(finalValue), baseCurrency, currencyFormat)})
+            </span>
+          )}
+        </div>
       </div>
+      {typeof unconverted === "number" && unconverted > 0 && (
+        <span className="text-[10px] text-destructive/80 font-mono text-right">
+          Sin tasa histórica: {formatCents(unconverted, String(finalName), currencyFormat)}
+        </span>
+      )}
     </div>
   );
 }
@@ -48,6 +57,8 @@ type RevenuePoint = {
   currency: string;
   amount: number;
   normalizedAmount: number;
+  unconvertedAmount?: number;
+  unconvertedCount?: number;
 };
 
 interface RevenueChartProps {
@@ -65,6 +76,14 @@ export function RevenueChart({
 }: Readonly<RevenueChartProps>) {
   const [timeframe, setTimeframe] = React.useState<"30d" | "12m">("30d");
   const isMonthlyLoading = false;
+
+  const hasUnconverted = React.useMemo(
+    () =>
+      (timeframe === "30d" ? data : monthlyData || []).some(
+        (item) => (item.unconvertedAmount ?? 0) > 0,
+      ),
+    [data, monthlyData, timeframe],
+  );
 
   const processedData = React.useMemo(() => {
     const activeData = timeframe === "30d" ? data : monthlyData || [];
@@ -98,6 +117,9 @@ export function RevenueChart({
       // formats via formatCents in tooltip and axis.
       group[item.currency] = ((group[item.currency] as number) || 0) + item.normalizedAmount;
       group[`${item.currency}_raw`] = ((group[`${item.currency}_raw`] as number) || 0) + item.amount;
+      group[`${item.currency}_unconverted`] =
+        ((group[`${item.currency}_unconverted`] as number) || 0) +
+        (item.unconvertedAmount ?? 0);
     });
 
     const currencies = Array.from(new Set(activeData.map((d) => d.currency)));
@@ -185,6 +207,12 @@ export function RevenueChart({
         className="flex-none"
       />
       <CardContent className="flex-1 flex flex-col relative">
+        {hasUnconverted && (
+          <Text as="p" size="xs" variant="muted" className="mb-2">
+            Algunos cobros no tienen tasa histórica exacta y no se incluyen en el
+            equivalente normalizado.
+          </Text>
+        )}
         {isMonthlyLoading && timeframe === "12m" && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/20 backdrop-blur-sm rounded-xl">
             <Spinner className="size-8 text-primary" />

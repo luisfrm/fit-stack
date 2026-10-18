@@ -41,7 +41,8 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `rates:${base}`                            | 1 hr   | Fresh server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`) |
 | `rates:last:${base}`                       | 30 d   | Last successful response per base currency; read ONLY when the provider fails (logged, never a silent `?? 1`) |
 | `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
-| `org:${orgId}:reports:revenue:12m`         | 1 hr   | Monthly revenue reports                                                                           |
+| `org:${orgId}:payments:analytics:${primaryCurrency}` | 5 min | Dashboard analytics; keyed by normalization target, invalidated on subscription/payment writes |
+| `org:${orgId}:reports:revenue:${primaryCurrency}:${months}m` | 1 hr | Monthly revenue reports normalized with persisted rates; keyed by normalization target |
 | `org:${orgId}:reports:receipts:*`          | 5 min  | Receipts audit report (invalidated on-write in issue/status/subscription writes)                  |
 | `member:role:${userId}:${orgId}`           | 1 min  | Cached Better Auth member role (custom session)                                                   |
 | `platform:settings`                        | 1 h    | SaaS-level global settings (invalidated on-write in POST /api/platform/settings)                  |

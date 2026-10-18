@@ -144,6 +144,24 @@ export const requireOrgTimezone = () =>
   });
 
 /**
+ * Resolves the active organization primary currency and stores it in
+ * `c.get('orgCurrency')` (typed). It is MANDATORY for money normalization:
+ * if missing, throws 500 — never assumes a currency.
+ * Compose AFTER `requireOrgPermission`/`requireAuth`.
+ */
+export const requireOrgCurrency = () =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    const primaryCurrency = c.get('org')?.primaryCurrency;
+    if (!primaryCurrency?.trim()) {
+      throw new HTTPException(500, {
+        message: 'La organización no tiene una moneda primaria configurada',
+      });
+    }
+    c.set('orgCurrency', primaryCurrency);
+    await next();
+  });
+
+/**
  * Ensures an active organization and sets it in `c.get('orgId')` (typed).
  * Useful for org-scoped routes without permission checks (e.g. upload).
  * Compose AFTER `requireAuth`.

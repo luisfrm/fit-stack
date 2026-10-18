@@ -7,7 +7,11 @@ export function createFinanceService(
   subsRepo: SubscriptionsRepository
 ) {
   return {
-    async getDashboardAnalytics(organizationId: string, timezone: string) {
+    async getDashboardAnalytics(
+      organizationId: string,
+      timezone: string,
+      primaryCurrency: string,
+    ) {
       const dateManager = new OrganizationDateManager(timezone);
       const utcNow = new Date();
 
@@ -17,20 +21,34 @@ export function createFinanceService(
       const activeSubscriptions = await subsRepo.getActiveCount(organizationId, utcNow);
       const activeSubscriptionsByPlan = await subsRepo.getActiveCountByPlan(organizationId, utcNow);
 
-      // Calculate today's revenue (Local day)
+      // Calculate today's revenue (Local day). Amounts are normalized with the
+      // PERSISTED exchange rate of each payment (SQL), never with live rates.
       const localTodayStart = dateManager.getStartOfDayUtc();
-      const todayPayments = await paymentsRepo.getAggregatedPayments(organizationId, localTodayStart, dateManager);
+      const todayPayments = await paymentsRepo.getAggregatedPayments(
+        organizationId,
+        localTodayStart,
+        dateManager,
+        primaryCurrency,
+      );
 
       const todayRevenueBreakdown = todayPayments.map((p) => ({
         currency: p.currency,
         amount: Number(p.amount),
+        normalizedAmount: Number(p.normalizedAmount),
+        unconvertedAmount: Number(p.unconvertedAmount),
+        unconvertedCount: Number(p.unconvertedCount),
       }));
 
       // 2. Fetch Chart Data (last 30 days)
       const startDate = new Date(localTodayStart);
       startDate.setUTCDate(startDate.getUTCDate() - 30);
 
-      const chartDataRaw = await paymentsRepo.getAggregatedPayments(organizationId, startDate, dateManager);
+      const chartDataRaw = await paymentsRepo.getAggregatedPayments(
+        organizationId,
+        startDate,
+        dateManager,
+        primaryCurrency,
+      );
 
       // Payment Methods breakdown
       const paymentMethodsRaw = await paymentsRepo.getPaymentsByMethod(organizationId, startDate);
@@ -75,8 +93,10 @@ export function createFinanceService(
           day: d.day,
           currency: d.currency,
           amount: Number(d.amount),
-          normalizedAmount: Number(d.amount),
-          originalExchangeRate: d.exchangeRate ?? '1',
+          normalizedAmount: Number(d.normalizedAmount),
+          unconvertedAmount: Number(d.unconvertedAmount),
+          unconvertedCount: Number(d.unconvertedCount),
+          originalExchangeRate: d.exchangeRate,
         })),
       };
     },

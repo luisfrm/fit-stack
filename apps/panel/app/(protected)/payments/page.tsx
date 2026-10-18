@@ -14,7 +14,9 @@ type MonthlyReportRow = {
   currency: string;
   amount: number;
   normalizedAmount: number;
-  originalExchangeRate: string;
+  unconvertedAmount: number;
+  unconvertedCount: number;
+  originalExchangeRate: string | null;
 };
 
 export default async function PaymentsPage({
@@ -59,10 +61,10 @@ export default async function PaymentsPage({
       { cache: "no-store" },
     ),
     financeService
-      .getRevenueReport(primaryCurrency)
+      .getRevenueReport()
       .catch(() => [] as MonthlyReportRow[]),
     financeService
-      .getAnalytics(primaryCurrency)
+      .getAnalytics()
       .catch(() => null),
   ]);
 

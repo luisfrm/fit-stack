@@ -38,7 +38,9 @@ interface PaymentsClientProps {
     currency: string;
     amount: number;
     normalizedAmount: number;
-    originalExchangeRate: string;
+    unconvertedAmount: number;
+    unconvertedCount: number;
+    originalExchangeRate: string | null;
   }>;
   readonly initialCurrencyFormat: CurrencyFormat;
   readonly initialPrimaryCurrency: string;
@@ -138,7 +140,7 @@ export function PaymentsClient({
     if (primaryCurrency) {
       setAnalyticsLoading(true);
       try {
-        const fresh = await financeService.getAnalytics(primaryCurrency);
+        const fresh = await financeService.getAnalytics();
         setAnalytics(fresh);
       } catch {
         // ignore analytics refresh errors

@@ -28,6 +28,9 @@ import type { MemberDeadlineItem } from "@/components/dashboard/member-deadline-
 interface TodayIncome {
   readonly amount: number | null;
   readonly currency: string;
+  /** True when at least one payment had no exact persisted rate. */
+  readonly incomplete: boolean;
+  readonly unconvertedCount: number;
 }
 
 interface GymDashboardProps {

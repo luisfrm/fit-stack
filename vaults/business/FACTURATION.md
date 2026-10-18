@@ -45,7 +45,7 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 
 **Detalle de la venta:** nombre del plan (snapshot, no el plan en vivo), periodo cubierto (`startDate`–`endDate`), precio unitario snapshot.
 
-**Desglose monetario:** `subtotal`, `taxDetails` (JSON `[{name, rate, amount}]`), `taxTotal`, `amountPaid`, `currencyPaid`. Si `currencyPaid ≠ primaryCurrency` de la Org, mostrar también `exchangeRateApplied` y el equivalente convertido.
+**Desglose monetario:** `subtotal`, `taxDetails` (JSON `[{name, rate, amount}]`), `taxTotal`, `amountPaid`, `currencyPaid`. Si `currencyPaid ≠ planSnapshotCurrency`, mostrar también `exchangeRateApplied` y el equivalente en la moneda del plan (`baseCurrency` del comprobante). La tasa persistida se lee "1 {planSnapshotCurrency} = {rate} {currencyPaid}", por lo que el equivalente se obtiene dividiendo (`roundCents(amountPaid / rate)`).
 
 **Pago:** método y referencia enmascarada (no exponer números de cuenta completos), fecha de pago vs. fecha de emisión del comprobante.
 

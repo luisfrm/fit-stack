@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone, requireOrgCurrency } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
@@ -27,21 +27,29 @@ const receiptsReportQuerySchema = z.object({
 
 export const reportRoutes = new Hono<AppEnv>()
   // GET /api/reports/revenue
-  .get('/revenue', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
+  .get('/revenue', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), requireOrgCurrency(), async (c) => {
     const orgId = c.get('orgId')!;
     // Timezone is required (validated by `requireOrgTimezone` middleware).
     const timezone = c.get('orgTimezone')!;
+    const primaryCurrency = c.get('orgCurrency')!;
     const monthsCount = Number(c.req.query('monthsCount') || '12');
 
     const cache = createCache(c.env);
-    const cacheKey = `org:${orgId}:reports:revenue:${monthsCount}m`;
+    // The normalization target is part of the key: a primary-currency change
+    // must never reuse totals normalized to the previous currency.
+    const cacheKey = `org:${orgId}:reports:revenue:${primaryCurrency}:${monthsCount}m`;
     const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
 
     const paymentsRepo = createPaymentsRepository(c.get('db'));
     const reportsService = createReportsService(paymentsRepo);
 
-    const revenue = await reportsService.getMonthlyRevenue(orgId, timezone, monthsCount);
+    const revenue = await reportsService.getMonthlyRevenue(
+      orgId,
+      timezone,
+      primaryCurrency,
+      monthsCount,
+    );
     await cache.set(cacheKey, revenue, 3600); // Cache 1 hour
     return c.json(revenue);
   })
