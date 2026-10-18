@@ -1,5 +1,5 @@
 /**
- * Receipts sequence integration tests (Phase 1).
+ * Receipts sequence integration tests.
  *
  * Covers: atomic sequence allocation under concurrency (including the
  * first-receipt-of-the-year race with no prior row), idempotent attach,
@@ -7,7 +7,7 @@
  * and void preserving the number.
  *
  * The payment fixture is created via HTTP (POST /api/subscriptions);
- * the sequence repo — which has no route in Phase 1 — is exercised
+ * the sequence repo — which has no route — is exercised
  * directly (precedent: knowledge.test.ts).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -27,7 +27,7 @@ import {
 import { createDb } from '@workspace/database/factory';
 import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 
-describe.skipIf(skipReason !== null)('Receipts sequence (Fase 1)', () => {
+describe.skipIf(skipReason !== null)('Receipts sequence', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();

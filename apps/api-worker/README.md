@@ -176,7 +176,7 @@ El periodo lo calcula el servidor (Regla 4: ningún día pagado se pierde) con `
 | `payment.currencyPaid`, `payment.paymentMethod`, `payment.paymentMethodDetails` | ✅ | Según contrato de pagos |
 | `payment.status` | ❌ | `processing` \| `validated` \| `voided` (opcional; el repo lo normaliza a `validated`). La emisión del comprobante se decide sobre la **fila persistida**, nunca sobre este campo (invariante validado ⇔ numerado) |
 | `payment.paymentDate` | ❌ | Ausente = ahora |
-| `payment.subtotal/taxTotal/taxDetails/taxOverrideReason` | ❌ | Override fiscal (solo reduce carga; ver gating C2) |
+| `payment.subtotal/taxTotal/taxDetails/taxOverrideReason` | ❌ | Override fiscal (solo reduce carga; ver gating fiscal) |
 
 Guards (el `code` es el contrato — los toasts del panel lo mapean, nunca texto libre):
 

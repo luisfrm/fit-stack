@@ -1,5 +1,5 @@
 /**
- * Downloadable VOIDED receipt (B2) — integration.
+ * Downloadable VOIDED receipt — integration.
  *
  * The bug it covers: `receipt_voided` flagged the receipt in the DB and the panel
  * showed "Anulado", but the PDF in R2 was still the emission one, so
@@ -37,7 +37,7 @@ import {
   type SweepEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Receipts voided PDF (B2)', () => {
+describe.skipIf(skipReason !== null)('Receipts voided PDF', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();

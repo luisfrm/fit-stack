@@ -19,7 +19,7 @@ const slugTakenError = (message: string) =>
   });
 
 /**
- * Explicit 400 for fiscal invariant (D6): override can only REDUCE
+ * Explicit 400 for fiscal invariant: override can only REDUCE
  * fiscal burden. Validates the MERGED config (an incoming partial does not know
  * the stored `isFormalTaxpayer`) and always before persisting.
  */
@@ -194,7 +194,7 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         const incoming = data.fiscalConfig as FiscalConfig | null | undefined;
         if (incoming !== undefined) {
           const merged = mergeFiscalConfig(current.fiscalConfig, incoming);
-          // Validates RESULT of merge, not incoming body (D6).
+          // Validates RESULT of merge, not incoming body.
           // If the same PATCH changes country, validates against the new country
           // (conditionals are country-scoped).
           const violation = findFiscalWriteViolation(

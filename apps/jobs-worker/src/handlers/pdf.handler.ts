@@ -182,7 +182,7 @@ async function resolveReceiptAttachment(
  * SaaS subscription payment confirmation (email.org_payment_received):
  * delivered to user who registered payment (payer) and org owners (deduplicated).
  * With status `processing` email clarifies period activates upon support approval.
- * From C2: if payment is numbered with PDF, attaches R2 bytes as-is (never regenerates);
+ * If payment is numbered with PDF, attaches R2 bytes as-is (never regenerates);
  * numbered without PDF → log + return (sweep repairs); without number → HTML without attachment.
  */
 export async function handleOrgPaymentReceived(

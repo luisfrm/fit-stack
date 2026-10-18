@@ -70,7 +70,7 @@ export function aggregateCurrencyTotals(rows: ReceiptMoneyRow[]): IReceiptCurren
 }
 
 /**
- * Emitter name FROZEN in snapshot (C1) for report row.
+ * Emitter name FROZEN in snapshot for report row.
  * Intentionally TOLERANT reading: report LISTS (does not recompose document),
  * so unreadable snapshot leaves cell empty rather than failing the whole report.
  * `null` = issuance prior to snapshot introduction.

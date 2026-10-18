@@ -28,7 +28,7 @@ interface CreatedSub {
   endDateOverrideReason: string | null;
 }
 
-describe.skipIf(skipReason !== null)('Subscriptions period (fase 4 / B3.3)', () => {
+describe.skipIf(skipReason !== null)('Subscriptions period', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();

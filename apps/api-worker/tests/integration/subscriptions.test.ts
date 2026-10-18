@@ -109,7 +109,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(res.status, res.text).toBe(201);
 
-      // Step 1: number + render enqueued; step 2 enqueues the email (Phase 2).
+      // Step 1: number + render enqueued; step 2 enqueues the email.
       const renders = owner.client.receiptQueue.ofType('receipt.render');
       expect(renders).toHaveLength(1);
       expect(renders[0]!.organizationId).toBe(organization.id);
@@ -391,7 +391,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         memberId: member.id,
         planId: plan.id,
         startDate: isoDate(31),
-        // B3.3: the end is computed by the server; the client endDate
+        // The end is computed by the server; the client endDate
         // (isoDate(61)) contradicts the authority and would be rejected with 422.
         payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
       });
@@ -594,7 +594,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         voidReason: 'Comprobante ilegible',
       });
       expect(voided.status, voided.text).toBe(200);
-      // C6: rejecting without an issued receipt answers 200 and says so.
+      // Rejecting without an issued receipt answers 200 and says so.
       expect(voided.body).toMatchObject({
         receiptVoided: false,
         receiptVoidReason: 'not_issued',

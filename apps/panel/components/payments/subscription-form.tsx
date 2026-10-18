@@ -330,7 +330,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [activeOrganization]);
 
-  // D6: an issuer that has not declared being a formal taxpayer does not detail
+  // An issuer that has not declared being a formal taxpayer does not detail
   // taxes, and thus cannot adjust them manually (backend rejects with 400).
   // Effective mode is always "auto" in that case.
   const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";

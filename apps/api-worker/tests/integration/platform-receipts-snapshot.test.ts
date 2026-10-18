@@ -1,5 +1,5 @@
 /**
- * SaaS issuer snapshot (C1) + `issued_by` (C5) — mirror of the Panel.
+ * SaaS issuer snapshot + `issued_by` — mirror of the Panel.
  *
  * The issuer is FitStack (`platform_setting`) and the recipient is the organization.
  * Issue, change the issuer identity and the recipient config, and request the
@@ -30,7 +30,7 @@ import {
   type ReceiptHandlerEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/C5)', () => {
+describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by', () => {
   let admin: AuthedUser;
   let tenant: Awaited<ReturnType<typeof createGymTenant>>;
   let plan: { id: number };
@@ -120,7 +120,7 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
     };
   }
 
-  it('C1: la identidad de FitStack queda congelada por comprobante', async () => {
+  it('la identidad de FitStack queda congelada por comprobante', async () => {
     const { paymentId } = await emitReceipt();
     const asIssued = await getReceipt(paymentId);
     expect(asIssued.receipt.emitter.name).toBe('FitStack');
@@ -155,9 +155,9 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
     expect(row!.issued_by).toBe(admin.userId);
   });
 
-  it('C1: pago legacy (snapshot NULL) sigue componiendo en vivo', async () => {
+  it('pago legacy (snapshot NULL) sigue componiendo en vivo', async () => {
     const { paymentId } = await emitReceipt();
-    // Pre-C1: the documented terminal state is forced.
+    // Legacy payment: the documented terminal state is forced.
     await testQuery(
       `UPDATE platform_subscription_payment SET emitter_snapshot = NULL WHERE id = $1`,
       [paymentId],
@@ -169,7 +169,7 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by (C1/
     expect(data.receipt.emitter.countryCode).toBe('CO');
   });
 
-  it('C5: el reporte SaaS expone actor y emisor congelado', async () => {
+  it('el reporte SaaS expone actor y emisor congelado', async () => {
     const { receiptNumber } = await emitReceipt();
 
     const res = await admin.client.get('/api/platform/subscriptions/receipts', {

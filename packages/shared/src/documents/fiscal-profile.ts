@@ -21,13 +21,13 @@ export const FiscalTaxOverrideSchema = z.object({
 /**
  * Contract for `organization.fiscalConfig`. api-worker re-exports it
  * (without duplicating) to validate `PATCH /api/organizations/profile`
- * in Phase 4 and org create/update in console.
+ * and org create/update in console.
  */
 export const FiscalConfigSchema = z
   .object({
     /** Label requested by issuer (gate determines the one actually applied). */
     documentLabel: z.string().min(1).optional(),
-    /** Explicit formal taxpayer declaration (Phase 4, with UX friction). */
+    /** Explicit formal taxpayer declaration (with UX friction). */
     isFormalTaxpayer: z.boolean().optional(),
     taxes: z.array(FiscalTaxOverrideSchema).optional(),
     /**
@@ -114,7 +114,7 @@ export function resolveFiscalProfile(
   const isFormalTaxpayer = config.isFormalTaxpayer ?? false;
   const confirmed = new Set(config.confirmedTaxes ?? []);
 
-  // D1 (frozen): an issuer who did NOT declare being a formal taxpayer
+  // Frozen rule: an issuer who did NOT declare being a formal taxpayer
   // cannot charge or declare taxes → country taxes are born
   // DISABLED (never a breakdown stating a false fiscal reality).
   const taxes: ResolvedTax[] = [
@@ -123,7 +123,7 @@ export function resolveFiscalProfile(
       rate: parseRateValue(t.value),
       enabled: isFormalTaxpayer,
     })),
-    // D2 (frozen): conditional taxes are ALWAYS born disabled, never
+    // Frozen rule: conditional taxes are ALWAYS born disabled, never
     // automatic (country rate is reference, not effective value).
     ...(country.conditionalTaxes ?? []).map((t) => ({
       name: t.name,
@@ -142,7 +142,7 @@ export function resolveFiscalProfile(
     target.enabled = override.enabled;
   }
 
-  // Defensive normalization (D6): STORED configuration must never
+  // Defensive normalization: STORED configuration must never
   // activate taxes the issuer did not declare — covers rows written before
   // this rule. Visible error happens on write (400
   // `TAXES_REQUIRE_FORMAL_TAXPAYER`); here read is closed.
@@ -173,7 +173,7 @@ export type FiscalWriteViolationCode =
 /**
  * Validates the `fiscalConfig` to be PERSISTED (not the incoming body: a
  * partial update does not know stored `isFormalTaxpayer`, so caller must
- * pass merge result — D6). Returns violation or `null`.
+ * pass merge result). Returns violation or `null`.
  *
  * Fail-closed invariant: override can only REDUCE tax burden. A
  * formal taxpayer with exempt activity disables taxes (allowed);

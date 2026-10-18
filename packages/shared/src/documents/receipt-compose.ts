@@ -82,7 +82,7 @@ export interface ComposeReceiptInput {
   member: ComposeMember | null;
   subscription: ComposeSubscription | null;
   /**
-   * Issuer identity frozen upon issuance (C1). `null`/`undefined` = issuance
+   * Issuer identity frozen upon issuance. `null`/`undefined` = issuance
    * prior to snapshot: composed LIVE (documented terminal state).
    */
   emitterSnapshot?: unknown;
@@ -114,7 +114,7 @@ function toIso(value: DateInput, method: string): string {
   return d.toISOString();
 }
 
-/* ── Issuer Snapshot (C1) ─────────────────────────────────────────────
+/* ── Issuer Snapshot ──────────────────────────────────────────────────
    Freezes upon issuance what was previously derived from live rows.
    A persisted snapshot GOVERNS: if it exists, current configuration is
    not read (which is why `GET /:id/receipt` stays identical after profile edits).
@@ -199,7 +199,7 @@ function platformEmitterIdentity(
   };
   return {
     emitter,
-    // FitStack is not declared formal taxpayer (C2): gate enforces
+    // FitStack is not declared formal taxpayer: gate enforces
     // 'Comprobante de pago' by construction, never 'Factura'.
     documentLabel: resolveDocumentLabel({
       taxId: emitter.taxId ?? undefined,
@@ -489,8 +489,8 @@ export function buildReceiptDataFromComposed(
   });
 }
 
-/* ── SaaS receipt (Console, C2) ────────────────────────────────────
-   Issuer = FitStack (`platform_setting` keys, C1); recipient = org.
+/* ── SaaS receipt (Console) ────────────────────────────────────────
+   Issuer = FitStack (`platform_setting` keys); recipient = org.
    Fiscal profile and taxes from recipient country WITHOUT override (the
    org does not decide its VAT); unknown country → visible error. Issuer without
    configured country uses recipient country as proxy (PENDING §8).
@@ -529,7 +529,7 @@ export interface PlatformComposeReceptor {
   timezone: string;
 }
 
-/** FitStack issuer (`platform_setting`, C1; all optional). */
+/** FitStack issuer (`platform_setting`; all optional). */
 export interface PlatformComposeEmitter {
   legalName?: string | null;
   taxId?: string | null;
@@ -544,7 +544,7 @@ export interface PlatformComposeReceiptInput {
   subscription: PlatformComposeSubscription | null;
   receptor: PlatformComposeReceptor;
   emitter: PlatformComposeEmitter;
-  /** Frozen identity upon issuance (C1); `null` = prior issuance (live). */
+  /** Frozen identity upon issuance; `null` = prior issuance (live). */
   emitterSnapshot?: unknown;
 }
 

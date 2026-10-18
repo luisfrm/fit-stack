@@ -94,12 +94,12 @@ function buildService(c: any) {
   return { repo, plansRepo, service: createPlatformSubscriptionsService(repo, plansRepo) };
 }
 
-/** Emission C2: step 1 where payment is validated (no I/O except DB+queue). */
+/** Emission: step 1 where payment is validated (no I/O except DB+queue). */
 function buildReceipts(c: any) {
   return createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
 }
 
-/** Emission affects the org invoices history (C3 reads it). */
+/** Emission affects the org invoices history (the receipts report reads it). */
 async function invalidateInvoicesCache(c: any, organizationId: string) {
   await createCache(c.env).invalidateExact(
     `platform:subscriptions:invoices:${organizationId}`,
@@ -107,7 +107,7 @@ async function invalidateInvoicesCache(c: any, organizationId: string) {
 }
 
 /**
- * Audit sequence (`GET /receipts`, C4): invalidated on any
+ * Audit sequence (`GET /receipts`): invalidated on any
  * write of subscriptions/payments because they can issue or void a number.
  */
 async function invalidateReceiptsReportCache(cache: ReturnType<typeof createCache>) {
@@ -264,7 +264,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     try {
       result = await service.createSubscriptionWithPayment(data, {
         receipts: buildReceipts(c),
-        // C5: session actor emitting (`issued_by`).
+        // Session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
@@ -332,7 +332,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     try {
       result = await service.renewSubscription(id, data, {
         receipts: buildReceipts(c),
-        // C5: session actor emitting (`issued_by`).
+        // Session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
     } finally {
@@ -379,7 +379,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       }
     }
 
-    // C6: receipt voiding attempt travels in response body
+    // Receipt voiding attempt travels in response body
     // (`receiptVoided` + `receiptVoidReason`), never silently.
     return c.json({ success: true, paymentId, status: data.status, ...receipt });
   })
@@ -481,7 +481,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     try {
       result = await service.registerPayment(id, data, {
         receipts: buildReceipts(c),
-        // C5: actor de sesión que emite (`issued_by`).
+        // Actor de sesión que emite (`issued_by`).
         by: c.get('user')?.id,
       });
     } finally {

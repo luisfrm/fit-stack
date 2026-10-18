@@ -7,8 +7,8 @@ import { receiptsService } from "./receipts-service";
  */
 export const emailsService = {
   /**
-   * Alias: el dueño del endpoint es `receiptsService` (Fase 3).
-   * Firma intacta (`Promise<void>`) para no romper callers externos.
+   * Alias: the endpoint owner is `receiptsService`.
+   * Signature kept intact (`Promise<void>`) so external callers do not break.
    */
   async sendReceiptByEmail(paymentId: number): Promise<void> {
     await receiptsService.sendReceiptEmail(paymentId);

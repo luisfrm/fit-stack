@@ -1,5 +1,5 @@
 /**
- * Compose del comprobante SaaS (C2): emisor FitStack por keys, receptor org,
+ * Compose del comprobante SaaS: emisor FitStack por keys, receptor org,
  * impuestos leídos (nunca recalculados), type 'receipt' por construcción.
  */
 import { describe, expect, it } from 'vitest';
@@ -141,7 +141,7 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(data.voided).toBe(true);
   });
 
-  /* ── Snapshot del emisor (C1) ── */
+  /* ── Snapshot del emisor ── */
 
   it('con snapshot: editar el emisor DESPUÉS no cambia el comprobante', () => {
     const issued = baseInput();

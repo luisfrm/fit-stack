@@ -300,7 +300,7 @@ export async function issueReceipt<TYear>(
     return { receiptNumber: fresh.receiptNumber, pdfStatus, skipped: false };
   }
 
-  // Frozen emitter identity (C1): persisted together with the number in
+  // Frozen emitter identity: persisted together with the number in
   // `attach`, so it is built BEFORE consuming the sequence — if anything
   // throws here, no correlative is burned.
   const emitterSnapshot = await profile.buildEmitterSnapshot(payment, org, fiscal.profile);

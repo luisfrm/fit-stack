@@ -25,7 +25,7 @@ describe('panelReceiptKey', () => {
 });
 
 describe('platformReceiptKey', () => {
-  it('arma platform/receipts/<año>/<numero>.pdf (reservado C2)', () => {
+  it('arma platform/receipts/<año>/<numero>.pdf', () => {
     expect(platformReceiptKey(2026, 'FS-0000001')).toBe(
       'platform/receipts/2026/FS-0000001.pdf',
     );

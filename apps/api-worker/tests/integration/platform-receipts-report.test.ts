@@ -1,5 +1,5 @@
 /**
- * SaaS receipt report (C4): audit of the global `FS-N` correlative.
+ * SaaS receipt report: audit of the global `FS-N` correlative.
  *
  * Mirror of the Panel report (`reports-receipts.test.ts`) over FitStack's
  * continuous series: classification, gaps (hole vs voided), totals per
@@ -33,7 +33,7 @@ import {
   type ReceiptHandlerEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Platform receipts report (C4)', () => {
+describe.skipIf(skipReason !== null)('Platform receipts report', () => {
   let admin: AuthedUser;
   let tenant: Awaited<ReturnType<typeof createGymTenant>>;
   let plan: { id: number };
@@ -43,7 +43,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report (C4)', () => {
     await truncateAll();
 
     admin = await registerPlatformUser('admin');
-    tenant = await createGymTenant('c4');
+    tenant = await createGymTenant('report');
     plan = await createPlatformPlan();
   });
 

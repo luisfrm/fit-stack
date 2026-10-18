@@ -46,7 +46,7 @@ export interface AssignReceiptNumberInput {
   timezone: string;
   taxOverride?: TaxOverrideInput | null;
   /**
-   * Session actor emitting receipt (C5). Optional in signature because sweep
+   * Session actor emitting receipt. Optional in signature because sweep
    * re-enqueues without session: in that case `NULL` is persisted, never a
    * fabricated actor (only written when numbering, and sweep does not number).
    */
@@ -93,7 +93,7 @@ function resolveTaxBreakdown(
   if (Math.abs(o.subtotal + o.taxTotal - amountPaid) > 1) {
     throw new ReceiptError(400, 'TAX_MISMATCH', 'El desglose no cuadra con el monto cobrado.');
   }
-  // D6: the override can only REDUCE tax burden. A non-formal taxpayer cannot
+  // The override can only REDUCE tax burden. A non-formal taxpayer cannot
   // detail taxes via this path (it would assert a fiscal fact they never declared).
   const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
   if (!profile.isFormalTaxpayer && overrideTotal > 0) {
@@ -186,7 +186,7 @@ export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile
     },
 
     async buildEmitterSnapshot(_payment, org, profile) {
-      // Frozen emitter identity (C1): persisted together with the number in
+      // Frozen emitter identity: persisted together with the number in
       // `attachReceipt`, so it is built BEFORE consuming the sequence.
       return buildEmitterSnapshot(org, profile);
     },
@@ -284,8 +284,8 @@ export function createReceiptsService(
           receiptNumber: composed.payment.receiptNumber,
         };
       }
-      // Compose via the shared row mapper (C1: if the payment was numbered
-      // after C1 the persisted snapshot wins; null = legacy, live compose).
+      // Compose via the shared row mapper (if the payment was numbered
+      // after the snapshot migration the persisted snapshot wins; null = legacy, live compose).
       const receipt = composePanelReceipt(composed);
       return {
         available: true,

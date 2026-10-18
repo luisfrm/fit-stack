@@ -167,7 +167,7 @@ export function PaymentsClient({
   ) => {
     try {
       const result = await financeService.updatePaymentStatus(paymentId, status, voidReason);
-      // C6: voiding a payment without an issued receipt is not an error, nor
+      // Voiding a payment without an issued receipt is not an error, nor
       // a generic "success": cashier needs to know that nothing was voided.
       if (status === PAYMENT_STATUSES.VOIDED) {
         const rejected = voidReason === "Pago rechazado";

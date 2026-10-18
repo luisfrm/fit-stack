@@ -98,7 +98,7 @@ export function createPlatformSubscriptionsService(
   rateProvider: ExchangeRateProvider = SAME_CURRENCY_ONLY_RATE_PROVIDER
 ) {
   /**
-   * Shared compensatory void closure (phase 3): all 4 emission sites
+   * Shared compensatory void closure: all 4 emission sites
    * must void with the same reason and audit trail. If there is no
    * `paymentId` (insert never ran) there is nothing to void.
    */
@@ -243,7 +243,7 @@ export function createPlatformSubscriptionsService(
         paymentCreated = true;
         paymentId = createdPayment.id;
 
-        // Emission C2: step 1 numbers where payment is validated (trial/
+        // Emission: step 1 numbers where payment is validated (trial/
         // free $0 SKIP inside service). Console session != payer:
         // no payer passed (remains NULL -> owners only + log).
         if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
@@ -345,7 +345,7 @@ export function createPlatformSubscriptionsService(
         // Extend period (side effect of payment)
         if (data.payment.status === PAYMENT_STATUSES.VALIDATED) {
           await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
-          // Emission C2 (console session != payer: without payer).
+          // Emission (console session != payer: without payer).
           if (opts?.receipts) {
             await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
           }
@@ -372,7 +372,7 @@ export function createPlatformSubscriptionsService(
     },
 
     /**
-     * Self-service renewal (org-scoped, phase 2): registers payment with
+     * Self-service renewal (org-scoped): registers payment with
      * status `processing` (pending support approval in console) WITHOUT
      * extending the period. All financial data is dictated by backend:
      * plan snapshot (name/price/currency/duration/features), rate via
@@ -486,7 +486,7 @@ export function createPlatformSubscriptionsService(
             const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year", 'UTC');
             await platformSubsRepo.updatePeriodEnd(subscriptionId, newPeriodEnd);
           }
-          // Issuance C2 (console session ≠ payer: no payer).
+          // Issuance (console session ≠ payer: no payer).
           if (opts?.receipts) {
             await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
           }
@@ -541,7 +541,7 @@ export function createPlatformSubscriptionsService(
      * Changes SaaS payment status and returns void attempt result:
      * internal service THROWS `RECEIPT_NOT_ISSUED` when payment
      * has no number, but the endpoint responds with **200** and
-     * `receiptVoided: false` + `receiptVoidReason: 'not_issued'` (C6):
+     * `receiptVoided: false` + `receiptVoidReason: 'not_issued'`:
      * silence conveys nothing to operator.
      */
     async updatePaymentStatus(
@@ -656,7 +656,7 @@ export function createPlatformSubscriptionsService(
           const newPeriodEnd = addDuration(baseDate, duration.value, duration.unit, 'UTC');
           await platformSubsRepo.updatePeriodEnd(parentSub.id, newPeriodEnd);
         }
-        // Issuance C2 only on transition →validated (re-PATCH does not renumber
+        // Issuance only on transition →validated (re-PATCH does not renumber
         // due to attach idempotency; console session ≠ payer: no payer).
         // If it fails, payment (already validated in DB) is voided and moved period
         // is REVERTED to previous value. Without `markPlatformReceiptVoided`:

@@ -42,7 +42,7 @@ const orgRenewSchema = z.object({
 
 /**
  * Org-scoped profile: branch identity (name, logo, slogan, timezone,
- * currency format) + fiscal issuing identity (Phase 4).
+ * currency format) + fiscal issuing identity.
  *
  * `countryCode`/`primaryCurrency` are immutable from here (required at
  * creation): rejected with 400 if provided. Changing country would recalculate
@@ -299,7 +299,7 @@ export const organizationRoutes = new Hono<AppEnv>()
   )
 
   // PATCH /api/organizations/profile - branch identity + issuer
-  // identity + fiscalConfig (Phase 4). Endpoint used by panel for
+  // identity + fiscalConfig. Endpoint used by panel for
   // organization form: NEVER call `/api/platform/*` from panel
   // (gym owner does not have platform role -> 403). Org-scoped:
   // owner/manager (ORGANIZATION.UPDATE). `countryCode` and `primaryCurrency`

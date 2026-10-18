@@ -1,5 +1,5 @@
 /**
- * Platform receipts contract integration tests (C3).
+ * Platform receipts contract integration tests.
  *
  * Covers the 3-state contract (`GET receipt`: 200 ready / 202 pending /
  * 200 `available:false pre_system`; never 409), the binary download
@@ -38,7 +38,7 @@ import {
   type ReceiptHandlerEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Platform receipts contract (C3)', () => {
+describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
   let admin: AuthedUser;
   let tenant: Awaited<ReturnType<typeof createGymTenant>>;
   let plan: { id: number };
@@ -48,7 +48,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract (C3)', () => {
     await truncateAll();
 
     admin = await registerPlatformUser('admin');
-    tenant = await createGymTenant('c3');
+    tenant = await createGymTenant('contract');
     plan = await createPlatformPlan();
   });
 
@@ -244,7 +244,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract (C3)', () => {
 
   it('resend sin destinatarios: 422 PAYER_EMAIL_MISSING', async () => {
     // Dedicated tenant: deleting its owners leaves the payment with no recipients.
-    const lonely = await createGymTenant('c3-lonely');
+    const lonely = await createGymTenant('lonely');
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: lonely.organization.id,
       planId: plan.id,

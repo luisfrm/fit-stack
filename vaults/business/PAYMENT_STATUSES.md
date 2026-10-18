@@ -118,8 +118,8 @@ Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en
 - **Anular es explícito**: `receiptVoided` (+ `receiptVoidReason: 'not_issued'`) en el body del PATCH y toast diferenciado en Panel y Console.
 - **Un solo estado de anulación**: rechazo y anulación son `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`, no se guarda.
 - **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (Linear — proyecto «Fit Stack»).
-- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello* (B2); el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver el backlog en Linear, proyecto «Fit Stack»).
-- **El ANULADO es un artefacto (B2)**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
+- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello*; el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver el backlog en Linear, proyecto «Fit Stack»).
+- **El ANULADO es un artefacto**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
 
 ## 6. Dónde vive cada cosa
 

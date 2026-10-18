@@ -247,29 +247,29 @@ describe.skipIf(skipReason !== null)('CMS API', () => {
         title: 'Órdenes',
       });
 
-      const b1 = await owner.client.post('/api/cms/blocks', {
+      const firstBlock = await owner.client.post('/api/cms/blocks', {
         pageId: page.body.id,
         blockType: 'hero',
         data: { title: 'Uno' },
       });
-      const b2 = await owner.client.post('/api/cms/blocks', {
+      const secondBlock = await owner.client.post('/api/cms/blocks', {
         pageId: page.body.id,
         blockType: 'services',
         data: { title: 'Servicios', items: [] },
       });
-      expect(b1.body.displayOrder).toBe(0);
-      expect(b2.body.displayOrder).toBe(1);
+      expect(firstBlock.body.displayOrder).toBe(0);
+      expect(secondBlock.body.displayOrder).toBe(1);
 
       // Delete the first block to create a gap, then create a new one:
       // displayOrder must be max(existing) + 1 = 2, never a raw count (1).
-      await owner.client.delete(`/api/cms/blocks/${b1.body.id}`);
-      const b3 = await owner.client.post('/api/cms/blocks', {
+      await owner.client.delete(`/api/cms/blocks/${firstBlock.body.id}`);
+      const thirdBlock = await owner.client.post('/api/cms/blocks', {
         pageId: page.body.id,
         blockType: 'contact',
         data: {},
       });
 
-      expect(b3.body.displayOrder).toBe(2);
+      expect(thirdBlock.body.displayOrder).toBe(2);
     });
 
     it('validates block data with the shared zod schemas', async () => {

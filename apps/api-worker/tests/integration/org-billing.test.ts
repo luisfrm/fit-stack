@@ -1,5 +1,5 @@
 /**
- * Org-scoped billing endpoints (phase 2 — self-service renewal).
+ * Org-scoped billing endpoints (self-service renewal).
  *
  * Covers: GET /api/organizations/subscription (org sub detail),
  * GET /api/organizations/payment-methods (platform methods exposed),
@@ -94,7 +94,7 @@ function startRateServer(rates: Record<string, number>): Promise<{ url: string; 
   });
 }
 
-describe.skipIf(skipReason !== null)('Org billing (fase 2 — renovación autoservicio)', () => {
+describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () => {
   let admin: AuthedUser;
   let tenantA: Awaited<ReturnType<typeof createGymTenant>>;
   let tenantB: Awaited<ReturnType<typeof createGymTenant>>;

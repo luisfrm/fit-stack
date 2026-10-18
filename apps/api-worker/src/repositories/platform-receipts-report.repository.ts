@@ -1,6 +1,6 @@
 /* ── Platform receipts report repository (api-worker) ───────────────────
    SaaS receipt report queries (audit of the `FS-N` series).
-   Mirrors the Panel queries in `payments.repository.ts` (Phase 5), with two
+   Mirrors the Panel queries in `payments.repository.ts`, with two
    deliberate differences:
    - No `organizationId`: the issuer is FitStack, the series is global.
    - Dates always in UTC: platform billing runs in UTC
@@ -158,7 +158,7 @@ export function createPlatformReceiptsReportRepository(db: Db) {
           voidedBy: platformSubscriptionPayment.voidedBy,
           voidedAt: platformSubscriptionPayment.voidedAt,
           voidReason: platformSubscriptionPayment.voidReason,
-          // C1/C5: frozen issuer + actor, for exportable ledger.
+          // Frozen issuer + actor, for exportable ledger.
           emitterSnapshot: platformSubscriptionPayment.emitterSnapshot,
           issuedBy: platformSubscriptionPayment.issuedBy,
         })

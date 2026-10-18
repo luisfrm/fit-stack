@@ -95,7 +95,7 @@ export default async function ClassesPage({
   const weekStart = weekDays[0]?.date ?? weekAnchor;
   const weekEnd = weekDays[6]?.date ?? weekAnchor;
 
-  // C2: today's next class + visible/hidden (without backend call, same source).
+  // Today's next class + visible/hidden (without backend call, same source).
   const todayLocal = toLocalDayString(orgTimezone);
   const todayOccurrences =
     expandWeek(calendarResult.data, todayLocal, orgTimezone).find((d) => d.date === todayLocal)

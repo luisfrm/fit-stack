@@ -1,5 +1,5 @@
 /**
- * Per-organization fiscal data (Phase 4): `PATCH /api/organizations/profile`.
+ * Per-organization fiscal data: `PATCH /api/organizations/profile`.
  *
  * Covers: real `fiscalConfig` schema (400), RBAC (cashier 403 / manager
  * 200), immutables (`countryCode`/`primaryCurrency` → 400), `isFormalTaxpayer`
@@ -38,7 +38,7 @@ import {
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 import { ORG_ROLES } from '@workspace/shared';
 
-describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', () => {
+describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
@@ -304,7 +304,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
         slug: `gym-fiscal-${tag}-${uid()}`,
       });
       await setActiveOrganization(user.client, organization.id);
-      // C2: without a formal-taxpayer declaration there is no breakdown.
+      // Without a formal-taxpayer declaration there is no breakdown.
       const declared = await user.client.patch('/api/organizations/profile', {
         fiscalConfig: { isFormalTaxpayer: true },
         confirmed: true,
@@ -327,7 +327,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile (Fase 4)', ()
   });
 
   /**
-   * C2 — fail-closed invariant (D6): the override can only REDUCE the tax
+   * Fail-closed invariant: the override can only REDUCE the tax
    * burden. A non-taxpayer cannot enable taxes (neither via config nor via
    * the payment's manual override) and a conditional requires confirmation.
    */

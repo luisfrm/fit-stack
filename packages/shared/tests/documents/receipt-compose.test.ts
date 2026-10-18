@@ -108,7 +108,7 @@ describe('buildReceiptDataFromComposed', () => {
     expect(buildReceiptDataFromComposed(input).amounts.baseTotal).toBeNull();
   });
 
-  /* ── Snapshot del emisor (C1) ── */
+  /* ── Snapshot del emisor ── */
 
   it('con snapshot: el perfil editado DESPUÉS no cambia el comprobante', () => {
     const issued = validInput();
@@ -157,7 +157,7 @@ describe('buildReceiptDataFromComposed', () => {
     const profile = resolveFiscalProfile('VE', { isFormalTaxpayer: true });
     const snapshot = buildEmitterSnapshot(input.organization, profile);
     expect(snapshot.version).toBe(1);
-    // Perfil del país completo, con el condicional apagado (D2).
+    // Perfil del país completo, con el condicional apagado.
     expect(snapshot.taxes).toEqual([
       { name: 'IVA', rate: 0.16, enabled: true },
       { name: 'IGTF', rate: 0.03, enabled: false },

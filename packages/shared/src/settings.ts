@@ -49,7 +49,7 @@ export const DEFAULT_PLATFORM_SETTINGS: Record<string, string> = {
   active_payment_methods: '[]',
   ai_provider_default: 'openrouter',
   feature_flags_free_tier_enabled: 'false',
-  // FitStack emitter legal identity (C1, Console receipts). Empty =
+  // FitStack emitter legal identity (Console receipts). Empty =
   // generic emitter "FitStack" + gate "Comprobante de pago" (never "Factura").
   fitstack_legal_name: '',
   fitstack_tax_id: '',

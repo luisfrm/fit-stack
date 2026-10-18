@@ -2,7 +2,7 @@
  * SaaS compensation when the emission fails.
  *
  * The 4 SaaS flows commit without a transaction (Neon HTTP has no `db.transaction()`):
- * the `catch` compensates by re-reading with the phase-2 helper. SaaS semantics:
+ * the `catch` compensates by re-reading with the shared helper. SaaS semantics:
  * a creation left without a valid payment is also voided with `cancel()` — never
  * `delete()` (a `voided` is ignored in the SaaS computation and would leave a
  * front-loaded period with no charge to sustain it); renewal/registration/transition
@@ -28,7 +28,7 @@ import { COMPENSATION_VOID_REASON } from '../../src/lib/subscription-compensatio
 
 const PRICE_CENTS = 5000;
 
-describe.skipIf(skipReason !== null)('Platform subscriptions compensation (fase 3)', () => {
+describe.skipIf(skipReason !== null)('Platform subscriptions compensation', () => {
   let admin: AuthedUser;
 
   beforeAll(async () => {

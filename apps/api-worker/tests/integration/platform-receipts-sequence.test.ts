@@ -1,15 +1,15 @@
 /**
- * Platform receipts sequence integration tests (C1).
+ * Platform receipts sequence integration tests.
  *
  * Covers: atomic global allocation under concurrency (including the
  * first-receipt race with no prior row), `FS-0000001` formatting from
- * shared (Phase 0), idempotent attach (`WHERE receipt_number IS NULL`),
+ * shared, idempotent attach (`WHERE receipt_number IS NULL`),
  * global uniqueness of receipt_number, NULL legacy payments coexisting,
  * and invalid input errors.
  *
  * The platform payment fixture is created via HTTP
  * (POST /api/platform/subscriptions); the sequence repo — which has no
- * route in C1 — is exercised directly (precedent: receipts-sequence).
+ * route — is exercised directly (precedent: receipts-sequence).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -30,7 +30,7 @@ import { createDb } from '@workspace/database/factory';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { formatConsoleReceiptNumber } from '@workspace/shared';
 
-describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
+describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
   let admin: AuthedUser;
   let tenant: Awaited<ReturnType<typeof createGymTenant>>;
   let plan: { id: number };
@@ -40,7 +40,7 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
     await truncateAll();
 
     admin = await registerPlatformUser('admin');
-    tenant = await createGymTenant('c1');
+    tenant = await createGymTenant('sequence');
     plan = await createPlatformPlan();
   });
 
@@ -68,7 +68,7 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
   }
 
   /** Platform subscription with a `processing` payment via HTTP (the attach
-   *  repo does not require a status; `processing` avoids C2's automatic step 1
+   *  repo does not require a status; `processing` avoids the automatic step 1
    *  to test the repo in isolation). */
   async function createPaidPlatformPayment(): Promise<number> {
     const res = await admin.client.post('/api/platform/subscriptions', {
@@ -106,7 +106,7 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence (C1)', () => {
     );
   });
 
-  it('usa el formato Console de Fase 0 como contrato (FS-0000001)', () => {
+  it('usa el formato Console como contrato (FS-0000001)', () => {
     expect(formatConsoleReceiptNumber(1)).toBe('FS-0000001');
     expect(formatConsoleReceiptNumber(42)).toBe('FS-0000042');
   });

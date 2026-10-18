@@ -29,7 +29,7 @@ export interface IPayment {
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
 
-  // Correlative receipt (Phase 1). NULL = prior to system (pre_system).
+  // Correlative receipt. NULL = prior to system (pre_system).
   receiptNumber?: string | null;
   documentType?: 'receipt' | 'invoice';
   receiptIssuedAt?: Date | null;
@@ -51,7 +51,7 @@ export interface ReceiptReportScope {
 }
 
 /**
- * Base report scope (Phase 5): `validated` payments + any payment with a
+ * Base report scope: `validated` payments + any payment with a
  * receipt number (covers `voided` with preserved number). `processing` / `voided`
  * without number are not receipts and are excluded. Date range by
  * `receipt_issued_at` for numbered receipts and `payment_date` for unnumbered.
@@ -238,7 +238,7 @@ export function createPaymentsRepository(db: Db) {
     },
 
     /**
-     * Receipt report (Phase 5). Status classification lives in
+     * Receipt report. Status classification lives in
      * the service; here we only SQL-filter what is expressible (requested status,
      * method, date range) over the shared base scope.
      */
@@ -307,7 +307,7 @@ export function createPaymentsRepository(db: Db) {
           voidedBy: payment.voidedBy,
           voidedAt: payment.voidedAt,
           voidReason: payment.voidReason,
-          // C1/C5: frozen issuer + actor, for exportable ledger.
+          // Frozen issuer + actor, for exportable ledger.
           emitterSnapshot: payment.emitterSnapshot,
           issuedBy: payment.issuedBy,
         })

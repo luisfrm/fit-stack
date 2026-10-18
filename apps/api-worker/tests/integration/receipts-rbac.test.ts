@@ -1,5 +1,5 @@
 /**
- * Receipts RBAC (Phase 6 — Panel closure).
+ * Receipts RBAC (Panel closure).
  *
  * Small and dedicated file: `receipts-emission.test.ts` is already God and is
  * not touched. Covers the missing negative gates:
@@ -25,7 +25,7 @@ import {
 } from '../helpers/auth';
 import { ORG_ROLES } from '@workspace/shared';
 
-describe.skipIf(skipReason !== null)('Receipts RBAC (Fase 6)', () => {
+describe.skipIf(skipReason !== null)('Receipts RBAC', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();

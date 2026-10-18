@@ -80,10 +80,10 @@ export function buildGrowthData(growth: Growth | undefined): GrowthChartData {
   });
 
   return Object.values(map).sort((a, b) => {
-    const [d1, m1] = a.day.split('-');
-    const [d2, m2] = b.day.split('-');
-    if (m1 !== m2) return Number(m1) - Number(m2);
-    return Number(d1) - Number(d2);
+    const [dayA, monthA] = a.day.split('-');
+    const [dayB, monthB] = b.day.split('-');
+    if (monthA !== monthB) return Number(monthA) - Number(monthB);
+    return Number(dayA) - Number(dayB);
   });
 }
 

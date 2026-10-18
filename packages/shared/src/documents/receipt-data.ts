@@ -45,7 +45,7 @@ export interface ReceiptSnapshotTax {
 }
 
 /**
- * Emitter identity FROZEN at the time of issuance (C1). Persisted alongside
+ * Emitter identity FROZEN at the time of issuance. Persisted alongside
  * the number (`emitter_snapshot`) and `GET /:id/receipt` reads it as-is:
  * the JSON and audit trail do not change if the emitter edits their profile
  * later (the PDF in R2 was already immutable). Freezes everything derived live:

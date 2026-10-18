@@ -33,7 +33,7 @@ export interface AssignPlatformReceiptNumberInput {
   /** Payer (session during `processing` creation); no overwrite on validation. */
   payerEmail?: string | null;
   payerName?: string | null;
-  /** Session actor emitting receipt (C5); without session defaults to `NULL`, never fabricated. */
+  /** Session actor emitting receipt; without session defaults to `NULL`, never fabricated. */
   actor?: string | null;
 }
 
@@ -62,7 +62,7 @@ export interface PlatformReceiptContext {
   payer?: { email: string; name: string } | null;
   /**
    * Session actor: `voided_by` in VOIDED branch and `issued_by` on numbering
-   * (C5). Without session no actor is fabricated: explicit null.
+   * Without session no actor is fabricated: explicit null.
    */
   by?: string;
 }
@@ -155,7 +155,7 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
     },
 
     async buildEmitterSnapshot(payment, org, profile) {
-      // Frozen emitter identity (C1): FitStack (settings) + receptor country
+      // Frozen emitter identity: FitStack (settings) + receptor country
       // profile. Built BEFORE consuming the global sequence (nothing burns a
       // correlative).
       return buildPlatformEmitterSnapshot(
@@ -338,8 +338,8 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
           receiptNumber: composed.payment.receiptNumber,
         };
       }
-      // Compose via the shared row mapper (C1: if the payment was numbered
-      // after C1 the persisted snapshot wins; null = legacy, live compose).
+      // Compose via the shared row mapper (if the payment was numbered
+      // after the snapshot migration the persisted snapshot wins; null = legacy, live compose).
       const receipt = composePlatformReceipt(composed);
       return {
         available: true,

@@ -105,7 +105,7 @@ interface PaymentSectionProps {
   readonly onTaxRateChange: (name: string, pct: string) => void;
   readonly taxOverrideReason: string;
   readonly onTaxOverrideReasonChange: (value: string) => void;
-  /** Issuer formal taxpayer declaration (tax gating, C2). */
+  /** Issuer formal taxpayer declaration (tax gating). */
   readonly taxEmitterIsFormal: boolean;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Platform receipts emission integration tests (C2).
+ * Platform receipts emission integration tests.
  *
  * Covers: step 1 numbering on approve (number + receipt.render with
  * scope 'platform', taxes persisted, zero emails), step 2 completion via
@@ -11,7 +11,7 @@
  * The PDF renderer is stubbed (`vi.mock` on jobs-worker's receipt-pdf):
  * render fidelity is covered by jobs-worker's own smoke test; here we
  * assert the step-2 LOGIC. Everything else (DB, queues, R2) is real via
- * spies. Mirror of receipts-emission.test.ts (Panel, Phase 2).
+ * spies. Mirror of receipts-emission.test.ts (Panel).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -42,7 +42,7 @@ import {
   type SweepEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
+describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
   let admin: AuthedUser;
   let tenant: Awaited<ReturnType<typeof createGymTenant>>;
   let plan: { id: number };
@@ -52,7 +52,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     await truncateAll();
 
     admin = await registerPlatformUser('admin');
-    tenant = await createGymTenant('c2');
+    tenant = await createGymTenant('emission');
     plan = await createPlatformPlan();
   });
 
@@ -161,7 +161,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
 
     const payment = await readPayment(paymentId);
     expect(payment['receipt_number']).toMatch(/^FS-\d{7,}$/);
-    // C2/D1: the platform issuer (FitStack) is not declared as a
+    // The platform issuer (FitStack) is not declared as a
     // formal taxpayer anywhere → the SaaS receipt does not itemize
     // taxes: the total charged is persisted, with no invented breakdown.
     expect(payment['tax_details']).toEqual([]);
@@ -239,7 +239,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     expect(renders).not.toContainEqual(expect.objectContaining({ paymentId: recentId }));
   });
 
-  it('T4b barrido: PDF listo sin notificar también se recupera (C6)', async () => {
+  it('T4b barrido: PDF listo sin notificar también se recupera', async () => {
     const paymentId = await createProcessingPayment();
     await approvePayment(paymentId);
     const numbered = await testQuery<{ receipt_number: string }>(
@@ -249,7 +249,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission (C2)', () => {
     const receiptNumber = numbered[0]!.receipt_number;
 
     // Simulated state: PDF already rendered, notification unmarked and emission
-    // 45 min ago → the sweep's 2nd predicate (C6) is the only one that covers it.
+    // 45 min ago → the sweep's 2nd predicate is the only one that covers it.
     await testQuery(
       `UPDATE platform_subscription_payment
          SET receipt_pdf_key = $2, receipt_notified_at = NULL,

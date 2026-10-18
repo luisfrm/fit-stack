@@ -50,9 +50,9 @@ const createSubSchema = z.object({
     // with its own audit trail, so a payment cannot be born `voided`.
     status: z.enum(['processing', 'validated']).optional(),
     paymentDate: z.string().optional(),
-    // Fiscal breakdown in integer cents (Phase 0: open schema;
-    // service calculates it by default and only accepts override with
-    // taxOverrideReason in Phase 2).
+    // Fiscal breakdown in integer cents (open schema; the service
+    // calculates it by default and only accepts an override with
+    // taxOverrideReason).
     subtotal: z.number().int().positive().optional(),
     taxTotal: z.number().int().min(0).optional(),
     taxDetails: z.array(taxDetailSchema).optional(),
@@ -123,7 +123,7 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     try {
       newSub = await subsService.create(orgId, payload as any, timezone, {
         receipts: receiptsService,
-        // C5: session actor emitting receipt (recorded in `issued_by`).
+        // Session actor emitting receipt (recorded in `issued_by`).
         by: c.get('user')?.id,
       });
     } finally {

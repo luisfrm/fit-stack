@@ -309,7 +309,7 @@ export default function OrganizationSettingsPage() {
           taxes,
           isFormalTaxpayer: fiscalFormal,
           // Explicit confirmations for conditional taxes: without this list
-          // the resolver turns them off (fail-closed, D2).
+          // the resolver turns them off (fail-closed).
           confirmedTaxes: fiscalTaxes
             .filter((tax) => tax.requiresConfirmation && tax.confirmed)
             .map((tax) => tax.name),

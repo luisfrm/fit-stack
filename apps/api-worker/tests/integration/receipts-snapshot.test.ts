@@ -1,10 +1,10 @@
 /**
- * Issuer snapshot (C1) + emission traceability (C5).
+ * Issuer snapshot + emission traceability.
  *
- * C1: `GET /:id/receipt` must ALWAYS return what was issued. The test issues,
+ * `GET /:id/receipt` must ALWAYS return what was issued. The test issues,
  * changes the issuer profile (legal name, RIF, address, country and
  * `fiscalConfig`) and requests the receipt again: it has to be identical.
- * C5: `issued_by` is the session actor that numbered it; step 2 (consumer, with no
+ * `issued_by` is the session actor that numbered it; step 2 (consumer, with no
  * session) never overwrites it nor invents one.
  *
  * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
@@ -36,13 +36,13 @@ import {
   type ReceiptHandlerEnv,
 } from '../../../jobs-worker/src/handlers/receipt.handler';
 
-describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () => {
+describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by', () => {
   let tenant: GymTenant;
 
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
-    tenant = await createGymTenant('c1');
+    tenant = await createGymTenant('snapshot');
   });
 
   function jobsEnv(owner: AuthedUser): ReceiptHandlerEnv {
@@ -103,7 +103,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     };
   }
 
-  it('C1: editar el perfil del emisor no cambia el comprobante ya emitido', async () => {
+  it('editar el perfil del emisor no cambia el comprobante ya emitido', async () => {
     const { paymentId } = await emitReceipt();
     const asIssued = await getReceipt(paymentId);
 
@@ -137,11 +137,11 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
       [paymentId],
     );
     expect(row!.emitter_snapshot).not.toBeNull();
-    // C5: the session actor that issued it.
+    // The session actor that issued it.
     expect(row!.issued_by).toBe(tenant.owner.userId);
   });
 
-  it('C5: la emisión manual también deja actor', async () => {
+  it('la emisión manual también deja actor', async () => {
     // Validated payment WITHOUT a number (legacy): `POST /:id/issue` numbers it and sets the actor.
     const member = await createGymMember(tenant.owner.client);
     const rows = await testQuery<{ id: number }>(
@@ -166,7 +166,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     expect(row!.emitter_snapshot).not.toBeNull();
   });
 
-  it('C1/C5: paso 2 (sin sesión) no pisa la auditoría de la emisión', async () => {
+  it('paso 2 (sin sesión) no pisa la auditoría de la emisión', async () => {
     const { paymentId } = await emitReceipt();
     const before = await testQuery<{ issued_by: string | null; emitter_snapshot: unknown }>(
       `SELECT issued_by, emitter_snapshot FROM payment WHERE id = $1`,
@@ -194,7 +194,7 @@ describe.skipIf(skipReason !== null)('Receipt snapshot + issued_by (C1/C5)', () 
     expect(after[0]!.emitter_snapshot).toEqual(before[0]!.emitter_snapshot);
   });
 
-  it('C1/C5: el reporte expone emisor congelado y actor', async () => {
+  it('el reporte expone emisor congelado y actor', async () => {
     const { receiptNumber } = await emitReceipt();
 
     const res = await tenant.owner.client.get('/api/reports/receipts', {
