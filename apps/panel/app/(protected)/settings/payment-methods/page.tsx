@@ -24,65 +24,22 @@ import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
 import { SimpleSelect } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@/lib/hooks/use-auth";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
 import { type IPaymentMethodConfig, type IPaymentMethodField } from "@workspace/shared/types";
-
-const SUGGESTED_METHODS: IPaymentMethodConfig[] = [
-  {
-    id: "pago_movil",
-    name: "Pago Móvil",
-    fields: [
-      { id: "fld_pm1", label: "Referencia de Pago", type: "text", required: true },
-      { id: "fld_pm2", label: "Banco Emisor", type: "text", required: true },
-      { id: "fld_pm3", label: "Captura de Pantalla", type: "file", required: false },
-    ],
-    currency: "VES"
-  },
-  {
-    id: "zelle",
-    name: "Zelle",
-    fields: [
-      { id: "fld_z1", label: "Email de cuenta issuers", type: "text", required: true },
-      { id: "fld_z2", label: "Nombre del titular", type: "text", required: false },
-    ],
-    currency: "USD"
-  },
-  {
-    id: "cash",
-    name: "Efectivo",
-    fields: [],
-    currency: null
-  },
-  {
-    id: "transferencia",
-    name: "Transferencia Bancaria",
-    fields: [
-      { id: "fld_tb1", label: "Número de Referencia", type: "text", required: true },
-      { id: "fld_tb2", label: "Banco Destino", type: "text", required: true },
-    ],
-    currency: null
-  },
-  {
-    id: "binance",
-    name: "Binance",
-    fields: [
-      {
-        id: "fld_b1",
-        label: "Instrucciones de Pago",
-        type: "visual",
-        required: false,
-        value: "Método de pago: Binance\nEnviar a: pagos@fitstack.app\nRed: BEP-20 (BNB)\n\nAdjunta el comprobante de la transferencia en los campos de abajo."
-      },
-      { id: "fld_b2", label: "Email remitente", type: "text", required: true },
-      { id: "fld_b3", label: "Comprobante / Captura", type: "file", required: true },
-    ],
-    currency: null
-  }
-];
+import { getSuggestedPaymentMethods } from "@workspace/shared";
 
 export default function PaymentMethodsSettingsPage() {
   const { settings, isLoading, isUpdating, updateSettings } = useSettings();
+  const { activeOrganization } = useAuth();
+
+  // Suggestions follow the country of the active organization (`COUNTRIES`);
+  // an unknown country resolves to the universal methods only.
+  const suggestedMethods = React.useMemo(
+    () => getSuggestedPaymentMethods(activeOrganization?.countryCode),
+    [activeOrganization?.countryCode],
+  );
 
   const [paymentMethods, setPaymentMethods] = React.useState<IPaymentMethodConfig[]>([]);
   const [editingMethod, setEditingMethod] = React.useState<IPaymentMethodConfig | null>(null);
@@ -187,7 +144,7 @@ export default function PaymentMethodsSettingsPage() {
                   <Text className="text-[10px] font-bold uppercase tracking-wider">Sugerencias rápidas</Text>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SUGGESTED_METHODS.map(suggested => (
+                  {suggestedMethods.map(suggested => (
                     <Button
                       key={suggested.id}
                       variant="glass"

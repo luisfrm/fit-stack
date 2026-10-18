@@ -28,6 +28,15 @@ IPaymentMethodConfig, IPaymentMethodField (type: 'text' | 'file' | 'number' | 'v
 > building details — `subscription-form.tsx` / `platform-subscription-form.tsx`).
 > `paymentMethodDetailsSchema` (api-worker) remains `text|file|number`.
 
+// payment-methods.ts (RD-149 — SSOT de métodos de pago sugeridos)
+UNIVERSAL_SUGGESTED_PAYMENT_METHODS (Efectivo, Transferencia Bancaria, Tarjeta / Punto de Venta),
+COUNTRY_SUGGESTED_PAYMENT_METHODS (VE: Pago Móvil VES, Zelle USD, Binance · CO: Nequi, DaviPlata, PSE, Bre-B, Datáfono COP),
+getSuggestedPaymentMethods(countryCode?) → métodos del país + universales sin duplicados (un país puede especializar un universal reusando su `id`); país desconocido/ausente ⇒ solo universales, nunca hereda los de otro país.
+
+> Las sugerencias de métodos de pago viven **solo** en `@workspace/shared`. Panel
+> (`activeOrg.countryCode`) y Console (`fitstack_country_code`) consumen
+> `getSuggestedPaymentMethods`; ninguna app declara su propia copia del catálogo.
+
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
