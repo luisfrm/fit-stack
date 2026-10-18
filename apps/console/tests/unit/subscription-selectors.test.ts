@@ -6,8 +6,11 @@ import {
   selectExpiringSoon,
   selectOrgCurrentMonth,
   selectOrgBilledTotal,
+  selectOrgLatestPayment,
+  selectPaymentDisplayAmount,
 } from "@/lib/platform/subscription-selectors";
 import type {
+  PlatformPayment,
   SubscriptionWithDetails,
   SubscriptionStats,
 } from "@/lib/services/platform-subscriptions-service";
@@ -189,5 +192,81 @@ describe("selectOrgBilledTotal", () => {
         { status: "processing", amountPaid: 9999, baseAmount: 9999 },
       ]),
     ).toEqual({ totalCents: 8000, count: 2 });
+  });
+});
+
+describe("selectOrgLatestPayment", () => {
+  const payment = (
+    overrides: Partial<PlatformPayment> = {},
+  ): PlatformPayment =>
+    ({
+      id: 1,
+      organizationId: "org-1",
+      planId: 10,
+      status: "validated",
+      paymentDate: "2026-09-05T00:00:00Z",
+      amountPaid: 5000,
+      currencyPaid: "USD",
+      baseAmount: null,
+      ...overrides,
+    }) as PlatformPayment;
+
+  it("returns the most recent validated payment", () => {
+    const result = selectOrgLatestPayment([
+      payment({ id: 1, paymentDate: "2026-09-05T00:00:00Z" }),
+      payment({ id: 2, paymentDate: "2026-10-05T00:00:00Z" }),
+      payment({ id: 3, paymentDate: "2026-08-01T00:00:00Z" }),
+    ]);
+    expect(result?.id).toBe(2);
+  });
+
+  it("skips voided receipts even when they are the most recent", () => {
+    const result = selectOrgLatestPayment([
+      payment({ id: 1, paymentDate: "2026-09-05T00:00:00Z" }),
+      payment({
+        id: 2,
+        paymentDate: "2026-10-05T00:00:00Z",
+        receiptVoided: true,
+      }),
+    ]);
+    expect(result?.id).toBe(1);
+  });
+
+  it("returns null when every validated payment has a voided receipt", () => {
+    expect(
+      selectOrgLatestPayment([
+        payment({ id: 1, receiptVoided: true }),
+        payment({ id: 2, paymentDate: "2026-10-05T00:00:00Z", receiptVoided: true }),
+      ]),
+    ).toBeNull();
+  });
+
+  it("ignores non-validated rows and invalid dates", () => {
+    expect(
+      selectOrgLatestPayment([
+        payment({ id: 1, status: "processing", paymentDate: "2026-10-05T00:00:00Z" }),
+        payment({ id: 2, paymentDate: "not-a-date" }),
+      ]),
+    ).toBeNull();
+  });
+});
+
+describe("selectPaymentDisplayAmount", () => {
+  it("formats baseAmount with the base currency, never with currencyPaid", () => {
+    expect(
+      selectPaymentDisplayAmount(
+        { amountPaid: 730000, currencyPaid: "VES", baseAmount: 20000 },
+        "USD",
+      ),
+    ).toEqual({ amountCents: 20000, currency: "USD" });
+  });
+
+  it("keeps amountPaid with currencyPaid when there is no baseAmount", () => {
+    expect(
+      selectPaymentDisplayAmount(
+        { amountPaid: 730000, currencyPaid: "VES", baseAmount: null },
+        "USD",
+      ),
+    ).toEqual({ amountCents: 730000, currency: "VES" });
   });
 });

@@ -17,6 +17,8 @@ import { selectPortalAdoption } from "@/lib/platform/organization-selectors";
 import {
   selectOrgBilledTotal,
   selectOrgCurrentMonth,
+  selectOrgLatestPayment,
+  selectPaymentDisplayAmount,
 } from "@/lib/platform/subscription-selectors";
 import type {
   SubscriptionWithDetails,
@@ -102,9 +104,12 @@ export function OrgProfileCards({
   const adoption = gymOverview ? selectPortalAdoption(gymOverview) : null;
   const billed = selectOrgBilledTotal(invoices);
   const currentMonth = selectOrgCurrentMonth(invoices, new Date());
-  const latest = [...invoices]
-    .filter((p) => p.status === "validated")
-    .sort((a, b) => +new Date(b.paymentDate) - +new Date(a.paymentDate))[0];
+  // Latest VALIDATED and non-voided payment; currency always matches the
+  // amount it belongs to (`baseAmount` is in the platform base currency).
+  const latest = selectOrgLatestPayment(invoices);
+  const latestAmount = latest
+    ? selectPaymentDisplayAmount(latest, currency)
+    : null;
 
   const activeCatalog: FeatureCatalog = catalog ?? FEATURE_CATALOG;
   const resolvedPlan = resolveFeatures(planFeatures ?? null);
@@ -376,8 +381,8 @@ export function OrgProfileCards({
         </Text>
         <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
           {billed.count} pago(s) validados
-          {latest
-            ? ` · último ${formatCents(latest.baseAmount ?? latest.amountPaid, latest.currencyPaid, currencyFormat)} el ${formatDate(latest.paymentDate)}`
+          {latest && latestAmount
+            ? ` · último ${formatCents(latestAmount.amountCents, latestAmount.currency, currencyFormat)} el ${formatDate(latest.paymentDate)}`
             : ""}
         </Text>
         <div className="flex items-end gap-5">
