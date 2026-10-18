@@ -1,0 +1,165 @@
+/**
+ * Country-driven identification values (`"<type>-<number>"` convention).
+ *
+ * The prefixes and labels come from `COUNTRIES` (SSOT): a natural person uses
+ * `docLabel` (`C.I.`, `C.C.`) and an organization uses `taxLabel` (`R.I.F.`,
+ * `NIT`). Legacy rows written before the convention keep working untouched.
+ */
+import { describe, expect, it } from 'vitest';
+import { COUNTRIES } from '../../src/constants';
+import {
+  defaultTaxDocumentType,
+  formatDocumentId,
+  getCountryIdentity,
+  parseDocumentId,
+} from '../../src/formatting/document-id';
+
+const VE_TYPES = COUNTRIES.VE!.docType;
+const CO_TYPES = COUNTRIES.CO!.docType;
+
+describe('parseDocumentId', () => {
+  it('splits a known country prefix from the number', () => {
+    expect(parseDocumentId('V-12345678', VE_TYPES)).toEqual({
+      type: 'V',
+      number: '12345678',
+    });
+    expect(parseDocumentId('C.C.-12345678', CO_TYPES)).toEqual({
+      type: 'C.C.',
+      number: '12345678',
+    });
+  });
+
+  it('keeps hyphens that belong to the number (VE R.I.F. shape)', () => {
+    expect(parseDocumentId('J-12345678-9', VE_TYPES)).toEqual({
+      type: 'J',
+      number: '12345678-9',
+    });
+  });
+
+  it('treats a legacy value without separator as the number (no fabricated prefix)', () => {
+    expect(parseDocumentId('12345678', VE_TYPES)).toEqual({
+      type: '',
+      number: '12345678',
+    });
+    expect(parseDocumentId('12345678')).toEqual({ type: '', number: '12345678' });
+  });
+
+  it('does not strip a prefix the country does not define', () => {
+    expect(parseDocumentId('12-3456789', VE_TYPES)).toEqual({
+      type: '',
+      number: '12-3456789',
+    });
+    expect(parseDocumentId('TAX-9001', VE_TYPES)).toEqual({
+      type: '',
+      number: 'TAX-9001',
+    });
+  });
+
+  it('never splits when the country is unknown (no prefix universe)', () => {
+    expect(parseDocumentId('J-12345678-9', [])).toEqual({
+      type: '',
+      number: 'J-12345678-9',
+    });
+  });
+
+  it('handles empty and incomplete values', () => {
+    expect(parseDocumentId(null)).toEqual({ type: '', number: '' });
+    expect(parseDocumentId('   ')).toEqual({ type: '', number: '' });
+    expect(parseDocumentId('V-', VE_TYPES)).toEqual({ type: '', number: 'V-' });
+    expect(parseDocumentId('-1234', VE_TYPES)).toEqual({ type: '', number: '-1234' });
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(parseDocumentId('  V-12345678 ', VE_TYPES)).toEqual({
+      type: 'V',
+      number: '12345678',
+    });
+  });
+});
+
+describe('formatDocumentId', () => {
+  it('composes the persisted form', () => {
+    expect(formatDocumentId('V', '12345678')).toBe('V-12345678');
+    expect(formatDocumentId('J', '12345678-9')).toBe('J-12345678-9');
+  });
+
+  it('returns the plain number when there is no prefix', () => {
+    expect(formatDocumentId('', '12345678')).toBe('12345678');
+    expect(formatDocumentId(null, '12345678')).toBe('12345678');
+  });
+
+  it('returns an empty value (nullable column) instead of a dangling prefix', () => {
+    expect(formatDocumentId('V', '')).toBe('');
+    expect(formatDocumentId('V', null)).toBe('');
+    expect(formatDocumentId('V', '   ')).toBe('');
+  });
+
+  it('round-trips every parsed value', () => {
+    for (const raw of ['V-12345678', 'J-12345678-9', 'C.C.-12345678', '12345678']) {
+      const parsed = parseDocumentId(raw, [...VE_TYPES, ...CO_TYPES]);
+      expect(formatDocumentId(parsed.type || 'V', parsed.number)).toBe(
+        raw === '12345678' ? `V-${raw}` : raw,
+      );
+    }
+  });
+});
+
+describe('getCountryIdentity', () => {
+  it('returns the country labels and prefixes', () => {
+    expect(getCountryIdentity('VE')).toEqual({
+      docLabel: 'C.I.',
+      taxLabel: 'R.I.F.',
+      docTypes: VE_TYPES,
+    });
+    expect(getCountryIdentity('CO')).toEqual({
+      docLabel: 'C.C.',
+      taxLabel: 'NIT',
+      docTypes: CO_TYPES,
+    });
+  });
+
+  it('returns undefined for an unknown or absent country (no fallback)', () => {
+    expect(getCountryIdentity('XX')).toBeUndefined();
+    expect(getCountryIdentity('')).toBeUndefined();
+    expect(getCountryIdentity(null)).toBeUndefined();
+    expect(getCountryIdentity(undefined)).toBeUndefined();
+  });
+});
+
+describe('defaultTaxDocumentType', () => {
+  it('prefers the tax label when the country also defines it as a prefix', () => {
+    expect(defaultTaxDocumentType('CO')).toBe('NIT');
+  });
+
+  it('falls back to the first defined prefix when the tax label is not a prefix', () => {
+    expect(defaultTaxDocumentType('VE')).toBe('V');
+  });
+
+  it('is empty for an unknown country', () => {
+    expect(defaultTaxDocumentType('XX')).toBe('');
+    expect(defaultTaxDocumentType(null)).toBe('');
+  });
+});
+
+describe('COUNTRIES document prefixes', () => {
+  it('VE declares the natural person and juridical prefixes', () => {
+    expect(VE_TYPES).toEqual(['V', 'E', 'P', 'J', 'G']);
+  });
+
+  it('CO declares the natural person and juridical prefixes', () => {
+    expect(CO_TYPES).toEqual(['C.C.', 'C.E.', 'NIT', 'T.I.', 'PPT', 'PA']);
+  });
+
+  it('every country prefix is non empty (options rendered as-is)', () => {
+    for (const country of Object.values(COUNTRIES)) {
+      for (const type of country.docType) {
+        expect(type.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('the tax label is unique among the prefixes when the country defines it', () => {
+    expect(VE_TYPES.filter((t) => t === COUNTRIES.VE!.taxLabel)).toEqual([]);
+    expect(CO_TYPES.filter((t) => t === COUNTRIES.CO!.taxLabel)).toEqual(['NIT']);
+  });
+});

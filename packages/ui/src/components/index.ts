@@ -55,6 +55,8 @@ export { FormTabs } from "@workspace/ui/components/form-tabs";
 export { CountrySelector } from "@workspace/ui/components/country-selector";
 export { CurrencySelector } from "@workspace/ui/components/currency-selector";
 export { ActiveCurrenciesField } from "@workspace/ui/components/active-currencies-field";
+export { DocumentIdField } from "@workspace/ui/components/document-id-field";
+export type { DocumentIdValue } from "@workspace/ui/components/document-id-field";
 export { SimpleSelect } from "@workspace/ui/components/simple-select";
 export type { SimpleSelectOption } from "@workspace/ui/components/simple-select";
 export { Separator } from "@workspace/ui/components/separator";

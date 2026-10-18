@@ -43,6 +43,8 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 
 **Datos del miembro:** nombre completo, documento de identidad si existe (usar `docLabel` del país), contacto opcional.
 
+**Identificación (persona y organización):** se persiste como un solo string `"<tipo>-<número>"` (p. ej. `V-12345678`, `C.C.-12345678`). Los prefijos válidos salen de `COUNTRIES[cc].docType` y la etiqueta de `docLabel` (persona natural) o `taxLabel` (organización); ningún label se escribe a mano en los formularios. El parseo es tolerante: un valor anterior sin prefijo (o con un prefijo que el país no define) se conserva tal cual y se normaliza recién al volver a guardar.
+
 **Detalle de la venta:** nombre del plan (snapshot, no el plan en vivo), periodo cubierto (`startDate`–`endDate`), precio unitario snapshot.
 
 **Desglose monetario:** `subtotal`, `taxDetails` (JSON `[{name, rate, amount}]`), `taxTotal`, `amountPaid`, `currencyPaid`. Si `currencyPaid ≠ planSnapshotCurrency`, mostrar también `exchangeRateApplied` y el equivalente en la moneda del plan (`baseCurrency` del comprobante). La tasa persistida se lee "1 {planSnapshotCurrency} = {rate} {currencyPaid}", por lo que el equivalente se obtiene dividiendo (`roundCents(amountPaid / rate)`).

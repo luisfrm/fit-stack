@@ -13,6 +13,7 @@ import {
   CheckboxCard,
   FormTabs,
   ActiveCurrenciesField,
+  DocumentIdField,
 } from "@workspace/ui/components";
 import {
   Building2,
@@ -27,7 +28,13 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { COUNTRY_LIST, COUNTRIES, COUNTRY_INDEX } from "@workspace/shared/constants";
-import { FiscalConfigSchema } from "@workspace/shared";
+import {
+  defaultTaxDocumentType,
+  FiscalConfigSchema,
+  formatDocumentId,
+  getCountryIdentity,
+  parseDocumentId,
+} from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -106,7 +113,13 @@ function OrganizationStep1({
   slugStatus,
   slugError,
 }: Step1Props) {
-  const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
+  // Tax registry identity: prefix options (`docType`) and label (`taxLabel`)
+  // come from `COUNTRIES`; an unknown country renders an explicit empty state.
+  const countryIdentity = getCountryIdentity(formData.countryCode);
+  const taxIdValue = parseDocumentId(
+    formData.taxId ?? "",
+    countryIdentity?.docTypes ?? [],
+  );
   // Explicit primary currency (editable). Never derived silently at render time:
   // an empty value blocks the step with a visible error.
   const primaryCurrency = formData.primaryCurrency ?? "";
@@ -254,13 +267,23 @@ function OrganizationStep1({
       />
 
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input
-          label={`ID Fiscal (${countryConfig?.taxLabel ?? "Registro"})`}
-          placeholder="Ej: J-12345678-9"
-          value={formData.taxId ?? ""}
-          onChange={(e) => onChange("taxId", e.target.value)}
-          leftIcon={<Fingerprint size={16} />}
-        />
+        {countryIdentity ? (
+          <DocumentIdField
+            label={`ID Fiscal (${countryIdentity.taxLabel})`}
+            types={countryIdentity.docTypes}
+            defaultType={defaultTaxDocumentType(formData.countryCode)}
+            value={taxIdValue}
+            onChange={(next) =>
+              onChange("taxId", formatDocumentId(next.type, next.number))
+            }
+            placeholder="12345678-9"
+            leftIcon={<Fingerprint size={16} />}
+          />
+        ) : (
+          <Text size="sm" variant="muted">
+            Selecciona el país para registrar el ID fiscal.
+          </Text>
+        )}
         <Input
           label="Dirección"
           placeholder="Ej: Av. Principal, Edif. X..."

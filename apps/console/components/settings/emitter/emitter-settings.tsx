@@ -7,11 +7,18 @@ import { Text } from "@workspace/ui/components/text";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { CountrySelector } from "@workspace/ui/components/country-selector";
+import { DocumentIdField } from "@workspace/ui/components/document-id-field";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { mutationError } from "@/lib/errors";
 import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { COUNTRY_LIST } from "@workspace/shared/constants";
+import {
+  defaultTaxDocumentType,
+  formatDocumentId,
+  getCountryIdentity,
+  parseDocumentId,
+} from "@workspace/shared";
 
 interface PlatformEmitterSettingsProps {
   readonly initialSettings: Record<string, string>;
@@ -40,6 +47,11 @@ export function PlatformEmitterSettings({
     () => initialSettings[PLATFORM_SETTINGS_KEYS.FITSTACK_COUNTRY_CODE] || "",
   );
   const [isUpdating, setIsUpdating] = React.useState(false);
+
+  // The emitter may have no country (generic FitStack emitter): the tax
+  // registry label and its prefixes only exist once a country is selected.
+  const countryIdentity = getCountryIdentity(countryCode);
+  const taxIdValue = parseDocumentId(taxId, countryIdentity?.docTypes ?? []);
 
   const handleSave = async () => {
     setIsUpdating(true);
@@ -108,13 +120,15 @@ export function PlatformEmitterSettings({
               disabled={isUpdating}
               data-testid="emitter-legal-name"
             />
-            <Input
-              label="ID Fiscal (RIF / NIT / RFC)"
-              value={taxId}
-              onChange={(e) => setTaxId(e.target.value)}
-              placeholder="J-123456789"
+            <DocumentIdField
+              label={countryIdentity ? `ID Fiscal (${countryIdentity.taxLabel})` : "ID Fiscal"}
+              types={countryIdentity?.docTypes ?? []}
+              defaultType={defaultTaxDocumentType(countryCode)}
+              value={taxIdValue}
+              onChange={(next) => setTaxId(formatDocumentId(next.type, next.number))}
+              placeholder="12345678-9"
               disabled={isUpdating}
-              data-testid="emitter-tax-id"
+              testId="emitter-tax-id"
             />
             <Input
               label="Dirección Fiscal"

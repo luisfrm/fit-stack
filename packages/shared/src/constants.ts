@@ -279,7 +279,7 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Caracas",
     docLabel: "C.I.",
     taxLabel: "R.I.F.",
-    docType: ["V", "E", "P"],
+    docType: ["V", "E", "P", "J", "G"],
     legalDisclaimer: [
       "Este comprobante no constituye una factura fiscal digital conforme a la normativa del SENIAT. Es un registro interno emitido por el sistema de gestión del establecimiento.",
       "Generado con FitStack",
@@ -299,7 +299,7 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
     timezone: "America/Bogota",
     docLabel: "C.C.",
     taxLabel: "NIT",
-    docType: ["C.C.", "NIT"],
+    docType: ["C.C.", "C.E.", "NIT", "T.I.", "PPT", "PA"],
     legalDisclaimer: [
       "Este comprobante no constituye una factura fiscal digital conforme a la normativa de la DIAN. Es un registro interno emitido por el sistema de gestión del establecimiento.",
       "Generado con FitStack",

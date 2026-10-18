@@ -15,7 +15,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { CountrySelector, toast, Title, SimpleSelect } from "@workspace/ui";
+import { CountrySelector, toast, Title, SimpleSelect, DocumentIdField } from "@workspace/ui";
 import { useAuth, usePermissions } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
@@ -23,7 +23,11 @@ import { mutationError } from "@/lib/errors";
 import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 import {
+  defaultTaxDocumentType,
   FiscalConfigSchema,
+  formatDocumentId,
+  getCountryIdentity,
+  parseDocumentId,
   resolveDocumentLabel,
   resolveFiscalProfile,
 } from "@workspace/shared";
@@ -219,8 +223,13 @@ export default function OrganizationSettingsPage() {
     }
   };
 
-  // Get current country labels for placeholder/logic
-  const currentCountry = COUNTRIES[formData.countryCode] || COUNTRIES.VE;
+  // Country labels come from `COUNTRIES` (SSOT); an unknown country renders an
+  // explicit empty state, never another country's labels.
+  const countryIdentity = getCountryIdentity(formData.countryCode);
+  const taxIdValue = parseDocumentId(
+    formData.taxId,
+    countryIdentity?.docTypes ?? [],
+  );
 
   const fiscalCountry = activeOrg?.countryCode ? COUNTRIES[activeOrg.countryCode] : undefined;
   const appliedDocumentLabel = resolveDocumentLabel({
@@ -473,13 +482,23 @@ export default function OrganizationSettingsPage() {
                   "Payment Receipt"). Marking mandatory blocked native submit
                   for the entire form. */}
               <div className="space-y-2">
-                <Input
-                  label={`Nro. Registro (${currentCountry?.taxLabel})`}
-                  placeholder="J-12345678-9"
-                  value={formData.taxId}
-                  onChange={(e) => handleChange("taxId", e.target.value)}
-                  leftIcon={<ShieldCheck className="w-4 h-4" />}
-                />
+                {countryIdentity ? (
+                  <DocumentIdField
+                    label={`Nro. Registro (${countryIdentity.taxLabel})`}
+                    types={countryIdentity.docTypes}
+                    defaultType={defaultTaxDocumentType(formData.countryCode)}
+                    value={taxIdValue}
+                    onChange={(next) =>
+                      handleChange("taxId", formatDocumentId(next.type, next.number))
+                    }
+                    placeholder="12345678-9"
+                    leftIcon={<ShieldCheck className="w-4 h-4" />}
+                  />
+                ) : (
+                  <Text size="sm" variant="muted">
+                    La organización no tiene país configurado.
+                  </Text>
+                )}
                 <Text size="xs" variant="muted" className="italic opacity-70">
                   Opcional. Requerido junto al nombre legal y la dirección para activar el contribuyente formal.
                 </Text>
