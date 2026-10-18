@@ -69,7 +69,7 @@ export const COUNTRY_SUGGESTED_PAYMENT_METHODS: Record<
       id: 'zelle',
       name: 'Zelle',
       fields: [
-        { id: 'fld_z1', label: 'Email de cuenta issuers', type: 'text', required: true },
+        { id: 'fld_z1', label: 'Email de la cuenta emisora', type: 'text', required: true },
         { id: 'fld_z2', label: 'Nombre del titular', type: 'text', required: false },
       ],
       currency: 'USD',
