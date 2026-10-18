@@ -176,6 +176,13 @@
       "when": 1792349233303,
       "tag": "0024_yielding_hammerhead",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792363356870,
+      "tag": "0025_validate_subscription_fks",
+      "breakpoints": true
     }
   ]
 }
