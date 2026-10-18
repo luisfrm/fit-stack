@@ -1,6 +1,6 @@
 /* ── Documents / tax-math — tax calculation ─────────────────────────────
-   Hybrid model: automatic by default (`computeTaxes` from fiscal profile),
-   with audited manual override (`applyTaxOverride` requires a reason).
+   Single model: taxes come from the fiscal profile (country SSOT) and are
+   calculated here — there is NO manual override anymore.
    UNITS: everything operates in INTEGER CENTS (the unit of `payment` and
    `platform_subscription_payment`: `bigint` columns). Callers with higher-level
    units convert at the boundary using `unitsToCents` (`money.ts`).
@@ -25,8 +25,6 @@ export interface TaxInput {
    * is decomposed tax-inclusive (IGTF VE). Omitted = standard tax-inclusive.
    */
   basis?: 'gross_first';
-  /** Informative: activation required explicit user confirmation (does not affect calculation). */
-  requiresConfirmation?: boolean;
 }
 
 export interface ComputeTaxesOptions {
@@ -151,60 +149,4 @@ export function computeInclusiveTaxes(
     taxDetails[taxDetails.length - 1]!.amount += dust;
   }
   return { subtotal, taxDetails, taxTotal, total };
-}
-
-export interface TaxOverrideInput {
-  /** Integer cents. */
-  taxTotal: number;
-  /** Integer cents per line. */
-  taxDetails: ITaxDetail[];
-  /** Audit reason. Empty or whitespace only → throws. */
-  taxOverrideReason: string;
-  /** Actor (user.id) authorizing the override. Informative. */
-  actor?: string;
-}
-
-/**
- * Audited manual override: caller provides custom breakdown (integer cents)
- * and this function validates it (mandatory reason, valid lines, sum ≈ total).
- * Throws if inconsistent — never persists an inconsistent override silently.
- */
-export function applyTaxOverride(
-  base: number,
-  _taxes: TaxInput[],
-  override: TaxOverrideInput,
-): ComputedTaxes {
-  assertValidBase(base);
-  if (override.taxOverrideReason.trim().length === 0) {
-    throw new Error('applyTaxOverride: taxOverrideReason es obligatorio para override manual.');
-  }
-  if (!Number.isInteger(override.taxTotal) || override.taxTotal < 0) {
-    throw new Error(`applyTaxOverride: taxTotal inválido (${String(override.taxTotal)}). Debe ser centavos enteros ≥ 0.`);
-  }
-  for (const line of override.taxDetails) {
-    if (
-      line.name.trim().length === 0 ||
-      !Number.isFinite(line.rate) ||
-      line.rate < 0 ||
-      line.rate > 1 ||
-      !Number.isInteger(line.amount) ||
-      line.amount < 0
-    ) {
-      throw new Error(
-        `applyTaxOverride: línea de impuesto inválida (${JSON.stringify(line)}). El monto debe ser centavos enteros.`,
-      );
-    }
-  }
-  const linesSum = override.taxDetails.reduce((sum, line) => sum + line.amount, 0);
-  if (Math.abs(linesSum - override.taxTotal) > TAX_TOTAL_TOLERANCE) {
-    throw new Error(
-      `applyTaxOverride: Σ líneas (${linesSum}) ≠ taxTotal (${override.taxTotal}).`,
-    );
-  }
-  return {
-    subtotal: base,
-    taxDetails: override.taxDetails,
-    taxTotal: override.taxTotal,
-    total: base + override.taxTotal,
-  };
 }

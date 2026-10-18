@@ -32,28 +32,10 @@ export const paymentMethodDetailsSchema = z
   .optional();
 
 /**
- * Tax line persisted in the payment. `rate` is a fraction 0–1 and amounts
- * are integer cents (see `money.ts` in `@workspace/shared`).
- * Single source of truth for PDF and reports.
+ * Org fiscal contract — re-export from shared, not duplicated.
+ *
+ * There is no tax write contract anymore: taxes come from `COUNTRIES` (SSOT),
+ * the only fiscal switch is `isFormalTaxpayer` (Console-governed) and the
+ * breakdown is always computed at emission time.
  */
-export const taxDetailSchema = z.object({
-  name: z.string().min(1),
-  rate: z.number().min(0).max(1),
-  amount: z.number().int().min(0),
-});
-
-/** Org fiscal contract — re-export from shared, not duplicated. */
-
-
-/**
- * Manual tax override with audit trail: requires non-empty reason.
- * Amounts in integer cents. The service also validates that Σ lines ≈
- * taxTotal (see `applyTaxOverride`).
- */
-export const taxOverrideSchema = z.object({
-  taxTotal: z.number().int().min(0),
-  taxDetails: z.array(taxDetailSchema),
-  taxOverrideReason: z.string().trim().min(1),
-});
-
 export { FiscalConfigSchema } from '@workspace/shared';

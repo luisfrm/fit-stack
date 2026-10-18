@@ -34,7 +34,6 @@ export interface IPayment {
   documentType?: 'receipt' | 'invoice';
   receiptIssuedAt?: Date | null;
   receiptPdfKey?: string | null;
-  taxOverrideReason?: string | null;
   receiptVoided?: boolean;
   voidedBy?: string | null;
   voidedAt?: Date | null;
@@ -107,7 +106,9 @@ export function createPaymentsRepository(db: Db) {
           documentType: data.documentType ?? 'receipt',
           receiptIssuedAt: data.receiptIssuedAt ?? null,
           receiptPdfKey: data.receiptPdfKey ?? null,
-          taxOverrideReason: data.taxOverrideReason ?? null,
+          // `tax_override_reason` is legacy READ-ONLY: the column stays so
+          // historical receipts keep their audit trail, but no write path sets
+          // it anymore (the breakdown always comes from `COUNTRIES`).
           receiptVoided: data.receiptVoided ?? false,
           voidedBy: data.voidedBy ?? null,
           voidedAt: data.voidedAt ?? null,

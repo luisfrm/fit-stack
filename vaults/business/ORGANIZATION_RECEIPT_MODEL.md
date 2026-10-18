@@ -22,7 +22,7 @@ FitStack **no presenta, declara, retiene ni paga impuestos por la organización*
 - **FitStack:** proveedor de registro, cálculo interno, documento y distribución.
 - **Responsable fiscal de la venta:** exclusivamente la organización.
 
-La declaración `isFormalTaxpayer` es una afirmación de la propia organización. FitStack no la verifica.
+La declaración `isFormalTaxpayer` es una afirmación de la propia organización que Fit-Stack registra desde Console; no la verifica.
 
 ## 3. Flujo real cuando un pago queda validado
 
@@ -45,14 +45,12 @@ Código: `apps/api-worker/src/services/subscriptions.service.ts:190`, `apps/api-
 2. Reutiliza el número si el pago ya estaba numerado.
 3. Calcula el año en la zona horaria de la organización.
 4. Reserva el siguiente número en la secuencia anual por organización.
-5. Calcula el desglose en centavos enteros:
-   - Automático: descomposición tax-inclusive con `computeInclusiveTaxes`.
-   - Manual: override auditado con `taxOverrideReason` obligatorio.
-6. Persiste número, fecha de emisión, impuestos y motivo de override.
+5. Calcula el desglose en centavos enteros con `computeInclusiveTaxes`, siempre desde `COUNTRIES` (SSOT): sin declaración de contribuyente formal el total es el subtotal y no hay líneas de impuesto.
+6. Persiste número, fecha de emisión y desglose calculado (`tax_override_reason` es legado de solo lectura).
 7. Encola `receipt.render`.
 8. No envía correo en este paso.
 
-Código: `apps/api-worker/src/services/receipt-issue.core.ts` (secuencia del paso 1), `apps/api-worker/src/services/receipts.service.ts` (perfil Panel: override de impuestos), `packages/shared/src/documents/tax-math.ts`.
+Código: `apps/api-worker/src/services/receipt-issue.core.ts` (secuencia del paso 1), `apps/api-worker/src/services/receipts.service.ts` (perfil Panel), `packages/shared/src/documents/tax-math.ts`.
 
 ### 3.3 Paso 2: PDF inmutable y notificación
 
@@ -143,8 +141,8 @@ FitStack no se encarga de:
 La organización debe:
 
 - Registrar su identidad legal verdadera: razón social, identificación fiscal y dirección.
-- Declarar `isFormalTaxpayer` solamente si corresponde a su situación real.
-- Mantener actualizados impuestos, disclaimer y datos emisores.
+- Mantener esa identidad completa mientras Fit-Stack declara `isFormalTaxpayer` desde Console (solo con identidad completa).
+- Mantener actualizados el disclaimer y sus datos emisores (las tasas las define `COUNTRIES`).
 - Decidir si una venta requiere factura fiscal.
 - Usar un proveedor homologado, imprenta autorizada o contador cuando la ley lo exija.
 - Cumplir IVA/IGV, IGTF u otras obligaciones aplicables.
@@ -161,36 +159,35 @@ Campos relevantes:
 - `legalName`
 - `taxId`
 - `address`
-- `fiscalConfig`
-- `confirmed`, solo como fricción para declarar contribuyente formal.
+- `fiscalConfig.disclaimerOverride`
+
+El régimen fiscal (`fiscalConfig.isFormalTaxpayer`) es **platform-only**: se escribe desde Console (`PATCH /api/platform/organizations/:id`). La ruta del tenant responde `403 FISCAL_CONFIG_PLATFORM_ONLY` si intenta enviarlo (junto con las claves legadas `taxes`/`confirmedTaxes` o un `fiscalConfig: null`), sin escritura parcial.
 
 Reglas actuales:
 
 - Ruta org-scoped con permiso `ORGANIZATION.UPDATE`.
 - `countryCode` y `primaryCurrency` son inmutables después de la creación.
-- `fiscalConfig` se fusiona, no se reemplaza a ciegas.
-- `fiscalConfig: null` restablece los defaults del país.
-- `isFormalTaxpayer: true` exige `confirmed: true` solamente en la transición desde no formal.
+- `fiscalConfig` se fusiona, no se reemplaza a ciegas (un PATCH parcial de `disclaimerOverride` conserva `isFormalTaxpayer`).
+- Console solo puede activar `isFormalTaxpayer` con identidad completa (`legalName` + `taxId` + `address`); si falta alguna → `400 FISCAL_IDENTITY_INCOMPLETE` sin escritura parcial.
 - Se invalida el perfil cacheado de la sesión.
 
-Código: `apps/api-worker/src/routes/organizations.route.ts:227`, `apps/api-worker/src/services/organizations.service.ts:38`, `apps/api-worker/src/services/organizations.service.ts:130`.
+Código: `apps/api-worker/src/routes/organizations.route.ts`, `apps/api-worker/src/services/organizations.service.ts`.
 
-`fiscalConfig` admite:
+`fiscalConfig` admite (contrato estricto: cualquier otra clave → 400):
 
 - `documentLabel`: etiqueta solicitada, actualmente solo lectura en producto.
-- `isFormalTaxpayer`: declaración explícita.
-- `taxes`: override por nombre de impuesto, con tasa y habilitación.
+- `isFormalTaxpayer`: declaración, escrita solo desde Console.
 - `disclaimerOverride`: texto legal alternativo.
 
-Los impuestos desconocidos se conservan, pero el resolver los ignora. El país sigue siendo la fuente de defaults y `countryCode` desconocido produce un error visible.
+Las tasas y condiciones **no** se configuran por organización: viven en `COUNTRIES` (SSOT). Las claves legadas (`taxes`, `confirmedTaxes`) se descartan al leer una fila almacenada y nunca se rescriben. Un `countryCode` desconocido produce un error visible.
 
-Código: `packages/shared/src/documents/fiscal-profile.ts:26`, `packages/shared/src/documents/fiscal-profile.ts:86`.
+Código: `packages/shared/src/documents/fiscal-profile.ts` (`FiscalConfigSchema`, `resolveFiscalProfile`).
 
 ## 9. Qué significa `isFormalTaxpayer: true` hoy
 
 Hoy significa únicamente:
 
-> “Esta organización afirma que es contribuyente formal.”
+> “Esta organización se declara contribuyente formal (Fit-Stack lo registra desde Console a su solicitud).”
 
 No significa:
 
@@ -230,10 +227,10 @@ La etiqueta solicitada por el emisor no es un parámetro del gate. Por eso el ca
 
 Hoy ofrecemos **preparación, no facturación fiscal**:
 
-- Guardar su declaración formal.
-- Guardar su identificación fiscal.
+- Tener su declaración formal (`isFormalTaxpayer`) gestionada por Fit-Stack desde la consola de plataforma.
+- Editar su identificación fiscal (nombre legal, ID fiscal y dirección).
 - Guardar una etiqueta solicitada para futura referencia.
-- Personalizar impuestos internos y disclaimer.
+- Personalizar el disclaimer (las tasas y condiciones las define `COUNTRIES`).
 - Emitir comprobantes internos consistentes con su identidad.
 - Exportar/descargar y reenviar el documento.
 - Mantener trazabilidad interna por número correlativo.
@@ -259,7 +256,7 @@ Para pasar de preparación a facturación fiscal real habría que implementar, c
 6. Manejo de anulaciones/notas de crédito según la norma local.
 7. Actualización del disclaimer para indicar factura fiscal real.
 8. Revisión de responsabilidades, términos y textos del producto.
-9. Pasar `hasFiscalHomologation: true` solamente cuando exista conexión real.
+9. Habilitar la etiqueta “Factura” en el gate (`HAS_FISCAL_HOMOLOGATION`) solo cuando exista conexión real; hoy `hasFiscalHomologation` no forma parte de `FiscalConfigSchema` (400).
 10. Pruebas específicas por país y por proveedor.
 
 Mientras eso no exista, la única etiqueta válida sigue siendo “Comprobante de pago”.

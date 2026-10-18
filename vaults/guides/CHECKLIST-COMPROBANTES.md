@@ -35,7 +35,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [x] **C0** Integridad del correlativo (orden + carrera + compensación)
 - [x] **C8** Guardado de organización org-scoped en Panel (D5)
 - [x] **C1** Snapshot del emisor — migración `0016`, sin backfill
-- [x] **C2** Perfil fiscal conservador (`isFormalTaxpayer`, IGTF)
+- [x] **C2** Perfil fiscal conservador (`isFormalTaxpayer` como único switch, IGTF condicional del país; RD-145 lo restringe a Console)
 - [x] **C3** Fidelidad del PDF (placeholders fuera, equivalente en moneda base)
 - [x] **C4** Auditoría espejo en Console (`FS-N` + export CSV)
 - [x] **C5** Trazabilidad de emisión (`issued_by`) — misma `0016`
@@ -53,7 +53,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [ ] **§12.2** El borrado de un **miembro** arrastra su histórico financiero por cascada — la única vía por la que un pago desaparece hoy.
 - [ ] **§13** `DELETE /api/platform/subscriptions/:id` (Console) borra la suscripción SaaS y sus pagos: puede dejar la serie `FS-N` sin las filas que la auditoría necesita.
 - [ ] **§14** El email que agota reintentos y cae a la DLQ **después** de la marca de notificado no lo recupera el barrido: recuperación manual (`send-email` / `resend`).
-- [ ] **§9 → RD-138** Tasa y base del IGTF a confirmar con contador + declaración fiscal del emisor plataforma (los `FS-N` no detallan impuestos).
+- [ ] **§9 → RD-138** Tasa y base del IGTF a confirmar con contador (hoy `COUNTRIES` fija 3% con base `gross_first`) + declaración fiscal del emisor plataforma (los `FS-N` no detallan impuestos).
 - [ ] **§11** Los comprobantes emitidos antes de C1 recomponen en vivo (limitación documentada, sin backfill inventado).
 - [ ] **§10 → RD-139** Universo de `gaps[]` a escala (disparador de performance).
 - [ ] **§8** Disclaimer de Console con país proxy hasta configurar `fitstack_country_code`.

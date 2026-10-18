@@ -7,8 +7,7 @@ import {
   type PaginatedMembers,
   type IMember,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetails,
-  type ITaxDetail
+  type IPaymentMethodDetails
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
@@ -32,7 +31,6 @@ import { apiCode } from "@/lib/errors";
 import {
   centsToUnits,
   unitsToCents,
-  parseRateValue,
   previewReceiptTaxes,
   resolveFiscalProfile,
   computeSubscriptionPeriod,
@@ -44,7 +42,6 @@ import {
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
-import { type TaxMode } from "./tax-block";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status" | "endDate"> {
   endDate?: string;
@@ -57,10 +54,6 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
     paymentDate?: Date | string;
-    subtotal?: number;
-    taxTotal?: number;
-    taxDetails?: ITaxDetail[];
-    taxOverrideReason?: string;
   }
 }
 
@@ -89,40 +82,6 @@ function validateDynamicPaymentFields(
       toast.error(`El campo "${field.label}" es obligatorio`);
       return false;
     }
-  }
-
-  return true;
-}
-
-/**
- * Validates tax override inputs and rates when taxMode is set to 'override'.
- */
-function validateTaxOverrides(
-  taxMode: TaxMode,
-  reason: string,
-  rateOverrides: Record<string, string>,
-  preview: unknown
-): boolean {
-  if (taxMode !== "override") return true;
-
-  if (!reason.trim()) {
-    toast.error("Indica el motivo del ajuste manual de impuestos");
-    return false;
-  }
-
-  for (const [name, raw] of Object.entries(rateOverrides)) {
-    if (raw.trim() === "") continue;
-    try {
-      parseRateValue(raw);
-    } catch {
-      toast.error(`Tasa inválida para ${name}`);
-      return false;
-    }
-  }
-
-  if (!preview) {
-    toast.error("No se pudo calcular el desglose de impuestos");
-    return false;
   }
 
   return true;
@@ -201,12 +160,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
-
-  // Fiscal override (auto mode = backend decomposes; override = manual
-  // rates + audit reason, amounts always in integer cents).
-  const [taxMode, setTaxMode] = React.useState<TaxMode>("auto");
-  const [taxRateOverrides, setTaxRateOverrides] = React.useState<Record<string, string>>({});
-  const [taxOverrideReason, setTaxOverrideReason] = React.useState("");
 
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
@@ -319,7 +272,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     );
   }, [activePaymentMethods, paymentCurrency]);
 
-  // Issuer org fiscal profile (country defaults + overrides).
+  // Fiscal profile of the issuer org: taxes and label come from the country
+  // (`COUNTRIES`, SSOT) plus the Console-governed `isFormalTaxpayer`.
   const fiscalProfile = React.useMemo(() => {
     const countryCode = activeOrganization?.countryCode;
     if (!countryCode) return null;
@@ -330,44 +284,18 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [activeOrganization]);
 
-  // An issuer that has not declared being a formal taxpayer does not detail
-  // taxes, and thus cannot adjust them manually (backend rejects with 400).
-  // Effective mode is always "auto" in that case.
-  const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";
-
-  // Breakdown preview using the single shared source of truth. Under override,
-  // manual rates are applied; if any rate is invalid, auto is shown and
-  // submit is blocked with toast.
+  // Breakdown preview using the single shared source of truth (the same
+  // function the backend uses at emission time). Nothing is editable here:
+  // rates come from `COUNTRIES`, never from the operator.
   const taxPreview = React.useMemo(() => {
     if (!fiscalProfile) return null;
-    const totalCents = unitsToCents(finalAmount);
     try {
-      if (effectiveTaxMode !== "override") {
-        const auto = previewReceiptTaxes(totalCents, fiscalProfile, paymentCurrency);
-        return { ...auto, lines: auto.taxDetails };
-      }
-      const taxes = fiscalProfile.taxes.map((tax) => {
-        const raw = taxRateOverrides[tax.name];
-        if (raw === undefined || raw.trim() === "") return tax;
-        return { ...tax, rate: parseRateValue(raw) };
-      });
-      const custom = previewReceiptTaxes(totalCents, { ...fiscalProfile, taxes }, paymentCurrency);
-      return { ...custom, lines: custom.taxDetails };
+      const auto = previewReceiptTaxes(unitsToCents(finalAmount), fiscalProfile, paymentCurrency);
+      return { ...auto, lines: auto.taxDetails };
     } catch {
       return null;
     }
-  }, [fiscalProfile, effectiveTaxMode, taxRateOverrides, finalAmount, paymentCurrency]);
-
-  const handleTaxModeChange = (mode: TaxMode) => {
-    setTaxMode(mode);
-    if (mode === "override" && fiscalProfile && Object.keys(taxRateOverrides).length === 0) {
-      setTaxRateOverrides(
-        Object.fromEntries(
-          fiscalProfile.taxes.map((tax) => [tax.name, String(Number((tax.rate * 100).toFixed(4)))]),
-        ),
-      );
-    }
-  };
+  }, [fiscalProfile, finalAmount, paymentCurrency]);
 
   // Fetch Exchange Rate and Calculate Amount
   React.useEffect(() => {
@@ -449,7 +377,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
-    return validateTaxOverrides(effectiveTaxMode, taxOverrideReason, taxRateOverrides, taxPreview);
+    return true;
   };
 
   // Helper to process file uploads in dynamic fields
@@ -500,12 +428,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
     if (requiresOverrideReason) {
       payload.endDateOverrideReason = endDateOverrideReason.trim();
-    }
-    if (effectiveTaxMode === "override" && taxPreview) {
-      payload.payment.subtotal = taxPreview.subtotal;
-      payload.payment.taxTotal = taxPreview.taxTotal;
-      payload.payment.taxDetails = taxPreview.lines;
-      payload.payment.taxOverrideReason = taxOverrideReason.trim();
     }
 
     return payload;
@@ -676,14 +598,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           onPaymentDetailsChange={setPaymentDetails}
           disabled={isSectionDisabled}
           taxPreview={taxPreview}
-          taxMode={taxMode}
-          onTaxModeChange={handleTaxModeChange}
-          taxRateOverrides={taxRateOverrides}
-          onTaxRateChange={(name, pct) =>
-            setTaxRateOverrides((prev) => ({ ...prev, [name]: pct }))
-          }
-          taxOverrideReason={taxOverrideReason}
-          onTaxOverrideReasonChange={setTaxOverrideReason}
           taxEmitterIsFormal={fiscalProfile?.isFormalTaxpayer ?? false}
         />
       )}

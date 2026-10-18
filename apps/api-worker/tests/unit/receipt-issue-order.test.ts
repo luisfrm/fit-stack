@@ -25,7 +25,6 @@ import {
 } from '@workspace/shared';
 import {
   issueReceipt,
-  ReceiptError,
   type IssuerProfile,
   type ReceiptIssueDeps,
   type ReceiptIssueOrg,
@@ -127,7 +126,6 @@ function orderHarness(
         subtotal: 1000,
         taxTotal: 0,
         taxDetails: [],
-        taxOverrideReason: null,
       };
     },
     buildEmitterSnapshot: async () => {
@@ -208,16 +206,18 @@ describe('issueReceipt — step order (faked ports)', () => {
   });
 
   it('a fiscal failure throws before the sequence is ever consumed', async () => {
+    // Real fiscal failure mode: `resolveFiscalProfile` throws on an unknown
+    // country (uncoded `Error`, no silent fallback).
     const { calls, profile, deps } = orderHarness(() => ({
       resolveFiscal: async () => {
         calls.push('resolveFiscal');
-        throw new ReceiptError(400, 'TAX_MISMATCH', 'El desglose no cuadra.');
+        throw new Error('resolveFiscalProfile: countryCode desconocido ("XX").');
       },
     }));
 
-    await expect(issueReceipt(profile, deps, INPUT)).rejects.toMatchObject({
-      code: 'TAX_MISMATCH',
-    });
+    await expect(issueReceipt(profile, deps, INPUT)).rejects.toThrow(
+      /countryCode desconocido/,
+    );
     expect(calls).not.toContain('nextNumber');
     expect(calls).not.toContain('attach');
     expect(calls).not.toContain('queue.send');

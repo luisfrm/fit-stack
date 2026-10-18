@@ -100,6 +100,38 @@ async function assertPlatformRole(client: TestClient, role: string): Promise<voi
   }
 }
 
+/**
+ * Declares the organization a FORMAL TAXPAYER through Console, the only writer
+ * of `fiscalConfig.isFormalTaxpayer` (the tenant route answers
+ * `403 FISCAL_CONFIG_PLATFORM_ONLY`). Activation requires a complete issuer
+ * identity, so the defaults fill all three fields; tests that need an
+ * incomplete identity send their own payload instead of using this helper.
+ *
+ * Returns the promoted platform admin so the caller can issue further console
+ * writes without registering another one.
+ */
+export async function declareFormalTaxpayer(
+  organizationId: string,
+  identity: Partial<Record<'legalName' | 'taxId' | 'address', string>> = {},
+): Promise<AuthedUser> {
+  const admin = await registerPlatformUser('admin');
+  const res = await admin.client.patch(
+    `/api/platform/organizations/${organizationId}`,
+    {
+      legalName: identity.legalName ?? 'Gym Formal C.A.',
+      taxId: identity.taxId ?? 'J-12345678-9',
+      address: identity.address ?? 'Av. Principal 123',
+      fiscalConfig: { isFormalTaxpayer: true },
+    },
+  );
+  if (res.status !== 200) {
+    throw new Error(
+      `declare formal taxpayer failed (${res.status}): ${res.text}`,
+    );
+  }
+  return admin;
+}
+
 export interface TestOrganization {
   id: string;
   name: string;

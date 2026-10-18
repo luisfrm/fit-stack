@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { COUNTRY_LIST, COUNTRIES, COUNTRY_INDEX } from "@workspace/shared/constants";
+import { FiscalConfigSchema } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
@@ -60,6 +61,9 @@ interface Step1Props {
   readonly onLogoChange: (file: File | null) => void;
   readonly onRemoveLogo: () => void;
   readonly onChange: (field: keyof IOrganization, value: unknown) => void;
+  /** Platform-governed fiscal regime: only Fit-Stack toggles it (never the tenant). */
+  readonly formalTaxpayer: boolean;
+  readonly onFormalTaxpayerChange: (value: boolean) => void;
   readonly slugStatus: "idle" | "valid" | "error";
   readonly slugError: string | null;
 }
@@ -73,6 +77,8 @@ function OrganizationStep1({
   onLogoChange,
   onRemoveLogo,
   onChange,
+  formalTaxpayer,
+  onFormalTaxpayerChange,
   slugStatus,
   slugError,
 }: Step1Props) {
@@ -234,6 +240,23 @@ function OrganizationStep1({
         />
       </div>
 
+      <div className="col-span-full pt-2">
+        <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+          Régimen fiscal
+        </Text>
+      </div>
+
+      <div className="col-span-full">
+        <CheckboxCard
+          id="formalTaxpayer"
+          checked={formalTaxpayer}
+          onCheckedChange={(checked) => onFormalTaxpayerChange(checked === true)}
+          label="Contribuyente formal"
+          description="Habilita el desglose de impuestos del país en los comprobantes (nombre legal, ID fiscal y dirección deben estar completos). El tenant no puede cambiar esta condición."
+          className="border-primary/10 bg-primary/5 hover:bg-primary/10"
+        />
+      </div>
+
       <Text className="text-[9px] text-white/40 leading-relaxed italic col-span-full">
         Los campos con * son obligatorios.
       </Text>
@@ -342,6 +365,14 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() =>
     deriveActiveCurrencies(initialData?.countryCode ?? "VE"),
   );
+
+  // Fiscal regime: platform-owned. Stored config is parsed with the STRICT
+  // shared contract (legacy `taxes`/`confirmedTaxes` rows are ignored here,
+  // never re-sent) and only `isFormalTaxpayer` is ever written from Console.
+  const [formalTaxpayer, setFormalTaxpayer] = React.useState<boolean>(() => {
+    const stored = FiscalConfigSchema.safeParse(initialData?.fiscalConfig ?? {});
+    return stored.success ? stored.data.isFormalTaxpayer === true : false;
+  });
 
   const [ownerData, setOwnerData] = React.useState<OwnerData>({
     firstName: "",
@@ -493,6 +524,9 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       const payload: Partial<IOrganization> = {
         ...formData,
         logo: previewUrl ? (finalLogoUrl || null) : null,
+        // Platform-only fiscal regime. Country taxes are NOT sent: they come
+        // from `COUNTRIES` (SSOT) at emission time.
+        fiscalConfig: { isFormalTaxpayer: formalTaxpayer },
       };
 
       // Active currencies set only on creation (in edit mode they are managed from gym panel).
@@ -545,6 +579,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
               onLogoChange={handleLogoChange}
               onRemoveLogo={removeImage}
               onChange={handleChange}
+              formalTaxpayer={formalTaxpayer}
+              onFormalTaxpayerChange={setFormalTaxpayer}
               slugStatus={slugStatus}
               slugError={slugError}
             />
@@ -572,6 +608,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
                 onLogoChange={handleLogoChange}
                 onRemoveLogo={removeImage}
                 onChange={handleChange}
+                formalTaxpayer={formalTaxpayer}
+                onFormalTaxpayerChange={setFormalTaxpayer}
                 slugStatus={slugStatus}
                 slugError={slugError}
               />

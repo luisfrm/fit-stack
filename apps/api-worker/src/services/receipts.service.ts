@@ -4,7 +4,6 @@ import {
   type AttachReceiptInput,
 } from '@workspace/database/repositories/receipts';
 import {
-  applyTaxOverride,
   buildEmitterSnapshot,
   buildPaymentReceiptEvent,
   buildReceiptRenderEvent,
@@ -32,19 +31,11 @@ import {
 // importing `ReceiptError` from this module.
 export { ReceiptError };
 
-export interface TaxOverrideInput {
-  subtotal: number;
-  taxTotal: number;
-  taxDetails: ITaxDetail[];
-  taxOverrideReason: string;
-}
-
 export interface AssignReceiptNumberInput {
   orgId: string;
   paymentId: number;
   /** Org timezone (from `requireOrgTimezone()`): defines local year. */
   timezone: string;
-  taxOverride?: TaxOverrideInput | null;
   /**
    * Session actor emitting receipt. Optional in signature because sweep
    * re-enqueues without session: in that case `NULL` is persisted, never a
@@ -70,45 +61,23 @@ function receiptYear(timezone: string): number {
 }
 
 /**
- * Resolves the tax breakdown for a receipt.
- * Either validates and applies the caller-supplied override, or
- * computes the breakdown automatically from the inclusive-tax profile.
+ * Resolves the tax breakdown for a receipt: always computed from the
+ * inclusive-tax profile (`COUNTRIES` is the tax SSOT). There is no manual
+ * override path anymore — an issuer that is not a formal taxpayer gets
+ * `subtotal = amountPaid`, `taxTotal = 0`, `taxDetails = []` from the profile.
  */
 function resolveTaxBreakdown(
   amountPaid: number,
   profile: ReturnType<typeof resolveFiscalProfile>,
   currencyPaid: string,
-  taxOverride?: TaxOverrideInput | null,
-): { subtotal: number; taxTotal: number; taxDetails: ITaxDetail[]; taxOverrideReason: string | null } {
-  if (!taxOverride) {
-    // Auto decomposition: single source of truth in shared, same as panel preview.
-    const computed = computeInclusiveTaxes(amountPaid, profile.taxes, { currencyPaid });
-    return { ...computed, taxOverrideReason: null };
-  }
-
-  const o = taxOverride;
-  if (!o.taxOverrideReason || o.taxOverrideReason.trim().length === 0) {
-    throw new ReceiptError(400, 'TAX_OVERRIDE_REASON_REQUIRED', 'El override de impuestos exige motivo.');
-  }
-  if (Math.abs(o.subtotal + o.taxTotal - amountPaid) > 1) {
-    throw new ReceiptError(400, 'TAX_MISMATCH', 'El desglose no cuadra con el monto cobrado.');
-  }
-  // The override can only REDUCE tax burden. A non-formal taxpayer cannot
-  // detail taxes via this path (it would assert a fiscal fact they never declared).
-  const overrideTotal = o.taxDetails.reduce((sum, line) => sum + line.amount, 0);
-  if (!profile.isFormalTaxpayer && overrideTotal > 0) {
-    throw new ReceiptError(
-      400,
-      'TAXES_REQUIRE_FORMAL_TAXPAYER',
-      'Para detallar impuestos primero debes declarar el negocio como contribuyente formal.',
-    );
-  }
-  const computed = applyTaxOverride(o.subtotal, profile.taxes, {
-    taxTotal: o.taxTotal,
-    taxDetails: o.taxDetails,
-    taxOverrideReason: o.taxOverrideReason,
-  });
-  return { ...computed, taxOverrideReason: o.taxOverrideReason };
+): { subtotal: number; taxTotal: number; taxDetails: ITaxDetail[] } {
+  // Single source of truth in shared, same as panel preview.
+  const computed = computeInclusiveTaxes(amountPaid, profile.taxes, { currencyPaid });
+  return {
+    subtotal: computed.subtotal,
+    taxTotal: computed.taxTotal,
+    taxDetails: computed.taxDetails,
+  };
 }
 
 /**
@@ -141,7 +110,7 @@ export interface PanelIssuerRepos {
 
 /**
  * Panel issuer profile (the gym organization): per-organization yearly
- * sequence, audited tax override, no $0 skip, `panel` event scope. Exported
+ * sequence, computed tax breakdown, no $0 skip, `panel` event scope. Exported
  * for the step-order unit test; routes only see `createReceiptsService`.
  */
 export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile<number> {
@@ -172,17 +141,16 @@ export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile
       return input.orgId!;
     },
 
-    async resolveFiscal(payment, org, input) {
+    async resolveFiscal(payment, org) {
       const profile = resolveFiscalProfile(org.countryCode, org.fiscalConfig);
       // Taxes in integer cents. amountPaid = TOTAL charged (taxes included):
-      // auto mode decomposes the base; an override is validated.
-      const { subtotal, taxTotal, taxDetails, taxOverrideReason } = resolveTaxBreakdown(
+      // the breakdown is always decomposed from the country tax profile.
+      const { subtotal, taxTotal, taxDetails } = resolveTaxBreakdown(
         Number(payment.amountPaid),
         profile,
         payment.currencyPaid,
-        input.taxOverride,
       );
-      return { profile, subtotal, taxTotal, taxDetails, taxOverrideReason };
+      return { profile, subtotal, taxTotal, taxDetails };
     },
 
     async buildEmitterSnapshot(_payment, org, profile) {
@@ -210,7 +178,6 @@ export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile
         receiptNumber: data.receiptNumber,
         documentType: 'receipt',
         receiptIssuedAt: data.receiptIssuedAt,
-        taxOverrideReason: data.taxOverrideReason,
         subtotal: data.subtotal,
         taxTotal: data.taxTotal,
         taxDetails: data.taxDetails,

@@ -6,6 +6,7 @@ import { OrganizationForm } from "./organization-form";
 import type { OwnerData } from "./organization-form-types";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { uploadService } from "@/lib/services/upload-service";
+import { apiCode, mutationError } from "@/lib/errors";
 import { type IPlatformOrganization, DEFAULT_ORG_STAFF_VALUES } from "@workspace/shared";
 
 interface OrganizationModalProps {
@@ -113,9 +114,21 @@ export function OrganizationModal({
         await handleCreateOrganization(formData, ownerData, logoFile, settings);
       }
       handleSuccess();
-    } catch (error: any) {
-      console.error("Error saving organization:", error);
-      toast.error("Algo salió mal");
+    } catch (error: unknown) {
+      // Toasts resolve by business CODE, never by the server message. The
+      // formal-taxpayer activation is rejected while the fiscal identity
+      // (legalName + taxId + address) is incomplete.
+      if (apiCode(error) === "FISCAL_IDENTITY_INCOMPLETE") {
+        toast.error(
+          mutationError(
+            "OrganizationModal",
+            error,
+            "Completa el nombre legal, el ID fiscal y la dirección antes de activar el contribuyente formal.",
+          ),
+        );
+        return;
+      }
+      toast.error(mutationError("OrganizationModal", error, "Algo salió mal"));
     }
   };
 

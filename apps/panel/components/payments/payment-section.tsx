@@ -20,7 +20,7 @@ import {
 import { sortPaymentMethodFields } from "@workspace/shared";
 import { ValueConverter, type CurrencyFormat, type ITaxDetail } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
-import { TaxBlock, type TaxMode } from "./tax-block";
+import { TaxBlock } from "./tax-block";
 
 interface RenderDynamicFieldParams {
   readonly field: IPaymentMethodField;
@@ -97,14 +97,8 @@ interface PaymentSectionProps {
   readonly paymentDate: string;
   readonly onPaymentDateChange: (value: string) => void;
   readonly disabled?: boolean;
-  // Tax block (preview calculated by parent via `previewReceiptTaxes`).
+  // Tax block (read-only preview calculated by parent via `previewReceiptTaxes`).
   readonly taxPreview: { subtotal: number; taxTotal: number; lines: ITaxDetail[] } | null;
-  readonly taxMode: TaxMode;
-  readonly onTaxModeChange: (mode: TaxMode) => void;
-  readonly taxRateOverrides: Record<string, string>;
-  readonly onTaxRateChange: (name: string, pct: string) => void;
-  readonly taxOverrideReason: string;
-  readonly onTaxOverrideReasonChange: (value: string) => void;
   /** Issuer formal taxpayer declaration (tax gating). */
   readonly taxEmitterIsFormal: boolean;
 }
@@ -138,12 +132,6 @@ export function PaymentSection({
   onPaymentDateChange,
   disabled,
   taxPreview,
-  taxMode,
-  onTaxModeChange,
-  taxRateOverrides,
-  onTaxRateChange,
-  taxOverrideReason,
-  onTaxOverrideReasonChange,
   taxEmitterIsFormal,
 }: PaymentSectionProps) {
   return (
@@ -246,13 +234,6 @@ export function PaymentSection({
           taxTotal={taxPreview.taxTotal}
           total={taxPreview.subtotal + taxPreview.taxTotal}
           lines={taxPreview.lines}
-          mode={taxMode}
-          onModeChange={onTaxModeChange}
-          rateOverrides={taxRateOverrides}
-          onRateChange={onTaxRateChange}
-          reason={taxOverrideReason}
-          onReasonChange={onTaxOverrideReasonChange}
-          disabled={disabled}
           emitterIsFormal={taxEmitterIsFormal}
         />
       )}

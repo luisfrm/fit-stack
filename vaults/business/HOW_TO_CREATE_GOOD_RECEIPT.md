@@ -86,14 +86,14 @@ Formato sugerido: `{slug-del-gym}-2026-000045` (evita usar el `organization.id` 
 | Detalle | `payment.planSnapshotName`, `planSnapshotPrice`, `planSnapshotCurrency` | `payment` (snapshot, no `membershipPlan` en vivo) |
 | Periodo cubierto | `subscription.startDate` → `subscription.endDate` | `subscription` |
 | Monto | `amountPaid`, `currencyPaid`, `exchangeRateApplied` | `payment` |
-| Impuestos | `subtotal`, `taxTotal`, `taxDetails` (según `organization.fiscalConfig.taxes`; nacen apagados salvo `isFormalTaxpayer: true`) | `payment` + config de país/org |
+| Impuestos | `subtotal`, `taxTotal`, `taxDetails` (según `COUNTRIES`, SSOT; nacen apagados salvo `isFormalTaxpayer: true`, que solo se activa desde Console) | `payment` + config de país |
 | Método de pago | `paymentMethod`, `paymentMethodDetails` (enmascarado) | `payment` |
 | Fechas | `paymentDate` vs fecha de emisión | `payment` |
 | Pie legal | disclaimer del país del gym (`organization.countryCode`) + "Generado con FitStack" | config de país |
 
 ### Diferencia clave vs. Console
 
-En Panel, los impuestos (`taxDetails`) **sí pueden variar por comprobante**, porque cada gym decide si activa o no impuestos en su `fiscalConfig`. En Console, en cambio, los impuestos (si algún día aplican) los define FitStack de forma uniforme para todos los Orgs de un mismo país — no cada Org decide su propio IVA sobre lo que le cobra FitStack.
+En ambos niveles las tasas y condiciones salen de `COUNTRIES` (SSOT): no hay override por organización. La única diferencia fiscal es el switch `isFormalTaxpayer`, que solo se activa desde Console (con identidad fiscal completa): mientras esté apagado el comprobante no detalla impuestos (`subtotal = importe`, sin líneas); encendido, se aplica el perfil del país del emisor (por ejemplo IVA + IGTF condicional en VE). El desglose siempre lo calcula el servidor (`computeInclusiveTaxes`); no existe override manual.
 
 ---
 
@@ -104,7 +104,7 @@ En Panel, los impuestos (`taxDetails`) **sí pueden variar por comprobante**, po
 | Emisor | FitStack (único) | Cada gym (múltiple) |
 | Receptor | Organización | Member |
 | Alcance de la numeración | Global, una sola secuencia | Por organización, una secuencia por gym |
-| Quién configura impuestos | FitStack (uniforme por país) | Cada gym (`fiscalConfig` propio) |
+| Quién configura impuestos | `COUNTRIES` (SSOT, uniforme por país) | `COUNTRIES` (SSOT, uniforme por país) |
 | Tabla fuente | `platformSubscriptionPayment` | `payment` |
 | ¿Puede ser "invoice" hoy? | No (FitStack sin RIF aún) | No (requiere homologación por gym, ver checklist) |
 

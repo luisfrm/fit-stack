@@ -15,12 +15,17 @@ import { createPlatformSubscriptionsService } from '../services/platform-subscri
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import type { NewDbOrganization } from '../repositories/organizations.repository';
 import type { AppEnv } from '../lib/env';
+import {
+  TENANT_FORBIDDEN_FISCAL_KEYS,
+  TenantFiscalConfigSchema,
+  type FiscalConfig,
+} from '@workspace/shared';
 
 /**
  * platform_setting keys (single source in apps/console/lib/config/platform-settings.ts).
@@ -42,16 +47,22 @@ const orgRenewSchema = z.object({
 
 /**
  * Org-scoped profile: branch identity (name, logo, slogan, timezone,
- * currency format) + fiscal issuing identity.
+ * currency format) + fiscal ISSUER identity (legalName/taxId/address) and
+ * the disclaimer the tenant owns.
+ *
+ * The fiscal REGIME is platform-only: `isFormalTaxpayer` (and the legacy
+ * `taxes`/`confirmedTaxes`) are rejected with an explicit
+ * `403 FISCAL_CONFIG_PLATFORM_ONLY` (see `TENANT_FORBIDDEN_FISCAL_KEYS`).
+ * Taxes are not configurable at all: `COUNTRIES` is their SSOT.
  *
  * `countryCode`/`primaryCurrency` are immutable from here (required at
  * creation): rejected with 400 if provided. Changing country would recalculate
  * primary currency - platform-level operation, not tenant.
- * `confirmed` provides friction for formal taxpayer declaration.
  *
  * `.passthrough()` (not `.strict()`) is deliberate: allows DETECTING prohibited
- * keys to return an explicit 400. Handler only forwards known fields, so
- * extra data is not persisted (no mass-assignment).
+ * keys (top-level and inside `fiscalConfig`) to return an explicit error.
+ * Handler only forwards known fields, so extra data is not persisted
+ * (no mass-assignment).
  */
 const orgProfileSchema = z
   .object({
@@ -64,8 +75,7 @@ const orgProfileSchema = z
     legalName: z.string().min(1).nullable().optional(),
     taxId: z.string().min(1).nullable().optional(),
     address: z.string().min(1).nullable().optional(),
-    fiscalConfig: FiscalConfigSchema.nullable().optional(),
-    confirmed: z.boolean().optional(),
+    fiscalConfig: TenantFiscalConfigSchema.nullable().optional(),
   })
   .passthrough();
 
@@ -88,17 +98,20 @@ const PROFILE_SCALAR_KEYS: readonly ProfileScalarKey[] = [
 ] as const;
 
 /**
- * Checks whether transitioning to formal taxpayer requires explicit user confirmation.
+ * Tenant-writable `fiscalConfig` keys. The forbidden ones are rejected by the
+ * handler (`403`); here only the tenant-owned fields are copied, so a
+ * platform key can never reach the merge (no mass-assignment).
  */
-function requiresFormalTaxpayerConfirmation(
-  body: OrgProfileInput,
-  currentFiscalConfig: unknown,
-): boolean {
-  const wantsFormal = body.fiscalConfig?.isFormalTaxpayer === true;
-  const wasFormal =
-    (currentFiscalConfig as { isFormalTaxpayer?: boolean } | null)?.isFormalTaxpayer === true;
-
-  return wantsFormal && !wasFormal && body.confirmed !== true;
+function toTenantFiscalConfig(
+  fiscal: OrgProfileInput['fiscalConfig'],
+): FiscalConfig | null {
+  if (fiscal == null) return null;
+  const sanitized: FiscalConfig = {};
+  if (fiscal.documentLabel !== undefined) sanitized.documentLabel = fiscal.documentLabel;
+  if (fiscal.disclaimerOverride !== undefined) {
+    sanitized.disclaimerOverride = fiscal.disclaimerOverride;
+  }
+  return sanitized;
 }
 
 /**
@@ -112,7 +125,7 @@ function buildOrganizationPatch(body: OrgProfileInput): Partial<NewDbOrganizatio
     }
   }
   if (body.fiscalConfig !== undefined) {
-    patch.fiscalConfig = body.fiscalConfig;
+    patch.fiscalConfig = toTenantFiscalConfig(body.fiscalConfig);
   }
   return patch;
 }
@@ -326,6 +339,37 @@ export const organizationRoutes = new Hono<AppEnv>()
         );
       }
 
+      // Fiscal regime is a PLATFORM decision (Console): the tenant can edit its
+      // issuer identity and disclaimer, never `isFormalTaxpayer` nor the legacy
+      // tax keys. Explicit 403 (not a silent strip).
+      const fiscalConfig = body.fiscalConfig;
+      // A `null` reset would wipe the platform-governed regime
+      // (`isFormalTaxpayer`), so it is platform-only as well.
+      if (fiscalConfig === null) {
+        return c.json(
+          {
+            error: 'El régimen fiscal lo gestiona Fit-Stack desde la consola de plataforma.',
+            code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+            fields: ['fiscalConfig'],
+          },
+          403,
+        );
+      }
+      const platformFiscalKeys =
+        fiscalConfig == null
+          ? []
+          : TENANT_FORBIDDEN_FISCAL_KEYS.filter((key) => key in fiscalConfig);
+      if (platformFiscalKeys.length > 0) {
+        return c.json(
+          {
+            error: 'El régimen fiscal lo gestiona Fit-Stack desde la consola de plataforma.',
+            code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+            fields: platformFiscalKeys,
+          },
+          403,
+        );
+      }
+
       const orgsRepo = createOrganizationsRepository(c.get('db'));
       const service = createOrganizationsService(
         orgsRepo,
@@ -334,18 +378,6 @@ export const organizationRoutes = new Hono<AppEnv>()
 
       const current = await service.findOrganizationById(orgId);
       if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
-
-      // Intentional friction ONLY on false->true transition: explicit
-      // declaration + confirmation (never a cosmetic toggle).
-      if (requiresFormalTaxpayerConfirmation(body, current.fiscalConfig)) {
-        return c.json(
-          {
-            error: 'Confirma la declaración de contribuyente formal para continuar.',
-            code: 'FORMAL_TAXPAYER_CONFIRMATION_REQUIRED',
-          },
-          400,
-        );
-      }
 
       // Only present fields: body without persistable fields is an
       // idempotent no-op, never a Drizzle 500 ("No values to set").

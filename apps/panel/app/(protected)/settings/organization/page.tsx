@@ -15,7 +15,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { CountrySelector, toast, Title, SimpleSelect, Checkbox, Switch, ConfirmationModal } from "@workspace/ui";
+import { CountrySelector, toast, Title, SimpleSelect } from "@workspace/ui";
 import { useAuth, usePermissions } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
@@ -24,90 +24,24 @@ import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 import {
   FiscalConfigSchema,
-  parseRateValue,
   resolveDocumentLabel,
   resolveFiscalProfile,
-  type FiscalConfig,
 } from "@workspace/shared";
 import { useRouter } from "next/navigation";
 
-interface FiscalTaxRow {
-  name: string;
-  ratePct: string;
-  enabled: boolean;
-  /**
-   * Conditional tax (e.g., IGTF): activation requires manual rate +
-   * explicit confirmation, never applied alone (varies by decree).
-   */
-  requiresConfirmation: boolean;
-  /** Recorded confirmation (`fiscalConfig.confirmedTaxes`). */
-  confirmed: boolean;
-}
-
-interface FiscalTaxCardProps {
-  readonly tax: FiscalTaxRow;
-  readonly isSavingFiscal: boolean;
-  readonly fiscalFormal: boolean;
-  readonly onRateChange: (name: string, ratePct: string) => void;
-  readonly onToggle: (name: string, enabled: boolean) => void;
-  readonly onConfirmChange: (name: string, confirmed: boolean) => void;
-}
-
-function FiscalTaxCard({
-  tax,
-  isSavingFiscal,
-  fiscalFormal,
-  onRateChange,
-  onToggle,
-  onConfirmChange,
-}: FiscalTaxCardProps) {
+/**
+ * Read-only fact row of the fiscal identity: the issuer identity and the
+ * fiscal regime are governed elsewhere (identity: this form; regime: Console).
+ */
+function FiscalFact({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <div
-      className="space-y-3 bg-foreground/5 border border-border p-4 rounded-xl"
-      data-testid={`fiscal-tax-${tax.name}`}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_auto] gap-4 items-end">
-        <Input
-          label={`${tax.name} (%)`}
-          placeholder="16"
-          value={tax.ratePct}
-          disabled={!tax.enabled || isSavingFiscal}
-          data-testid={`fiscal-tax-rate-${tax.name}`}
-          onChange={(e) => onRateChange(tax.name, e.target.value)}
-        />
-        <div className="flex items-center gap-2 pb-2">
-          <Switch
-            checked={tax.enabled}
-            disabled={
-              !fiscalFormal ||
-              (tax.requiresConfirmation && !tax.confirmed) ||
-              isSavingFiscal
-            }
-            data-testid={`fiscal-tax-toggle-${tax.name}`}
-            onCheckedChange={(value) => onToggle(tax.name, value)}
-          />
-          <Text size="xs" variant="muted">{tax.enabled ? "Activo" : "Apagado"}</Text>
-        </div>
-      </div>
-      {tax.requiresConfirmation && (
-        <div className="space-y-2">
-          <label className="flex items-start gap-3">
-            <Checkbox
-              checked={tax.confirmed}
-              disabled={!fiscalFormal || isSavingFiscal}
-              data-testid={`fiscal-tax-confirm-${tax.name}`}
-              aria-label={`Confirmar tasa vigente de ${tax.name}`}
-              onCheckedChange={(value) => onConfirmChange(tax.name, value === true)}
-            />
-            <Text size="xs" variant="muted">
-              Confirmo que verifiqué la tasa vigente de {tax.name} con mi contador: los impuestos condicionales cambian por decreto y no se aplican solos.
-            </Text>
-          </label>
-          <Text size="xs" variant="muted" className="italic">
-            Activar {tax.name} cambia la base de los demás impuestos de esos comprobantes: se extrae primero del total cobrado.
-          </Text>
-        </div>
-      )}
+    <div className="bg-foreground/5 border border-border p-4 rounded-xl space-y-1">
+      <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">
+        {label}
+      </Text>
+      <Text size="sm" weight="bold" className="break-words">
+        {value}
+      </Text>
     </div>
   );
 }
@@ -135,16 +69,13 @@ export default function OrganizationSettingsPage() {
   const { can } = usePermissions();
   const canUpdateFiscal = can(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE);
 
-  const [fiscalLegalName, setFiscalLegalName] = React.useState("");
-  const [fiscalTaxId, setFiscalTaxId] = React.useState("");
-  const [fiscalAddress, setFiscalAddress] = React.useState("");
-  const [fiscalTaxes, setFiscalTaxes] = React.useState<FiscalTaxRow[]>([]);
   const [fiscalDisclaimer, setFiscalDisclaimer] = React.useState("");
   const [fiscalFormal, setFiscalFormal] = React.useState(false);
-  const [fiscalRequestedLabel, setFiscalRequestedLabel] = React.useState("");
+  const [fiscalProfile, setFiscalProfile] = React.useState<
+    ReturnType<typeof resolveFiscalProfile> | null
+  >(null);
   const [fiscalError, setFiscalError] = React.useState<string | null>(null);
   const [isSavingFiscal, setIsSavingFiscal] = React.useState(false);
-  const [confirmFormalOpen, setConfirmFormalOpen] = React.useState(false);
   const fiscalInitialized = React.useRef(false);
 
   const hasInitialized = React.useRef(false);
@@ -174,24 +105,13 @@ export default function OrganizationSettingsPage() {
           throw new Error("La organización no tiene país configurado.");
         }
         const stored = FiscalConfigSchema.safeParse(org.fiscalConfig ?? {});
-        const config: FiscalConfig = stored.success ? stored.data : {};
+        const config = stored.success ? stored.data : {};
+        // Fiscal regime is read-only here: `COUNTRIES` is the tax SSOT and
+        // `isFormalTaxpayer` is activated from Console.
         const profile = resolveFiscalProfile(countryCode, config);
-        setFiscalLegalName(org.legalName || "");
-        setFiscalTaxId(org.taxId || "");
-        setFiscalAddress(org.address || "");
-        const confirmedTaxes = new Set(config.confirmedTaxes ?? []);
-        setFiscalTaxes(
-          profile.taxes.map((tax) => ({
-            name: tax.name,
-            ratePct: String(Number((tax.rate * 100).toFixed(4))),
-            enabled: tax.enabled,
-            requiresConfirmation: tax.requiresConfirmation === true,
-            confirmed: confirmedTaxes.has(tax.name),
-          })),
-        );
+        setFiscalProfile(profile);
         setFiscalDisclaimer((config.disclaimerOverride ?? []).join("\n"));
-        setFiscalFormal(config.isFormalTaxpayer ?? false);
-        setFiscalRequestedLabel(config.documentLabel ?? "");
+        setFiscalFormal(profile.isFormalTaxpayer);
         setFiscalError(null);
       } catch (err) {
         setFiscalError("No se pudo cargar la configuración fiscal.");
@@ -250,47 +170,16 @@ export default function OrganizationSettingsPage() {
     }
   };
   
-  const saveFiscal = async (opts?: { confirmed?: boolean }) => {
+  /**
+   * Saves the tenant-owned fiscal data (the disclaimer; the issuer identity is
+   * owned by the general form). The fiscal regime (`isFormalTaxpayer`) and the
+   * tax rates are NOT sent: both are platform/`COUNTRIES` owned, and the API
+   * answers `403 FISCAL_CONFIG_PLATFORM_ONLY` if a tenant tries to write them.
+   */
+  const saveFiscal = async () => {
     if (!activeOrg || !canUpdateFiscal || isSavingFiscal) return;
-    const countryCode = activeOrg.countryCode;
-    if (!countryCode) {
+    if (!activeOrg.countryCode) {
       toast.error("La organización no tiene país configurado.");
-      return;
-    }
-
-    let taxes: FiscalConfig["taxes"];
-    try {
-      taxes = fiscalTaxes.map((tax) => ({
-        name: tax.name,
-        rate: parseRateValue(tax.ratePct || "0"),
-        enabled: tax.enabled,
-      }));
-    } catch {
-      toast.error("Revisa las tasas de impuestos antes de guardar.");
-      return;
-    }
-
-    // Mirror guards of backend invariants (400 remains authoritative).
-    if (!fiscalFormal && taxes.some((tax) => tax.enabled)) {
-      toast.error(
-        "Para activar impuestos primero declara el negocio como contribuyente formal.",
-      );
-      return;
-    }
-    const unconfirmed = fiscalTaxes.filter(
-      (tax) => tax.enabled && tax.requiresConfirmation && !tax.confirmed,
-    );
-    if (unconfirmed.length > 0) {
-      toast.error(
-        `Confirma la tasa vigente de ${unconfirmed.map((tax) => tax.name).join(", ")} antes de activarlo.`,
-      );
-      return;
-    }
-
-    const stored = FiscalConfigSchema.safeParse(activeOrg.fiscalConfig ?? {});
-    const wasFormal = stored.success ? (stored.data.isFormalTaxpayer ?? false) : false;
-    if (fiscalFormal && !wasFormal && opts?.confirmed !== true) {
-      setConfirmFormalOpen(true);
       return;
     }
 
@@ -302,29 +191,12 @@ export default function OrganizationSettingsPage() {
     setIsSavingFiscal(true);
     try {
       await orgProfileService.updateProfile({
-        legalName: fiscalLegalName.trim() || null,
-        taxId: fiscalTaxId.trim() || null,
-        address: fiscalAddress.trim() || null,
-        fiscalConfig: {
-          taxes,
-          isFormalTaxpayer: fiscalFormal,
-          // Explicit confirmations for conditional taxes: without this list
-          // the resolver turns them off (fail-closed).
-          confirmedTaxes: fiscalTaxes
-            .filter((tax) => tax.requiresConfirmation && tax.confirmed)
-            .map((tax) => tax.name),
-          ...(disclaimerLines.length > 0 ? { disclaimerOverride: disclaimerLines } : {}),
-        },
-        ...(fiscalFormal && !wasFormal ? { confirmed: true } : {}),
+        ...(disclaimerLines.length > 0
+          ? { fiscalConfig: { disclaimerOverride: disclaimerLines } }
+          : {}),
       });
 
       toast.success("Configuración fiscal guardada correctamente");
-      setFormData((prev) => ({
-        ...prev,
-        legalName: fiscalLegalName,
-        taxId: fiscalTaxId,
-        address: fiscalAddress,
-      }));
       await refetch();
       router.refresh();
     } catch (err) {
@@ -352,31 +224,9 @@ export default function OrganizationSettingsPage() {
 
   const fiscalCountry = activeOrg?.countryCode ? COUNTRIES[activeOrg.countryCode] : undefined;
   const appliedDocumentLabel = resolveDocumentLabel({
-    taxId: fiscalTaxId.trim() || activeOrg?.taxId,
+    taxId: formData.taxId.trim() || activeOrg?.taxId,
     isFormalTaxpayer: fiscalFormal,
   });
-
-  const handleTaxRateChange = (name: string, ratePct: string) => {
-    setFiscalTaxes((prev) =>
-      prev.map((row) => (row.name === name ? { ...row, ratePct } : row)),
-    );
-  };
-
-  const handleTaxToggle = (name: string, enabled: boolean) => {
-    setFiscalTaxes((prev) =>
-      prev.map((row) => (row.name === name ? { ...row, enabled } : row)),
-    );
-  };
-
-  const handleTaxConfirmChange = (name: string, confirmed: boolean) => {
-    setFiscalTaxes((prev) =>
-      prev.map((row) =>
-        row.name === name
-          ? { ...row, confirmed, enabled: confirmed ? row.enabled : false }
-          : row,
-      ),
-    );
-  };
 
   const renderFiscalContent = () => {
     if (fiscalError) {
@@ -387,60 +237,86 @@ export default function OrganizationSettingsPage() {
       return <Text variant="muted" size="sm">La organización no tiene país configurado.</Text>;
     }
 
+    const countryTaxes = fiscalProfile?.taxes ?? [];
+
     return (
       <div className="space-y-8 pt-2">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Input
+          <FiscalFact
             label="Nombre de Registro / Legal"
-            placeholder="Elite Fitness C.A."
-            value={fiscalLegalName}
-            onChange={(e) => setFiscalLegalName(e.target.value)}
+            value={formData.legalName.trim() || "Sin definir"}
           />
-          <Input
+          <FiscalFact
             label={`Nro. Registro (${fiscalCountry.taxLabel})`}
-            placeholder="J-12345678-9"
-            value={fiscalTaxId}
-            onChange={(e) => setFiscalTaxId(e.target.value)}
+            value={formData.taxId.trim() || "Sin definir"}
           />
         </div>
 
-        <Input
+        <FiscalFact
           label="Dirección fiscal"
-          placeholder="Av. Principal, Caracas"
-          value={fiscalAddress}
-          onChange={(e) => setFiscalAddress(e.target.value)}
+          value={formData.address.trim() || "Sin definir"}
         />
+
+        <Text size="xs" variant="muted" className="italic">
+          Estos datos se editan en “Información de Registro” y se guardan con “Actualizar Sede”.
+        </Text>
 
         <div className="bg-foreground/5 border border-border p-4 rounded-xl space-y-1">
           <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">Etiqueta aplicada del documento</Text>
           <Text size="lg" weight="bold">{appliedDocumentLabel}</Text>
-          {fiscalRequestedLabel && fiscalRequestedLabel !== appliedDocumentLabel && (
-            <Text size="xs" variant="muted" className="italic">
-              Solicitada: “{fiscalRequestedLabel}”. El sistema aplica “{appliedDocumentLabel}” mientras no haya homologación fiscal.
-            </Text>
-          )}
+          <Text size="xs" variant="muted" className="italic">
+            Mientras no exista homologación fiscal conectada, el sistema aplica “Comprobante de pago”.
+          </Text>
         </div>
 
-        <div className="space-y-4">
+        {/* Fiscal regime: READ-ONLY. It is a platform decision (Console), and
+            `COUNTRIES` is the single source of truth for the tax rates. */}
+        <div
+          className="space-y-3 bg-foreground/5 border border-border p-4 rounded-xl"
+          data-testid="fiscal-regime"
+        >
           <div className="flex flex-col gap-1">
-            <Text weight="bold" size="sm" className="uppercase tracking-wider">Impuestos por país</Text>
+            <Text weight="bold" size="sm" className="uppercase tracking-wider">Régimen fiscal</Text>
+            <Text size="sm" weight="bold" data-testid="fiscal-regime-value">
+              {fiscalFormal ? "Contribuyente formal" : "No declarado"}
+            </Text>
             <Text size="xs" variant="muted">
               {fiscalFormal
-                ? "Solo se detallan los impuestos que dejes activos; desactivarlos siempre se respeta (actividad exenta)."
-                : "Tu comprobante no detalla impuestos: se registra únicamente el total pagado. Para detallarlos, declara el negocio como contribuyente formal."}
+                ? "Se detallan los impuestos del país en cada comprobante."
+                : "Tu comprobante no detalla impuestos: se registra únicamente el total pagado."}
+            </Text>
+            <Text size="xs" variant="muted" className="italic">
+              Solo el equipo de Fit-Stack puede modificar esta condición desde la consola de plataforma.
             </Text>
           </div>
-          {fiscalTaxes.map((tax) => (
-            <FiscalTaxCard
-              key={tax.name}
-              tax={tax}
-              isSavingFiscal={isSavingFiscal}
-              fiscalFormal={fiscalFormal}
-              onRateChange={handleTaxRateChange}
-              onToggle={handleTaxToggle}
-              onConfirmChange={handleTaxConfirmChange}
-            />
-          ))}
+
+          <div className="space-y-2">
+            <Text size="xs" weight="bold" variant="muted" className="uppercase tracking-tighter">
+              Impuestos del país
+            </Text>
+            {countryTaxes.length === 0 ? (
+              <Text size="xs" variant="muted">Este país no define impuestos.</Text>
+            ) : (
+              countryTaxes.map((tax) => (
+                <div
+                  key={tax.name}
+                  data-testid={`fiscal-tax-${tax.name}`}
+                  className="flex items-center justify-between gap-3 border-b border-border/60 py-1.5 last:border-b-0"
+                >
+                  <Text size="xs">
+                    {tax.name} ({Number((tax.rate * 100).toFixed(4))}%)
+                  </Text>
+                  <Text size="xs" variant="muted" className="italic">
+                    {tax.condition
+                      ? "Condicional según la moneda de pago"
+                      : tax.enabled
+                        ? "Aplicable"
+                        : "No aplicable"}
+                  </Text>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <Textarea
@@ -449,36 +325,6 @@ export default function OrganizationSettingsPage() {
           value={fiscalDisclaimer}
           onChange={(e) => setFiscalDisclaimer(e.target.value)}
         />
-
-        <div className="flex items-start gap-3 bg-foreground/5 border border-border p-4 rounded-xl">
-          <Checkbox
-            checked={fiscalFormal}
-            disabled={isSavingFiscal}
-            data-testid="fiscal-formal-toggle"
-            onCheckedChange={(value) => {
-              const formalNow = value === true;
-              setFiscalFormal(formalNow);
-              if (!formalNow) {
-                // Without declaration no taxes apply: UI must not leave
-                // enabled an option that backend will reject (400).
-                setFiscalTaxes((prev) =>
-                  prev.map((row) => ({
-                    ...row,
-                    enabled: false,
-                    confirmed: false,
-                  })),
-                );
-              }
-            }}
-            aria-label="Declaración de contribuyente formal"
-          />
-          <div className="space-y-1">
-            <Text size="sm" weight="bold">Declaro bajo mi responsabilidad que este negocio está registrado como contribuyente formal.</Text>
-            <Text size="xs" variant="muted">
-              Esta declaración no convierte el comprobante en factura fiscal. Mientras no haya homologación, el documento seguirá diciendo “Comprobante de pago”.
-            </Text>
-          </div>
-        </div>
 
         <Button
           type="button"
@@ -635,9 +481,17 @@ export default function OrganizationSettingsPage() {
                   leftIcon={<ShieldCheck className="w-4 h-4" />}
                 />
                 <Text size="xs" variant="muted" className="italic opacity-70">
-                  Opcional. Completa la identidad emisora en la sección Facturación.
+                  Opcional. Requerido junto al nombre legal y la dirección para activar el contribuyente formal.
                 </Text>
               </div>
+
+              <Input
+                label="Dirección fiscal"
+                placeholder="Av. Principal, Caracas"
+                value={formData.address}
+                onChange={(e) => handleChange("address", e.target.value)}
+                leftIcon={<Building2 className="w-4 h-4" />}
+              />
 
               <div className="bg-foreground/5 border border-border p-4 rounded-xl flex items-center gap-4">
                 <div className="p-2.5 rounded-lg bg-foreground/5 text-foreground-muted">
@@ -699,15 +553,6 @@ export default function OrganizationSettingsPage() {
             {renderFiscalContent()}
           </Card>
         )}
-
-        <ConfirmationModal
-          open={confirmFormalOpen}
-          onOpenChange={setConfirmFormalOpen}
-          title="Confirmar declaración formal"
-          description="Confirmas, bajo tu responsabilidad, que este negocio está registrado como contribuyente formal. Esto no emite facturas fiscales."
-          confirmText="Confirmar declaración"
-          onConfirm={() => saveFiscal({ confirmed: true })}
-        />
 
         {/* ACCIONES FINALES */}
         <Card variant="settings" className="justify-between relative z-10 p-6 sm:p-8">

@@ -1,15 +1,8 @@
 "use client";
 
 import { ReceiptText } from "lucide-react";
-import {
-  Text,
-  Input,
-  Textarea,
-  Switch,
-} from "@workspace/ui/components";
+import { Text } from "@workspace/ui/components";
 import { formatCents, type CurrencyFormat, type ITaxDetail } from "@workspace/shared";
-
-export type TaxMode = "auto" | "override";
 
 interface TaxBlockProps {
   readonly currencyPaid: string;
@@ -18,25 +11,19 @@ interface TaxBlockProps {
   readonly taxTotal: number;
   readonly total: number;
   readonly lines: ITaxDetail[];
-  readonly mode: TaxMode;
-  readonly onModeChange: (mode: TaxMode) => void;
-  readonly rateOverrides: Record<string, string>;
-  readonly onRateChange: (name: string, pct: string) => void;
-  readonly reason: string;
-  readonly onReasonChange: (value: string) => void;
-  readonly disabled?: boolean;
   /**
-   * Declaración de contribuyente formal del emisor (`resolveFiscalProfile`).
-   * `false` → el comprobante NO detalla impuestos y el ajuste manual
-   * queda deshabilitado: el override solo puede reducir carga fiscal.
+   * Formal-taxpayer declaration of the emitter (`resolveFiscalProfile`).
+   * `false` → the receipt does NOT itemize taxes: only the total is recorded.
    */
   readonly emitterIsFormal: boolean;
 }
 
 /**
- * Bloque fiscal del flujo de pago (presentacional).
- * Los números los calcula el padre con `previewReceiptTaxes` (única fuente);
- * aquí solo se muestran con `formatCents` y se editan tasas/motivo.
+ * Read-only tax breakdown of the payment flow (presentational).
+ * The numbers are calculated by the parent with `previewReceiptTaxes`
+ * (single source of truth, same function the backend uses) and the rates come
+ * from `COUNTRIES` (SSOT): nothing here is editable — there is no manual
+ * override mode anymore.
  */
 export function TaxBlock({
   currencyPaid,
@@ -45,35 +32,13 @@ export function TaxBlock({
   taxTotal,
   total,
   lines,
-  mode,
-  onModeChange,
-  rateOverrides,
-  onRateChange,
-  reason,
-  onReasonChange,
-  disabled,
   emitterIsFormal,
 }: TaxBlockProps) {
-  const isOverride = mode === "override";
-
   return (
     <div className="space-y-4 pt-4 border-t border-border">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ReceiptText className="w-5 h-5 text-primary" />
-          <Text weight="bold" uppercase size="base" as="div">Impuestos</Text>
-        </div>
-        {emitterIsFormal && (
-          <div className="flex items-center gap-2">
-            <Text size="xs" variant="muted">Ajuste manual</Text>
-            <Switch
-              checked={isOverride}
-              disabled={disabled}
-              onCheckedChange={(value) => onModeChange(value ? "override" : "auto")}
-              aria-label="Ajuste manual de impuestos"
-            />
-          </div>
-        )}
+      <div className="flex items-center gap-2">
+        <ReceiptText className="w-5 h-5 text-primary" />
+        <Text weight="bold" uppercase size="base" as="div">Impuestos</Text>
       </div>
 
       {lines.length === 0 ? (
@@ -85,21 +50,11 @@ export function TaxBlock({
       ) : (
         <div className="space-y-2">
           {lines.map((line) => (
-            <div key={line.name} className="grid grid-cols-1 md:grid-cols-[1fr_140px_auto] gap-3 items-end">
-              <div className="flex justify-between items-center gap-4">
-                <Text size="sm">{line.name} ({Number((line.rate * 100).toFixed(4))}%)</Text>
-                <Text size="sm" weight="bold" className="tabular-nums">
-                  {formatCents(line.amount, currencyPaid, currencyFormat)}
-                </Text>
-              </div>
-              {isOverride && (
-                <Input
-                  label={`Tasa ${line.name} (%)`}
-                  value={rateOverrides[line.name] ?? String(Number((line.rate * 100).toFixed(4)))}
-                  disabled={disabled}
-                  onChange={(e) => onRateChange(line.name, e.target.value)}
-                />
-              )}
+            <div key={line.name} className="flex justify-between items-center gap-4">
+              <Text size="sm">{line.name} ({Number((line.rate * 100).toFixed(4))}%)</Text>
+              <Text size="sm" weight="bold" className="tabular-nums">
+                {formatCents(line.amount, currencyPaid, currencyFormat)}
+              </Text>
             </div>
           ))}
         </div>
@@ -123,21 +78,6 @@ export function TaxBlock({
           {formatCents(total, currencyPaid, currencyFormat)}
         </Text>
       </div>
-
-      {isOverride && (
-        <div className="space-y-2">
-          <Textarea
-            label="Motivo del ajuste manual *"
-            placeholder="Ej.: exoneración parcial autorizada por gerencia"
-            value={reason}
-            disabled={disabled}
-            onChange={(e) => onReasonChange(e.target.value)}
-          />
-          <Text size="xs" variant="muted" className="italic">
-            Los montos se recalculan con las tasas indicadas. Los campos con * son obligatorios.
-          </Text>
-        </div>
-      )}
     </div>
   );
 }

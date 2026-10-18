@@ -31,6 +31,7 @@ import {
   addUserToOrganization,
   createGymMember,
   createPlan,
+  declareFormalTaxpayer,
   isoDate,
 } from '../helpers/auth';
 import { createDb } from '@workspace/database/factory';
@@ -73,8 +74,9 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
 
   /**
    * Tenant + member + plan + validated $100.00 USD payment via HTTP.
-   * `declareFormal` leaves the location as a formal taxpayer with VAT + IGTF
-   * confirmed (without a declaration there is no breakdown).
+   * `declareFormal` declares the location a formal taxpayer from CONSOLE (the
+   * only writer of `fiscalConfig.isFormalTaxpayer`); without a declaration
+   * there is no breakdown.
    */
   async function createValidatedPayment(
     declareFormal = false,
@@ -82,18 +84,7 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
   ) {
     const { owner, organization } = await createGymTenant();
     if (declareFormal) {
-      const fiscal = await owner.client.patch('/api/organizations/profile', {
-        fiscalConfig: {
-          isFormalTaxpayer: true,
-          confirmedTaxes: ['IGTF'],
-          taxes: [
-            { name: 'IVA', rate: 0.16, enabled: true },
-            { name: 'IGTF', rate: 0.03, enabled: true },
-          ],
-        },
-        confirmed: true,
-      });
-      expect(fiscal.status, fiscal.text).toBe(200);
+      await declareFormalTaxpayer(organization.id);
     }
     const member = await createGymMember(owner.client);
     const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
@@ -156,7 +147,7 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
   it('T1b sede FORMAL: desglose IVA + IGTF con base gross_first y cuadre exacto', async () => {
     const { payment } = await createValidatedPayment(true);
 
-    // VE + USD + IGTF confirmed: IGTF = 3 % of 10000 = 300 (extracted
+    // VE + USD + formal (Console): IGTF = 3 % of 10000 = 300 (extracted
     // first); remainder 9700 → base = round(9700 / 1.16) = 8362 · VAT = 1338.
     const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
     expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);

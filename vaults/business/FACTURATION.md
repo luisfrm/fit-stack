@@ -15,7 +15,7 @@
 Tres condiciones, las tres necesarias:
 
 1. Tiene `taxId` (RIF/NIT/RFC/RUC/CUIT) cargado en su perfil.
-2. Declara explícitamente `fiscalConfig.isFormalTaxpayer: true` bajo su propia responsabilidad.
+2. Fit-Stack declara `fiscalConfig.isFormalTaxpayer: true` desde Console, con la identidad fiscal completa (`legalName` + `taxId` + `address`); el tenant no puede escribirlo (403 `FISCAL_CONFIG_PLATFORM_ONLY`).
 3. Tiene un mecanismo de numeración/homologación fiscal real conectado (imprenta digital autorizada en VE, PAC/CFDI en MX, CUFE/DIAN en CO, etc.).
 
 Sin el punto 3, no ofrecer la opción en producto, aunque el gym diga estar registrado.
@@ -55,7 +55,7 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 
 | País | Nombre correcto del impuesto | Tasa | Nota |
 |---|---|---|---|
-| VE | IVA | 16% | Además existe IGTF (condicional, solo si el pago es en USD/cripto; tasa variable por decreto — no hardcodear, requiere confirmación manual/contador) |
+| VE | IVA | 16% | Además existe IGTF (condicional: solo si el pago no es en VES). La tasa vigente vive en `COUNTRIES.conditionalTaxes` (SSOT) y se actualiza ahí cuando cambie el decreto — nunca por organización |
 | CO | IVA | 19% | — |
 | MX | IVA | 16% | Zona fronteriza tiene tasa reducida (8%), no cubierto por el default nacional |
 | AR | IVA | 21% | — |
@@ -70,25 +70,24 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 **Genérico para todos los países** (`ICountryConfig` ya cubre esto bien):
 - `docLabel`, `taxLabel`, `docType`, `currency`, `timezone`, `legalDisclaimer`
 
-**Por país, en `organization.fiscalConfig` (override sobre el default del país):**
+**Por país, en `organization.fiscalConfig`** (el resto —tasas y condiciones— lo define `COUNTRIES`, no la org):
 ```json
 {
   "documentLabel": "Comprobante de pago",
   "isFormalTaxpayer": false,
-  "taxes": [{ "name": "IVA", "rate": 0.16, "enabled": false }],
   "disclaimerOverride": null
 }
 ```
+`isFormalTaxpayer` es **platform-only** (se escribe solo desde Console, con identidad fiscal completa); el tenant únicamente edita `disclaimerOverride`. No existen `taxes` ni `confirmedTaxes`: cualquier clave fuera de este contrato responde 400.
 
 **Condicionales especiales (no van en `countryTaxes` fijo):**
 ```ts
 conditionalTaxes: [
-  { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", basis: "gross_first", requiresConfirmation: true, value: null }
+  { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", value: "3%" }
 ]
 ```
 
-> El IGTF nace **apagado** y nunca es automático: activarlo exige declaración de contribuyente formal + confirmación explícita + tasa manual (`fiscalConfig.confirmedTaxes`). La base `gross_first` extrae el IGTF del total **antes** de descomponer el resto con IVA. Ver RD-138 (Linear — proyecto «Fit Stack»).
-```
+> El IGTF es un impuesto **condicional del país**: se aplica solo cuando `isFormalTaxpayer` es verdadero **y** la condición se cumple (`payment_currency !== 'VES'`), con `basis: 'gross_first'` asignado por `resolveFiscalProfile` (extrae el IGTF del total **antes** de descomponer el resto con IVA). No hay confirmación manual ni tasa por org. Ver RD-138 y RD-145 (Linear — proyecto «Fit Stack»).
 
 ## 6. Notas específicas de Venezuela
 

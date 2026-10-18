@@ -20,8 +20,12 @@ export interface OrgProfileInput {
   legalName?: string | null;
   taxId?: string | null;
   address?: string | null;
-  fiscalConfig?: FiscalConfig | null;
-  confirmed?: boolean;
+  /**
+   * Tenant-owned fiscal keys only (`disclaimerOverride`, `documentLabel`).
+   * The regime (`isFormalTaxpayer`) is Console-only: the API answers
+   * `403 FISCAL_CONFIG_PLATFORM_ONLY`, so it is never typed here.
+   */
+  fiscalConfig?: FiscalConfig;
 }
 
 /**

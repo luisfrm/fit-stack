@@ -3,9 +3,8 @@ import type { OrganizationsRepository, OrganizationFilter, NewDbOrganization } f
 import type { SettingsRepository } from '../repositories/settings.repository';
 import {
   buildDefaultOrgSettings,
-  findFiscalWriteViolation,
+  parseStoredFiscalConfig,
   primaryCurrencyForCountry,
-  StoredFiscalConfigSchema,
 } from '@workspace/shared';
 import type { FiscalConfig } from '@workspace/shared';
 
@@ -18,55 +17,48 @@ const slugTakenError = (message: string) =>
     }),
   });
 
-/**
- * Explicit 400 for fiscal invariant: override can only REDUCE
- * fiscal burden. Validates the MERGED config (an incoming partial does not know
- * the stored `isFormalTaxpayer`) and always before persisting.
- */
-const FISCAL_VIOLATION_MESSAGES: Record<string, string> = {
-  TAXES_REQUIRE_FORMAL_TAXPAYER:
-    'Para activar impuestos primero debes declarar el negocio como contribuyente formal.',
-  TAX_REQUIRES_CONFIRMATION:
-    'Ese impuesto es condicional: exige confirmar la tasa vigente con tu contador antes de activarlo.',
-};
+/** Issuer identity columns that must be complete before declaring the org a formal taxpayer. */
+const FISCAL_IDENTITY_FIELDS = ['legalName', 'taxId', 'address'] as const;
 
-const fiscalViolationError = (violation: {
-  code: string;
-  taxName?: string;
-}) => {
+type FiscalIdentityField = (typeof FISCAL_IDENTITY_FIELDS)[number];
+
+type FiscalIdentitySource = Partial<Record<FiscalIdentityField, string | null>>;
+
+/** Missing (empty or whitespace-only) fiscal identity fields, in contract order. */
+function missingFiscalIdentity(source: FiscalIdentitySource): FiscalIdentityField[] {
+  return FISCAL_IDENTITY_FIELDS.filter((field) => !source[field]?.trim());
+}
+
+/**
+ * Explicit 400 for the platform-only activation: `isFormalTaxpayer` can only
+ * be turned on with a complete issuer identity (`legalName` + `taxId` +
+ * `address`). Never a partial write: the whole update is rejected.
+ */
+const fiscalIdentityIncompleteError = (missing: FiscalIdentityField[]) => {
   const message =
-    FISCAL_VIOLATION_MESSAGES[violation.code] ?? 'Configuración fiscal inválida.';
+    'Completa la identidad fiscal (nombre de registro, número de registro y dirección) antes de activar el contribuyente formal.';
   return new HTTPException(400, {
     message,
     res: new Response(
-      JSON.stringify({ error: message, code: violation.code, tax: violation.taxName }),
+      JSON.stringify({ error: message, code: 'FISCAL_IDENTITY_INCOMPLETE', fields: missing }),
       { status: 400, headers: { 'content-type': 'application/json' } },
     ),
   });
 };
 
-/**
- * Merge baseline: stored config may originate from an earlier version with
- * extra keys (when schema was lax) or from a future field. Parsed with a
- * tolerant schema (`.strip()`, not `.strict()`) so as NOT to lose `taxes`,
- * `disclaimerOverride`, or `isFormalTaxpayer` on an unknown key.
- */
-function parseStoredFiscalConfig(stored: unknown): FiscalConfig {
-  if (stored == null) return {};
-  const parsed = StoredFiscalConfigSchema.safeParse(stored);
-  if (!parsed.success) {
-    console.error('Stored fiscalConfig invalid, ignored as merge base.');
-    return {};
-  }
-  return parsed.data;
+/** Rejects the activation unless the (already merged) fiscal identity is complete. */
+function assertFiscalActivationAllowed(identity: FiscalIdentitySource): void {
+  const missing = missingFiscalIdentity(identity);
+  if (missing.length > 0) throw fiscalIdentityIncompleteError(missing);
 }
 
 /**
  * Merges incoming `fiscalConfig` over existing (merge, not blind replace):
- * present scalars replace; `taxes[]` merges by `name` (override updates rate/enabled;
- * unknown names preserved as-is — resolver ignores them) and `confirmedTaxes[]` accumulates
- * (a confirmation is not lost on a partial PATCH of another field; revoking it means turning
- * off the tax). Explicit `null` = reset to defaults.
+ * present scalars replace, untouched ones are preserved (a partial PATCH of
+ * `disclaimerOverride` must not drop `isFormalTaxpayer`). Explicit `null` =
+ * reset to country defaults. Taxes are NOT part of this contract anymore:
+ * they come from `COUNTRIES` (SSOT). The stored baseline is parsed with the
+ * tolerant shared parser (legacy keys dropped, never a merge crash).
  */
 export function mergeFiscalConfig(
   current: unknown,
@@ -79,19 +71,6 @@ export function mergeFiscalConfig(
   if (incoming.documentLabel !== undefined) merged.documentLabel = incoming.documentLabel;
   if (incoming.disclaimerOverride !== undefined) merged.disclaimerOverride = incoming.disclaimerOverride;
   if (incoming.isFormalTaxpayer !== undefined) merged.isFormalTaxpayer = incoming.isFormalTaxpayer;
-  if (incoming.confirmedTaxes !== undefined) {
-    merged.confirmedTaxes = [
-      ...new Set([...(base.confirmedTaxes ?? []), ...incoming.confirmedTaxes]),
-    ];
-  }
-
-  if (incoming.taxes !== undefined) {
-    const byName = new Map((base.taxes ?? []).map((t) => [t.name, t]));
-    for (const override of incoming.taxes) {
-      byName.set(override.name, override);
-    }
-    merged.taxes = [...byName.values()];
-  }
 
   return merged;
 }
@@ -151,13 +130,16 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
         updatedAt: new Date(),
       };
 
-      // Fail-closed on creation: an org cannot be born asserting
-      // taxes that its issuer never declared.
-      const createViolation = findFiscalWriteViolation(
-        data.countryCode,
-        data.fiscalConfig as FiscalConfig | null | undefined,
-      );
-      if (createViolation) throw fiscalViolationError(createViolation);
+      // Fail-closed on creation: a formal taxpayer is only accepted with a
+      // complete issuer identity (same rule as any later activation).
+      const createFiscal = data.fiscalConfig as FiscalConfig | null | undefined;
+      if (createFiscal?.isFormalTaxpayer === true) {
+        assertFiscalActivationAllowed({
+          legalName: data.legalName,
+          taxId: data.taxId,
+          address: data.address,
+        });
+      }
 
       const created = await orgsRepo.create(newOrgData);
       if (!created) {
@@ -189,19 +171,21 @@ export function createOrganizationsService(orgsRepo: OrganizationsRepository, se
       }
 
       // `fiscalConfig` (jsonb) merges over stored, never blind replacement:
-      // partial PATCH of `taxes[]` must not drop `disclaimerOverride` or `isFormalTaxpayer`.
+      // partial PATCH of `disclaimerOverride` must not drop `isFormalTaxpayer`.
       if ('fiscalConfig' in data) {
         const incoming = data.fiscalConfig as FiscalConfig | null | undefined;
         if (incoming !== undefined) {
           const merged = mergeFiscalConfig(current.fiscalConfig, incoming);
-          // Validates RESULT of merge, not incoming body.
-          // If the same PATCH changes country, validates against the new country
-          // (conditionals are country-scoped).
-          const violation = findFiscalWriteViolation(
-            data.countryCode ?? current.countryCode,
-            merged,
-          );
-          if (violation) throw fiscalViolationError(violation);
+          // Platform-only activation still requires a complete issuer identity,
+          // validated on the RESULT of the merge: the same PATCH may complete
+          // the identity and the declaration together. No partial write.
+          if (merged?.isFormalTaxpayer === true) {
+            assertFiscalActivationAllowed({
+              legalName: 'legalName' in data ? data.legalName : current.legalName,
+              taxId: 'taxId' in data ? data.taxId : current.taxId,
+              address: 'address' in data ? data.address : current.address,
+            });
+          }
           (data as { fiscalConfig?: FiscalConfig | null }).fiscalConfig = merged;
         }
       }

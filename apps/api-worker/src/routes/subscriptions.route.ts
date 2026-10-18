@@ -10,7 +10,7 @@ import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
 import { createCache, type Cache } from '../lib/cache';
-import { paymentMethodDetailsSchema, paymentMethodSchema, taxDetailSchema } from '../lib/schemas';
+import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -50,13 +50,8 @@ const createSubSchema = z.object({
     // with its own audit trail, so a payment cannot be born `voided`.
     status: z.enum(['processing', 'validated']).optional(),
     paymentDate: z.string().optional(),
-    // Fiscal breakdown in integer cents (open schema; the service
-    // calculates it by default and only accepts an override with
-    // taxOverrideReason).
-    subtotal: z.number().int().positive().optional(),
-    taxTotal: z.number().int().min(0).optional(),
-    taxDetails: z.array(taxDetailSchema).optional(),
-    taxOverrideReason: z.string().optional(),
+    // The tax breakdown is NOT part of the write contract: it is always
+    // computed from `COUNTRIES` (SSOT) at emission time.
   }),
 });
 
