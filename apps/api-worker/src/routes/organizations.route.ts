@@ -14,6 +14,7 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createExchangeRateProvider } from '../lib/exchange-rates';
+import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
 import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
 import { createOrganizationsService } from '../services/organizations.service';
@@ -231,6 +232,104 @@ export const organizationRoutes = new Hono<AppEnv>()
     await cache.set(cacheKey, data, 3600);
 
     return c.json(data);
+  })
+
+  // GET /api/organizations/receipts
+  // SaaS (FS-N) receipt history of the ACTIVE organization. Read-only and
+  // strictly org-scoped: the platform audit lives in console, the gym only
+  // ever sees its own payments. Amounts are integer cents.
+  .get('/receipts', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payments = await platformSubsRepo.getOrganizationInvoices(activeOrganizationId);
+
+    return c.json({
+      payments: payments.map((p) => ({
+        id: p.id,
+        receiptNumber: p.receiptNumber,
+        receiptVoided: p.receiptVoided,
+        receiptIssuedAt: p.receiptIssuedAt,
+        status: p.status,
+        planName: p.planSnapshotName,
+        planCurrency: p.planSnapshotCurrency,
+        planDurationValue: p.planSnapshotDurationValue,
+        planDurationUnit: p.planSnapshotDurationUnit,
+        amountPaid: p.amountPaid,
+        currencyPaid: p.currencyPaid,
+        baseAmount: p.baseAmount,
+        paymentMethod: p.paymentMethod,
+        paymentDate: p.paymentDate,
+      })),
+    });
+  })
+
+  // GET /api/organizations/receipts/:paymentId - 3-state receipt contract
+  // (never 409), mirroring the gym contract. A payment from ANOTHER
+  // organization answers 404: existence is never revealed.
+  .get('/receipts/:paymentId', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payment =
+      Number.isInteger(paymentId) && paymentId > 0
+        ? await platformSubsRepo.findPaymentById(paymentId)
+        : null;
+    if (!payment || payment.organizationId !== activeOrganizationId) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available) return c.json(state, 200);
+    if (state.pdfStatus === 'pending') {
+      return c.json(
+        { available: true, receiptNumber: state.receiptNumber, pdfStatus: 'pending' },
+        202,
+      );
+    }
+    return c.json({
+      available: true,
+      receiptNumber: state.receiptNumber,
+      pdfStatus: 'ready',
+      receipt: state.receipt,
+      pdfUrl: `/api/organizations/receipts/${paymentId}/pdf`,
+    });
+  })
+
+  // GET /api/organizations/receipts/:paymentId/pdf - binary download (200
+  // bytes or 404). Same org-scoping rule as the state endpoint.
+  .get('/receipts/:paymentId/pdf', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payment =
+      Number.isInteger(paymentId) && paymentId > 0
+        ? await platformSubsRepo.findPaymentById(paymentId)
+        : null;
+    if (!payment || payment.organizationId !== activeOrganizationId) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const r2 = createR2Service(c.env);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available || state.pdfStatus !== 'ready') {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    const file = await r2.getFile(state.pdfKey);
+    if (!file) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    return new Response(file.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${state.receiptNumber}.pdf"`,
+      },
+    });
   })
 
   // POST /api/organizations/subscription/renew
