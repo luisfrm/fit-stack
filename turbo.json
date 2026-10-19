@@ -32,6 +32,9 @@
         "SMTP_USER",
         "SMTP_PASS",
         "APP_ENV",
+        "NEXT_PHASE",
+        "CI",
+        "NODE_ENV",
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
         "JWT_SECRET"
