@@ -44,23 +44,24 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
     const body = c.req.valid('json');
     const cache = createCache(c.env);
 
-    // RD-148: the emitter identity issues the SaaS receipts, so its tax id
-    // prefix must belong to the emitter country. Only checked when the tax id
-    // is part of this write (the emitter form sends both keys together); an
-    // absent country has no catalog to enforce.
-    const emitterTaxId = body[EMITTER_TAX_ID_KEY];
-    if (emitterTaxId) {
-      const violation = documentIdTypeViolation(
-        emitterTaxId,
-        body[EMITTER_COUNTRY_CODE_KEY] ?? null,
-        EMITTER_TAX_ID_KEY,
-      );
-      if (violation) return c.json(violation, 400);
-    }
-
     const settingsRepo = createSettingsRepository(c.get('db'));
     const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
+
+    // RD-148: the emitter identity issues the SaaS receipts, so its tax id
+    // prefix must belong to the emitter country. A partial write may omit the
+    // country, so the persisted setting is read instead of skipping the check.
+    const emitterTaxId = body[EMITTER_TAX_ID_KEY];
+    if (emitterTaxId) {
+      const persisted = await settingsService.getAll(null);
+      const violation = documentIdTypeViolation(
+        emitterTaxId,
+        body[EMITTER_COUNTRY_CODE_KEY] ?? persisted[EMITTER_COUNTRY_CODE_KEY] ?? null,
+        EMITTER_TAX_ID_KEY,
+        persisted[EMITTER_TAX_ID_KEY] ?? null,
+      );
+      if (violation) return c.json(violation, 400);
+    }
 
     await settingsService.updateAll(null, body);
     await cache.invalidateExact('platform:settings');

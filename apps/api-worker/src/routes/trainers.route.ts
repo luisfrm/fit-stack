@@ -87,16 +87,19 @@ export const trainerRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
+    const trainersRepo = createTrainersRepository(c.get('db'));
+    const trainersService = createTrainersService(trainersRepo);
+
     // RD-148: the identification prefix must belong to the org country.
+    // The persisted value is read so a legacy row stays editable.
+    const existing = await trainersRepo.findById(orgId, id);
     const violation = documentIdTypeViolation(
       data.documentId,
       c.get('org')?.countryCode,
       'documentId',
+      existing?.documentId ?? null,
     );
     if (violation) return c.json(violation, 400);
-
-    const trainersRepo = createTrainersRepository(c.get('db'));
-    const trainersService = createTrainersService(trainersRepo);
 
     const updatedTrainer = await trainersService.update(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:coaches:*`);

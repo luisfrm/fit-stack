@@ -190,6 +190,21 @@ describe('isDocumentIdAllowedForCountry (RD-148 write guard)', () => {
     expect(isDocumentIdAllowedForCountry('NIT-9001', null)).toBe(true);
     expect(isDocumentIdAllowedForCountry('NIT-9001', undefined)).toBe(true);
   });
+
+  it('keeps a legacy row editable while the stored value is not changed', () => {
+    // A VE org that predates the catalog holds a CO-shaped id: repeating it is
+    // not a change, so the write (e.g. toggling `isActive`) is not blocked.
+    expect(isDocumentIdAllowedForCountry('C.C.-12345678', 'VE', 'C.C.-12345678')).toBe(
+      true,
+    );
+    expect(isDocumentIdAllowedForCountry('  V-1  ', 'VE', 'V-1')).toBe(true);
+  });
+
+  it('applies the rule as soon as the stored value changes', () => {
+    expect(isDocumentIdAllowedForCountry('C.C.-12345678', 'VE', 'V-1')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('NIT-9001', 'VE', 'C.C.-12345678')).toBe(false);
+    expect(isDocumentIdAllowedForCountry('C.C.-12345678', 'VE', null)).toBe(false);
+  });
 });
 
 describe('COUNTRIES document prefixes', () => {

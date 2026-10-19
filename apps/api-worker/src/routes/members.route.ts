@@ -305,6 +305,7 @@ export const memberRoutes = new Hono<AppEnv>()
       data.documentId,
       c.get('org')?.countryCode,
       'documentId',
+      existing.documentId,
     );
     if (violation) return c.json(violation, 400);
 

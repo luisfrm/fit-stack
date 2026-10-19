@@ -493,6 +493,7 @@ export const organizationRoutes = new Hono<AppEnv>()
         body.taxId,
         current.countryCode,
         'taxId',
+        current.taxId,
       );
       if (identityViolation) return c.json(identityViolation, 400);
 

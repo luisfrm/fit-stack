@@ -51,8 +51,10 @@ export function documentIdTypeViolation(
   value: string | null | undefined,
   countryCode: string | null | undefined,
   field: string,
+  /** Persisted value: resending it unchanged never blocks a legacy row. */
+  currentValue?: string | null,
 ): { error: string; code: string; fields: string[] } | null {
-  if (isDocumentIdAllowedForCountry(value, countryCode)) return null;
+  if (isDocumentIdAllowedForCountry(value, countryCode, currentValue)) return null;
   return {
     error: 'El tipo de documento no es válido para el país de la organización.',
     code: 'DOCUMENT_TYPE_INVALID',

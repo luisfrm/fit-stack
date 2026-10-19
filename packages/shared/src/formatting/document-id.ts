@@ -116,6 +116,9 @@ const ALL_KNOWN_DOC_TYPES: ReadonlySet<string> = new Set(
  *
  * Tolerant by design, so plain data entry is never blocked by legacy rows:
  * - empty/absent value → allowed (the column is nullable);
+ * - a value identical to `currentValue` → allowed: the guard only judges what
+ *   the write CHANGES, so a legacy row stays editable (e.g. toggling `isActive`
+ *   on a member whose stored prefix predates the catalog);
  * - no `-` → allowed (there is no prefix to check);
  * - an UNKNOWN token → allowed: indistinguishable from a legacy value that
  *   carries a hyphen inside the number (`"12-3456789"`), which
@@ -131,9 +134,12 @@ const ALL_KNOWN_DOC_TYPES: ReadonlySet<string> = new Set(
 export function isDocumentIdAllowedForCountry(
   value: string | null | undefined,
   countryCode?: string | null,
+  /** Value already persisted; repeating it is not a change. */
+  currentValue?: string | null,
 ): boolean {
   const raw = (value ?? '').trim();
   if (raw.length === 0) return true;
+  if (raw === (currentValue ?? '').trim()) return true;
 
   const separator = raw.indexOf('-');
   if (separator <= 0) return true;

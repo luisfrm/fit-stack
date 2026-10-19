@@ -187,12 +187,19 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
-    // RD-148: the tax id prefix must belong to the stored country when the
-    // payload does not restate it.
+    // RD-148: the tax id prefix must belong to the organization's country.
+    // The org is read once: it supplies the stored country (when the payload
+    // does not restate it) and the persisted id, so a legacy row whose prefix
+    // predates the catalog stays editable.
     if (data.taxId) {
-      const countryCode =
-        data.countryCode ?? (await service.findOrganizationById(id))?.countryCode;
-      const violation = documentIdTypeViolation(data.taxId, countryCode, 'taxId');
+      const existing = await service.findOrganizationById(id);
+      const countryCode = data.countryCode ?? existing?.countryCode;
+      const violation = documentIdTypeViolation(
+        data.taxId,
+        countryCode,
+        'taxId',
+        existing?.taxId,
+      );
       if (violation) return c.json(violation, 400);
     }
 
@@ -211,12 +218,19 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
-    // RD-148: the tax id prefix must belong to the stored country when the
-    // payload does not restate it.
+    // RD-148: the tax id prefix must belong to the organization's country.
+    // The org is read once: it supplies the stored country (when the payload
+    // does not restate it) and the persisted id, so a legacy row whose prefix
+    // predates the catalog stays editable.
     if (data.taxId) {
-      const countryCode =
-        data.countryCode ?? (await service.findOrganizationById(id))?.countryCode;
-      const violation = documentIdTypeViolation(data.taxId, countryCode, 'taxId');
+      const existing = await service.findOrganizationById(id);
+      const countryCode = data.countryCode ?? existing?.countryCode;
+      const violation = documentIdTypeViolation(
+        data.taxId,
+        countryCode,
+        'taxId',
+        existing?.taxId,
+      );
       if (violation) return c.json(violation, 400);
     }
 

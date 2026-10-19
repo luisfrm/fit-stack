@@ -386,7 +386,8 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
       });
       await setActiveOrganization(user.client, organization.id);
       // The regime is declared from Console; the tenant cannot do it.
-      await declareFormalTaxpayer(organization.id);
+      // The tax id uses a prefix of the org country (RD-148).
+      await declareFormalTaxpayer(organization.id, {}, countryCode);
       const { payment } = await createValidatedPayment(user.client, amountPaid);
       return payment;
     }
