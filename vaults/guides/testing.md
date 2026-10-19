@@ -10,7 +10,7 @@ Fit-Stack has **3 test layers**.
 Runs the Vitest suite across all packages/apps:
 
 ```bash
-pnpm test  # shared → api-worker → jobs-worker → panel → console (Vitest)
+pnpm test  # shared → auth → api-worker → jobs-worker → panel → console (Vitest)
 ```
 
 **What it includes:**

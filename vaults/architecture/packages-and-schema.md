@@ -90,6 +90,9 @@ useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, e
 usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 // permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
+
+// env.ts — requireApiBaseUrl(): missing NEXT_PUBLIC_API_BASE_URL throws visibly (no fallback)
+// getServerSession uses ofetch (never native fetch) and maps FetchError → AUTH_API_ERROR/NETWORK_ERROR
 ```
 
 ---
