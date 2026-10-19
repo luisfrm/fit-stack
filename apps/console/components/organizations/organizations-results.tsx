@@ -16,6 +16,8 @@ interface OrganizationsResultsProps {
   readonly aiUsage?: Record<string, OrgAiQuota>;
   readonly totalFiltered?: number;
   readonly onRefreshServer?: () => Promise<void>;
+  /** Platform settings: required by the subscription modal (currency/format). */
+  readonly settings: Record<string, string>;
 }
 
 export function OrganizationsResults({
@@ -23,6 +25,7 @@ export function OrganizationsResults({
   aiUsage,
   totalFiltered,
   onRefreshServer,
+  settings,
 }: OrganizationsResultsProps) {
   const [selectedOrg, setSelectedOrg] =
     React.useState<IPlatformOrganization | null>(null);
@@ -105,6 +108,7 @@ export function OrganizationsResults({
           onOpenChange={setIsSubModalOpen}
           initialOrganization={selectedOrg}
           onSuccess={refresh}
+          settings={settings}
         />
       )}
     </>

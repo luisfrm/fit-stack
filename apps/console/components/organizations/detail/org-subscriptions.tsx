@@ -13,7 +13,8 @@ interface OrgSubscriptionsProps {
   readonly page: number;
   readonly limit: number;
   readonly currencyFormat: CurrencyFormat;
-  readonly settings?: Record<string, string>;
+  /** Platform settings: required (payment methods, currency format). */
+  readonly settings: Record<string, string>;
   readonly onRefresh?: () => Promise<void>;
 }
 

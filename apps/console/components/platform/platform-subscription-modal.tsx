@@ -12,7 +12,8 @@ interface PlatformSubscriptionModalProps {
   readonly initialOrganization?: IPlatformOrganization | null;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
-  readonly settings?: Record<string, string>;
+  /** Platform settings: required (currency/format/payment methods come from it). */
+  readonly settings: Record<string, string>;
 }
 
 export function PlatformSubscriptionModal({

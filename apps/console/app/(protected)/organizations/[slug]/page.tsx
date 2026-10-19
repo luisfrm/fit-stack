@@ -13,9 +13,8 @@ import { organizationsService } from "@/lib/services/organizations-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { featuresService } from "@/lib/services/features-service";
 import { api } from "@/lib/api/client";
-import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { requirePlatformCurrency, requirePlatformCurrencyFormat } from "@/lib/config/platform-settings";
 import type { IPlatformOrganization } from "@workspace/shared/types";
-import type { CurrencyFormat } from "@workspace/shared";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -76,10 +75,10 @@ export default async function OrganizationProfilePage({
         .catch(() => null),
     ]);
 
-  const currencyFormat =
-    (settings[PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT] as CurrencyFormat) ||
-    "latam";
-  const currency = settings[PLATFORM_SETTINGS_KEYS.PRIMARY_CURRENCY] || "USD";
+  // Required platform settings (AGENTS.md §10): seeded by /api/init, a missing
+  // value must fail visibly instead of rendering an invented "latam"/"USD".
+  const currencyFormat = requirePlatformCurrencyFormat(settings);
+  const currency = requirePlatformCurrency(settings);
 
   const activeSub =
     subsResult.data.find((s) => !s.cancelledAt && s.status !== "cancelled") ??

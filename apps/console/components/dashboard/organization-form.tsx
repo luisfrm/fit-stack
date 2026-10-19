@@ -35,13 +35,24 @@ import {
   getCountryIdentity,
   parseDocumentId,
 } from "@workspace/shared";
+import type { CurrencyFormat } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { IOrganization, IPlatformOrganization } from "@workspace/shared/types";
+import { currencyFormatForCountry } from "@/lib/config/organization-presets";
 import type { OwnerData } from "./organization-form-types";
 
 export type { OwnerData };
+
+/**
+ * Editable organization state. `currencyFormat` can be empty ONLY while the
+ * country has no suggestion (unknown country): the required select then blocks
+ * the submit instead of an invented "latam" being saved.
+ */
+type OrganizationFormState = Omit<Partial<IOrganization>, "currencyFormat"> & {
+  currencyFormat?: CurrencyFormat | "";
+};
 
 interface OrganizationFormProps {
   readonly initialData?: IPlatformOrganization;
@@ -86,7 +97,7 @@ function parseStoredActiveCurrencies(settings?: Record<string, string> | null): 
 interface Step1Props {
   readonly isEdit: boolean;
   readonly previewUrl: string;
-  readonly formData: Partial<IOrganization>;
+  readonly formData: OrganizationFormState;
   readonly activeCurrencies: string[];
   readonly onActiveCurrenciesChange: (next: string[]) => void;
   readonly onLogoChange: (file: File | null) => void;
@@ -228,7 +239,8 @@ function OrganizationStep1({
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SimpleSelect
           label="Formato de Moneda"
-          value={formData.currencyFormat ?? "latam"}
+          required
+          value={formData.currencyFormat ?? ""}
           onChange={(val) => onChange("currencyFormat", val)}
           options={[
             { value: "latam", label: "LATAM / EU (1.250,50)" },
@@ -402,7 +414,7 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   const [activeStep, setActiveStep] = React.useState(0);
   const [maxReachedStep, setMaxReachedStep] = React.useState(0);
 
-  const [formData, setFormData] = React.useState<Partial<IOrganization>>({
+  const [formData, setFormData] = React.useState<OrganizationFormState>({
     name: initialData?.name ?? "",
     slug: initialData?.slug ?? "",
     logo: initialData?.logo ?? "",
@@ -417,8 +429,18 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     taxId: initialData?.taxId ?? "",
     legalName: initialData?.legalName ?? "",
     address: initialData?.address ?? "",
-    timezone: initialData?.timezone ?? "America/Caracas",
-    currencyFormat: initialData?.currencyFormat ?? "latam",
+    // Suggest the timezone and the currency format from the country of
+    // operation (`COUNTRIES`/`COUNTRY_INDEX`, SSOT). A stored value wins; an
+    // unknown country leaves them empty (required fields) instead of inventing
+    // "America/Caracas"/"latam".
+    timezone:
+      initialData?.timezone ??
+      COUNTRIES[initialData?.countryCode ?? "VE"]?.timezone ??
+      "",
+    currencyFormat:
+      initialData?.currencyFormat ??
+      currencyFormatForCountry(initialData?.countryCode ?? "VE") ??
+      "",
   });
 
   const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() => {
@@ -519,6 +541,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         !prevPrimary || prevPrimary === prevCountryCurrency
           ? nextCountryCurrency
           : prevPrimary;
+      const prevCountryFormat = currencyFormatForCountry(formData.countryCode);
+      const nextCountryFormat = currencyFormatForCountry(value);
       setActiveCurrencies((prev) => [
         ...new Set([
           ...(nextPrimary ? [nextPrimary] : []),
@@ -531,6 +555,12 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
         countryCode: value,
         ...(nextPrimary ? { primaryCurrency: nextPrimary } : {}),
         ...(config ? { timezone: config.timezone } : {}),
+        // Re-suggest the currency format only while it is still the previous
+        // country's suggestion: an explicit operator choice is never overwritten.
+        ...(nextCountryFormat &&
+        (!prev.currencyFormat || prev.currencyFormat === prevCountryFormat)
+          ? { currencyFormat: nextCountryFormat }
+          : {}),
       }));
       return;
     }
@@ -558,8 +588,15 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
   }, []);
 
   const validateStep1 = (): boolean => {
-    if (!formData.name?.trim() || !formData.countryCode || !formData.timezone) {
-      toast.error("Completa nombre, país y zona horaria para continuar.");
+    if (
+      !formData.name?.trim() ||
+      !formData.countryCode ||
+      !formData.timezone ||
+      !formData.currencyFormat
+    ) {
+      toast.error(
+        "Completa nombre, país, zona horaria y formato de moneda para continuar.",
+      );
       return false;
     }
     const primary = formData.primaryCurrency;
@@ -595,12 +632,22 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       return;
     }
 
+    // Zone/format are NOT NULL columns: never submit an empty (or invented)
+    // value — the operator must pick them.
+    const { timezone, currencyFormat } = formData;
+    if (!timezone || !currencyFormat) {
+      toast.error("Selecciona la zona horaria y el formato de moneda.");
+      return;
+    }
+
     setIsUploading(true);
     try {
       const finalLogoUrl = await resolveEditLogoUrl();
 
       const payload: Partial<IOrganization> = {
         ...formData,
+        timezone,
+        currencyFormat,
         logo: previewUrl ? (finalLogoUrl || null) : null,
         // Platform-only fiscal regime. Country taxes are NOT sent: they come
         // from `COUNTRIES` (SSOT) at emission time.

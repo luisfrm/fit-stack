@@ -23,9 +23,12 @@ interface SubscriptionsSidePanelProps {
   readonly revenue: RevenuePoint[];
   readonly activeSubscriptions: SubscriptionWithDetails[];
   readonly expiringSubscriptions: SubscriptionWithDetails[];
-  readonly currencyFormat?: CurrencyFormat;
-  readonly currency?: string;
-  readonly settings?: Record<string, string>;
+  /** Platform currency format (required: no invented default). */
+  readonly currencyFormat: CurrencyFormat;
+  /** Platform operating currency (required: no invented "USD"). */
+  readonly currency: string;
+  /** Platform settings: required (payment methods). */
+  readonly settings: Record<string, string>;
 }
 
 function formatDaysLeft(daysLeft: number): string {
@@ -76,9 +79,9 @@ export function SubscriptionsSidePanel({
   revenue,
   activeSubscriptions,
   expiringSubscriptions,
-  currencyFormat = "latam",
-  currency = "USD",
-  settings = {},
+  currencyFormat,
+  currency,
+  settings,
 }: SubscriptionsSidePanelProps) {
   const last6 = React.useMemo(() => revenue.slice(-6), [revenue]);
   const topPlans = React.useMemo(
