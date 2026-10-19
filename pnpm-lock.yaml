@@ -81,7 +81,7 @@ importers:
         specifier: ^7.4.0
         version: 7.4.0(@aws-sdk/credential-provider-node@3.972.27)(ws@8.21.0)(zod@3.25.76)
       zod:
-        specifier: ^3.24.2
+        specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
       '@cloudflare/workers-types':
