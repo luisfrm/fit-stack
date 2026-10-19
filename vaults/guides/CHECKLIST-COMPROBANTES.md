@@ -84,7 +84,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 
 ```bash
 pnpm typecheck && pnpm lint
-pnpm test                                    # shared → api-worker → panel → console
+pnpm test                                    # shared → auth → api-worker → jobs-worker → panel → console
 cd apps/api-worker && pnpm exec vitest run tests/integration/subscriptions.test.ts
 pnpm exec playwright test --project=panel    # 52
 pnpm exec playwright test --project=console  # 34

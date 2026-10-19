@@ -1,5 +1,6 @@
 import type { PlansRepository, IMembershipPlan, IMembershipsSummary } from '../repositories/plans.repository';
 import { OrganizationDateManager } from '../lib/date-manager';
+import { assertSupportedCurrency } from './organizations.service';
 
 export type { IMembershipPlan, IMembershipsSummary } from '../repositories/plans.repository';
 
@@ -28,6 +29,10 @@ export function createPlansService(plansRepo: PlansRepository) {
     },
 
     async create(organizationId: string, data: Omit<IMembershipPlan, 'id' | 'organizationId'>): Promise<IMembershipPlan> {
+      // A plan price is displayed with `Intl.NumberFormat`; an unsupported
+      // currency code would crash the render. Validate against the supported
+      // universe and fail with the explicit 400 (AGENTS.md §10).
+      assertSupportedCurrency(data.currency);
       const newPlan = await plansRepo.create(organizationId, data);
       if (!newPlan) {
         throw new Error('Error al crear el plan');
@@ -39,6 +44,10 @@ export function createPlansService(plansRepo: PlansRepository) {
       const plan = await plansRepo.findById(organizationId, id);
       if (!plan) {
         throw new Error('Plan no encontrado');
+      }
+      // Validate only when the payload changes the currency (partial update).
+      if (data.currency !== undefined) {
+        assertSupportedCurrency(data.currency);
       }
       return plansRepo.update(organizationId, id, data);
     },

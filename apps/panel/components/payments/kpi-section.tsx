@@ -32,7 +32,7 @@ export function KpiSection({
   stats,
   onFilterChange,
   activeFilter,
-  currencyFormat = "latam",
+  currencyFormat,
   monthCollectedCents,
   perSubscriptionCents,
   primaryCurrency = "",

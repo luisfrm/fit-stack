@@ -22,7 +22,8 @@ interface SubscriptionsClientProps {
   readonly initialStatus: string | null;
   readonly initialPlanId?: number | null;
   readonly plans?: IPlatformPlan[];
-  readonly settings?: Record<string, string>;
+  /** Platform settings: required (payment methods, currency format). */
+  readonly settings: Record<string, string>;
   readonly onRefresh?: () => Promise<void>;
 }
 

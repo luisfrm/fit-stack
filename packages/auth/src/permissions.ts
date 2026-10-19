@@ -16,7 +16,13 @@ export function usePermissions() {
     if (!role) return false;
     const roleDef = organizationRoles[role];
     if (!roleDef) return false;
-    return (roleDef as any).authorize({ [moduleName]: [actionName] }).success;
+    return roleDef
+      .authorize(
+        { [moduleName]: [actionName] } as Parameters<
+          typeof roleDef.authorize
+        >[0],
+      )
+      .success;
   };
 
   return {

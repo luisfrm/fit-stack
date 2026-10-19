@@ -19,6 +19,7 @@ import { CountrySelector, toast, Title, SimpleSelect, DocumentIdField } from "@w
 import { useAuth, usePermissions } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
+import { requireOrgConfig } from "@/lib/org-config";
 import { mutationError } from "@/lib/errors";
 import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
@@ -54,6 +55,8 @@ export default function OrganizationSettingsPage() {
   const router = useRouter();
   const { isPending: sessionLoading, activeOrganization: activeOrg, refetch } = useAuth();
 
+  // Empty until the session fills it: the form NEVER renders invented values
+  // (country/timezone/format are NOT NULL columns of the organization).
   const [formData, setFormData] = React.useState({
     name: "",
     slug: "",
@@ -61,10 +64,13 @@ export default function OrganizationSettingsPage() {
     legalName: "",
     taxId: "",
     address: "",
-    countryCode: "VE",
-    timezone: "America/Caracas",
-    currencyFormat: "latam",
+    countryCode: "",
+    timezone: "",
+    currencyFormat: "",
   });
+
+  /** Visible failure when the session does not expose the org config. */
+  const [configError, setConfigError] = React.useState<string | null>(null);
 
   const [logoUrl, setLogoUrl] = React.useState<string | null>(null);
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
@@ -88,6 +94,23 @@ export default function OrganizationSettingsPage() {
     if (!activeOrg || hasInitialized.current) return;
     const org = activeOrg;
     hasInitialized.current = true;
+
+    // Required org config (NOT NULL columns): lagging or corrupt data fails
+    // visibly instead of rendering "VE"/"America/Caracas"/"latam" (AGENTS.md §9/§10).
+    let config;
+    try {
+      config = requireOrgConfig(org);
+      setConfigError(null);
+    } catch (err) {
+      setConfigError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo leer la configuración de la organización.",
+      );
+      console.error("[OrgSettings]", err);
+      return;
+    }
+
     setFormData({
       name: org.name || "",
       slug: org.slug || "",
@@ -95,9 +118,9 @@ export default function OrganizationSettingsPage() {
       legalName: org.legalName || "",
       taxId: org.taxId || "",
       address: org.address || "",
-      countryCode: org.countryCode || "VE",
-      timezone: org.timezone || "America/Caracas",
-      currencyFormat: org.currencyFormat || "latam",
+      countryCode: config.countryCode,
+      timezone: config.timezone,
+      currencyFormat: config.currencyFormat,
     });
     setLogoUrl(org.logo || null);
 
@@ -130,6 +153,20 @@ export default function OrganizationSettingsPage() {
 
   const handleSave = async (e: React.SubmitEvent) => {
     e.preventDefault();
+
+    // NOT NULL columns: never submit an empty (or invented) zone/format.
+    const { timezone, currencyFormat } = formData;
+    if (!timezone || (currencyFormat !== "latam" && currencyFormat !== "usa")) {
+      toast.error(
+        "La organización no tiene zona horaria o formato de moneda configurado.",
+      );
+      return;
+    }
+    if (!formData.countryCode) {
+      toast.error("La organización no tiene país configurado.");
+      return;
+    }
+
     setIsUpdating(true);
 
     try {
@@ -151,7 +188,7 @@ export default function OrganizationSettingsPage() {
         logo: finalLogoUrl ?? null,
         slogan: formData.slogan.trim() || null,
         timezone: formData.timezone,
-        currencyFormat: formData.currencyFormat as "latam" | "usa",
+        currencyFormat,
         legalName: formData.legalName.trim() || null,
         taxId: formData.taxId.trim() || null,
         address: formData.address.trim() || null,
@@ -210,15 +247,15 @@ export default function OrganizationSettingsPage() {
     }
   };
 
-  // Helper to show current time in a zone
-  const getTimeInZone = (zone?: string) => {
+  // Helper to show current time in the organization's zone (required).
+  const getTimeInZone = (zone: string) => {
     try {
-      const targetZone = zone || "America/Caracas";
       return new Intl.DateTimeFormat("es-VE", {
         timeStyle: "short",
-        timeZone: targetZone,
+        timeZone: zone,
       }).format(new Date());
     } catch {
+      // Invalid/stale IANA value: show an explicit empty state, never another zone.
       return "--:--";
     }
   };
@@ -349,6 +386,32 @@ export default function OrganizationSettingsPage() {
   };
 
   if (sessionLoading && !hasInitialized.current) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="h-64 bg-foreground/5 rounded-2xl" />
+        <div className="h-96 bg-foreground/5 rounded-2xl" />
+      </div>
+    );
+  }
+
+  // Visible failure instead of a form rendered with invented config.
+  if (configError || !activeOrg) {
+    return (
+      <div
+        role="alert"
+        data-testid="org-config-error"
+        className="bg-foreground/5 border border-border rounded-xl p-6 space-y-2"
+      >
+        <Text weight="bold" size="lg">No se pudo cargar la configuración de la sede</Text>
+        <Text size="sm" variant="muted">
+          {configError ?? "No hay una organización activa en la sesión."}
+        </Text>
+      </div>
+    );
+  }
+
+  // The effect fills the form from the session on the next tick.
+  if (!hasInitialized.current) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-64 bg-foreground/5 rounded-2xl" />

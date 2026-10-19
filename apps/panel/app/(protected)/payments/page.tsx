@@ -1,6 +1,7 @@
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
 import { sessionService } from "@/lib/services/session-service";
+import { requireOrgConfig } from "@/lib/org-config";
 import { PAYMENT_STATUSES } from "@workspace/shared";
 import { PaymentsClient } from "./payments-client";
 import { updateTag } from "next/cache";
@@ -37,10 +38,11 @@ export default async function PaymentsPage({
   const activeOrgId = session?.session?.activeOrganizationId;
   const subsTag = `org:${activeOrgId}:subscriptions`;
 
-  // Moneda y formato: columnas obligatorias de la org (sin fallback de config).
-  const primaryCurrency = session?.activeOrganization?.primaryCurrency ?? "";
-  const currencyFormat =
-    (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam";
+  // Currency and format are required org columns: a missing value fails
+  // visibly instead of defaulting to "" / "latam".
+  const orgConfig = requireOrgConfig(session?.activeOrganization);
+  const primaryCurrency = orgConfig.primaryCurrency;
+  const currencyFormat = orgConfig.currencyFormat;
 
   const [subsResult, pendingResult, monthlyReport, analytics] = await Promise.all([
     subscriptionsService.getAll(

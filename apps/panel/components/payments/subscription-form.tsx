@@ -23,7 +23,7 @@ import {
   Badge
 } from "@workspace/ui/components";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
+import { parseDateAsConfigTimezone } from "@/lib/config/display";
 import { addDuration, toLocalDayString } from "@workspace/shared/date";
 import {
   exchangeRateAppliedValue,
@@ -33,6 +33,7 @@ import {
 } from "@workspace/shared";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
 import { apiCode } from "@/lib/errors";
 import {
   centsToUnits,
@@ -41,7 +42,6 @@ import {
   resolveFiscalProfile,
   computeSubscriptionPeriod,
   ORG_ROLES,
-  CurrencyFormat
 } from "@workspace/shared";
 
 // Sub-components
@@ -131,10 +131,68 @@ interface SubscriptionFormProps {
   readonly initialMember?: IMember | null;
 }
 
-export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initialMember }: SubscriptionFormProps) {
+/**
+ * Resolves the required org config before mounting the form: while the session
+ * is resolving it shows a skeleton, and once settled it shows a visible error
+ * instead of inventing "America/Caracas"/"latam" (AGENTS.md §9/§10).
+ */
+export function SubscriptionForm(props: SubscriptionFormProps) {
+  const { activeOrganization, isPending } = useAuth();
+
+  const resolved = React.useMemo(() => {
+    try {
+      return {
+        config: requireOrgConfig(activeOrganization),
+        error: null as string | null,
+      };
+    } catch (err) {
+      return {
+        config: null,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Organization configuration is incomplete.",
+      };
+    }
+  }, [activeOrganization]);
+
+  if (!resolved.config) {
+    if (isPending) {
+      return (
+        <div className="space-y-4 animate-pulse" aria-hidden="true">
+          <div className="h-24 bg-foreground/5 rounded-xl" />
+          <div className="h-40 bg-foreground/5 rounded-xl" />
+        </div>
+      );
+    }
+    return (
+      <div
+        role="alert"
+        className="bg-foreground/5 border border-border rounded-xl p-6 space-y-2"
+      >
+        <Text weight="bold" size="lg">
+          No se pudo cargar la configuración de la organización
+        </Text>
+        <Text size="sm" variant="muted">
+          {resolved.error}
+        </Text>
+      </div>
+    );
+  }
+
+  return <SubscriptionFormContent {...props} orgConfig={resolved.config} />;
+}
+
+function SubscriptionFormContent({
+  orgConfig,
+  onSubmit,
+  isLoading,
+  onAddMemberClick,
+  initialMember,
+}: SubscriptionFormProps & { readonly orgConfig: OrgConfig }) {
   const { settings } = useSettings();
   const { activeOrganization } = useAuth();
-  const timezone = activeOrganization?.timezone || DEFAULT_TIMEZONE;
+  const timezone = orgConfig.timezone;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 
   // States 
@@ -172,7 +230,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
 
-  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
+  const currencyFormat = orgConfig.currencyFormat;
 
   const selectedPlan = React.useMemo(() => plans.find(p => p.id === planId), [plans, planId]);
 

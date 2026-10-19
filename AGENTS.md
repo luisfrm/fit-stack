@@ -10,7 +10,7 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
-pnpm test         # Full test suite (shared → api-worker → jobs-worker → panel → console, Vitest)
+pnpm test         # Full test suite (shared → auth → api-worker → jobs-worker → panel → console, Vitest)
 pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
 pnpm seed:e2e     # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
 pnpm format       # Format code (Prettier)
@@ -103,7 +103,9 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ### 10. Explicit Configuration Without Silent Fallbacks
 
-**NEVER** invent silent fallbacks (`|| "USD"`, `|| "latam"`, `|| "openrouter"`); missing config = visible error. Required (no default): `timezone`/`countryCode`/`primaryCurrency`/`currencyFormat`; extensible → KV `gym_setting` (only fallback `[]`). Org creation derives `primaryCurrency` from the country **only when absent** (Console preselects it but allows another active currency); `active_currencies` always contains the primary, the country currency **and `USD`** (platform operating currency); `POST /api/settings` rejects primary/format (400); no zod `.default()` (defaults in `@workspace/shared/defaults.ts`); UI reads currency/format from the org.
+**NEVER** invent silent fallbacks (`|| "USD"`, `|| "latam"`, `|| "openrouter"`, `?? 'America/Caracas'`); missing config = visible error. Required (no default): `timezone`/`countryCode`/`primaryCurrency`/`currencyFormat`; extensible → KV `gym_setting` (only fallback `[]`). Org creation derives `primaryCurrency` from the country **only when absent** (Console preselects it but allows another active currency); `active_currencies` always contains the primary, the country currency **and `USD`** (platform operating currency); `POST /api/settings` rejects primary/format (400); no zod `.default()` (defaults in `@workspace/shared/defaults.ts`); UI reads currency/format from the org.
+
+**Official resolvers (source of truth, no fallbacks):** Panel → `requireOrgConfig`/`resolveOrgCurrencyFormat` (`apps/panel/lib/org-config.ts`); Console → `requirePlatformSetting/Currency/CurrencyFormat` (`apps/console/lib/config/platform-settings.ts`) + `currencyFormatForCountry` (`apps/console/lib/config/organization-presets.ts`, **suggestion only**, returns `null` for unknown country — never a read-time fallback). These helpers **are the pattern**; reintroducing `|| "USD"` / `|| "latam"` / `|| "America/Caracas"` or `??` variants is a violation.
 
 ### 11. Money Convention (integer cents)
 
@@ -123,6 +125,9 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
 | Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib`; the `FitTaskEvent` contract lives in `@workspace/shared` (`queues/fit-task-events.ts`): validated builders at every send site + `isFitTaskEvent` guard, unknown → ack + error log, never retry |
 | R2 storage | [`architecture/file-storage.md`](vaults/architecture/file-storage.md) — every org key starts `<orgId>/` (server-resolved); public only `cms/` + `platform/branding/` |
+| Org config resolvers (Panel) | `apps/panel/lib/org-config.ts` — `requireOrgConfig`/`resolveOrgCurrencyFormat`: fail visibly if session org lacks country/timezone/format/primaryCurrency; no fallbacks |
+| Platform settings resolvers (Console) | `apps/console/lib/config/platform-settings.ts` — `requirePlatformSetting/Currency/CurrencyFormat`: seeded via `/api/init`; fail visibly if missing |
+| Org presets (Console) | `apps/console/lib/config/organization-presets.ts` — `currencyFormatForCountry`: suggestion only (`null` for unknown); never a read-time fallback |
 | Package exports / DB schema | [`architecture/packages-and-schema.md`](vaults/architecture/packages-and-schema.md) — 33 tables |
 | Modules / Staff & Trainers | [`architecture/modules.md`](vaults/architecture/modules.md), [`staff-trainers.md`](vaults/architecture/staff-trainers.md) |
 | Frontend data layer | [`guides/frontend-data-layer.md`](vaults/guides/frontend-data-layer.md) — no raw `fetch`; post-mutation = service → `updateTag` → `router.refresh()`; `updateTag` server-only |

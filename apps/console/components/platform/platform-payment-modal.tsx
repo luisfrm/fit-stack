@@ -21,7 +21,8 @@ interface PlatformPaymentModalProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onSuccess?: () => void;
-  readonly settings?: Record<string, string>;
+  /** Platform settings: required (currency/format/payment methods come from it). */
+  readonly settings: Record<string, string>;
   readonly className?: string;
 }
 

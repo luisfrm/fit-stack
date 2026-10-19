@@ -3,6 +3,7 @@ import { MembershipsClient } from "./memberships-client";
 import { settingsService } from "@/lib/services/settings-service";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { sessionService } from "@workspace/auth/service";
+import { requireOrgConfig } from "@/lib/org-config";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -48,9 +49,7 @@ export default async function MembershipsPage() {
       initialSummary={summary}
       refreshPlans={refreshPlans}
       activeCurrencies={activeCurrencies}
-      currencyFormat={
-        (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam"
-      }
+      currencyFormat={requireOrgConfig(session?.activeOrganization).currencyFormat}
     />
   );
 }

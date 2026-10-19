@@ -63,6 +63,7 @@ Fit-Stack uses **Better Auth** for authentication.
   - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
   - `@workspace/auth/service` — `sessionService.getSession()` for server components
   - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)` and `canAccessCms()`
+  - `@workspace/auth/env` — `requireApiBaseUrl()`: missing `NEXT_PUBLIC_API_BASE_URL` throws visibly (no runtime fallback, §10). **Build-time exception**: non-production builds (`NEXT_PHASE=phase-production-build`) warn and use a build-only placeholder (mirrors `envs.ts`) so `next build` can collect page data; production builds and runtime still throw. `getServerSession` uses **ofetch** (never native `fetch`, §8) and maps `FetchError` → `AUTH_API_ERROR` (with HTTP status) / `NETWORK_ERROR`
 - **`apps/panel/lib/auth-client.ts`** and **`apps/console/lib/auth-client.ts`** — re-export `@workspace/auth/client`
 - **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
 
@@ -134,12 +135,17 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 ### 10. Explicit Configuration Without Silent Fallbacks (Seeding)
 
-- **Golden rule**: NEVER invent silent fallbacks in frontend or backend code (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`). If a configuration is missing, it must be a visible error, not silently assumed behavior.
+- **Golden rule**: NEVER invent silent fallbacks in frontend or backend code (`|| "USD"`, `|| "latam"`, `["USD", "VES"]`, `|| "openrouter"`, `?? 'America/Caracas'`). If a configuration is missing, it must be a visible error, not silently assumed behavior.
 - **Taxonomy**: **required** are `NOT NULL` columns without default in `organization` (`timezone`, `countryCode`, `primaryCurrency`, `currencyFormat`) — a single `insert` at creation, impossible to miss. **Extensible** lives in KV (`gym_setting`: `active_currencies`, `active_payment_methods`, `brand_*`) with the only allowed fallback `[]`/safe parse. Guards over **data** (`currencyPaid`, `planCurrency` in UI) are not config and stay, documented.
 - **Org creation** (`organizations.service.createOrganization`): `primaryCurrency` is explicit — absent → `primaryCurrencyForCountry(countryCode)` (creation only), unknown → 400 `UNSUPPORTED_CURRENCY`; accepts explicit `currencyFormat` (`'latam'` is the **write** default) + `settings` override (`{ ...buildDefaultOrgSettings(cc, primary), ...settings }`). `buildDefaultOrgSettings` seeds `active_currencies` as `Set([primaryCurrency, country.currency, "USD"])`, so a cross-currency org (USD primary in VE) is `["USD","VES"]` and a VE org with no explicit primary is `["VES","USD"]`; an explicit list must already contain the primary (400 `PRIMARY_CURRENCY_NOT_ACTIVE`) and is normalized to also include the country currency. `primaryCurrency` updates require a valid `active_currencies` row (400 `ACTIVE_CURRENCIES_NOT_CONFIGURED` when absent) and the value must be in it; changing `countryCode` never rewrites the primary. `POST /api/settings` rejects `primary_currency`/`currency_format` (400).
 - **User creation** (the 3 flows: `POST /api/members`, `POST /platform/organizations/:id/staff`, `POST /platform/staff`): no `.default()` in zod — defaults in `@workspace/shared/defaults.ts` (`DEFAULT_MEMBER_VALUES`, `DEFAULT_ORG_STAFF_VALUES`, `DEFAULT_PLATFORM_STAFF_VALUES`) resolved with spread in route/service.
 - **Platform seeding (`platform_setting`)**: unchanged (KV singleton, seeded in `/api/init` via `DEFAULT_PLATFORM_SETTINGS`).
 - **UI reads**: currency/format are read from the org (`session.activeOrganization` / `useAuth().activeOrganization`), never from settings. The panel Currencies page only edits `active_currencies` (primary readonly); the format is edited in Location Settings.
+- **Official resolvers (source of truth, no fallbacks):**
+  - **Panel** → `requireOrgConfig` / `resolveOrgCurrencyFormat` (`apps/panel/lib/org-config.ts`): throws visibly if the session org lacks `countryCode`, `timezone`, `currencyFormat`, or `primaryCurrency`; `resolveOrgCurrencyFormat` returns `null` for unknown format (never a fallback).
+  - **Console (platform settings)** → `requirePlatformSetting` / `requirePlatformCurrency` / `requirePlatformCurrencyFormat` (`apps/console/lib/config/platform-settings.ts`): settings are seeded via `/api/init`; reading a missing key throws naming the key and the seeding command.
+  - **Console (org presets)** → `currencyFormatForCountry` (`apps/console/lib/config/organization-presets.ts`): returns `"usa"` for `US`, `"latam"` for all other known countries, `null` for unknown/absent country — this is a **suggestion only** for the operator; it is never used as a read-time fallback for stored organizations.
+  - Reintroducing `|| "USD"` / `|| "latam"` / `|| "America/Caracas"` or `??` variants is a violation of this standard.
 
 ### 11. Money Convention (integer cents)
 

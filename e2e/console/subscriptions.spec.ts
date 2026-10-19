@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { SELECTORS } from "../helpers/selectors";
 
 const SUBS = SELECTORS.consoleSubscriptions;
@@ -67,5 +67,42 @@ test.describe("Console — Subscriptions", () => {
         await expect(page).toHaveURL(/planId=\d+/, { timeout: 10_000 });
       }
     }
+  });
+
+  /**
+   * RD-132 — no silent currency/format fallback: the money KPIs are rendered
+   * with `formatCents(..., primary_currency, currency_format)` taken from the
+   * platform settings, so both the currency code and the separator convention
+   * must be the configured ones (never a hardcoded "USD"/"latam").
+   *
+   * The settings are NOT mutated here: the console caches
+   * `GET /platform/settings` for 600s (`console:settings` tag) and the API
+   * invalidates its own Redis cache on write, not Next's data cache — a
+   * mutation would not be observable within the test without a
+   * revalidation hook. The absence path (missing setting → visible error) is
+   * covered by `apps/console/tests/unit/platform-settings.test.ts`.
+   */
+  test("money KPIs use the platform currency and format", async ({
+    page,
+    consoleApi,
+  }) => {
+    const settings = await consoleApi.get<Record<string, string>>(
+      "/api/platform/settings",
+    );
+    const currency = settings["primary_currency"];
+    const format = settings["currency_format"];
+    expect(currency, "platform settings must be seeded (/api/init)").toBeTruthy();
+    expect(["latam", "usa"]).toContain(format);
+
+    await page.goto("/subscriptions", { waitUntil: "domcontentloaded" });
+    const mrr = page.locator(SUBS.kpiMrr);
+    await expect(mrr).toBeVisible({ timeout: 20_000 });
+
+    const text = (await mrr.innerText()).replace(/\s+/g, " ");
+    expect(text).toContain(currency as string);
+    // latam → "1.250,50 EUR" · usa → "1,250.50 EUR"
+    expect(text).toMatch(
+      format === "usa" ? /\d\.\d{2} [A-Z]{3}/ : /\d,\d{2} [A-Z]{3}/,
+    );
   });
 });

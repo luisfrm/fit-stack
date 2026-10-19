@@ -1,5 +1,32 @@
+import { FetchError, ofetch } from "ofetch";
 import { authClient, type Session, type User, type SignInParams, type SignUpParams } from "./client";
+import { requireApiBaseUrl } from "./env";
 import { type PlatformRole, type IAuthError } from '@workspace/shared';
+
+/** Payload returned by Better Auth's email sign-in flow. */
+type SignInData = Awaited<ReturnType<typeof authClient.signIn.email>>["data"];
+/** Payload returned by Better Auth's email sign-up flow. */
+type SignUpData = Awaited<ReturnType<typeof authClient.signUp.email>>["data"];
+
+/**
+ * Normalizes a thrown value into the `IAuthError` contract (no `any`).
+ * Values that already carry a string `code` pass through; anything else
+ * becomes a generic auth error with a readable message.
+ */
+function toAuthError(error: unknown): IAuthError {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return error as IAuthError;
+  }
+  if (error instanceof Error) {
+    return { code: "AUTH_UNKNOWN_ERROR", message: error.message };
+  }
+  return { code: "AUTH_UNKNOWN_ERROR", message: String(error) };
+}
 
 export const sessionService = {
   async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: IAuthError | null }> {
@@ -18,9 +45,9 @@ export const sessionService = {
 
         const result = await authClient.getSession({ fetchOptions: { headers: cleanHeaders } });
         return { data: result?.data as Session | null, error: (result?.error as IAuthError) || null };
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching session on server:", error);
-        return { data: null, error: error as IAuthError };
+        return { data: null, error: toAuthError(error) };
       }
     }
 
@@ -29,46 +56,59 @@ export const sessionService = {
   },
 
   async getServerSession(headers: Headers) {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    // Resolved OUTSIDE the `try`: a missing API base URL is a configuration
+    // error that must surface as itself, never be reported as a network error.
+    const apiBase = requireApiBaseUrl();
+
+    // Pass only essential auth headers (cookie & authorization)
+    // to prevent forwarding frontend Host header to backend API server
+    const cleanHeaders = new Headers();
+    const cookie = headers.get("cookie");
+    if (cookie) cleanHeaders.set("cookie", cookie);
+    const authorization = headers.get("authorization");
+    if (authorization) cleanHeaders.set("authorization", authorization);
 
     try {
-      const cleanHeaders = new Headers();
-      const cookie = headers.get("cookie");
-      if (cookie) cleanHeaders.set("cookie", cookie);
-      const authorization = headers.get("authorization");
-      if (authorization) cleanHeaders.set("authorization", authorization);
-
-      const response = await fetch(`${apiBase}/api/auth/get-session`, {
+      // `ofetch` (AGENTS.md §8) throws `FetchError` on non-2xx responses, so the
+      // HTTP status is read from the error instead of `response.ok`.
+      const data = await ofetch<unknown>(`${apiBase}/api/auth/get-session`, {
         headers: cleanHeaders,
-        cache: 'no-store',
+        cache: "no-store",
       });
-
-      if (!response.ok) {
-        return { data: null, error: { code: 'AUTH_API_ERROR', message: `Auth API error: ${response.statusText}`, status: response.status } };
-      }
-
-      const data = await response.json();
       return { data, error: null };
-    } catch {
+    } catch (error) {
+      if (error instanceof FetchError) {
+        const status = error.response?.status ?? error.statusCode ?? 0;
+        const statusText =
+          error.response?.statusText || error.statusText || String(status);
+        return {
+          data: null,
+          error: {
+            code: 'AUTH_API_ERROR',
+            message: `Auth API error: ${statusText}`,
+            status,
+          },
+        };
+      }
       return { data: null, error: { code: 'NETWORK_ERROR', message: "Error de red al obtener sesión" } };
     }
   },
 
-  async signIn(params: SignInParams): Promise<{ data: any; error: IAuthError | null }> {
+  async signIn(params: SignInParams): Promise<{ data: SignInData | null; error: IAuthError | null }> {
     try {
       const result = await authClient.signIn.email(params);
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
-  async signUp(params: SignUpParams): Promise<{ data: any; error: IAuthError | null }> {
+  async signUp(params: SignUpParams): Promise<{ data: SignUpData | null; error: IAuthError | null }> {
     try {
       const result = await authClient.signUp.email(params);
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
@@ -82,8 +122,8 @@ export const sessionService = {
         }
       });
       return { data: result?.data || true, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
@@ -93,8 +133,8 @@ export const sessionService = {
         organizationId: organizationId || null,
       });
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 

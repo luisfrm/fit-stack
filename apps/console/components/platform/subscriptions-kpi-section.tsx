@@ -23,8 +23,10 @@ interface KpiSectionProps {
   isLoading?: boolean;
   activeFilter: string | null;
   onFilterChange: (filter: string | null) => void;
-  currencyFormat?: CurrencyFormat;
-  currency?: string;
+  /** Platform currency format (required: no invented default). */
+  currencyFormat: CurrencyFormat;
+  /** Platform operating currency (required: no invented "USD"). */
+  currency: string;
 }
 
 function StatCard({
@@ -126,8 +128,8 @@ export function SubscriptionsKpiSection({
   isLoading,
   activeFilter,
   onFilterChange,
-  currencyFormat = "latam",
-  currency = "USD",
+  currencyFormat,
+  currency,
 }: KpiSectionProps) {
   const defaultStats: SubscriptionStats = {
     active: 0,

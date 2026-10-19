@@ -14,12 +14,15 @@ import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import {
+  PLATFORM_SETTINGS_KEYS,
+  requirePlatformCurrency,
+  requirePlatformCurrencyFormat,
+} from "@/lib/config/platform-settings";
 import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
 import {
   exchangeRateAppliedValue,
   paymentConversionView,
-  type CurrencyFormat,
   type ExchangeRateLoadStatus,
 } from "@workspace/shared";
 import { centsToUnits, unitsToCents } from "@workspace/shared";
@@ -51,7 +54,8 @@ interface PlatformSubscriptionFormProps {
   readonly onSubmit: (data: PlatformSubscriptionSubmitData) => Promise<void>;
   readonly isLoading?: boolean;
   readonly initialOrganization?: IPlatformOrganization | null;
-  readonly settings?: Record<string, string>;
+  /** Platform settings: required (currency/format/payment methods come from it). */
+  readonly settings: Record<string, string>;
   /** Preloaded plan (payment mode on an existing subscription). */
   readonly initialPlan?: IPlatformPlan | null;
   /** Payment only: hides plan selector, trial, and dates; modifies submit. */
@@ -107,7 +111,7 @@ export function PlatformSubscriptionForm({
   paymentOnly = false,
   submitLabel,
 }: PlatformSubscriptionFormProps) {
-  const platformSettings = React.useMemo(() => settings ?? {}, [settings]);
+  const platformSettings = settings;
   const [plans, setPlans] = React.useState<IPlatformPlan[]>([]);
 
   const [selectedOrganization, setSelectedOrganization] =
@@ -144,7 +148,12 @@ export function PlatformSubscriptionForm({
   const [isTrial, setIsTrial] = React.useState(false);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
 
-  const [paymentCurrency, setPaymentCurrency] = React.useState("USD");
+  // Payment currency: the platform operating currency (`primary_currency`,
+  // editable from /settings/currencies), never a hardcoded "USD". The operator
+  // can still change it to any active platform currency.
+  const [paymentCurrency, setPaymentCurrency] = React.useState(
+    requirePlatformCurrency(platformSettings),
+  );
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [paymentDetails, setPaymentDetails] = React.useState("");
@@ -157,9 +166,7 @@ export function PlatformSubscriptionForm({
 
   const [amountFocus, setAmountFocus] = React.useState(false);
 
-  const currencyFormat = platformSettings[
-    PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT
-  ] as CurrencyFormat;
+  const currencyFormat = requirePlatformCurrencyFormat(platformSettings);
 
   const allPlans = React.useMemo(
     () =>

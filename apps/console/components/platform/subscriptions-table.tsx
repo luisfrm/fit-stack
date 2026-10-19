@@ -51,9 +51,10 @@ interface SubscriptionsTableProps {
     limit: number;
     onPageChange: (page: number) => void;
   };
-  currencyFormat?: CurrencyFormat;
+  currencyFormat: CurrencyFormat;
   onChange?: () => void;
-  settings?: Record<string, string>;
+  /** Platform settings: required (payment methods, currency format). */
+  settings: Record<string, string>;
   /** Links the org name to its profile. Disable on the detail page itself. */
   linkOrganization?: boolean;
 }
@@ -373,7 +374,7 @@ export function SubscriptionsTable({
   subscriptions,
   loading = false,
   pagination,
-  currencyFormat = "latam",
+  currencyFormat,
   onChange,
   settings,
   linkOrganization = true,
@@ -529,11 +530,13 @@ export function SubscriptionsTable({
               <Text weight="bold">
                 {detailModal.isTrial
                   ? "Gratuito"
-                  : formatCents(
-                    detailModal.priceOverride ?? detailModal.planPrice ?? 0,
-                    detailModal.planCurrency ?? "USD",
-                    currencyFormat,
-                  )}
+                  : detailModal.planCurrency
+                    ? formatCents(
+                      detailModal.priceOverride ?? detailModal.planPrice ?? 0,
+                      detailModal.planCurrency,
+                      currencyFormat,
+                    )
+                    : "—"}
               </Text>
             </DetailRow>
             <DetailRow label="Pagos">

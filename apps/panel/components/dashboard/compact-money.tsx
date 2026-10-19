@@ -9,7 +9,8 @@ interface CompactMoneyProps {
   readonly amount: number | null | undefined;
   /** Currency code or symbol (USD, VES...) — rendered in smaller size */
   readonly currency?: string;
-  readonly format?: CurrencyFormat;
+  /** Required: the organization format is NOT NULL (never a "latam" default). */
+  readonly format: CurrencyFormat;
   /** Class to control the font size of the primary digits (default text-3xl) */
   readonly valueClassName?: string;
   readonly className?: string;
@@ -31,7 +32,7 @@ const SEPARATORS: Record<CurrencyFormat, { thousand: string; decimal: string }> 
 export function CompactMoney({
   amount,
   currency,
-  format = "latam",
+  format,
   valueClassName,
   className,
 }: Readonly<CompactMoneyProps>) {
