@@ -157,10 +157,12 @@ describe('buildReceiptDataFromComposed', () => {
     const profile = resolveFiscalProfile('VE', { isFormalTaxpayer: true });
     const snapshot = buildEmitterSnapshot(input.organization, profile);
     expect(snapshot.version).toBe(1);
-    // Perfil del país completo, con el condicional apagado.
+    // Perfil del país completo: declararse contribuyente formal habilita el
+    // perfil (el condicional se evalúa al calcular, ver `tax_details`).
+    // El snapshot guarda solo nombre/tasa/estado (shape persistido v1).
     expect(snapshot.taxes).toEqual([
       { name: 'IVA', rate: 0.16, enabled: true },
-      { name: 'IGTF', rate: 0.03, enabled: false },
+      { name: 'IGTF', rate: 0.03, enabled: true },
     ]);
     expect(snapshot.documentLabel).toBe('Comprobante de pago');
     input.emitterSnapshot = snapshot;

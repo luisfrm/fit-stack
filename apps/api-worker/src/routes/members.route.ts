@@ -17,6 +17,7 @@ import { createPlatformSubscriptionsRepository } from '../repositories/platform-
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
+import { documentIdTypeViolation } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 const memberSchema = z.object({
@@ -235,6 +236,14 @@ export const memberRoutes = new Hono<AppEnv>()
     const auth = c.get('auth');
     const cache = createCache(c.env);
 
+    // RD-148: the identification prefix must belong to the org country.
+    const violation = documentIdTypeViolation(
+      data.documentId,
+      c.get('org')?.countryCode,
+      'documentId',
+    );
+    if (violation) return c.json(violation, 400);
+
     // Portal seat guard: only client invitations (role member)
     if (sendInvite && data.role === 'member') {
       const featuresService = createFeaturesService(
@@ -290,6 +299,15 @@ export const memberRoutes = new Hono<AppEnv>()
     if (!existing) {
       return c.json({ error: 'Miembro no encontrado' }, 404);
     }
+
+    // RD-148: the identification prefix must belong to the org country.
+    const violation = documentIdTypeViolation(
+      data.documentId,
+      c.get('org')?.countryCode,
+      'documentId',
+      existing.documentId,
+    );
+    if (violation) return c.json(violation, 400);
 
     const updatedMember = await membersService.updateMember(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:members:*`);

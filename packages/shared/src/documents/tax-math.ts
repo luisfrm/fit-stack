@@ -1,6 +1,6 @@
 /* ── Documents / tax-math — tax calculation ─────────────────────────────
-   Hybrid model: automatic by default (`computeTaxes` from fiscal profile),
-   with audited manual override (`applyTaxOverride` requires a reason).
+   Single model: taxes come from the fiscal profile (country SSOT) and are
+   calculated here — there is NO manual override anymore.
    UNITS: everything operates in INTEGER CENTS (the unit of `payment` and
    `platform_subscription_payment`: `bigint` columns). Callers with higher-level
    units convert at the boundary using `unitsToCents` (`money.ts`).
@@ -25,8 +25,6 @@ export interface TaxInput {
    * is decomposed tax-inclusive (IGTF VE). Omitted = standard tax-inclusive.
    */
   basis?: 'gross_first';
-  /** Informative: activation required explicit user confirmation (does not affect calculation). */
-  requiresConfirmation?: boolean;
 }
 
 export interface ComputeTaxesOptions {
@@ -90,13 +88,61 @@ export function computeTaxes(
 }
 
 /**
+ * Absorbs the rounding dust on the inclusive lines only.
+ *
+ * `gross_first` lines (IGTF) are statutory amounts calculated on the gross
+ * total: they are never re-adjusted here. Negative dust is drained from the
+ * last inclusive line backwards, never taking a line below zero, so the
+ * `ITaxDetail.amount` domain (non-negative cents) always holds while
+ * `Σ taxDetails === taxTotal` stays exact.
+ */
+function absorbInclusiveDust(
+  rows: Array<{ detail: ITaxDetail; inclusive: boolean }>,
+  dust: number,
+): void {
+  if (dust === 0) return;
+  const inclusiveRows = rows.filter((row) => row.inclusive);
+  if (inclusiveRows.length === 0) {
+    // With only gross_first lines `subtotal = remaining`, so dust is always 0.
+    throw new Error(
+      'computeInclusiveTaxes: rounding dust without inclusive lines to absorb it.',
+    );
+  }
+
+  if (dust > 0) {
+    inclusiveRows[inclusiveRows.length - 1]!.detail.amount += dust;
+    return;
+  }
+
+  let pending = -dust;
+  const last = inclusiveRows[inclusiveRows.length - 1]!;
+  if (last.detail.amount >= pending) {
+    last.detail.amount -= pending;
+    return;
+  }
+
+  for (let i = inclusiveRows.length - 1; i >= 0 && pending > 0; i -= 1) {
+    const row = inclusiveRows[i]!;
+    const reduction = Math.min(row.detail.amount, pending);
+    row.detail.amount -= reduction;
+    pending -= reduction;
+  }
+  if (pending > 0) {
+    throw new Error(
+      'computeInclusiveTaxes: rounding dust could not be absorbed without negative amounts.',
+    );
+  }
+}
+
+/**
  * Tax-INCLUSIVE decomposition (total charged already includes taxes).
  *
  * Model: `basis: 'gross_first'` lines (IGTF VE) are EXTRACTED first from
  * the total — statutory rules calculate them on gross paid in foreign currency —
  * and the remainder is decomposed tax-inclusive with the others:
  * `subtotal = round((total − Σgross_first) / (1 + Σrates))`. Lines are
- * computed on that base and rounding dust (≤1¢) goes to the last line so that
+ * computed on that base and rounding dust goes to the inclusive lines
+ * (last one first, never below zero) so that
  * `subtotal + taxTotal === total` holds exactly. Zero base → no breakdown.
  *
  * ⚠️ Enabling a `gross_first` tax CHANGES the base for the remaining taxes
@@ -139,72 +185,22 @@ export function computeInclusiveTaxes(
   }
 
   // Order = fiscal profile order (country), not category order.
-  const taxDetails: ITaxDetail[] = applicable.map((t) => ({
-    name: t.name,
-    rate: t.rate,
-    amount: amountByName.get(t.name) ?? 0,
+  const detailRows = applicable.map((t) => ({
+    detail: {
+      name: t.name,
+      rate: t.rate,
+      amount: amountByName.get(t.name) ?? 0,
+    } satisfies ITaxDetail,
+    inclusive: t.basis !== 'gross_first',
   }));
   const taxTotal = total - subtotal;
-  // Rounding dust (≤1¢) assigned to last line: exact balance.
-  const dust = taxTotal - taxDetails.reduce((sum, l) => sum + l.amount, 0);
-  if (taxDetails.length > 0 && dust !== 0) {
-    taxDetails[taxDetails.length - 1]!.amount += dust;
-  }
-  return { subtotal, taxDetails, taxTotal, total };
-}
-
-export interface TaxOverrideInput {
-  /** Integer cents. */
-  taxTotal: number;
-  /** Integer cents per line. */
-  taxDetails: ITaxDetail[];
-  /** Audit reason. Empty or whitespace only → throws. */
-  taxOverrideReason: string;
-  /** Actor (user.id) authorizing the override. Informative. */
-  actor?: string;
-}
-
-/**
- * Audited manual override: caller provides custom breakdown (integer cents)
- * and this function validates it (mandatory reason, valid lines, sum ≈ total).
- * Throws if inconsistent — never persists an inconsistent override silently.
- */
-export function applyTaxOverride(
-  base: number,
-  _taxes: TaxInput[],
-  override: TaxOverrideInput,
-): ComputedTaxes {
-  assertValidBase(base);
-  if (override.taxOverrideReason.trim().length === 0) {
-    throw new Error('applyTaxOverride: taxOverrideReason es obligatorio para override manual.');
-  }
-  if (!Number.isInteger(override.taxTotal) || override.taxTotal < 0) {
-    throw new Error(`applyTaxOverride: taxTotal inválido (${String(override.taxTotal)}). Debe ser centavos enteros ≥ 0.`);
-  }
-  for (const line of override.taxDetails) {
-    if (
-      line.name.trim().length === 0 ||
-      !Number.isFinite(line.rate) ||
-      line.rate < 0 ||
-      line.rate > 1 ||
-      !Number.isInteger(line.amount) ||
-      line.amount < 0
-    ) {
-      throw new Error(
-        `applyTaxOverride: línea de impuesto inválida (${JSON.stringify(line)}). El monto debe ser centavos enteros.`,
-      );
-    }
-  }
-  const linesSum = override.taxDetails.reduce((sum, line) => sum + line.amount, 0);
-  if (Math.abs(linesSum - override.taxTotal) > TAX_TOTAL_TOLERANCE) {
-    throw new Error(
-      `applyTaxOverride: Σ líneas (${linesSum}) ≠ taxTotal (${override.taxTotal}).`,
-    );
-  }
+  const dust =
+    taxTotal - detailRows.reduce((sum, row) => sum + row.detail.amount, 0);
+  absorbInclusiveDust(detailRows, dust);
   return {
-    subtotal: base,
-    taxDetails: override.taxDetails,
-    taxTotal: override.taxTotal,
-    total: base + override.taxTotal,
+    subtotal,
+    taxDetails: detailRows.map((row) => row.detail),
+    taxTotal,
+    total,
   };
 }

@@ -98,6 +98,36 @@ describe.skipIf(skipReason !== null)('Members API', () => {
       expect(res.status, res.text).toBe(400);
     });
 
+    it('rejects a document type from another country (400 DOCUMENT_TYPE_INVALID)', async () => {
+      // The tenant is created in VE, so `C.C.` (a CO prefix) is out of its
+      // catalog: the server must reject it, not only the UI (RD-148).
+      const res = await tenant.owner.client.post('/api/members', {
+        firstName: 'Test',
+        lastName: 'Doc Bad',
+        email: uniqueEmail(),
+        role: 'member',
+        documentId: 'C.C.-12345678',
+      });
+
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toMatchObject({
+        code: 'DOCUMENT_TYPE_INVALID',
+        fields: ['documentId'],
+      });
+    });
+
+    it('accepts a document type of the organization country', async () => {
+      const res = await tenant.owner.client.post('/api/members', {
+        firstName: 'Test',
+        lastName: 'Doc Ok',
+        email: uniqueEmail(),
+        role: 'member',
+        documentId: 'V-12345678',
+      });
+
+      expect(res.status, res.text).toBe(201);
+    });
+
     it('rejects unauthenticated creation', async () => {
       const client = createClient();
       const res = await client.post('/api/members', {

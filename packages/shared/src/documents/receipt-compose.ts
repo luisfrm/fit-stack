@@ -205,7 +205,9 @@ function platformEmitterIdentity(
       taxId: emitter.taxId ?? undefined,
       isFormalTaxpayer: false,
     }),
-    recipientDocLabel: profile.docLabel,
+    // B2B recipient (organization): the printed label is the country
+    // `taxLabel` (`R.I.F.`, `NIT`), never the person-natural `docLabel`.
+    recipientDocLabel: profile.taxLabel,
     disclaimer: profile.disclaimer.includes('Emitido por FitStack')
       ? profile.disclaimer
       : [...profile.disclaimer, 'Emitido por FitStack'],
@@ -525,6 +527,8 @@ export interface PlatformComposeReceptor {
   name: string;
   legalName?: string | null;
   taxId?: string | null;
+  /** Fiscal address; `null`/absent = the document omits the line. */
+  address?: string | null;
   countryCode: string;
   timezone: string;
 }
@@ -587,9 +591,13 @@ export function buildPlatformReceiptDataFromComposed(
     method: 'buildPlatformReceiptDataFromComposed',
     identity,
     recipient: {
+      // Structural B2B marker: the PDF renders organization wording, never
+      // "Socio / Cliente" (person-natural), without text heuristics.
+      kind: 'organization',
       name: receptor.legalName?.trim() || receptor.name,
       documentId: receptor.taxId?.trim() || null,
       docLabel: identity.recipientDocLabel,
+      address: receptor.address?.trim() || null,
     },
     document: {
       number: input.receiptNumber,

@@ -150,7 +150,6 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
         subtotal: computed.subtotal,
         taxTotal: computed.taxTotal,
         taxDetails: computed.taxDetails,
-        taxOverrideReason: null,
       };
     },
 

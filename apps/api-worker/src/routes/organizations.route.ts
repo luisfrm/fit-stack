@@ -13,14 +13,27 @@ import { createPlatformPlansRepository } from '../repositories/platform-plans.re
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
-import { createExchangeRateProvider } from '../lib/exchange-rates';
+import {
+  createExchangeRateProvider,
+  exchangeRateErrorResponse,
+} from '../lib/exchange-rates';
+import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
-import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  documentIdTypeViolation,
+} from '../lib/schemas';
 import { createOrganizationsService } from '../services/organizations.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import type { NewDbOrganization } from '../repositories/organizations.repository';
 import type { AppEnv } from '../lib/env';
+import {
+  TENANT_FORBIDDEN_FISCAL_KEYS,
+  TenantFiscalConfigSchema,
+  type FiscalConfig,
+} from '@workspace/shared';
 
 /**
  * platform_setting keys (single source in apps/console/lib/config/platform-settings.ts).
@@ -42,16 +55,24 @@ const orgRenewSchema = z.object({
 
 /**
  * Org-scoped profile: branch identity (name, logo, slogan, timezone,
- * currency format) + fiscal issuing identity.
+ * currency format) + fiscal ISSUER identity (legalName/taxId/address) and
+ * the disclaimer the tenant owns.
  *
- * `countryCode`/`primaryCurrency` are immutable from here (required at
- * creation): rejected with 400 if provided. Changing country would recalculate
- * primary currency - platform-level operation, not tenant.
- * `confirmed` provides friction for formal taxpayer declaration.
+ * The fiscal REGIME is platform-only: `isFormalTaxpayer` (and the legacy
+ * `taxes`/`confirmedTaxes`) are rejected with an explicit
+ * `403 FISCAL_CONFIG_PLATFORM_ONLY` (see `TENANT_FORBIDDEN_FISCAL_KEYS`).
+ * Taxes are not configurable at all: `COUNTRIES` is their SSOT.
+ *
+ * `countryCode` is immutable from here (required at creation): rejected with
+ * 400 if provided. `primaryCurrency` IS editable, but only inside the
+ * organization's `active_currencies` (service answers 400 otherwise, no partial
+ * write). Changing country would recalculate localization - platform-level
+ * operation, not tenant.
  *
  * `.passthrough()` (not `.strict()`) is deliberate: allows DETECTING prohibited
- * keys to return an explicit 400. Handler only forwards known fields, so
- * extra data is not persisted (no mass-assignment).
+ * keys (top-level and inside `fiscalConfig`) to return an explicit error.
+ * Handler only forwards known fields, so extra data is not persisted
+ * (no mass-assignment).
  */
 const orgProfileSchema = z
   .object({
@@ -61,15 +82,16 @@ const orgProfileSchema = z
     slogan: z.string().nullable().optional(),
     timezone: z.string().min(1, 'La zona horaria es requerida').optional(),
     currencyFormat: z.enum(['latam', 'usa']).optional(),
+    // Editable, always inside the org's `active_currencies` (service validates).
+    primaryCurrency: z.string().min(1).optional(),
     legalName: z.string().min(1).nullable().optional(),
     taxId: z.string().min(1).nullable().optional(),
     address: z.string().min(1).nullable().optional(),
-    fiscalConfig: FiscalConfigSchema.nullable().optional(),
-    confirmed: z.boolean().optional(),
+    fiscalConfig: TenantFiscalConfigSchema.nullable().optional(),
   })
   .passthrough();
 
-const FORBIDDEN_PROFILE_KEYS = ['countryCode', 'primaryCurrency'] as const;
+const FORBIDDEN_PROFILE_KEYS = ['countryCode'] as const;
 
 type OrgProfileInput = z.infer<typeof orgProfileSchema>;
 
@@ -82,23 +104,27 @@ const PROFILE_SCALAR_KEYS: readonly ProfileScalarKey[] = [
   'slogan',
   'timezone',
   'currencyFormat',
+  'primaryCurrency',
   'legalName',
   'taxId',
   'address',
 ] as const;
 
 /**
- * Checks whether transitioning to formal taxpayer requires explicit user confirmation.
+ * Tenant-writable `fiscalConfig` keys. The forbidden ones are rejected by the
+ * handler (`403`); here only the tenant-owned fields are copied, so a
+ * platform key can never reach the merge (no mass-assignment).
  */
-function requiresFormalTaxpayerConfirmation(
-  body: OrgProfileInput,
-  currentFiscalConfig: unknown,
-): boolean {
-  const wantsFormal = body.fiscalConfig?.isFormalTaxpayer === true;
-  const wasFormal =
-    (currentFiscalConfig as { isFormalTaxpayer?: boolean } | null)?.isFormalTaxpayer === true;
-
-  return wantsFormal && !wasFormal && body.confirmed !== true;
+function toTenantFiscalConfig(
+  fiscal: OrgProfileInput['fiscalConfig'],
+): FiscalConfig | null {
+  if (fiscal == null) return null;
+  const sanitized: FiscalConfig = {};
+  if (fiscal.documentLabel !== undefined) sanitized.documentLabel = fiscal.documentLabel;
+  if (fiscal.disclaimerOverride !== undefined) {
+    sanitized.disclaimerOverride = fiscal.disclaimerOverride;
+  }
+  return sanitized;
 }
 
 /**
@@ -112,7 +138,7 @@ function buildOrganizationPatch(body: OrgProfileInput): Partial<NewDbOrganizatio
     }
   }
   if (body.fiscalConfig !== undefined) {
-    patch.fiscalConfig = body.fiscalConfig;
+    patch.fiscalConfig = toTenantFiscalConfig(body.fiscalConfig);
   }
   return patch;
 }
@@ -215,6 +241,104 @@ export const organizationRoutes = new Hono<AppEnv>()
     return c.json(data);
   })
 
+  // GET /api/organizations/receipts
+  // SaaS (FS-N) receipt history of the ACTIVE organization. Read-only and
+  // strictly org-scoped: the platform audit lives in console, the gym only
+  // ever sees its own payments. Amounts are integer cents.
+  .get('/receipts', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payments = await platformSubsRepo.getOrganizationInvoices(activeOrganizationId);
+
+    return c.json({
+      payments: payments.map((p) => ({
+        id: p.id,
+        receiptNumber: p.receiptNumber,
+        receiptVoided: p.receiptVoided,
+        receiptIssuedAt: p.receiptIssuedAt,
+        status: p.status,
+        planName: p.planSnapshotName,
+        planCurrency: p.planSnapshotCurrency,
+        planDurationValue: p.planSnapshotDurationValue,
+        planDurationUnit: p.planSnapshotDurationUnit,
+        amountPaid: p.amountPaid,
+        currencyPaid: p.currencyPaid,
+        baseAmount: p.baseAmount,
+        paymentMethod: p.paymentMethod,
+        paymentDate: p.paymentDate,
+      })),
+    });
+  })
+
+  // GET /api/organizations/receipts/:paymentId - 3-state receipt contract
+  // (never 409), mirroring the gym contract. A payment from ANOTHER
+  // organization answers 404: existence is never revealed.
+  .get('/receipts/:paymentId', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payment =
+      Number.isInteger(paymentId) && paymentId > 0
+        ? await platformSubsRepo.findPaymentById(paymentId)
+        : null;
+    if (!payment || payment.organizationId !== activeOrganizationId) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available) return c.json(state, 200);
+    if (state.pdfStatus === 'pending') {
+      return c.json(
+        { available: true, receiptNumber: state.receiptNumber, pdfStatus: 'pending' },
+        202,
+      );
+    }
+    return c.json({
+      available: true,
+      receiptNumber: state.receiptNumber,
+      pdfStatus: 'ready',
+      receipt: state.receipt,
+      pdfUrl: `/api/organizations/receipts/${paymentId}/pdf`,
+    });
+  })
+
+  // GET /api/organizations/receipts/:paymentId/pdf - binary download (200
+  // bytes or 404). Same org-scoping rule as the state endpoint.
+  .get('/receipts/:paymentId/pdf', requireAuth(), requireOrg(), async (c) => {
+    const activeOrganizationId = c.get('orgId')!;
+    const paymentId = Number(c.req.param('paymentId'));
+
+    const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
+    const payment =
+      Number.isInteger(paymentId) && paymentId > 0
+        ? await platformSubsRepo.findPaymentById(paymentId)
+        : null;
+    if (!payment || payment.organizationId !== activeOrganizationId) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+
+    const receiptsService = createPlatformReceiptsService(c.get('db'), c.env.RECEIPT_QUEUE);
+    const r2 = createR2Service(c.env);
+    const state = await receiptsService.getPlatformReceiptState(paymentId);
+    if (!state.available || state.pdfStatus !== 'ready') {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    const file = await r2.getFile(state.pdfKey);
+    if (!file) {
+      return c.json({ error: 'Comprobante no disponible.' }, 404);
+    }
+    return new Response(file.bytes, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${state.receiptNumber}.pdf"`,
+      },
+    });
+  })
+
   // POST /api/organizations/subscription/renew
   // Self-service renewal: only on expiry, no pending payments, not cancelled.
   // Payment is registered as `processing` (support review in console) and
@@ -287,12 +411,10 @@ export const organizationRoutes = new Hono<AppEnv>()
 
         return c.json({ success: true, paymentId }, 201);
       } catch (err) {
-        if (err instanceof Error && err.message === 'Exchange rate API unavailable') {
-          return c.json({ error: 'Servicio de tasas de cambio no disponible, intente nuevamente' }, 503);
-        }
-        if (err instanceof Error && err.message.startsWith('No exchange rate for')) {
-          return c.json({ error: 'Moneda de pago no soportada por el proveedor de tasas' }, 400);
-        }
+        // Rate failures are typed (`lib/exchange-rates.ts`), so the mapping is
+        // by class, never by message text (single shared mapper).
+        const rateFailure = exchangeRateErrorResponse(err);
+        if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
         throw err;
       }
     }
@@ -302,8 +424,8 @@ export const organizationRoutes = new Hono<AppEnv>()
   // identity + fiscalConfig. Endpoint used by panel for
   // organization form: NEVER call `/api/platform/*` from panel
   // (gym owner does not have platform role -> 403). Org-scoped:
-  // owner/manager (ORGANIZATION.UPDATE). `countryCode` and `primaryCurrency`
-  // are immutable post-creation (400 if passed).
+  // owner/manager (ORGANIZATION.UPDATE). `countryCode` is immutable
+  // post-creation (400); `primaryCurrency` must be an active currency.
   .patch(
     '/profile',
     requireOrgPermission(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE),
@@ -318,11 +440,42 @@ export const organizationRoutes = new Hono<AppEnv>()
       if (forbidden.length > 0) {
         return c.json(
           {
-            error: 'El país y la moneda principal se definen al crear la organización.',
+            error: 'El país de operación se define al crear la organización.',
             code: 'IMMUTABLE_FIELD',
             fields: forbidden,
           },
           400,
+        );
+      }
+
+      // Fiscal regime is a PLATFORM decision (Console): the tenant can edit its
+      // issuer identity and disclaimer, never `isFormalTaxpayer` nor the legacy
+      // tax keys. Explicit 403 (not a silent strip).
+      const fiscalConfig = body.fiscalConfig;
+      // A `null` reset would wipe the platform-governed regime
+      // (`isFormalTaxpayer`), so it is platform-only as well.
+      if (fiscalConfig === null) {
+        return c.json(
+          {
+            error: 'El régimen fiscal lo gestiona Fit-Stack desde la consola de plataforma.',
+            code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+            fields: ['fiscalConfig'],
+          },
+          403,
+        );
+      }
+      const platformFiscalKeys =
+        fiscalConfig == null
+          ? []
+          : TENANT_FORBIDDEN_FISCAL_KEYS.filter((key) => key in fiscalConfig);
+      if (platformFiscalKeys.length > 0) {
+        return c.json(
+          {
+            error: 'El régimen fiscal lo gestiona Fit-Stack desde la consola de plataforma.',
+            code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+            fields: platformFiscalKeys,
+          },
+          403,
         );
       }
 
@@ -335,17 +488,14 @@ export const organizationRoutes = new Hono<AppEnv>()
       const current = await service.findOrganizationById(orgId);
       if (!current) return c.json({ error: 'Organización no encontrada' }, 404);
 
-      // Intentional friction ONLY on false->true transition: explicit
-      // declaration + confirmation (never a cosmetic toggle).
-      if (requiresFormalTaxpayerConfirmation(body, current.fiscalConfig)) {
-        return c.json(
-          {
-            error: 'Confirma la declaración de contribuyente formal para continuar.',
-            code: 'FORMAL_TAXPAYER_CONFIRMATION_REQUIRED',
-          },
-          400,
-        );
-      }
+      // RD-148: the tax id prefix must belong to the organization's country.
+      const identityViolation = documentIdTypeViolation(
+        body.taxId,
+        current.countryCode,
+        'taxId',
+        current.taxId,
+      );
+      if (identityViolation) return c.json(identityViolation, 400);
 
       // Only present fields: body without persistable fields is an
       // idempotent no-op, never a Drizzle 500 ("No values to set").

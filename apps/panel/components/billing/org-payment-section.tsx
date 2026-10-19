@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Calculator, CreditCard, Eye, Info } from "lucide-react";
 import {
+  Button,
   Card,
   Text,
   Input,
@@ -11,7 +12,16 @@ import {
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { sortPaymentMethodFields } from "@workspace/shared";
-import { formatCents, unitsToCents } from "@workspace/shared";import type { IPaymentMethodConfig } from "@workspace/shared/types";
+import {
+  ValueConverter,
+  formatCents,
+  formatShortDate,
+  roundCents,
+  type CurrencyFormat,
+  type ExchangeRateLoadStatus,
+  type PaymentConversionView,
+} from "@workspace/shared";
+import type { IPaymentMethodConfig } from "@workspace/shared/types";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface OrgPaymentSectionProps {
@@ -25,9 +35,11 @@ interface OrgPaymentSectionProps {
   readonly selectedPaymentConfig?: IPaymentMethodConfig;
   readonly dynamicFieldValues: Record<string, any>;
   readonly onDynamicChange: (id: string, value: any) => void;
-  /** Tasa en vivo del frontend — SOLO referencial (el backend la calcula al registrar). */
-  readonly referenceRate: number;
-  readonly referenceAmount: number;
+  /** API rate (read-only) and whether the converted amount can be shown. */
+  readonly conversion: PaymentConversionView;
+  readonly rateStatus: ExchangeRateLoadStatus;
+  readonly onRetryRate: () => void;
+  readonly currencyFormat: CurrencyFormat;
   readonly paymentDate: string;
   readonly onPaymentDateChange: (value: string) => void;
   readonly onCurrencyChange: (value: string) => void;
@@ -46,8 +58,10 @@ export function OrgPaymentSection({
   selectedPaymentConfig,
   dynamicFieldValues,
   onDynamicChange,
-  referenceRate,
-  referenceAmount,
+  conversion,
+  rateStatus,
+  onRetryRate,
+  currencyFormat,
   paymentDate,
   onPaymentDateChange,
   onCurrencyChange,
@@ -106,20 +120,56 @@ export function OrgPaymentSection({
               {formatCents(planPriceCents, planCurrency)}
             </Text>
           </div>
-          {paymentCurrency !== planCurrency && referenceRate > 0 && (
+          {conversion.conversionBlock === "readonly" && (
+            <div className="flex items-center justify-between gap-3">
+              <Text size="xs" variant="muted" uppercase className="font-bold tracking-wider">
+                Tasa ({planCurrency} {"\u2192"} {paymentCurrency})
+              </Text>
+              <Text size="sm" className="tabular-nums opacity-80">
+                {conversion.rate === null
+                  ? (rateStatus === "loading" ? "Consultando..." : "No disponible")
+                  : ValueConverter.format(conversion.rate, "", currencyFormat)}
+              </Text>
+            </div>
+          )}
+          {conversion.conversionBlock === "readonly" && conversion.rate !== null && (
             <div className="flex items-center justify-between gap-3">
               <Text size="xs" variant="muted" uppercase className="font-bold tracking-wider">
                 Monto referencial ({paymentCurrency})
               </Text>
               <Text size="sm" className="tabular-nums opacity-80">
-                {formatCents(unitsToCents(referenceAmount), paymentCurrency)}
+                {formatCents(roundCents(planPriceCents * conversion.rate), paymentCurrency)}
               </Text>
             </div>
+          )}
+          {rateStatus === "error" && (
+            <div className="flex items-start justify-between gap-2 pt-1.5 border-t border-border-muted">
+              <Text size="xs" variant="danger" role="alert" className="leading-relaxed">
+                No se pudo obtener la tasa oficial. El pago está bloqueado.
+              </Text>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={onRetryRate}
+                disabled={disabled}
+              >
+                Reintentar
+              </Button>
+            </div>
+          )}
+          {conversion.stale && (
+            <Text size="xs" variant="muted">
+              Tasa no actualizada: se usa la última disponible del proveedor
+              {conversion.providerUpdatedAt
+                ? ` (${formatShortDate(new Date(conversion.providerUpdatedAt))})`
+                : ""}.
+            </Text>
           )}
           <div className="flex items-start gap-1.5 pt-1.5 border-t border-border-muted">
             <Info className="w-3.5 h-3.5 text-foreground-dim shrink-0 mt-0.5" />
             <Text size="xs" variant="muted" className="leading-relaxed">
-              Monto referencial para tu cálculo. El sistema calcula la tasa oficial y el monto final al momento de registrar el pago de {planName}.
+              La tasa la provee la API oficial. El sistema confirma el monto final al registrar el pago de {planName}.
             </Text>
           </div>
         </div>

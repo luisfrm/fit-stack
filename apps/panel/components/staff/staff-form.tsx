@@ -7,10 +7,18 @@ import {
   CheckboxCard,
   toast,
   SimpleSelect,
+  DocumentIdField,
 } from "@workspace/ui/components";
 import { type IMember } from "@/types/dashboard";
 import { User, Mail, CreditCard, ShieldCheck, Send, Phone, Upload, X, MapPin, Calendar } from "lucide-react";
-import { canAssignRole, ORG_ROLES, type OrgRole } from "@workspace/shared";
+import {
+  canAssignRole,
+  formatDocumentId,
+  getCountryIdentity,
+  ORG_ROLES,
+  parseDocumentId,
+  type OrgRole,
+} from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
@@ -30,7 +38,8 @@ const STAFF_ROLE_OPTIONS = [
 ] as const;
 
 export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) {
-  const { orgRole } = useAuth();
+  const { orgRole, activeOrganization } = useAuth();
+  const identity = getCountryIdentity(activeOrganization?.countryCode);
   const isEdit = !!initialData?.id;
   const [sendInvite, setSendInvite] = React.useState(!isEdit);
   const [isUploading, setIsUploading] = React.useState(false);
@@ -66,6 +75,13 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
   const handleChange = (field: keyof IMember, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Identification follows the country of the active organization: prefix
+  // options (`docType`) and label (`docLabel`) come from `COUNTRIES`.
+  const documentIdValue = parseDocumentId(
+    formData.documentId ?? "",
+    identity?.docTypes ?? [],
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -206,13 +222,23 @@ export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="Identificación / DNI"
-          placeholder="Nº de documento"
-          value={formData.documentId ?? ""}
-          onChange={(e) => handleChange("documentId", e.target.value)}
-          leftIcon={<CreditCard size={16} />}
-        />
+        {identity ? (
+          <DocumentIdField
+            label={`Identificación (${identity.docLabel})`}
+            types={identity.docTypes}
+            value={documentIdValue}
+            onChange={(next) =>
+              handleChange("documentId", formatDocumentId(next.type, next.number))
+            }
+            placeholder="Nº de documento"
+            name="documentId"
+            leftIcon={<CreditCard size={16} />}
+          />
+        ) : (
+          <Text size="sm" variant="muted">
+            La organización no tiene país configurado.
+          </Text>
+        )}
         <Input
           label="Teléfono"
           placeholder="Ej: +58 412 1234567"

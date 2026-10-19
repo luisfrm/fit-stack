@@ -127,3 +127,46 @@ export function selectOrgBilledTotal(
   }
   return { totalCents, count };
 }
+
+/**
+ * Latest billable payment of an organization: `validated` and NOT
+ * `receiptVoided` (an ANULADO receipt consumed its `FS-N` but is not valid
+ * income, so it never surfaces as the card's last payment). Ties keep the
+ * first row of the input, same as the previous sort-based resolution.
+ */
+export function selectOrgLatestPayment<
+  T extends Pick<PlatformPayment, "status" | "paymentDate" | "receiptVoided">,
+>(invoices: readonly T[]): T | null {
+  let latest: T | null = null;
+  let latestTs = Number.NEGATIVE_INFINITY;
+  for (const invoice of invoices) {
+    if (invoice.status !== "validated" || invoice.receiptVoided === true) {
+      continue;
+    }
+    const ts = new Date(invoice.paymentDate).getTime();
+    if (Number.isNaN(ts) || ts <= latestTs) continue;
+    latest = invoice;
+    latestTs = ts;
+  }
+  return latest;
+}
+
+export interface PaymentDisplayAmount {
+  amountCents: number;
+  currency: string;
+}
+
+/**
+ * Displayable amount of a SaaS payment, never crossed: `baseAmount`
+ * (integer cents in `baseCurrency`) when persisted, otherwise `amountPaid`
+ * in `currencyPaid`. The currency always follows the amount it belongs to.
+ */
+export function selectPaymentDisplayAmount(
+  payment: Pick<PlatformPayment, "amountPaid" | "currencyPaid" | "baseAmount">,
+  baseCurrency: string,
+): PaymentDisplayAmount {
+  if (payment.baseAmount != null) {
+    return { amountCents: payment.baseAmount, currency: baseCurrency };
+  }
+  return { amountCents: payment.amountPaid, currency: payment.currencyPaid };
+}

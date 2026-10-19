@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checklistPrePdf,
+  MISSING_VALUE_PLACEHOLDER,
   type ReceiptData,
 } from '../../src/documents/receipt-data';
 
@@ -165,5 +166,23 @@ describe('checklistPrePdf', () => {
     data.emitter.address = null;
     data.recipient.documentId = null;
     expect(checklistPrePdf(data)).toEqual({ ok: true, errors: [] });
+  });
+
+  it('la dirección del receptor entra en el blindaje anti-UUID/anti-placeholder', () => {
+    const withUuid = validReceipt();
+    withUuid.recipient.address = `Av. ${UUID}`;
+    expect(checklistPrePdf(withUuid).errors).toContain(
+      'UUID técnico visible en campos del comprobante.',
+    );
+
+    const withPlaceholder = validReceipt();
+    withPlaceholder.recipient.address = MISSING_VALUE_PLACEHOLDER;
+    const result = checklistPrePdf(withPlaceholder);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.includes('omitirse'))).toBe(true);
+
+    const withoutAddress = validReceipt();
+    withoutAddress.recipient.address = null;
+    expect(checklistPrePdf(withoutAddress)).toEqual({ ok: true, errors: [] });
   });
 });

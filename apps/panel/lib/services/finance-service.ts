@@ -1,5 +1,4 @@
 import { api, type ApiFetchOptions } from "@/lib/api/client";
-import { getExchangeRates } from "@/lib/api/exchange-rates";
 import type {
   IReceiptsReportFilters,
   IReceiptsReportResult,
@@ -8,8 +7,16 @@ import type {
 const PAYMENTS_PATH = "/payments";
 const REPORTS_PATH = "/reports";
 
+type NormalizedAmounts = {
+  /** Cents in the organization primary currency (exact persisted rate). */
+  normalizedAmount: number;
+  /** Raw cents that could not be normalized (no exact persisted rate). */
+  unconvertedAmount: number;
+  unconvertedCount: number;
+};
+
 type AnalyticsKpis = {
-  todayRevenue: Array<{ currency: string; amount: number }>;
+  todayRevenue: Array<{ currency: string; amount: number } & NormalizedAmounts>;
   pendingPayments: number;
   expiringSoon: number;
   activeSubscriptions: number;
@@ -32,18 +39,16 @@ type AnalyticsResponse = {
     day: string;
     currency: string;
     amount: number;
-    normalizedAmount: number;
-    originalExchangeRate: string;
-  }>;
+    originalExchangeRate: string | null;
+  } & NormalizedAmounts>;
 };
 
 type RevenueRow = {
   month: string;
   currency: string;
   amount: number;
-  normalizedAmount: number;
-  originalExchangeRate: string;
-};
+  originalExchangeRate: string | null;
+} & NormalizedAmounts;
 
 /**
  * Service to handle financial operations: exchange rate fetching,
@@ -75,58 +80,21 @@ export const financeService = {
     });
   },
 
-  async getAnalytics(baseCurrency: string): Promise<AnalyticsResponse> {
-    const data = (await api(`${PAYMENTS_PATH}/analytics`)) as AnalyticsResponse;
-
-    if (data.chartData && baseCurrency) {
-      const currencies = Array.from(
-        new Set(data.chartData.map((d) => d.currency)),
-      );
-
-      const rates: Record<string, number> = {};
-      for (const curr of currencies) {
-        try {
-          const exchangeRates = await getExchangeRates(curr);
-          rates[curr] = exchangeRates[baseCurrency] ?? 1;
-        } catch {
-          rates[curr] = 1;
-        }
-      }
-
-      data.chartData = data.chartData.map((d) => ({
-        ...d,
-        normalizedAmount: d.amount * (rates[d.currency] ?? 1),
-      }));
-    }
-
-    return data;
+  /**
+   * Dashboard analytics. All monetary normalization (including today's
+   * revenue) is resolved by the API in SQL with each payment's persisted
+   * `exchange_rate_applied`; the panel NEVER fetches live rates for reports.
+   */
+  async getAnalytics(): Promise<AnalyticsResponse> {
+    return (await api(`${PAYMENTS_PATH}/analytics`)) as AnalyticsResponse;
   },
 
-  async getRevenueReport(baseCurrency: string): Promise<RevenueRow[]> {
-    const data = (await api(`${REPORTS_PATH}/revenue`)) as RevenueRow[];
-
-    if (data && baseCurrency) {
-      const currencies = Array.from(
-        new Set(data.map((d) => d.currency)),
-      );
-
-      const rates: Record<string, number> = {};
-      for (const curr of currencies) {
-        try {
-          const exchangeRates = await getExchangeRates(curr);
-          rates[curr] = exchangeRates[baseCurrency] ?? 1;
-        } catch {
-          rates[curr] = 1;
-        }
-      }
-
-      return data.map((d) => ({
-        ...d,
-        normalizedAmount: d.amount * (rates[d.currency] ?? 1),
-      }));
-    }
-
-    return data;
+  /**
+   * Monthly revenue report, already normalized to the organization primary
+   * currency with the persisted historical rate of every payment.
+   */
+  async getRevenueReport(): Promise<RevenueRow[]> {
+    return (await api(`${REPORTS_PATH}/revenue`)) as RevenueRow[];
   },
 
   /**

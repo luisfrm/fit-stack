@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { navigateByClick } from '../helpers/nav';
-import { checkSwitch, selectOption } from '../helpers/interactions';
 import { uid } from '../helpers/api';
 import { TEST_MEMBERS, TEST_PLAN } from '../helpers/test-tenant';
 
@@ -46,20 +45,26 @@ test.describe('Panel — Settings', () => {
     });
   });
 
-  test('guarda la configuración fiscal y la re-renderiza persistida', async ({ page }) => {
+  // The fiscal regime (`isFormalTaxpayer`) and the tax rates are platform-owned:
+  // the tenant can only edit the legal disclaimer. There is no checkbox, no
+  // confirmation modal and no manual override anymore.
+  test('muestra el régimen fiscal como solo lectura y persiste el disclaimer', async ({ page }) => {
     await page.goto('/settings/organization', { waitUntil: 'domcontentloaded' });
     const section = page.getByTestId('org-fiscal-section');
     await expect(section).toBeVisible({ timeout: 30_000 });
 
+    // Read-only regime: the value is rendered, never editable.
+    await expect(section.getByTestId('fiscal-regime-value')).toHaveText(
+      /No declarado|Contribuyente formal/,
+    );
+    await expect(section.getByRole('checkbox')).toHaveCount(0);
+
+    // Rates come from `COUNTRIES` (SSOT). The seed org is VE: IVA is always listed.
+    await expect(section.getByTestId('fiscal-tax-IVA')).toBeVisible();
+
     const disclaimer = `Aviso fiscal E2E ${uid()}`;
     await section.getByLabel('Disclaimer legal alternativo').fill(disclaimer);
-
-    // Formal declaration with double confirmation (intentional friction).
-    await section.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }).check();
     await section.getByRole('button', { name: 'Guardar facturación' }).click();
-    const confirmDialog = page.getByRole('dialog').filter({ hasText: 'Confirmar declaración formal' });
-    await expect(confirmDialog).toBeVisible({ timeout: 10_000 });
-    await confirmDialog.getByRole('button', { name: 'Confirmar declaración' }).click();
 
     await expect(page.getByText('Configuración fiscal guardada correctamente').first()).toBeVisible({
       timeout: 20_000,
@@ -69,9 +74,10 @@ test.describe('Panel — Settings', () => {
     const reloaded = page.getByTestId('org-fiscal-section');
     await expect(reloaded).toBeVisible({ timeout: 30_000 });
     await expect(reloaded.getByLabel('Disclaimer legal alternativo')).toHaveValue(disclaimer);
-    await expect(
-      reloaded.getByRole('checkbox', { name: 'Declaración de contribuyente formal' }),
-    ).toBeChecked();
+    await expect(reloaded.getByTestId('fiscal-regime-value')).toHaveText(
+      /No declarado|Contribuyente formal/,
+    );
+    await expect(reloaded.getByRole('checkbox')).toHaveCount(0);
     // Without real homologation, the applied label is still receipt.
     await expect(reloaded.getByText('Comprobante de pago').first()).toBeVisible();
   });
@@ -98,10 +104,9 @@ test.describe('Panel — Settings', () => {
     await expect(page.getByLabel('Eslogan / Lema')).toHaveValue(value, { timeout: 30_000 });
   });
 
-  // It depends on the spec "guarda la configuración fiscal…" (above) having
-  // declared the branch as a formal taxpayer: without that declaration the
-  // manual tax override is not even offered (the override only reduces).
-  test('override de impuestos sin motivo muestra error genérico', async ({ page }) => {
+  // The breakdown is computed server-side from `COUNTRIES`; the operator has no
+  // manual override control anymore (no switch, no reason field).
+  test('el pago no ofrece ajuste manual de impuestos', async ({ page }) => {
     await page.goto('/payments', { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'NUEVO PAGO' }).click();
 
@@ -117,25 +122,10 @@ test.describe('Panel — Settings', () => {
     await dialog.getByText(TEST_MEMBERS.withoutPlan.email).first().click();
     await dialog.getByRole('button', { name: new RegExp(TEST_PLAN.name, 'i') }).click();
 
-    // The payment method is required: without it the payment validation returns
-    // early, before the tax override is evaluated, and the asserted toast would
-    // be a different one. The combobox exposes no accessible name (the
-    // `SimpleSelect` Label is not associated), so it is located by its rendered
-    // placeholder.
-    await selectOption(
-      page,
-      dialog.getByRole('combobox').filter({ hasText: 'Seleccionar Método' }),
-      'Otro / Personalizado',
-    );
-    await dialog.locator('#other-method-details').fill('Efectivo E2E');
-
-    await checkSwitch(
-      dialog.getByRole('switch', { name: 'Ajuste manual de impuestos' }),
-    );
-    await dialog.getByRole('button', { name: 'GENERAR SUSCRIPCIÓN' }).click();
-
-    await expect(
-      page.getByText('Indica el motivo del ajuste manual de impuestos').first(),
-    ).toBeVisible({ timeout: 20_000 });
+    // The read-only tax block is rendered for the selected plan…
+    await expect(dialog.getByText('Impuestos').first()).toBeVisible({ timeout: 20_000 });
+    // …and there is no way to adjust it manually.
+    await expect(dialog.getByRole('switch', { name: 'Ajuste manual de impuestos' })).toHaveCount(0);
+    await expect(dialog.getByText('Indica el motivo del ajuste manual de impuestos')).toHaveCount(0);
   });
 });

@@ -682,6 +682,8 @@ export interface IPlatformOrganization extends IOrganization {
   latestSubscription?: (IPlatformSubscription & { planName?: string }) | null;
   memberCount?: number;
   userCount?: number;
+  /** Extensible `gym_setting` values (e.g. `active_currencies`), console detail only. */
+  settings?: Record<string, string> | null;
 }
 
 /**

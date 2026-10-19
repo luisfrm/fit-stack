@@ -6,6 +6,7 @@ import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/s
 import { createTrainersRepository } from '../repositories/trainers.repository';
 import { createTrainersService } from '../services/trainers.service';
 import { createCache } from '../lib/cache';
+import { documentIdTypeViolation } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 const trainerSchema = z.object({
@@ -63,6 +64,14 @@ export const trainerRoutes = new Hono<AppEnv>()
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
+    // RD-148: the identification prefix must belong to the org country.
+    const violation = documentIdTypeViolation(
+      data.documentId,
+      c.get('org')?.countryCode,
+      'documentId',
+    );
+    if (violation) return c.json(violation, 400);
+
     const trainersRepo = createTrainersRepository(c.get('db'));
     const trainersService = createTrainersService(trainersRepo);
 
@@ -80,6 +89,17 @@ export const trainerRoutes = new Hono<AppEnv>()
 
     const trainersRepo = createTrainersRepository(c.get('db'));
     const trainersService = createTrainersService(trainersRepo);
+
+    // RD-148: the identification prefix must belong to the org country.
+    // The persisted value is read so a legacy row stays editable.
+    const existing = await trainersRepo.findById(orgId, id);
+    const violation = documentIdTypeViolation(
+      data.documentId,
+      c.get('org')?.countryCode,
+      'documentId',
+      existing?.documentId ?? null,
+    );
+    if (violation) return c.json(violation, 400);
 
     const updatedTrainer = await trainersService.update(orgId, id, data as any);
     await cache.invalidate(`org:${orgId}:coaches:*`);

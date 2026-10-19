@@ -29,7 +29,7 @@ import {
   hasActiveSubscription,
 } from "@/lib/platform-permissions";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@/lib/errors";
 import {
   Trash2,
   Calendar,
@@ -403,13 +403,13 @@ export function SubscriptionsTable({
       setDeleteModal(null);
       onChange?.();
     } catch (err) {
-      toast.error(
-        mutationError(
-          "SubscriptionsTable",
-          err,
-          "No se pudo eliminar la suscripción",
-        ),
-      );
+      // Financial history: the API answers 409 SUBSCRIPTION_HAS_PAYMENTS;
+      // the operator must cancel instead of deleting.
+      const fallback =
+        apiCode(err) === "SUBSCRIPTION_HAS_PAYMENTS"
+          ? "La suscripción tiene pagos asociados; cancélala en lugar de borrarla"
+          : "No se pudo eliminar la suscripción";
+      toast.error(mutationError("SubscriptionsTable", err, fallback));
     } finally {
       setActionLoading(false);
     }

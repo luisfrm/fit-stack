@@ -117,6 +117,8 @@ export interface PlatformReceiptOrganizationRow {
   name: string;
   legalName?: string | null;
   taxId?: string | null;
+  /** Fiscal address of the receptor; absent = the document omits the line. */
+  address?: string | null;
   countryCode: string;
   timezone: string;
 }
@@ -242,6 +244,7 @@ export function composePlatformReceipt(rows: PlatformReceiptComposedRows): Recei
       name: organization.name,
       legalName: organization.legalName,
       taxId: organization.taxId,
+      address: organization.address,
       countryCode: organization.countryCode,
       timezone: organization.timezone,
     },

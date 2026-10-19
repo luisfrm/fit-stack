@@ -6,9 +6,18 @@ import { createSettingsRepository } from '../repositories/settings.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createSettingsService } from '../services/settings.service';
 import { createCache } from '../lib/cache';
+import { documentIdTypeViolation } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 const settingsSchema = z.record(z.string(), z.string());
+
+/**
+ * Emitter identity keys (`platform_setting`), same wire names the SaaS
+ * receipt composer reads (`receipt-compose.ts`). Declared here because they
+ * are only relevant to this write path.
+ */
+const EMITTER_TAX_ID_KEY = 'fitstack_tax_id';
+const EMITTER_COUNTRY_CODE_KEY = 'fitstack_country_code';
 
 export const platformSettingsRoutes = new Hono<AppEnv>()
   // GET /api/platform/settings
@@ -38,6 +47,21 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
     const settingsRepo = createSettingsRepository(c.get('db'));
     const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
+
+    // RD-148: the emitter identity issues the SaaS receipts, so its tax id
+    // prefix must belong to the emitter country. A partial write may omit the
+    // country, so the persisted setting is read instead of skipping the check.
+    const emitterTaxId = body[EMITTER_TAX_ID_KEY];
+    if (emitterTaxId) {
+      const persisted = await settingsService.getAll(null);
+      const violation = documentIdTypeViolation(
+        emitterTaxId,
+        body[EMITTER_COUNTRY_CODE_KEY] ?? persisted[EMITTER_COUNTRY_CODE_KEY] ?? null,
+        EMITTER_TAX_ID_KEY,
+        persisted[EMITTER_TAX_ID_KEY] ?? null,
+      );
+      if (violation) return c.json(violation, 400);
+    }
 
     await settingsService.updateAll(null, body);
     await cache.invalidateExact('platform:settings');

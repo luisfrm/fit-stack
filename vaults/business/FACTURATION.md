@@ -15,7 +15,7 @@
 Tres condiciones, las tres necesarias:
 
 1. Tiene `taxId` (RIF/NIT/RFC/RUC/CUIT) cargado en su perfil.
-2. Declara explícitamente `fiscalConfig.isFormalTaxpayer: true` bajo su propia responsabilidad.
+2. Fit-Stack declara `fiscalConfig.isFormalTaxpayer: true` desde Console, con la identidad fiscal completa (`legalName` + `taxId` + `address`); el tenant no puede escribirlo (403 `FISCAL_CONFIG_PLATFORM_ONLY`).
 3. Tiene un mecanismo de numeración/homologación fiscal real conectado (imprenta digital autorizada en VE, PAC/CFDI en MX, CUFE/DIAN en CO, etc.).
 
 Sin el punto 3, no ofrecer la opción en producto, aunque el gym diga estar registrado.
@@ -43,9 +43,13 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 
 **Datos del miembro:** nombre completo, documento de identidad si existe (usar `docLabel` del país), contacto opcional.
 
+**Identificación (persona y organización):** se persiste como un solo string `"<tipo>-<número>"` (p. ej. `V-12345678`, `C.C.-12345678`). Los prefijos válidos salen de `COUNTRIES[cc].docType` y la etiqueta de `docLabel` (persona natural) o `taxLabel` (organización); ningún label se escribe a mano en los formularios. El parseo es tolerante: un valor anterior sin prefijo (o con un prefijo que el país no define) se conserva tal cual y se normaliza recién al volver a guardar.
+
+**El servidor no confía en el selector del cliente (RD-148).** `isDocumentIdAllowedForCountry` (`packages/shared/src/formatting/document-id.ts`) valida el prefijo contra `COUNTRIES` **antes de escribir** y la API responde `400 { error, code: 'DOCUMENT_TYPE_INVALID', fields }` (`documentIdTypeViolation`, `apps/api-worker/src/lib/schemas.ts`) en `POST`/`PUT /api/members` (`documentId`), `POST`/`PUT /api/trainers` (`documentId`), `PATCH /api/organizations/profile` (`taxId` contra el país de la org), `POST`/`PUT`/`PATCH /api/platform/organizations` (`taxId`, leyendo el país y el id persistidos cuando el payload los omite) y `POST /api/platform/settings` (identidad del emisor: `fitstack_tax_id` contra `fitstack_country_code`, con el país persistido si la escritura parcial lo omite). Tolerancias, para no bloquear datos heredados: vacío/ausente → OK; valor **idéntico al persistido** → OK (el guard solo juzga lo que la escritura **cambia**, así una fila legacy sigue editable); sin `-` → OK; token que ningún país define → OK (es indistinguible de un número con guion interno, igual que `parseDocumentId`); país desconocido/ausente → OK (no hay catálogo que exigir y la emisión fiscal ya falla cerrada). Se **rechazan** un prefijo definido por **otro país** (`C.C.`/`NIT` en un emisor VE) y un `"V-"` colgante sin número. Un gym VE no puede registrar un tipo de documento colombiano.
+
 **Detalle de la venta:** nombre del plan (snapshot, no el plan en vivo), periodo cubierto (`startDate`–`endDate`), precio unitario snapshot.
 
-**Desglose monetario:** `subtotal`, `taxDetails` (JSON `[{name, rate, amount}]`), `taxTotal`, `amountPaid`, `currencyPaid`. Si `currencyPaid ≠ primaryCurrency` de la Org, mostrar también `exchangeRateApplied` y el equivalente convertido.
+**Desglose monetario:** `subtotal`, `taxDetails` (JSON `[{name, rate, amount}]`), `taxTotal`, `amountPaid`, `currencyPaid`. Si `currencyPaid ≠ planSnapshotCurrency`, mostrar también `exchangeRateApplied` y el equivalente en la moneda del plan (`baseCurrency` del comprobante). La tasa persistida se lee "1 {planSnapshotCurrency} = {rate} {currencyPaid}", por lo que el equivalente se obtiene dividiendo (`roundCents(amountPaid / rate)`).
 
 **Pago:** método y referencia enmascarada (no exponer números de cuenta completos), fecha de pago vs. fecha de emisión del comprobante.
 
@@ -55,7 +59,7 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 
 | País | Nombre correcto del impuesto | Tasa | Nota |
 |---|---|---|---|
-| VE | IVA | 16% | Además existe IGTF (condicional, solo si el pago es en USD/cripto; tasa variable por decreto — no hardcodear, requiere confirmación manual/contador) |
+| VE | IVA | 16% | Además existe IGTF (condicional: solo si el pago no es en VES). La tasa vigente vive en `COUNTRIES.conditionalTaxes` (SSOT) y se actualiza ahí cuando cambie el decreto — nunca por organización |
 | CO | IVA | 19% | — |
 | MX | IVA | 16% | Zona fronteriza tiene tasa reducida (8%), no cubierto por el default nacional |
 | AR | IVA | 21% | — |
@@ -70,25 +74,24 @@ Guardar el número asignado en `payment.receiptNumber`, asignado en el **paso 1 
 **Genérico para todos los países** (`ICountryConfig` ya cubre esto bien):
 - `docLabel`, `taxLabel`, `docType`, `currency`, `timezone`, `legalDisclaimer`
 
-**Por país, en `organization.fiscalConfig` (override sobre el default del país):**
+**Por país, en `organization.fiscalConfig`** (el resto —tasas y condiciones— lo define `COUNTRIES`, no la org):
 ```json
 {
   "documentLabel": "Comprobante de pago",
   "isFormalTaxpayer": false,
-  "taxes": [{ "name": "IVA", "rate": 0.16, "enabled": false }],
   "disclaimerOverride": null
 }
 ```
+`isFormalTaxpayer` es **platform-only** (se escribe solo desde Console, con identidad fiscal completa); el tenant únicamente edita `disclaimerOverride`. No existen `taxes` ni `confirmedTaxes`: cualquier clave fuera de este contrato responde 400.
 
 **Condicionales especiales (no van en `countryTaxes` fijo):**
 ```ts
 conditionalTaxes: [
-  { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", basis: "gross_first", requiresConfirmation: true, value: null }
+  { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", value: "3%" }
 ]
 ```
 
-> El IGTF nace **apagado** y nunca es automático: activarlo exige declaración de contribuyente formal + confirmación explícita + tasa manual (`fiscalConfig.confirmedTaxes`). La base `gross_first` extrae el IGTF del total **antes** de descomponer el resto con IVA. Ver RD-138 (Linear — proyecto «Fit Stack»).
-```
+> El IGTF es un impuesto **condicional del país**: se aplica solo cuando `isFormalTaxpayer` es verdadero **y** la condición se cumple (`payment_currency !== 'VES'`), con `basis: 'gross_first'` asignado por `resolveFiscalProfile` (extrae el IGTF del total **antes** de descomponer el resto con IVA). No hay confirmación manual ni tasa por org. Ver RD-138 y RD-145 (Linear — proyecto «Fit Stack»).
 
 ## 6. Notas específicas de Venezuela
 

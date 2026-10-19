@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { UUID_PATTERN } from '@workspace/shared';
+import { UUID_PATTERN, isDocumentIdAllowedForCountry } from '@workspace/shared';
 
 /**
  * Canonical paymentMethod schema.
@@ -32,28 +32,32 @@ export const paymentMethodDetailsSchema = z
   .optional();
 
 /**
- * Tax line persisted in the payment. `rate` is a fraction 0–1 and amounts
- * are integer cents (see `money.ts` in `@workspace/shared`).
- * Single source of truth for PDF and reports.
+ * Org fiscal contract — re-export from shared, not duplicated.
+ *
+ * There is no tax write contract anymore: taxes come from `COUNTRIES` (SSOT),
+ * the only fiscal switch is `isFormalTaxpayer` (Console-governed) and the
+ * breakdown is always computed at emission time.
  */
-export const taxDetailSchema = z.object({
-  name: z.string().min(1),
-  rate: z.number().min(0).max(1),
-  amount: z.number().int().min(0),
-});
-
-/** Org fiscal contract — re-export from shared, not duplicated. */
-
+export { FiscalConfigSchema } from '@workspace/shared';
 
 /**
- * Manual tax override with audit trail: requires non-empty reason.
- * Amounts in integer cents. The service also validates that Σ lines ≈
- * taxTotal (see `applyTaxOverride`).
+ * RD-148 write guard for an identification (`"<type>-<number>"`): the prefix
+ * must be a `docType` of the issuer's country (`COUNTRIES` = SSOT). Returns the
+ * `400` payload (business code, so the UI resolves by code) or `null` when the
+ * value is acceptable. See `isDocumentIdAllowedForCountry` for the tolerance
+ * rules — legacy values are never blocked by this check.
  */
-export const taxOverrideSchema = z.object({
-  taxTotal: z.number().int().min(0),
-  taxDetails: z.array(taxDetailSchema),
-  taxOverrideReason: z.string().trim().min(1),
-});
-
-export { FiscalConfigSchema } from '@workspace/shared';
+export function documentIdTypeViolation(
+  value: string | null | undefined,
+  countryCode: string | null | undefined,
+  field: string,
+  /** Persisted value: resending it unchanged never blocks a legacy row. */
+  currentValue?: string | null,
+): { error: string; code: string; fields: string[] } | null {
+  if (isDocumentIdAllowedForCountry(value, countryCode, currentValue)) return null;
+  return {
+    error: 'El tipo de documento no es válido para el país de la organización.',
+    code: 'DOCUMENT_TYPE_INVALID',
+    fields: [field],
+  };
+}

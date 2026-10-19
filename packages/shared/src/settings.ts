@@ -29,11 +29,21 @@ function activeCurrenciesFor(primary: string, fallbacks: string[]): string {
  * Defaults for EXTENSIBLE ORGANIZATION settings (gym_setting). Seeded
  * upon org creation. Mandatory keys (primary_currency, currency_format,
  * timezone) are NOT NULL columns in `organization` — they do not live here.
+ *
+ * `primaryCurrency` is OPTIONAL and explicit: Console preselects the country
+ * currency but the operator can pick another one (e.g. a gym in VE that bills
+ * in USD). `active_currencies` always contains the chosen primary, the country
+ * currency and USD (the platform operating currency), so a cross-currency
+ * organization is usable from day one (no silent currency fallback).
  */
-export function buildDefaultOrgSettings(countryCode?: string | null): Record<string, string> {
-  const primary = currencyForCountry(countryCode);
+export function buildDefaultOrgSettings(
+  countryCode?: string | null,
+  primaryCurrency?: string,
+): Record<string, string> {
+  const countryCurrency = currencyForCountry(countryCode);
+  const primary = primaryCurrency ?? countryCurrency;
   return {
-    active_currencies: activeCurrenciesFor(primary, ['USD']),
+    active_currencies: activeCurrenciesFor(primary, [countryCurrency, 'USD']),
     active_payment_methods: '[]',
   };
 }

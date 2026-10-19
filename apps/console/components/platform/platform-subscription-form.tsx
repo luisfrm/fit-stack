@@ -16,7 +16,12 @@ import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
-import { type CurrencyFormat } from "@workspace/shared";
+import {
+  exchangeRateAppliedValue,
+  paymentConversionView,
+  type CurrencyFormat,
+  type ExchangeRateLoadStatus,
+} from "@workspace/shared";
 import { centsToUnits, unitsToCents } from "@workspace/shared";
 import { OrganizationSelector } from "./organization-selector";
 import { PaymentSection } from "./payment-section";
@@ -140,7 +145,6 @@ export function PlatformSubscriptionForm({
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
 
   const [paymentCurrency, setPaymentCurrency] = React.useState("USD");
-  const [exchangeRate, setExchangeRate] = React.useState(1);
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [paymentDetails, setPaymentDetails] = React.useState("");
@@ -152,7 +156,6 @@ export function PlatformSubscriptionForm({
   const [paymentValidated, setPaymentValidated] = React.useState(true);
 
   const [amountFocus, setAmountFocus] = React.useState(false);
-  const [rateFocus, setRateFocus] = React.useState(false);
 
   const currencyFormat = platformSettings[
     PLATFORM_SETTINGS_KEYS.CURRENCY_FORMAT
@@ -188,8 +191,36 @@ export function PlatformSubscriptionForm({
     );
   }, [selectedPlan, startDate, isTrial, hasTrialDays]);
 
-  const planCurrency = selectedPlan?.currency || "USD";
-  const { data: planRates } = useExchangeRates(planCurrency);
+  const planCurrency = selectedPlan?.currency ?? "";
+  const {
+    snapshot: planRatesSnapshot,
+    isLoading: isLoadingRates,
+    isError: ratesError,
+    reload: reloadRates,
+  } = useExchangeRates(planCurrency);
+
+  const rateStatus: ExchangeRateLoadStatus = !selectedPlan
+    ? "idle"
+    : paymentCurrency === planCurrency
+      ? "ready"
+      : ratesError
+        ? "error"
+        : isLoadingRates
+          ? "loading"
+          : planRatesSnapshot
+            ? "ready"
+            : "idle";
+
+  const conversion = React.useMemo(
+    () =>
+      paymentConversionView(
+        planCurrency,
+        paymentCurrency,
+        planRatesSnapshot ?? null,
+        rateStatus,
+      ),
+    [planCurrency, paymentCurrency, planRatesSnapshot, rateStatus],
+  );
 
   const isForced =
     initialOrganization !== undefined && initialOrganization !== null;
@@ -271,17 +302,16 @@ export function PlatformSubscriptionForm({
   React.useEffect(() => {
     if (!selectedPlan) {
       setFinalAmount(0);
-      setExchangeRate(1);
       return;
     }
-    let rate = 1;
-    if (paymentCurrency !== selectedPlan.currency && planRates) {
-      rate = planRates[paymentCurrency] ?? 1;
+    if (conversion.rate === null) {
+      // No API rate yet: never compute (nor submit) with an assumed rate.
+      setFinalAmount(0);
+      return;
     }
-    setExchangeRate(rate);
     // price is already in cents → units for display
-    setFinalAmount(centsToUnits(Number(selectedPlan.price) * rate));
-  }, [selectedPlan, paymentCurrency, planRates]);
+    setFinalAmount(centsToUnits(Number(selectedPlan.price) * conversion.rate));
+  }, [selectedPlan, conversion.rate]);
 
   const handleSelectOrg = (org: IPlatformOrganization) => {
     setSelectedOrganization(org);
@@ -387,6 +417,13 @@ export function PlatformSubscriptionForm({
         return;
       }
 
+      if (!conversion.canSubmit) {
+        toast.error(
+          "La tasa de cambio aún no está disponible. El pago está bloqueado hasta que cargue.",
+        );
+        return;
+      }
+
       if (paymentMethodId !== "other" && !selectedPaymentConfig) {
         toast.error(
           "El método de pago seleccionado ya no está disponible. Recarga la página.",
@@ -410,8 +447,7 @@ export function PlatformSubscriptionForm({
         payment: {
           amountPaidCents: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
-          exchangeRateApplied:
-            exchangeRate === 1 ? undefined : String(exchangeRate),
+          exchangeRateApplied: exchangeRateAppliedValue(conversion),
           paymentMethod:
             paymentMethodId === "other"
               ? paymentDetails.trim()
@@ -542,15 +578,11 @@ export function PlatformSubscriptionForm({
           onDynamicChange={(id, value) =>
             setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))
           }
-          exchangeRate={exchangeRate}
-          rateFocus={rateFocus}
+          conversion={conversion}
+          rateStatus={rateStatus}
+          onRetryRate={reloadRates}
           amountFocus={amountFocus}
-          onRateFocus={setRateFocus}
           onAmountFocus={setAmountFocus}
-          onRateChange={(val) => {
-            setExchangeRate(val);
-            setFinalAmount(centsToUnits(Number(selectedPlan!.price) * val));
-          }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
@@ -583,6 +615,7 @@ export function PlatformSubscriptionForm({
           isProcessingUploads ||
           !organizationId ||
           !planId ||
+          (showPayment && !conversion.canSubmit) ||
           (paymentOnly && isFreePlan)
         }
         className="w-full h-12 uppercase tracking-widest font-bold shadow-xl shadow-primary/5"

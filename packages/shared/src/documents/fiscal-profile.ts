@@ -1,7 +1,8 @@
 /* ── Documents / fiscal-profile — issuer fiscal profile ───────────────────
-   The country provides the default (`COUNTRIES`), the org overrides it
-   (`fiscalConfig`, column `organization.fiscalConfig`). Zero hardcoding
-   in consumers: no caller invents labels or tax rates.
+   `COUNTRIES` is the SINGLE SOURCE OF TRUTH (SSOT) for taxes: rates and
+   conditions live only there and no caller (org, panel, console) overrides
+   them. The only fiscal switch is `isFormalTaxpayer`, governed exclusively
+   from Console: while it is falsy no tax applies at all.
    Pure functions, no I/O, edge-safe (Workers).
    ─────────────────────────────────────────────────────────────────────── */
 
@@ -10,33 +11,21 @@ import { COUNTRIES } from '../constants';
 import type { ITaxDetail } from '../types';
 import { computeInclusiveTaxes } from './tax-math';
 
-/** Tax override by the org: disable it or change its rate. */
-export const FiscalTaxOverrideSchema = z.object({
-  name: z.string().min(1),
-  /** Rate as fraction 0–1 (0.16 = 16%). */
-  rate: z.number().min(0).max(1),
-  enabled: z.boolean(),
-});
-
 /**
- * Contract for `organization.fiscalConfig`. api-worker re-exports it
- * (without duplicating) to validate `PATCH /api/organizations/profile`
- * and org create/update in console.
+ * Contract for `organization.fiscalConfig`. Strict on purpose: any other key
+ * (legacy `taxes`/`confirmedTaxes`, `hasFiscalHomologation`, …) fails with
+ * 400 — never silently ignored. Taxes are NOT configurable here: they come
+ * from `COUNTRIES` (SSOT).
  */
 export const FiscalConfigSchema = z
   .object({
-    /** Label requested by issuer (gate determines the one actually applied). */
+    /** Label requested by issuer (the gate determines the one actually applied). */
     documentLabel: z.string().min(1).optional(),
-    /** Explicit formal taxpayer declaration (with UX friction). */
-    isFormalTaxpayer: z.boolean().optional(),
-    taxes: z.array(FiscalTaxOverrideSchema).optional(),
     /**
-     * Names of CONDITIONAL taxes that the issuer explicitly confirmed
-     * (same UX friction as `isFormalTaxpayer`: manual rate + confirmation check).
-     * Without this list, a conditional tax (e.g. IGTF) is not applied even if
-     * `enabled` is `true`: country's 3% is documented reference, varies by decree.
+     * Formal taxpayer declaration. Platform-only: it is written from Console
+     * (`PATCH /api/platform/organizations/:id`), never by the tenant.
      */
-    confirmedTaxes: z.array(z.string().min(1)).optional(),
+    isFormalTaxpayer: z.boolean().optional(),
     /** If omitted, falls back to country's `legalDisclaimer`. */
     disclaimerOverride: z.array(z.string().min(1)).optional(),
   })
@@ -45,14 +34,50 @@ export const FiscalConfigSchema = z
 export type FiscalConfig = z.infer<typeof FiscalConfigSchema>;
 
 /**
+ * `fiscalConfig` keys a TENANT can never write: the fiscal regime is a
+ * platform decision. They are accepted as input (unknown) by
+ * `TenantFiscalConfigSchema` only to be DETECTED and answered with an
+ * explicit `403 FISCAL_CONFIG_PLATFORM_ONLY` instead of a silent zod 400.
+ */
+export const TENANT_FORBIDDEN_FISCAL_KEYS = [
+  'isFormalTaxpayer',
+  'taxes',
+  'confirmedTaxes',
+] as const;
+
+/**
+ * `fiscalConfig` shape accepted from the tenant (panel). The forbidden keys
+ * are typed as `unknown` because they are rejected before parsing them as
+ * values — the handler only reads the key names.
+ */
+export const TenantFiscalConfigSchema = FiscalConfigSchema.extend({
+  isFormalTaxpayer: z.unknown().optional(),
+  taxes: z.unknown().optional(),
+  confirmedTaxes: z.unknown().optional(),
+}).strict();
+
+/**
  * Tolerant parsing of already stored `fiscalConfig` (jsonb): parsed with
- * `.strip()` so known fields are NOT lost if row contains keys from a
- * previous/future version. For writing, `FiscalConfigSchema` (`.strict()`) is always used.
+ * `.strip()` so keys written by a previous/future version (e.g. legacy
+ * `taxes`) are dropped instead of breaking the row. For writing,
+ * `FiscalConfigSchema` (`.strict()`) is always used.
  * `null`/invalid → `{}` (empty baseline, without breaking merge).
  */
 export const StoredFiscalConfigSchema = FiscalConfigSchema.strip();
 
-/** Resolved tax: country default + org override. */
+/**
+ * Tolerant parse of `fiscalConfig` ALREADY persisted (jsonb): legacy keys
+ * (`taxes`/`confirmedTaxes`) are stripped and an invalid stored value degrades
+ * to the empty baseline (no declared regime). Fail-closed and never a 500 in
+ * the emission path: a stored row can never assert a fiscal reality this
+ * version does not understand. Writing is ALWAYS strict (`FiscalConfigSchema`).
+ */
+export function parseStoredFiscalConfig(stored: unknown): FiscalConfig {
+  const parsed = StoredFiscalConfigSchema.safeParse(stored);
+  return parsed.success ? parsed.data : {};
+}
+
+/** Resolved tax: straight from the country (no org override exists). */
 export interface ResolvedTax {
   name: string;
   /** Fraction 0–1. */
@@ -65,8 +90,6 @@ export interface ResolvedTax {
    * rest (`computeInclusiveTaxes`). Applies to conditional taxes (VE IGTF).
    */
   basis?: 'gross_first';
-  /** Activation subject to explicit friction (manual rate + confirmation). */
-  requiresConfirmation?: boolean;
 }
 
 /** Effective fiscal profile of an issuer for a given country. */
@@ -93,9 +116,16 @@ export function parseRateValue(value: string): number {
 }
 
 /**
- * Resolves fiscal profile: defaults from `COUNTRIES[countryCode]` +
- * org override (matched by `name`; unknown taxes are
- * ignored). Unknown `countryCode` → visible error, never default.
+ * Resolves fiscal profile from `COUNTRIES[countryCode]` (SSOT) and the
+ * platform-governed declaration (`fiscalConfig.isFormalTaxpayer`).
+ *
+ * Frozen rule: while `isFormalTaxpayer` is falsy (absent, `false`, any other
+ * falsy value) NO tax applies — there is no intermediate state, and the
+ * country taxes are returned disabled. When it is truthy, the country taxes
+ * apply as `COUNTRIES` defines them; conditional taxes (VE IGTF) additionally
+ * keep their `condition`, evaluated at calculation time.
+ *
+ * Unknown `countryCode` → visible error, never a silent default.
  */
 export function resolveFiscalProfile(
   countryCode: string,
@@ -107,54 +137,30 @@ export function resolveFiscalProfile(
       `resolveFiscalProfile: countryCode desconocido ("${countryCode}"). Sin fallback silencioso.`,
     );
   }
-  // `fiscalConfig` is nullable jsonb: null and undefined mean "no
-  // override" (country defaults), not an invalid empty object.
+  // `fiscalConfig` is nullable jsonb: null and undefined mean "no override"
+  // (country defaults), not an invalid empty object. Stored rows are parsed
+  // tolerantly (legacy keys stripped), never with the strict write contract.
   const config: FiscalConfig =
-    fiscalConfig == null ? {} : FiscalConfigSchema.parse(fiscalConfig);
-  const isFormalTaxpayer = config.isFormalTaxpayer ?? false;
-  const confirmed = new Set(config.confirmedTaxes ?? []);
+    fiscalConfig == null ? {} : parseStoredFiscalConfig(fiscalConfig);
+  const isFormalTaxpayer = config.isFormalTaxpayer === true;
+  // Single gate: a non-declared issuer details nothing, so every country tax
+  // is born disabled (a false fiscal reality is never stated).
+  const enabled = isFormalTaxpayer;
 
-  // Frozen rule: an issuer who did NOT declare being a formal taxpayer
-  // cannot charge or declare taxes → country taxes are born
-  // DISABLED (never a breakdown stating a false fiscal reality).
   const taxes: ResolvedTax[] = [
     ...country.countryTaxes.map((t) => ({
       name: t.name,
       rate: parseRateValue(t.value),
-      enabled: isFormalTaxpayer,
+      enabled,
     })),
-    // Frozen rule: conditional taxes are ALWAYS born disabled, never
-    // automatic (country rate is reference, not effective value).
     ...(country.conditionalTaxes ?? []).map((t) => ({
       name: t.name,
       rate: parseRateValue(t.value),
-      enabled: false,
+      enabled,
       condition: t.condition,
       basis: 'gross_first' as const,
-      requiresConfirmation: true as const,
     })),
   ];
-
-  for (const override of config.taxes ?? []) {
-    const target = taxes.find((t) => t.name === override.name);
-    if (!target) continue;
-    target.rate = override.rate;
-    target.enabled = override.enabled;
-  }
-
-  // Defensive normalization: STORED configuration must never
-  // activate taxes the issuer did not declare — covers rows written before
-  // this rule. Visible error happens on write (400
-  // `TAXES_REQUIRE_FORMAL_TAXPAYER`); here read is closed.
-  for (const tax of taxes) {
-    if (!isFormalTaxpayer) {
-      tax.enabled = false;
-      continue;
-    }
-    if (tax.requiresConfirmation === true && !confirmed.has(tax.name)) {
-      tax.enabled = false;
-    }
-  }
 
   return {
     taxes,
@@ -165,42 +171,6 @@ export function resolveFiscalProfile(
   };
 }
 
-/** Violation codes when writing `fiscalConfig` (used by API → 400). */
-export type FiscalWriteViolationCode =
-  | 'TAXES_REQUIRE_FORMAL_TAXPAYER'
-  | 'TAX_REQUIRES_CONFIRMATION';
-
-/**
- * Validates the `fiscalConfig` to be PERSISTED (not the incoming body: a
- * partial update does not know stored `isFormalTaxpayer`, so caller must
- * pass merge result). Returns violation or `null`.
- *
- * Fail-closed invariant: override can only REDUCE tax burden. A
- * formal taxpayer with exempt activity disables taxes (allowed);
- * a non-taxpayer can never activate them.
- */
-export function findFiscalWriteViolation(
-  countryCode: string,
-  config: FiscalConfig | null | undefined,
-): { code: FiscalWriteViolationCode; taxName?: string } | null {
-  if (config == null) return null;
-  const enabled = (config.taxes ?? []).filter((t) => t.enabled);
-  if (enabled.length > 0 && config.isFormalTaxpayer !== true) {
-    return { code: 'TAXES_REQUIRE_FORMAL_TAXPAYER', taxName: enabled[0]!.name };
-  }
-  const conditional = new Set(
-    (COUNTRIES[countryCode]?.conditionalTaxes ?? []).map((t) => t.name),
-  );
-  if (conditional.size === 0) return null;
-  const confirmed = new Set(config.confirmedTaxes ?? []);
-  for (const tax of enabled) {
-    if (conditional.has(tax.name) && !confirmed.has(tax.name)) {
-      return { code: 'TAX_REQUIRES_CONFIRMATION', taxName: tax.name };
-    }
-  }
-  return null;
-}
-
 /** Previewed tax breakdown (integer cents). */
 export interface PreviewTaxesResult {
   subtotal: number;
@@ -209,7 +179,7 @@ export interface PreviewTaxesResult {
 }
 
 /**
- * Previews taxes in AUTOMATIC mode for total charged (tax-INCLUSIVE).
+ * Previews taxes for total charged (tax-INCLUSIVE).
  * Delegates to `computeInclusiveTaxes` (same function used by step 1
  * of issuance in `receipts.service.ts`): preview and real receipt
  * share a single source of truth, never diverging.

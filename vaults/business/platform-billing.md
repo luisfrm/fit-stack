@@ -46,13 +46,33 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 - **Note**: The `/no-subscription` page is OUTSIDE the `(protected)` layout to prevent infinite redirect loops.
 
+### Subscription deletion (RD-153)
+
+`DELETE /api/platform/subscriptions/:id` is a hard delete and exists only for a
+subscription with **zero** payment rows (e.g. a misplaced record). With any
+`platform_subscription_payment` row the endpoint answers **409
+`SUBSCRIPTION_HAS_PAYMENTS`** and deletes zero rows: the record is financial
+history and must be **cancelled** instead. The FK
+`platform_subscription_payment.subscription_id → platform_subscription.id` is
+`ON DELETE RESTRICT` as the DB-level backstop (no cascade, so `FS-N` numbers are
+never silently destroyed and `gaps[]` cannot report them as holes). The backstop
+is mapped, never leaked: a FK violation raised by the `DELETE`
+(`isPostgresForeignKeyViolation(err, 'subscription_id')` in `lib/errors.ts`, which
+walks the deep Drizzle/Neon cause for SQLSTATE `23503`) is translated by the same
+`subscriptionHasPaymentsError()` factory into the **same 409 body**, so the console
+toast keeps resolving by `code` and the TOCTOU window between the count and the
+delete can never surface as a 500. The pre-check stays only because it answers
+without touching the DB; the constraint decides.
+
+**Rule: a SaaS subscription with payments is CANCELLED, never deleted.**
+
 ### Self-service renewal (phase 2 — org pays from the panel)
 
 Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → support approves/rejects it in console (badge "Pending payment" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VIEW SCREENSHOT" links to R2) → once validated, the period is extended automatically.
 
 - **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
   - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.
-  - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, cache `rates:{base}` 1h; `EXCHANGE_API_URL` override for tests). `rate = 1` if currency == plan currency; provider failure → 503.
+  - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, fresh cache `rates:{base}` 1h + `rates:last:{base}` 30d; `EXCHANGE_API_URL` override for tests). `rate = 1` only if currency == plan currency. Provider failure → uses the last successful response for the SAME base (logged) or, without one, fails visibly (503) — never an assumed rate. Rates are never editable in the UI.
   - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
   - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
   - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).

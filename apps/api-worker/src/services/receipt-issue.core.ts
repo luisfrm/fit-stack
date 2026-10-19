@@ -4,8 +4,8 @@
    load payment → validate → idempotency → fiscal work → anti-race re-read →
    consume sequence → validate number → attach → release on lost race →
    enqueue render. The divergences are enumerated as tiny `IssuerProfile`
-   strategies (table/scoping, sequence source, number format, $0 skip, tax
-   override, payer capture, event scope); everything else lives here ONCE.
+   strategies (table/scoping, sequence source, number format, $0 skip,
+   payer capture, event scope); everything else lives here ONCE.
 
    ⚠️ CRITICAL ORDER: fiscal profile, emitter snapshot and tax breakdown run
    BEFORE consuming the sequence (a consumed number is NEVER reused, so a
@@ -41,26 +41,14 @@ export class ReceiptError extends Error {
 }
 
 /**
- * Audited tax override accepted by the panel profile. Structural twin of the
- * `TaxOverrideInput` exported by `receipts.service.ts` (defined here to keep
- * the core free of service imports).
+ * Input accepted by the core; each profile reads the fields its issuer uses.
  */
-export interface ReceiptIssueTaxOverride {
-  subtotal: number;
-  taxTotal: number;
-  taxDetails: ITaxDetail[];
-  taxOverrideReason: string;
-}
-
-/** Input accepted by the core; each profile reads the fields its issuer uses. */
 export interface ReceiptIssueInput {
   /** Panel: organization scoping. Console: derived from the payment row. */
   orgId?: string;
   paymentId: number;
   /** Panel: org timezone (defines the local year of the sequence). */
   timezone?: string;
-  /** Panel: audited tax override. Console never overrides. */
-  taxOverride?: ReceiptIssueTaxOverride | null;
   /** Session actor persisted at numbering; absent → `null`, never invented. */
   actor?: string | null;
   /** Console: payer captured while `processing` if still empty. */
@@ -107,14 +95,12 @@ export interface ReceiptIssueFiscal {
   subtotal: number;
   taxTotal: number;
   taxDetails: ITaxDetail[];
-  taxOverrideReason: string | null;
 }
 
 /** Everything persisted together with the number in the single attach statement. */
 export interface ReceiptIssueAttach {
   receiptNumber: string;
   receiptIssuedAt: Date;
-  taxOverrideReason: string | null;
   subtotal: number;
   taxTotal: number;
   taxDetails: ITaxDetail[];
@@ -153,8 +139,8 @@ export interface ReceiptIssueDeps {
 /**
  * One issuer's divergences. Every strategy is tiny on purpose: the core owns
  * the sequence, the profile only parametrizes it. Panel and Console differ in
- * the table/scoping, sequence source, number format, $0 skip, tax override,
- * payer capture and event scope — nothing else.
+ * the table/scoping, sequence source, number format, $0 skip, payer capture
+ * and event scope — nothing else.
  */
 export interface IssuerProfile<TYear> {
   /** Tracing namespace preserved verbatim (`receipts` / `platform-receipts`). */
@@ -325,7 +311,6 @@ export async function issueReceipt<TYear>(
     {
       receiptNumber,
       receiptIssuedAt: new Date(),
-      taxOverrideReason: fiscal.taxOverrideReason,
       subtotal: fiscal.subtotal,
       taxTotal: fiscal.taxTotal,
       taxDetails: fiscal.taxDetails,

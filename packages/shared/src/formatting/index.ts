@@ -4,4 +4,5 @@
    ─────────────────────────────────────────────────────────────────────── */
 
 export * from './currency';
+export * from './document-id';
 export { centsToUnits, unitsToCents } from '../documents/money';

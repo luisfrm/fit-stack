@@ -191,7 +191,7 @@ export const platformSubscriptionPayment = pgTable(
 
     // Relations
     subscriptionId: bigint('subscription_id', { mode: 'number' })
-      .references(() => platformSubscription.id, { onDelete: 'cascade' }),
+      .references(() => platformSubscription.id, { onDelete: 'restrict' }),
     organizationId: text('organization_id')
       .notNull()
       .references(() => organization.id, { onDelete: 'cascade' }),
@@ -492,7 +492,7 @@ export const payment = pgTable(
     memberId: bigint('member_id', { mode: 'number' })
       .references(() => gymMember.id, { onDelete: 'restrict' }).notNull(),
     subscriptionId: bigint('subscription_id', { mode: 'number' })
-      .references(() => subscription.id),
+      .references(() => subscription.id, { onDelete: 'restrict' }),
 
     planSnapshotName: text('plan_snapshot_name').notNull(),
     planSnapshotPrice: bigint('plan_snapshot_price', { mode: 'number' }).notNull(), // cents

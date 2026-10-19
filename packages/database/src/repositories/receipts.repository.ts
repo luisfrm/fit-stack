@@ -42,7 +42,6 @@ export interface AttachReceiptInput {
   receiptNumber: string;
   documentType: ReceiptDocumentType;
   receiptIssuedAt: Date;
-  taxOverrideReason?: string | null;
   /** Integer cents; step 1 always persists them alongside the number. */
   subtotal?: number | null;
   taxTotal?: number | null;
@@ -181,7 +180,8 @@ export function createReceiptsRepository(db: Db) {
           receiptNumber: input.receiptNumber,
           documentType: input.documentType,
           receiptIssuedAt: input.receiptIssuedAt,
-          taxOverrideReason: input.taxOverrideReason ?? null,
+          // `tax_override_reason` is legacy READ-ONLY: the column keeps the
+          // historical audit trail, no write path sets it anymore.
           subtotal: input.subtotal ?? null,
           taxTotal: input.taxTotal ?? null,
           taxDetails: input.taxDetails ?? null,

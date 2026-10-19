@@ -6,11 +6,15 @@ import { CalendarClock, RefreshCw, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { OrgPaymentSection } from "./org-payment-section";
 import { renewOrgSubscription, type OrgPaymentMethodsResponse, type OrgSubscriptionInfo } from "@/lib/services/org-billing";
-import { mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@/lib/errors";
 import { uploadService } from "@/lib/services/upload-service";
-import { getExchangeRates } from "@/lib/api/exchange-rates";
+import { getExchangeRateSnapshot } from "@/lib/api/exchange-rates";
 import { toLocalDayString } from "@workspace/shared/date";
-import { centsToUnits } from "@workspace/shared";
+import {
+  paymentConversionView,
+  type ExchangeRateLoadStatus,
+  type ExchangeRateSnapshot,
+} from "@workspace/shared";
 import type { IPaymentMethodDetails } from "@workspace/shared/types";
 
 interface OrgRenewalModalProps {
@@ -41,9 +45,14 @@ export function OrgRenewalModal({
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
   const [paymentDate, setPaymentDate] = React.useState(() => toLocalDayString(activeOrganization?.timezone));
-  const [referenceRate, setReferenceRate] = React.useState(1);
-  const [referenceAmount, setReferenceAmount] = React.useState(centsToUnits(subscription.planPrice));
+  const [rateSnapshot, setRateSnapshot] = React.useState<ExchangeRateSnapshot | null>(null);
+  const [rateStatus, setRateStatus] = React.useState<ExchangeRateLoadStatus>('idle');
+  const [rateReloadToken, setRateReloadToken] = React.useState(0);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Required configuration (NOT NULL since creation): a missing value is a
+  // data problem, so it is surfaced as a visible error — never defaulted.
+  const currencyFormat = activeOrganization?.currencyFormat;
 
   const activeCurrencies = paymentMethods?.activeCurrencies ?? [subscription.planCurrency];
   const activePaymentMethods = React.useMemo(
@@ -64,30 +73,56 @@ export function OrgRenewalModal({
 
   React.useEffect(() => {
     if (paymentCurrency === subscription.planCurrency) {
-      setReferenceRate(1);
-      setReferenceAmount(centsToUnits(subscription.planPrice));
+      setRateSnapshot(null);
+      setRateStatus('ready');
       return;
     }
+
     let cancelled = false;
-    getExchangeRates(subscription.planCurrency)
-      .then((rates) => {
+    setRateSnapshot(null);
+    setRateStatus('loading');
+
+    getExchangeRateSnapshot(subscription.planCurrency)
+      .then((snapshot) => {
         if (cancelled) return;
-        const rate = rates[paymentCurrency] ?? 0;
-        setReferenceRate(rate);
-        setReferenceAmount(centsToUnits(subscription.planPrice) * rate);
+        setRateSnapshot(snapshot);
+        const rate = snapshot.rates[paymentCurrency];
+        const isValidRate =
+          typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+        // Missing currency in the response: never assume a rate.
+        setRateStatus(isValidRate ? 'ready' : 'error');
       })
-      .catch(() => {
-        if (!cancelled) {
-          setReferenceRate(0);
-          setReferenceAmount(0);
-        }
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error fetching exchange rates for org renewal', error);
+        setRateStatus('error');
       });
+
     return () => {
       cancelled = true;
     };
-  }, [paymentCurrency, subscription.planCurrency, subscription.planPrice]);
+  }, [paymentCurrency, subscription.planCurrency, rateReloadToken]);
+
+  const conversion = React.useMemo(
+    () =>
+      paymentConversionView(
+        subscription.planCurrency,
+        paymentCurrency,
+        rateSnapshot,
+        rateStatus,
+      ),
+    [subscription.planCurrency, paymentCurrency, rateSnapshot, rateStatus],
+  );
 
   const validate = (): boolean => {
+    if (!currencyFormat) {
+      toast.error("La organización no tiene un formato de moneda configurado. Contacta a soporte.");
+      return false;
+    }
+    if (paymentCurrency !== subscription.planCurrency && !conversion.canSubmit) {
+      toast.error("La tasa de cambio aún no está disponible. El pago está bloqueado hasta que cargue.");
+      return false;
+    }
     if (!paymentMethodId) {
       toast.error("Selecciona un método de pago");
       return false;
@@ -167,7 +202,15 @@ export function OrgRenewalModal({
       await onRenewed?.();
     } catch (err) {
       // The API message is never shown directly to the user — console only.
-      toast.error(mutationError("OrgRenewalModal", err, "No se pudo registrar el pago. Intente nuevamente."));
+      // UX-meaningful failures are resolved by business CODE, never by text.
+      const code = apiCode(err);
+      const fallback =
+        code === "EXCHANGE_RATE_UNAVAILABLE"
+          ? "El servicio de tasas de cambio no está disponible. Intenta de nuevo en unos minutos."
+          : code === "PAYMENT_CURRENCY_UNSUPPORTED"
+            ? "La moneda de pago seleccionada no está soportada por el proveedor de tasas."
+            : "No se pudo registrar el pago. Intente nuevamente.";
+      toast.error(mutationError("OrgRenewalModal", err, fallback));
     } finally {
       setIsSubmitting(false);
     }
@@ -201,25 +244,35 @@ export function OrgRenewalModal({
           </div>
         </div>
 
-        <OrgPaymentSection
-          planName={subscription.planName}
-          planPriceCents={subscription.planPrice}
-          planCurrency={subscription.planCurrency}
-          paymentCurrency={paymentCurrency}
-          paymentMethodId={paymentMethodId}
-          activeCurrencies={activeCurrencies}
-          activePaymentMethods={activePaymentMethods}
-          selectedPaymentConfig={selectedPaymentConfig}
-          dynamicFieldValues={dynamicFieldValues}
-          onDynamicChange={(id, value) => setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))}
-          referenceRate={referenceRate}
-          referenceAmount={referenceAmount}
-          paymentDate={paymentDate}
-          onPaymentDateChange={setPaymentDate}
-          onCurrencyChange={setPaymentCurrency}
-          onMethodChange={setPaymentMethodId}
-          disabled={isSubmitting}
-        />
+        {currencyFormat ? (
+          <OrgPaymentSection
+            planName={subscription.planName}
+            planPriceCents={subscription.planPrice}
+            planCurrency={subscription.planCurrency}
+            paymentCurrency={paymentCurrency}
+            paymentMethodId={paymentMethodId}
+            activeCurrencies={activeCurrencies}
+            activePaymentMethods={activePaymentMethods}
+            selectedPaymentConfig={selectedPaymentConfig}
+            dynamicFieldValues={dynamicFieldValues}
+            onDynamicChange={(id, value) => setDynamicFieldValues((prev) => ({ ...prev, [id]: value }))}
+            conversion={conversion}
+            rateStatus={rateStatus}
+            onRetryRate={() => setRateReloadToken((value) => value + 1)}
+            currencyFormat={currencyFormat}
+            paymentDate={paymentDate}
+            onPaymentDateChange={setPaymentDate}
+            onCurrencyChange={setPaymentCurrency}
+            onMethodChange={setPaymentMethodId}
+            disabled={isSubmitting}
+          />
+        ) : (
+          <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5">
+            <Text size="xs" className="text-destructive/90 leading-relaxed">
+              No se pudo cargar la configuración de moneda de la organización. Contacta a soporte.
+            </Text>
+          </div>
+        )}
 
         <div className="flex items-center justify-between p-3 rounded-xl border border-amber-500/20 bg-amber-500/5">
           <div className="flex items-center gap-2">
@@ -234,7 +287,12 @@ export function OrgRenewalModal({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleSubmit} loading={isSubmitting} disabled={isSubmitting}>
+          <Button
+            variant="primary"
+            onClick={handleSubmit}
+            loading={isSubmitting}
+            disabled={isSubmitting || !conversion.canSubmit || !currencyFormat}
+          >
             Enviar Pago
           </Button>
         </div>

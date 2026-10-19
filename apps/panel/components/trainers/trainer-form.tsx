@@ -6,13 +6,21 @@ import {
   Button,
   CheckboxCard,
   toast,
-  Textarea
+  Text,
+  Textarea,
+  DocumentIdField,
 } from "@workspace/ui/components";
 import { type ITrainer } from "@/types/dashboard";
 import { User, Star, Image as ImageIcon, Hash, Upload, X, Mail, CreditCard, Phone, Calendar, Plus } from "lucide-react";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
-import { ORG_ROLES } from "@workspace/shared";
+import {
+  formatDocumentId,
+  getCountryIdentity,
+  ORG_ROLES,
+  parseDocumentId,
+} from "@workspace/shared";
+import { useAuth } from "@/lib/hooks/use-auth";
 
 interface TrainerFormProps {
   readonly initialData?: ITrainer;
@@ -21,6 +29,8 @@ interface TrainerFormProps {
 }
 
 export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormProps) {
+  const { activeOrganization } = useAuth();
+  const identity = getCountryIdentity(activeOrganization?.countryCode);
   const isEdit = !!initialData?.id;
 
   const [specialities, setSpecialities] = React.useState<string[]>(
@@ -60,6 +70,13 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
   const handleChange = (field: keyof ITrainer, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Identification follows the country of the active organization: prefix
+  // options (`docType`) and label (`docLabel`) come from `COUNTRIES`.
+  const documentIdValue = parseDocumentId(
+    formData.documentId ?? "",
+    identity?.docTypes ?? [],
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,13 +158,23 @@ export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormPro
           required
           leftIcon={<Mail size={16} />}
         />
-        <Input
-          label="Identificación / DNI"
-          placeholder="Nº de documento"
-          value={formData.documentId ?? ""}
-          onChange={(e) => handleChange("documentId", e.target.value)}
-          leftIcon={<CreditCard size={16} />}
-        />
+        {identity ? (
+          <DocumentIdField
+            label={`Identificación (${identity.docLabel})`}
+            types={identity.docTypes}
+            value={documentIdValue}
+            onChange={(next) =>
+              handleChange("documentId", formatDocumentId(next.type, next.number))
+            }
+            placeholder="Nº de documento"
+            name="documentId"
+            leftIcon={<CreditCard size={16} />}
+          />
+        ) : (
+          <Text size="sm" variant="muted">
+            La organización no tiene país configurado.
+          </Text>
+        )}
       </div>
 
       {/* ── Phone and Birthday ── */}

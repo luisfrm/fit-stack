@@ -108,6 +108,64 @@ describe('renderReceiptPdfBytes', () => {
     expect(text).toContain('Juan Pérez');
   }, 60000);
 
+  it('receptor organización (VE): R.I.F. y sin "Socio / Cliente"', async () => {
+    const data = sampleReceipt();
+    data.recipient = {
+      kind: 'organization',
+      name: 'Gimnasio Demo C.A.',
+      documentId: 'J-99988877-6',
+      docLabel: 'R.I.F.',
+      address: 'Av. Libertador, Torre Demo, Caracas',
+    };
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    expect(text).toContain('R.I.F.: J-99988877-6');
+    expect(text).toContain('Gimnasio Demo C.A.');
+    expect(text).toContain('DIRECCIÓN FISCAL');
+    expect(text).toContain('Av. Libertador, Torre Demo, Caracas');
+    expect(text).not.toContain('SOCIO / CLIENTE');
+    expect(text).not.toContain('DEL SOCIO');
+  }, 60000);
+
+  it('receptor organización (CO): NIT sin rótulos de socio', async () => {
+    const data = sampleReceipt();
+    data.recipient = {
+      kind: 'organization',
+      name: 'Gimnasio Demo S.A.S.',
+      documentId: '900123456-7',
+      docLabel: 'NIT',
+      address: 'Cra. 7 # 71-21, Bogotá',
+    };
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    expect(text).toContain('NIT: 900123456-7');
+    expect(text).not.toContain('SOCIO / CLIENTE');
+    expect(text).not.toContain('DEL SOCIO');
+  }, 60000);
+
+  it('receptor organización sin dirección omite el bloque (sin placeholder)', async () => {
+    const data = sampleReceipt();
+    data.recipient = {
+      kind: 'organization',
+      name: 'Gimnasio Demo C.A.',
+      documentId: 'J-99988877-6',
+      docLabel: 'R.I.F.',
+      address: null,
+    };
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    expect(text).toContain('R.I.F.: J-99988877-6');
+    expect(text).not.toContain('DIRECCIÓN FISCAL');
+    expect(text).not.toContain('---');
+  }, 60000);
+
+  it('el comprobante del gym al miembro conserva los rótulos de persona natural', async () => {
+    const text = extractPdfText(await renderReceiptPdfBytes(sampleReceipt(), 'latam'));
+    expect(text).toContain('SOCIO / CLIENTE');
+    expect(text).toContain('C.I. DEL SOCIOV-12345678');
+    expect(text).not.toContain('DIRECCIÓN FISCAL');
+  }, 60000);
+
   it('estampa ANULADO cuando el comprobante está anulado', async () => {
     const data = sampleReceipt();
     data.voided = true;

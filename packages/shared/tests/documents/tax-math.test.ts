@@ -1,10 +1,10 @@
 /**
- * Cálculo de impuestos: automático por defecto + override auditado.
+ * Cálculo de impuestos: descomposición tax-inclusive desde el perfil fiscal
+ * del país (`COUNTRIES`, SSOT). Sin override manual.
  * Todo en centavos enteros (ver money.ts).
  */
 import { describe, expect, it } from 'vitest';
 import {
-  applyTaxOverride,
   computeInclusiveTaxes,
   computeTaxes,
   roundCents,
@@ -55,12 +55,12 @@ describe('computeTaxes', () => {
     expect(us).toEqual({ subtotal: 100, taxDetails: [], taxTotal: 0, total: 100 });
   });
 
-  it('respeta impuestos apagados por la org (formal con actividad exenta)', () => {
-    const { taxes } = resolveFiscalProfile('VE', {
-      isFormalTaxpayer: true,
-      taxes: [{ name: 'IVA', rate: 0.16, enabled: false }],
-    });
-    const result = computeTaxes(100, taxes, { currencyPaid: 'VES' });
+  it('respeta impuestos apagados que reciba (enabled false nunca se aplica)', () => {
+    const result = computeTaxes(
+      100,
+      [{ name: 'IVA', rate: 0.16, enabled: false }],
+      { currencyPaid: 'VES' },
+    );
     expect(result.taxDetails).toEqual([]);
     expect(result.total).toBe(100);
   });
@@ -142,57 +142,26 @@ describe('computeInclusiveTaxes', () => {
     ];
     expect(() => computeInclusiveTaxes(1000, taxes)).toThrow();
   });
-});
 
-describe('applyTaxOverride', () => {
-  const taxes = [{ name: 'IVA', rate: 0.16, enabled: true }];
+  it('spreads the dust across inclusive lines without leaving negative amounts', () => {
+    // total=4: subtotal=round(4/1.51)=3, lines 2 and 0, taxTotal=1.
+    // The old "last line absorbs everything" moved the last line to -1.
+    const result = computeInclusiveTaxes(4, [
+      { name: 'A', rate: 0.5, enabled: true },
+      { name: 'B', rate: 0.01, enabled: true },
+    ]);
 
-  it('sin motivo lanza (híbrido con auditoría)', () => {
-    expect(() =>
-      applyTaxOverride(100, taxes, {
-        taxTotal: 10,
-        taxDetails: [{ name: 'IVA', rate: 0.1, amount: 10 }],
-        taxOverrideReason: '   ',
-      }),
-    ).toThrow();
-  });
-
-  it('descuadre entre líneas y total lanza (más de 1 centavo)', () => {
-    expect(() =>
-      applyTaxOverride(100, taxes, {
-        taxTotal: 10,
-        taxDetails: [{ name: 'IVA', rate: 0.1, amount: 8 }],
-        taxOverrideReason: 'Exoneración parcial',
-      }),
-    ).toThrow();
-  });
-
-  it('línea inválida lanza', () => {
-    expect(() =>
-      applyTaxOverride(100, taxes, {
-        taxTotal: 5,
-        taxDetails: [{ name: '', rate: 2, amount: -1 }],
-        taxOverrideReason: 'motivo',
-      }),
-    ).toThrow();
-  });
-
-  it('override válido retorna el desglose manual', () => {
-    const result = applyTaxOverride(
-      100,
-      taxes,
-      {
-        taxTotal: 8,
-        taxDetails: [{ name: 'IVA reducido', rate: 0.08, amount: 8 }],
-        taxOverrideReason: 'Decreto de exoneración 123',
-        actor: 'user-1',
-      },
+    expect(result.subtotal).toBe(3);
+    expect(result.taxTotal).toBe(1);
+    expect(result.taxDetails.every((line) => line.amount >= 0)).toBe(true);
+    expect(result.taxDetails.reduce((sum, line) => sum + line.amount, 0)).toBe(
+      result.taxTotal,
     );
-    expect(result).toEqual({
-      subtotal: 100,
-      taxDetails: [{ name: 'IVA reducido', rate: 0.08, amount: 8 }],
-      taxTotal: 8,
-      total: 108,
-    });
+    expect(result.subtotal + result.taxTotal).toBe(result.total);
+    // The correction is drained from the previous line when the last is 0.
+    expect(result.taxDetails).toEqual([
+      { name: 'A', rate: 0.5, amount: 1 },
+      { name: 'B', rate: 0.01, amount: 0 },
+    ]);
   });
 });

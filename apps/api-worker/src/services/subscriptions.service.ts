@@ -10,7 +10,6 @@ import {
   computeSubscriptionPeriod,
   toLocalDayString,
   type IPaymentMethodDetails,
-  type ITaxDetail,
 } from '@workspace/shared';
 import { ReceiptError } from './receipts.service';
 
@@ -29,10 +28,6 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
     paymentMethodDetails?: IPaymentMethodDetails | null;
     status?: string;
     paymentDate?: string | Date;
-    subtotal?: number;
-    taxTotal?: number;
-    taxDetails?: ITaxDetail[];
-    taxOverrideReason?: string;
   };
 }
 
@@ -46,12 +41,6 @@ export interface ReceiptHooks {
     paymentId: number;
     timezone: string;
     actor?: string;
-    taxOverride?: {
-      subtotal: number;
-      taxTotal: number;
-      taxDetails: ITaxDetail[];
-      taxOverrideReason: string;
-    } | null;
   }): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }>;
   markReceiptVoided(input: {
     orgId: string;
@@ -348,21 +337,11 @@ export function createSubscriptionsService(
               'subscriptions.create: opts.receipts es requerido para emitir el comprobante.',
             );
           }
-          const p = payload.payment;
           await opts.receipts.assignReceiptNumber({
             orgId: organizationId,
             paymentId: createdPayment.id,
             timezone,
             actor: opts.by,
-            taxOverride:
-              p.taxTotal !== undefined && p.taxDetails !== undefined
-                ? {
-                  subtotal: p.subtotal ?? p.amountPaid,
-                  taxTotal: p.taxTotal,
-                  taxDetails: p.taxDetails,
-                  taxOverrideReason: p.taxOverrideReason ?? '',
-                }
-                : null,
           });
         }
       } catch (err) {

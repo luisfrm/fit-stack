@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireOrgPermission, requireOrgTimezone } from '../lib/route-handler';
+import { requireOrgPermission, requireOrgTimezone, requireOrgCurrency } from '../lib/route-handler';
 import { PERMISSION_MODULES as PM, PERMISSION_ACTIONS as PA } from '@workspace/shared';
 import { createSubscriptionsRepository } from '../repositories/subscriptions.repository';
 import { createPaymentsRepository } from '../repositories/payments.repository';
@@ -21,10 +21,13 @@ const updateStatusSchema = z.object({
 
 export const paymentRoutes = new Hono<AppEnv>()
   // GET /api/payments/analytics
-  .get('/analytics', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), async (c) => {
+  .get('/analytics', requireOrgPermission(PM.REPORTS, PA.READ), requireOrgTimezone(), requireOrgCurrency(), async (c) => {
     const orgId = c.get('orgId')!;
+    const primaryCurrency = c.get('orgCurrency')!;
     const cache = createCache(c.env);
-    const cacheKey = `org:${orgId}:payments:analytics`;
+    // The normalization target is part of the key: changing the primary
+    // currency must never serve a total normalized to the previous one.
+    const cacheKey = `org:${orgId}:payments:analytics:${primaryCurrency}`;
 
     const cached = await cache.get(cacheKey);
     if (cached) return c.json(cached);
@@ -37,7 +40,7 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const financeService = createFinanceService(paymentsRepo, subsRepo);
 
-    const stats = await financeService.getDashboardAnalytics(orgId, timezone);
+    const stats = await financeService.getDashboardAnalytics(orgId, timezone, primaryCurrency);
     await cache.set(cacheKey, stats, 300);
 
     return c.json(stats);
@@ -69,7 +72,7 @@ export const paymentRoutes = new Hono<AppEnv>()
       },
     );
     await cache.invalidate(`org:${orgId}:subscriptions*`);
-    await cache.invalidateExact(`org:${orgId}:payments:analytics`);
+    await cache.invalidate(`org:${orgId}:payments:analytics*`);
     // `withoutActiveSubscription` from members:stats depends on subs/payments.
     await cache.invalidateExact(`org:${orgId}:members:stats`);
     await cache.invalidate(`org:${orgId}:dashboard:stats:*`);

@@ -60,6 +60,8 @@ export type AppVariables = {
   org?: IOrganization | null;
   /** Active org timezone (set by `requireOrgTimezone`). */
   orgTimezone?: string;
+  /** Active org primary currency (set by `requireOrgCurrency`). */
+  orgCurrency?: string;
   /** Resolved features for the active org (set by `requireFeature`) */
   orgFeatures?: {
     features: Record<string, { enabled: boolean; limits?: Record<string, number> }>;

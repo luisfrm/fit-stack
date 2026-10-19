@@ -5,6 +5,7 @@ import { SimpleChart, type ChartConfig } from "@workspace/ui";
 import { Card } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";
 import {
+  hasUnconvertedRevenue,
   lastSixMonths,
   REVENUE_MINI_CONFIG,
   type MonthlyRevenueRow,
@@ -21,6 +22,10 @@ interface RevenueMiniChartProps {
  */
 export function RevenueMiniChart({ monthlyReport }: Readonly<RevenueMiniChartProps>) {
   const data = React.useMemo(() => lastSixMonths(monthlyReport), [monthlyReport]);
+  const incomplete = React.useMemo(
+    () => hasUnconvertedRevenue(monthlyReport),
+    [monthlyReport],
+  );
 
   return (
     <Card data-testid="dashboard-revenue-mini" className="overflow-hidden pb-0 flex flex-col">
@@ -29,6 +34,11 @@ export function RevenueMiniChart({ monthlyReport }: Readonly<RevenueMiniChartPro
         <Text as="p" size="xs" variant="muted" className="mt-1">
           Recaudación mensual normalizada.
         </Text>
+        {incomplete && (
+          <Text as="p" size="xs" variant="muted" className="mt-1">
+            Parcial: hay cobros sin tasa histórica exacta.
+          </Text>
+        )}
       </div>
       <div className="flex-1 min-h-0 p-4 pt-2">
         <div className="h-[190px] w-full">

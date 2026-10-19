@@ -7,14 +7,13 @@ import {
   type PaginatedMembers,
   type IMember,
   type IPaymentMethodConfig,
-  type IPaymentMethodDetails,
-  type ITaxDetail
+  type IPaymentMethodDetails
 } from "@/types/dashboard";
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
 import { plansService } from "@/lib/services/plans-service";
 import { settingsService } from "@/lib/services/settings-service";
-import { getExchangeRates } from "@/lib/api/exchange-rates";
+import { getExchangeRateSnapshot } from "@/lib/api/exchange-rates";
 import {
   Input,
   Button,
@@ -26,13 +25,18 @@ import {
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { parseDateAsConfigTimezone, DEFAULT_TIMEZONE } from "@/lib/config/display";
 import { addDuration, toLocalDayString } from "@workspace/shared/date";
+import {
+  exchangeRateAppliedValue,
+  paymentConversionView,
+  type ExchangeRateLoadStatus,
+  type ExchangeRateSnapshot,
+} from "@workspace/shared";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { apiCode } from "@/lib/errors";
 import {
   centsToUnits,
   unitsToCents,
-  parseRateValue,
   previewReceiptTaxes,
   resolveFiscalProfile,
   computeSubscriptionPeriod,
@@ -44,7 +48,6 @@ import {
 import { MemberSelector } from "./member-selector";
 import { PlanSelector } from "./plan-selector";
 import { PaymentSection } from "./payment-section";
-import { type TaxMode } from "./tax-block";
 
 interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName" | "planName" | "status" | "endDate"> {
   endDate?: string;
@@ -57,10 +60,6 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
     paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
     paymentDate?: Date | string;
-    subtotal?: number;
-    taxTotal?: number;
-    taxDetails?: ITaxDetail[];
-    taxOverrideReason?: string;
   }
 }
 
@@ -89,40 +88,6 @@ function validateDynamicPaymentFields(
       toast.error(`El campo "${field.label}" es obligatorio`);
       return false;
     }
-  }
-
-  return true;
-}
-
-/**
- * Validates tax override inputs and rates when taxMode is set to 'override'.
- */
-function validateTaxOverrides(
-  taxMode: TaxMode,
-  reason: string,
-  rateOverrides: Record<string, string>,
-  preview: unknown
-): boolean {
-  if (taxMode !== "override") return true;
-
-  if (!reason.trim()) {
-    toast.error("Indica el motivo del ajuste manual de impuestos");
-    return false;
-  }
-
-  for (const [name, raw] of Object.entries(rateOverrides)) {
-    if (raw.trim() === "") continue;
-    try {
-      parseRateValue(raw);
-    } catch {
-      toast.error(`Tasa inválida para ${name}`);
-      return false;
-    }
-  }
-
-  if (!preview) {
-    toast.error("No se pudo calcular el desglose de impuestos");
-    return false;
   }
 
   return true;
@@ -193,7 +158,9 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
   // Payment States
   const [paymentCurrency, setPaymentCurrency] = React.useState<string>('USD');
-  const [exchangeRate, setExchangeRate] = React.useState(1);
+  const [rateSnapshot, setRateSnapshot] = React.useState<ExchangeRateSnapshot | null>(null);
+  const [rateStatus, setRateStatus] = React.useState<ExchangeRateLoadStatus>('idle');
+  const [rateReloadToken, setRateReloadToken] = React.useState(0);
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState<string>('');
   const [paymentDetails, setPaymentDetails] = React.useState("");
@@ -202,15 +169,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
 
-  // Fiscal override (auto mode = backend decomposes; override = manual
-  // rates + audit reason, amounts always in integer cents).
-  const [taxMode, setTaxMode] = React.useState<TaxMode>("auto");
-  const [taxRateOverrides, setTaxRateOverrides] = React.useState<Record<string, string>>({});
-  const [taxOverrideReason, setTaxOverrideReason] = React.useState("");
-
   // Input Focus States for "Veil" effect
   const [amountFocus, setAmountFocus] = React.useState(false);
-  const [rateFocus, setRateFocus] = React.useState(false);
 
   const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
 
@@ -319,7 +279,8 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     );
   }, [activePaymentMethods, paymentCurrency]);
 
-  // Issuer org fiscal profile (country defaults + overrides).
+  // Fiscal profile of the issuer org: taxes and label come from the country
+  // (`COUNTRIES`, SSOT) plus the Console-governed `isFormalTaxpayer`.
   const fiscalProfile = React.useMemo(() => {
     const countryCode = activeOrganization?.countryCode;
     if (!countryCode) return null;
@@ -330,70 +291,77 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
   }, [activeOrganization]);
 
-  // An issuer that has not declared being a formal taxpayer does not detail
-  // taxes, and thus cannot adjust them manually (backend rejects with 400).
-  // Effective mode is always "auto" in that case.
-  const effectiveTaxMode: TaxMode = fiscalProfile?.isFormalTaxpayer ? taxMode : "auto";
-
-  // Breakdown preview using the single shared source of truth. Under override,
-  // manual rates are applied; if any rate is invalid, auto is shown and
-  // submit is blocked with toast.
+  // Breakdown preview using the single shared source of truth (the same
+  // function the backend uses at emission time). Nothing is editable here:
+  // rates come from `COUNTRIES`, never from the operator.
   const taxPreview = React.useMemo(() => {
     if (!fiscalProfile) return null;
-    const totalCents = unitsToCents(finalAmount);
     try {
-      if (effectiveTaxMode !== "override") {
-        const auto = previewReceiptTaxes(totalCents, fiscalProfile, paymentCurrency);
-        return { ...auto, lines: auto.taxDetails };
-      }
-      const taxes = fiscalProfile.taxes.map((tax) => {
-        const raw = taxRateOverrides[tax.name];
-        if (raw === undefined || raw.trim() === "") return tax;
-        return { ...tax, rate: parseRateValue(raw) };
-      });
-      const custom = previewReceiptTaxes(totalCents, { ...fiscalProfile, taxes }, paymentCurrency);
-      return { ...custom, lines: custom.taxDetails };
+      const auto = previewReceiptTaxes(unitsToCents(finalAmount), fiscalProfile, paymentCurrency);
+      return { ...auto, lines: auto.taxDetails };
     } catch {
       return null;
     }
-  }, [fiscalProfile, effectiveTaxMode, taxRateOverrides, finalAmount, paymentCurrency]);
+  }, [fiscalProfile, finalAmount, paymentCurrency]);
 
-  const handleTaxModeChange = (mode: TaxMode) => {
-    setTaxMode(mode);
-    if (mode === "override" && fiscalProfile && Object.keys(taxRateOverrides).length === 0) {
-      setTaxRateOverrides(
-        Object.fromEntries(
-          fiscalProfile.taxes.map((tax) => [tax.name, String(Number((tax.rate * 100).toFixed(4)))]),
-        ),
-      );
-    }
-  };
-
-  // Fetch Exchange Rate and Calculate Amount
+  // Exchange rate and converted amount. The rate is READ-ONLY and comes from
+  // the exchange-rates API: it is never editable here.
   React.useEffect(() => {
-    const updateFinance = async () => {
-      if (!selectedPlan) {
-        setFinalAmount(0);
-        setExchangeRate(1);
-        return;
-      }
+    if (!selectedPlan) {
+      setRateSnapshot(null);
+      setRateStatus('idle');
+      setFinalAmount(0);
+      return;
+    }
 
-      let rate = 1;
-      if (paymentCurrency !== selectedPlan.currency) {
-        try {
-          const rates = await getExchangeRates(selectedPlan.currency);
-          rate = rates[paymentCurrency] ?? 1;
-        } catch {
-          rate = 1;
+    if (paymentCurrency === selectedPlan.currency) {
+      setRateSnapshot(null);
+      setRateStatus('ready');
+      setFinalAmount(centsToUnits(selectedPlan.price));
+      return;
+    }
+
+    let cancelled = false;
+    setRateSnapshot(null);
+    setRateStatus('loading');
+    setFinalAmount(0);
+
+    getExchangeRateSnapshot(selectedPlan.currency)
+      .then((snapshot) => {
+        if (cancelled) return;
+        setRateSnapshot(snapshot);
+        const rate = snapshot.rates[paymentCurrency];
+        const isValidRate =
+          typeof rate === 'number' && Number.isFinite(rate) && rate > 0;
+        if (!isValidRate) {
+          // Provider responded but without this currency: never assume a rate.
+          setRateStatus('error');
+          return;
         }
-      }
+        setRateStatus('ready');
+        setFinalAmount(centsToUnits(selectedPlan.price * rate));
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error fetching exchange rates', error);
+        setRateStatus('error');
+      });
 
-      setExchangeRate(rate);
-      setFinalAmount(centsToUnits(selectedPlan.price * rate));
+    return () => {
+      cancelled = true;
     };
+  }, [selectedPlan, paymentCurrency, rateReloadToken]);
 
-    updateFinance();
-  }, [selectedPlan, paymentCurrency]);
+  const conversion = React.useMemo(
+    () =>
+      paymentConversionView(
+        selectedPlan?.currency ?? '',
+        paymentCurrency,
+        rateSnapshot,
+        rateStatus,
+      ),
+    [selectedPlan, paymentCurrency, rateSnapshot, rateStatus],
+  );
 
   // Dynamically search members
   React.useEffect(() => {
@@ -428,6 +396,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
   const validatePaymentFields = () => {
     if (!memberId || !planId) return false;
 
+    if (selectedPlan && !conversion.canSubmit) {
+      toast.error("La tasa de cambio aún no está disponible. El pago está bloqueado hasta que cargue.");
+      return false;
+    }
+
     // Simple Date Validation
     const start = parseDateAsConfigTimezone(startDate, timezone);
     if (Number.isNaN(start.getTime())) {
@@ -449,7 +422,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       return false;
     }
 
-    return validateTaxOverrides(effectiveTaxMode, taxOverrideReason, taxRateOverrides, taxPreview);
+    return true;
   };
 
   // Helper to process file uploads in dynamic fields
@@ -487,7 +460,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
       payment: {
         amountPaid: unitsToCents(finalAmount),
         currencyPaid: paymentCurrency,
-        exchangeRateApplied: exchangeRate === 1 ? undefined : String(exchangeRate),
+        exchangeRateApplied: exchangeRateAppliedValue(conversion),
         paymentMethod,
         paymentMethodDetails: finalPaymentMethodDetails,
         status: paymentValidated ? "validated" : "processing",
@@ -500,12 +473,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
     }
     if (requiresOverrideReason) {
       payload.endDateOverrideReason = endDateOverrideReason.trim();
-    }
-    if (effectiveTaxMode === "override" && taxPreview) {
-      payload.payment.subtotal = taxPreview.subtotal;
-      payload.payment.taxTotal = taxPreview.taxTotal;
-      payload.payment.taxDetails = taxPreview.lines;
-      payload.payment.taxOverrideReason = taxOverrideReason.trim();
     }
 
     return payload;
@@ -652,15 +619,11 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           selectedPaymentConfig={selectedPaymentConfig}
           dynamicFieldValues={dynamicFieldValues}
           onDynamicChange={(id, value) => setDynamicFieldValues(prev => ({ ...prev, [id]: value }))}
-          exchangeRate={exchangeRate}
-          rateFocus={rateFocus}
+          conversion={conversion}
+          rateStatus={rateStatus}
+          onRetryRate={() => setRateReloadToken((value) => value + 1)}
           amountFocus={amountFocus}
-          onRateFocus={setRateFocus}
           onAmountFocus={setAmountFocus}
-          onRateChange={(val) => {
-            setExchangeRate(val);
-            setFinalAmount(centsToUnits(selectedPlan.price * val));
-          }}
           onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
@@ -676,14 +639,6 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
           onPaymentDetailsChange={setPaymentDetails}
           disabled={isSectionDisabled}
           taxPreview={taxPreview}
-          taxMode={taxMode}
-          onTaxModeChange={handleTaxModeChange}
-          taxRateOverrides={taxRateOverrides}
-          onTaxRateChange={(name, pct) =>
-            setTaxRateOverrides((prev) => ({ ...prev, [name]: pct }))
-          }
-          taxOverrideReason={taxOverrideReason}
-          onTaxOverrideReasonChange={setTaxOverrideReason}
           taxEmitterIsFormal={fiscalProfile?.isFormalTaxpayer ?? false}
         />
       )}
@@ -722,7 +677,7 @@ export function SubscriptionForm({ onSubmit, isLoading, onAddMemberClick, initia
 
       <Button
         type="submit"
-        disabled={isLoading || isProcessingUploads || !memberId || !planId || isPendingPayment}
+        disabled={isLoading || isProcessingUploads || !memberId || !planId || isPendingPayment || !conversion.canSubmit}
         className="w-full h-12 uppercase tracking-widest font-bold shadow-xl shadow-primary/5"
       >
         {isLoading || isProcessingUploads ? "PROCESANDO..." : "GENERAR SUSCRIPCIÓN"}

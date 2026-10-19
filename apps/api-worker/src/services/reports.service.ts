@@ -70,17 +70,29 @@ export function createReportsService(paymentsRepo: PaymentsRepository) {
   }
 
   return {
-    async getMonthlyRevenue(organizationId: string, timezone: string, monthsCount: number = 12) {
+    async getMonthlyRevenue(
+      organizationId: string,
+      timezone: string,
+      primaryCurrency: string,
+      monthsCount: number = 12,
+    ) {
       const dateManager = new OrganizationDateManager(timezone);
       const startDate = dateManager.getStartOfMonthUtc(monthsCount);
 
-      const rawData = await paymentsRepo.getAggregatedPaymentsMonthly(organizationId, startDate, dateManager);
+      const rawData = await paymentsRepo.getAggregatedPaymentsMonthly(
+        organizationId,
+        startDate,
+        dateManager,
+        primaryCurrency,
+      );
 
       return rawData.map((d) => ({
         month: d.month,
         currency: d.currency,
         amount: Number(d.amount),
-        normalizedAmount: Number(d.amount),
+        normalizedAmount: Number(d.normalizedAmount),
+        unconvertedAmount: Number(d.unconvertedAmount),
+        unconvertedCount: Number(d.unconvertedCount),
         originalExchangeRate: d.exchangeRate,
       }));
     },

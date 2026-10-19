@@ -13,6 +13,7 @@ import {
   CheckboxCard,
   FormTabs,
   ActiveCurrenciesField,
+  DocumentIdField,
 } from "@workspace/ui/components";
 import {
   Building2,
@@ -27,16 +28,23 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { COUNTRY_LIST, COUNTRIES, COUNTRY_INDEX } from "@workspace/shared/constants";
+import {
+  defaultTaxDocumentType,
+  FiscalConfigSchema,
+  formatDocumentId,
+  getCountryIdentity,
+  parseDocumentId,
+} from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { useDebounce } from "@/lib/hooks/use-debounce";
-import { IOrganization } from "@workspace/shared/types";
+import { IOrganization, IPlatformOrganization } from "@workspace/shared/types";
 import type { OwnerData } from "./organization-form-types";
 
 export type { OwnerData };
 
 interface OrganizationFormProps {
-  readonly initialData?: IOrganization;
+  readonly initialData?: IPlatformOrganization;
   readonly onSubmit: (
     orgData: Partial<IOrganization>,
     ownerData?: OwnerData,
@@ -46,9 +54,33 @@ interface OrganizationFormProps {
   readonly isLoading?: boolean;
 }
 
-function deriveActiveCurrencies(countryCode?: string | null): string[] {
-  const primary = (countryCode && COUNTRIES[countryCode]?.currency) || "USD";
-  return [...new Set([primary, "USD"])];
+/**
+ * Active currencies suggested by the country, preserving the chosen primary
+ * (`RD-146`): the primary is explicit and must always be active. USD stays as
+ * the operating currency of the platform (existing behavior).
+ */
+function deriveActiveCurrencies(
+  countryCode?: string | null,
+  primaryCurrency?: string | null,
+): string[] {
+  const countryCurrency = countryCode ? COUNTRIES[countryCode]?.currency : undefined;
+  const primary = primaryCurrency || countryCurrency;
+  return [...new Set([primary, countryCurrency, "USD"].filter(Boolean) as string[])];
+}
+
+/** Reads the stored `active_currencies` JSON (tolerant: invalid → `null`). */
+function parseStoredActiveCurrencies(settings?: Record<string, string> | null): string[] | null {
+  const raw = settings?.active_currencies;
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((c) => typeof c === "string")) {
+      return parsed as string[];
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 interface Step1Props {
@@ -60,6 +92,9 @@ interface Step1Props {
   readonly onLogoChange: (file: File | null) => void;
   readonly onRemoveLogo: () => void;
   readonly onChange: (field: keyof IOrganization, value: unknown) => void;
+  /** Platform-governed fiscal regime: only Fit-Stack toggles it (never the tenant). */
+  readonly formalTaxpayer: boolean;
+  readonly onFormalTaxpayerChange: (value: boolean) => void;
   readonly slugStatus: "idle" | "valid" | "error";
   readonly slugError: string | null;
 }
@@ -73,11 +108,21 @@ function OrganizationStep1({
   onLogoChange,
   onRemoveLogo,
   onChange,
+  formalTaxpayer,
+  onFormalTaxpayerChange,
   slugStatus,
   slugError,
 }: Step1Props) {
-  const countryConfig = formData.countryCode ? COUNTRIES[formData.countryCode] : undefined;
-  const primaryCurrency = countryConfig?.currency ?? "";
+  // Tax registry identity: prefix options (`docType`) and label (`taxLabel`)
+  // come from `COUNTRIES`; an unknown country renders an explicit empty state.
+  const countryIdentity = getCountryIdentity(formData.countryCode);
+  const taxIdValue = parseDocumentId(
+    formData.taxId ?? "",
+    countryIdentity?.docTypes ?? [],
+  );
+  // Explicit primary currency (editable). Never derived silently at render time:
+  // an empty value blocks the step with a visible error.
+  const primaryCurrency = formData.primaryCurrency ?? "";
   const getSlugInputState = () => {
     if (slugStatus === "error") return "error";
     if (slugStatus === "valid") return "success";
@@ -155,11 +200,15 @@ function OrganizationStep1({
           countries={COUNTRY_LIST}
         />
 
-        <Input
-          label="Moneda principal)"
+        <SimpleSelect
+          label="Moneda principal *"
+          required
           value={primaryCurrency}
-          disabled
-          hint="Bloqueada al país de operación. No editable."
+          onChange={(val) => onChange("primaryCurrency", val)}
+          options={(primaryCurrency && !activeCurrencies.includes(primaryCurrency)
+            ? [primaryCurrency, ...activeCurrencies]
+            : activeCurrencies
+          ).map((code) => ({ value: code, label: code }))}
         />
       </div>
 
@@ -171,8 +220,8 @@ function OrganizationStep1({
         disabled={isEdit}
         hint={
           isEdit
-            ? "Las activas de una sede existente se gestionan desde su panel de Monedas."
-            : "La principal siempre está incluida. El backend la deriva del país."
+            ? "Las activas de una sede existente se gestionan desde su panel de Monedas. La principal debe pertenecer a esta lista."
+            : "La principal se sugiere desde el país y siempre se incluye junto con la moneda del país (ej. USD en VE)."
         }
       />
 
@@ -218,19 +267,46 @@ function OrganizationStep1({
       />
 
       <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input
-          label={`ID Fiscal (${countryConfig?.taxLabel ?? "Registro"})`}
-          placeholder="Ej: J-12345678-9"
-          value={formData.taxId ?? ""}
-          onChange={(e) => onChange("taxId", e.target.value)}
-          leftIcon={<Fingerprint size={16} />}
-        />
+        {countryIdentity ? (
+          <DocumentIdField
+            label={`ID Fiscal (${countryIdentity.taxLabel})`}
+            types={countryIdentity.docTypes}
+            defaultType={defaultTaxDocumentType(formData.countryCode)}
+            value={taxIdValue}
+            onChange={(next) =>
+              onChange("taxId", formatDocumentId(next.type, next.number))
+            }
+            placeholder="12345678-9"
+            leftIcon={<Fingerprint size={16} />}
+          />
+        ) : (
+          <Text size="sm" variant="muted">
+            Selecciona el país para registrar el ID fiscal.
+          </Text>
+        )}
         <Input
           label="Dirección"
           placeholder="Ej: Av. Principal, Edif. X..."
           value={formData.address ?? ""}
           onChange={(e) => onChange("address", e.target.value)}
           leftIcon={<MapPin size={16} />}
+        />
+      </div>
+
+      <div className="col-span-full pt-2">
+        <Text size="xs" weight="bold" className="uppercase tracking-widest text-primary/70">
+          Régimen fiscal
+        </Text>
+      </div>
+
+      <div className="col-span-full">
+        <CheckboxCard
+          id="formalTaxpayer"
+          checked={formalTaxpayer}
+          onCheckedChange={(checked) => onFormalTaxpayerChange(checked === true)}
+          label="Contribuyente formal"
+          description="Habilita el desglose de impuestos del país en los comprobantes (nombre legal, ID fiscal y dirección deben estar completos). El tenant no puede cambiar esta condición."
+          className="border-primary/10 bg-primary/5 hover:bg-primary/10"
         />
       </div>
 
@@ -332,6 +408,12 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     logo: initialData?.logo ?? "",
     slogan: initialData?.slogan ?? "",
     countryCode: initialData?.countryCode ?? "VE",
+    // Primary currency is explicit and editable (Console preselects the country
+    // currency). It must belong to `active_currencies`.
+    primaryCurrency:
+      initialData?.primaryCurrency ??
+      COUNTRIES[initialData?.countryCode ?? "VE"]?.currency ??
+      "",
     taxId: initialData?.taxId ?? "",
     legalName: initialData?.legalName ?? "",
     address: initialData?.address ?? "",
@@ -339,9 +421,27 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
     currencyFormat: initialData?.currencyFormat ?? "latam",
   });
 
-  const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() =>
-    deriveActiveCurrencies(initialData?.countryCode ?? "VE"),
-  );
+  const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() => {
+    // Existing org: the stored list is the authority (also used by the API to
+    // validate the primary). New org: derive country currency + the suggested
+    // primary. An inconsistent legacy list is preserved, never "fixed" silently.
+    const stored = parseStoredActiveCurrencies(initialData?.settings);
+    return (
+      stored ??
+      deriveActiveCurrencies(
+        initialData?.countryCode ?? "VE",
+        initialData?.primaryCurrency ?? null,
+      )
+    );
+  });
+
+  // Fiscal regime: platform-owned. Stored config is parsed with the STRICT
+  // shared contract (legacy `taxes`/`confirmedTaxes` rows are ignored here,
+  // never re-sent) and only `isFormalTaxpayer` is ever written from Console.
+  const [formalTaxpayer, setFormalTaxpayer] = React.useState<boolean>(() => {
+    const stored = FiscalConfigSchema.safeParse(initialData?.fiscalConfig ?? {});
+    return stored.success ? stored.data.isFormalTaxpayer === true : false;
+  });
 
   const [ownerData, setOwnerData] = React.useState<OwnerData>({
     firstName: "",
@@ -406,19 +506,30 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       setSlugStatus("idle");
       setSlugError(null);
     }
-    // Changing country re-suggests timezone and re-derives primary currency in active list
-    // (preserving any extras the user already selected).
+    // Changing country re-suggests the timezone and the country currency, but
+    // only while the primary is still the suggested one: an explicit choice
+    // (e.g. USD in VE) is never overwritten silently.
     if (field === "countryCode" && typeof value === "string") {
       const config = COUNTRY_LIST.find((c) => c.code === value);
-      const prevPrimary =
+      const prevCountryCurrency =
         formData.countryCode != null ? COUNTRIES[formData.countryCode]?.currency : undefined;
-      const nextPrimary = config?.currency ?? "USD";
+      const nextCountryCurrency = config?.currency;
+      const prevPrimary = formData.primaryCurrency;
+      const nextPrimary =
+        !prevPrimary || prevPrimary === prevCountryCurrency
+          ? nextCountryCurrency
+          : prevPrimary;
       setActiveCurrencies((prev) => [
-        ...new Set([nextPrimary, "USD", ...prev.filter((c) => c !== prevPrimary)]),
+        ...new Set([
+          ...(nextPrimary ? [nextPrimary] : []),
+          ...(nextCountryCurrency ? [nextCountryCurrency] : []),
+          ...prev.filter((c) => c !== prevCountryCurrency),
+        ]),
       ]);
       setFormData((prev) => ({
         ...prev,
         countryCode: value,
+        ...(nextPrimary ? { primaryCurrency: nextPrimary } : {}),
         ...(config ? { timezone: config.timezone } : {}),
       }));
       return;
@@ -451,11 +562,9 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       toast.error("Completa nombre, país y zona horaria para continuar.");
       return false;
     }
-    const primary = formData.countryCode
-      ? COUNTRIES[formData.countryCode]?.currency
-      : undefined;
+    const primary = formData.primaryCurrency;
     if (!primary || !activeCurrencies.includes(primary)) {
-      toast.error("Las monedas activas deben incluir la principal.");
+      toast.error("La moneda principal debe estar entre las monedas activas.");
       return false;
     }
     if (slugStatus === "error") {
@@ -493,6 +602,9 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
       const payload: Partial<IOrganization> = {
         ...formData,
         logo: previewUrl ? (finalLogoUrl || null) : null,
+        // Platform-only fiscal regime. Country taxes are NOT sent: they come
+        // from `COUNTRIES` (SSOT) at emission time.
+        fiscalConfig: { isFormalTaxpayer: formalTaxpayer },
       };
 
       // Active currencies set only on creation (in edit mode they are managed from gym panel).
@@ -545,6 +657,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
               onLogoChange={handleLogoChange}
               onRemoveLogo={removeImage}
               onChange={handleChange}
+              formalTaxpayer={formalTaxpayer}
+              onFormalTaxpayerChange={setFormalTaxpayer}
               slugStatus={slugStatus}
               slugError={slugError}
             />
@@ -572,6 +686,8 @@ export function OrganizationForm({ initialData, onSubmit, isLoading }: Organizat
                 onLogoChange={handleLogoChange}
                 onRemoveLogo={removeImage}
                 onChange={handleChange}
+                formalTaxpayer={formalTaxpayer}
+                onFormalTaxpayerChange={setFormalTaxpayer}
                 slugStatus={slugStatus}
                 slugError={slugError}
               />

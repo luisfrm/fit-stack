@@ -1,10 +1,17 @@
 /**
- * Per-organization fiscal data: `PATCH /api/organizations/profile`.
+ * Per-organization fiscal data.
  *
- * Covers: real `fiscalConfig` schema (400), RBAC (cashier 403 / manager
- * 200), immutables (`countryCode`/`primaryCurrency` → 400), `isFormalTaxpayer`
- * friction (only the false→true transition requires `confirmed`), merge
- * (no blind replacement), audited override and forced documentary gate.
+ * Contract (RD-145): `COUNTRIES` is the tax SINGLE SOURCE OF TRUTH and
+ * `isFormalTaxpayer` is the only fiscal switch, writable EXCLUSIVELY from
+ * Console (`PATCH /api/platform/organizations/:id`).
+ *
+ * - Tenant (`PATCH /api/organizations/profile`): edits issuer identity
+ *   (`legalName`/`taxId`/`address`) and `disclaimerOverride`; any fiscal-regime
+ *   key answers `403 FISCAL_CONFIG_PLATFORM_ONLY` with no partial write.
+ * - Console: activating the regime requires a complete issuer identity
+ *   (`400 FISCAL_IDENTITY_INCOMPLETE`, no partial write).
+ * - `hasFiscalHomologation` left the contract (400), legacy tax lists are never
+ *   accepted and the payment route computes the breakdown on the server.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -26,7 +33,9 @@ import {
   createGymTenant,
   createOrganization,
   createPlan,
+  declareFormalTaxpayer,
   isoDate,
+  registerPlatformUser,
   registerUser,
   setActiveOrganization,
   uid,
@@ -47,7 +56,8 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
   async function createValidatedPayment(
     client: ReturnType<typeof createClient>,
     amountPaid = 10000,
-  ) {    const member = await createGymMember(client);
+  ) {
+    const member = await createGymMember(client);
     const plan = await createPlan(client, { price: amountPaid, currency: 'USD' });
     const res = await client.post('/api/subscriptions', {
       memberId: member.id,
@@ -70,14 +80,6 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     );
     return { member, plan, payment: rows[0]! };
   }
-
-  it('rechaza fiscalConfig inválido con 400', async () => {
-    const { owner } = await createGymTenant('fiscal-invalid');
-    const res = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: { taxes: 'basura' },
-    });
-    expect(res.status, res.text).toBe(400);
-  });
 
   it('cashier → 403, manager → 200', async () => {
     const { organization } = await createGymTenant('fiscal-rbac');
@@ -103,14 +105,48 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     expect(allowed.status, allowed.text).toBe(200);
   });
 
-  it('countryCode/primaryCurrency son inmutables (400 IMMUTABLE_FIELD)', async () => {
+  it('countryCode es inmutable (400 IMMUTABLE_FIELD); primaryCurrency ya no lo es', async () => {
     const { owner } = await createGymTenant('fiscal-immutable');
     const res = await owner.client.patch('/api/organizations/profile', {
       countryCode: 'PE',
-      primaryCurrency: 'PEN',
     });
     expect(res.status, res.text).toBe(400);
-    expect(res.body).toMatchObject({ code: 'IMMUTABLE_FIELD' });
+    expect(res.body).toMatchObject({
+      code: 'IMMUTABLE_FIELD',
+      fields: ['countryCode'],
+    });
+  });
+
+  it('tipo de documento de otro país → 400 DOCUMENT_TYPE_INVALID (RD-148)', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-doctype');
+
+    const before = await testQuery<{ tax_id: string | null }>(
+      `SELECT tax_id FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+
+    // VE tenant: `C.C.` is a CO prefix, never part of the VE catalog.
+    const res = await owner.client.patch('/api/organizations/profile', {
+      taxId: 'C.C.-12345678',
+    });
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({
+      code: 'DOCUMENT_TYPE_INVALID',
+      fields: ['taxId'],
+    });
+
+    // Rejected before any write.
+    const after = await testQuery<{ tax_id: string | null }>(
+      `SELECT tax_id FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(after[0]!.tax_id).toBe(before[0]!.tax_id);
+
+    // A prefix of the org country is accepted.
+    const ok = await owner.client.patch('/api/organizations/profile', {
+      taxId: 'J-12345678-9',
+    });
+    expect(ok.status, ok.text).toBe(200);
   });
 
   it('identidad de sede org-scoped: el owner guarda y persiste el set general', async () => {
@@ -129,7 +165,7 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     expect(res.status, res.text).toBe(200);
 
     const rows = await testQuery<Record<string, unknown>>(
-      `SELECT name, slogan, logo, timezone, currency_format, legal_name, tax_id, address
+      `SELECT name, slogan, logo, timezone, currency_format, legal_name, tax_id, address, fiscal_config
          FROM organization WHERE id = $1`,
       [organization.id],
     );
@@ -142,6 +178,8 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
       legal_name: 'Sede Renombrada C.A.',
       tax_id: 'J-99999999-9',
       address: 'Av. Siempre Viva 742',
+      // Identity edits never declare the fiscal regime: platform-only.
+      fiscal_config: null,
     });
   });
 
@@ -156,58 +194,231 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
     expect(res.body).toMatchObject({ code: 'SLUG_TAKEN' });
   });
 
-  it('formal exige confirmed solo en la transición false→true', async () => {
-    const { owner } = await createGymTenant('fiscal-formal');
+  it('el tenant no puede escribir el régimen fiscal → 403 FISCAL_CONFIG_PLATFORM_ONLY', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-tenant-forbidden');
 
-    const missing = await owner.client.patch('/api/organizations/profile', {
+    // Every platform-owned key (and the legacy tax lists) answers 403 instead
+    // of a silent strip, naming the offending fields.
+    const forbiddenPayloads: Array<Record<string, unknown>> = [
+      { isFormalTaxpayer: true },
+      { taxes: [] },
+      { confirmedTaxes: ['IGTF'] },
+    ];
+    for (const payload of forbiddenPayloads) {
+      const key = Object.keys(payload)[0]!;
+      const res = await owner.client.patch('/api/organizations/profile', {
+        fiscalConfig: payload,
+      });
+      expect(res.status, `${key}: ${res.text}`).toBe(403);
+      expect(res.body).toMatchObject({
+        code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+        fields: [key],
+      });
+    }
+
+    // A `null` reset would also wipe the platform-governed regime.
+    const reset = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: null,
+    });
+    expect(reset.status, reset.text).toBe(403);
+    expect(reset.body).toMatchObject({
+      code: 'FISCAL_CONFIG_PLATFORM_ONLY',
+      fields: ['fiscalConfig'],
+    });
+
+    // No partial write: the tenant scalars sent alongside are not persisted.
+    const mixed = await owner.client.patch('/api/organizations/profile', {
+      legalName: 'No debe persistir C.A.',
       fiscalConfig: { isFormalTaxpayer: true },
     });
-    expect(missing.status, missing.text).toBe(400);
-    expect(missing.body).toMatchObject({
-      code: 'FORMAL_TAXPAYER_CONFIRMATION_REQUIRED',
-    });
+    expect(mixed.status, mixed.text).toBe(403);
 
-    const confirmed = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: { isFormalTaxpayer: true },
-      confirmed: true,
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT legal_name, tax_id, address, fiscal_config FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(rows[0]).toMatchObject({
+      legal_name: null,
+      tax_id: null,
+      address: null,
+      fiscal_config: null,
     });
-    expect(confirmed.status, confirmed.text).toBe(200);
-
-    // Already formal: a later PATCH without the flag does not require confirmation.
-    const noop = await owner.client.patch('/api/organizations/profile', {
-      address: 'Av. Principal',
-    });
-    expect(noop.status, noop.text).toBe(200);
   });
 
-  it('merge parcial + receipt refleja disclaimer y etiqueta forzada', async () => {
-    const { owner, organization } = await createGymTenant('fiscal-merge');
+  it('el tenant edita identidad y disclaimer; el régimen de Console sobrevive al merge', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-tenant-identity');
+    await declareFormalTaxpayer(organization.id);
 
-    const first = await owner.client.patch('/api/organizations/profile', {
+    const res = await owner.client.patch('/api/organizations/profile', {
+      legalName: 'Gym Legal C.A.',
       taxId: 'J-12345678-9',
-      fiscalConfig: {
-        isFormalTaxpayer: true,
-        disclaimerOverride: ['Aviso custom de la sede'],
-        taxes: [{ name: 'IVA', rate: 0.16, enabled: true }],
+      address: 'Av. 1',
+      fiscalConfig: { disclaimerOverride: ['Aviso de la sede'] },
+    });
+    expect(res.status, res.text).toBe(200);
+
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT legal_name, tax_id, address, fiscal_config FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(rows[0]).toMatchObject({
+      legal_name: 'Gym Legal C.A.',
+      tax_id: 'J-12345678-9',
+      address: 'Av. 1',
+    });
+    // Partial PATCH: the tenant-owned disclaimer is merged in, the
+    // platform-owned declaration is preserved (never blind replacement).
+    expect(rows[0]!['fiscal_config']).toEqual({
+      isFormalTaxpayer: true,
+      disclaimerOverride: ['Aviso de la sede'],
+    });
+  });
+
+  it('Console exige identidad fiscal completa para activar el régimen → 400 FISCAL_IDENTITY_INCOMPLETE', async () => {
+    const { organization } = await createGymTenant('fiscal-console-incomplete');
+    const admin = await registerPlatformUser('admin');
+
+    const res = await admin.client.patch(
+      `/api/platform/organizations/${organization.id}`,
+      {
+        legalName: 'Gym Incompleto C.A.',
+        fiscalConfig: { isFormalTaxpayer: true },
       },
-      confirmed: true,
+    );
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({
+      code: 'FISCAL_IDENTITY_INCOMPLETE',
+      fields: ['taxId', 'address'],
     });
-    expect(first.status, first.text).toBe(200);
 
-    // Partial PATCH of taxes[]: it must not erase the disclaimer nor the formal flag.
-    const second = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: { taxes: [{ name: 'IVA', rate: 0.1, enabled: true }] },
+    // Fail-closed: neither the regime nor the identity was persisted.
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT legal_name, tax_id, address, fiscal_config FROM organization WHERE id = $1`,
+      [organization.id],
+    );
+    expect(rows[0]).toMatchObject({
+      legal_name: null,
+      tax_id: null,
+      address: null,
+      fiscal_config: null,
     });
-    expect(second.status, second.text).toBe(200);
+  });
 
-    const { payment } = await createValidatedPayment(owner.client);
+  it('Console activa con identidad completa: el desglose sale de COUNTRIES', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-console-activate');
+    await declareFormalTaxpayer(organization.id);
+
+    const { payment } = await createValidatedPayment(owner.client, 10000);
+    const details = payment['tax_details'] as Array<{ name: string; amount: number }>;
+    // VE + USD: IVA 16% (country) + IGTF 3% (conditional, foreign currency).
+    expect(details.map((d) => d.name).sort()).toEqual(['IGTF', 'IVA']);
+
+    const subtotal = Number(payment['subtotal']);
+    const taxTotal = Number(payment['tax_total']);
+    const summedDetails = details.reduce((sum, d) => sum + d.amount, 0);
+    expect(taxTotal).toBe(summedDetails);
+    expect(subtotal + taxTotal).toBe(10000);
+  });
+
+  it('`hasFiscalHomologation` salió del contrato → 400 (tenant y Console)', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-homologation');
+
+    const tenant = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: { hasFiscalHomologation: true },
+    });
+    expect(tenant.status, tenant.text).toBe(400);
+
+    const admin = await registerPlatformUser('admin');
+    const platform = await admin.client.patch(
+      `/api/platform/organizations/${organization.id}`,
+      { fiscalConfig: { hasFiscalHomologation: true } },
+    );
+    expect(platform.status, platform.text).toBe(400);
+  });
+
+  it('el desglose enviado por el cliente se ignora: siempre se calcula en el servidor', async () => {
+    const { owner } = await createGymTenant('fiscal-manual-breakdown');
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
+
+    const res = await owner.client.post('/api/subscriptions', {
+      memberId: member.id,
+      planId: plan.id,
+      startDate: isoDate(0),
+      endDate: isoDate(30),
+      payment: {
+        amountPaid: 10000,
+        currencyPaid: 'USD',
+        paymentMethod: 'cash',
+        paymentMethodDetails: [],
+        status: 'validated',
+        paymentDate: isoDate(0),
+        // Legacy override fields: unknown to the write contract, never applied.
+        subtotal: 9900,
+        taxTotal: 100,
+        taxDetails: [{ name: 'IVA', rate: 0.16, amount: 100 }],
+        taxOverrideReason: 'ajuste autorizado',
+      },
+    });
+    expect(res.status, res.text).toBe(201);
+
+    const rows = await testQuery<Record<string, unknown>>(
+      `SELECT subtotal, tax_total, tax_details, tax_override_reason
+         FROM payment WHERE subscription_id = $1`,
+      [res.body.id],
+    );
+    // Not a formal taxpayer → the whole charge is the subtotal, no taxes.
+    expect(rows[0]).toMatchObject({
+      tax_details: [],
+      tax_override_reason: null,
+    });
+    expect(Number(rows[0]!['subtotal'])).toBe(10000);
+    expect(Number(rows[0]!['tax_total'])).toBe(0);
+  });
+
+  it('formal PE muestra IGV; US no trae impuestos', async () => {
+    async function taxedPayment(countryCode: string, amountPaid: number) {
+      const tag = countryCode.toLowerCase();
+      const user = await registerUser({ email: uniqueEmail(`fiscal-${tag}`) });
+      const organization = await createOrganization(user.client, {
+        countryCode,
+        slug: `gym-fiscal-${tag}-${uid()}`,
+      });
+      await setActiveOrganization(user.client, organization.id);
+      // The regime is declared from Console; the tenant cannot do it.
+      // The tax id uses a prefix of the org country (RD-148).
+      await declareFormalTaxpayer(organization.id, {}, countryCode);
+      const { payment } = await createValidatedPayment(user.client, amountPaid);
+      return payment;
+    }
+
+    const pe = await taxedPayment('PE', 11800);
+    const peDetails = pe['tax_details'] as Array<{ name: string; amount: number }>;
+    expect(peDetails.map((d) => d.name)).toEqual(['IGV']);
+    expect(Number(pe['subtotal'])).toBe(10000);
+    expect(Number(pe['tax_total'])).toBe(1800);
+
+    const us = await taxedPayment('US', 5000);
+    expect(us['tax_details']).toEqual([]);
+    expect(Number(us['subtotal'])).toBe(5000);
+    expect(Number(us['tax_total'])).toBe(0);
+  });
+
+  it('el comprobante refleja el disclaimer de la sede y la etiqueta forzada', async () => {
+    const { owner, organization } = await createGymTenant('fiscal-receipt');
+    await declareFormalTaxpayer(organization.id);
+
+    const custom = await owner.client.patch('/api/organizations/profile', {
+      fiscalConfig: { disclaimerOverride: ['Aviso custom de la sede'] },
+    });
+    expect(custom.status, custom.text).toBe(200);
+
+    const { payment } = await createValidatedPayment(owner.client, 11800);
     const paymentId = Number(payment['id']);
     const receiptNumber = payment['receipt_number'] as string;
-    expect(receiptNumber).toMatch(
-      new RegExp(`^\\d{4}-\\d{6}$`),
-    );
+    expect(receiptNumber).toMatch(new RegExp(`^\\d{4}-\\d{6}$`));
 
-    // Real step 2: the compose must reflect a custom disclaimer and the
+    // Real step 2: the compose must reflect the custom disclaimer and the
     // forced label ("Comprobante de pago" even with taxId + formal).
     const env = owner.client.env as Record<string, unknown>;
     const jobsEnv: ReceiptHandlerEnv = {
@@ -236,171 +447,16 @@ describe.skipIf(skipReason !== null)('Organizations fiscal profile', () => {
       'Aviso custom de la sede',
     );
 
-    const rows = await testQuery<Record<string, unknown>>(
+    const rows = await testQuery<{ fiscal_config: Record<string, unknown> }>(
       `SELECT fiscal_config FROM organization WHERE id = $1`,
       [organization.id],
     );
-    const fiscal = rows[0]!['fiscal_config'] as {
-      isFormalTaxpayer?: boolean;
-      disclaimerOverride?: string[];
-      taxes?: Array<{ name: string; rate: number }>;
-    };
-    expect(fiscal.isFormalTaxpayer).toBe(true);
-    expect(fiscal.disclaimerOverride).toEqual(['Aviso custom de la sede']);
-    expect(fiscal.taxes?.find((t) => t.name === 'IVA')?.rate).toBe(0.1);
-  });
-
-  it('override sin motivo → 400; descuadre → 400', async () => {
-    const { owner } = await createGymTenant('fiscal-override');
-    const member = await createGymMember(owner.client);
-    const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
-    const base = {
-      memberId: member.id,
-      planId: plan.id,
-      startDate: isoDate(0),
-      endDate: isoDate(30),
-    };
-
-    const noReason = await owner.client.post('/api/subscriptions', {
-      ...base,
-      payment: {
-        amountPaid: 10000,
-        currencyPaid: 'USD',
-        paymentMethod: 'cash',
-        paymentMethodDetails: [],
-        status: 'validated',
-        paymentDate: isoDate(0),
-        taxTotal: 100,
-        taxDetails: [{ name: 'IVA', rate: 0.16, amount: 100 }],
-      },
+    const fiscal = rows[0]!.fiscal_config;
+    expect(fiscal).toEqual({
+      isFormalTaxpayer: true,
+      disclaimerOverride: ['Aviso custom de la sede'],
     });
-    expect(noReason.status, noReason.text).toBe(400);
-    expect(noReason.body).toMatchObject({ code: 'TAX_OVERRIDE_REASON_REQUIRED' });
-
-    const mismatch = await owner.client.post('/api/subscriptions', {
-      ...base,
-      payment: {
-        amountPaid: 10000,
-        currencyPaid: 'USD',
-        paymentMethod: 'cash',
-        paymentMethodDetails: [],
-        status: 'validated',
-        paymentDate: isoDate(0),
-        taxTotal: 100,
-        taxDetails: [{ name: 'IVA', rate: 0.16, amount: 50 }],
-        taxOverrideReason: 'ajuste autorizado',
-      },
-    });
-    expect(mismatch.status, mismatch.text).toBe(400);
-    expect(mismatch.body).toMatchObject({ code: 'TAX_MISMATCH' });
-  });
-
-  it('PE formal muestra IGV; US no trae impuestos', async () => {
-    async function taxedPayment(countryCode: string, amountPaid: number) {
-      const tag = countryCode.toLowerCase();
-      const user = await registerUser({ email: uniqueEmail(`fiscal-${tag}`) });
-      const organization = await createOrganization(user.client, {
-        countryCode,
-        slug: `gym-fiscal-${tag}-${uid()}`,
-      });
-      await setActiveOrganization(user.client, organization.id);
-      // Without a formal-taxpayer declaration there is no breakdown.
-      const declared = await user.client.patch('/api/organizations/profile', {
-        fiscalConfig: { isFormalTaxpayer: true },
-        confirmed: true,
-      });
-      expect(declared.status, declared.text).toBe(200);
-      const { payment } = await createValidatedPayment(user.client, amountPaid);
-      return payment;
-    }
-
-    const pe = await taxedPayment('PE', 11800);
-    const peDetails = pe['tax_details'] as Array<{ name: string; amount: number }>;
-    expect(peDetails.map((d) => d.name)).toEqual(['IGV']);
-    expect(Number(pe['subtotal'])).toBe(10000);
-    expect(Number(pe['tax_total'])).toBe(1800);
-
-    const us = await taxedPayment('US', 5000);
-    expect(us['tax_details']).toEqual([]);
-    expect(Number(us['subtotal'])).toBe(5000);
-    expect(Number(us['tax_total'])).toBe(0);
-  });
-
-  /**
-   * Fail-closed invariant: the override can only REDUCE the tax
-   * burden. A non-taxpayer cannot enable taxes (neither via config nor via
-   * the payment's manual override) and a conditional requires confirmation.
-   */
-  it('activar impuestos sin declararse formal → 400 TAXES_REQUIRE_FORMAL_TAXPAYER', async () => {
-    const { owner, organization } = await createGymTenant('fiscal-gate');
-
-    const res = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: {
-        taxes: [{ name: 'IVA', rate: 0.16, enabled: true }],
-      },
-    });
-    expect(res.status, res.text).toBe(400);
-    expect(res.body).toMatchObject({ code: 'TAXES_REQUIRE_FORMAL_TAXPAYER' });
-
-    // The stored config did NOT change (fail-closed before persisting).
-    const rows = await testQuery<{ fiscal_config: unknown }>(
-      `SELECT fiscal_config FROM organization WHERE id = $1`,
-      [organization.id],
-    );
-    expect(rows[0]!.fiscal_config ?? null).toBeNull();
-  });
-
-  it('condicional activado sin confirmar → 400 TAX_REQUIRES_CONFIRMATION', async () => {
-    const { owner } = await createGymTenant('fiscal-conditional');
-
-    const declared = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: { isFormalTaxpayer: true },
-      confirmed: true,
-    });
-    expect(declared.status, declared.text).toBe(200);
-
-    const unconfirmed = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: { taxes: [{ name: 'IGTF', rate: 0.03, enabled: true }] },
-    });
-    expect(unconfirmed.status, unconfirmed.text).toBe(400);
-    expect(unconfirmed.body).toMatchObject({ code: 'TAX_REQUIRES_CONFIRMATION' });
-
-    const confirmed = await owner.client.patch('/api/organizations/profile', {
-      fiscalConfig: {
-        confirmedTaxes: ['IGTF'],
-        taxes: [
-          { name: 'IVA', rate: 0.16, enabled: true },
-          { name: 'IGTF', rate: 0.03, enabled: true },
-        ],
-      },
-    });
-    expect(confirmed.status, confirmed.text).toBe(200);
-  });
-
-  it('el override manual no puede inventar impuestos si no es formal', async () => {
-    const { owner } = await createGymTenant('fiscal-override-informal');
-    const member = await createGymMember(owner.client);
-    const plan = await createPlan(owner.client, { price: 10000, currency: 'USD' });
-
-    const res = await owner.client.post('/api/subscriptions', {
-      memberId: member.id,
-      planId: plan.id,
-      startDate: isoDate(0),
-      endDate: isoDate(30),
-      payment: {
-        amountPaid: 10000,
-        currencyPaid: 'USD',
-        paymentMethod: 'cash',
-        paymentMethodDetails: [],
-        status: 'validated',
-        paymentDate: isoDate(0),
-        subtotal: 9900,
-        taxTotal: 100,
-        taxDetails: [{ name: 'IVA', rate: 0.16, amount: 100 }],
-        taxOverrideReason: 'ajuste autorizado por gerencia',
-      },
-    });
-    expect(res.status, res.text).toBe(400);
-    expect(res.body).toMatchObject({ code: 'TAXES_REQUIRE_FORMAL_TAXPAYER' });
+    // COUNTRIES is the tax SSOT: no per-org tax list is ever stored.
+    expect(fiscal['taxes']).toBeUndefined();
   });
 });

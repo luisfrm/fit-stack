@@ -19,7 +19,12 @@ import { createPlatformSettingsRepository } from '../repositories/platform-setti
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
 import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
-import { paymentMethodDetailsSchema, paymentMethodSchema, FiscalConfigSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  FiscalConfigSchema,
+  documentIdTypeViolation,
+} from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import { DEFAULT_ORG_STAFF_VALUES, isOrgStorageKey } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
@@ -33,6 +38,9 @@ const createOrgSchema = z.object({
   // Timezone is REQUIRED from creation (no silent default).
   timezone: z.string().min(1, 'La zona horaria es requerida'),
   currencyFormat: z.enum(['latam', 'usa']).optional(),
+  // Editable primary currency (defaults to the country currency on creation).
+  // It must belong to the organization's `active_currencies` (service validates).
+  primaryCurrency: z.string().min(1).optional(),
   taxId: z.string().nullable().optional(),
   legalName: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
@@ -129,28 +137,38 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const slug = c.req.param('slug');
     const includeMemberCount = c.req.query('includeMemberCount') === 'true';
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+    const settingsRepo = createSettingsRepository(c.get('db'));
+    const service = createOrganizationsService(repo, settingsRepo);
 
     const org = await service.findOrganizationBySlug(slug, { includeMemberCount });
     if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
-    return c.json(org);
+    // Extensible settings (`active_currencies`, …) travel with the org so the
+    // console can edit the primary currency inside the active universe.
+    const settings = await settingsRepo.getAll(org.id);
+    return c.json({ ...org, settings });
   })
 
   // GET /api/platform/organizations/:id
   .get('/:id', requirePlatformAuth(), async (c) => {
     const id = c.req.param('id');
     const repo = createOrganizationsRepository(c.get('db'));
-    const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+    const settingsRepo = createSettingsRepository(c.get('db'));
+    const service = createOrganizationsService(repo, settingsRepo);
 
     const org = await service.findOrganizationById(id);
     if (!org) return c.json({ error: 'Organización no encontrada' }, 404);
-    return c.json(org);
+    const settings = await settingsRepo.getAll(org.id);
+    return c.json({ ...org, settings });
   })
 
   // POST /api/platform/organizations
   .post('/', requirePlatformAuth(), zValidator('json', createOrgSchema), async (c) => {
     const data = c.req.valid('json');
     const cache = createCache(c.env);
+
+    // RD-148: the tax id prefix must belong to the organization's country.
+    const violation = documentIdTypeViolation(data.taxId, data.countryCode, 'taxId');
+    if (violation) return c.json(violation, 400);
 
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
@@ -169,6 +187,22 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
 
+    // RD-148: the tax id prefix must belong to the organization's country.
+    // The org is read once: it supplies the stored country (when the payload
+    // does not restate it) and the persisted id, so a legacy row whose prefix
+    // predates the catalog stays editable.
+    if (data.taxId) {
+      const existing = await service.findOrganizationById(id);
+      const countryCode = data.countryCode ?? existing?.countryCode;
+      const violation = documentIdTypeViolation(
+        data.taxId,
+        countryCode,
+        'taxId',
+        existing?.taxId,
+      );
+      if (violation) return c.json(violation, 400);
+    }
+
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');
     await cache.invalidateExact(`org:${id}:profile`);
@@ -183,6 +217,22 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
     const repo = createOrganizationsRepository(c.get('db'));
     const service = createOrganizationsService(repo, createSettingsRepository(c.get('db')));
+
+    // RD-148: the tax id prefix must belong to the organization's country.
+    // The org is read once: it supplies the stored country (when the payload
+    // does not restate it) and the persisted id, so a legacy row whose prefix
+    // predates the catalog stays editable.
+    if (data.taxId) {
+      const existing = await service.findOrganizationById(id);
+      const countryCode = data.countryCode ?? existing?.countryCode;
+      const violation = documentIdTypeViolation(
+        data.taxId,
+        countryCode,
+        'taxId',
+        existing?.taxId,
+      );
+      if (violation) return c.json(violation, 400);
+    }
 
     const updatedOrg = await service.updateOrganization(id, data as any);
     await cache.invalidate('platform:organizations*');

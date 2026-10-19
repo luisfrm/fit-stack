@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient, type TestClient } from './client';
 import { setUserPlatformRole, testQuery } from './db';
-import { ORG_ROLES, addLocalDays, toLocalDayString } from '@workspace/shared';
+import { ORG_ROLES, addLocalDays, defaultTaxDocumentType, toLocalDayString } from '@workspace/shared';
 
 /** Short unique suffix so records never collide across runs. */
 export function uid(prefix = ''): string {
@@ -98,6 +98,43 @@ async function assertPlatformRole(client: TestClient, role: string): Promise<voi
         `got "${sessionRole ?? 'undefined'}" (status ${res.status}).`,
     );
   }
+}
+
+/**
+ * Declares the organization a FORMAL TAXPAYER through Console, the only writer
+ * of `fiscalConfig.isFormalTaxpayer` (the tenant route answers
+ * `403 FISCAL_CONFIG_PLATFORM_ONLY`). Activation requires a complete issuer
+ * identity, so the defaults fill all three fields; tests that need an
+ * incomplete identity send their own payload instead of using this helper.
+ *
+ * Returns the promoted platform admin so the caller can issue further console
+ * writes without registering another one.
+ */
+export async function declareFormalTaxpayer(
+  organizationId: string,
+  identity: Partial<Record<'legalName' | 'taxId' | 'address', string>> = {},
+  /** Organization country: the default tax id must use a prefix of it (RD-148). */
+  countryCode = 'VE',
+): Promise<AuthedUser> {
+  const admin = await registerPlatformUser('admin');
+  // The API rejects a document type from another country's catalog, so the
+  // default identifier is derived from the organization country.
+  const defaultTaxType = defaultTaxDocumentType(countryCode) || 'V';
+  const res = await admin.client.patch(
+    `/api/platform/organizations/${organizationId}`,
+    {
+      legalName: identity.legalName ?? 'Gym Formal C.A.',
+      taxId: identity.taxId ?? `${defaultTaxType}-12345678-9`,
+      address: identity.address ?? 'Av. Principal 123',
+      fiscalConfig: { isFormalTaxpayer: true },
+    },
+  );
+  if (res.status !== 200) {
+    throw new Error(
+      `declare formal taxpayer failed (${res.status}): ${res.text}`,
+    );
+  }
+  return admin;
 }
 
 export interface TestOrganization {

@@ -35,7 +35,7 @@
 - Mostrar la palabra "Factura" en un documento que no es una factura fiscal homologada.
 - Asumir por la Org que está o no registrada como contribuyente.
 - Ofrecer un modo "invoice" sin un mecanismo real de homologación fiscal detrás (numeración oficial, conexión con la autoridad tributaria).
-- Calcular o retener impuestos en nombre de la Org sin que ella lo haya configurado explícitamente.
+- Calcular o retener impuestos en nombre de la Org cuando no se ha registrado su condición de contribuyente formal (declarada por la Org y registrada desde Console).
 
 ## Texto sugerido para comunicar esto a los clientes (Orgs)
 
