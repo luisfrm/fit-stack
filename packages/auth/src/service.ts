@@ -1,4 +1,6 @@
+import { FetchError, ofetch } from "ofetch";
 import { authClient, type Session, type User, type SignInParams, type SignUpParams } from "./client";
+import { requireApiBaseUrl } from "./env";
 import { type PlatformRole, type IAuthError } from '@workspace/shared';
 
 export const sessionService = {
@@ -29,27 +31,40 @@ export const sessionService = {
   },
 
   async getServerSession(headers: Headers) {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001";
+    // Resolved OUTSIDE the `try`: a missing API base URL is a configuration
+    // error that must surface as itself, never be reported as a network error.
+    const apiBase = requireApiBaseUrl();
+
+    // Pass only essential auth headers (cookie & authorization)
+    // to prevent forwarding frontend Host header to backend API server
+    const cleanHeaders = new Headers();
+    const cookie = headers.get("cookie");
+    if (cookie) cleanHeaders.set("cookie", cookie);
+    const authorization = headers.get("authorization");
+    if (authorization) cleanHeaders.set("authorization", authorization);
 
     try {
-      const cleanHeaders = new Headers();
-      const cookie = headers.get("cookie");
-      if (cookie) cleanHeaders.set("cookie", cookie);
-      const authorization = headers.get("authorization");
-      if (authorization) cleanHeaders.set("authorization", authorization);
-
-      const response = await fetch(`${apiBase}/api/auth/get-session`, {
+      // `ofetch` (AGENTS.md §8) throws `FetchError` on non-2xx responses, so the
+      // HTTP status is read from the error instead of `response.ok`.
+      const data = await ofetch<unknown>(`${apiBase}/api/auth/get-session`, {
         headers: cleanHeaders,
-        cache: 'no-store',
+        cache: "no-store",
       });
-
-      if (!response.ok) {
-        return { data: null, error: { code: 'AUTH_API_ERROR', message: `Auth API error: ${response.statusText}`, status: response.status } };
-      }
-
-      const data = await response.json();
       return { data, error: null };
-    } catch {
+    } catch (error) {
+      if (error instanceof FetchError) {
+        const status = error.response?.status ?? error.statusCode ?? 0;
+        const statusText =
+          error.response?.statusText || error.statusText || String(status);
+        return {
+          data: null,
+          error: {
+            code: 'AUTH_API_ERROR',
+            message: `Auth API error: ${statusText}`,
+            status,
+          },
+        };
+      }
       return { data: null, error: { code: 'NETWORK_ERROR', message: "Error de red al obtener sesión" } };
     }
   },

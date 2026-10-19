@@ -14,10 +14,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "better-auth": "^1.5.5",
+    "ofetch": "^1.5.1",
     "react": "^19.0.0"
   },
   "devDependencies": {
@@ -27,6 +30,7 @@
     "@workspace/shared": "workspace:*",
     "eslint": "^9.39.2",
     "next": "16.1.6",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^3"
   }
 }

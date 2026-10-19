@@ -1,9 +1,12 @@
 import { createAuthClient } from 'better-auth/react';
 import { customSessionClient, organizationClient } from "better-auth/client/plugins";
 import { organizationAc, organizationRoles, IUser, ISession, IOrganization, IAuthMember } from '@workspace/shared';
+import { requireApiBaseUrl } from './env';
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL!,
+  // Required configuration: a missing base URL throws instead of falling back
+  // to an invented port (AGENTS.md §10).
+  baseURL: requireApiBaseUrl(),
   fetchOptions: {
     credentials: 'include',
   },
