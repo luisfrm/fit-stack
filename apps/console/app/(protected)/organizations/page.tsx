@@ -13,6 +13,10 @@ import { OrganizationsResults } from "@/components/organizations/organizations-r
 import { OrganizationsPagination } from "@/components/organizations/organizations-pagination";
 import { api } from "@/lib/api/client";
 import {
+  requirePlatformCurrency,
+  requirePlatformCurrencyFormat,
+} from "@/lib/config/platform-settings";
+import {
   selectOrgKpis,
   filterOrgsByCountry,
   filterOrgsBySubStatus,
@@ -72,6 +76,11 @@ export default async function OrganizationsPage({
   const settings = await api<Record<string, string>>("/platform/settings", {
     next: { revalidate: 600, tags: ["console:settings"] },
   });
+
+  // Fail fast, like `subscriptions` and `[slug]`: a missing setting is a
+  // visible error at page load, never an invented "USD"/"latam" (AGENTS.md §10).
+  requirePlatformCurrencyFormat(settings);
+  requirePlatformCurrency(settings);
 
   const filtered = filterOrgsBySubStatus(
     filterOrgsByCountry(dataset.data, country),
