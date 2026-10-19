@@ -63,7 +63,7 @@ Fit-Stack uses **Better Auth** for authentication.
   - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
   - `@workspace/auth/service` — `sessionService.getSession()` for server components
   - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)` and `canAccessCms()`
-  - `@workspace/auth/env` — `requireApiBaseUrl()`: missing `NEXT_PUBLIC_API_BASE_URL` throws visibly (no fallback, §10); `getServerSession` uses **ofetch** (never native `fetch`, §8) and maps `FetchError` → `AUTH_API_ERROR` (with HTTP status) / `NETWORK_ERROR`
+  - `@workspace/auth/env` — `requireApiBaseUrl()`: missing `NEXT_PUBLIC_API_BASE_URL` throws visibly (no runtime fallback, §10). **Build-time exception**: non-production builds (`NEXT_PHASE=phase-production-build`) warn and use a build-only placeholder (mirrors `envs.ts`) so `next build` can collect page data; production builds and runtime still throw. `getServerSession` uses **ofetch** (never native `fetch`, §8) and maps `FetchError` → `AUTH_API_ERROR` (with HTTP status) / `NETWORK_ERROR`
 - **`apps/panel/lib/auth-client.ts`** and **`apps/console/lib/auth-client.ts`** — re-export `@workspace/auth/client`
 - **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
 
