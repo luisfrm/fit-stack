@@ -4,6 +4,8 @@ import * as React from "react";
 import { KpiGroup } from "./kpi-group";
 import { CompactMoney } from "./compact-money";
 import { Text } from "@workspace/ui/components";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
 
 interface TodayIncome {
@@ -37,6 +39,11 @@ function getRelativeTime(dateStr: string): string {
 }
 
 export function DashboardStatsView({ stats, todayIncome, pendingPayments }: DashboardStatsViewProps) {
+  const { activeOrganization } = useAuth();
+  // Format comes from the session (NOT NULL column): while the session resolves
+  // the amount is not rendered, never formatted with an invented "latam".
+  const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);
+
   const items = React.useMemo(
     () => [
       {
@@ -53,11 +60,14 @@ export function DashboardStatsView({ stats, todayIncome, pendingPayments }: Dash
       },
       {
         label: "Ingresos del Día",
-        value: (
+        value: currencyFormat ? (
           <CompactMoney
             amount={todayIncome?.amount ?? null}
             currency={todayIncome?.currency}
+            format={currencyFormat}
           />
+        ) : (
+          <Text as="span" className="text-3xl">—</Text>
         ),
         icon: "wallet" as const,
         trend: todayIncome?.incomplete
@@ -86,7 +96,7 @@ export function DashboardStatsView({ stats, todayIncome, pendingPayments }: Dash
         accent: true,
       },
     ],
-    [stats, todayIncome, pendingPayments],
+    [stats, todayIncome, pendingPayments, currencyFormat],
   );
 
   return <KpiGroup items={items} />;

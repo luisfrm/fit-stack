@@ -9,6 +9,7 @@ import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { differenceInDays, parseISO } from "date-fns";
 
 interface MembersTableProps {
@@ -39,7 +40,7 @@ const getColumns = (
     onSuccess: () => void;
     trigger: React.ReactNode;
   }>,
-  currencyFormat: CurrencyFormat = "latam",
+  currencyFormat: CurrencyFormat,
   hideRoleColumn?: boolean,
   SubscriptionModal?: React.ComponentType<{
     initialMember: IMember;
@@ -234,10 +235,16 @@ export function MembersTable({
   emptyDescription
 }: MembersTableProps) {
   const { activeOrganization } = useAuth();
-  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
+  // Format comes from the session (NOT NULL column): until the session resolves
+  // there is no format, so the table stays in its loading state instead of
+  // rendering amounts with an invented "latam".
+  const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);
 
   const columns = React.useMemo(
-    () => getColumns(onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal),
+    () =>
+      currencyFormat
+        ? getColumns(onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal)
+        : [],
     [onDelete, onSuccess, EditModal, currencyFormat, hideRoleColumn, SubscriptionModal]
   );
 
@@ -245,7 +252,7 @@ export function MembersTable({
     <Table
       columns={columns}
       data={members}
-      loading={loading}
+      loading={loading || !currencyFormat}
       emptyState={
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <Text variant="muted" size="lg" weight="bold">

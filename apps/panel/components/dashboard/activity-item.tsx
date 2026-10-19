@@ -6,7 +6,8 @@ import { Text } from "@workspace/ui/components";
 import { NextImage } from "@workspace/ui/components/next/image";
 import { uploadService } from "@/lib/services/upload-service";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { formatCents, type CurrencyFormat } from "@workspace/shared";
+import { resolveOrgCurrencyFormat } from "@/lib/org-config";
+import { formatCents } from "@workspace/shared";
 
 interface ActivityItemProps {
   name: string;
@@ -20,7 +21,9 @@ interface ActivityItemProps {
 
 export function ActivityItem({ name, time, imageUrl, planName, amountPaid, currencyPaid, endDate }: Readonly<ActivityItemProps>) {
   const { activeOrganization } = useAuth();
-  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
+  // Both values come from the session (NOT NULL columns): no invented
+  // "America/Caracas" / "latam" / "USD" fallbacks (AGENTS.md §9/§10).
+  const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-foreground/5 transition-colors">
@@ -48,9 +51,9 @@ export function ActivityItem({ name, time, imageUrl, planName, amountPaid, curre
           </Text>
         )}
         <div className="flex items-center gap-2">
-          {amountPaid !== undefined && (
+          {amountPaid !== undefined && currencyPaid && currencyFormat && (
             <Text as="span" size="xs" variant="muted" className="tabular-nums">
-              {formatCents(amountPaid, currencyPaid || 'USD', currencyFormat)}
+              {formatCents(amountPaid, currencyPaid, currencyFormat)}
             </Text>
           )}
           {endDate && (

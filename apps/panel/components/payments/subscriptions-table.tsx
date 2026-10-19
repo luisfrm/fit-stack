@@ -22,6 +22,7 @@ import {
 import { ReceiptDialog } from "./receipt-dialog";
 import { formatCents, maskReference, type CurrencyFormat } from "@workspace/shared";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { NoData } from "../dashboard/no-data";
 
 const getPaymentStatusBadge = (status?: string, receiptNumber?: string | null) => {
@@ -105,23 +106,28 @@ const getColumns = (
     },
     {
       header: "Plan / Paquete",
-      cell: (sub) => (
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <Text as="span" size="sm" className="uppercase font-bold tracking-widest text-primary leading-tight">
-              {sub.planName}
-            </Text>
-            {getSubscriptionStatusBadge(sub.status)}
-          </div>
-          <div className="flex flex-col">
-            {sub.planSnapshotPrice !== undefined && (
-              <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
-                Precio base: {formatCents(sub.planSnapshotPrice, sub.planSnapshotCurrency ?? sub.currencyPaid ?? 'USD', currencyFormat)}
+      cell: (sub) => {
+        // Currency of the plan snapshot (fallback: the paid currency). No
+        // invented "USD": the line is hidden when neither is present.
+        const planPriceCurrency = sub.planSnapshotCurrency ?? sub.currencyPaid;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <Text as="span" size="sm" className="uppercase font-bold tracking-widest text-primary leading-tight">
+                {sub.planName}
               </Text>
-            )}
+              {getSubscriptionStatusBadge(sub.status)}
+            </div>
+            <div className="flex flex-col">
+              {sub.planSnapshotPrice !== undefined && planPriceCurrency && (
+                <Text as="span" size="xs" variant="muted" className="opacity-60 italic">
+                  Precio base: {formatCents(sub.planSnapshotPrice, planPriceCurrency, currencyFormat)}
+                </Text>
+              )}
+            </div>
           </div>
-        </div>
-      )
+        );
+      }
     },
     {
       header: "Vigencia",
@@ -144,8 +150,8 @@ const getColumns = (
       cell: (sub) => (
         <div className="flex flex-col gap-0.5">
             <Text weight="bold" size="sm" className="text-foreground tabular-nums">
-              {sub.amountPaid
-                ? formatCents(sub.amountPaid, sub.currencyPaid ?? "USD", currencyFormat)
+              {sub.amountPaid && sub.currencyPaid
+                ? formatCents(sub.amountPaid, sub.currencyPaid, currencyFormat)
                 : "---"
               }
           </Text>
@@ -303,13 +309,19 @@ export function SubscriptionsTable({
   onSuccess
 }: SubscriptionsTableProps) {
   const { activeOrganization } = useAuth();
-  const currencyFormat = (activeOrganization?.currencyFormat ?? "latam") as CurrencyFormat;
+  // Format comes from the session (NOT NULL column): no invented "latam", and
+  // the table waits for the session instead of rendering unformatted money.
+  const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);
 
-  const columns = React.useMemo(() => getColumns(
-    onStatusChange,
-    onPaymentStatusChange,
-    currencyFormat,
-    onSuccess
+  const columns = React.useMemo(() => (
+    currencyFormat
+      ? getColumns(
+        onStatusChange,
+        onPaymentStatusChange,
+        currencyFormat,
+        onSuccess
+      )
+      : []
   ), [onStatusChange, onPaymentStatusChange, currencyFormat, onSuccess]);
 
   return (
@@ -317,7 +329,7 @@ export function SubscriptionsTable({
       className="min-h-[600px]"
       columns={columns}
       data={subscriptions}
-      loading={loading}
+      loading={loading || !currencyFormat}
       pagination={pagination}
       emptyState={
         <NoData

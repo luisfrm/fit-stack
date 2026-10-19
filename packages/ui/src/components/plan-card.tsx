@@ -37,9 +37,11 @@ export function PlanCard({
   className,
   showMembersCount = false,
 }: PlanCardProps) {
+  // `currency` is required by `PlanCardProps`: never invent a "USD" fallback
+  // (AGENTS.md §10). An invalid/empty code surfaces as a visible error.
   const priceFormatted = new Intl.NumberFormat("es-VE", {
     style: "currency",
-    currency: plan.currency || "USD",
+    currency: plan.currency,
   }).format(plan.price / 100);
 
   const durationLabel = React.useMemo(() => {

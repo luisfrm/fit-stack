@@ -1,5 +1,6 @@
 import { financeService } from "@/lib/services/finance-service";
 import { sessionService } from "@/lib/services/session-service";
+import { requireOrgConfig } from "@/lib/org-config";
 import type {
   IReceiptsReportResult,
   ReceiptReportStatusFilter,
@@ -72,8 +73,7 @@ export default async function ReceiptsReportPage({
   const receiptsTag = `org:${activeOrgId}:reports:receipts`;
 
   // Moneda y formato: columnas obligatorias de la org (sin fallback de config).
-  const currencyFormat =
-    (session?.activeOrganization?.currencyFormat as "latam" | "usa" | undefined) ?? "latam";
+  const currencyFormat = requireOrgConfig(session?.activeOrganization).currencyFormat;
 
   const report = filtersError
     ? EMPTY_REPORT

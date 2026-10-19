@@ -17,6 +17,7 @@ import { useDebounce } from "@/lib/hooks/use-debounce";
 import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus, type CurrencyFormat } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
@@ -86,9 +87,10 @@ export function PaymentsClient({
   // No delete action: a payment record is voided or revoked, never deleted.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;
+  // Session value first; `initialCurrencyFormat` is the SSR value resolved from
+  // the same organization (no invented "latam").
   const currencyFormat =
-    ((activeOrganization?.currencyFormat as CurrencyFormat | undefined) ||
-      initialCurrencyFormat);
+    resolveOrgCurrencyFormat(activeOrganization) ?? initialCurrencyFormat;
 
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
   const [activeFilter, setActiveFilter] = React.useState<string | null>(initialStatus);

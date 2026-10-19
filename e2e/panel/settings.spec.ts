@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { navigateByClick } from '../helpers/nav';
 import { uid } from '../helpers/api';
-import { TEST_MEMBERS, TEST_PLAN } from '../helpers/test-tenant';
+import { TEST_MEMBERS, TEST_ORG, TEST_PLAN } from '../helpers/test-tenant';
 
 test.describe('Panel — Settings', () => {
   test('displays settings page (redirects to general)', async ({ page }) => {
@@ -80,6 +80,25 @@ test.describe('Panel — Settings', () => {
     await expect(reloaded.getByRole('checkbox')).toHaveCount(0);
     // Without real homologation, the applied label is still receipt.
     await expect(reloaded.getByText('Comprobante de pago').first()).toBeVisible();
+  });
+
+  /**
+   * RD-133 — the organization form renders the config stored on the org
+   * (`IOrganization`, NOT NULL columns), never an invented
+   * "America/Caracas"/"latam". The absence path (missing config → visible
+   * error, never a default) is covered by `tests/unit/org-config.test.ts`;
+   * here we assert the happy path against the seeded tenant.
+   */
+  test('la sede muestra la configuración real de la organización', async ({ page }) => {
+    await page.goto('/settings/organization', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.getByLabel('Eslogan / Lema')).toBeVisible({ timeout: 30_000 });
+    // No visible-config error for a healthy organization.
+    await expect(page.getByTestId('org-config-error')).toHaveCount(0);
+    // Values come from the organization row (country/timezone/format/currency).
+    await expect(page.getByText(`Venezuela (${TEST_ORG.timezone})`).first()).toBeVisible();
+    await expect(page.getByText('LATAM / EU (1.250,50)').first()).toBeVisible();
+    await expect(page.getByText(TEST_ORG.primaryCurrency).first()).toBeVisible();
   });
 
   test('guarda los datos generales de la sede (endpoint org-scoped)', async ({ page }) => {
