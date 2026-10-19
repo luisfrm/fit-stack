@@ -41,7 +41,7 @@ export const {
   organization,
 } = authClient;
 
-export interface User extends IUser { }
+export type User = IUser;
 export interface Session extends ISession {
   member?: IAuthMember | null;
   activeOrganization?: IOrganization | null;

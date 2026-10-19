@@ -3,6 +3,31 @@ import { authClient, type Session, type User, type SignInParams, type SignUpPara
 import { requireApiBaseUrl } from "./env";
 import { type PlatformRole, type IAuthError } from '@workspace/shared';
 
+/** Payload returned by Better Auth's email sign-in flow. */
+type SignInData = Awaited<ReturnType<typeof authClient.signIn.email>>["data"];
+/** Payload returned by Better Auth's email sign-up flow. */
+type SignUpData = Awaited<ReturnType<typeof authClient.signUp.email>>["data"];
+
+/**
+ * Normalizes a thrown value into the `IAuthError` contract (no `any`).
+ * Values that already carry a string `code` pass through; anything else
+ * becomes a generic auth error with a readable message.
+ */
+function toAuthError(error: unknown): IAuthError {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "string"
+  ) {
+    return error as IAuthError;
+  }
+  if (error instanceof Error) {
+    return { code: "AUTH_UNKNOWN_ERROR", message: error.message };
+  }
+  return { code: "AUTH_UNKNOWN_ERROR", message: String(error) };
+}
+
 export const sessionService = {
   async getSession(customHeaders?: Headers): Promise<{ data: Session | null; error: IAuthError | null }> {
     if (globalThis.window === undefined) {
@@ -20,9 +45,9 @@ export const sessionService = {
 
         const result = await authClient.getSession({ fetchOptions: { headers: cleanHeaders } });
         return { data: result?.data as Session | null, error: (result?.error as IAuthError) || null };
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error fetching session on server:", error);
-        return { data: null, error: error as IAuthError };
+        return { data: null, error: toAuthError(error) };
       }
     }
 
@@ -69,21 +94,21 @@ export const sessionService = {
     }
   },
 
-  async signIn(params: SignInParams): Promise<{ data: any; error: IAuthError | null }> {
+  async signIn(params: SignInParams): Promise<{ data: SignInData | null; error: IAuthError | null }> {
     try {
       const result = await authClient.signIn.email(params);
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
-  async signUp(params: SignUpParams): Promise<{ data: any; error: IAuthError | null }> {
+  async signUp(params: SignUpParams): Promise<{ data: SignUpData | null; error: IAuthError | null }> {
     try {
       const result = await authClient.signUp.email(params);
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
@@ -97,8 +122,8 @@ export const sessionService = {
         }
       });
       return { data: result?.data || true, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
@@ -108,8 +133,8 @@ export const sessionService = {
         organizationId: organizationId || null,
       });
       return { data: result?.data || null, error: (result?.error as IAuthError) || null };
-    } catch (err: any) {
-      return { data: null, error: err as IAuthError };
+    } catch (err: unknown) {
+      return { data: null, error: toAuthError(err) };
     }
   },
 
