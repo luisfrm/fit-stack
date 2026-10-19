@@ -39,7 +39,7 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `org:${orgId}:subscription`                | 1 min  | Org SaaS sub with plan details (self-service renewal)                                             |
 | `org:${orgId}:payment-methods`             | 1 h    | Platform payment methods exposed to the org (invalidated on-write in POST /api/platform/settings) |
 | `rates:${base}`                            | 1 hr   | Fresh server-side exchange rates (open.er-api.com, provider in `api-worker/src/lib/exchange-rates.ts`) |
-| `rates:last:${base}`                       | 30 d   | Last successful response per base currency; read ONLY when the provider fails (logged, never a silent `?? 1`) |
+| `rates:last:${base}`                       | 30 d   | Last successful response per base currency; read ONLY when the provider fails — the call then RESOLVES with that rate flagged `stale: true` (+ provider timestamp, warning logged), never a silent `?? 1`; with no last-known the provider throws `ExchangeRateUnavailableError` → **503 `EXCHANGE_RATE_UNAVAILABLE`** |
 | `org:${orgId}:features`                    | 5 min  | Resolved features + isFreeTier of the org                                                         |
 | `org:${orgId}:payments:analytics:${primaryCurrency}` | 5 min | Dashboard analytics; keyed by normalization target, invalidated on subscription/payment writes |
 | `org:${orgId}:reports:revenue:${primaryCurrency}:${months}m` | 1 hr | Monthly revenue reports normalized with persisted rates; keyed by normalization target |
@@ -57,6 +57,8 @@ The API uses **Upstash Redis** (`@upstash/redis` v1.37.0) for serverless-compati
 | `platform:gym-overview:{orgId}`            | 5 min  | Gym adoption + portal per org (no cross-invalidation from gym writes)                     |
 | `platform:receipts:*`                      | 5 min  | Audit of the `FS-N` sequence (Console); key by filters, invalidated on-write on any subscription/payment write (issuance/voiding) |
 | `platform:staff*`                          | 5 min  | Platform staff (SaaS admins: support/admin/owner)                                                 |
+
+> **Rates contract (RD-154)**: a stale-but-served rate (provider down, `rates:last` hit) is success by design and carries **no** error code — the UI flags it. **503 `EXCHANGE_RATE_UNAVAILABLE`** means *no rate at all*; a currency missing from the provider response is **400 `PAYMENT_CURRENCY_UNSUPPORTED`**. Both are mapped by class through `exchangeRateErrorResponse`, never by message text.
 
 ### Cache Invalidation Strategy
 

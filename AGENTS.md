@@ -87,7 +87,7 @@ Centralized middleware — never write auth/error boilerplate manually.
 | `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
 | `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |
 
-Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`); toasts resolve by **code**, never text.
+Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`, `400 DOCUMENT_TYPE_INVALID`, `409 SUBSCRIPTION_HAS_PAYMENTS`); toasts resolve by **code**, never text. Typed domain failures map through one mapper by **class**, never message (`exchangeRateErrorResponse` → `503 EXCHANGE_RATE_UNAVAILABLE`).
 
 ### 7. Error Handling & Mutations
 
