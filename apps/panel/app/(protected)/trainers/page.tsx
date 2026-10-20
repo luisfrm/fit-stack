@@ -1,6 +1,6 @@
 import { trainersService } from "@/lib/services/trainers-service";
 import { TrainersClient } from "./trainers-client";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { updateTag } from "next/cache";
 
 export const dynamic = "force-dynamic";
@@ -9,23 +9,25 @@ const PAGE_LIMIT = 10;
 
 export default async function TrainersPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{
     query?: string;
     page?: string;
     isVisible?: string;
   }>;
-}) {
+}>) {
   const params = await searchParams;
   const query = params.query || "";
   const page = Math.max(1, Number(params.page) || 1);
   const isVisibleParam = params.isVisible;
-  const initialVisibility: "all" | "visible" | "hidden" =
-    isVisibleParam === "true"
-      ? "visible"
-      : isVisibleParam === "false"
-        ? "hidden"
-        : "all";
+  let initialVisibility: "all" | "visible" | "hidden";
+  if (isVisibleParam === "true") {
+    initialVisibility = "visible";
+  } else if (isVisibleParam === "false") {
+    initialVisibility = "hidden";
+  } else {
+    initialVisibility = "all";
+  }
 
   const { data: session } = await sessionService.getSession();
   const activeOrgId = session?.session?.activeOrganizationId;
@@ -53,8 +55,6 @@ export default async function TrainersPage({
     updateTag(tag);
   };
 
-  void refreshTrainers;
-
   return (
     <TrainersClient
       initialTrainers={result.data}
@@ -64,6 +64,7 @@ export default async function TrainersPage({
       initialQuery={query}
       initialVisibility={initialVisibility}
       limit={PAGE_LIMIT}
+      onRefreshServer={refreshTrainers}
     />
   );
 }

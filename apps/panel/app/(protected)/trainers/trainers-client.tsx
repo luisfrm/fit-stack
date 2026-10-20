@@ -19,7 +19,7 @@ import { type ITrainer } from "@workspace/shared/types";
 import { uploadService } from "@/lib/services/upload-service";
 import { NoData } from "@/components/dashboard/no-data";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 
 interface TrainersClientProps {
@@ -30,6 +30,7 @@ interface TrainersClientProps {
   readonly initialQuery: string;
   readonly initialVisibility: "all" | "visible" | "hidden";
   readonly limit: number;
+  readonly onRefreshServer?: () => Promise<void>;
 }
 
 type VisibilityFilter = "all" | "visible" | "hidden";
@@ -42,6 +43,7 @@ export function TrainersClient({
   initialQuery,
   initialVisibility,
   limit,
+  onRefreshServer,
 }: TrainersClientProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState(initialQuery);
@@ -54,9 +56,12 @@ export function TrainersClient({
   const [visibility, setVisibility] = React.useState<VisibilityFilter>(initialVisibility);
   const [togglingId, setTogglingId] = React.useState<number | null>(null);
 
-  const refresh = React.useCallback(() => {
+  const refresh = React.useCallback(async () => {
+    if (onRefreshServer) {
+      await onRefreshServer();
+    }
     router.refresh();
-  }, [router]);
+  }, [router, onRefreshServer]);
 
   React.useEffect(() => {
     if (debouncedSearch === initialQuery) return;
@@ -94,7 +99,7 @@ export function TrainersClient({
     try {
       await trainersService.updateTrainer(trainer.id, { isVisible });
       toast.success(`Entrenador ${isVisible ? "visible" : "oculto"}`);
-      router.refresh();
+      await refresh();
     } catch (error) {
       console.error("Error updating trainer visibility:", error);
       toast.error("Error al actualizar visibilidad");
@@ -110,7 +115,7 @@ export function TrainersClient({
       toast.success("Entrenador eliminado");
       setIsDeleteModalOpen(false);
       setTrainerToDelete(undefined);
-      router.refresh();
+      await refresh();
     } catch (error) {
       console.error("Error deleting trainer:", error);
       toast.error("Error al eliminar entrenador");
