@@ -24,7 +24,7 @@ import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
 import { SimpleSelect } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
 import { type IPaymentMethodConfig, type IPaymentMethodField } from "@workspace/shared/types";

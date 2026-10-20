@@ -1,1 +1,0 @@
-export { sessionService } from '@workspace/auth/service';

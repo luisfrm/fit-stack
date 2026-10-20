@@ -8,8 +8,8 @@ import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast, Checkbox, Label, SplashScreen } from "@workspace/ui/components";
-import { useSession } from "@/lib/auth-client";
-import { sessionService } from "@/lib/services/session-service";
+import { useSession } from "@workspace/auth/client";
+import { sessionService } from "@workspace/auth/service";
 import { useRouter } from "next/navigation";
 
 /* ─────────────────────────────────────────────

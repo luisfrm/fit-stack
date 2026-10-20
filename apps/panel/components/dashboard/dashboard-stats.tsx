@@ -4,7 +4,7 @@ import * as React from "react";
 import { KpiGroup } from "./kpi-group";
 import { CompactMoney } from "./compact-money";
 import { Text } from "@workspace/ui/components";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
 

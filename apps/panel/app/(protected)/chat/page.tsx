@@ -1,5 +1,5 @@
 import { ChatView } from "@/components/chat/chat-view";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { getOrgFeatures, getAiUsage } from "@/lib/services/org-features";
 import { chatService } from "@/lib/services/chat-service";
 import { redirect } from "next/navigation";

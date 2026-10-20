@@ -7,7 +7,7 @@ import {
   formatPlatformRole,
   type PlatformRole,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";
 import { getStaffRoleCounts } from "@/lib/staff-role-counts";
 

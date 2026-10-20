@@ -9,7 +9,14 @@ import {
   ActionsDropdown
 } from "@workspace/ui/components";
 import { type ISubscription } from "@/types/dashboard";
-import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, getVoidKind } from "@workspace/shared";
+import {
+  PAYMENT_STATUSES,
+  SUBSCRIPTION_STATUSES,
+  getVoidKind,
+  formatCents,
+  maskReference,
+  type CurrencyFormat,
+} from "@workspace/shared";
 import {
   Ban,
   CheckCircle2,
@@ -20,8 +27,8 @@ import {
   Clock,
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
-import { formatCents, maskReference, type CurrencyFormat } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+
+import { useAuth } from "@workspace/auth/hooks";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { NoData } from "../dashboard/no-data";
 

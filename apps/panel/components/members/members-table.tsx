@@ -8,7 +8,7 @@ import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { differenceInDays, parseISO } from "date-fns";
 

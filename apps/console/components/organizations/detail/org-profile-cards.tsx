@@ -7,12 +7,11 @@ import {
   resolveFeatures,
   type FeatureCatalog,
   type PlanFeaturesV2,
-} from "@workspace/shared";
-import { SubscriptionStatusBadge } from "@/components/platform/subscription-status-badge";
-import {
   formatCents,
   type CurrencyFormat,
 } from "@workspace/shared";
+import { SubscriptionStatusBadge } from "@/components/platform/subscription-status-badge";
+
 import { selectPortalAdoption } from "@/lib/platform/organization-selectors";
 import {
   selectOrgBilledTotal,

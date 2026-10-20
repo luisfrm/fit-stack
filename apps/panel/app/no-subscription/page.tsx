@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import {
   PLATFORM_SUBSCRIPTION_STATUSES,
   hasAccess,

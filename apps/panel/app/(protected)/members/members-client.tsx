@@ -14,9 +14,9 @@ import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { mutationError } from "@/lib/errors";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
+import { mutationError } from "@workspace/shared";
+import { useAuth } from "@workspace/auth/hooks";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface MembersClientProps {

@@ -1,5 +1,6 @@
 import { ofetch } from "ofetch";
 import {
+  BASE_EXCHANGE_API_URL,
   createMemoryExchangeRatesStore,
   loadExchangeRates,
   type ExchangeRateSnapshot,
@@ -12,7 +13,6 @@ interface ExchangeRatesResponse {
   time_last_update_unix?: number;
 }
 
-const DEFAULT_URL = "https://open.er-api.com/v6/latest";
 const FRESH_TTL_SECONDS = 3600;
 // Last successful response is kept to survive provider outages. It is only
 // read on the failure path and is always flagged as stale.
@@ -39,7 +39,7 @@ export async function getExchangeRateSnapshot(
     ttlSeconds: FRESH_TTL_SECONDS,
     lastKnownTtlSeconds: LAST_KNOWN_TTL_SECONDS,
     fetchRates: async (base) => {
-      const url = `${process.env.NEXT_PUBLIC_EXCHANGE_URL ?? DEFAULT_URL}/${base}`;
+      const url = `${process.env.NEXT_PUBLIC_EXCHANGE_URL ?? BASE_EXCHANGE_API_URL}/${base}`;
       const data = await ofetch<ExchangeRatesResponse>(url, {
         next: { revalidate: FRESH_TTL_SECONDS },
       });

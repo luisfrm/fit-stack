@@ -15,11 +15,12 @@ import {
 } from "@workspace/ui/components";
 import { ReceiptDialog } from "@/components/payments/receipt-dialog";
 import { financeService } from "@/lib/services/finance-service";
-import { mutationError } from "@/lib/errors";
 import {
+  mutationError,
   formatCents,
   type CurrencyFormat,
 } from "@workspace/shared";
+
 import {
   type IReceiptReportRow,
   type IReceiptsReportResult,

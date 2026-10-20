@@ -16,14 +16,14 @@ import { Button } from "@workspace/ui/components/button";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { CountrySelector, toast, Title, SimpleSelect, DocumentIdField } from "@workspace/ui";
-import { useAuth, usePermissions } from "@/lib/hooks/use-auth";
+import { useAuth, usePermissions } from "@workspace/auth/hooks";
 import { uploadService } from "@/lib/services/upload-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
 import { requireOrgConfig } from "@/lib/org-config";
-import { mutationError } from "@/lib/errors";
-import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
-import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 import {
+  mutationError,
+  PERMISSION_MODULES,
+  PERMISSION_ACTIONS,
   defaultTaxDocumentType,
   FiscalConfigSchema,
   formatDocumentId,
@@ -32,6 +32,8 @@ import {
   resolveDocumentLabel,
   resolveFiscalProfile,
 } from "@workspace/shared";
+import { COUNTRY_LIST, COUNTRIES } from "@workspace/shared/constants";
+
 import { useRouter } from "next/navigation";
 
 /**

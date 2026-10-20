@@ -6,8 +6,12 @@ import { OrganizationForm } from "./organization-form";
 import type { OwnerData } from "./organization-form-types";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { uploadService } from "@/lib/services/upload-service";
-import { apiCode, mutationError } from "@/lib/errors";
-import { type IPlatformOrganization, DEFAULT_ORG_STAFF_VALUES } from "@workspace/shared";
+import {
+  apiCode,
+  mutationError,
+  type IPlatformOrganization,
+  DEFAULT_ORG_STAFF_VALUES,
+} from "@workspace/shared";
 
 interface OrganizationModalProps {
   readonly initialData?: IPlatformOrganization;

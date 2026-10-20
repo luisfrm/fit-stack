@@ -20,7 +20,7 @@ import {
   ORG_ROLES,
   parseDocumentId,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 
 interface TrainerFormProps {
   readonly initialData?: ITrainer;

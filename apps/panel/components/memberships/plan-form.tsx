@@ -11,7 +11,7 @@ import {
   Label,
 } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { centsToUnits, unitsToCents } from "@workspace/shared";
 import { Plus, Trash2, BadgeDollarSign, Loader2, Save, Send } from "lucide-react";
 

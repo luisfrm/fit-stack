@@ -10,9 +10,10 @@
 ```
 lib/
 ├── api/
-│   ├── client.ts          ← ofetch.create() context-aware
-│   ├── types.ts           ← ApiFetchOptions (extends FetchOptions + next)
-│   └── exchange-rates.ts  ← external fetch (no auth)
+│   ├── client.ts          ← instancia de createApiClient() (implementación: @workspace/auth/api-client)
+│   └── exchange-rates.ts  ← external fetch (no auth); transporte por app, caché y reglas en @workspace/shared
+├── config/
+│   └── envs.ts            ← solo NEXT_PUBLIC_R2_URL (no silent fallbacks)
 ├── services/              ← typed methods (reusable from RSC and client)
 │   ├── organizations-service.ts
 │   ├── platform-plans-service.ts
@@ -20,18 +21,22 @@ lib/
 │   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
 │   ├── currency-service.ts (legacy, use lib/api/exchange-rates in RSC)
 │   ├── init-service.ts
-│   ├── upload-service.ts
-│   └── session-service.ts (uses authClient, unchanged)
-└── hooks/                 ← vanilla hooks (no TanStack Query): use-auth, use-debounce,
-                             use-exchange-rates, use-organization-activation, use-theme
+│   └── upload-service.ts
+└── hooks/                 ← hooks propios de la app (no TanStack Query): use-settings (panel),
+                             use-exchange-rates, use-organization-activation
 ```
 
-### Context-aware behavior (`lib/api/client.ts`)
+> `session-service`, `auth-client`, `use-auth`, `use-theme` y `use-debounce` **no tienen copia local**:
+> se importan de `@workspace/auth/service`, `@workspace/auth/client`, `@workspace/auth/hooks` y `@workspace/ui/hooks/*`.
+> Helpers puros (formato de hora, `cleanNumericInput`, errores de mutación, `buildMediaUrl`)
+> viven en `@workspace/shared`. `<OrgContextGuard>` vive en `@workspace/ui` y se monta una vez en `Providers`.
 
-| Context              | Cookie handling                                                            | Interceptors                                                             |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op)                                             |
-| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
+### Context-aware behavior (`lib/api/client.ts` → `@workspace/auth/api-client`)
+
+| Context              | Cookie handling                                                            | Interceptors                                                                 |
+| -------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | Never redirects                                                              |
+| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → emite `ORG_CONTEXT_LOST_EVENT`; `<OrgContextGuard>` hace `router.replace('/reset-org-context')` (un hook no puede vivir en el interceptor) |
 
 ### Service usage pattern
 

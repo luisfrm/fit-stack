@@ -11,10 +11,10 @@ import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast } from "@workspace/ui/components";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { capitalize } from "@/lib/helper";
 import { membersService } from "@/lib/services/members-service";
-import { useSession } from "@/lib/auth-client";
+import { useSession } from "@workspace/auth/client";
 
 function RegisterForm() {
   const { data: session, isPending: sessionPending } = useSession();

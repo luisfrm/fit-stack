@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AppSidebar, MobileNav } from "@/components/dashboard/sidebar";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";
 import { PLATFORM_SUBSCRIPTION_STATUSES, hasAccess, PERMISSION_MODULES, PERMISSION_ACTIONS, type OrgRole } from "@workspace/shared";

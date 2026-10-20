@@ -1,8 +1,8 @@
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { useSettings } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import React from "react";
 
 /**

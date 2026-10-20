@@ -23,13 +23,19 @@ import { ExtendSubscriptionModal } from "./extend-subscription-modal";
 import { DeleteSubscriptionModal } from "./delete-subscription-modal";
 import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
-import { formatCents, PAYMENT_STATUSES } from "@workspace/shared";
+import {
+  formatCents,
+  PAYMENT_STATUSES,
+  apiCode,
+  mutationError,
+  type CurrencyFormat,
+} from "@workspace/shared";
 import {
   canManageBilling,
   hasActiveSubscription,
 } from "@/lib/platform-permissions";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { apiCode, mutationError } from "@/lib/errors";
+import { useAuth } from "@workspace/auth/hooks";
+
 import {
   Trash2,
   Calendar,
@@ -39,7 +45,6 @@ import {
   CreditCard,
   History,
 } from "lucide-react";
-import { type CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionsTableProps {
   subscriptions: SubscriptionWithDetails[];

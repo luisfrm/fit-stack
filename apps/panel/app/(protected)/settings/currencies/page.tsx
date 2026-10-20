@@ -12,7 +12,7 @@ import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { ActiveCurrenciesField } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { Title, toast } from "@workspace/ui";
 import { COUNTRY_INDEX } from "@workspace/shared";
 

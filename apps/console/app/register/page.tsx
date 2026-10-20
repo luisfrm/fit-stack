@@ -11,9 +11,9 @@ import { Title } from "@workspace/ui/components/title";
 import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { toast } from "@workspace/ui/components";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { staffService } from "@/lib/services/staff-service";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@workspace/auth/client";
 
 /**
  * Forces a fresh session fetch (bypasses the 5-min cookieCache) so the

@@ -33,11 +33,11 @@ import {
   Badge,
 } from "@workspace/ui/components";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { usePermissions } from "@workspace/auth/hooks";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
 import SignOutButton from "../SignOutButton";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@workspace/auth/client";
 import { OrganizationPicker } from "./organization-picker";
 import { useOrgFeatures } from "./org-features-provider";
 import { filterNavItemsByFeatures } from "@/lib/features/nav-filter";

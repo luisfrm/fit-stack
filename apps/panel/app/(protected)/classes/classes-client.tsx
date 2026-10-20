@@ -11,8 +11,8 @@ import { ClassesSummaryStrip } from "@/components/classes/classes-summary-strip"
 import type { WeekCalendarDay, WeekOccurrence } from "@/lib/classes/week-calendar";
 import { classesService } from "@/lib/services/classes-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { mutationError } from "@/lib/errors";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
+import { mutationError } from "@workspace/shared";
 import { toast } from "@workspace/ui/components";
 
 interface ClassesClientProps {

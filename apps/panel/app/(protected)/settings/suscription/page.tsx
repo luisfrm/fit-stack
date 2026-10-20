@@ -1,7 +1,7 @@
 import { Text, Badge, Button } from "@workspace/ui/components";
 import { Title } from "@workspace/ui";
 import { Gift, Sparkles, Users, Zap, ShieldCheck, Info } from "lucide-react";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { getOrgFeatures, getOrgSeats, getAiUsage } from "@/lib/services/org-features";
 import { getOrgSubscriptionStatus } from "@/lib/services/subscription-status";
 import { getOrgSubscription, getOrgPaymentMethods } from "@/lib/services/org-billing";

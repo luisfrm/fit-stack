@@ -224,3 +224,56 @@ export function getTimezoneOffset(tz?: string | null, date: Date = new Date()): 
 
 // (`daysBetween` was removed: it used the DST-sensitive approximation Math.floor(ms/86_400_000).
 //  For tz-aware remaining days, use localDayRange/toLocalDayString.)
+
+// ── Wall-clock time formatting ──────────────────────────────────────────────
+
+/**
+ * Display format for an organization's wall-clock times.
+ * `12h` renders as "8:30 AM"; `24h` renders as "08:30".
+ */
+export type TimeFormat = '12h' | '24h';
+
+/** Default display format when the organization has no explicit preference. */
+export const DEFAULT_TIME_FORMAT: TimeFormat = '12h';
+
+/**
+ * Formats a stored `HH:MM` string for display.
+ *
+ * Stored values are ALWAYS 24-h (`00:00`–`23:59`); this helper only handles
+ * the presentation layer and is timezone-agnostic: it never shifts the value.
+ *
+ * @param time   Stored value, e.g. "08:30" or "22:00".
+ * @param format `12h` (default) or `24h`.
+ * @returns Formatted string, e.g. "8:30 AM" or "08:30".
+ */
+export function formatTime(
+  time: string,
+  format: TimeFormat = DEFAULT_TIME_FORMAT,
+): string {
+  const [hStr, mStr] = time.split(':');
+  const h = Number.parseInt(hStr ?? '0', 10);
+  const m = Number.parseInt(mStr ?? '0', 10);
+  const mm = String(m).padStart(2, '0');
+
+  if (format === '24h') {
+    return `${String(h).padStart(2, '0')}:${mm}`;
+  }
+
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${mm} ${period}`;
+}
+
+/**
+ * Formats a time range from two `HH:MM` strings.
+ * e.g. "8:30 AM – 9:30 AM" or "08:30 – 09:30".
+ */
+export function formatTimeRange(
+  startTime: string,
+  endTime?: string | null,
+  format: TimeFormat = DEFAULT_TIME_FORMAT,
+): string {
+  const start = formatTime(startTime, format);
+  if (!endTime) return start;
+  return `${start} – ${formatTime(endTime, format)}`;
+}

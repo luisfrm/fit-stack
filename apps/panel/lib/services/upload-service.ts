@@ -1,4 +1,4 @@
-import { isPublicStorageKey } from "@workspace/shared";
+import { buildMediaUrl } from "@workspace/shared";
 import { api, type ApiFetchOptions } from "@/lib/api/client";
 import { env } from "@/lib/config/envs";
 
@@ -70,19 +70,10 @@ export const uploadService = {
    * Public by design (`<orgId>/cms/…`, branding): direct R2 URL.
    * Private (avatars, logos, payment evidence): authenticated panel proxy
    * (`/api/media`), which forwards cookie to API — never a guessable URL.
+   *
+   * Policy lives in `@workspace/shared` so both apps resolve assets the same.
    */
   getMediaUrl(key: string | null | undefined): string {
-    if (!key) return "";
-    if (key.startsWith("http")) return key;
-
-    const cleanKey = key.startsWith("/") ? key.slice(1) : key;
-
-    if (isPublicStorageKey(cleanKey)) {
-      const baseUrl = env.r2Url;
-      const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
-      return `${cleanBaseUrl}/${cleanKey}`;
-    }
-
-    return `/api/media?key=${encodeURIComponent(cleanKey)}`;
+    return buildMediaUrl(key, env.r2Url);
   },
 };

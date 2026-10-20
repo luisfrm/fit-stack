@@ -8,9 +8,10 @@ import {
   platformRoles,
   PLATFORM_ROLE_LABELS,
   type PlatformRole,
+  mutationError,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { mutationError } from "@/lib/errors";
+import { useAuth } from "@workspace/auth/hooks";
+
 import {
   staffService,
   type PlatformStaffMember,

@@ -5,7 +5,7 @@ import { Table, ColumnDef, Badge, Button, Text } from "@workspace/ui/components"
 import { type IGymClass } from "@/types/dashboard";
 import { Edit2, Trash2, Eye, EyeOff, Calendar } from "lucide-react";
 import { ClassModal } from "./class-modal";
-import { formatTimeRange } from "@/lib/config/display";
+import { formatTimeRange } from "@workspace/shared";
 
 interface ClassesTableProps {
   readonly classes: IGymClass[];

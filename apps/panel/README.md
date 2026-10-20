@@ -75,12 +75,12 @@ apps/panel/
 │   ├── staff/
 │   └── trainers/
 └── lib/
-    ├── auth-client.ts             # Re-export de @workspace/auth/client
     ├── auth-utils.ts              # Cookie helpers
-    ├── hooks/                     # use-auth, use-settings, use-theme, use-debounce
-    ├── services/                  # members, plans, payments, sessions, settings...
-    ├── api/                       # ofetch client + exchange-rates helper
-    └── config/                    # envs, constants, display config
+    ├── org-config.ts              # requireOrgConfig / resolveOrgCurrencyFormat (sin fallbacks)
+    ├── hooks/                     # Propios de la app: use-settings, use-organization-activation
+    ├── services/                  # members, plans, payments, settings, upload...
+    ├── api/                       # instancia de createApiClient (@workspace/auth/api-client) + exchange-rates
+    └── config/                    # envs (solo NEXT_PUBLIC_R2_URL)
 ```
 
 ## Flujos Clave

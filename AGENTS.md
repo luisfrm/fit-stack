@@ -10,7 +10,7 @@ pnpm build        # Build all apps
 pnpm dev          # Run all dev servers
 pnpm lint         # Lint all apps
 pnpm typecheck    # Type-check all apps
-pnpm test         # Full test suite (shared → auth → api-worker → jobs-worker → panel → console, Vitest)
+pnpm test         # Full test suite (shared → auth → ui → api-worker → jobs-worker → panel → console, Vitest)
 pnpm test:e2e     # E2E tests (Playwright, launches dev servers automatically)
 pnpm seed:e2e     # Demo seed: fills Fit Stack/fit-stack (keeps data, NOT a test)
 pnpm format       # Format code (Prettier)
@@ -34,7 +34,7 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 ## Monorepo Structure
 
 - **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
-- **Packages**: `auth`, `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
+- **Packages**: `auth` (sessions + shared HTTP client), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
 - **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`). Backlog/pending work lives in Linear (project «Fit Stack»).
 
 ## Project Context (Business Overview)
@@ -95,7 +95,7 @@ No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
-**Native `fetch` is PROHIBITED**; use **ofetch** — Fit-Stack API always via each app's context-aware client (`apps/{console,panel}/lib/api/client.ts`: baseURL, cookie forwarding on server, `credentials:"include"`, intercepts `ORGANIZATION_NOT_FOUND`); external APIs via `ofetch` directly; `next/headers` only to read context. Env: `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_R2_URL` required; `NEXT_PUBLIC_EXCHANGE_URL` optional.
+**Native `fetch` is PROHIBITED**; use **ofetch** — Fit-Stack API always via each app's context-aware client (`apps/{console,panel}/lib/api/client.ts`, a thin instance of `createApiClient` from `@workspace/auth/api-client`: baseURL, cookie forwarding on server, `credentials:"include"`, `ORGANIZATION_NOT_FOUND` → `ORG_CONTEXT_LOST_EVENT` handled by `<OrgContextGuard>` (`@workspace/ui`) with `router.replace`); external APIs via `ofetch` directly; `next/headers` only to read context. Env: `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_R2_URL` required; `NEXT_PUBLIC_EXCHANGE_URL` optional.
 
 ### 9. Date & Timezone Handling
 

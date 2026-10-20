@@ -1,10 +1,10 @@
 import { ofetch } from "ofetch";
 import {
+  BASE_EXCHANGE_API_URL,
   createMemoryExchangeRatesStore,
   loadExchangeRates,
   type ExchangeRateSnapshot,
 } from "@workspace/shared";
-import { BASE_EXCHANGE_API_URL } from "@/lib/config/constants";
 
 interface ExchangeRatesResponse {
   result: string;

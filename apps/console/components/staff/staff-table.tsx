@@ -16,7 +16,7 @@ import {
   formatPlatformRole,
   type PlatformRole,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { paginate } from "@/lib/paginate";
 import { staffService } from "@/lib/services/staff-service";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";

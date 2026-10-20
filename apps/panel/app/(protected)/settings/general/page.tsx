@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useSettings } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { OrganizationSettingsForm } from "@/components/dashboard/organization-settings-form";
 
 export default function GeneralSettingsPage() {

@@ -1,5 +1,5 @@
 import { financeService } from "@/lib/services/finance-service";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { requireOrgConfig } from "@/lib/org-config";
 import type {
   IReceiptsReportResult,

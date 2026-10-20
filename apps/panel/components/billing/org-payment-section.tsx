@@ -11,8 +11,8 @@ import {
   CurrencySelector,
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
-import { sortPaymentMethodFields } from "@workspace/shared";
 import {
+  sortPaymentMethodFields,
   ValueConverter,
   formatCents,
   formatShortDate,
@@ -21,6 +21,7 @@ import {
   type ExchangeRateLoadStatus,
   type PaymentConversionView,
 } from "@workspace/shared";
+
 import type { IPaymentMethodConfig } from "@workspace/shared/types";
 import { cn } from "@workspace/ui/lib/utils";
 

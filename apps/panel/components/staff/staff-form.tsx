@@ -19,7 +19,7 @@ import {
   parseDocumentId,
   type OrgRole,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";

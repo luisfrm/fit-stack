@@ -1,6 +1,6 @@
 "use client";
 
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
 import React from "react";
 
 export function ThemeInjector() {

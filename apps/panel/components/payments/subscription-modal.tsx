@@ -6,7 +6,7 @@ import { SubscriptionForm } from "./subscription-form";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { MemberForm } from "../members/member-form";
 import { membersService } from "@/lib/services/members-service";
-import { apiCode, mutationError } from "@/lib/errors";
+import { apiCode, mutationError } from "@workspace/shared";
 import { IMember } from "@/types/dashboard";
 
 interface SubscriptionModalProps {

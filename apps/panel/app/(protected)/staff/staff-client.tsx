@@ -10,7 +10,7 @@ import { StaffModal } from "@/components/staff/staff-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 
 interface StaffClientProps {
   readonly initialStaff: IMember[];

@@ -65,6 +65,27 @@ panel types forms with them): ContentBlockType, BLOCK_SCHEMAS (hero/services/cla
 testimonials/gallery/contact/team) + validateBlockData(), IContentPage, IContentBlock
 (discriminated by blockType → block-typed data), IContentPageWithBlocks.
 Requires `zod` as a dependency of @workspace/shared.
+
+// errors.ts (RD-127 — frontend error helpers shared by panel and console)
+formatApiErrorMessage(data) → string | null   // Zod/API issues → readable Spanish
+mutationError(scope, err, fallback)           // logs the error, returns the generic toast text
+apiCode(err) → string | undefined             // business code (toasts compare CODE, never text)
+
+// forms.ts
+cleanNumericInput(currentValue, newValue)
+
+// date.ts
+formatTime(time, format?) / formatTimeRange(start, end?, format?) / TimeFormat / DEFAULT_TIME_FORMAT
+// (wall-clock display only; the value is never shifted by a timezone)
+
+// storage.ts
+buildMediaUrl(key, r2PublicUrl)   // public → R2 URL; private → authenticated `/api/media`
+
+// exchange-rates.ts
+BASE_EXCHANGE_API_URL, EUR_EXCHANGE_URL, USD_EXCHANGE_URL, EUR/USD_EXCHANGE_URL_V4
+
+// constants.ts
+ORG_CONTEXT_LOST_EVENT   // browser event emitted by the API client when the active org is gone
 ```
 
 ---
@@ -91,9 +112,16 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 
 // permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
 
-// env.ts — requireApiBaseUrl(): missing NEXT_PUBLIC_API_BASE_URL throws visibly at runtime (no fallback);
-// non-production builds warn + build-only placeholder (mirrors envs.ts), production builds throw
+// env.ts — requireEnvValue(name, rawValue, { buildTimeValue, message? }): single required-env
+// resolver (missing value throws visibly; non-production builds warn + build-only placeholder);
+// requireApiBaseUrl() builds on it. Each app keeps the literal process.env.NEXT_PUBLIC_* read.
 // getServerSession uses ofetch (never native fetch) and maps FetchError → AUTH_API_ERROR/NETWORK_ERROR
+
+// api-client.ts (entry: @workspace/auth/api-client) — HTTP client shared by panel and console
+createApiClient({ basePath?, onOrganizationNotFound?, retry?, timeout? })
+  → { api, apiBlob }  // cookies on the server (next/headers), credentials in the browser,
+                       // ORGANIZATION_NOT_FOUND → onOrganizationNotFound(), Zod/API errors formatted
+ApiFetchOptions<R>, NextFetchConfig
 ```
 
 ---

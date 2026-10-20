@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, useSession } from "@workspace/auth/client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@workspace/ui/components/card";
 import { Text } from "@workspace/ui/components/text";

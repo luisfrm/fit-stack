@@ -8,7 +8,7 @@ import {
   Logotipo,
 } from "@workspace/ui/components";
 import { formatPlatformRole } from "@workspace/shared";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
 import { SidebarNav } from "@/app/(protected)/sidebar-nav";
 import SignOutButton from "@/components/sign-out-button";
 import type { SidebarUser, SidebarBranding } from "@workspace/ui/components";

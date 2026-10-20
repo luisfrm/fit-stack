@@ -5,7 +5,7 @@ import { User, CalendarClock } from "lucide-react";
 import { Text } from "@workspace/ui/components";
 import { NextImage } from "@workspace/ui/components/next/image";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { formatCents } from "@workspace/shared";
 

@@ -9,16 +9,16 @@ import { Button } from "@workspace/ui/components/button";
 import { CountrySelector } from "@workspace/ui/components/country-selector";
 import { DocumentIdField } from "@workspace/ui/components/document-id-field";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
-import { mutationError } from "@/lib/errors";
-import { api } from "@/lib/api/client";
-import { Title, toast } from "@workspace/ui";
-import { COUNTRY_LIST } from "@workspace/shared/constants";
 import {
+  mutationError,
   defaultTaxDocumentType,
   formatDocumentId,
   getCountryIdentity,
   parseDocumentId,
 } from "@workspace/shared";
+import { api } from "@/lib/api/client";
+import { Title, toast } from "@workspace/ui";
+import { COUNTRY_LIST } from "@workspace/shared/constants";
 
 interface PlatformEmitterSettingsProps {
   readonly initialSettings: Record<string, string>;

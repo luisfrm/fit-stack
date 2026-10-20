@@ -63,9 +63,9 @@ Fit-Stack uses **Better Auth** for authentication.
   - `@workspace/auth/client` — raw `authClient`, `useSession`, `organization`
   - `@workspace/auth/service` — `sessionService.getSession()` for server components
   - `@workspace/auth/hooks` — `useAuth()` with role flags + `usePermissions()` with `can(module, action)` and `canAccessCms()`
-  - `@workspace/auth/env` — `requireApiBaseUrl()`: missing `NEXT_PUBLIC_API_BASE_URL` throws visibly (no runtime fallback, §10). **Build-time exception**: non-production builds (`NEXT_PHASE=phase-production-build`) warn and use a build-only placeholder (mirrors `envs.ts`) so `next build` can collect page data; production builds and runtime still throw. `getServerSession` uses **ofetch** (never native `fetch`, §8) and maps `FetchError` → `AUTH_API_ERROR` (with HTTP status) / `NETWORK_ERROR`
-- **`apps/panel/lib/auth-client.ts`** and **`apps/console/lib/auth-client.ts`** — re-export `@workspace/auth/client`
-- **`apps/panel/lib/hooks/use-auth.ts`** — re-exports `useAuth` and `usePermissions` from `@workspace/auth/hooks`
+  - `@workspace/auth/env` — `requireEnvValue(name, rawValue, { buildTimeValue, message? })` is the single required-env resolver: a missing value throws visibly (no runtime fallback, §10); non-production builds (`NEXT_PHASE=phase-production-build`) warn and use a build-only placeholder so `next build` can collect page data; production builds and runtime still throw. `requireApiBaseUrl()` builds on it. Each app keeps its own literal `process.env.NEXT_PUBLIC_*` read (Next only inlines verbatim references) and passes the value in. `getServerSession` uses **ofetch** (never native `fetch`, §8) and maps `FetchError` → `AUTH_API_ERROR` (with HTTP status) / `NETWORK_ERROR`
+  - `@workspace/auth/api-client` — `createApiClient()` is the shared HTTP client (see §8)
+- **No local re-exports**: import `useAuth`/`usePermissions` from `@workspace/auth/hooks`, `sessionService` from `@workspace/auth/service` and `authClient` from `@workspace/auth/client`. The former `apps/*/lib/auth-client.ts` and `apps/*/lib/hooks/use-auth.ts` shims were removed.
 
 **Conventions:**
 
@@ -102,7 +102,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 ### 7. Error Handling & Mutations
 
 - **User Feedback**: No silent `console.log()` errors in production. All mutations MUST use `try/catch` with `toast.success`/`toast.error` from explicit server responses.
-- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `mutationError(scope, err, "<generic action message>")` (helper in `apps/{panel,console}/lib/errors.ts` — logs the raw error with `console.error` and returns the fallback) + `toast.error(...)`, e.g. "Could not save the plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
+- **Toasts and API errors (rule)**: toasts NEVER show raw API messages (`err?.data?.error`, `error.message`, server string matching). Mandatory pattern: `mutationError(scope, err, "<generic action message>")` (helper in `@workspace/shared` — logs the raw error with `console.error` and returns the fallback) + `toast.error(...)`, e.g. "Could not save the plan". Exceptions with UX meaning (e.g. AI quota exhausted) are handled by mapping the **error code** (`err.data?.code`), never by text.
 - **Implementation Plans**: a plan is a **Linear issue**, written in **English** (see [Task Tracking (Linear)](#task-tracking-linear)); the chat response about it is in **Spanish**. Always ask for explicit approval before implementing.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
@@ -110,14 +110,14 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 **Native `fetch` is PROHIBITED.** All HTTP requests use **ofetch**:
 
 - **Fit-Stack API (api-worker)** → ALWAYS through each app's context-aware client:
-  - Console: `apps/console/lib/api/client.ts` (export `api`)
-  - Panel: `apps/panel/lib/api/client.ts` (exports `api` and `apiBlob`)
-  - The client adds `baseURL` (`${apiBaseUrl}/api`), **forwards cookies on server** (RSC), `credentials: "include"` on client, `retry`/`timeout`, and intercepts `ORGANIZATION_NOT_FOUND`.
+  - Console: `apps/console/lib/api/client.ts`; Panel: `apps/panel/lib/api/client.ts`. Both export `api` and `apiBlob`.
+  - It is a thin instance of `createApiClient` (`@workspace/auth/api-client`), which adds `baseURL` (`${requireApiBaseUrl()}/api`), **forwards cookies on server** (RSC), sends `credentials: "include"` on client, applies `retry`/`timeout`, formats Zod/API errors and, on `ORGANIZATION_NOT_FOUND`, emits `ORG_CONTEXT_LOST_EVENT`; `<OrgContextGuard>` (`@workspace/ui`) navigates with `router.replace`.
+  - `apiBlob` shares the same interceptors, including the org-lost event (it decodes a JSON error body delivered as a Blob).
   - Server actions that invalidate cache (`updateTag`) + `router.refresh()` do NOT make HTTP requests — they combine with `api()` for the calls.
-- **External APIs** (e.g. exchange rates from open.er-api.com) → `ofetch` directly, WITHOUT going through the internal client (which must not send session or API baseURL). See `apps/{console,panel}/lib/api/exchange-rates.ts` with `next: { revalidate }` for Next cache.
+- **External APIs** (e.g. exchange rates from open.er-api.com) → `ofetch` directly, WITHOUT going through the internal client (which must not send session or API baseURL). The transport stays per app (`apps/{console,panel}/lib/api/exchange-rates.ts`) because `NEXT_PUBLIC_EXCHANGE_URL` must appear literally for Next to inline it; the cache, last-known fallback and payment-conversion rules live in `@workspace/shared`.
 - `next/headers` (`cookies()`, `headers()`) is used only to read request context — never to make the HTTP request.
 
-**Frontend env vars** (`apps/{panel,console}/lib/config/envs.ts`, Zod-validated): `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` (required); `NEXT_PUBLIC_EXCHANGE_URL` (optional, read in `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
+**Frontend env vars**: `NEXT_PUBLIC_API_BASE_URL` (resolved by `requireApiBaseUrl`) and `NEXT_PUBLIC_R2_URL` (resolved in each app's `lib/config/envs.ts` through `requireEnvValue`; the literal read stays in the app) are required; `NEXT_PUBLIC_EXCHANGE_URL` is optional (read in `lib/api/exchange-rates.ts`, default `https://open.er-api.com/v6/latest`).
 
 ---
 
@@ -130,7 +130,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
   - **Services**: `finance`, `plans`, `reports`, `dashboard`, `settings`, `subscriptions` require `timezone: string` **without default**.
   - **Org creation (console → `/api/platform/organizations`)**: `timezone` is `required` in `createOrgSchema`, validated in `organizations.service.createOrganization`, and `required: true` in `ORGANIZATION_ADDITIONAL_FIELDS` (Better Auth). The `organization.timezone` schema is `notNull` **without default** (DB).
 - **SQL vs JS**: **aggregation** by local day/month (reports, daily revenue) is done **in SQL** with `AT TIME ZONE`. The JS util resolves the **input** (local day boundaries as UTC `Date` for the `WHERE gte/lte`) and the **display**; it doesn't replace Postgres.
-- **UI** (panel/console): local "today" is obtained with `toLocalDayString(orgTimezone)`; parsing `'YYYY-MM-DD'` with `parseDateAsConfigTimezone(dateStr, tz)` (alias of `parseLocalToUtc`). Wall-clock helpers (`formatTime`/`formatTimeRange`) live in `apps/{panel,console}/lib/config/display.ts`, which re-exports the tz helpers from `@workspace/shared`.
+- **UI** (panel/console): local "today" is obtained with `toLocalDayString(orgTimezone)`; parsing `'YYYY-MM-DD'` with `parseDateAsConfigTimezone(dateStr, tz)` (alias of `parseLocalToUtc`). Wall-clock helpers (`formatTime`/`formatTimeRange`, `TimeFormat`) live in `@workspace/shared/date` — there is no per-app `display.ts` anymore; both apps import them from `@workspace/shared`.
 - **Platform (SaaS) billing operates in UTC**: it calls the shared `addDuration(…, 'UTC')` **explicitly** — never mixed with the org tz. The old `billing-utils.ts` UTC copy was deleted; `addDuration` now requires the tz (no silent `America/Caracas` fallback).
 
 ### 10. Explicit Configuration Without Silent Fallbacks (Seeding)

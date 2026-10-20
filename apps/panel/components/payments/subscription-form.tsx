@@ -22,20 +22,14 @@ import {
   cn,
   Badge
 } from "@workspace/ui/components";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { parseDateAsConfigTimezone } from "@/lib/config/display";
-import { addDuration, toLocalDayString } from "@workspace/shared/date";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import {
+  parseDateAsConfigTimezone,
   exchangeRateAppliedValue,
   paymentConversionView,
   type ExchangeRateLoadStatus,
   type ExchangeRateSnapshot,
-} from "@workspace/shared";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
-import { apiCode } from "@/lib/errors";
-import {
+  apiCode,
   centsToUnits,
   unitsToCents,
   previewReceiptTaxes,
@@ -43,6 +37,11 @@ import {
   computeSubscriptionPeriod,
   ORG_ROLES,
 } from "@workspace/shared";
+import { addDuration, toLocalDayString } from "@workspace/shared/date";
+
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useAuth } from "@workspace/auth/hooks";
+import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";

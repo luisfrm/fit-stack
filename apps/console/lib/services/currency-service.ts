@@ -4,7 +4,7 @@
  * For RSC pages, import `getExchangeRates` from `@/lib/api/exchange-rates` instead.
  */
 import { ofetch } from "ofetch";
-import { EUR_EXCHANGE_URL } from "@/lib/config/constants";
+import { EUR_EXCHANGE_URL } from "@workspace/shared";
 
 export interface ExchangeRatesResponse {
   result: string;

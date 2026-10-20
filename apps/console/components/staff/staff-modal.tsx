@@ -4,7 +4,7 @@ import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
 import { StaffForm } from "./staff-form";
 import { canAssignPlatformRole, platformRoles, type PlatformRole } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import { staffService, type CreateStaffInput } from "@/lib/services/staff-service";
 
 interface StaffModalProps {

@@ -1,6 +1,6 @@
 import { contentService } from "@/lib/services/content-service";
 import { ContentListClient } from "./content-list-client";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { getOrgFeatures } from "@/lib/services/org-features";
 import { redirect } from "next/navigation";
 

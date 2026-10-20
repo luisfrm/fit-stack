@@ -4,7 +4,6 @@
  * import it directly. For Server Components, prefer `getExchangeRates`.
  */
 import { getExchangeRates } from "@/lib/api/exchange-rates";
-import { EUR_EXCHANGE_URL } from "@/lib/config/constants";
 
 export interface ExchangeRatesResponse {
   result: string;

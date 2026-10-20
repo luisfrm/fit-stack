@@ -27,6 +27,8 @@ import {
   PAYMENT_STATUSES,
   type CurrencyFormat,
   type ReceiptData,
+  apiCode,
+  mutationError,
 } from "@workspace/shared";
 import { useReactToPrint } from "react-to-print";
 import {
@@ -34,8 +36,8 @@ import {
   type ReceiptState,
 } from "@/lib/services/receipts-service";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { apiCode, mutationError } from "@/lib/errors";
+import { useAuth } from "@workspace/auth/hooks";
+
 import { useRouter } from "next/navigation";
 
 interface ReceiptDialogProps {

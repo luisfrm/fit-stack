@@ -13,6 +13,7 @@ Capa compartida de autenticación cliente (Better Auth). Contiene el cliente, ho
 | `@workspace/auth/service` | `sessionService` (getSession, signIn, signUp) |
 | `@workspace/auth/hooks` | `useAuth()` — hook con role flags (`isOwner`, `isManager`, etc.) |
 | `@workspace/auth/permissions` | `usePermissions()` — `can(module, action)`, `canAccessCms()` |
+| `@workspace/auth/api-client` | `createApiClient()` — cliente HTTP del API de Fit-Stack compartido por panel y console |
 
 ---
 
@@ -60,13 +61,31 @@ const { activeOrganization } = useAuth()
 await authClient.organization.setActive({ organizationId: 'org_123' })
 ```
 
+### Cliente del API (panel / console)
+
+```ts
+// apps/*/lib/api/client.ts — única instancia por app
+import { createApiClient } from '@workspace/auth/api-client'
+
+const { api, apiBlob } = createApiClient({
+  onOrganizationNotFound: () => window.dispatchEvent(new Event(ORG_CONTEXT_LOST_EVENT)),
+})
+
+export { api, apiBlob }
+export type { ApiFetchOptions } from '@workspace/auth/api-client'
+```
+
+El cliente reutiliza `requireApiBaseUrl()` (este paquete), reenvía cookies en el
+servidor y formatea errores de validación. `ORG_CONTEXT_LOST_EVENT` lo escucha
+`<OrgContextGuard>`, que navega con `router.replace('/reset-org-context')`.
+
 ---
 
 ## Convenciones
 
 - **Siempre** usar `useAuth()` en UI — expone `activeOrganization` y los role flags. **Nunca** `useSession()` directamente.
 - Para server components: `sessionService.getSession()` con headers de la request.
-- Los archivos `apps/*/lib/auth-client.ts` re-exportan este paquete para centralización.
+- No crear re-exports locales en `apps/*/lib`: importar directo de `@workspace/auth/*`.
 
 ---
 

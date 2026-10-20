@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import {
   hasAccess,
   PERMISSION_MODULES,

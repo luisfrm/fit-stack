@@ -38,7 +38,7 @@ import {
 import type { CurrencyFormat } from "@workspace/shared";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import { IOrganization, IPlatformOrganization } from "@workspace/shared/types";
 import { currencyFormatForCountry } from "@/lib/config/organization-presets";
 import type { OwnerData } from "./organization-form-types";

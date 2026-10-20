@@ -4,14 +4,13 @@ import * as React from "react";
 import { Download, ReceiptText, RefreshCw } from "lucide-react";
 import { Badge, Button, Card, Text, toast } from "@workspace/ui/components";
 import { Title } from "@workspace/ui";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useAuth } from "@workspace/auth/hooks";
 import {
   getOrgReceipts,
   orgReceiptsService,
   type OrgReceiptRow,
 } from "@/lib/services/org-receipts";
-import { mutationError } from "@/lib/errors";
-import { formatCents } from "@workspace/shared";
+import { mutationError, formatCents } from "@workspace/shared";
 
 /** Duration units as shown next to the plan name (snapshot of the payment). */
 const DURATION_UNIT_LABELS: Record<string, string> = {

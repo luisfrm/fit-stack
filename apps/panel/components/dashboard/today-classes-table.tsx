@@ -3,7 +3,7 @@
 import { type ColumnDef, Table, Text } from "@workspace/ui/components";
 
 import { type IClassToday } from "@/types/dashboard";
-import { formatTimeRange } from "@/lib/config/display";
+import { formatTimeRange } from "@workspace/shared";
 import { NoData } from "./no-data";
 
 const TODAY_CLASSES_COLUMNS: ColumnDef<IClassToday>[] = [
