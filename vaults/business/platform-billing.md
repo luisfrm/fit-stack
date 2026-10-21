@@ -57,7 +57,7 @@ history and must be **cancelled** instead. The FK
 `ON DELETE RESTRICT` as the DB-level backstop (no cascade, so `FS-N` numbers are
 never silently destroyed and `gaps[]` cannot report them as holes). The backstop
 is mapped, never leaked: a FK violation raised by the `DELETE`
-(`isPostgresForeignKeyViolation(err, 'subscription_id')` in `lib/errors.ts`, which
+(`isPostgresForeignKeyViolation(err, 'subscription_id')` in `apps/api-worker/src/lib/errors.ts`, which
 walks the deep Drizzle/Neon cause for SQLSTATE `23503`) is translated by the same
 `subscriptionHasPaymentsError()` factory into the **same 409 body**, so the console
 toast keeps resolving by `code` and the TOCTOU window between the count and the

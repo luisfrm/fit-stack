@@ -85,7 +85,7 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 | `requireOrg()`                              | Org-scoped routes without permission check                                                                        | Session + active org. Sets `c.set('orgId', orgId)`                                                              |
 | `requireOrgTimezone()`                      | Routes that compute or filter by local date (reports, stats, billing)                                             | Validates the org has a timezone (500 if missing). Sets `c.set('orgTimezone', tz)`                              |
 | `requireAuth()`                             | General authenticated routes                                                                                      | Session + user only                                                                                             |
-| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`)                                                                             | Session + platform permission via `auth.api.userHasPermission`                                                  |
+| `requirePlatformPermission(module, action)` | SaaS admin routes (`/api/platform/*`)                                                                             | Session + platform permission via `auth.api.userHasPermission` (fail-closed fallback to `canPlatform(role, module, action)`) |
 | `requirePlatformAuth()`                     | Alias of `requirePlatformPermission('organization', 'create')` — standard middleware for `/api/platform/*` routes | Session + `organization.create` permission                                                                      |
 
 ```ts

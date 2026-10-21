@@ -120,6 +120,10 @@ can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE); // true para cashier
 
 `can()` es la única implementación (vive en `@workspace/shared`); el hook solo la envuelve con el `orgRole` de la sesión. En el servidor se usa `hasAccess` (alias de `can`).
 
+### Console (UI)
+
+`canAccessConsole(role)` gatea la entrada al layout y `canManageBilling(role)` (`apps/console/lib/platform-permissions.ts`) gatea las mutaciones de billing. Ambas derivan de `canPlatform()` en `@workspace/shared`; no hay comparaciones de rol hardcodeadas.
+
 ---
 
 ## Cómo agregar un nuevo rol o módulo

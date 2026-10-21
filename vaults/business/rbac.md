@@ -11,6 +11,8 @@ Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared
 
 **Console access gate**: `canAccessConsole(role)` (`@workspace/shared`) — `true` only for roles with `organization.create` (admin/owner); `support` is read-only and doesn't enter the console layout.
 
+**Console billing mutation**: `canManageBilling(role)` (`apps/console/lib/platform-permissions.ts`) derives from `canPlatform(role, 'subscription', 'cancel')`: `owner`/`admin` can mutate subscriptions/payments; `support` is read-only. No hardcoded role comparisons.
+
 ### Organization Roles
 
 ```ts

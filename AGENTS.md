@@ -84,7 +84,7 @@ Centralized middleware — never write auth/error boilerplate manually.
 | `requireOrgTimezone()` | Routes by local date | Validates tz (500 if missing); sets `orgTimezone` |
 | `requireOrgCurrency()` | Money normalized to the primary currency | Validates `primaryCurrency` (500 if missing); sets `orgCurrency` |
 | `requireAuth()` | General authenticated | Session + user |
-| `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
+| `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission (`auth.api.userHasPermission`, fail-closed `canPlatform()` fallback) |
 | `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |
 
 Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`, `400 DOCUMENT_TYPE_INVALID`, `409 SUBSCRIPTION_HAS_PAYMENTS`); toasts resolve by **code**, never text. Typed domain failures map through one mapper by **class**, never message (`exchangeRateErrorResponse` → `503 EXCHANGE_RATE_UNAVAILABLE`).

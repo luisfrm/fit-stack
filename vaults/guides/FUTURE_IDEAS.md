@@ -39,7 +39,7 @@ export default nextConfig;
 Para que las sesiones funcionen en el `.exe`, integraremos el plugin nativo de HTTP de Tauri en el cliente de auth:
 
 ```typescript
-// apps/panel/lib/auth-client.ts (o apps/web según el caso)
+// packages/auth/src/client.ts (cliente compartido de Better Auth)
 import { createAuthClient } from "better-auth/client"
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http"
 
