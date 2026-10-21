@@ -24,7 +24,7 @@ import { Modal } from "@workspace/ui/components/modal";
 import { Switch } from "@workspace/ui/components/switch";
 import { SimpleSelect } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
 import { type IPaymentMethodConfig, type IPaymentMethodField } from "@workspace/shared/types";
@@ -32,7 +32,7 @@ import { getSuggestedPaymentMethods } from "@workspace/shared";
 
 export default function PaymentMethodsSettingsPage() {
   const { settings, isLoading, isUpdating, updateSettings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
 
   // Suggestions follow the country of the active organization (`COUNTRIES`);
   // an unknown country resolves to the universal methods only.

@@ -12,13 +12,13 @@ import { Text } from "@workspace/ui/components/text";
 import { Button } from "@workspace/ui/components/button";
 import { ActiveCurrenciesField } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { Title, toast } from "@workspace/ui";
 import { COUNTRY_INDEX } from "@workspace/shared";
 
 export default function CurrencySettingsPage() {
   const { settings, isLoading, isUpdating, updateSettings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
 
   // Primary currency and format: org columns (primary is derived from country
   // and format is configured in Gym Settings). Here only active currencies

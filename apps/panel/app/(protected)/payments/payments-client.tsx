@@ -23,7 +23,7 @@ import {
   mutationError,
 } from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
@@ -90,7 +90,7 @@ export function PaymentsClient({
   onSuccess,
 }: PaymentsClientProps) {
   const router = useRouter();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // No delete action: a payment record is voided or revoked, never deleted.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;

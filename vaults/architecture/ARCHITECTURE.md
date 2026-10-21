@@ -201,16 +201,17 @@ Existen dos niveles de acceso:
 * Se definió la acción `panel: ["access"]` en el `organizationStatement` para controlar dinámicamente el ingreso a la aplicación `apps/panel`.
 * **Nomenclatura Profesional**: En las vistas y componentes del cliente, el chequeo se realiza mediante la función `hasAccess`:
   ```tsx
-  import { usePermissions } from '@workspace/auth/hooks';
+  import { useOrgPermissions } from '@workspace/auth/org';
   import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared';
 
-  const { hasAccess } = usePermissions();
+  const { can } = useOrgPermissions();
 
-  if (hasAccess(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
+  if (can(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     // Renderiza la navegación del panel
   }
   ```
-* **Uso de Constantes**: Se prohíbe escribir *magic strings* arbitrarias. Todas las consultas de permisos consumen `PERMISSION_MODULES` y `PERMISSION_ACTIONS`.
+* **Una sola implementación**: el cliente usa `useOrgPermissions().can(...)`, que delega en `can()` de `@workspace/shared`; el servidor usa `hasAccess` (alias de `can`). No hay chequeos duplicados.
+* **Identidad ≠ autorización**: los flags de `useOrgAuth()` (`isOwner`, `isManager`, …) solo describen al usuario; nunca autorizan.
 
 ### 5.3. Autorización de Subida de Archivos (dos rutas, una autoridad por caso)
 

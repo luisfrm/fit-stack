@@ -40,7 +40,7 @@ import {
 import { addDuration, toLocalDayString } from "@workspace/shared/date";
 
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
 
 // Sub-components
@@ -136,7 +136,7 @@ interface SubscriptionFormProps {
  * instead of inventing "America/Caracas"/"latam" (AGENTS.md §9/§10).
  */
 export function SubscriptionForm(props: SubscriptionFormProps) {
-  const { activeOrganization, isPending } = useAuth();
+  const { activeOrganization, isPending } = useOrgAuth();
 
   const resolved = React.useMemo(() => {
     try {
@@ -190,7 +190,7 @@ function SubscriptionFormContent({
   initialMember,
 }: SubscriptionFormProps & { readonly orgConfig: OrgConfig }) {
   const { settings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const timezone = orgConfig.timezone;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 

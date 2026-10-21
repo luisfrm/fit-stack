@@ -19,24 +19,28 @@ lib/
 │   ├── platform-plans-service.ts
 │   ├── platform-subscriptions-service.ts
 │   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
-│   ├── currency-service.ts (legacy, use lib/api/exchange-rates in RSC)
 │   ├── init-service.ts
 │   └── upload-service.ts
-└── hooks/                 ← hooks propios de la app (no TanStack Query): use-settings (panel),
-                             use-exchange-rates, use-organization-activation
+└── hooks/                 ← hooks propios de la app (no TanStack Query): use-exchange-rates
 ```
 
-> `session-service`, `auth-client`, `use-auth`, `use-theme` y `use-debounce` **no tienen copia local**:
-> se importan de `@workspace/auth/service`, `@workspace/auth/client`, `@workspace/auth/hooks` y `@workspace/ui/hooks/*`.
-> Helpers puros (formato de hora, `cleanNumericInput`, errores de mutación, `buildMediaUrl`)
-> viven en `@workspace/shared`. `<OrgContextGuard>` vive en `@workspace/ui` y se monta una vez en `Providers`.
+> `session-service`, `auth-client`, `use-theme` y `use-debounce` **no tienen copia local**:
+> se importan de `@workspace/auth/service`, `@workspace/auth/client` y `@workspace/ui/hooks/*`.
+> Los hooks de auth viven en dos carriles: **org** (`@workspace/auth/org`:
+> `useOrgAuth`, `useOrgPermissions`) y **platform** (`@workspace/auth/platform`:
+> `usePlatformAuth`). Helpers puros (formato de hora, `cleanNumericInput`,
+> errores de mutación, `buildMediaUrl`) viven en `@workspace/shared`.
 
 ### Context-aware behavior (`lib/api/client.ts` → `@workspace/auth/api-client`)
 
-| Context              | Cookie handling                                                            | Interceptors                                                                 |
-| -------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | Never redirects                                                              |
-| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → emite `ORG_CONTEXT_LOST_EVENT`; `<OrgContextGuard>` hace `router.replace('/reset-org-context')` (un hook no puede vivir en el interceptor) |
+| Context              | Cookie handling                                                            | Interceptors                                                                    |
+| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | None                                                                            |
+| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | Zod/API validation errors become readable strings before React renders them     |
+
+> La recuperación de contexto de organización es **server-side**: los layouts de
+> Panel y Console comprueban `sessionError.code === "ORGANIZATION_NOT_FOUND"`
+> (Better Auth) y redirigen a `/reset-org-context`.
 
 ### Service usage pattern
 

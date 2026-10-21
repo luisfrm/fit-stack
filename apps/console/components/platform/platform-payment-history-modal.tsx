@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { canManageBilling } from "@/lib/platform-permissions";
-import { useAuth } from "@workspace/auth/hooks";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 import { PaymentDetailsList } from "./payment-details-list";
 
@@ -113,8 +113,8 @@ export function PlatformPaymentHistoryModal({
   const [actionPaymentId, setActionPaymentId] = React.useState<number | null>(null);
   const actionLoading = actionPaymentId !== null;
   const [expandedId, setExpandedId] = React.useState<number | null>(null);
-  const { user } = useAuth();
-  const canChangeStatus = canManageBilling(user?.role);
+  const { platformRole } = usePlatformAuth();
+  const canChangeStatus = canManageBilling(platformRole);
 
   const loadPayments = React.useCallback(
     async (signal?: AbortSignal) => {

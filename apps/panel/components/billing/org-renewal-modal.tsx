@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Modal, Button, Text, Badge, toast } from "@workspace/ui/components";
 import { CalendarClock, RefreshCw, Sparkles } from "lucide-react";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { OrgPaymentSection } from "./org-payment-section";
 import { renewOrgSubscription, type OrgPaymentMethodsResponse, type OrgSubscriptionInfo } from "@/lib/services/org-billing";
 import {
@@ -42,7 +42,7 @@ export function OrgRenewalModal({
   paymentMethods,
   onRenewed,
 }: OrgRenewalModalProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const [paymentCurrency, setPaymentCurrency] = React.useState(subscription.planCurrency);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});

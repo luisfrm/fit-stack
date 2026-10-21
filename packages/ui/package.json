@@ -5,12 +5,9 @@
   "private": true,
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@workspace/shared": "workspace:*",
     "@radix-ui/react-slot": "^1.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -29,8 +26,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
-    "@testing-library/dom": "^10",
-    "@testing-library/react": "^16",
     "@turbo/gen": "^2.8.1",
     "@types/culori": "^4.0.1",
     "@types/node": "^25.1.0",
@@ -39,10 +34,8 @@
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
-    "jsdom": "^26",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
-    "vitest": "^3"
+    "typescript": "^5.9.3"
   },
   "exports": {
     ".": "./src/index.ts",

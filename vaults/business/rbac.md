@@ -53,17 +53,28 @@ import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
 .get('/', requireOrgPermission(PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ), async (c) => { ... })
 ```
 
-**In UI (client-side)**: Use `useAuth()` and `usePermissions()` from `@workspace/auth/hooks`
+**In UI (client-side)**: `useOrgAuth()` (identity) and `useOrgPermissions()` (authorization) from `@workspace/auth/org`; `usePlatformAuth()` from `@workspace/auth/platform` in the Console.
 
 ```tsx
-import { useAuth, usePermissions } from "@workspace/auth/hooks";
-const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useAuth();
-const { can } = usePermissions();
+import { useOrgAuth, useOrgPermissions } from "@workspace/auth/org";
+const { isOwner, isManager, isCashier, isCoach, isMember, orgRole } = useOrgAuth();
+const { can } = useOrgPermissions();
 const canEditClasses = can(
   PERMISSION_MODULES.CLASSES,
   PERMISSION_ACTIONS.UPDATE,
 );
 ```
+
+> **Identity vs authorization.** The role flags (`isOwner`, `isManager`, …) describe
+> WHO the user is and are only for labels/badges/conditional copy. They must NEVER
+> gate a route, a module or a button: that always goes through `can(module, action)`
+> (or `hasAccess(role, module, action)` on the server), the single implementation of
+> the matrix. Gating with flags duplicates the matrix and lets the two drift.
+>
+> **Platform vs organization.** `@workspace/auth/org` exposes the tenant side
+> (`activeOrganization`, `orgRole`, flags, `can`) and is global for the Panel and
+> future tenant apps. `@workspace/auth/platform` exposes the SaaS side
+> (`user`, `platformRole`) for the Console. Neither returns the other's fields.
 
 ### Anti-escalation
 
@@ -86,10 +97,15 @@ Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/sr
 Only `OWNER`, `MANAGER`, `CASHIER` can use the panel app (`apps/panel`). Implemented via the `panel: ["access"]` permission (`PANEL` module, `ACCESS` action):
 
 ```ts
-import { usePermissions } from "@workspace/auth/hooks";
-const { canAccessCms } = usePermissions(); // equivalent to can(PANEL, ACCESS)
-if (orgRole && !canAccessCms()) redirect("/unauthorized");
+// Server (layout): hasAccess = can
+hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)
+
+// Client: useOrgPermissions().can(PANEL, ACCESS)
 ```
+
+The panel layout (`apps/panel/app/(protected)/layout.tsx`) redirects to `/unauthorized`
+when the check fails. No role list is hardcoded anywhere: adding a role with panel
+access is a one-line change in `organizationRoles`.
 
 ### Security Rules
 

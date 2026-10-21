@@ -462,11 +462,3 @@ export function indexCountries(countries: readonly ICountryConfig[]): CountryInd
 }
 
 export const COUNTRY_INDEX: CountryIndex = indexCountries(COUNTRY_LIST);
-
-/**
- * Browser event emitted by the HTTP client when the API reports
- * `ORGANIZATION_NOT_FOUND` (the active organization no longer exists or the
- * session lost it). A client component listens for it and navigates with
- * `useRouter` — a fetch interceptor cannot call a React hook.
- */
-export const ORG_CONTEXT_LOST_EVENT = "fit-stack:org-context-lost";

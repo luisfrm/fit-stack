@@ -16,7 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { CountrySelector, toast, Title, SimpleSelect, DocumentIdField } from "@workspace/ui";
-import { useAuth, usePermissions } from "@workspace/auth/hooks";
+import { useOrgAuth, useOrgPermissions } from "@workspace/auth/org";
 import { uploadService } from "@/lib/services/upload-service";
 import { orgProfileService } from "@/lib/services/org-profile-service";
 import { requireOrgConfig } from "@/lib/org-config";
@@ -55,7 +55,7 @@ function FiscalFact({ label, value }: { readonly label: string; readonly value: 
 
 export default function OrganizationSettingsPage() {
   const router = useRouter();
-  const { isPending: sessionLoading, activeOrganization: activeOrg, refetch } = useAuth();
+  const { isPending: sessionLoading, activeOrganization: activeOrg, refetch } = useOrgAuth();
 
   // Empty until the session fills it: the form NEVER renders invented values
   // (country/timezone/format are NOT NULL columns of the organization).
@@ -78,7 +78,7 @@ export default function OrganizationSettingsPage() {
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [isUpdating, setIsUpdating] = React.useState(false);
 
-  const { can } = usePermissions();
+  const { can } = useOrgPermissions();
   const canUpdateFiscal = can(PERMISSION_MODULES.ORGANIZATION, PERMISSION_ACTIONS.UPDATE);
 
   const [fiscalDisclaimer, setFiscalDisclaimer] = React.useState("");

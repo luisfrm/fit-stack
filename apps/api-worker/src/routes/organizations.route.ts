@@ -505,7 +505,7 @@ export const organizationRoutes = new Hono<AppEnv>()
       const updated = await service.updateOrganization(orgId, patch);
 
       // Session profile is cached for 5 min: invalidate so changes
-      // reflect in `useAuth().activeOrganization` without waiting for TTL.
+      // reflect in `useOrgAuth().activeOrganization` without waiting for TTL.
       const cache = createCache(c.env);
       await cache.invalidateExact(`org:${orgId}:profile`);
 

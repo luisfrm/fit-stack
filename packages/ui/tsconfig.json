@@ -8,8 +8,7 @@
     "noEmit": true,
     "types": ["next"],
     "paths": {
-      "@workspace/ui/*": ["./src/*"],
-      "@workspace/shared/*": ["../shared/src/*"]
+      "@workspace/ui/*": ["./src/*"]
     }
   },
   "include": ["."],

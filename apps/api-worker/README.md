@@ -296,7 +296,7 @@ Las escrituras (POST/PUT/DELETE) invalidan los patrones relacionados inmediatame
 - `member` — rol del usuario en la org activa (cacheado 1 min en `member:role:{userId}:{orgId}`)
 - `activeOrganization` — objeto completo de la org activa (cacheado 5 min en `org:{id}:profile`), usado para branding del sidebar, tema (color primario) y timezone
 
-Gracias a `customSessionClient` en `@workspace/auth`, estos campos fluyen tanto al server (`sessionService.getSession()`) como al cliente (`useAuth()`).
+Gracias a `customSessionClient` en `@workspace/auth`, estos campos fluyen tanto al server (`sessionService.getSession()`) como al cliente (`useOrgAuth()`).
 
 `organization` plugin: invitaciones por email via `TASK_QUEUE`, hook `afterAcceptInvitation` (vincula `gym_member.userId`) e `afterUpdateMemberRole` (invalida caché de rol).
 

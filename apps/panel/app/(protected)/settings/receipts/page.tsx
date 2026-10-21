@@ -4,7 +4,7 @@ import * as React from "react";
 import { Download, ReceiptText, RefreshCw } from "lucide-react";
 import { Badge, Button, Card, Text, toast } from "@workspace/ui/components";
 import { Title } from "@workspace/ui";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import {
   getOrgReceipts,
   orgReceiptsService,
@@ -62,7 +62,7 @@ function displayAmount(row: OrgReceiptRow): { cents: number; currency: string } 
 }
 
 export default function SettingsReceiptsPage() {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const [rows, setRows] = React.useState<OrgReceiptRow[] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [downloadingId, setDownloadingId] = React.useState<number | null>(null);

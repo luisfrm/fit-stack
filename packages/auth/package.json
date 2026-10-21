@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
     "./service": "./src/service.ts",
-    "./hooks": "./src/hooks.ts",
+    "./org": "./src/org.tsx",
+    "./platform": "./src/platform.ts",
     "./env": "./src/env.ts",
     "./api-client": "./src/api-client.ts"
   },

@@ -34,7 +34,7 @@ import {
   canManageBilling,
   hasActiveSubscription,
 } from "@/lib/platform-permissions";
-import { useAuth } from "@workspace/auth/hooks";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 import {
   Trash2,
@@ -384,8 +384,8 @@ export function SubscriptionsTable({
   settings,
   linkOrganization = true,
 }: Readonly<SubscriptionsTableProps>) {
-  const { user } = useAuth();
-  const canMutateBilling = canManageBilling(user?.role);
+  const { platformRole } = usePlatformAuth();
+  const canMutateBilling = canManageBilling(platformRole);
   const [detailModal, setDetailModal] =
     React.useState<SubscriptionWithDetails | null>(null);
   const [cancelModal, setCancelModal] =

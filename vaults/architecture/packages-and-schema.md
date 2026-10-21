@@ -40,7 +40,8 @@ getSuggestedPaymentMethods(countryCode?) → métodos del país + universales si
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
-orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationStatement,
+orgRoleDefinitions, canPlatform(role, module, action), canAccessConsole(role),
+PlatformStatement, OrganizationStatement,
 OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
@@ -85,7 +86,7 @@ buildMediaUrl(key, r2PublicUrl)   // public → R2 URL; private → authenticate
 BASE_EXCHANGE_API_URL, EUR_EXCHANGE_URL, USD_EXCHANGE_URL, EUR/USD_EXCHANGE_URL_V4
 
 // constants.ts
-ORG_CONTEXT_LOST_EVENT   // browser event emitted by the API client when the active org is gone
+ORG_CONTEXT_LOST_EVENT   // (removed) organization-context recovery is server-side in the layouts
 ```
 
 ---
@@ -93,7 +94,8 @@ ORG_CONTEXT_LOST_EVENT   // browser event emitted by the API client when the act
 ## Auth Package (`@workspace/auth`)
 
 ```ts
-// Entry: @workspace/auth (re-exports client, service, hooks, permissions + shared constants)
+// Entry: @workspace/auth (re-exports client, service + shared constants). Hooks live in two separate entries:
+// org (tenant apps) and platform (Console).
 
 // client.ts — createAuthClient with customSession + organization plugin
 authClient, useSession, organization
@@ -105,12 +107,15 @@ sessionService.getServerSession(headers) → { data, error }
 sessionService.signIn({ email, password }) → { data, error }
 sessionService.signUp({ email, password, name }) → { data, error }
 
-// hooks.ts — "use client"
-useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, error, roleName,
-              orgRole, isAdmin, isOwner, isManager, isCashier, isCoach, isMember, refetch }
-usePermissions() → { orgRole, can(module, action), canAccessCms() }
+// org.tsx — "use client" (@workspace/auth/org) — tenant side, global for Panel + future tenant apps
+useOrgAuth() → { session, user, activeOrganization, orgRole,
+                 isOwner, isManager, isCashier, isCoach, isMember,   // identity only, never authorization
+                 isPending, error, refetch }
+useOrgPermissions() → { can(module, action) }   // thin wrapper over `can` from @workspace/shared
 
-// permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
+// platform.ts — "use client" (@workspace/auth/platform) — SaaS side, Console only
+usePlatformAuth() → { session, user, platformRole, isPending, error, refetch }
+// no organization fields; platform authorization goes through canPlatform/canAccessConsole
 
 // env.ts — requireEnvValue(name, rawValue, { buildTimeValue, message? }): single required-env
 // resolver (missing value throws visibly; non-production builds warn + build-only placeholder);
@@ -118,9 +123,9 @@ usePermissions() → { orgRole, can(module, action), canAccessCms() }
 // getServerSession uses ofetch (never native fetch) and maps FetchError → AUTH_API_ERROR/NETWORK_ERROR
 
 // api-client.ts (entry: @workspace/auth/api-client) — HTTP client shared by panel and console
-createApiClient({ basePath?, onOrganizationNotFound?, retry?, timeout? })
+createApiClient({ basePath?, retry?, timeout? })
   → { api, apiBlob }  // cookies on the server (next/headers), credentials in the browser,
-                       // ORGANIZATION_NOT_FOUND → onOrganizationNotFound(), Zod/API errors formatted
+                       // Zod/API validation errors formatted into readable strings
 ApiFetchOptions<R>, NextFetchConfig
 ```
 

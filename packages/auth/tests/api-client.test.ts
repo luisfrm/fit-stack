@@ -25,7 +25,7 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ toString: () => "session=abc" }),
 }));
 
-type Handler = (context: unknown) => Promise<void>;
+type Handler = (context: unknown) => void;
 
 function setBrowserEnvironment(present: boolean): void {
   if (present) {
@@ -47,6 +47,12 @@ function requestHandlerOf(
   options: Record<string, unknown>,
 ): (context: unknown) => Promise<void> {
   return options.onRequest as (context: unknown) => Promise<void>;
+}
+
+function zodErrorBody(): Record<string, unknown> {
+  return {
+    error: { issues: [{ message: "Required", path: ["email"] }] },
+  };
 }
 
 describe("createApiClient", () => {
@@ -101,47 +107,29 @@ describe("createApiClient", () => {
     expect(options.credentials).toBe("include");
   });
 
-  it("formats Zod errors and announces a lost organization in the browser", async () => {
+  it("formats a Zod error into a readable string in the browser", () => {
     setBrowserEnvironment(true);
-    const onOrganizationNotFound = vi.fn();
-    createApiClient({ onOrganizationNotFound });
+    createApiClient();
 
-    const body: Record<string, unknown> = {
-      error: { issues: [{ message: "Required", path: ["email"] }] },
-    };
-    await errorHandlerOf(createCalls[0] ?? {})({ response: { _data: body } });
+    const body = zodErrorBody();
+    errorHandlerOf(createCalls[0] ?? {})({ response: { _data: body } });
 
-    expect(onOrganizationNotFound).not.toHaveBeenCalled();
+    expect(typeof body.error).toBe("string");
     expect(String(body.error)).toContain("Correo electrónico");
   });
 
-  it("announces a lost organization when the API reports it", async () => {
-    setBrowserEnvironment(true);
-    const onOrganizationNotFound = vi.fn();
-    createApiClient({ onOrganizationNotFound });
+  it("leaves the body untouched on the server", () => {
+    createApiClient();
 
-    await errorHandlerOf(createCalls[0] ?? {})({
-      response: { _data: { code: "ORGANIZATION_NOT_FOUND" } },
-    });
+    const body = zodErrorBody();
+    errorHandlerOf(createCalls[0] ?? {})({ response: { _data: body } });
 
-    expect(onOrganizationNotFound).toHaveBeenCalledOnce();
-  });
-
-  it("does not navigate on the server (no window)", async () => {
-    const onOrganizationNotFound = vi.fn();
-    createApiClient({ onOrganizationNotFound });
-
-    await errorHandlerOf(createCalls[0] ?? {})({
-      response: { _data: { code: "ORGANIZATION_NOT_FOUND" } },
-    });
-
-    expect(onOrganizationNotFound).not.toHaveBeenCalled();
+    expect(typeof body.error).toBe("object");
   });
 
   it("apiBlob requests a blob and shares the error interceptor", async () => {
     setBrowserEnvironment(true);
-    const onOrganizationNotFound = vi.fn();
-    const { apiBlob } = createApiClient({ onOrganizationNotFound });
+    const { apiBlob } = createApiClient();
 
     const result = await apiBlob("/receipts/2026/1.pdf", {
       next: { revalidate: 60 },
@@ -155,26 +143,9 @@ describe("createApiClient", () => {
     expect(directCalls[0]?.options.responseType).toBe("blob");
 
     const handler = errorHandlerOf(directCalls[0]?.options ?? {});
-    expect(typeof handler).toBe("function");
+    const body = zodErrorBody();
+    handler({ response: { _data: body } });
 
-    await handler({
-      response: {
-        _data: new Blob([JSON.stringify({ code: "ORGANIZATION_NOT_FOUND" })]),
-      },
-    });
-
-    expect(onOrganizationNotFound).toHaveBeenCalledOnce();
-  });
-
-  it("ignores a non-JSON blob error body", async () => {
-    setBrowserEnvironment(true);
-    const onOrganizationNotFound = vi.fn();
-    createApiClient({ onOrganizationNotFound });
-
-    await errorHandlerOf(createCalls[0] ?? {})({
-      response: { _data: new Blob(["<html>proxy error</html>"]) },
-    });
-
-    expect(onOrganizationNotFound).not.toHaveBeenCalled();
+    expect(typeof body.error).toBe("string");
   });
 });

@@ -75,9 +75,8 @@ apps/panel/
 │   ├── staff/
 │   └── trainers/
 └── lib/
-    ├── auth-utils.ts              # Cookie helpers
     ├── org-config.ts              # requireOrgConfig / resolveOrgCurrencyFormat (sin fallbacks)
-    ├── hooks/                     # Propios de la app: use-settings, use-organization-activation
+    ├── hooks/                     # Propios de la app: use-settings
     ├── services/                  # members, plans, payments, settings, upload...
     ├── api/                       # instancia de createApiClient (@workspace/auth/api-client) + exchange-rates
     └── config/                    # envs (solo NEXT_PUBLIC_R2_URL)

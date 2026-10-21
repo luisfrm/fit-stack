@@ -2,7 +2,7 @@ import { useTheme } from "@workspace/ui/hooks/use-theme";
 import { SETTINGS_KEYS } from "@/lib/hooks/use-settings";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { useSettings } from "@/lib/hooks/use-settings";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import React from "react";
 
 /**
@@ -15,7 +15,7 @@ import React from "react";
 export function ThemeInjector() {
   const { isDark } = useTheme();
   const { settings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const activeOrganizationId = activeOrganization?.id;
 
   React.useEffect(() => {

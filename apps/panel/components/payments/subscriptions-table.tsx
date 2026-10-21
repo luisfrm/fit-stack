@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { ReceiptDialog } from "./receipt-dialog";
 
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { NoData } from "../dashboard/no-data";
 
@@ -315,7 +315,7 @@ export function SubscriptionsTable({
   pagination,
   onSuccess
 }: SubscriptionsTableProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // Format comes from the session (NOT NULL column): no invented "latam", and
   // the table waits for the session instead of rendering unformatted money.
   const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);

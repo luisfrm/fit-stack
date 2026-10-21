@@ -20,7 +20,7 @@ import {
   ORG_ROLES,
   parseDocumentId,
 } from "@workspace/shared";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 
 interface TrainerFormProps {
   readonly initialData?: ITrainer;
@@ -29,7 +29,7 @@ interface TrainerFormProps {
 }
 
 export function TrainerForm({ initialData, onSubmit, isLoading }: TrainerFormProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const identity = getCountryIdentity(activeOrganization?.countryCode);
   const isEdit = !!initialData?.id;
 

@@ -19,7 +19,7 @@ import {
   parseDocumentId,
   type OrgRole,
 } from "@workspace/shared";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Text } from "@workspace/ui/components/text";
@@ -38,7 +38,7 @@ const STAFF_ROLE_OPTIONS = [
 ] as const;
 
 export function StaffForm({ initialData, onSubmit, isLoading }: StaffFormProps) {
-  const { orgRole, activeOrganization } = useAuth();
+  const { orgRole, activeOrganization } = useOrgAuth();
   const identity = getCountryIdentity(activeOrganization?.countryCode);
   const isEdit = !!initialData?.id;
   const [sendInvite, setSendInvite] = React.useState(!isEdit);

@@ -109,17 +109,16 @@ Errores normalizados vía `onError` → `{ error, details? }`.
 ### Panel (UI)
 
 ```ts
-import { usePermissions } from "@workspace/auth/hooks";
+import { useOrgPermissions } from "@workspace/auth/org";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 
-const { can, hasAccess, canAccessPanel } = usePermissions();
+const { can } = useOrgPermissions();
 
-if (!canAccessPanel()) redirect("/unauthorized");
+if (!can(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) redirect("/unauthorized");
 can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE); // true para cashier/coach
-hasAccess(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS); // alias de can()
 ```
 
-`canAccessCms` se mantiene como alias de `canAccessPanel` por compatibilidad — usar `canAccessPanel`/`hasAccess` en código nuevo.
+`can()` es la única implementación (vive en `@workspace/shared`); el hook solo la envuelve con el `orgRole` de la sesión. En el servidor se usa `hasAccess` (alias de `can`).
 
 ---
 
@@ -153,14 +152,14 @@ packages/shared/src/
     └── index.ts
 
 packages/auth/src/
-├── permissions.ts             # usePermissions() → can/hasAccess/canAccessPanel
-└── hooks.ts                   # useAuth() → orgRole, isOwner/isManager/...
+├── org.tsx                    # useOrgAuth() (identidad) + useOrgPermissions() (can)
+└── platform.ts                # usePlatformAuth() → user, platformRole
 
 apps/api-worker/src/lib/
 └── route-handler.ts           # requireOrgPermission, requirePlatformAuth, requireFeature
 
 apps/panel/app/dashboard/
-└── layout.tsx                 # guard canAccessPanel() → /unauthorized
+└── layout.tsx                 # guard hasAccess(PANEL, ACCESS) → /unauthorized
 ```
 
 Ver también `AGENTS.md` § RBAC y § Features & Free Tier (`requireFeature` + `ai_chat`).

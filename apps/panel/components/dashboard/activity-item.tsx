@@ -5,7 +5,7 @@ import { User, CalendarClock } from "lucide-react";
 import { Text } from "@workspace/ui/components";
 import { NextImage } from "@workspace/ui/components/next/image";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@workspace/auth/hooks";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { formatCents } from "@workspace/shared";
 
@@ -20,7 +20,7 @@ interface ActivityItemProps {
 }
 
 export function ActivityItem({ name, time, imageUrl, planName, amountPaid, currencyPaid, endDate }: Readonly<ActivityItemProps>) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // Both values come from the session (NOT NULL columns): no invented
   // "America/Caracas" / "latam" / "USD" fallbacks (AGENTS.md §9/§10).
   const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);

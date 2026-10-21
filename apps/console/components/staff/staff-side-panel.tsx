@@ -5,16 +5,15 @@ import { Badge, Card, Text } from "@workspace/ui/components";
 import {
   PLATFORM_ROLE_LABELS,
   formatPlatformRole,
-  type PlatformRole,
 } from "@workspace/shared";
-import { useAuth } from "@workspace/auth/hooks";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";
 import { getStaffRoleCounts } from "@/lib/staff-role-counts";
 
 const ROLE_ORDER = ["owner", "admin", "support"] as const;
 
 export function StaffSidePanel({ staff }: { readonly staff: PlatformStaffMember[] }) {
-  const { user } = useAuth();
+  const { platformRole } = usePlatformAuth();
   const counts = getStaffRoleCounts(staff);
 
   return (
@@ -56,7 +55,7 @@ export function StaffSidePanel({ staff }: { readonly staff: PlatformStaffMember[
             Tu rol
           </Text>
           <Badge variant="outline">
-            {formatPlatformRole((user?.role || "user") as PlatformRole)}
+            {formatPlatformRole(platformRole)}
           </Badge>
         </div>
       </Card>

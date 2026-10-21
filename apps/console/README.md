@@ -61,7 +61,7 @@ apps/console/
 │   └── staff/                     # staff-table, staff-modal, staff-form
 └── lib/
     ├── api/                       # instancia de createApiClient (@workspace/auth/api-client) + exchange-rates
-    ├── hooks/                     # Propios de la app: use-exchange-rates, use-organization-activation
+    ├── hooks/                     # Propios de la app: use-exchange-rates
     ├── services/                  # organizations, platform-plans, platform-subscriptions, staff, upload
     └── config/                    # envs (solo NEXT_PUBLIC_R2_URL), platform-settings, organization-presets
 ```

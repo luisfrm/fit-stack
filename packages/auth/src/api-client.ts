@@ -41,12 +41,6 @@ export type ApiFetchOptions<R extends ResponseType = "json"> = Omit<
 export interface CreateApiClientOptions {
   /** Path appended to the API base URL. Defaults to `/api`. */
   readonly basePath?: string;
-  /**
-   * Called on the client when the API answers `ORGANIZATION_NOT_FOUND`
-   * (the active organization no longer exists). The app decides how to
-   * navigate: a fetch interceptor cannot call a React hook.
-   */
-  readonly onOrganizationNotFound?: () => void;
   readonly retry?: number;
   readonly timeout?: number;
 }
@@ -70,55 +64,20 @@ async function attachAuth(context: FetchContext): Promise<void> {
 }
 
 /**
- * Reads the business `code` from an error payload.
- *
- * JSON responses expose it directly. A `responseType: "blob"` request (PDF
- * downloads) parses the error body as a Blob even when the API answered JSON,
- * so the text is decoded best-effort; a non-JSON body simply has no code.
+ * Response-error interceptor shared by `api` and `apiBlob`: a JSON error body
+ * whose `error` is an object is formatted into a readable string, so React
+ * never renders a raw object as a child.
  */
-async function readErrorCode(body: unknown): Promise<string | undefined> {
-  if (isRecord(body) && typeof body.code === "string") {
-    return body.code;
-  }
-  if (typeof Blob !== "undefined" && body instanceof Blob) {
-    try {
-      const parsed: unknown = JSON.parse(await body.text());
-      if (isRecord(parsed) && typeof parsed.code === "string") {
-        return parsed.code;
-      }
-    } catch {
-      // Not JSON (e.g. an HTML proxy error page): no business code.
+function responseErrorHandler({ response }: FetchContext): void {
+  if (typeof window === "undefined") return;
+
+  const body: unknown = response?._data;
+  if (isRecord(body) && isRecord(body.error)) {
+    const formatted = formatApiErrorMessage(body);
+    if (formatted) {
+      body.error = formatted;
     }
   }
-  return undefined;
-}
-
-/**
- * Response-error interceptor shared by `api` and `apiBlob`, so a PDF download
- * and a JSON request react the same way.
- *
- * - `ORGANIZATION_NOT_FOUND` → notifies the app (event → `router.replace`).
- * - Zod/API validation errors (JSON only) → readable string so React never
- *   renders a raw object as a child.
- */
-function createResponseErrorHandler(onOrganizationNotFound?: () => void) {
-  return async ({ response }: FetchContext): Promise<void> => {
-    if (typeof window === "undefined") return;
-
-    const body: unknown = response?._data;
-
-    const code = await readErrorCode(body);
-    if (code === "ORGANIZATION_NOT_FOUND") {
-      onOrganizationNotFound?.();
-    }
-
-    if (isRecord(body) && isRecord(body.error)) {
-      const formatted = formatApiErrorMessage(body);
-      if (formatted) {
-        body.error = formatted;
-      }
-    }
-  };
 }
 
 /**
@@ -131,16 +90,13 @@ export function createApiClient(options: CreateApiClientOptions = {}) {
   const baseURL = `${requireApiBaseUrl()}${options.basePath ?? "/api"}`;
   const retry = options.retry ?? 1;
   const timeout = options.timeout ?? 30_000;
-  const handleResponseError = createResponseErrorHandler(
-    options.onOrganizationNotFound,
-  );
 
   const api = ofetch.create({
     baseURL,
     retry,
     timeout,
     onRequest: attachAuth,
-    onResponseError: handleResponseError,
+    onResponseError: responseErrorHandler,
   });
 
   /**
@@ -160,7 +116,7 @@ export function createApiClient(options: CreateApiClientOptions = {}) {
       responseType: "blob",
       headers: requestOptions.headers,
       onRequest: attachAuth,
-      onResponseError: handleResponseError,
+      onResponseError: responseErrorHandler,
     } as unknown as FetchOptions<"blob">)) as unknown as T;
   }
 
