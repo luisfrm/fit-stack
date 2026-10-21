@@ -49,7 +49,7 @@ export function canPlatform(
   moduleName: keyof PlatformStatement,
   actionName: string,
 ): boolean {
-  if (!role || !(role in platformRoles)) return false;
+  if (!role || !Object.hasOwn(platformRoles, role)) return false;
   const roleDef = platformRoles[role as keyof typeof platformRoles];
   const statement = {
     [moduleName]: [actionName],

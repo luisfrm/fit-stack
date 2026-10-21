@@ -141,11 +141,8 @@ describe("createApiClient", () => {
       "https://api.fit-stack.test/api",
     );
     expect(directCalls[0]?.options.responseType).toBe("blob");
-
-    const handler = errorHandlerOf(directCalls[0]?.options ?? {});
-    const body = zodErrorBody();
-    handler({ response: { _data: body } });
-
-    expect(typeof body.error).toBe("string");
+    expect(directCalls[0]?.options.onResponseError).toBe(
+      createCalls[0]?.onResponseError,
+    );
   });
 });

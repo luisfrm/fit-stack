@@ -14,7 +14,7 @@ Sistema de permisos basado en **Better Auth Access Control** con matriz tipada. 
 | Matriz | `access-control.ts` | `organizationAc.newRole(...)` / `platformAc.newRole(...)` |
 | Cliente puro | `can(role, module, action)` | Lectura de matriz (`packages/shared/src/permissions/can.ts`) |
 | API | `requireOrgPermission` / `requirePlatformPermission` | Middleware Hono que valida sesión + `can()` |
-| Panel UX | `usePermissions()` | `can(module, action)`, `hasAccess`, `canAccessPanel()` |
+| Panel UX | `useOrgPermissions()` | `can(module, action)` |
 | Anti-escalación | `canAssignRole(actor, target)` | Valida asignación de roles en miembros/staff |
 
 **Coach y member no entran al Panel.** **Pagos** se autorizan vía módulo `subscriptions` (no existe módulo `payments`).

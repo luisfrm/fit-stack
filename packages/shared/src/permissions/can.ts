@@ -11,7 +11,7 @@ export function can(
   module: PermissionModule | string,
   action: PermissionAction | string,
 ): boolean {
-  if (!role || !(role in organizationRoles)) return false;
+  if (!role || !Object.hasOwn(organizationRoles, role)) return false;
   const roleDef = organizationRoles[role as OrganizationRole];
   const statement = { [module]: [action] } as unknown as Parameters<
     typeof roleDef.authorize

@@ -27,13 +27,21 @@ import { useOrgAuth, useOrgPermissions } from '@workspace/auth/org'
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared'
 
 function MyComponent() {
-  const { activeOrganization, orgRole, isOwner } = useOrgAuth()
+  const { isOwner } = useOrgAuth()
   const { can } = useOrgPermissions()
 
+  // Authorization always goes through the matrix: owner, manager and cashier pass.
+  const canAccess = can(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)
   const canEdit = can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE)
 
-  if (isOwner) return <AdminPanel />
-  return <ReadOnlyView />
+  if (!canAccess) return <AccessDenied />
+
+  return (
+    <>
+      {isOwner && <OwnerBadge />} {/* identity only: never an authorization gate */}
+      {canEdit ? <EditView /> : <ReadOnlyView />}
+    </>
+  )
 }
 ```
 
@@ -44,13 +52,20 @@ function MyComponent() {
 
 ```tsx
 import { usePlatformAuth } from '@workspace/auth/platform'
-import { canAccessConsole, canPlatform } from '@workspace/shared'
+import { canAssignPlatformRole, platformRoles, type PlatformRole } from '@workspace/shared'
 
 function StaffTable() {
-  const { user, platformRole } = usePlatformAuth()
-  const canAssign = canPlatform(platformRole, 'user', 'set-role')
+  const { platformRole } = usePlatformAuth()
+
+  // Roles this actor may assign (anti-escalation): admin can assign admin/support, never owner.
+  const assignableRoles = Object.keys(platformRoles).filter((role) =>
+    canAssignPlatformRole(platformRole, role as PlatformRole),
+  )
 }
 ```
+
+> `canPlatform(role, module, action)` responde "¿puede ejecutar esta acción?" y **no** sustituye a
+> `canAssignPlatformRole(actorRole, targetRole)`: un `admin` tiene `user:set-role` pero no puede asignar `owner`.
 
 `usePlatformAuth` no devuelve campos de organización: la Console es platform-scoped.
 

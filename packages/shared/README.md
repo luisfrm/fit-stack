@@ -36,7 +36,7 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ### `access-control.ts`
 
 - `platformStatement`/`platformAc`/`platformRoles` — AC de plataforma SaaS (roles: `owner`, `admin`, `support`)
-- `canAccessConsole(role)` — gate de acceso al Console (true para cualquier rol de `platformRoles`)
+- `canAccessConsole(role)` — gate de acceso al Console (deriva de la matriz: solo roles con `organization.create`, es decir `admin` y `owner`; `support` devuelve `false`)
 - `organizationStatement`/`organizationAc`/`organizationRoles` — AC de tenant (roles: `owner`, `manager`, `cashier`, `coach`, `member`)
 - `orgRoleDefinitions` — alias de `organizationRoles` (mapa Better Auth de rol → permisos nativos)
 

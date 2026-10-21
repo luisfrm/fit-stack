@@ -84,9 +84,6 @@ buildMediaUrl(key, r2PublicUrl)   // public → R2 URL; private → authenticate
 
 // exchange-rates.ts
 BASE_EXCHANGE_API_URL, EUR_EXCHANGE_URL, USD_EXCHANGE_URL, EUR/USD_EXCHANGE_URL_V4
-
-// constants.ts
-ORG_CONTEXT_LOST_EVENT   // (removed) organization-context recovery is server-side in the layouts
 ```
 
 ---
