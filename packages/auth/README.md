@@ -101,7 +101,7 @@ errores de validación.
 ## Convenciones
 
 - **Org vs platform:** `useOrgAuth`/`useOrgPermissions` para apps de gimnasio; `usePlatformAuth` para la Console. No mezclar campos de un carril en el otro.
-- **Identidad vs autorización:** los flags no autorizan; `can()` / `hasAccess()` / `canPlatform()` sí.
+- **Identidad vs autorización:** los flags no autorizan; `can()` / `canPlatform()` sí.
 - Para server components: `sessionService.getSession()` con headers de la request.
 - No crear re-exports locales en `apps/*/lib`: importar directo de `@workspace/auth/*`.
 

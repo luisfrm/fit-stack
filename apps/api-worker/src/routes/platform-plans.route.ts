@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformPlansService } from '../services/platform-plans.service';
 import { createCache } from '../lib/cache';
@@ -39,7 +39,7 @@ const platformPlanSchema = z.object({
 
 export const platformPlanRoutes = new Hono<AppEnv>()
   // GET /api/platform/plans
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('plan', 'list'), async (c) => {
     const cache = createCache(c.env);
     const cacheKey = 'platform:plans';
 
@@ -57,7 +57,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/plans/with-stats
-  .get('/with-stats', requirePlatformAuth(), async (c) => {
+  .get('/with-stats', requirePlatformPermission('plan', 'list'), async (c) => {
     const repo = createPlatformPlansRepository(c.get('db'));
     const service = createPlatformPlansService(repo);
 
@@ -66,7 +66,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/plans/summary
-  .get('/summary', requirePlatformAuth(), async (c) => {
+  .get('/summary', requirePlatformPermission('plan', 'list'), async (c) => {
     const repo = createPlatformPlansRepository(c.get('db'));
     const service = createPlatformPlansService(repo);
 
@@ -75,7 +75,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/plans/:id
-  .get('/:id', requirePlatformAuth(), async (c) => {
+  .get('/:id', requirePlatformPermission('plan', 'list'), async (c) => {
     const id = Number(c.req.param('id'));
 
     const repo = createPlatformPlansRepository(c.get('db'));
@@ -86,7 +86,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/plans
-  .post('/', requirePlatformAuth(), zValidator('json', platformPlanSchema), async (c) => {
+  .post('/', requirePlatformPermission('console', 'manage'), zValidator('json', platformPlanSchema), async (c) => {
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -99,7 +99,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/platform/plans/:id
-  .put('/:id', requirePlatformAuth(), zValidator('json', platformPlanSchema.partial()), async (c) => {
+  .put('/:id', requirePlatformPermission('console', 'manage'), zValidator('json', platformPlanSchema.partial()), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -114,7 +114,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // PATCH /api/platform/plans/:id (PUT alias for client compatibility)
-  .patch('/:id', requirePlatformAuth(), zValidator('json', platformPlanSchema.partial()), async (c) => {
+  .patch('/:id', requirePlatformPermission('console', 'manage'), zValidator('json', platformPlanSchema.partial()), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -129,7 +129,7 @@ export const platformPlanRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/plans/:id
-  .delete('/:id', requirePlatformAuth(), async (c) => {
+  .delete('/:id', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

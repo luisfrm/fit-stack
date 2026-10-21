@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Users, Mail, RefreshCw, CheckCircle2, Clock, UserPlus } from "lucide-react";
 import { Card, Text, Button, Badge, toast } from "@workspace/ui/components";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { ProvisionOwnerModal } from "./provision-owner-modal";
 import type { IMember } from "@workspace/shared/types";
@@ -12,6 +14,8 @@ interface OrganizationStaffCardProps {
 }
 
 export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardProps) {
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
   const [staff, setStaff] = React.useState<IMember[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [resendingId, setResendingId] = React.useState<number | null>(null);
@@ -74,16 +78,18 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
               Esta sede aún no tiene un usuario propietario asignado. Agrega un propietario para enviarle su invitación.
             </p>
           </div>
-          <ProvisionOwnerModal
-            organizationId={organizationId}
-            onSuccess={fetchStaff}
-            trigger={
-              <Button size="sm" className="gap-2 text-xs font-semibold">
-                <UserPlus className="w-4 h-4" />
-                Agregar Propietario
-              </Button>
-            }
-          />
+          {canManage && (
+            <ProvisionOwnerModal
+              organizationId={organizationId}
+              onSuccess={fetchStaff}
+              trigger={
+                <Button size="sm" className="gap-2 text-xs font-semibold">
+                  <UserPlus className="w-4 h-4" />
+                  Agregar Propietario
+                </Button>
+              }
+            />
+          )}
         </div>
       );
     }
@@ -127,7 +133,7 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
                   </Badge>
                 )}
 
-                {!isLinked && (
+                {!isLinked && canManage && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -165,7 +171,7 @@ export function OrganizationStaffCard({ organizationId }: OrganizationStaffCardP
         </div>
 
         <div className="flex items-center gap-2">
-          {!hasOwner && (
+          {!hasOwner && canManage && (
             <ProvisionOwnerModal
               organizationId={organizationId}
               onSuccess={fetchStaff}

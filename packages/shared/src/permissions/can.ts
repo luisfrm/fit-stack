@@ -27,8 +27,3 @@ export function canAny(
 ): boolean {
   return checks.some(([module, action]) => can(role, module, action));
 }
-
-/**
-  Alias for can() using clean, professional naming for permission checks.
- */
-export const hasAccess = can;

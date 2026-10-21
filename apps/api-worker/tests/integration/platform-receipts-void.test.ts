@@ -5,7 +5,7 @@
  * ANULADO flag; void without a number → **200 with `receiptVoided:false` +
  * `receiptVoidReason:'not_issued'`** (the payment status does change; the code
  * `RECEIPT_NOT_ISSUED` is an internal service contract); re-void is
- * idempotent (audit intact); support 403 (inherited from `requirePlatformAuth`);
+ * idempotent (audit intact); support 403 (inherited from `console:manage`);
  * void neither cancels the subscription nor reverts the cumulative period.
  *
  * Voiding enqueues the render of the stamped PDF and until that artifact
@@ -265,7 +265,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
     );
   });
 
-  it('support 403 al anular (heredado de requirePlatformAuth)', async () => {
+  it('support 403 al anular (heredado de console:manage)', async () => {
     const { paymentId } = await approveAndComplete();
     const support = await registerPlatformUser('support');
     const res = await setStatus(paymentId, 'voided', support.client);

@@ -61,8 +61,7 @@ Worker **stateless y por request**: en cada petición se crea la instancia de Be
 |-------|-----|------------|
 | `requireAuth()` | Rutas con sesión pero sin permiso granular | Sesión + user (401 si falta) |
 | `requireOrgPermission(module, action)` | CRUD de tenant | Sesión + `activeOrganizationId` (400) + permiso vía `auth.api.hasPermission` contra la matriz de `@workspace/shared` (403). Fallback a `can(role, module, action)` si el AC plugin falla |
-| `requirePlatformPermission(module, action)` | Rutas SaaS admin | Sesión + `auth.api.userHasPermission` (403 si no). Fallback a `user.role === 'admin'` |
-| `requirePlatformAuth()` | Alias de platform auth | `requirePlatformPermission('organization', 'create')` |
+| `requirePlatformPermission(module, action)` | Rutas SaaS admin | Sesión + `auth.api.userHasPermission` (403 si no). Fallback fail-closed a `canPlatform(user.role, module, action)` |
 
 ### Estructura
 
@@ -188,7 +187,9 @@ Guards (el `code` es el contrato — los toasts del panel lo mapean, nunca texto
 
 Si el pago o la emisión fallan tras crear la suscripción, el service **compensa** (helper `compensateFailedEmission`): decide **por relectura** (con hasta 3 reintentos para vencer un blip de Neon HTTP) si el número quedó persistido (`committed` → el alta es válida, no se re-lanza); si la relectura no se puede resolver (`unresolved`) **no se toca nada** (fail-closed real: anular un comprobante posiblemente numerado lo serviría/enviaría sin sello) y se re-lanza el error original; en caso contrario anula el pago con motivo fijo `COMPENSATION_VOID_REASON` o cancela la huérfana con `cancel()` — nunca `delete()` (registro financiero inmutable). En el flujo gym el pago anulado ya computa `ANULADA`, así que la suscripción **no** se cancela además. En SaaS, donde el periodo se extiende antes de emitir, la compensación también **revierte el periodo** a su valor previo (`updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) **solo si la anulación del pago tuvo éxito** (si no, el cobro sigue válido y no se pierden los días pagados); y un alta SaaS con el pago creado-pero-anulado **cancela también la suscripción** (un `voided` se ignora en `computePlatformSubscriptionStatus` y dejaría un periodo front-loadeado sin cobro) — solo en `compensated`, nunca en `unresolved`. Las mutaciones invalidan las cachés dependientes en un `finally`, así que el camino de fallo compensado también invalida.
 
-### Rutas plataforma (SaaS admin — `requirePlatformAuth`, roles globales `admin`/`owner`)
+### Rutas plataforma (SaaS admin — `requirePlatformPermission`, roles globales `owner`/`admin`/`support`)
+
+`support` es de solo lectura: cada GET exige el permiso de lectura de su módulo (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) y toda mutación de orgs/planes/suscripciones/staff exige `console:manage` (settings y branding, `setting:write`). No existe `requirePlatformAuth`.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|

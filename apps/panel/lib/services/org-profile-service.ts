@@ -32,7 +32,7 @@ export interface OrgProfileInput {
 /**
  * Única vía de escritura del panel para la fila `organization`.
  * Nunca toca `/platform/organizations`: ese service es de nivel plataforma
- * (`requirePlatformAuth`) y un owner de gym no tiene ese rol.
+ * (`console:manage`) y un owner de gym no tiene ese rol.
  */
 export const orgProfileService = {
   async updateProfile(data: OrgProfileInput): Promise<unknown> {

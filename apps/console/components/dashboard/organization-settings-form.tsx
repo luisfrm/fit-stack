@@ -19,6 +19,8 @@ import {
 } from "@workspace/ui/components";
 import { ColorUtils } from "@workspace/ui/lib/color-utils";
 import { SETTINGS_KEYS } from "@/lib/config/settings";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import Link from "next/link";
 
 const DEFAULT_BRANDING = {
@@ -45,6 +47,8 @@ export function OrganizationSettingsForm({
   description = "Configura la identidad y parámetros técnicos de la sede.",
   backUrl = "/dashboard"
 }: OrganizationSettingsFormProps) {
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
   const [formData, setFormData] = React.useState<Record<string, string>>({});
   const hasInitialized = React.useRef(false);
 
@@ -247,15 +251,17 @@ export function OrganizationSettingsForm({
             >
               <Link href={backUrl}>Cancelar</Link>
             </Button>
-            <Button
-              type="submit"
-              loading={isUpdating}
-              disabled={isUpdating}
-              leftIcon={<Save className="w-4 h-4" />}
-              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
-            >
-              Guardar Ajustes
-            </Button>
+            {canManage && (
+              <Button
+                type="submit"
+                loading={isUpdating}
+                disabled={isUpdating}
+                leftIcon={<Save className="w-4 h-4" />}
+                className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+              >
+                Guardar Ajustes
+              </Button>
+            )}
           </div>
         </Card>
 

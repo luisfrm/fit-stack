@@ -40,7 +40,7 @@ getSuggestedPaymentMethods(countryCode?) → métodos del país + universales si
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
-orgRoleDefinitions, canPlatform(role, module, action), canAccessConsole(role),
+orgRoleDefinitions, canPlatform(role, module, action),
 PlatformStatement, OrganizationStatement,
 OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
@@ -51,7 +51,7 @@ ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode*, taxId, legalName, address,
   modules.ts:         PERMISSION_MODULES (12 modules: dashboard, reports, members, staff,
                       subscriptions, plans, classes, content, settings, organization, ai, panel)
   actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
-  can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
+  can.ts:             can(role, module, action), canAny()
   role-assignment.ts: canAssignRole(actor, target) (org) and canAssignPlatformRole(actor, target) (platform)
 
 // ai.ts
@@ -112,7 +112,7 @@ useOrgPermissions() → { can(module, action) }   // thin wrapper over `can` fro
 
 // platform.ts — "use client" (@workspace/auth/platform) — SaaS side, Console only
 usePlatformAuth() → { session, user, platformRole, isPending, error, refetch }
-// no organization fields; platform authorization goes through canPlatform/canAccessConsole
+// no organization fields; platform authorization goes through canPlatform (console.access/manage)
 
 // env.ts — requireEnvValue(name, rawValue, { buildTimeValue, message? }): single required-env
 // resolver (missing value throws visibly; non-production builds warn + build-only placeholder);

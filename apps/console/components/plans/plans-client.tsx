@@ -8,7 +8,8 @@ import { PlatformPlanCard } from "@/components/platform/platform-plan-card";
 import { PlatformPlanModal } from "@/components/platform/platform-plan-modal";
 import type { PlatformPlanWithStats, PlatformPlansSummary } from "@/lib/services/platform-plans-service";
 import type { FeatureCatalog } from "@workspace/shared";
-import { centsToUnits } from "@workspace/shared";
+import { canPlatform, centsToUnits } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { useRouter } from "next/navigation";
 
 interface PlansClientProps {
@@ -33,6 +34,8 @@ export function PlansClient({
   onSuccess,
 }: PlansClientProps) {
   const router = useRouter();
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
   const plans = initialPlans;
   const summary = initialSummary;
   const loading = false;
@@ -130,16 +133,18 @@ export function PlansClient({
             <Text size="lg" weight="bold" className="text-slate-400">No hay planes de plataforma</Text>
             <Text size="sm" variant="muted">Crea el primer nivel de suscripción para Fit-Stack.</Text>
           </div>
-          <PlatformPlanModal
-            onSuccess={refresh}
-            settings={settings}
-            catalog={catalog}
-            trigger={
-              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-                CREAR PRIMER PLAN
-              </Button>
-            }
-          />
+          {canManage && (
+            <PlatformPlanModal
+              onSuccess={refresh}
+              settings={settings}
+              catalog={catalog}
+              trigger={
+                <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+                  CREAR PRIMER PLAN
+                </Button>
+              }
+            />
+          )}
         </div>
       );
     }
@@ -170,16 +175,18 @@ export function PlansClient({
         description="Configuración global de los niveles de servicio y derechos de acceso (Entitlements)."
         iconName="ShieldCheck"
       >
-        <PlatformPlanModal
-          onSuccess={refresh}
-          settings={settings}
-          catalog={catalog}
-          trigger={
-            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              NUEVO PLAN
-            </Button>
-          }
-        />
+        {canManage && (
+          <PlatformPlanModal
+            onSuccess={refresh}
+            settings={settings}
+            catalog={catalog}
+            trigger={
+              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+                NUEVO PLAN
+              </Button>
+            }
+          />
+        )}
       </DashboardHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

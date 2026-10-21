@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requireAuth, requirePlatformAuth } from '../lib/route-handler';
+import { requireAuth, requirePlatformPermission } from '../lib/route-handler';
 import { createUsersRepository } from '../repositories/users.repository';
 import { createTokenService } from '../services/token.service';
 import { createCache } from '../lib/cache';
@@ -24,7 +24,7 @@ const createStaffSchema = z.object({
 
 export const platformStaffRoutes = new Hono<AppEnv>()
   // GET /api/platform/staff?role=&search=
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('user', 'list'), async (c) => {
     const role = c.req.query('role');
     const search = c.req.query('search');
     if (role && !(role in platformRoles)) {
@@ -55,7 +55,7 @@ export const platformStaffRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/staff
-  .post('/', requirePlatformAuth(), zValidator('json', createStaffSchema), async (c) => {
+  .post('/', requirePlatformPermission('console', 'manage'), zValidator('json', createStaffSchema), async (c) => {
     const data = { ...DEFAULT_PLATFORM_STAFF_VALUES, ...c.req.valid('json') };
     // Session user type omits `role` (additionalFields has input:false), so cast like route-handler does.
     const actor = c.get('user') as { role?: string } | undefined;
@@ -145,7 +145,7 @@ export const platformStaffRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/staff/:id — revoke platform access (role → 'user')
-  .delete('/:id', requirePlatformAuth(), async (c) => {
+  .delete('/:id', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = c.req.param('id');
     // Session user type omits `role` (additionalFields has input:false), so cast like route-handler does.
     const actor = c.get('user') as { id: string; role?: string };

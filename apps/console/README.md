@@ -3,7 +3,7 @@
 Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de plataforma, suscripciones, configuraciones globales (currencies, payment methods) y el equipo de administración (Staff).
 
 **Puerto:** 3000  
-**Acceso:** Usuarios con rol global de plataforma que pasen `canAccessConsole(role)` (admin/owner — los que tienen `organization.create` en `platformRoles`); `support` es read-only y no entra al layout
+**Acceso:** Usuarios con rol global de plataforma que pasen `canPlatform(role, 'console', 'access')` (`owner`, `admin` y `support`); `support` es read-only y no puede mutar nada (`console:manage` / `setting:write`)
 
 ---
 

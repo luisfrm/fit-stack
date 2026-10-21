@@ -6,33 +6,49 @@
  * here mirrors a rule documented in `vaults/business/RBAC-STRUCTURE.md`.
  */
 import { describe, expect, it } from "vitest";
-import {
-  canAccessConsole,
-  canPlatform,
-  type PlatformStatement,
-} from "../src/access-control";
+import { canPlatform, type PlatformStatement } from "../src/access-control";
 import { can } from "../src/permissions/can";
 import { PERMISSION_ACTIONS } from "../src/permissions/actions";
 import { PERMISSION_MODULES } from "../src/permissions/modules";
 import { ORG_ROLES } from "../src/constants";
 
-// ─── canAccessConsole(role) ────────────────────────────────────────────────
+// ─── console.access / console.manage ───────────────────────────────────────
 
 const consoleAccessCases: ReadonlyArray<
   readonly [string | null | undefined, boolean]
 > = [
   ["owner", true],
   ["admin", true],
-  ["support", false],
+  ["support", true],
   ["user", false],
   ["", false],
   [null, false],
   [undefined, false],
 ];
 
-describe("canAccessConsole(role)", () => {
+describe("canPlatform(role, 'console', 'access')", () => {
   it.each(consoleAccessCases)("%s → %s", (role, expected) => {
-    expect(canAccessConsole(role)).toBe(expected);
+    expect(canPlatform(role, "console", "access")).toBe(expected);
+  });
+});
+
+describe("canPlatform(role, 'console', 'manage')", () => {
+  it.each([
+    ["owner", true],
+    ["admin", true],
+    ["support", false],
+    ["user", false],
+    ["", false],
+    [null, false],
+    [undefined, false],
+  ] as const)("%s → %s", (role, expected) => {
+    expect(canPlatform(role, "console", "manage")).toBe(expected);
+  });
+});
+
+describe("canPlatform(role, 'organization', 'list')", () => {
+  it.each(["owner", "admin", "support"])("allows %s", (role) => {
+    expect(canPlatform(role, "organization", "list")).toBe(true);
   });
 });
 
@@ -42,7 +58,10 @@ const platformCases: ReadonlyArray<
   readonly [string, keyof PlatformStatement, string, boolean]
 > = [
   // owner — full platform access
+  ["owner", "console", "access", true],
+  ["owner", "console", "manage", true],
   ["owner", "organization", "create", true],
+  ["owner", "organization", "list", true],
   ["owner", "organization", "delete", true],
   ["owner", "subscription", "list", true],
   ["owner", "subscription", "cancel", true],
@@ -50,7 +69,10 @@ const platformCases: ReadonlyArray<
   ["owner", "setting", "read", true],
   ["owner", "setting", "write", true],
   // admin — full tenant management, no organization delete
+  ["admin", "console", "access", true],
+  ["admin", "console", "manage", true],
   ["admin", "organization", "create", true],
+  ["admin", "organization", "list", true],
   ["admin", "organization", "delete", false],
   ["admin", "subscription", "list", true],
   ["admin", "subscription", "cancel", true],
@@ -58,8 +80,13 @@ const platformCases: ReadonlyArray<
   ["admin", "setting", "read", true],
   ["admin", "setting", "write", true],
   // support — read-only
+  ["support", "console", "access", true],
+  ["support", "console", "manage", false],
   ["support", "organization", "create", false],
+  ["support", "organization", "list", true],
   ["support", "organization", "delete", false],
+  ["support", "plan", "list", true],
+  ["support", "user", "list", true],
   ["support", "subscription", "list", true],
   ["support", "subscription", "cancel", false],
   ["support", "subscription", "extend", false],

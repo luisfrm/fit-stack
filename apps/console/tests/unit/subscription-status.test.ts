@@ -1,18 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  canManageBilling,
-  hasActiveSubscription,
-} from "@/lib/platform-permissions";
-
-describe("canManageBilling", () => {
-  it.each(["owner", "admin"])("allows %s", (role) => {
-    expect(canManageBilling(role)).toBe(true);
-  });
-
-  it.each(["support", "user", "", null, undefined])("denies %s", (role) => {
-    expect(canManageBilling(role as string | null | undefined)).toBe(false);
-  });
-});
+import { hasActiveSubscription } from "@/lib/platform/subscription-status";
 
 describe("hasActiveSubscription", () => {
   it.each(["active", "trial"])("accepts %s without cancelledAt", (status) => {

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createR2Service } from '../lib/r2';
 import { constructStorageKey } from '../lib/storage-keys';
 import {
@@ -30,7 +30,7 @@ const presignedSchema = z.object({
 
 export const platformUploadRoutes = new Hono<AppEnv>()
   // GET /api/platform/upload
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('setting', 'read'), async (c) => {
     const r2Service = createR2Service(c.env);
     const files = await r2Service.listFiles(PLATFORM_BRANDING_PREFIX);
     return c.json(files);
@@ -38,7 +38,7 @@ export const platformUploadRoutes = new Hono<AppEnv>()
 
   // GET /api/platform/upload/file?key=platform/branding/... - authenticated delivery
   // (branding is also public, this is for previews with session).
-  .get('/file', requirePlatformAuth(), async (c) => {
+  .get('/file', requirePlatformPermission('setting', 'read'), async (c) => {
     const key = c.req.query('key');
 
     if (!key) return c.json({ error: 'Key is required' }, 400);
@@ -58,7 +58,7 @@ export const platformUploadRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/upload?key=platform/branding/...
-  .delete('/', requirePlatformAuth(), async (c) => {
+  .delete('/', requirePlatformPermission('setting', 'write'), async (c) => {
     const key = c.req.query('key');
 
     if (!key) {
@@ -74,7 +74,7 @@ export const platformUploadRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/platform/upload/direct?key=platform/branding/...
-  .put('/direct', requirePlatformAuth(), async (c) => {
+  .put('/direct', requirePlatformPermission('setting', 'write'), async (c) => {
     const key = c.req.query('key');
 
     if (!key) {
@@ -98,7 +98,7 @@ export const platformUploadRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/upload/presigned
-  .post('/presigned', requirePlatformAuth(), zValidator('json', presignedSchema), async (c) => {
+  .post('/presigned', requirePlatformPermission('setting', 'write'), zValidator('json', presignedSchema), async (c) => {
     const body = c.req.valid('json');
 
     const uniqueKey = constructStorageKey(

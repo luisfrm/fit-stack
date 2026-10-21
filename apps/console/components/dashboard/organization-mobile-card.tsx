@@ -5,6 +5,8 @@ import { Card, Text, Badge, Button, Skeleton } from "@workspace/ui/components";
 import { CreditCard, ExternalLink, Building2 } from "lucide-react";
 import { OrganizationActions } from "./organization-actions";
 import { selectOrgHealth } from "@/lib/platform/organization-selectors";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 import { type IPlatformOrganization } from "@workspace/shared/types";
 import type { OrgAiQuota } from "@/lib/services/organizations-service";
@@ -48,6 +50,8 @@ export function OrganizationMobileCard({
   aiQuota,
   EditModal,
 }: OrganizationMobileCardProps) {
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
   if (isLoading) {
     return (
       <Card className="p-5 space-y-4">
@@ -196,15 +200,17 @@ export function OrganizationMobileCard({
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-        <Button
-          variant="outlined"
-          size="sm"
-          onClick={() => onAddSubscription?.(org)}
-          className="bg-transparent border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest py-3 h-auto"
-        >
-          <CreditCard size={14} className="mr-2 text-primary" />
-          Plan
-        </Button>
+        {canManage && (
+          <Button
+            variant="outlined"
+            size="sm"
+            onClick={() => onAddSubscription?.(org)}
+            className="bg-transparent border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest py-3 h-auto"
+          >
+            <CreditCard size={14} className="mr-2 text-primary" />
+            Plan
+          </Button>
+        )}
         <Button
           variant="primary"
           size="sm"

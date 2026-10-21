@@ -2,7 +2,7 @@
  * Pure selectors for the organizations module (no fetch).
  */
 import type { IPlatformOrganization } from "@workspace/shared/types";
-import { hasActiveSubscription } from "@/lib/platform-permissions";
+import { hasActiveSubscription } from "@/lib/platform/subscription-status";
 
 export interface OrgKpis {
   total: number;

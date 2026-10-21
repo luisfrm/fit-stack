@@ -130,9 +130,6 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
     await next();
   });
 
-/** Alias for platform auth */
-export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
-
 /**
  * Resolves active organization timezone from session and stores it
  * in `c.get('orgTimezone')` (typed). It is MANDATORY: if missing, throws 500 —

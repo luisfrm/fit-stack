@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import { createOrganizationsService } from '../services/organizations.service';
@@ -81,7 +81,7 @@ const provisionOwnerSchema = z.object({
 
 export const platformOrganizationRoutes = new Hono<AppEnv>()
   // GET /api/platform/organizations
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('organization', 'list'), async (c) => {
     const query = c.req.query('query');
     const page = Number(c.req.query('page') || '1');
     const limit = Number(c.req.query('limit') || '10');
@@ -110,7 +110,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // GET /api/platform/organizations/check-slug - live availability of slug
   .get(
     '/check-slug',
-    requirePlatformAuth(),
+    requirePlatformPermission('organization', 'list'),
     zValidator(
       'query',
       z.object({ slug: z.string().min(1, 'El slug es requerido'), excludeId: z.string().optional() }),
@@ -133,7 +133,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   )
 
   // GET /api/platform/organizations/by-slug/:slug
-  .get('/by-slug/:slug', requirePlatformAuth(), async (c) => {
+  .get('/by-slug/:slug', requirePlatformPermission('organization', 'list'), async (c) => {
     const slug = c.req.param('slug');
     const includeMemberCount = c.req.query('includeMemberCount') === 'true';
     const repo = createOrganizationsRepository(c.get('db'));
@@ -149,7 +149,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/organizations/:id
-  .get('/:id', requirePlatformAuth(), async (c) => {
+  .get('/:id', requirePlatformPermission('organization', 'list'), async (c) => {
     const id = c.req.param('id');
     const repo = createOrganizationsRepository(c.get('db'));
     const settingsRepo = createSettingsRepository(c.get('db'));
@@ -162,7 +162,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/organizations
-  .post('/', requirePlatformAuth(), zValidator('json', createOrgSchema), async (c) => {
+  .post('/', requirePlatformPermission('console', 'manage'), zValidator('json', createOrgSchema), async (c) => {
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -179,7 +179,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/platform/organizations/:id
-  .put('/:id', requirePlatformAuth(), zValidator('json', createOrgSchema.partial()), async (c) => {
+  .put('/:id', requirePlatformPermission('console', 'manage'), zValidator('json', createOrgSchema.partial()), async (c) => {
     const id = c.req.param('id');
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -210,7 +210,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // PATCH /api/platform/organizations/:id
-  .patch('/:id', requirePlatformAuth(), zValidator('json', createOrgSchema.partial()), async (c) => {
+  .patch('/:id', requirePlatformPermission('console', 'manage'), zValidator('json', createOrgSchema.partial()), async (c) => {
     const id = c.req.param('id');
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -241,7 +241,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/organizations/:id
-  .delete('/:id', requirePlatformAuth(), async (c) => {
+  .delete('/:id', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = c.req.param('id');
     const cache = createCache(c.env);
 
@@ -257,7 +257,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // POST /api/platform/organizations/:id/ai-credits - manual grant of AI credits (tests / top-up)
   .post(
     '/:id/ai-credits',
-    requirePlatformAuth(),
+    requirePlatformPermission('console', 'manage'),
     zValidator('json', z.object({ credits: z.number().int().min(1).max(1_000_000) })),
     async (c) => {
       const orgId = c.req.param('id');
@@ -293,7 +293,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   )
 
   // GET /api/platform/organizations/:id/ai-usage - read AI quota by org (console)
-  .get('/:id/ai-usage', requirePlatformAuth(), async (c) => {
+  .get('/:id/ai-usage', requirePlatformPermission('organization', 'list'), async (c) => {
     const orgId = c.req.param('id');
     const cache = createCache(c.env);
 
@@ -326,7 +326,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
   // GET /api/platform/organizations/:id/gym-overview - gym + portal adoption (console).
   // Accepted staleness (5 min): gym writes do not invalidate platform keys.
-  .get('/:id/gym-overview', requirePlatformAuth(), async (c) => {
+  .get('/:id/gym-overview', requirePlatformPermission('organization', 'list'), async (c) => {
     const orgId = c.req.param('id');
     const cache = createCache(c.env);
 
@@ -352,7 +352,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/organizations/:id/subscriptions
-  .get('/:id/subscriptions', requirePlatformAuth(), async (c) => {
+  .get('/:id/subscriptions', requirePlatformPermission('organization', 'list'), async (c) => {
     const id = c.req.param('id');
     const repo = createPlatformSubscriptionsRepository(c.get('db'));
     const plansRepo = createPlatformPlansRepository(c.get('db'));
@@ -365,7 +365,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // POST /api/platform/organizations/:id/subscriptions
   .post(
     '/:id/subscriptions',
-    requirePlatformAuth(),
+    requirePlatformPermission('console', 'manage'),
     zValidator(
       'json',
       z.object({
@@ -413,7 +413,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   )
 
   // GET /api/platform/organizations/:id/staff
-  .get('/:id/staff', requirePlatformAuth(), async (c) => {
+  .get('/:id/staff', requirePlatformPermission('organization', 'list'), async (c) => {
     const id = c.req.param('id');
     const membersRepo = createMembersRepository(c.get('db'));
 
@@ -428,7 +428,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // POST /api/platform/organizations/:id/staff
   .post(
     '/:id/staff',
-    requirePlatformAuth(),
+    requirePlatformPermission('console', 'manage'),
     zValidator('json', provisionOwnerSchema),
     async (c) => {
       const id = c.req.param('id');
@@ -463,7 +463,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   )
 
   // POST /api/platform/organizations/:id/join
-  .post('/:id/join', requirePlatformAuth(), async (c) => {
+  .post('/:id/join', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = c.req.param('id');
     const user = c.get('user');
 
@@ -485,7 +485,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/organizations/:id/staff/:memberId/resend-invite
-  .post('/:id/staff/:memberId/resend-invite', requirePlatformAuth(), async (c) => {
+  .post('/:id/staff/:memberId/resend-invite', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = c.req.param('id');
     const memberId = Number(c.req.param('memberId'));
 
@@ -515,7 +515,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // ---------------------------------------------------------------------------
 
   // GET /api/platform/organizations/:id/upload?folder=
-  .get('/:id/upload', requirePlatformAuth(), async (c) => {
+  .get('/:id/upload', requirePlatformPermission('organization', 'list'), async (c) => {
     const orgId = c.req.param('id');
     await assertOrganizationExists(c, orgId);
 
@@ -526,7 +526,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
   // GET /api/platform/organizations/:id/upload/file?key=<orgId>/… - authenticated
   // delivery for console (org logo, payment proof).
-  .get('/:id/upload/file', requirePlatformAuth(), async (c) => {
+  .get('/:id/upload/file', requirePlatformPermission('organization', 'list'), async (c) => {
     const orgId = c.req.param('id');
     const key = c.req.query('key');
 
@@ -548,7 +548,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/organizations/:id/upload?key=<orgId>/…
-  .delete('/:id/upload', requirePlatformAuth(), async (c) => {
+  .delete('/:id/upload', requirePlatformPermission('console', 'manage'), async (c) => {
     const orgId = c.req.param('id');
     const key = c.req.query('key');
 
@@ -563,7 +563,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   })
 
   // PUT /api/platform/organizations/:id/upload/direct?key=<orgId>/…
-  .put('/:id/upload/direct', requirePlatformAuth(), async (c) => {
+  .put('/:id/upload/direct', requirePlatformPermission('console', 'manage'), async (c) => {
     const orgId = c.req.param('id');
     const key = c.req.query('key');
 
@@ -589,7 +589,7 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
   // POST /api/platform/organizations/:id/upload/presigned
   .post(
     '/:id/upload/presigned',
-    requirePlatformAuth(),
+    requirePlatformPermission('console', 'manage'),
     zValidator('json', uploadPresignedSchema),
     async (c) => {
       const orgId = c.req.param('id');

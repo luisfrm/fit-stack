@@ -51,8 +51,8 @@ Every platform payment (`platform_subscription_payment`) stores `features_snapsh
 
 | Endpoint                          | Auth                  | Use                                                       |
 | --------------------------------- | --------------------- | --------------------------------------------------------- |
-| `GET /api/platform/features`      | `requirePlatformAuth` | Catalog (console)                                         |
-| `/api/platform/knowledge`         | `requirePlatformAuth` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
+| `GET /api/platform/features`      | `setting:read`        | Catalog (console)                                         |
+| `/api/platform/knowledge`         | `setting:read`/`setting:write` | AI Knowledge Base CRUD (platform docs, bge-m3 embeddings) |
 | `GET /api/organizations/features` | `requireAuth`         | Resolved features + `isFreeTier` + status (panel gate)    |
 | `GET /api/organizations/seats`    | `requireAuth`         | Portal seats                                              |
 | `GET /api/ai/usage`               | `requireAuth`         | AI quotas                                                 |

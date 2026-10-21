@@ -16,6 +16,8 @@ import {
   getCountryIdentity,
   parseDocumentId,
 } from "@workspace/shared";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { COUNTRY_LIST } from "@workspace/shared/constants";
@@ -34,6 +36,8 @@ export function PlatformEmitterSettings({
   initialSettings,
   onSaved,
 }: PlatformEmitterSettingsProps) {
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const [legalName, setLegalName] = React.useState<string>(
     () => initialSettings[PLATFORM_SETTINGS_KEYS.FITSTACK_LEGAL_NAME] || "",
   );
@@ -94,9 +98,11 @@ export function PlatformEmitterSettings({
             comprobantes de pago de suscripciones. Vacío = emisor genérico.
           </Text>
         </div>
-        <Button onClick={handleSave} disabled={isUpdating} data-testid="emitter-save">
-          {isUpdating ? "Guardando…" : "Guardar"}
-        </Button>
+        {canWrite && (
+          <Button onClick={handleSave} disabled={isUpdating} data-testid="emitter-save">
+            {isUpdating ? "Guardando…" : "Guardar"}
+          </Button>
+        )}
       </div>
 
       <div className="space-y-8 max-w-4xl">

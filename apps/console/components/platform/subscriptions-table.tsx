@@ -24,16 +24,14 @@ import { DeleteSubscriptionModal } from "./delete-subscription-modal";
 import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
 import {
-  formatCents,
-  PAYMENT_STATUSES,
   apiCode,
+  canPlatform,
+  formatCents,
   mutationError,
+  PAYMENT_STATUSES,
   type CurrencyFormat,
 } from "@workspace/shared";
-import {
-  canManageBilling,
-  hasActiveSubscription,
-} from "@/lib/platform-permissions";
+import { hasActiveSubscription } from "@/lib/platform/subscription-status";
 import { usePlatformAuth } from "@workspace/auth/platform";
 
 import {
@@ -385,7 +383,7 @@ export function SubscriptionsTable({
   linkOrganization = true,
 }: Readonly<SubscriptionsTableProps>) {
   const { platformRole } = usePlatformAuth();
-  const canMutateBilling = canManageBilling(platformRole);
+  const canMutateBilling = canPlatform(platformRole, "console", "manage");
   const [detailModal, setDetailModal] =
     React.useState<SubscriptionWithDetails | null>(null);
   const [cancelModal, setCancelModal] =

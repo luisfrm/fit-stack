@@ -3,7 +3,8 @@
 import * as React from "react";
 import { Edit2, CreditCard, Zap, ExternalLink } from "lucide-react";
 import { ActionsDropdown } from "@workspace/ui/components";
-import { type IPlatformOrganization } from "@workspace/shared/types";
+import { canPlatform, type IPlatformOrganization } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { GrantAiCreditsModal } from "./grant-ai-credits-modal";
 
 interface OrganizationActionsProps {
@@ -29,6 +30,8 @@ export function OrganizationActions({
   EditModal,
   menuClassName,
 }: OrganizationActionsProps) {
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
   const dropdownSections = React.useMemo(
     () => [
       {
@@ -38,13 +41,13 @@ export function OrganizationActions({
             label: "Editar Información",
             icon: <Edit2 size={14} />,
             Modal: EditModal,
-            show: !!EditModal,
+            show: !!EditModal && canManage,
           },
           {
             label: "Editar Información",
             icon: <Edit2 size={14} />,
             onClick: onEdit,
-            show: !EditModal,
+            show: !EditModal && canManage,
           },
           {
             label: "Ver Suscripciones",
@@ -56,17 +59,18 @@ export function OrganizationActions({
             label: "Gestionar Plan",
             icon: <CreditCard size={14} />,
             onClick: onAddSubscription,
+            show: canManage,
           },
           {
             label: "Dar AI Credits",
             icon: <Zap size={14} />,
             Modal: GrantAiCreditsModal,
-            show: true,
+            show: canManage,
           },
         ],
       },
     ],
-    [EditModal, onEdit, onAddSubscription, onViewSubscriptions],
+    [EditModal, onEdit, onAddSubscription, onViewSubscriptions, canManage],
   );
 
   return (

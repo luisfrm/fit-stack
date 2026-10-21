@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createKnowledgeRepository } from '../repositories/knowledge.repository';
 import { createKnowledgeService } from '../services/knowledge.service';
 import { createAIService } from '../services/ai.service';
@@ -21,42 +21,50 @@ const documentUpdateSchema = z.object({
 });
 
 export const platformKnowledgeRoutes = new Hono<AppEnv>()
-  .use('*', requirePlatformAuth())
-
-  .get('/', async (c) => {
+  .get('/', requirePlatformPermission('setting', 'read'), async (c) => {
     const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
     return c.json(await svc.list(null));
   })
 
-  .get('/:id/content', async (c) => {
+  .get('/:id/content', requirePlatformPermission('setting', 'read'), async (c) => {
     const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
     return c.json(await svc.getContent(c.req.param('id')));
   })
 
-  .get('/:id', async (c) => {
+  .get('/:id', requirePlatformPermission('setting', 'read'), async (c) => {
     const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
     return c.json(await svc.getById(c.req.param('id')));
   })
 
-  .post('/', zValidator('json', documentCreateSchema), async (c) => {
-    const body = c.req.valid('json');
-    if (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID) {
-      return c.json({ error: 'IA no configurada: faltan credenciales de embedding' }, 503);
-    }
-    const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
-    return c.json(await svc.create(body), 201);
-  })
+  .post(
+    '/',
+    requirePlatformPermission('setting', 'write'),
+    zValidator('json', documentCreateSchema),
+    async (c) => {
+      const body = c.req.valid('json');
+      if (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID) {
+        return c.json({ error: 'IA no configurada: faltan credenciales de embedding' }, 503);
+      }
+      const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
+      return c.json(await svc.create(body), 201);
+    },
+  )
 
-  .patch('/:id', zValidator('json', documentUpdateSchema), async (c) => {
-    const body = c.req.valid('json');
-    if (body.content !== undefined && (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)) {
-      return c.json({ error: 'IA no configurada: faltan credenciales de embedding' }, 503);
-    }
-    const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
-    return c.json(await svc.update(c.req.param('id'), body));
-  })
+  .patch(
+    '/:id',
+    requirePlatformPermission('setting', 'write'),
+    zValidator('json', documentUpdateSchema),
+    async (c) => {
+      const body = c.req.valid('json');
+      if (body.content !== undefined && (!c.env.CLOUDFLARE_AI_API_TOKEN || !c.env.CLOUDFLARE_ACCOUNT_ID)) {
+        return c.json({ error: 'IA no configurada: faltan credenciales de embedding' }, 503);
+      }
+      const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
+      return c.json(await svc.update(c.req.param('id'), body));
+    },
+  )
 
-  .delete('/:id', async (c) => {
+  .delete('/:id', requirePlatformPermission('setting', 'write'), async (c) => {
     const svc = createKnowledgeService(createKnowledgeRepository(c.get('db')), createAIService(c.env));
     return c.json(await svc.remove(c.req.param('id')));
   });

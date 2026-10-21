@@ -3,7 +3,7 @@
  *
  * Covers: /api/platform/upload (presigned/direct/list/delete) — the
  * platform-scoped R2 routes for assets with no organization context
- * (e.g. branding), guarded by `requirePlatformAuth`.
+ * (e.g. branding), guarded by `setting:read` / `setting:write`.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';

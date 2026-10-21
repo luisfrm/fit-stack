@@ -3,7 +3,7 @@ import { AppSidebar, MobileNav } from "@/components/dashboard/sidebar";
 import { sessionService } from "@workspace/auth/service";
 import { redirect } from "next/navigation";
 import { OrganizationPicker } from "@/components/dashboard/organization-picker";
-import { PLATFORM_SUBSCRIPTION_STATUSES, hasAccess, PERMISSION_MODULES, PERMISSION_ACTIONS, type OrgRole } from "@workspace/shared";
+import { PLATFORM_SUBSCRIPTION_STATUSES, can, PERMISSION_MODULES, PERMISSION_ACTIONS, type OrgRole } from "@workspace/shared";
 import { SubscriptionWarningBanner } from "@/components/dashboard/subscription/subscription-warning-banner";
 import { FreeTierBanner } from "@/components/dashboard/free-tier-banner";
 import { getOrgSubscriptionStatus } from "@/lib/services/subscription-status";
@@ -33,7 +33,7 @@ export default async function DashboardLayout({
   }
 
   const orgRole = session.member?.role as OrgRole | undefined;
-  if (orgRole && !hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
+  if (orgRole && !can(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     redirect("/unauthorized");
   }
 

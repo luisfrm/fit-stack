@@ -2,8 +2,9 @@ import { createAccessControl } from "better-auth/plugins/access";
 
 // --- PLATFORM ACCESS CONTROL (SaaS Admin) ---
 const platformStatement = {
+  console: ["access", "manage"],
   user: ["create", "list", "ban", "impersonate", "delete", "set-role"],
-  organization: ["create", "approve", "suspend", "delete"],
+  organization: ["list", "create", "approve", "suspend", "delete"],
   plan: ["create", "list", "update", "delete"],
   subscription: ["list", "cancel", "extend"],
   setting: ["read", "write"],
@@ -14,22 +15,25 @@ export const platformAc = createAccessControl(platformStatement);
 
 export const platformRoles = {
   support: platformAc.newRole({
+    console: ["access"],
     user: ["list"],
-    organization: [],
+    organization: ["list"],
     plan: ["list"],
     subscription: ["list"],
     setting: ["read"],
   }),
   admin: platformAc.newRole({
+    console: ["access", "manage"],
     user: ["list", "ban", "set-role"],
-    organization: ["create", "approve", "suspend"],
+    organization: ["list", "create", "approve", "suspend"],
     plan: ["create", "list", "update"],
     subscription: ["list", "cancel", "extend"],
     setting: ["read", "write"],
   }),
   owner: platformAc.newRole({
+    console: ["access", "manage"],
     user: ["create", "list", "ban", "impersonate", "delete", "set-role"],
-    organization: ["create", "approve", "suspend", "delete"],
+    organization: ["list", "create", "approve", "suspend", "delete"],
     plan: ["create", "list", "update", "delete"],
     subscription: ["list", "cancel", "extend"],
     setting: ["read", "write"],
@@ -55,16 +59,6 @@ export function canPlatform(
     [moduleName]: [actionName],
   } as unknown as Parameters<typeof roleDef.authorize>[0];
   return roleDef.authorize(statement).success;
-}
-
-/**
- * Whether a user with the given global (platform) role can access the FitStack Console.
- * Derived from the permission matrix: the role must be able to create organizations
- * (`requirePlatformAuth` checks exactly this), so `admin` and `owner` pass but
- * `support` (read-only, no `organization.create`) does not.
- */
-export function canAccessConsole(role?: string | null): boolean {
-  return canPlatform(role, 'organization', 'create');
 }
 
 // --- ORGANIZATION ACCESS CONTROL (Tenant Gym) ---

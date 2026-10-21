@@ -8,9 +8,9 @@ import type { Session, User } from "./client";
  * Platform (FitStack SaaS) auth, used by the Console.
  *
  * Intentionally has no organization fields: the Console is platform-scoped.
- * Authorization uses the platform matrix through `canPlatform` /
- * `canAccessConsole` from `@workspace/shared`; this hook only exposes the
- * user and their platform role.
+ * Authorization uses the platform matrix through `canPlatform` from
+ * `@workspace/shared` (`console.access`, `console.manage`, per-module reads);
+ * this hook only exposes the user and their platform role.
  */
 export function usePlatformAuth() {
   const { data: sessionData, isPending, error, refetch } = useSession();

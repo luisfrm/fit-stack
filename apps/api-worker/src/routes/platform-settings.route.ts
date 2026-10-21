@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createSettingsService } from '../services/settings.service';
@@ -21,7 +21,7 @@ const EMITTER_COUNTRY_CODE_KEY = 'fitstack_country_code';
 
 export const platformSettingsRoutes = new Hono<AppEnv>()
   // GET /api/platform/settings
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('setting', 'read'), async (c) => {
     const cache = createCache(c.env);
     const cacheKey = 'platform:settings';
 
@@ -40,7 +40,7 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/settings
-  .post('/', requirePlatformAuth(), zValidator('json', settingsSchema), async (c) => {
+  .post('/', requirePlatformPermission('setting', 'write'), zValidator('json', settingsSchema), async (c) => {
     const body = c.req.valid('json');
     const cache = createCache(c.env);
 
