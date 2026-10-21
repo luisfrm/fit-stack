@@ -27,6 +27,8 @@ import {
   PAYMENT_STATUSES,
   type CurrencyFormat,
   type ReceiptData,
+  apiCode,
+  mutationError,
 } from "@workspace/shared";
 import { useReactToPrint } from "react-to-print";
 import {
@@ -34,8 +36,8 @@ import {
   type ReceiptState,
 } from "@/lib/services/receipts-service";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { apiCode, mutationError } from "@/lib/errors";
+import { useOrgAuth } from "@workspace/auth/org";
+
 import { useRouter } from "next/navigation";
 
 interface ReceiptDialogProps {
@@ -173,7 +175,7 @@ function ReadyBody({ receipt, currencyFormat, timezone }: Readonly<{ receipt: Re
 
 export function ReceiptDialog({ initialData: subscription, trigger, onSuccess }: ReceiptDialogProps) {
   const router = useRouter();
-  const { activeOrganization: org } = useAuth();
+  const { activeOrganization: org } = useOrgAuth();
   // Sin fallback silencioso: currencyFormat es NOT NULL en la org.
   const currencyFormat = org?.currencyFormat as CurrencyFormat | undefined;
 

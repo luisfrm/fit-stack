@@ -2,8 +2,9 @@ import { createAccessControl } from "better-auth/plugins/access";
 
 // --- PLATFORM ACCESS CONTROL (SaaS Admin) ---
 const platformStatement = {
+  console: ["access", "manage"],
   user: ["create", "list", "ban", "impersonate", "delete", "set-role"],
-  organization: ["create", "approve", "suspend", "delete"],
+  organization: ["list", "create", "approve", "suspend", "delete"],
   plan: ["create", "list", "update", "delete"],
   subscription: ["list", "cancel", "extend"],
   setting: ["read", "write"],
@@ -14,22 +15,25 @@ export const platformAc = createAccessControl(platformStatement);
 
 export const platformRoles = {
   support: platformAc.newRole({
+    console: ["access"],
     user: ["list"],
-    organization: [],
+    organization: ["list"],
     plan: ["list"],
     subscription: ["list"],
     setting: ["read"],
   }),
   admin: platformAc.newRole({
+    console: ["access", "manage"],
     user: ["list", "ban", "set-role"],
-    organization: ["create", "approve", "suspend"],
+    organization: ["list", "create", "approve", "suspend"],
     plan: ["create", "list", "update"],
     subscription: ["list", "cancel", "extend"],
     setting: ["read", "write"],
   }),
   owner: platformAc.newRole({
+    console: ["access", "manage"],
     user: ["create", "list", "ban", "impersonate", "delete", "set-role"],
-    organization: ["create", "approve", "suspend", "delete"],
+    organization: ["list", "create", "approve", "suspend", "delete"],
     plan: ["create", "list", "update", "delete"],
     subscription: ["list", "cancel", "extend"],
     setting: ["read", "write"],
@@ -39,16 +43,22 @@ export const platformRoles = {
 export type PlatformRole = keyof typeof platformRoles | 'user';
 
 /**
- * Whether a user with the given global (platform) role can access the FitStack Console.
- * Derived from the permission matrix: the role must be able to create organizations
- * (`requirePlatformAuth` checks exactly this), so `admin` and `owner` pass but
- * `support` (read-only, no `organization.create`) does not.
+ * Pure platform permission check: role + module + action.
+ *
+ * Mirror of `can()` for organization roles. Console authorization must always
+ * go through the matrix, never through hardcoded role comparisons.
  */
-export function canAccessConsole(role?: string | null): boolean {
-  if (!role || !(role in platformRoles)) return false;
-  return platformRoles[role as keyof typeof platformRoles]
-    .authorize({ organization: ['create'] })
-    .success;
+export function canPlatform(
+  role: string | null | undefined,
+  moduleName: keyof PlatformStatement,
+  actionName: string,
+): boolean {
+  if (!role || !Object.hasOwn(platformRoles, role)) return false;
+  const roleDef = platformRoles[role as keyof typeof platformRoles];
+  const statement = {
+    [moduleName]: [actionName],
+  } as unknown as Parameters<typeof roleDef.authorize>[0];
+  return roleDef.authorize(statement).success;
 }
 
 // --- ORGANIZATION ACCESS CONTROL (Tenant Gym) ---

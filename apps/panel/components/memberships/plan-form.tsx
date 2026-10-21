@@ -11,7 +11,7 @@ import {
   Label,
 } from "@workspace/ui/components";
 import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { centsToUnits, unitsToCents } from "@workspace/shared";
 import { Plus, Trash2, BadgeDollarSign, Loader2, Save, Send } from "lucide-react";
 
@@ -28,7 +28,7 @@ interface FeatureItem {
 
 export function PlanForm({ initialData, onSubmit, isLoading }: PlanFormProps) {
   const { settings, isLoading: isLoadingSettings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const isEdit = !!initialData?.id;
 
   const [name, setName] = React.useState(initialData?.name || "");

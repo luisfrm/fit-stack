@@ -17,7 +17,7 @@ import {
   getCountryIdentity,
   parseDocumentId,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { uploadService } from "@/lib/services/upload-service";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { cn } from "@workspace/ui/lib/utils";
@@ -29,7 +29,7 @@ interface MemberFormProps {
 }
 
 export function MemberForm({ initialData, onSubmit, isLoading }: MemberFormProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const isEdit = !!initialData?.id;
   const identity = getCountryIdentity(activeOrganization?.countryCode);
   const [sendInvite, setSendInvite] = React.useState(!isEdit);

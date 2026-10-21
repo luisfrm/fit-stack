@@ -20,6 +20,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { PlatformPlanModal } from "./platform-plan-modal";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import {
+  canPlatform,
   FEATURE_CATALOG,
   centsToUnits,
   formatFeatureLimits,
@@ -27,6 +28,7 @@ import {
   type FeatureCatalog,
   type PlanFeaturesV2,
 } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 /* ─────────────────────────────────────────────
    CONSTANTS & HELPERS
@@ -115,6 +117,8 @@ interface PlatformPlanCardProps {
 export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, catalog }: PlatformPlanCardProps) {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const activeCatalog = catalog ?? FEATURE_CATALOG;
+  const { platformRole } = usePlatformAuth();
+  const canManage = canPlatform(platformRole, "console", "manage");
 
   // Style Variants
   const styles = React.useMemo(() => ({
@@ -199,28 +203,30 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, 
       <PlanFeatures features={features} catalog={activeCatalog} />
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
-        <PlatformPlanModal
-          planData={plan}
-          onSuccess={onUpdate}
-          settings={settings}
-          catalog={activeCatalog}
-          trigger={
-            <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", styles.editButton)}>
-              Editar Plan
-            </Button>
-          }
-        />
-        <Button
-          variant="outlined"
-          size="icon"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="h-11 w-11 border-destructive/10 hover:bg-destructive/10 bg-transparent"
-        >
-          <Trash2 size={18} className="text-destructive/60" />
-        </Button>
-      </div>
+      {canManage && (
+        <div className="flex items-center gap-2">
+          <PlatformPlanModal
+            planData={plan}
+            onSuccess={onUpdate}
+            settings={settings}
+            catalog={activeCatalog}
+            trigger={
+              <Button className={cn("flex-1 uppercase font-black text-xs tracking-widest h-11 transition-all", styles.editButton)}>
+                Editar Plan
+              </Button>
+            }
+          />
+          <Button
+            variant="outlined"
+            size="icon"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="h-11 w-11 border-destructive/10 hover:bg-destructive/10 bg-transparent"
+          >
+            <Trash2 size={18} className="text-destructive/60" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

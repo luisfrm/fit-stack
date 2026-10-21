@@ -14,7 +14,8 @@ import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
-import { COUNTRY_INDEX } from "@workspace/shared";
+import { COUNTRY_INDEX, canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 interface PlatformCurrenciesSettingsProps {
   readonly initialSettings: Record<string, string>;
@@ -25,6 +26,8 @@ export function PlatformCurrenciesSettings({
   initialSettings,
   onSaved,
 }: PlatformCurrenciesSettingsProps) {
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const [activeCurrencies, setActiveCurrencies] = React.useState<string[]>(() => {
     const raw = initialSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_CURRENCIES];
     if (!raw) return [];
@@ -159,14 +162,16 @@ export function PlatformCurrenciesSettings({
           </div>
 
           <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <Button
-              onClick={handleSave}
-              loading={isUpdating}
-              disabled={activeCurrencies.length === 0}
-              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
-            >
-              Guardar Cambios de Moneda
-            </Button>
+            {canWrite && (
+              <Button
+                onClick={handleSave}
+                loading={isUpdating}
+                disabled={activeCurrencies.length === 0}
+                className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+              >
+                Guardar Cambios de Moneda
+              </Button>
+            )}
           </div>
         </Card>
       </div>

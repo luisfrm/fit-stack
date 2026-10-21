@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import {
   PLATFORM_SUBSCRIPTION_STATUSES,
-  hasAccess,
+  can,
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
   type OrgRole,
@@ -26,7 +26,7 @@ export default async function NoSubscriptionPage() {
 
   // No panel access role (coach/member) → proper destination is /unauthorized.
   const orgRole = session.member?.role as OrgRole | undefined;
-  if (orgRole && !hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
+  if (orgRole && !can(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     redirect("/unauthorized");
   }
 

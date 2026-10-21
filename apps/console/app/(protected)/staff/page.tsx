@@ -2,6 +2,8 @@ import { Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { updateTag } from "next/cache";
+import { sessionService } from "@workspace/auth/service";
+import { canPlatform } from "@workspace/shared";
 import { staffService } from "@/lib/services/staff-service";
 import { StaffModal } from "@/components/staff/staff-modal";
 import { StaffSidePanel } from "@/components/staff/staff-side-panel";
@@ -17,6 +19,8 @@ export default async function StaffPage({
   searchParams: Promise<{ role?: string; search?: string }>;
 }>) {
   const params = await searchParams;
+  const userRole = await sessionService.getUserRole();
+  const canManage = canPlatform(userRole, "console", "manage");
   const role =
     params.role && STAFF_ROLES.has(params.role) ? params.role : undefined;
   const search = params.search || undefined;
@@ -44,14 +48,16 @@ export default async function StaffPage({
         description="Equipo de administración de la plataforma SaaS Fit-Stack."
         iconName="Users"
       >
-        <StaffModal
-          onSuccess={refreshStaff}
-          trigger={
-            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              AGREGAR ADMIN
-            </Button>
-          }
-        />
+        {canManage && (
+          <StaffModal
+            onSuccess={refreshStaff}
+            trigger={
+              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+                AGREGAR ADMIN
+              </Button>
+            }
+          />
+        )}
       </DashboardHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

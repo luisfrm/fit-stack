@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { requirePlatformAuth } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createCache } from '../lib/cache';
 import {
   FEATURE_CATALOG,
@@ -13,7 +13,7 @@ import type { AppEnv } from '../lib/env';
  * Mounted at `/api/platform/features` (mount pattern by repo prefix).
  */
 export const platformFeaturesRoutes = new Hono<AppEnv>()
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('setting', 'read'), async (c) => {
     const cache = createCache(c.env);
     const cacheKey = 'platform:features';
     const cached = await cache.get(cacheKey);

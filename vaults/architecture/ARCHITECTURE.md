@@ -197,20 +197,21 @@ Existen dos niveles de acceso:
 1. **Plataforma Staff (`platformAc`)**: Roles globales para la gestión del SaaS (`owner`, `admin`, `support`).
 2. **Organizaciones Gym (`organizationAc`)**: Roles de tenant (`owner`, `manager`, `cashier`, `coach`, `member`).
 
-### 5.2. Permiso `panel: ["access"]` y Nomenclatura `hasAccess`
+### 5.2. Permiso `panel: ["access"]` y chequeo con `can`
 * Se definió la acción `panel: ["access"]` en el `organizationStatement` para controlar dinámicamente el ingreso a la aplicación `apps/panel`.
-* **Nomenclatura Profesional**: En las vistas y componentes del cliente, el chequeo se realiza mediante la función `hasAccess`:
+* **Nomenclatura**: en cliente y servidor el chequeo se realiza con `can` (vía `useOrgPermissions()` en el cliente):
   ```tsx
-  import { usePermissions } from '@workspace/auth/hooks';
+  import { useOrgPermissions } from '@workspace/auth/org';
   import { PERMISSION_MODULES, PERMISSION_ACTIONS } from '@workspace/shared';
 
-  const { hasAccess } = usePermissions();
+  const { can } = useOrgPermissions();
 
-  if (hasAccess(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
+  if (can(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     // Renderiza la navegación del panel
   }
   ```
-* **Uso de Constantes**: Se prohíbe escribir *magic strings* arbitrarias. Todas las consultas de permisos consumen `PERMISSION_MODULES` y `PERMISSION_ACTIONS`.
+* **Una sola implementación**: el cliente usa `useOrgPermissions().can(...)`, que delega en `can()` de `@workspace/shared`; el servidor usa `can()` directamente. No hay alias ni chequeos duplicados.
+* **Identidad ≠ autorización**: los flags de `useOrgAuth()` (`isOwner`, `isManager`, …) solo describen al usuario; nunca autorizan.
 
 ### 5.3. Autorización de Subida de Archivos (dos rutas, una autoridad por caso)
 
@@ -219,8 +220,8 @@ No existe un "upload bypass": cada superficie tiene su propia ruta y la organiza
 | Superficie | Ruta | Organización | Auth |
 | --- | --- | --- | --- |
 | Panel (gym) | `/api/upload/*` | **sesión** (`c.get('orgId')`) | `requireOrgPermission(MEMBERS, CREATE)` |
-| Console (org) | `/api/platform/organizations/:orgId/upload/*` | **path** (`:orgId` + org existente) | `requirePlatformAuth` (admin/owner; `support` → 403) |
-| Console (branding) | `/api/platform/upload/*` | sin org (scope fijo) | `requirePlatformAuth` |
+| Console (org) | `/api/platform/organizations/:orgId/upload/*` | **path** (`:orgId` + org existente) | `requirePlatformPermission('console','manage')` (admin/owner; `support` → 403) |
+| Console (branding) | `/api/platform/upload/*` | sin org (scope fijo) | `requirePlatformPermission('setting','write')` |
 | Sitio público | `/api/public/files/*` | — | sin auth, **allowlist** |
 
 **Reglas**:

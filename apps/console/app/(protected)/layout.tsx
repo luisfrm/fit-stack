@@ -1,7 +1,7 @@
 import * as React from "react";
 import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
-import { canAccessConsole } from "@workspace/shared";
+import { canPlatform } from "@workspace/shared";
 import { AppSidebar, MobileNav } from "@/components/dashboard/sidebar";
 import type { SidebarUser } from "@workspace/ui/components";
 import { api } from "@/lib/api/client";
@@ -26,7 +26,7 @@ export default async function DashboardLayout({
 
   const userRole = await sessionService.getUserRole();
 
-  if (!canAccessConsole(userRole)) {
+  if (!canPlatform(userRole, "console", "access")) {
     redirect("/unauthorized");
   }
 

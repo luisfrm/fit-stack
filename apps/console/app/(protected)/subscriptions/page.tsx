@@ -1,6 +1,8 @@
 import { Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
+import { sessionService } from "@workspace/auth/service";
+import { canPlatform } from "@workspace/shared";
 import { SubscriptionsKpiSection } from "@/components/platform/subscriptions-kpi-section";
 import { PlatformSubscriptionModal } from "@/components/platform/platform-subscription-modal";
 import { SubscriptionsSidePanel } from "@/components/platform/subscriptions-side-panel";
@@ -36,6 +38,8 @@ export default async function PlatformSubscriptionsPage({
   }>;
 }) {
   const params = await searchParams;
+  const userRole = await sessionService.getUserRole();
+  const canManage = canPlatform(userRole, "console", "manage");
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search || "";
   const statusFilter = params.status || null;
@@ -105,15 +109,17 @@ export default async function PlatformSubscriptionsPage({
         description="Gestiona las suscripciones de todas las organizaciones al plataforma Fit-Stack."
         iconName="CalendarCheck"
       >
-        <PlatformSubscriptionModal
-          onSuccess={refreshSubs}
-          settings={settings}
-          trigger={
-            <Button size="sm" rightIcon={<Plus size={18} />}>
-              NUEVA SUSCRIPCIÓN
-            </Button>
-          }
-        />
+        {canManage && (
+          <PlatformSubscriptionModal
+            onSuccess={refreshSubs}
+            settings={settings}
+            trigger={
+              <Button size="sm" rightIcon={<Plus size={18} />}>
+                NUEVA SUSCRIPCIÓN
+              </Button>
+            }
+          />
+        )}
       </DashboardHeader>
 
       <SubscriptionsKpiSection

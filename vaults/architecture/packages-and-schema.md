@@ -40,7 +40,8 @@ getSuggestedPaymentMethods(countryCode?) → métodos del país + universales si
 // access-control.ts
 platformStatement/platformAc/platformRoles (owner, admin, support),
 organizationStatement/organizationAc/organizationRoles (owner/manager/cashier/coach/member),
-orgRoleDefinitions, canAccessConsole(role), PlatformStatement, OrganizationStatement,
+orgRoleDefinitions, canPlatform(role, module, action),
+PlatformStatement, OrganizationStatement,
 OrgRole/PlatformRole/OrganizationRole types. Re-exports PERMISSION_MODULES and PERMISSION_ACTIONS.
 
 // auth-config.ts
@@ -50,7 +51,7 @@ ORGANIZATION_ADDITIONAL_FIELDS (slogan, countryCode*, taxId, legalName, address,
   modules.ts:         PERMISSION_MODULES (12 modules: dashboard, reports, members, staff,
                       subscriptions, plans, classes, content, settings, organization, ai, panel)
   actions.ts:         PERMISSION_ACTIONS (READ, CREATE, UPDATE, DELETE, ACCESS)
-  can.ts:             can(role, module, action), canAny(), hasAccess (alias of can)
+  can.ts:             can(role, module, action), canAny()
   role-assignment.ts: canAssignRole(actor, target) (org) and canAssignPlatformRole(actor, target) (platform)
 
 // ai.ts
@@ -65,6 +66,24 @@ panel types forms with them): ContentBlockType, BLOCK_SCHEMAS (hero/services/cla
 testimonials/gallery/contact/team) + validateBlockData(), IContentPage, IContentBlock
 (discriminated by blockType → block-typed data), IContentPageWithBlocks.
 Requires `zod` as a dependency of @workspace/shared.
+
+// errors.ts (RD-127 — frontend error helpers shared by panel and console)
+formatApiErrorMessage(data) → string | null   // Zod/API issues → readable Spanish
+mutationError(scope, err, fallback)           // logs the error, returns the generic toast text
+apiCode(err) → string | undefined             // business code (toasts compare CODE, never text)
+
+// forms.ts
+cleanNumericInput(currentValue, newValue)
+
+// date.ts
+formatTime(time, format?) / formatTimeRange(start, end?, format?) / TimeFormat / DEFAULT_TIME_FORMAT
+// (wall-clock display only; the value is never shifted by a timezone)
+
+// storage.ts
+buildMediaUrl(key, r2PublicUrl)   // public → R2 URL; private → authenticated `/api/media`
+
+// exchange-rates.ts
+BASE_EXCHANGE_API_URL, EUR_EXCHANGE_URL, USD_EXCHANGE_URL, EUR/USD_EXCHANGE_URL_V4
 ```
 
 ---
@@ -72,7 +91,8 @@ Requires `zod` as a dependency of @workspace/shared.
 ## Auth Package (`@workspace/auth`)
 
 ```ts
-// Entry: @workspace/auth (re-exports client, service, hooks, permissions + shared constants)
+// Entry: @workspace/auth (re-exports client, service + shared constants). Hooks live in two separate entries:
+// org (tenant apps) and platform (Console).
 
 // client.ts — createAuthClient with customSession + organization plugin
 authClient, useSession, organization
@@ -84,16 +104,26 @@ sessionService.getServerSession(headers) → { data, error }
 sessionService.signIn({ email, password }) → { data, error }
 sessionService.signUp({ email, password, name }) → { data, error }
 
-// hooks.ts — "use client"
-useAuth() → { session, user, activeOrganization, isAuthenticated, isPending, error, roleName,
-              orgRole, isAdmin, isOwner, isManager, isCashier, isCoach, isMember, refetch }
-usePermissions() → { orgRole, can(module, action), canAccessCms() }
+// org.tsx — "use client" (@workspace/auth/org) — tenant side, global for Panel + future tenant apps
+useOrgAuth() → { session, user, activeOrganization, orgRole,
+                 isOwner, isManager, isCashier, isCoach, isMember,   // identity only, never authorization
+                 isPending, error, refetch }
+useOrgPermissions() → { can(module, action) }   // thin wrapper over `can` from @workspace/shared
 
-// permissions.ts — checkAccess / canAccessCms built on PERMISSION_MODULES.PANEL + PERMISSION_ACTIONS.ACCESS
+// platform.ts — "use client" (@workspace/auth/platform) — SaaS side, Console only
+usePlatformAuth() → { session, user, platformRole, isPending, error, refetch }
+// no organization fields; platform authorization goes through canPlatform (console.access/manage)
 
-// env.ts — requireApiBaseUrl(): missing NEXT_PUBLIC_API_BASE_URL throws visibly at runtime (no fallback);
-// non-production builds warn + build-only placeholder (mirrors envs.ts), production builds throw
+// env.ts — requireEnvValue(name, rawValue, { buildTimeValue, message? }): single required-env
+// resolver (missing value throws visibly; non-production builds warn + build-only placeholder);
+// requireApiBaseUrl() builds on it. Each app keeps the literal process.env.NEXT_PUBLIC_* read.
 // getServerSession uses ofetch (never native fetch) and maps FetchError → AUTH_API_ERROR/NETWORK_ERROR
+
+// api-client.ts (entry: @workspace/auth/api-client) — HTTP client shared by panel and console
+createApiClient({ basePath?, retry?, timeout? })
+  → { api, apiBlob }  // cookies on the server (next/headers), credentials in the browser,
+                       // Zod/API validation errors formatted into readable strings
+ApiFetchOptions<R>, NextFetchConfig
 ```
 
 ---

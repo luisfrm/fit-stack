@@ -11,7 +11,7 @@ import {
 } from "@workspace/ui/components";
 import { type IGymClass } from "@/types/dashboard";
 import { Calendar, Clock, User, Repeat } from "lucide-react";
-import { parseDateAsConfigTimezone } from "@/lib/config/display";
+import { parseDateAsConfigTimezone } from "@workspace/shared";
 
 const DAYS_OF_WEEK = [
   { label: "Domingo", value: 0 },

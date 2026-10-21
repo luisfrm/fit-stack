@@ -26,7 +26,7 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 |---------|---------|
 | `@workspace/auth` | Shared Better Auth client, hooks, session service |
 | `@workspace/ui` | shadcn/ui design system components |
-| `@workspace/shared` | DTOs, types, constants, permissions (`hasAccess`), country config |
+| `@workspace/shared` | DTOs, types, constants, permissions (`can`/`canPlatform`), country config |
 | `@workspace/database` | Drizzle ORM schema + Neon Postgres client |
 | `@workspace/eslint-config` | Shared ESLint presets |
 | `@workspace/typescript-config` | Shared TypeScript presets |
@@ -97,7 +97,7 @@ pnpm format
 - **Multi-tenancy** — Every gym is an `Organization`. All queries filter by `organizationId`.
 - **Cloudflare Workers API** — `apps/api-worker` (Hono + Neon HTTP driver) using `Route → Service → Repository → Database` layering.
 - **Two-tier roles** — Platform roles (`owner`/`admin`/`support`, SaaS console) + `ORG_ROLES` (tenant-scoped panel).
-- **Unified RBAC** — Defined in `packages/shared/src/access-control.ts`. Includes `panel: ["access"]` and `hasAccess()` evaluation.
+- **Unified RBAC** — Defined in `packages/shared/src/access-control.ts`. Includes `panel: ["access"]` and `can()`/`canPlatform()` evaluation.
 - **Drizzle Schema Rule** — No PostgreSQL `pgEnum` types and no `.$type<...>()` annotations. Uses plain `text()` columns; allowed values are validated by Zod (backend) and the frontend, never by the DB layer.
 - **Caching** — Upstash Redis with graceful degradation (cache keys in AGENTS.md).
 - **Active org profile** — Resolved by the `api-worker` custom session (`activeOrganization`) with a 5-min Redis cache (`org:{id}:profile`).

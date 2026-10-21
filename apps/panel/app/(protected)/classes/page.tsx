@@ -1,6 +1,6 @@
 import { classesService } from "@/lib/services/classes-service";
 import { ClassesClient } from "./classes-client";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { resolveWeekAnchor, expandWeek } from "@/lib/classes/week-calendar";
 import { countVisibility } from "@/lib/classes/class-summary-selectors";
 import { addLocalDays, toLocalDayString } from "@workspace/shared/date";

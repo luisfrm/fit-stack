@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { sessionService } from "@workspace/auth/service";
-import { canAccessConsole } from "@workspace/shared";
+import { canPlatform } from "@workspace/shared";
 import SignOutButton from "@/components/sign-out-button";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export default async function UnauthorizedPage() {
   }
 
   const userRole = await sessionService.getUserRole();
-  if (canAccessConsole(userRole)) {
+  if (canPlatform(userRole, "console", "access")) {
     redirect("/dashboard");
   }
 

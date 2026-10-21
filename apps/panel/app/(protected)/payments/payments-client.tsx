@@ -13,16 +13,23 @@ import { KpiSection } from "@/components/payments/kpi-section";
 import { RevenueChart } from "@/components/payments/revenue-chart";
 import { PaymentMethodsChart } from "@/components/payments/payment-methods-chart";
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { PAYMENT_STATUSES, SUBSCRIPTION_STATUSES, type SubscriptionStatus, type CurrencyFormat } from "@workspace/shared";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
+import {
+  PAYMENT_STATUSES,
+  SUBSCRIPTION_STATUSES,
+  type SubscriptionStatus,
+  type CurrencyFormat,
+  apiCode,
+  mutationError,
+} from "@workspace/shared";
 import { cn } from "@workspace/ui/lib/utils";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { GLOBAL_FAB_ITEMS } from "@/lib/constants/fab-items";
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
 import { monthCollectedTotal, perActiveSubscription } from "@/lib/payments/payment-selectors";
-import { apiCode, mutationError } from "@/lib/errors";
+
 import type { ISubscription, PaginatedSubscriptions } from "@workspace/shared/types";
 
 interface PaymentsClientProps {
@@ -83,7 +90,7 @@ export function PaymentsClient({
   onSuccess,
 }: PaymentsClientProps) {
   const router = useRouter();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // No delete action: a payment record is voided or revoked, never deleted.
   const primaryCurrency =
     activeOrganization?.primaryCurrency || initialPrimaryCurrency;

@@ -26,3 +26,12 @@
 - API routes: `/api/trainers`
 
 **Note**: Trainers appear in both views (staff table + trainers table) because they are gym_members with role `COACH`.
+
+**Console staff (`/staff`) is a different domain — do not unify (RD-128).**
+
+- Panel = **gym staff**: `gym_member` + `membersService`, org roles (`OWNER`/`MANAGER`/`CASHIER`/`COACH`), photo upload, invitation. Components: `apps/panel/components/staff/staff-{form,modal,table}.tsx`.
+- Console = **platform staff**: the SaaS team, `staffService` (`/api/platform/staff`), platform roles (`owner`/`admin`/`support`), revoke + role change. Components: `apps/console/components/staff/staff-{client,form,modal,table,role-modal,side-panel}.tsx`.
+
+They share a component name by coincidence, not a contract: different tables,
+roles, services and permissions. Unifying them would add more conditionals than
+the two implementations it would replace.

@@ -28,7 +28,8 @@ import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
 import { type IPaymentMethodConfig, type IPaymentMethodField } from "@workspace/shared/types";
-import { getSuggestedPaymentMethods } from "@workspace/shared";
+import { canPlatform, getSuggestedPaymentMethods } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 interface PlatformPaymentMethodsSettingsProps {
   readonly initialSettings: Record<string, string>;
@@ -39,6 +40,8 @@ export function PlatformPaymentMethodsSettings({
   initialSettings,
   onSaved,
 }: PlatformPaymentMethodsSettingsProps) {
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const [paymentMethods, setPaymentMethods] = React.useState<IPaymentMethodConfig[]>(() => {
     const raw = initialSettings[PLATFORM_SETTINGS_KEYS.ACTIVE_PAYMENT_METHODS];
     if (!raw) return [];
@@ -249,14 +252,16 @@ export function PlatformPaymentMethodsSettings({
           </div>
 
           <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <Button
-              onClick={handleSave}
-              loading={isUpdating}
-              disabled={isUpdating}
-              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
-            >
-              Guardar Métodos
-            </Button>
+            {canWrite && (
+              <Button
+                onClick={handleSave}
+                loading={isUpdating}
+                disabled={isUpdating}
+                className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+              >
+                Guardar Métodos
+              </Button>
+            )}
           </div>
         </Card>
       </div>

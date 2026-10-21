@@ -1,6 +1,8 @@
 import { Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
+import { sessionService } from "@workspace/auth/service";
+import { canPlatform } from "@workspace/shared";
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
 import {
   organizationsService,
@@ -53,6 +55,8 @@ export default async function OrganizationsPage({
   }>;
 }) {
   const params = await searchParams;
+  const userRole = await sessionService.getUserRole();
+  const canManage = canPlatform(userRole, "console", "manage");
   const query = params.query || "";
   const country = params.country || null;
   const subStatus = SUB_STATUS_VALUES.includes(
@@ -122,14 +126,16 @@ export default async function OrganizationsPage({
         description="Listado global de clientes SaaS y su estado actual de suscripción."
         iconName="LayoutGrid"
       >
-        <OrganizationModal
-          onSuccess={refreshOrgs}
-          trigger={
-            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              NUEVA ORGANIZACIÓN
-            </Button>
-          }
-        />
+        {canManage && (
+          <OrganizationModal
+            onSuccess={refreshOrgs}
+            trigger={
+              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+                NUEVA ORGANIZACIÓN
+              </Button>
+            }
+          />
+        )}
       </DashboardHeader>
 
       <OrganizationsKpiSection kpis={kpis} />

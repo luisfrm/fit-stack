@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { requirePlatformAuth, requirePlatformPermission } from '../lib/route-handler';
+import { requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformReceiptsReportRepository } from '../repositories/platform-receipts-report.repository';
@@ -116,7 +116,7 @@ async function invalidateReceiptsReportCache(cache: ReturnType<typeof createCach
 
 export const platformSubscriptionRoutes = new Hono<AppEnv>()
   // GET /api/platform/subscriptions
-  .get('/', requirePlatformAuth(), async (c) => {
+  .get('/', requirePlatformPermission('subscription', 'list'), async (c) => {
     const status = c.req.query('status') as any;
     const planId = c.req.query('planId') ? Number(c.req.query('planId')) : undefined;
     const organizationId = c.req.query('organizationId');
@@ -147,7 +147,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/subscriptions/stats
-  .get('/stats', requirePlatformAuth(), async (c) => {
+  .get('/stats', requirePlatformPermission('subscription', 'list'), async (c) => {
     const cache = createCache(c.env);
     const cacheKey = 'platform:subscriptions:stats';
 
@@ -162,7 +162,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
   // GET /api/platform/subscriptions/revenue?months=12 - monthly SaaS series in UTC.
   // Precedes /:id so Hono does not capture it as a param.
-  .get('/revenue', requirePlatformAuth(), async (c) => {
+  .get('/revenue', requirePlatformPermission('subscription', 'list'), async (c) => {
     const raw = Number(c.req.query('months') || '12');
     const months = Math.min(24, Math.max(1, Number.isFinite(raw) ? Math.floor(raw) : 12));
 
@@ -226,7 +226,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
   // GET /api/platform/subscriptions/by-organization/:orgId/invoices - SaaS history of org.
   // Precedes /:id so Hono does not capture it as a param.
-  .get('/by-organization/:orgId/invoices', requirePlatformAuth(), async (c) => {
+  .get('/by-organization/:orgId/invoices', requirePlatformPermission('subscription', 'list'), async (c) => {
     const orgId = c.req.param('orgId');
 
     const cache = createCache(c.env);
@@ -242,7 +242,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/subscriptions/:id
-  .get('/:id', requirePlatformAuth(), async (c) => {
+  .get('/:id', requirePlatformPermission('subscription', 'list'), async (c) => {
     const id = Number(c.req.param('id'));
     const { service } = buildService(c);
 
@@ -253,7 +253,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions
-  .post('/', requirePlatformAuth(), zValidator('json', createSubscriptionSchema), async (c) => {
+  .post('/', requirePlatformPermission('console', 'manage'), zValidator('json', createSubscriptionSchema), async (c) => {
     const data = c.req.valid('json');
     const cache = createCache(c.env);
 
@@ -281,7 +281,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions/:id/cancel
-  .post('/:id/cancel', requirePlatformAuth(), zValidator('json', cancelSchema), async (c) => {
+  .post('/:id/cancel', requirePlatformPermission('console', 'manage'), zValidator('json', cancelSchema), async (c) => {
     const id = Number(c.req.param('id'));
     const { reason } = c.req.valid('json');
     const cache = createCache(c.env);
@@ -300,7 +300,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions/:id/extend
-  .post('/:id/extend', requirePlatformAuth(), zValidator('json', extendSchema), async (c) => {
+  .post('/:id/extend', requirePlatformPermission('console', 'manage'), zValidator('json', extendSchema), async (c) => {
     const id = Number(c.req.param('id'));
     const { newEndDate } = c.req.valid('json');
     const cache = createCache(c.env);
@@ -319,7 +319,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions/:id/renew
-  .post('/:id/renew', requirePlatformAuth(), zValidator('json', renewSchema), async (c) => {
+  .post('/:id/renew', requirePlatformPermission('console', 'manage'), zValidator('json', renewSchema), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -348,7 +348,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // PATCH /api/platform/subscriptions/payments/:paymentId/status
-  .patch('/payments/:paymentId/status', requirePlatformAuth(), zValidator('json', updatePaymentStatusSchema), async (c) => {
+  .patch('/payments/:paymentId/status', requirePlatformPermission('console', 'manage'), zValidator('json', updatePaymentStatusSchema), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -357,7 +357,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const payment = await service.getPaymentById(paymentId);
     if (!payment) return c.json({ error: 'Pago no encontrado' }, 404);
 
-    // Explicit guard (no `!`): `requirePlatformAuth` guarantees session, but
+    // Explicit guard (no `!`): `requirePlatformPermission` guarantees session, but
     // the VOID actor is resolved same as the rest of the file.
     const actor = c.get('user')?.id;
     if (!actor) return c.json({ error: 'Sesión requerida.' }, 401);
@@ -437,7 +437,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
 
   // POST /api/platform/subscriptions/payments/:paymentId/resend - manual resend
   // to payer+owners (4 frozen branches). Admin/owner only: support 403.
-  .post('/payments/:paymentId/resend', requirePlatformAuth(), async (c) => {
+  .post('/payments/:paymentId/resend', requirePlatformPermission('console', 'manage'), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
 
     const receiptsService = createPlatformReceiptsService(
@@ -456,7 +456,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // GET /api/platform/subscriptions/:id/payments
-  .get('/:id/payments', requirePlatformAuth(), async (c) => {
+  .get('/:id/payments', requirePlatformPermission('subscription', 'list'), async (c) => {
     const id = Number(c.req.param('id'));
     const { service } = buildService(c);
 
@@ -468,7 +468,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // POST /api/platform/subscriptions/:id/payments
-  .post('/:id/payments', requirePlatformAuth(), zValidator('json', paymentSchema), async (c) => {
+  .post('/:id/payments', requirePlatformPermission('console', 'manage'), zValidator('json', paymentSchema), async (c) => {
     const id = Number(c.req.param('id'));
     const data = c.req.valid('json');
     const cache = createCache(c.env);
@@ -497,7 +497,7 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // DELETE /api/platform/subscriptions/:id
-  .delete('/:id', requirePlatformAuth(), async (c) => {
+  .delete('/:id', requirePlatformPermission('console', 'manage'), async (c) => {
     const id = Number(c.req.param('id'));
     const cache = createCache(c.env);
 

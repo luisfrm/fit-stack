@@ -19,7 +19,15 @@ import type {
   IPaymentMethodDetails,
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
-import { formatCents, getVoidKind, type CurrencyFormat } from "@workspace/shared";
+import {
+  formatCents,
+  getVoidKind,
+  type CurrencyFormat,
+  apiCode,
+  mutationError,
+  summarizeFeatures,
+  type PlanFeaturesV2,
+} from "@workspace/shared";
 import {
   Trash2,
   RefreshCw,
@@ -33,10 +41,9 @@ import {
   Send,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
-import { canManageBilling } from "@/lib/platform-permissions";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { apiCode, mutationError } from "@/lib/errors";
-import { summarizeFeatures, type PlanFeaturesV2 } from "@workspace/shared";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
+
 import { PaymentDetailsList } from "./payment-details-list";
 
 type PlatformPaymentWithSnapshot = PlatformPayment & {
@@ -106,8 +113,8 @@ export function PlatformPaymentHistoryModal({
   const [actionPaymentId, setActionPaymentId] = React.useState<number | null>(null);
   const actionLoading = actionPaymentId !== null;
   const [expandedId, setExpandedId] = React.useState<number | null>(null);
-  const { user } = useAuth();
-  const canChangeStatus = canManageBilling(user?.role);
+  const { platformRole } = usePlatformAuth();
+  const canChangeStatus = canPlatform(platformRole, "console", "manage");
 
   const loadPayments = React.useCallback(
     async (signal?: AbortSignal) => {

@@ -14,14 +14,15 @@ import {
 } from "@workspace/ui/components";
 import { ImageUpload } from "@workspace/ui/components/image-upload";
 import { type IPlatformPlan, type IPaymentMethodConfig } from "@workspace/shared/types";
-import { sortPaymentMethodFields } from "@workspace/shared";
 import {
+  sortPaymentMethodFields,
   ValueConverter,
   formatShortDate,
   type CurrencyFormat,
   type ExchangeRateLoadStatus,
   type PaymentConversionView,
 } from "@workspace/shared";
+
 import { cn } from "@workspace/ui/lib/utils";
 
 interface PaymentSectionProps {

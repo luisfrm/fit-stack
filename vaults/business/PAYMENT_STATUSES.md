@@ -101,7 +101,7 @@ resto                    → active     (ACTIVA)
 3. **Aprobación** — `PATCH /api/platform/subscriptions/payments/:id/status` con `validated`: extiende el periodo (solo en la transición `wasPending`, con la duración del **snapshot** del pago) y numera el `FS-N`.
 4. **Anulación** — el mismo PATCH con **`voided`**: marca ANULADO si había comprobante y se **ignora** en el status computado (no cancela la suscripción). No existe `invalid`: el rechazo también es `voided`.
 5. **Registro manual** — `POST /api/platform/subscriptions/:id/payments`: alta de un pago fuera del flujo de autoservicio.
-6. **Comprobante** — `GET .../payments/:id/receipt` (contrato de 3 estados: `ready` / `pending` / `available:false`) y `/receipt/pdf`. Lectura: `subscription:list` (soporte también). Escrituras (validar, anular, reenviar): `requirePlatformAuth` (soporte **403**).
+6. **Comprobante** — `GET .../payments/:id/receipt` (contrato de 3 estados: `ready` / `pending` / `available:false`) y `/receipt/pdf`. Lectura: `subscription:list` (soporte también). Escrituras (validar, anular, reenviar): `console:manage` (soporte **403**).
 7. **Diferencia deliberada**: `DELETE /api/platform/subscriptions/:id` **sí existe** en Console (borra la suscripción SaaS y sus pagos por cascada) — es una decisión distinta de la del Panel y arrastra el histórico de la serie `FS-N` si ya había números emitidos. Ver el backlog en Linear (proyecto «Fit Stack»).
 
 ### 4.1 Punto 7: sin doble periodo

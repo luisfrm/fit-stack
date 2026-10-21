@@ -2,6 +2,8 @@ import { Building2, Users, TrendingUp, ShieldCheck, Plus } from "lucide-react";
 import { Button, StatCard } from "@workspace/ui/components";
 import { DashboardHeader } from "@workspace/ui/components/dashboard-header";
 import { OrganizationModal } from "@/components/dashboard/organization-modal";
+import { sessionService } from "@workspace/auth/service";
+import { canPlatform } from "@workspace/shared";
 import { RenewalsWidget } from "@/components/dashboard/dashboard-renewals-widget";
 import { PaymentsReviewWidget } from "@/components/dashboard/dashboard-payments-review-widget";
 import { TrialsWidget } from "@/components/dashboard/dashboard-trials-widget";
@@ -25,6 +27,8 @@ import { updateTag } from "next/cache";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const userRole = await sessionService.getUserRole();
+  const canManage = canPlatform(userRole, "console", "manage");
   const [{ data: orgs }, stats, settings, recentSubs] = await Promise.all([
     organizationsService.getAll(
       { limit: 50, includeMemberCount: true },
@@ -107,14 +111,16 @@ export default async function DashboardPage() {
         description="Gestión global de organizaciones y métricas de la plataforma."
         iconName="Globe"
       >
-        <OrganizationModal
-          trigger={
-            <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
-              Nueva Organización
-            </Button>
-          }
-          onSuccess={refreshOrgs}
-        />
+        {canManage && (
+          <OrganizationModal
+            trigger={
+              <Button variant="primary" size="sm" leftIcon={<Plus size={18} />}>
+                Nueva Organización
+              </Button>
+            }
+            onSuccess={refreshOrgs}
+          />
+        )}
       </DashboardHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

@@ -49,3 +49,36 @@ export function isPublicStorageKey(key: string): boolean {
   const [scope, folder] = key.split('/');
   return Boolean(scope) && folder === PUBLIC_ORG_FOLDER;
 }
+
+/**
+ * Resolves the URL used by the UI to display a stored asset.
+ *
+ * Public by design (`<orgId>/cms/…`, `platform/branding/…`): direct R2 URL.
+ * Private (avatars, logos, payment proof): authenticated proxy `/api/media`,
+ * which forwards the cookie to the API — never a guessable URL.
+ *
+ * @param key          Stored key (or an already absolute URL).
+ * @param r2PublicUrl  R2 public base URL of the running app (`NEXT_PUBLIC_R2_URL`).
+ */
+export function buildMediaUrl(
+  key: string | null | undefined,
+  r2PublicUrl: string,
+): string {
+  if (!key) return '';
+  if (key.startsWith('http')) return key;
+
+  const cleanKey = key.startsWith('/') ? key.slice(1) : key;
+
+  if (isPublicStorageKey(cleanKey)) {
+    const baseUrl = r2PublicUrl.trim();
+    if (!baseUrl) {
+      throw new Error(
+        'buildMediaUrl: r2PublicUrl is required to resolve a public asset',
+      );
+    }
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    return `${cleanBaseUrl}/${cleanKey}`;
+  }
+
+  return `/api/media?key=${encodeURIComponent(cleanKey)}`;
+}

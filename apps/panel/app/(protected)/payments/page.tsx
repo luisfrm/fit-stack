@@ -1,6 +1,6 @@
 import { subscriptionsService } from "@/lib/services/subscriptions-service";
 import { financeService } from "@/lib/services/finance-service";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { requireOrgConfig } from "@/lib/org-config";
 import { PAYMENT_STATUSES } from "@workspace/shared";
 import { PaymentsClient } from "./payments-client";

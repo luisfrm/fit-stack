@@ -8,9 +8,10 @@ import {
   platformRoles,
   PLATFORM_ROLE_LABELS,
   type PlatformRole,
+  mutationError,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { mutationError } from "@/lib/errors";
+import { usePlatformAuth } from "@workspace/auth/platform";
+
 import {
   staffService,
   type PlatformStaffMember,
@@ -34,8 +35,7 @@ export function StaffRoleModal({
   onOpenChange,
   onSuccess,
 }: StaffRoleModalProps) {
-  const { user } = useAuth();
-  const actorRole = (user?.role || "user") as PlatformRole;
+  const { platformRole } = usePlatformAuth();
 
   const [role, setRole] = React.useState<string>("admin");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -46,7 +46,7 @@ export function StaffRoleModal({
 
   // Anti-escalation: only roles that the actor is allowed to assign.
   const assignableRoles = ROLE_OPTIONS.filter((opt) =>
-    canAssignPlatformRole(actorRole, opt.value as PlatformRole),
+    canAssignPlatformRole(platformRole, opt.value as PlatformRole),
   );
 
   const handleSubmit = async (e: React.SubmitEvent) => {

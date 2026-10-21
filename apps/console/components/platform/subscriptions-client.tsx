@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button, Text, SimpleSelect } from "@workspace/ui/components";
 import { SubscriptionsTable } from "@/components/platform/subscriptions-table";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import { cn } from "@workspace/ui/lib/utils";
 import type { CurrencyFormat } from "@workspace/shared";
 import type { SubscriptionWithDetails } from "@/lib/services/platform-subscriptions-service";

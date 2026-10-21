@@ -34,7 +34,7 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 ## Monorepo Structure
 
 - **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
-- **Packages**: `auth`, `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
+- **Packages**: `auth` (sessions + shared HTTP client + org/platform hooks), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
 - **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`). Backlog/pending work lives in Linear (project «Fit Stack»).
 
 ## Project Context (Business Overview)
@@ -71,7 +71,7 @@ Server First (`"use client"` only at leaf nodes; fetch server-side). URL state o
 
 ### 5. Security & Authentication Architecture
 
-Better Auth; client **MUST** use `useAuth()` (never `useSession()` directly); server uses `sessionService`/`getSession()`. Name/Logo SSOT = the `organization` table (`authClient.organization.update()`); tenant identity → `PATCH /api/organizations/profile`; the panel **never** calls `/api/platform/*` from a tenant form; `countryCode` immutable post-creation; `primaryCurrency` editable only inside `active_currencies` (Console picks it at creation, preselected from the country). **CORS is code-only** (`apps/api-worker/src/lib/cors.ts`). Public routes skip auth: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`.
+Better Auth; client **MUST** use `useOrgAuth()` (org apps) or `usePlatformAuth()` (Console) — never `useSession()` directly; server uses `sessionService`/`getSession()`. Name/Logo SSOT = the `organization` table (`authClient.organization.update()`); tenant identity → `PATCH /api/organizations/profile`; the panel **never** calls `/api/platform/*` from a tenant form; `countryCode` immutable post-creation; `primaryCurrency` editable only inside `active_currencies` (Console picks it at creation, preselected from the country). **CORS is code-only** (`apps/api-worker/src/lib/cors.ts`). Public routes skip auth: `/healthz`, `/favicon.ico`, `/api/auth/*`, `/api/init`, `/api/public/*`.
 
 ### 6. Route Handler Pattern (`apps/api-worker/src/lib/route-handler.ts`)
 
@@ -84,8 +84,9 @@ Centralized middleware — never write auth/error boilerplate manually.
 | `requireOrgTimezone()` | Routes by local date | Validates tz (500 if missing); sets `orgTimezone` |
 | `requireOrgCurrency()` | Money normalized to the primary currency | Validates `primaryCurrency` (500 if missing); sets `orgCurrency` |
 | `requireAuth()` | General authenticated | Session + user |
-| `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission |
-| `requirePlatformAuth()` | Alias of `requirePlatformPermission('organization','create')` | Session + `organization.create` |
+| `requirePlatformPermission(module, action)` | SaaS `/api/platform/*` | Session + platform permission (`auth.api.userHasPermission`, fail-closed `canPlatform()` fallback) |
+
+Console entry is `console.access`; reads use their own module (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) and mutations use `console:manage` (settings, branding and knowledge use `setting:write`). `support` is read-only.
 
 Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`, `400 DOCUMENT_TYPE_INVALID`, `409 SUBSCRIPTION_HAS_PAYMENTS`); toasts resolve by **code**, never text. Typed domain failures map through one mapper by **class**, never message (`exchangeRateErrorResponse` → `503 EXCHANGE_RATE_UNAVAILABLE`).
 
@@ -95,7 +96,7 @@ No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
-**Native `fetch` is PROHIBITED**; use **ofetch** — Fit-Stack API always via each app's context-aware client (`apps/{console,panel}/lib/api/client.ts`: baseURL, cookie forwarding on server, `credentials:"include"`, intercepts `ORGANIZATION_NOT_FOUND`); external APIs via `ofetch` directly; `next/headers` only to read context. Env: `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_R2_URL` required; `NEXT_PUBLIC_EXCHANGE_URL` optional.
+**Native `fetch` is PROHIBITED**; use **ofetch** — Fit-Stack API always via each app's context-aware client (`apps/{console,panel}/lib/api/client.ts`, a thin instance of `createApiClient` from `@workspace/auth/api-client`: baseURL, cookie forwarding on server, `credentials:"include"`, Zod/API error formatting); external APIs via `ofetch` directly; `next/headers` only to read context. Env: `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_R2_URL` required; `NEXT_PUBLIC_EXCHANGE_URL` optional.
 
 ### 9. Date & Timezone Handling
 

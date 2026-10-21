@@ -14,8 +14,10 @@ import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { featuresService } from "@/lib/services/features-service";
 import { api } from "@/lib/api/client";
 import { requirePlatformCurrency, requirePlatformCurrencyFormat } from "@/lib/config/platform-settings";
-import type { IPlatformOrganization } from "@workspace/shared/types";
 import { updateTag } from "next/cache";
+import { sessionService } from "@workspace/auth/service";
+import { canPlatform } from "@workspace/shared";
+import type { IPlatformOrganization } from "@workspace/shared/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +39,9 @@ export default async function OrganizationProfilePage({
   ]);
 
   const page = Math.max(1, Number(sp.page) || 1);
+
+  const userRole = await sessionService.getUserRole();
+  const canManage = canPlatform(userRole, "console", "manage");
 
   const org = await organizationsService
     .getBySlug(
@@ -114,29 +119,33 @@ export default async function OrganizationProfilePage({
         iconName="Building2"
       >
         <div className="flex items-center gap-2">
-          <OrganizationModal
-            initialData={org as IPlatformOrganization}
-            onSuccess={refreshOrgs}
-            trigger={
-              <Button
-                variant="outlined"
-                size="sm"
-                leftIcon={<Pencil size={16} />}
-              >
-                EDITAR
-              </Button>
-            }
-          />
-          <PlatformSubscriptionModal
-            initialOrganization={org as IPlatformOrganization}
-            onSuccess={refreshOrgs}
-            settings={settings}
-            trigger={
-              <Button size="sm" leftIcon={<Plus size={18} />}>
-                GESTIONAR PLAN
-              </Button>
-            }
-          />
+          {canManage && (
+            <>
+              <OrganizationModal
+                initialData={org as IPlatformOrganization}
+                onSuccess={refreshOrgs}
+                trigger={
+                  <Button
+                    variant="outlined"
+                    size="sm"
+                    leftIcon={<Pencil size={16} />}
+                  >
+                    EDITAR
+                  </Button>
+                }
+              />
+              <PlatformSubscriptionModal
+                initialOrganization={org as IPlatformOrganization}
+                onSuccess={refreshOrgs}
+                settings={settings}
+                trigger={
+                  <Button size="sm" leftIcon={<Plus size={18} />}>
+                    GESTIONAR PLAN
+                  </Button>
+                }
+              />
+            </>
+          )}
         </div>
       </DashboardHeader>
 

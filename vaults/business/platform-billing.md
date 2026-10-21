@@ -57,7 +57,7 @@ history and must be **cancelled** instead. The FK
 `ON DELETE RESTRICT` as the DB-level backstop (no cascade, so `FS-N` numbers are
 never silently destroyed and `gaps[]` cannot report them as holes). The backstop
 is mapped, never leaked: a FK violation raised by the `DELETE`
-(`isPostgresForeignKeyViolation(err, 'subscription_id')` in `lib/errors.ts`, which
+(`isPostgresForeignKeyViolation(err, 'subscription_id')` in `apps/api-worker/src/lib/errors.ts`, which
 walks the deep Drizzle/Neon cause for SQLSTATE `23503`) is translated by the same
 `subscriptionHasPaymentsError()` factory into the **same 409 body**, so the console
 toast keeps resolving by `code` and the TOCTOU window between the count and the
@@ -68,7 +68,7 @@ without touching the DB; the constraint decides.
 
 ### Self-service renewal (phase 2 — org pays from the panel)
 
-Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → support approves/rejects it in console (badge "Pending payment" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VIEW SCREENSHOT" links to R2) → once validated, the period is extended automatically.
+Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/settings/suscription` → the payment stays `processing` ("under review") → an `admin`/`owner` approves/rejects it in console (`console:manage`; `support` is read-only) (badge "Pending payment" in the subscriptions table + `PlatformPaymentHistoryModal` which now renders `paymentMethodDetails` with `PaymentDetailsList`, incl. "VIEW SCREENSHOT" links to R2) → once validated, the period is extended automatically.
 
 - **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
   - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.

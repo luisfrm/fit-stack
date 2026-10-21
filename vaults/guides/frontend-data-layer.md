@@ -10,28 +10,37 @@
 ```
 lib/
 ├── api/
-│   ├── client.ts          ← ofetch.create() context-aware
-│   ├── types.ts           ← ApiFetchOptions (extends FetchOptions + next)
-│   └── exchange-rates.ts  ← external fetch (no auth)
+│   ├── client.ts          ← instancia de createApiClient() (implementación: @workspace/auth/api-client)
+│   └── exchange-rates.ts  ← external fetch (no auth); transporte por app, caché y reglas en @workspace/shared
+├── config/
+│   └── envs.ts            ← solo NEXT_PUBLIC_R2_URL (no silent fallbacks)
 ├── services/              ← typed methods (reusable from RSC and client)
 │   ├── organizations-service.ts
 │   ├── platform-plans-service.ts
 │   ├── platform-subscriptions-service.ts
 │   ├── staff-service.ts (platform staff: getAll/create/revoke/validateToken/accept)
-│   ├── currency-service.ts (legacy, use lib/api/exchange-rates in RSC)
 │   ├── init-service.ts
-│   ├── upload-service.ts
-│   └── session-service.ts (uses authClient, unchanged)
-└── hooks/                 ← vanilla hooks (no TanStack Query): use-auth, use-debounce,
-                             use-exchange-rates, use-organization-activation, use-theme
+│   └── upload-service.ts
+└── hooks/                 ← hooks propios de la app (no TanStack Query): use-exchange-rates
 ```
 
-### Context-aware behavior (`lib/api/client.ts`)
+> `session-service`, `auth-client`, `use-theme` y `use-debounce` **no tienen copia local**:
+> se importan de `@workspace/auth/service`, `@workspace/auth/client` y `@workspace/ui/hooks/*`.
+> Los hooks de auth viven en dos carriles: **org** (`@workspace/auth/org`:
+> `useOrgAuth`, `useOrgPermissions`) y **platform** (`@workspace/auth/platform`:
+> `usePlatformAuth`). Helpers puros (formato de hora, `cleanNumericInput`,
+> errores de mutación, `buildMediaUrl`) viven en `@workspace/shared`.
 
-| Context              | Cookie handling                                                            | Interceptors                                                             |
-| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | No `window.location` (no-op)                                             |
-| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | `ORGANIZATION_NOT_FOUND` → `window.location.href = '/reset-org-context'` |
+### Context-aware behavior (`lib/api/client.ts` → `@workspace/auth/api-client`)
+
+| Context              | Cookie handling                                                            | Interceptors                                                                    |
+| -------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Server (RSC)**     | Reads `cookies()` from `next/headers` and forwards them as `Cookie` header | None                                                                            |
+| **Client (browser)** | `credentials: 'include'` (browser sends cookies automatically)             | Zod/API validation errors become readable strings before React renders them     |
+
+> La recuperación de contexto de organización es **server-side**: los layouts de
+> Panel y Console comprueban `sessionError.code === "ORGANIZATION_NOT_FOUND"`
+> (Better Auth) y redirigen a `/reset-org-context`.
 
 ### Service usage pattern
 
@@ -145,7 +154,7 @@ silently without re-rendering. Panel uses the same shape
 - **Client leaves** (search inputs, pagination buttons, modals) use `useRouter` + `searchParams` from `next/navigation` to modify the URL → server re-render.
 - **Type C pages** (currencies, payment-methods) are already **RSC parent + client child with `initialData`**: the server fetches settings (`console:settings`) and the client starts with the data (no loading flash) and saves via `api POST` + server action `updateTag`. The `organizations/[id]/settings` page remains client (fetch with `useState`/`useEffect`, no TanStack Query).
 - **TanStack Query is REMOVED from the project** (console and panel). Single standard: **RSC + ofetch + Next cache for all reads**; mutations in RSC pages use `service → toast → updateTag → refresh`. A client-side fetching library would only be reintroduced if a live-data feature (polling, optimistic UI, infinite scroll) justifies it.
-- **Reusable module pattern** (dashboard/staff/subscriptions/organizations): pure selectors in `lib/platform/*-selectors.ts` (unit-tested) + permissions in `lib/platform-permissions.ts` + server-safe formatting in `lib/utils/value-converters.ts` (`formatCents`, `formatShortDate`); tables with `MAX_ITEMS=10` and URL filters; unique hooks → `data-testid`, repeated hooks → `class`.
+- **Reusable module pattern** (dashboard/staff/subscriptions/organizations): pure selectors in `lib/platform/*-selectors.ts` (unit-tested) + permission checks via `canPlatform` from `@workspace/shared` (no local permission module) + server-safe formatting in `lib/utils/value-converters.ts` (`formatCents`, `formatShortDate`); tables with `MAX_ITEMS=10` and URL filters; unique hooks → `data-testid`, repeated hooks → `class`.
 
 ### Settings constants
 

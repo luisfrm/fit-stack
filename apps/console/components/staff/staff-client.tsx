@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Button } from "@workspace/ui/components";
 import { StaffTable } from "@/components/staff/staff-table";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import { cn } from "@workspace/ui/lib/utils";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";
 

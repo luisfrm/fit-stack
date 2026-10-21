@@ -7,15 +7,27 @@ import {
   MobileNav as UIMobileNav,
   Logotipo,
 } from "@workspace/ui/components";
-import { formatPlatformRole } from "@workspace/shared";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { canPlatform, formatPlatformRole } from "@workspace/shared";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { SidebarNav } from "@/app/(protected)/sidebar-nav";
 import SignOutButton from "@/components/sign-out-button";
-import type { SidebarUser, SidebarBranding } from "@workspace/ui/components";
+import type {
+  SidebarUser,
+  SidebarBranding,
+  SidebarNavItem,
+} from "@workspace/ui/components";
 
 interface ConsoleSidebarProps {
   user: SidebarUser;
   branding?: Partial<SidebarBranding>;
+}
+
+function useFilteredNavItems(): SidebarNavItem[] {
+  const { platformRole } = usePlatformAuth();
+  return SidebarNav.filter((item) =>
+    canPlatform(platformRole, item.module, item.action),
+  );
 }
 
 function useConsoleSidebarBranding(
@@ -23,6 +35,7 @@ function useConsoleSidebarBranding(
   branding?: Partial<SidebarBranding>,
 ) {
   const { isDark, toggleTheme } = useTheme();
+  const navigation = useFilteredNavItems();
 
   const formattedUser = React.useMemo(
     () => ({ ...user, role: formatPlatformRole(user.role) }),
@@ -38,18 +51,18 @@ function useConsoleSidebarBranding(
     [branding],
   );
 
-  return { formattedUser, resolvedBranding, isDark, toggleTheme };
+  return { formattedUser, resolvedBranding, navigation, isDark, toggleTheme };
 }
 
 export function AppSidebar({ user, branding }: ConsoleSidebarProps) {
-  const { formattedUser, resolvedBranding, isDark, toggleTheme } =
+  const { formattedUser, resolvedBranding, navigation, isDark, toggleTheme } =
     useConsoleSidebarBranding(user, branding);
 
   return (
     <UISidebar
       user={formattedUser}
       branding={resolvedBranding}
-      navigation={SidebarNav}
+      navigation={navigation}
       footer={<SignOutButton />}
       themeToggle={{ isDark, toggle: toggleTheme }}
     />
@@ -57,14 +70,14 @@ export function AppSidebar({ user, branding }: ConsoleSidebarProps) {
 }
 
 export function MobileNav({ user, branding }: ConsoleSidebarProps) {
-  const { formattedUser, resolvedBranding, isDark, toggleTheme } =
+  const { formattedUser, resolvedBranding, navigation, isDark, toggleTheme } =
     useConsoleSidebarBranding(user, branding);
 
   return (
     <UIMobileNav
       user={formattedUser}
       branding={resolvedBranding}
-      navigation={SidebarNav}
+      navigation={navigation}
       footer={<SignOutButton />}
       themeToggle={{ isDark, toggle: toggleTheme }}
     />

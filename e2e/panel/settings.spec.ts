@@ -113,7 +113,7 @@ test.describe('Panel — Settings', () => {
     await page.getByRole('button', { name: 'Actualizar Sede' }).click();
 
     // Regression: the general save called `/api/platform/organizations`
-    // (`requirePlatformAuth`) → 403 for a gym owner. The success toast is
+    // (`console:manage`) → 403 for a gym owner. The success toast is
     // the signal that it now uses the real org-scoped endpoint.
     await expect(
       page.getByText('Información de la sede actualizada correctamente').first(),

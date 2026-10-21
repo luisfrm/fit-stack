@@ -16,5 +16,7 @@ export * from './settings';
 export * from './payment-methods';
 export * from './exchange-rates';
 export * from './storage';
+export * from './errors';
+export * from './forms';
 export * from './defaults';
 

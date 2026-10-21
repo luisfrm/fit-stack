@@ -11,10 +11,12 @@ import { api } from "@/lib/api/client";
 import { FeaturesEditor } from "@/components/platform/features-editor";
 import {
   FREE_TIER_FEATURES,
+  canPlatform,
   resolveFeatures,
   type FeatureCatalog,
   type PlanFeaturesV2,
 } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { useRouter } from "next/navigation";
 
 interface FreeTierSettingsProps {
@@ -25,6 +27,8 @@ interface FreeTierSettingsProps {
 
 export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTierSettingsProps) {
   const router = useRouter();
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const raw = initialSettings[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER];
   const isEnabled =
     initialSettings[PLATFORM_SETTINGS_KEYS.FEATURE_FLAGS_FREE_TIER_ENABLED] === "true";
@@ -164,13 +168,15 @@ export function FreeTierSettings({ initialSettings, catalog, onSaved }: FreeTier
           <Info className="size-3.5 text-foreground-dim shrink-0 mt-0.5" />
           <span>Se aplica al instante a todas las orgs sin suscripción pagada. No genera suscripciones ni aparece en el catálogo.</span>
         </div>
-        <Button
-          onClick={handleSave}
-          loading={isUpdating}
-          className="w-full sm:w-auto px-8 h-11 text-sm font-bold uppercase tracking-[0.08em]"
-        >
-          Guardar Plan Gratuito
-        </Button>
+        {canWrite && (
+          <Button
+            onClick={handleSave}
+            loading={isUpdating}
+            className="w-full sm:w-auto px-8 h-11 text-sm font-bold uppercase tracking-[0.08em]"
+          >
+            Guardar Plan Gratuito
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -18,8 +18,8 @@ import {
   type IPaymentMethodConfig,
   type IPaymentMethodField,
 } from "@/types/dashboard";
-import { sortPaymentMethodFields } from "@workspace/shared";
 import {
+  sortPaymentMethodFields,
   ValueConverter,
   formatShortDate,
   type CurrencyFormat,
@@ -27,6 +27,7 @@ import {
   type ITaxDetail,
   type PaymentConversionView,
 } from "@workspace/shared";
+
 import { cn } from "@workspace/ui/lib/utils";
 import { TaxBlock } from "./tax-block";
 
@@ -152,7 +153,6 @@ export function PaymentSection({
           <Text weight="bold" uppercase size="base" as="div">Detalles del Pago</Text>
         </div>
       </div>
-
 
       <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

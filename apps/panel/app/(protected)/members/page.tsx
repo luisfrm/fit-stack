@@ -1,6 +1,6 @@
 import { membersService } from "@/lib/services/members-service";
 import { MembersClient } from "./members-client";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { getOrgFeatures, getOrgSeats } from "@/lib/services/org-features";
 import { PortalSeatsBanner } from "@/components/dashboard/portal-seats-banner";
 import { updateTag } from "next/cache";

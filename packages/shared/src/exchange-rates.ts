@@ -6,6 +6,20 @@
    can block the payment.
    ─────────────────────────────────────────────────────────────────────── */
 
+/**
+ * Exchange-rate provider endpoints (open.er-api.com / exchangerate-api.com).
+ *
+ * These are PUBLIC, credential-free endpoints. The app may override the base
+ * URL through `NEXT_PUBLIC_EXCHANGE_URL` (resolved in the app, which owns the
+ * environment); the constants here are the default and are never a fallback
+ * for a missing API base URL.
+ */
+export const BASE_EXCHANGE_API_URL = 'https://open.er-api.com/v6/latest';
+export const EUR_EXCHANGE_URL = 'https://open.er-api.com/v6/latest/EUR';
+export const USD_EXCHANGE_URL = 'https://open.er-api.com/v6/latest/USD';
+export const EUR_EXCHANGE_URL_V4 = 'https://api.exchangerate-api.com/v4/latest/EUR';
+export const USD_EXCHANGE_URL_V4 = 'https://api.exchangerate-api.com/v4/latest/USD';
+
 /** State of the load performed by a consumer (never persisted). */
 export type ExchangeRateLoadStatus = "idle" | "loading" | "ready" | "error";
 

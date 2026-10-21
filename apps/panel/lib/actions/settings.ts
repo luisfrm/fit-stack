@@ -1,7 +1,7 @@
 "use server";
 
 import { updateTag } from "next/cache";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 
 /**
  * Purges Next.js data cache for the active organization's settings.

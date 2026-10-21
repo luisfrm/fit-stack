@@ -4,14 +4,13 @@ import * as React from "react";
 import { Download, ReceiptText, RefreshCw } from "lucide-react";
 import { Badge, Button, Card, Text, toast } from "@workspace/ui/components";
 import { Title } from "@workspace/ui";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import {
   getOrgReceipts,
   orgReceiptsService,
   type OrgReceiptRow,
 } from "@/lib/services/org-receipts";
-import { mutationError } from "@/lib/errors";
-import { formatCents } from "@workspace/shared";
+import { mutationError, formatCents } from "@workspace/shared";
 
 /** Duration units as shown next to the plan name (snapshot of the payment). */
 const DURATION_UNIT_LABELS: Record<string, string> = {
@@ -63,7 +62,7 @@ function displayAmount(row: OrgReceiptRow): { cents: number; currency: string } 
 }
 
 export default function SettingsReceiptsPage() {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const [rows, setRows] = React.useState<OrgReceiptRow[] | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [downloadingId, setDownloadingId] = React.useState<number | null>(null);

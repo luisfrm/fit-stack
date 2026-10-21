@@ -8,7 +8,7 @@ const ORGANIZATIONS_PATH = "/platform/organizations";
  * list organizations (org discovery at sign-in).
  *
  * ⚠️ NO agregar `update` aquí: `PATCH /api/platform/organizations/:id` exige
- * `requirePlatformAuth` (permiso de plataforma `organization.create`), así que
+ * `console:manage` (permiso de plataforma), así que
  * un owner/manager de gym recibe 403. La escritura de la fila `organization`
  * desde el panel vive en `orgProfileService` (`PATCH /api/organizations/profile`,
  * org-scoped) — ver AGENTS.md §5.

@@ -4,10 +4,9 @@
  *  1. `requireAuth`            → session + user (401 if missing)
  *  2. `requireOrgPermission`   → session + active org + org permission
  *                               (400 without org, 403 without permission)
- *  3. `requirePlatformPermission` / alias `requirePlatformAuth`
- *                               → session + platform permission
- *                               (401 / 403, roles: owner/admin allowed,
- *                                support is read-only, plain user denied)
+ *  3. `requirePlatformPermission` → session + platform permission
+ *                               (401 / 403, read routes allowed for support,
+ *                                write routes require console.manage)
  *
  * Fixtures are shared per `describe` (beforeAll) because the matrix tests
  * are all read-only or rejected before any mutation — this keeps the suite
@@ -166,7 +165,7 @@ describe.skipIf(skipReason !== null)('Guards (route-handler middlewares)', () =>
     });
   });
 
-  describe('requirePlatformPermission (requirePlatformAuth alias)', () => {
+  describe('requirePlatformPermission', () => {
     let admin: AuthedUser;
     let owner: AuthedUser;
     let support: AuthedUser;
@@ -201,23 +200,31 @@ describe.skipIf(skipReason !== null)('Guards (route-handler middlewares)', () =>
       expect(res.status, res.text).toBe(403);
     });
 
-    it('rejects support (read-only) on routes guarded by organization.create', async () => {
-      // GET /api/platform/settings is guarded by requirePlatformAuth, which
-      // checks organization.create — support has setting.read but no org rights.
+    it('allows support on GET /api/platform/settings (setting.read)', async () => {
       const res = await support.client.get('/api/platform/settings');
-      expect(res.status, res.text).toBe(403);
+      expect(res.status, res.text).toBe(200);
     });
 
-    it('rejects support on POST /api/platform/organizations', async () => {
+    it('allows support on GET /api/platform/staff (user.list)', async () => {
+      const res = await support.client.get('/api/platform/staff');
+      expect(res.status, res.text).toBe(200);
+    });
+
+    it('allows support on GET /api/platform/plans (plan.list)', async () => {
+      const res = await support.client.get('/api/platform/plans');
+      expect(res.status, res.text).toBe(200);
+    });
+
+    it('allows support on GET /api/platform/subscriptions (subscription.list)', async () => {
+      const res = await support.client.get('/api/platform/subscriptions');
+      expect(res.status, res.text).toBe(200);
+    });
+
+    it('rejects support on POST /api/platform/organizations (console.manage)', async () => {
       const res = await support.client.post('/api/platform/organizations', {
         name: `Gym ${uid()}`,
         slug: `gym-${uid()}`,
       });
-      expect(res.status, res.text).toBe(403);
-    });
-
-    it('rejects support on /api/platform/staff', async () => {
-      const res = await support.client.get('/api/platform/staff');
       expect(res.status, res.text).toBe(403);
     });
   });

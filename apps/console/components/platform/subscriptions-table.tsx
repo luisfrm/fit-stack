@@ -23,13 +23,17 @@ import { ExtendSubscriptionModal } from "./extend-subscription-modal";
 import { DeleteSubscriptionModal } from "./delete-subscription-modal";
 import { PlatformPaymentModal } from "./platform-payment-modal";
 import { PriceCell } from "./price-cell";
-import { formatCents, PAYMENT_STATUSES } from "@workspace/shared";
 import {
-  canManageBilling,
-  hasActiveSubscription,
-} from "@/lib/platform-permissions";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { apiCode, mutationError } from "@/lib/errors";
+  apiCode,
+  canPlatform,
+  formatCents,
+  mutationError,
+  PAYMENT_STATUSES,
+  type CurrencyFormat,
+} from "@workspace/shared";
+import { hasActiveSubscription } from "@/lib/platform/subscription-status";
+import { usePlatformAuth } from "@workspace/auth/platform";
+
 import {
   Trash2,
   Calendar,
@@ -39,7 +43,6 @@ import {
   CreditCard,
   History,
 } from "lucide-react";
-import { type CurrencyFormat } from "@workspace/shared";
 
 interface SubscriptionsTableProps {
   subscriptions: SubscriptionWithDetails[];
@@ -379,8 +382,8 @@ export function SubscriptionsTable({
   settings,
   linkOrganization = true,
 }: Readonly<SubscriptionsTableProps>) {
-  const { user } = useAuth();
-  const canMutateBilling = canManageBilling(user?.role);
+  const { platformRole } = usePlatformAuth();
+  const canMutateBilling = canPlatform(platformRole, "console", "manage");
   const [detailModal, setDetailModal] =
     React.useState<SubscriptionWithDetails | null>(null);
   const [cancelModal, setCancelModal] =

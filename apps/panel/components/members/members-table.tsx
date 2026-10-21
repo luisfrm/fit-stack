@@ -8,7 +8,7 @@ import { MemberModal } from "./member-modal";
 import { membersService } from "@/lib/services/members-service";
 import { uploadService } from "@/lib/services/upload-service";
 import { ValueConverter, CurrencyFormat } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { differenceInDays, parseISO } from "date-fns";
 
@@ -234,7 +234,7 @@ export function MembersTable({
   emptyTitle,
   emptyDescription
 }: MembersTableProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // Format comes from the session (NOT NULL column): until the session resolves
   // there is no format, so the table stays in its loading state instead of
   // rendering amounts with an invented "latam".

@@ -19,6 +19,8 @@ import {
   knowledgeService,
 } from "@/lib/services/knowledge-service";
 import { KnowledgeDocModal } from "@/components/knowledge/knowledge-doc-modal";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 const SOURCE_BADGE_VARIANT: Record<KnowledgeDoc["source"], "default" | "info" | "warning"> = {
   faq: "info",
@@ -33,6 +35,8 @@ interface KnowledgeSettingsProps {
 
 export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsProps) {
   const router = useRouter();
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const [mode, setMode] = React.useState<"closed" | "create" | { edit: KnowledgeDoc; content: string }>("closed");
   const [deleteTarget, setDeleteTarget] = React.useState<KnowledgeDoc | null>(null);
 
@@ -140,9 +144,11 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
             políticas de FitStack están disponibles para todas las organizaciones.
           </Text>
         </div>
-        <Button onClick={openCreate} leftIcon={<Plus className="size-4" />}>
-          Nuevo documento
-        </Button>
+        {canWrite && (
+          <Button onClick={openCreate} leftIcon={<Plus className="size-4" />}>
+            Nuevo documento
+          </Button>
+        )}
       </div>
 
       <div className="space-y-8 max-w-4xl">
@@ -174,9 +180,11 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
                   Crea tu primer FAQ o política para que el asistente pueda responder sobre FitStack.
                 </Text>
               </div>
-              <Button onClick={openCreate} leftIcon={<Plus className="size-4" />}>
-                Crear primer documento
-              </Button>
+              {canWrite && (
+                <Button onClick={openCreate} leftIcon={<Plus className="size-4" />}>
+                  Crear primer documento
+                </Button>
+              )}
             </div>
           ) : (
             <ul className="divide-y divide-white/5">
@@ -202,29 +210,33 @@ export function KnowledgeSettings({ initialDocs, onSaved }: KnowledgeSettingsPro
                       Actualizado {formatDate(doc.updatedAt)}
                     </Text>
                   </div>
-                  <Switch
-                    checked={doc.isActive}
-                    onCheckedChange={(checked) => void toggleActive(doc, checked)}
-                    aria-label={`Activar ${doc.title}`}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEdit(doc)}
-                    title="Editar"
-                    aria-label={`Editar ${doc.title}`}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDeleteTarget(doc)}
-                    title="Eliminar"
-                    aria-label={`Eliminar ${doc.title}`}
-                  >
-                    <Trash2 className="size-4 text-destructive" />
-                  </Button>
+                  {canWrite && (
+                    <>
+                      <Switch
+                        checked={doc.isActive}
+                        onCheckedChange={(checked) => void toggleActive(doc, checked)}
+                        aria-label={`Activar ${doc.title}`}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(doc)}
+                        title="Editar"
+                        aria-label={`Editar ${doc.title}`}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteTarget(doc)}
+                        title="Eliminar"
+                        aria-label={`Eliminar ${doc.title}`}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

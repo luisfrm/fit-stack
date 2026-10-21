@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import {
-  hasAccess,
+  can,
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
   type OrgRole,
@@ -27,7 +27,7 @@ export default async function UnauthorizedPage() {
   if (!orgRole) {
     redirect("/dashboard");
   }
-  if (hasAccess(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
+  if (can(orgRole, PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) {
     redirect("/dashboard");
   }
 

@@ -4,7 +4,7 @@ import * as React from "react";
 import { Modal, toast } from "@workspace/ui/components";
 import { StaffForm } from "./staff-form";
 import { canAssignPlatformRole, platformRoles, type PlatformRole } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { staffService, type CreateStaffInput } from "@/lib/services/staff-service";
 
 interface StaffModalProps {
@@ -13,10 +13,9 @@ interface StaffModalProps {
 }
 
 export function StaffModal({ trigger, onSuccess }: StaffModalProps) {
-  const { user } = useAuth();
-  const actorRole = (user?.role || "user") as PlatformRole;
+  const { platformRole } = usePlatformAuth();
   const canAssign = Object.keys(platformRoles).some((role) =>
-    canAssignPlatformRole(actorRole, role as PlatformRole),
+    canAssignPlatformRole(platformRole, role as PlatformRole),
   );
 
   const [internalOpen, setInternalOpen] = React.useState(false);

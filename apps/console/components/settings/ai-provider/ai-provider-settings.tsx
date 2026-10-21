@@ -9,6 +9,8 @@ import { Title, toast } from "@workspace/ui";
 import { SimpleSelect } from "@workspace/ui/components";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { api } from "@/lib/api/client";
+import { canPlatform } from "@workspace/shared";
+import { usePlatformAuth } from "@workspace/auth/platform";
 
 interface AiProviderSettingsProps {
   readonly initialSettings: Record<string, string>;
@@ -16,6 +18,8 @@ interface AiProviderSettingsProps {
 }
 
 export function AiProviderSettings({ initialSettings, onSaved }: AiProviderSettingsProps) {
+  const { platformRole } = usePlatformAuth();
+  const canWrite = canPlatform(platformRole, "setting", "write");
   const [provider, setProvider] = React.useState<string>(
     () => initialSettings[PLATFORM_SETTINGS_KEYS.AI_PROVIDER_DEFAULT] || "",
   );
@@ -120,13 +124,15 @@ export function AiProviderSettings({ initialSettings, onSaved }: AiProviderSetti
           </div>
 
           <div className="flex flex-col-reverse md:flex-row items-center gap-3 w-full md:w-auto mt-4 md:mt-0">
-            <Button
-              onClick={handleSave}
-              loading={isUpdating}
-              className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
-            >
-              Guardar Proveedor IA
-            </Button>
+            {canWrite && (
+              <Button
+                onClick={handleSave}
+                loading={isUpdating}
+                className="w-full md:w-auto md:px-8 h-14 md:h-12 text-sm font-bold uppercase tracking-[0.1em]"
+              >
+                Guardar Proveedor IA
+              </Button>
+            )}
           </div>
         </Card>
       </div>

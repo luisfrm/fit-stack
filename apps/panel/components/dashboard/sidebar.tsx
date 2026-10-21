@@ -33,11 +33,11 @@ import {
   Badge,
 } from "@workspace/ui/components";
 import { uploadService } from "@/lib/services/upload-service";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { usePermissions } from "@workspace/auth/hooks";
-import { useTheme } from "@/lib/hooks/use-theme";
+import { useOrgAuth } from "@workspace/auth/org";
+import { useOrgPermissions } from "@workspace/auth/org";
+import { useTheme } from "@workspace/ui/hooks/use-theme";
 import SignOutButton from "../SignOutButton";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@workspace/auth/client";
 import { OrganizationPicker } from "./organization-picker";
 import { useOrgFeatures } from "./org-features-provider";
 import { filterNavItemsByFeatures } from "@/lib/features/nav-filter";
@@ -64,7 +64,7 @@ const GYM_NAV_ITEMS: GymNavItem[] = [
 ];
 
 function useFilteredNavItems(): SidebarNavItem[] {
-  const { can } = usePermissions();
+  const { can } = useOrgPermissions();
   const { features } = useOrgFeatures();
   return filterNavItemsByFeatures(GYM_NAV_ITEMS, features).filter((item) =>
     can(item.module, PERMISSION_ACTIONS.READ),
@@ -123,7 +123,7 @@ export function SwitchOrganizationAction() {
 }
 
 function useSidebarBranding(user: SidebarUser, initialOrg?: IOrganization | null) {
-  const { isPending: sessionLoading, activeOrganization: clientOrg } = useAuth();
+  const { isPending: sessionLoading, activeOrganization: clientOrg } = useOrgAuth();
   const { isDark, toggleTheme } = useTheme();
   const { isFreeTier } = useOrgFeatures();
 

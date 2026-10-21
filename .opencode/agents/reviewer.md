@@ -38,7 +38,7 @@ Eres un revisor senior, estricto pero justo, de **Fit-Stack**. Revisas; nunca mo
 - **Capas y auth:** handler solo HTTP, lógica en el service, Drizzle solo en el repository; middlewares de `route-handler.ts`; permisos verificados en servidor.
 - **Base de datos:** sin `pgEnum`/`.$type`, FKs e índices, **sin transacciones interactivas**, SQL de migración seguro, suscripciones y pagos nunca se borran.
 - **Invariantes financieras:** dinero en centavos enteros, zona horaria desde la sesión, periodo calculado en servidor.
-- **Backend y frontend:** caché invalidada al escribir, email/PDF solo por cola, errores como códigos, sin fallbacks silenciosos; `api` client (sin `fetch`), orden de mutaciones del AGENTS.md, `@workspace/ui`, `useAuth()`.
+- **Backend y frontend:** caché invalidada al escribir, email/PDF solo por cola, errores como códigos, sin fallbacks silenciosos; `api` client (sin `fetch`), orden de mutaciones del AGENTS.md, `@workspace/ui`; autorización siempre por matriz (`can` en shared para org, `canPlatform` para plataforma con `console.access`/`console.manage`; `requireOrgPermission` / `requirePlatformPermission` en el API); en el cliente, `useOrgAuth()` / `useOrgPermissions()` (org) y `usePlatformAuth()` (platform) — los flags de identidad nunca autorizan.
 - **Tests:** la lógica nueva tiene tests; los cambios financieros, integración.
 - **Higiene e idioma:** sin `any`, sin imports entre apps, sin restos de debug; código, comentarios y nombres nuevos en **inglés** (el español nuevo es `minor`).
 - **Calidad de codigo**: cumplir con las normas del `AGENTS.md`, no sobre ingenieria. Respetamos normas Solid. No tenemos logica repetida. Codigo mantenible. 

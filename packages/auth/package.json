@@ -10,7 +10,10 @@
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
     "./service": "./src/service.ts",
-    "./hooks": "./src/hooks.ts"
+    "./org": "./src/org.tsx",
+    "./platform": "./src/platform.ts",
+    "./env": "./src/env.ts",
+    "./api-client": "./src/api-client.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -19,15 +22,18 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@workspace/shared": "workspace:*",
     "better-auth": "^1.5.5",
     "ofetch": "^1.5.1",
     "react": "^19.0.0"
+  },
+  "peerDependencies": {
+    "next": ">=16"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
-    "@workspace/shared": "workspace:*",
     "eslint": "^9.39.2",
     "next": "16.1.6",
     "typescript": "^5.0.0",

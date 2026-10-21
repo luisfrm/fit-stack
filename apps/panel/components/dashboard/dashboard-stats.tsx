@@ -4,7 +4,7 @@ import * as React from "react";
 import { KpiGroup } from "./kpi-group";
 import { CompactMoney } from "./compact-money";
 import { Text } from "@workspace/ui/components";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import type { DashboardStats } from "@/lib/services/dashboard-service";
 
@@ -39,7 +39,7 @@ function getRelativeTime(dateStr: string): string {
 }
 
 export function DashboardStatsView({ stats, todayIncome, pendingPayments }: DashboardStatsViewProps) {
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   // Format comes from the session (NOT NULL column): while the session resolves
   // the amount is not rendered, never formatted with an invented "latam".
   const currencyFormat = resolveOrgCurrencyFormat(activeOrganization);

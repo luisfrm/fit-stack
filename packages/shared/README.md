@@ -36,7 +36,7 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 ### `access-control.ts`
 
 - `platformStatement`/`platformAc`/`platformRoles` — AC de plataforma SaaS (roles: `owner`, `admin`, `support`)
-- `canAccessConsole(role)` — gate de acceso al Console (true para cualquier rol de `platformRoles`)
+- `canPlatform(role, module, action)` — chequeo de la matriz de plataforma (`console.access`, `console.manage`, lecturas por módulo, `setting.write`)
 - `organizationStatement`/`organizationAc`/`organizationRoles` — AC de tenant (roles: `owner`, `manager`, `cashier`, `coach`, `member`)
 - `orgRoleDefinitions` — alias de `organizationRoles` (mapa Better Auth de rol → permisos nativos)
 
@@ -50,7 +50,7 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 |------|----------|
 | `modules.ts` | `PERMISSION_MODULES` (12 módulos: dashboard, reports, members, staff, subscriptions, plans, classes, content, settings, organization, ai, panel) + `PERMISSION_MODULE_VALUES` |
 | `actions.ts` | `PERMISSION_ACTIONS` (READ, CREATE, UPDATE, DELETE, ACCESS) |
-| `can.ts` | `can(role, module, action)`, `canAny(role, checks)`, `hasAccess` (alias de `can`) |
+| `can.ts` | `can(role, module, action)`, `canAny(role, checks)` |
 | `role-assignment.ts` | `canAssignRole(actor, target)` (org) y `canAssignPlatformRole(actor, target)` (plataforma) — anti-escalation |
 | `index.ts` | Re-export del módulo `permissions` |
 

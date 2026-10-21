@@ -1,4 +1,4 @@
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { redirect } from "next/navigation";
 
 export default async function HomePage() {

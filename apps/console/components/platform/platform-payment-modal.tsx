@@ -14,7 +14,7 @@ import {
 } from "@/lib/services/platform-subscriptions-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { mutationError } from "@/lib/errors";
+import { mutationError } from "@workspace/shared";
 
 interface PlatformPaymentModalProps {
   readonly subscription: SubscriptionWithDetails;

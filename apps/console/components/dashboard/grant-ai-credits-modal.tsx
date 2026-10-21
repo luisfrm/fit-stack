@@ -6,7 +6,7 @@ import { Zap } from "lucide-react";
 import { Modal, Button, Input, Text, toast } from "@workspace/ui/components";
 import type { IPlatformOrganization } from "@workspace/shared/types";
 import { organizationsService } from "@/lib/services/organizations-service";
-import { mutationError } from "@/lib/errors";
+import { mutationError } from "@workspace/shared";
 
 interface GrantAiCreditsModalProps {
   readonly initialData: IPlatformOrganization;

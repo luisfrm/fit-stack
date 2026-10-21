@@ -16,7 +16,7 @@ import {
   formatPlatformRole,
   type PlatformRole,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import { paginate } from "@/lib/paginate";
 import { staffService } from "@/lib/services/staff-service";
 import type { PlatformStaffMember } from "@/lib/services/staff-service";
@@ -106,7 +106,7 @@ function StaffActionsCell({
 
 const getColumns = (
   actorId?: string,
-  actorRole: PlatformRole = "user",
+  platformRole: PlatformRole = "user",
   onEditRole?: (member: PlatformStaffMember) => void,
   onRevoke?: (member: PlatformStaffMember) => void,
 ): ColumnDef<PlatformStaffMember>[] => [
@@ -125,7 +125,7 @@ const getColumns = (
         member={m}
         canManage={
           m.id !== actorId &&
-          canAssignPlatformRole(actorRole, m.role as PlatformRole)
+          canAssignPlatformRole(platformRole, m.role as PlatformRole)
         }
         onEditRole={(target) => onEditRole?.(target)}
         onRevoke={(target) => onRevoke?.(target)}
@@ -140,8 +140,7 @@ interface StaffTableProps {
 }
 
 export function StaffTable({ staff, onSuccess }: Readonly<StaffTableProps>) {
-  const { user } = useAuth();
-  const actorRole = (user?.role || "user") as PlatformRole;
+  const { user, platformRole } = usePlatformAuth();
 
   const [revokeTarget, setRevokeTarget] =
     React.useState<PlatformStaffMember | null>(null);
@@ -176,14 +175,14 @@ export function StaffTable({ staff, onSuccess }: Readonly<StaffTableProps>) {
     () =>
       getColumns(
         user?.id,
-        actorRole,
+        platformRole,
         setRoleTarget,
         (target) => {
           setRevokeTarget(target);
           setIsConfirmOpen(true);
         },
       ),
-    [user?.id, actorRole],
+    [user?.id, platformRole],
   );
 
   return (

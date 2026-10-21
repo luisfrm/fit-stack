@@ -9,7 +9,7 @@ import {
   PLATFORM_ROLE_LABELS,
   type PlatformRole,
 } from "@workspace/shared";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { usePlatformAuth } from "@workspace/auth/platform";
 import type { CreateStaffInput } from "@/lib/services/staff-service";
 
 const ROLE_OPTIONS = Object.keys(platformRoles).map((role) => ({
@@ -23,8 +23,7 @@ interface StaffFormProps {
 }
 
 export function StaffForm({ onSubmit, isLoading }: StaffFormProps) {
-  const { user } = useAuth();
-  const actorRole = (user?.role || "user") as PlatformRole;
+  const { platformRole } = usePlatformAuth();
 
   const [formData, setFormData] = React.useState<CreateStaffInput>({
     name: "",
@@ -36,7 +35,7 @@ export function StaffForm({ onSubmit, isLoading }: StaffFormProps) {
   // Anti-escalation: only show roles the actor may assign
   // (owner → any; admin → support/admin; support → none)
   const assignableRoles = ROLE_OPTIONS.filter((opt) =>
-    canAssignPlatformRole(actorRole, opt.value as PlatformRole),
+    canAssignPlatformRole(platformRole, opt.value as PlatformRole),
   );
 
   const handleChange = (field: keyof CreateStaffInput, value: unknown) => {

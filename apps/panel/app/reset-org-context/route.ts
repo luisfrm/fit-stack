@@ -1,4 +1,4 @@
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@workspace/auth/client";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 

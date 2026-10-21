@@ -10,8 +10,8 @@ import {
   type FeatureDefinition,
   type FeatureId,
   type PlanFeaturesV2,
+  cleanNumericInput,
 } from "@workspace/shared";
-import { cleanNumericInput } from "@/lib/utils/helper";
 
 interface FeaturesEditorProps {
   readonly catalog?: FeatureCatalog;

@@ -22,20 +22,14 @@ import {
   cn,
   Badge
 } from "@workspace/ui/components";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { parseDateAsConfigTimezone } from "@/lib/config/display";
-import { addDuration, toLocalDayString } from "@workspace/shared/date";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import {
+  parseDateAsConfigTimezone,
   exchangeRateAppliedValue,
   paymentConversionView,
   type ExchangeRateLoadStatus,
   type ExchangeRateSnapshot,
-} from "@workspace/shared";
-import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
-import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
-import { apiCode } from "@/lib/errors";
-import {
+  apiCode,
   centsToUnits,
   unitsToCents,
   previewReceiptTaxes,
@@ -43,6 +37,11 @@ import {
   computeSubscriptionPeriod,
   ORG_ROLES,
 } from "@workspace/shared";
+import { addDuration, toLocalDayString } from "@workspace/shared/date";
+
+import { useSettings, SETTINGS_KEYS } from "@/lib/hooks/use-settings";
+import { useOrgAuth } from "@workspace/auth/org";
+import { requireOrgConfig, type OrgConfig } from "@/lib/org-config";
 
 // Sub-components
 import { MemberSelector } from "./member-selector";
@@ -137,7 +136,7 @@ interface SubscriptionFormProps {
  * instead of inventing "America/Caracas"/"latam" (AGENTS.md §9/§10).
  */
 export function SubscriptionForm(props: SubscriptionFormProps) {
-  const { activeOrganization, isPending } = useAuth();
+  const { activeOrganization, isPending } = useOrgAuth();
 
   const resolved = React.useMemo(() => {
     try {
@@ -191,7 +190,7 @@ function SubscriptionFormContent({
   initialMember,
 }: SubscriptionFormProps & { readonly orgConfig: OrgConfig }) {
   const { settings } = useSettings();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const timezone = orgConfig.timezone;
   const [plans, setPlans] = React.useState<IMembershipPlan[]>([]);
 

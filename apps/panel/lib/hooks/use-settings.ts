@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { settingsService } from "@/lib/services/settings-service";
 import { invalidateSettingsCache } from "@/lib/actions/settings";
-import { mutationError } from "@/lib/errors";
+import { mutationError } from "@workspace/shared";
 import { toast } from "@workspace/ui";
 
 export const SETTINGS_KEYS = {

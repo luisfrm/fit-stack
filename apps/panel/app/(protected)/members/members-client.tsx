@@ -14,9 +14,9 @@ import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { membersService } from "@/lib/services/members-service";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { FilterPanel } from "@/components/dashboard/filter-panel";
-import { useDebounce } from "@/lib/hooks/use-debounce";
-import { mutationError } from "@/lib/errors";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
+import { mutationError } from "@workspace/shared";
+import { useOrgAuth } from "@workspace/auth/org";
 import { cn } from "@workspace/ui/lib/utils";
 
 interface MembersClientProps {
@@ -60,7 +60,7 @@ export function MembersClient({
   onRefreshServer,
 }: MembersClientProps) {
   const router = useRouter();
-  const { activeOrganization } = useAuth();
+  const { activeOrganization } = useOrgAuth();
   const [members, setMembers] = React.useState<IMember[]>(initialMembers);
   const [page, setPage] = React.useState(initialPage);
   const [totalPages, setTotalPages] = React.useState(initialTotalPages);

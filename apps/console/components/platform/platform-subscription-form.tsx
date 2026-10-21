@@ -13,7 +13,7 @@ import { PAYMENT_STATUSES } from "@workspace/shared/constants";
 import { uploadService } from "@/lib/services/upload-service";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
-import { useDebounce } from "@/lib/hooks/use-debounce";
+import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import {
   PLATFORM_SETTINGS_KEYS,
   requirePlatformCurrency,
@@ -24,8 +24,10 @@ import {
   exchangeRateAppliedValue,
   paymentConversionView,
   type ExchangeRateLoadStatus,
+  centsToUnits,
+  unitsToCents,
 } from "@workspace/shared";
-import { centsToUnits, unitsToCents } from "@workspace/shared";
+
 import { OrganizationSelector } from "./organization-selector";
 import { PaymentSection } from "./payment-section";
 import { PlatformPlanSelector } from "./platform-plan-selector";

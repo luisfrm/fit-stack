@@ -7,6 +7,7 @@ import {
   type PlatformStatement,
   type FeatureId,
   can,
+  canPlatform,
 } from '@workspace/shared';
 import type { AppEnv } from './env';
 import { createCache } from './cache';
@@ -111,18 +112,23 @@ export const requirePlatformPermission = <Module extends keyof PlatformStatement
       if (err instanceof APIError) {
         throw new HTTPException(err.statusCode === 401 ? 401 : 403, { message: err.message });
       }
-      // Fail-closed fallback: if Better Auth check fails, only full
-      // platform staff (owner/admin) passes; the rest receives 403.
-      if ((user as any).role !== 'admin' && (user as any).role !== 'owner') {
-        throw new HTTPException(403, { message: 'Forbidden: Requires platform admin' });
+      // Fail-closed fallback: the platform matrix decides, never a role list.
+      const platformRole = (user as { role?: string }).role;
+      if (
+        !canPlatform(
+          platformRole,
+          moduleName as keyof PlatformStatement,
+          action as string,
+        )
+      ) {
+        throw new HTTPException(403, {
+          message: 'Forbidden: Insufficient platform permissions',
+        });
       }
     }
 
     await next();
   });
-
-/** Alias for platform auth */
-export const requirePlatformAuth = () => requirePlatformPermission('organization', 'create');
 
 /**
  * Resolves active organization timezone from session and stores it

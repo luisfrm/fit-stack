@@ -14,7 +14,7 @@ Sistema de permisos basado en **Better Auth Access Control** con matriz tipada. 
 | Matriz | `access-control.ts` | `organizationAc.newRole(...)` / `platformAc.newRole(...)` |
 | Cliente puro | `can(role, module, action)` | Lectura de matriz (`packages/shared/src/permissions/can.ts`) |
 | API | `requireOrgPermission` / `requirePlatformPermission` | Middleware Hono que valida sesión + `can()` |
-| Panel UX | `usePermissions()` | `can(module, action)`, `hasAccess`, `canAccessPanel()` |
+| Panel UX | `useOrgPermissions()` | `can(module, action)` |
 | Anti-escalación | `canAssignRole(actor, target)` | Valida asignación de roles en miembros/staff |
 
 **Coach y member no entran al Panel.** **Pagos** se autorizan vía módulo `subscriptions` (no existe módulo `payments`).
@@ -38,11 +38,11 @@ Cada rol es un `newRole({ modulo: [acciones] })`. La validación es `roleDef.aut
 
 | Rol | Alcance |
 |-----|---------|
-| `support` | Solo lectura (`organization: []`, `plan:list`, `subscription:list`, `setting:read`). No entra a Console. |
-| `admin` | Crea/aprueba/suspende organizaciones, gestiona planes y settings (`setting:read/write`). Entra a Console vía `canAccessConsole()`. |
+| `support` | Solo lectura (`console:access`, `organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`). No puede mutar nada. |
+| `admin` | Crea/aprueba/suspende organizaciones, gestiona planes y settings (`setting:read/write`), `console:manage`. Entra a Console vía `console:access`. |
 | `owner` | Todo lo de admin + `organization:delete`, `plan:delete`, `user:delete/impersonate`. |
 
-Campo `user.role` guarda este rol. `canAccessConsole()` exige `organization:create`.
+Campo `user.role` guarda este rol. `console:access` habilita el layout; `console:manage` habilita las mutaciones (settings/branding/knowledge usan `setting:write`).
 
 ### Organización (tenant)
 
@@ -94,14 +94,17 @@ Validado server-side en `POST /api/members` y staff.
 ### API (api-worker)
 
 ```ts
-import { requireOrgPermission, requirePlatformAuth } from "@/lib/route-handler";
+import { requireOrgPermission, requirePlatformPermission } from "@/lib/route-handler";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 
 // Org-scoped
 .get("/", requireOrgPermission(PERMISSION_MODULES.MEMBERS, PERMISSION_ACTIONS.READ), async (c) => { ... })
 
-// Plataforma
-.get("/", requirePlatformAuth(), async (c) => { ... })
+// Plataforma (lectura)
+.get("/", requirePlatformPermission("organization", "list"), async (c) => { ... })
+
+// Plataforma (escritura)
+.post("/", requirePlatformPermission("console", "manage"), zValidator("json", schema), async (c) => { ... })
 ```
 
 Errores normalizados vía `onError` → `{ error, details? }`.
@@ -109,17 +112,20 @@ Errores normalizados vía `onError` → `{ error, details? }`.
 ### Panel (UI)
 
 ```ts
-import { usePermissions } from "@workspace/auth/hooks";
+import { useOrgPermissions } from "@workspace/auth/org";
 import { PERMISSION_MODULES, PERMISSION_ACTIONS } from "@workspace/shared";
 
-const { can, hasAccess, canAccessPanel } = usePermissions();
+const { can } = useOrgPermissions();
 
-if (!canAccessPanel()) redirect("/unauthorized");
+if (!can(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS)) redirect("/unauthorized");
 can(PERMISSION_MODULES.CLASSES, PERMISSION_ACTIONS.UPDATE); // true para cashier/coach
-hasAccess(PERMISSION_MODULES.PANEL, PERMISSION_ACTIONS.ACCESS); // alias de can()
 ```
 
-`canAccessCms` se mantiene como alias de `canAccessPanel` por compatibilidad — usar `canAccessPanel`/`hasAccess` en código nuevo.
+`can()` es la única implementación (vive en `@workspace/shared`); el hook solo la envuelve con el `orgRole` de la sesión. En el servidor se usa `can` directamente.
+
+### Console (UI)
+
+`canPlatform(role, 'console', 'access')` gatea la entrada al layout y `/unauthorized`; las lecturas usan su módulo (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) y las mutaciones `console:manage` (`setting:write` para settings, branding y knowledge). Todo deriva de `canPlatform()` en `@workspace/shared`; no hay comparaciones de rol hardcodeadas.
 
 ---
 
@@ -148,19 +154,19 @@ packages/shared/src/
 └── permissions/
     ├── modules.ts             # PERMISSION_MODULES
     ├── actions.ts             # PERMISSION_ACTIONS
-    ├── can.ts                 # can(), hasAccess
+    ├── can.ts                 # can(), canAny()
     ├── role-assignment.ts     # canAssignRole(), canAssignPlatformRole()
     └── index.ts
 
 packages/auth/src/
-├── permissions.ts             # usePermissions() → can/hasAccess/canAccessPanel
-└── hooks.ts                   # useAuth() → orgRole, isOwner/isManager/...
+├── org.tsx                    # useOrgAuth() (identidad) + useOrgPermissions() (can)
+└── platform.ts                # usePlatformAuth() → user, platformRole
 
 apps/api-worker/src/lib/
-└── route-handler.ts           # requireOrgPermission, requirePlatformAuth, requireFeature
+└── route-handler.ts           # requireOrgPermission, requirePlatformPermission, requireFeature
 
 apps/panel/app/dashboard/
-└── layout.tsx                 # guard canAccessPanel() → /unauthorized
+└── layout.tsx                 # guard can(PANEL, ACCESS) → /unauthorized
 ```
 
 Ver también `AGENTS.md` § RBAC y § Features & Free Tier (`requireFeature` + `ai_chat`).

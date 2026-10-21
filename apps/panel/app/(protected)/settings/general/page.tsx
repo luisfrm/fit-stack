@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { useSettings } from "@/lib/hooks/use-settings";
-import { useAuth } from "@/lib/hooks/use-auth";
+import { useOrgAuth } from "@workspace/auth/org";
 import { OrganizationSettingsForm } from "@/components/dashboard/organization-settings-form";
 
 export default function GeneralSettingsPage() {
   const { settings, isLoading: settingsLoading, isUpdating: settingsUpdating, updateSettings } = useSettings();
-  const { isPending: sessionLoading } = useAuth();
+  const { isPending: sessionLoading } = useOrgAuth();
 
   const handleSave = async (data: Record<string, string>) => {
     await updateSettings(data);

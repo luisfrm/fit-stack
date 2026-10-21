@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@workspace/auth/client";
 import { Button } from "@workspace/ui/components/button";
 import { Text } from "@workspace/ui/components/text";
 import { SplashScreen, toast } from "@workspace/ui/components";
@@ -10,7 +10,7 @@ import { Building2, ChevronRight, LogOut, Loader2 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { uploadService } from "@/lib/services/upload-service";
 import { NextImage } from "@workspace/ui/components/next/image";
-import { sessionService } from "@/lib/services/session-service";
+import { sessionService } from "@workspace/auth/service";
 import { organizationsService } from "@/lib/services/organizations-service";
 
 interface OrganizationPickerProps {

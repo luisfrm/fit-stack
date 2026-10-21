@@ -3,7 +3,7 @@
 Panel SaaS super-admin (Fit-Stack staff). Gestiona organizaciones, planes de plataforma, suscripciones, configuraciones globales (currencies, payment methods) y el equipo de administración (Staff).
 
 **Puerto:** 3000  
-**Acceso:** Usuarios con rol global de plataforma que pasen `canAccessConsole(role)` (admin/owner — los que tienen `organization.create` en `platformRoles`); `support` es read-only y no entra al layout
+**Acceso:** Usuarios con rol global de plataforma que pasen `canPlatform(role, 'console', 'access')` (`owner`, `admin` y `support`); `support` es read-only y no puede mutar nada (`console:manage` / `setting:write`)
 
 ---
 
@@ -60,10 +60,10 @@ apps/console/
 │                                  # subscriptions-table + kpi-section, payment-section
 │   └── staff/                     # staff-table, staff-modal, staff-form
 └── lib/
-    ├── auth-client.ts             # Re-export de @workspace/auth/client
-    ├── hooks/                     # Vanilla (sin TanStack Query): use-auth, use-debounce, use-exchange-rates
-    ├── services/                  # organizations, platform-plans, platform-subscriptions, staff
-    └── config/                    # envs, constants, display config
+    ├── api/                       # instancia de createApiClient (@workspace/auth/api-client) + exchange-rates
+    ├── hooks/                     # Propios de la app: use-exchange-rates
+    ├── services/                  # organizations, platform-plans, platform-subscriptions, staff, upload
+    └── config/                    # envs (solo NEXT_PUBLIC_R2_URL), platform-settings, organization-presets
 ```
 
 ## Rutas

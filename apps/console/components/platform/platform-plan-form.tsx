@@ -10,10 +10,8 @@ import {
   CurrencySelector,
 } from "@workspace/ui/components";
 import { type IPlatformPlan } from "@workspace/shared/types";
-import { cleanNumericInput } from "@/lib/utils/helper";
-import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
-import { FeaturesEditor } from "./features-editor";
 import {
+  cleanNumericInput,
   FEATURE_CATALOG,
   centsToUnits,
   resolveFeatures,
@@ -21,6 +19,8 @@ import {
   type FeatureCatalog,
   type PlanFeaturesV2,
 } from "@workspace/shared";
+import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
+import { FeaturesEditor } from "./features-editor";
 
 interface PlatformPlanFormProps {
   readonly initialData?: Partial<IPlatformPlan>;
