@@ -9,7 +9,7 @@
 2. **Todo dato mostrado en el comprobante viene de snapshots, nunca de tablas "en vivo".** Si el plan cambia después, el comprobante ya emitido no debe cambiar.
 3. **La moneda y la tasa de cambio aplicada siempre se muestran juntas** si el pago fue en una moneda distinta a la moneda principal del emisor.
 4. **El disclaimer legal del país siempre va al pie**, tomado de la config de país (`COUNTRIES[code].legalDisclaimer`), nunca hardcodeado por documento.
-5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `[[FACTURATION]]` §2. El campo `documentLabel` es de solo lectura y no participa del gate.
+5. **La etiqueta del documento** ("Comprobante de pago" vs "Factura") depende de si el emisor cumple las 3 condiciones descritas en `[[FACTURATION]]` §3. La etiqueta la decide el gate; ningún campo de configuración puede pedirla.
 
 ---
 

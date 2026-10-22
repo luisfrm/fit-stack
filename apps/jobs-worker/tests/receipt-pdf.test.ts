@@ -3,7 +3,7 @@
  *
  * Lives in jobs-worker because pdf-lib only resolves here (workerd-safe, no
  * WASM). Asserts the document is a valid PDF **and** the texto realmente
- * impreso: los campos opcionales ausentes se omiten (FACTURATION.md §3) y la
+ * impreso: los campos opcionales ausentes se omiten (FACTURATION.md §7) y la
  * conversión a moneda base usa la tasa persistida.
  */
 import { inflateSync } from 'node:zlib';
@@ -205,7 +205,7 @@ describe('renderReceiptPdfBytes', () => {
     data.amounts.baseTotal = 318;
 
     const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
-    // Fail-closed (FACTURATION.md §3): sin tasa no se muestra conversión,
+    // Fail-closed (FACTURATION.md §7): sin tasa no se muestra conversión,
     // aunque `baseTotal` venga informado.
     expect(text).not.toContain('Tasa aplicada');
     expect(text).not.toContain('Equivalente');

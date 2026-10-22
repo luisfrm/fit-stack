@@ -37,7 +37,7 @@ Routes mounted in `apps/api-worker/src/index.ts` (all under `/api`, except `/hea
 > | `/api/organizations/features` | Resolved features of the active org + `isFreeTier` (panel gate, cache `org:*:features`) |
 > | `/api/organizations/seats` | Portal seats of the active org (`{ used, limit, pending }`) |
 
-> **Document-type write guard (RD-148)**: every write of an identification — members/trainers `documentId`, `PATCH /api/organizations/profile` `taxId`, platform organizations `taxId` (POST/PUT/PATCH) and `POST /api/platform/settings` (`fitstack_tax_id`) — answers **400 `{ code: 'DOCUMENT_TYPE_INVALID', fields }`** when the `"<type>-<number>"` prefix is a document type of ANOTHER country. It is enforced server-side against `COUNTRIES` (the client selector is never trusted), partial writes read the stored country/id, and a legacy value resent unchanged is never blocked. Rules: [`../business/FACTURATION.md`](../business/FACTURATION.md) §3.
+> **Document-type write guard (RD-148)**: every write of an identification — members/trainers `documentId`, `PATCH /api/organizations/profile` `taxId`, platform organizations `taxId` (POST/PUT/PATCH) and `POST /api/platform/settings` (`fitstack_tax_id`) — answers **400 `{ code: 'DOCUMENT_TYPE_INVALID', fields }`** when the `"<type>-<number>"` prefix is a document type of ANOTHER country. It is enforced server-side against `COUNTRIES` (the client selector is never trusted), partial writes read the stored country/id, and a legacy value resent unchanged is never blocked. Rules: [`../business/FACTURATION.md`](../business/FACTURATION.md) §9.
 
 ---
 
