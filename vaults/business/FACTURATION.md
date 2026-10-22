@@ -54,7 +54,7 @@ Las tres son **obligatorias**. Si falta una, el documento es "Comprobante de pag
 
 Hoy: (1) puede ser `true`, (2) puede estar cargado, (3) **siempre es `false`**. Por eso el resultado es siempre "Comprobante de pago".
 
-> La condición 3 no es un olvido ni un bug: no existe integración con máquinas fiscales y no hay plan de tenerla. El código la deja como una constante explícita y **ningún camino de producción pasa el flag que la activaría**, así que la etiqueta "Factura" es **inalcanzable en la práctica**.
+> La condición 3 no es un olvido ni un bug: no existe integración con máquinas fiscales y no hay plan de tenerla. El código la deja como una constante explícita, el gate **no acepta ningún override**, así que la etiqueta "Factura" es **inalcanzable por construcción**.
 
 ## 4. Cómo se decide la etiqueta (el gate)
 
@@ -65,14 +65,14 @@ La decisión vive en una sola función pura:
 resolveDocumentLabel({ taxId, isFormalTaxpayer })
 ```
 
-La tercera condición es la constante `HAS_FISCAL_HOMOLOGATION`, que hoy vale `false`. El gate acepta un parámetro opcional `hasFiscalHomologation`, pero **ningún llamador de producción lo pasa**: siempre cae en la constante.
+La tercera condición es la constante `HAS_FISCAL_HOMOLOGATION`, que hoy vale `false`. El gate no acepta ningún override: siempre usa la constante.
 
 | `taxId` | `isFormalTaxpayer` | Homologación real | Resultado |
 |---|---|---|---|
 | vacío | cualquiera | `false` | Comprobante de pago |
 | cargado | `false` | `false` | Comprobante de pago |
 | cargado | `true` | `false` | Comprobante de pago |
-| cargado | `true` | `true` | Factura *(futuro, hoy imposible sin pasar el flag)* |
+| cargado | `true` | `true` | Factura *(futuro, hoy imposible por construcción)* |
 
 Tres reglas que no cambian:
 
