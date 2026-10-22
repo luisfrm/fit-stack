@@ -14,8 +14,14 @@ import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
 import type { AppEnv } from '../lib/env';
 
+/**
+ * RD-156: a PATCH only carries the two decisions an operator makes on an
+ * existing charge — confirm (`validated`) or void (`voided`). `processing` is a
+ * creation status: accepting it here allowed `validated → processing →
+ * validated`, which numbered and extended the same charge twice.
+ */
 const updateStatusSchema = z.object({
-  status: z.enum(['processing', 'validated', 'voided']),
+  status: z.enum(['validated', 'voided']),
   voidReason: z.string().min(1).optional(),
 });
 

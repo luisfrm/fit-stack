@@ -126,7 +126,7 @@ apps/api-worker/
 | GET | `/api/subscriptions` | `subscriptions.read` | Lista suscripciones |
 | GET | `/api/subscriptions/recent` | `subscriptions.read` | Suscripciones recientes |
 | POST | `/api/subscriptions` | `subscriptions.create` | Crea suscripción (unidad atómica con pago) |
-| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `voided`) + `voidReason?`. `→ validated` solo desde `processing` (**409 `PAYMENT_NOT_REVALIDATABLE`**) y nunca sobre una suscripción cancelada (**409 `SUBSCRIPTION_CANCELLED`**) — invariante validado ⇔ numerado, espejo del console. Sin DELETE de suscripciones (registro financiero inmutable) |
+| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (**`validated` \| `voided`** desde RD-156) + `voidReason?`. Cualquier otro destino (p. ej. `processing`) → **400** en el schema (el backstop del servicio emite `PAYMENT_STATUS_TRANSITION_INVALID`); `→ validated` solo desde `processing` (**409 `PAYMENT_NOT_REVALIDATABLE`**) y nunca sobre una suscripción cancelada (**409 `SUBSCRIPTION_CANCELLED`**) — invariante validado ⇔ numerado, espejo del console. Sin DELETE de suscripciones (registro financiero inmutable) |
 | POST | `/api/payments/:id/send-email` | `subscriptions.read` | Envía recibo por email (vía queue) |
 | GET | `/api/classes` | `classes.read` | Lista clases (grupos) |
 | GET | `/api/classes/:id` | `classes.read` | Detalle de clase |
@@ -209,7 +209,7 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 | POST | `/api/platform/subscriptions/:id/renew` | Renueva |
 | GET | `/api/platform/subscriptions/:id/payments` | Pagos de la suscripción |
 | POST | `/api/platform/subscriptions/:id/payments` | Registra pago |
-| PATCH | `/api/platform/subscriptions/payments/:id/status` | Cambia estado del pago. `→ validated` solo desde `processing`: un pago no-`processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**; una suscripción cancelada → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (el pago queda `processing`) |
+| PATCH | `/api/platform/subscriptions/payments/:id/status` | Cambia estado del pago (**`validated` \| `voided`**). `→ validated` solo desde `processing`: un pago no-`processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**; una suscripción cancelada → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (el pago queda `processing`); `processing` como destino → **400** en el schema (backstop del servicio: `PAYMENT_STATUS_TRANSITION_INVALID`; RD-156 evita el doble periodo) |
 | DELETE | `/api/platform/subscriptions/:id` | Elimina suscripción |
 | GET | `/api/platform/organizations` | Lista organizaciones (paginada) |
 | GET | `/api/platform/organizations/:id` | Detalle de organización |

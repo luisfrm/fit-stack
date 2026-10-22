@@ -6,6 +6,7 @@ import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
 import { COMPENSATION_VOID_REASON, compensateFailedEmission } from '../lib/subscription-compensation';
 import {
+  API_ERROR_CODES,
   PAYMENT_STATUSES,
   computeSubscriptionPeriod,
   toLocalDayString,
@@ -79,12 +80,13 @@ export interface PaymentStatusResult {
  * the `code` is the contract that apps map to toasts (never arbitrary text).
  */
 const businessError = (
-  status: 409 | 422,
+  status: 400 | 409 | 422,
   code:
     | 'END_DATE_BEFORE_START'
     | 'END_DATE_OVERRIDE_REASON_REQUIRED'
     | 'PAYMENT_NOT_REVALIDATABLE'
-    | 'SUBSCRIPTION_CANCELLED',
+    | 'SUBSCRIPTION_CANCELLED'
+    | typeof API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID,
   message: string,
 ) =>
   new HTTPException(status, {
@@ -373,13 +375,26 @@ export function createSubscriptionsService(
       status: string,
       opts?: ReceiptContext,
     ): Promise<PaymentStatusResult> {
+      // RD-156: `validated` and `voided` are the only legal targets. The route
+      // enum already rejects anything else; this is the service-level backstop
+      // for any other caller. `* → processing` is the dangerous one: the charge
+      // keeps its number and can be validated again (period / numbering twice).
+      if (status !== PAYMENT_STATUSES.VALIDATED && status !== PAYMENT_STATUSES.VOIDED) {
+        throw businessError(
+          400,
+          API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID,
+          'Solo se puede validar o anular un pago',
+        );
+      }
+
       const previous = await paymentsRepo.findById(organizationId, paymentId);
 
       // Mirrors Console guard (validated ⇔ numbered invariant): rejected
       // BEFORE writing a `validated` payment that would lack number or
       // backing period. Only a `processing` payment can be validated —
       // a `voided` cannot be undone (its subscription is already cancelled by
-      // the void) — and never on a cancelled subscription.
+      // the void) — and never on a cancelled subscription. `validated →
+      // validated` is idempotent: it does not renumber nor extend anything.
       const wasPending = previous != null && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
         if (previous!.status !== PAYMENT_STATUSES.PROCESSING) {

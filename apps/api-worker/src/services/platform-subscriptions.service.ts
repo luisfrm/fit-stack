@@ -14,7 +14,7 @@ import {
   type PaymentStatus,
 } from '@workspace/shared/constants';
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
-import { normalizeFeatures, addDuration } from '@workspace/shared';
+import { normalizeFeatures, addDuration, API_ERROR_CODES } from '@workspace/shared';
 import { HTTPException } from 'hono/http-exception';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import type { PlatformReceiptContext } from './platform-receipts.service';
@@ -585,6 +585,25 @@ export function createPlatformSubscriptionsService(
     ): Promise<{ receiptVoided: boolean; receiptVoidReason?: 'not_issued' }> {
       const payment = await platformSubsRepo.findPaymentById(paymentId);
       if (!payment) throw new Error('Pago no encontrado');
+      // RD-156: `validated` and `voided` are the only legal targets (the route
+      // enum already rejects the rest; this is the service-level backstop).
+      // `* → processing` is the dangerous one: it kept the charge's snapshot and
+      // let it be validated again, extending `current_period_end` twice.
+      if (
+        data.status !== PAYMENT_STATUSES.VALIDATED &&
+        data.status !== PAYMENT_STATUSES.VOIDED
+      ) {
+        throw new HTTPException(400, {
+          res: new Response(
+            JSON.stringify({
+              error: 'Solo se puede validar o anular un pago',
+              code: API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID,
+            }),
+            { status: 400, headers: { 'content-type': 'application/json' } },
+          ),
+        });
+      }
+
       // `wasPending` = was not validated. Re-PATCH to `validated` does not
       // re-extend or renumber (idempotency). Only a `processing` payment
       // can transition to `validated`: `voided` cannot be re-validated

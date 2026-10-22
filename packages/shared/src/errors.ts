@@ -8,6 +8,21 @@
  */
 
 /**
+ * Stable API business codes (`err.data.code`) that a screen resolves to its
+ * own message. Registered here so both apps compare the CODE, never the text.
+ */
+export const API_ERROR_CODES = {
+  /**
+   * `PATCH /payments/:id/status` and its Console mirror: the requested status
+   * is not a legal transition (`400`). Only `validated` and `voided` are
+   * accepted targets; `processing` is a creation status.
+   */
+  PAYMENT_STATUS_TRANSITION_INVALID: "PAYMENT_STATUS_TRANSITION_INVALID",
+} as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
+
+/**
  * Maps known schema field keys to user-friendly Spanish labels.
  * Unknown keys fall back to the field name itself.
  */

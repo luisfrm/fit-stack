@@ -522,8 +522,9 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         status: 'invalid',
       });
 
-      // `invalid`/`pending` disappeared from the contract: the enum only accepts
-      // processing | validated | voided. The schema rejects before the service.
+      // `invalid`/`pending` disappeared from the contract: the PATCH enum only
+      // accepts validated | voided (RD-156 removed `processing` as a target).
+      // The schema rejects before the service.
       expect(res.status, res.text).toBe(400);
     });
 
@@ -726,6 +727,41 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       });
       expect(res.status, res.text).toBe(409);
       expect(res.body).toMatchObject({ code: 'SUBSCRIPTION_CANCELLED' });
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('processing');
+      expect(after.receipt_number).toBeNull();
+    });
+
+    it('RD-156: `processing` no es un destino del PATCH (400) y la fila queda intacta', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'validated');
+      const before = await readPayment(paymentId);
+      expect(before.status).toBe('validated');
+
+      // RD-156: sending a validated charge back to `processing` used to be
+      // accepted, and the next `validated` renumbered it (the Console period was
+      // extended twice). The enum now rejects it at the schema layer.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'processing',
+      });
+      expect(res.status, res.text).toBe(400);
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('validated');
+      expect(after.receipt_number).toBe(before.receipt_number);
+    });
+
+    it('RD-156: `processing → processing` tampoco es una transición (400)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
+
+      // `processing` is a creation status, not a PATCH target: a "no-op" PATCH
+      // here would be a silent lie about an approval that never happened.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'processing',
+      });
+      expect(res.status, res.text).toBe(400);
 
       const after = await readPayment(paymentId);
       expect(after.status).toBe('processing');

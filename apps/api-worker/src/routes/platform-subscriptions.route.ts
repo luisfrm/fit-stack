@@ -26,9 +26,12 @@ const paymentStatusEnum = z.enum([
  * RD-113: `refunded` is a reserved/display-only status. No issuer may PATCH a
  * payment to it (there is no refund flow, no UI and no receipt behind it).
  * The full enum above keeps feeding create/renew/registerPayment unchanged.
+ *
+ * RD-156: `processing` is a creation status, never a PATCH target. Accepting it
+ * re-opened an already validated charge (`validated → processing → validated`),
+ * which extended `current_period_end` a second time for the same payment.
  */
 const updatePaymentStatusEnum = z.enum([
-  PAYMENT_STATUSES.PROCESSING,
   PAYMENT_STATUSES.VALIDATED,
   PAYMENT_STATUSES.VOIDED,
 ]);

@@ -17,6 +17,9 @@
  *
  * RD-113: the PATCH enum is narrowed to processing|validated|voided (no
  * `refunded`), while create/registerPayment keep the full enum.
+ * RD-156: the PATCH enum drops `processing` too — only `validated | voided` are
+ * legal targets, so `validated → processing → validated` can no longer extend
+ * the period twice.
  *
  * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
  * skip without the variable, `truncateAll` per file. The raw facts
@@ -267,6 +270,82 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     expect(row!.voided_at).toBeNull();
     expect(row!.void_reason).toBeNull();
 
+    expect(await readPeriodEnd(subId)).toBe(before);
+  });
+
+  it('RD-156: `processing` no es un destino del PATCH (400) y no mueve fila ni periodo', async () => {
+    const { organization } = await createGymTenant('rd156-processing-target');
+    const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'validated' });
+    const before = await readPeriodEnd(subId);
+
+    const res = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'processing' },
+    );
+    expect(res.status, res.text).toBe(400);
+
+    // Rejected at the schema layer: no status write, no voided_at, no period move.
+    const [row] = await testQuery<{
+      status: string;
+      receipt_number: string | null;
+      voided_at: string | null;
+    }>(
+      `SELECT status, receipt_number, voided_at
+         FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(row!.status).toBe('validated');
+    expect(row!.receipt_number).toMatch(/^FS-\d{7,}$/);
+    expect(row!.voided_at).toBeNull();
+
+    expect(await readPeriodEnd(subId)).toBe(before);
+  });
+
+  it('RD-156: el vaivén `validated → processing → validated` no regala el periodo', async () => {
+    const { organization } = await createGymTenant('rd156-roundtrip');
+    const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'processing' });
+
+    const first = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'validated' },
+    );
+    expect(first.status, first.text).toBe(200);
+    const afterFirst = await readPeriodEnd(subId);
+
+    // The return leg is now impossible: the extension cannot be re-opened.
+    const back = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'processing' },
+    );
+    expect(back.status, back.text).toBe(400);
+    expect(await readPeriodEnd(subId)).toBe(afterFirst);
+
+    // The idempotent re-PATCH keeps the same period (one extension, one number).
+    const again = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'validated' },
+    );
+    expect(again.status, again.text).toBe(200);
+    expect(await readPeriodEnd(subId)).toBe(afterFirst);
+  });
+
+  it('RD-156: `voided → validated` sigue siendo 409 PAYMENT_NOT_REVALIDATABLE', async () => {
+    const { organization } = await createGymTenant('rd156-void-validate');
+    const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'processing' });
+
+    const voided = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'voided', voidReason: 'Cobro anulado' },
+    );
+    expect(voided.status, voided.text).toBe(200);
+    const before = await readPeriodEnd(subId);
+
+    const res = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'validated' },
+    );
+    expect(res.status, res.text).toBe(409);
+    expect(res.body).toMatchObject({ code: 'PAYMENT_NOT_REVALIDATABLE' });
     expect(await readPeriodEnd(subId)).toBe(before);
   });
 

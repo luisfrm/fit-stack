@@ -33,7 +33,7 @@ Los **códigos** son el mismo contrato en las dos apps, pero **no son el mismo f
 
 | Código | Significado | Quién lo produce | Efecto |
 |---|---|---|---|
-| `processing` | **Pago recibido, esperando validación** | Panel: alta con el toggle "validar pago" apagado (**Por validar**). Console: autoservicio del gym (`POST /api/organizations/subscription/renew`) y registros manuales (**Procesando**) | No emite comprobante ni mueve el periodo. Bloquea registrar otro `processing` en la misma suscripción (`hasPendingPayment`) |
+| `processing` | **Pago recibido, esperando validación** | Panel: alta con el toggle "validar pago" apagado (**Por validar**). Console: autoservicio del gym (`POST /api/organizations/subscription/renew`) y registros manuales (**Procesando**). **Nunca** es destino del PATCH (§1.1) | No emite comprobante ni mueve el periodo. Bloquea registrar otro `processing` en la misma suscripción (`hasPendingPayment`) |
 | `validated` | **Pago confirmado** | Ambas | **Panel**: asigna el número de comprobante (paso 1) y encola el PDF (paso 2); el email sale del paso 2. **Console**: extiende `current_period_end` de forma **acumulativa** y asigna el `FS-N` |
 | `voided` | **Pago anulado.** Según el comprobante emitido se deriva `rejected` (sin número) o `annulled` (con número) | Ambas | Conserva **número + PDF de emisión** (intactos) y, si ya estaba numerado, genera su **PDF con sello ANULADO**; el número **nunca** se libera ni se reutiliza. **Panel**: además deja la suscripción **ANULADA**. **Console**: se **ignora** en el status computado; **no** cancela la suscripción ni revierte el periodo acumulado |
 | `refunded` | **Reservado, no implementado** | Nadie hoy (el enum y `refunded_at` existen; no hay UI ni servicio que lo produzca) | Ninguno hoy; **no** toca el flag ANULADO. Cuenta como pago calificado (`QUALIFYING_PAYMENT_STATUSES`) |
@@ -43,6 +43,22 @@ La respuesta de un PATCH que anula **dice qué pasó con el comprobante** (nunca
 Al anular se persisten **siempre** `voided_by` / `voided_at` / `void_reason`, haya o no comprobante (`updatePaymentStatus` en los repos de Panel y Console).
 
 > Regla de oro del flag ANULADO: **solo `voided` lo enciende**. `refunded` no lo toca.
+
+## 1.1 Transiciones legales del PATCH (RD-156)
+
+El PATCH de estado —`PATCH /api/payments/:id/status` (Panel) y `PATCH /api/platform/subscriptions/payments/:id/status` (Console)— solo acepta **dos destinos**: `validated | voided` (+ `voidReason?`). Los enums de **alta**/renovación/registro manual no cambian (cada uno con su propio contrato: el alta del Panel sigue aceptando solo `processing | validated`; la del Console y el registro manual aceptan el enum completo): `processing` es un **estado de creación**, nunca un destino de PATCH.
+
+| Origen (DB) | Destino | ¿Permitido? | Efecto |
+|---|---|---|---|
+| `processing` | `validated` | Sí | Aprueba: numera el comprobante; **Console** además extiende `current_period_end` **una sola vez** (duración del snapshot) |
+| `processing` | `voided` | Sí | Anula un pago pendiente; sin número el contrato responde **200** con `receiptVoided:false` + `not_issued` |
+| `validated` | `validated` | Sí (idempotente) | No renumera, **no re-extiende** ni reescribe auditoría |
+| `validated` | `voided` | Sí | ANULADO (número y PDF de emisión intactos) y, en **Panel**, suscripción **ANULADA** |
+| `voided` | `voided` | Sí (idempotente) | Conserva la **primera** anulación (`voided_by`/`void_reason` originales) |
+| `voided` | `validated` | **No** → `409 PAYMENT_NOT_REVALIDATABLE` | Un pago anulado no se re-valida (su suscripción ya quedó anulada en Panel) |
+| cualquiera | `processing` | **No** → `400` en el schema (backstop: `PAYMENT_STATUS_TRANSITION_INVALID`) | Reabría un cobro ya validado y regalaba el periodo dos veces revirtiendo el estado |
+
+Por qué: con `validated → processing → validated` el segundo PATCH volvía a contar como "transición" y el Console **extendía el periodo otra vez** con el mismo pago. El destino `processing` queda prohibido en el **schema Zod** (400 sin tocar la fila) y el servicio repite el guard antes de escribir (**defensa en profundidad**: `400` con `code` estable). El guard del servicio también conserva el `409 PAYMENT_NOT_REVALIDATABLE` (`voided → validated`) y el `409 SUBSCRIPTION_CANCELLED` (validar sobre una suscripción cancelada), ambos resueltos por **código**, nunca por texto.
 
 ## 2. Efectos, lado a lado
 
@@ -78,7 +94,7 @@ Un trial o un plan `price = 0` **fuerza** `status = validated` con `paymentMetho
 ## 3. Flujo Panel (gym)
 
 1. **Alta** — `POST /api/subscriptions` (owner/manager/cashier). Crea la suscripción **y** su pago; el estado inicial lo decide el cajero con el toggle "validar pago" (`validated` por defecto, `processing` si lo deja por revisar).
-2. **Aprobación** — `PATCH /api/payments/:id/status` con `validated`: numera el comprobante si aún no lo estaba y encola el render.
+2. **Aprobación** — `PATCH /api/payments/:id/status` con `validated` (el PATCH solo acepta `validated | voided`, ver §1.1): numera el comprobante si aún no lo estaba y encola el render.
 3. **Anulación / Rechazo** — `PATCH …` con **`voided`** (estado único): el cobro no vale y la suscripción queda **ANULADA**. Si el pago ya estaba numerado, el comprobante pasa a **ANULADO** (número y PDF intactos); si no, no hay nada que marcar y el body lo dice (`not_issued`). La distinción "rechazado" (`rejected`) vs "anulado" (`annulled`) se **deriva** con `getVoidKind`.
 4. **Revocar / restaurar acceso** — `PUT /api/subscriptions/:id` con `{ status: 'cancelled' | 'active' }`: mueve `cancelled_at`, **no** toca el pago. Si el cobro está anulado la acción no se ofrece (el status derivado manda: ANULADA gana sobre CANCELADA).
 5. **No hay DELETE**: ni ruta, ni permiso RBAC (`subscriptions.delete` no existe), ni acción en el panel. Un registro equivocado se **anula**.
@@ -98,7 +114,7 @@ resto                    → active     (ACTIVA)
 
 1. **Alta** — `POST /api/platform/subscriptions` (admin/owner): puede nacer `validated` o `processing`.
 2. **Autoservicio del gym** — `POST /api/organizations/subscription/renew` (owner/manager del gym): el pago nace **`processing`** y queda "en revisión". Todo lo financiero lo dicta el backend (snapshot del plan, tasa, importe).
-3. **Aprobación** — `PATCH /api/platform/subscriptions/payments/:id/status` con `validated`: extiende el periodo (solo en la transición `wasPending`, con la duración del **snapshot** del pago) y numera el `FS-N`.
+3. **Aprobación** — `PATCH /api/platform/subscriptions/payments/:id/status` con `validated` (el PATCH solo acepta `validated | voided`, ver §1.1): extiende el periodo (solo en la transición `processing → validated`, con la duración del **snapshot** del pago) y numera el `FS-N`.
 4. **Anulación** — el mismo PATCH con **`voided`**: marca ANULADO si había comprobante y se **ignora** en el status computado (no cancela la suscripción). No existe `invalid`: el rechazo también es `voided`.
 5. **Registro manual** — `POST /api/platform/subscriptions/:id/payments`: alta de un pago fuera del flujo de autoservicio.
 6. **Comprobante** — `GET .../payments/:id/receipt` (contrato de 3 estados: `ready` / `pending` / `available:false`) y `/receipt/pdf`. Lectura: `subscription:list` (soporte también). Escrituras (validar, anular, reenviar): `console:manage` (soporte **403**).
@@ -106,7 +122,9 @@ resto                    → active     (ACTIVA)
 
 ### 4.1 Punto 7: sin doble periodo
 
-Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en `startDate`). Al validar se extiende **una sola vez** (solo si `wasPending`) con la duración del snapshot del pago. Así un pago que nace por revisar y se aprueba después no suma dos veces el periodo.
+Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en `startDate`). Al validar se extiende **una sola vez** (solo en la transición `processing → validated`) con la duración del snapshot del pago. Así un pago que nace por revisar y se aprueba después no suma dos veces el periodo.
+
+El destino `processing` está **prohibido** en el PATCH (§1.1): mandar un pago `validated` de vuelta a `processing` reabría esa transición y extendía el periodo por segunda vez con el mismo cobro.
 
 ## 5. Invariantes (válidas en las dos apps)
 
@@ -132,6 +150,7 @@ Un alta con pago `processing` **no** front-loadea `current_period_end` (queda en
 | Último contrato SaaS con `hasValidatedPayment` | `getLastSubscriptionStatus` (repo + service de `platform-subscriptions`) |
 | Transiciones Panel | `apps/api-worker/src/services/subscriptions.service.ts`, `routes/payments.route.ts` |
 | Transiciones Console | `apps/api-worker/src/services/platform-subscriptions.service.ts`, `routes/platform-subscriptions.route.ts` |
+| Catálogo de códigos de error (toasts por `code`) | `packages/shared/src/errors.ts` (`API_ERROR_CODES`, p. ej. `PAYMENT_STATUS_TRANSITION_INVALID`) |
 | Guard de autoservicio | `apps/api-worker/src/routes/organizations.route.ts` |
 | Gate del free tier | `apps/api-worker/src/services/features.service.ts` |
 | Badges Panel | `apps/panel/components/payments/subscriptions-table.tsx` |
