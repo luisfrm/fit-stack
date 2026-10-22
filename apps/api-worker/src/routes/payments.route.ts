@@ -66,32 +66,38 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE, c.env.TASK_QUEUE);
 
-    const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
-      orgId,
-      id,
-      status,
-      {
-        receipts: receiptsService,
-        timezone,
-        by: c.get('user')?.id,
-        voidReason,
-      },
-    );
-    await cache.invalidate(`org:${orgId}:subscriptions*`);
-    await cache.invalidate(`org:${orgId}:payments:analytics*`);
-    // `withoutActiveSubscription` from members:stats depends on subs/payments.
-    await cache.invalidateExact(`org:${orgId}:members:stats`);
-    await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${orgId}:dashboard:action-items`);
-    await cache.invalidate(`org:${orgId}:reports:revenue*`);
-    await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    // Receipt voiding attempt is reported explicitly
-    // (200 with `receiptVoided: false` + reason), never silently.
-    return c.json({
-      ...payment,
-      receiptVoided,
-      ...(receiptVoidReason ? { receiptVoidReason } : {}),
-    });
+    // RD-155: invalidation lives in `finally` so a failed emission (the service
+    // compensates the payment to `voided` and re-throws) still drops the stale
+    // dashboard/report entries instead of serving the pre-PATCH state.
+    try {
+      const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
+        orgId,
+        id,
+        status,
+        {
+          receipts: receiptsService,
+          timezone,
+          by: c.get('user')?.id,
+          voidReason,
+        },
+      );
+      // Receipt voiding attempt is reported explicitly
+      // (200 with `receiptVoided: false` + reason), never silently.
+      return c.json({
+        ...payment,
+        receiptVoided,
+        ...(receiptVoidReason ? { receiptVoidReason } : {}),
+      });
+    } finally {
+      await cache.invalidate(`org:${orgId}:subscriptions*`);
+      await cache.invalidate(`org:${orgId}:payments:analytics*`);
+      // `withoutActiveSubscription` from members:stats depends on subs/payments.
+      await cache.invalidateExact(`org:${orgId}:members:stats`);
+      await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+      await cache.invalidate(`org:${orgId}:dashboard:action-items`);
+      await cache.invalidate(`org:${orgId}:reports:revenue*`);
+      await cache.invalidate(`org:${orgId}:reports:receipts*`);
+    }
   })
 
   // GET /api/payments/:id/receipt - 3-state contract, never 409.

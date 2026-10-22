@@ -63,7 +63,7 @@ All components from `@workspace/ui`, predefined variants (no ad-hoc Tailwind wit
 
 ### 3. Database Integrity & ORM
 
-Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`).
+Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`). **Sites**: gym `create()` and gym `PATCH /api/payments/:id/status` (`updatePaymentStatus`) plus the 4 SaaS flows; the gym PATCH passes only `readPayment`/`voidPayment` — **no `revertEffect`** (it never extends the period) and **no `cancelParent`** (the void alone derives ANULADA).
 
 ### 4. Next.js Patterns & Best Practices
 
@@ -92,7 +92,7 @@ Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }
 
 ### 7. Error Handling & Mutations
 
-No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text.
+No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text. Route-level cache invalidation goes in a `try/finally` around the service call, so a compensating service that re-throws (e.g. `PATCH /api/payments/:id/status`, RD-155) still drops stale keys while the error propagates unchanged.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 

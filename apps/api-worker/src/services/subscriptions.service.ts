@@ -468,12 +468,44 @@ export function createSubscriptionsService(
         if (!opts.timezone) {
           throw new Error('updatePaymentStatus: timezone es obligatoria para numerar.');
         }
-        await opts.receipts.assignReceiptNumber({
-          orgId: organizationId,
-          paymentId,
-          timezone: opts.timezone,
-          actor: opts.by,
-        });
+        // RD-155: a failed emission used to leave a `validated` payment with no
+        // number, no automatic repair (the sweep does not cover it) and a receipt
+        // link answering 404. Without interactive transactions the `validated`
+        // write cannot be rolled back, so the failure is compensated by
+        // RE-READING (never by error type): numbered → `committed`, the sweep
+        // recovers the pending render and the 200 stands; not numbered → the
+        // payment is voided with audit and the original error is re-thrown.
+        //
+        // No `cancelParent`: the charge already exists and the subscription
+        // derives ANULADA from the voided payment — cancelling it would revoke
+        // service that was already paid for. No `revertEffect`: this PATCH never
+        // extends the period.
+        try {
+          await opts.receipts.assignReceiptNumber({
+            orgId: organizationId,
+            paymentId,
+            timezone: opts.timezone,
+            actor: opts.by,
+          });
+        } catch (emissionError) {
+          const outcome = await compensateFailedEmission(
+            emissionError,
+            {
+              readPayment: () => paymentsRepo.findById(organizationId, paymentId),
+              voidPayment: () =>
+                paymentsRepo.updateStatus(organizationId, paymentId, PAYMENT_STATUSES.VOIDED, {
+                  voidedBy: opts?.by,
+                  voidReason: COMPENSATION_VOID_REASON,
+                }),
+            },
+            { paymentCreated: true },
+          );
+          // `unresolved` leaves the row untouched (fail-closed). Re-throwing keeps
+          // the failure visible; the payment stays `validated` without a number and
+          // only the manual `POST /:id/issue` can repair it (the sweep does not
+          // cover that state).
+          if (outcome !== 'committed') throw emissionError;
+        }
       }
 
       return { payment: updated, receiptVoided, receiptVoidReason };
