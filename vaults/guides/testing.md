@@ -66,10 +66,9 @@ pnpm seed:e2e           # Demo seed: fills Fit Stack/fit-stack (NOT a test, keep
 
 **Playwright config** (`playwright.config.ts`):
 
-- `testDir: './e2e'`, `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org), `timeout: 60_000`, `retries: 1` in CI.
-- `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
+- `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org); timeouts, retries, traces and reporters live in the file, not here.
 - **Project order: console first, then panel** (`console-setup` → `console` → `panel-setup` → `panel`). `--project` filters still run isolated (each pulls only its login setup).
-- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
+- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally, `false` in CI.
 
 **Structure**:
 
@@ -127,7 +126,8 @@ e2e/
 - `E2E_KEEP_DATA=1` — skip teardown to inspect the suite tenant (next run resets anyway).
 - `API_BASE_URL` / `PANEL_URL` / `CONSOLE_URL` — override app URLs (defaults: 8788/3001/3000).
 
-**Dev dependencies** (root): `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`, `tsx` (seed runner), `@workspace/shared` (date utils in e2e/seed).
+**Dev dependencies** (root): declared in `package.json` — Playwright, the Neon serverless client, `tsx` (seed runner) and `@workspace/shared` (date utils in `e2e/seed`).
 
+> **CI**: `.github/workflows/ci.yml` runs `pnpm test` (integration is skipped without `TEST_DATABASE_URL`); E2E is local-only.
 > When you add or change API behavior, the integration tests are the first line of defense: run `pnpm test` before asking for review.
 > E2E tests validate complete user flows in the UI — run with `pnpm test:e2e` (separate from `pnpm test`).

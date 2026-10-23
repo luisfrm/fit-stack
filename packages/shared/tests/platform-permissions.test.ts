@@ -3,7 +3,7 @@
  *
  * Complements `permissions.test.ts` (tenant matrix) with the platform gate,
  * the platform action matrix and the panel-access regression rule. Every case
- * here mirrors a rule documented in `vaults/business/RBAC-STRUCTURE.md`.
+ * here mirrors a rule documented in `vaults/business/rbac-structure.md`.
  */
 import { describe, expect, it } from "vitest";
 import { canPlatform, type PlatformStatement } from "../src/access-control";

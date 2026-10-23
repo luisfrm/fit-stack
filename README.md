@@ -103,7 +103,7 @@ pnpm format
 - **Active org profile** — Resolved by the `api-worker` custom session (`activeOrganization`) with a 5-min Redis cache (`org:{id}:profile`).
 - **Atomic Invoicing** — Subscriptions + Payments created in a single unit.
 - **Cumulative Expiration** — Renewing extends from `periodEnd`, not today.
-- **Multi-currency** — Base currency (USD) + local currencies via real-time exchange rates.
+- **Multi-currency** — `primaryCurrency` (derived from the organization's country) + active local currencies via real-time exchange rates.
 
 ---
 
@@ -133,15 +133,17 @@ pnpm format
 - **Local development**: `pnpm dev` (see Quick Start above). Each app reads its `.env` (templates in `.env.example`); the `api-worker` reads `.dev.vars` via Wrangler.
 - **Production**: workers and DB are deployed through the workflows above; the Next.js apps are deployed manually to Vercel with `NEXT_PUBLIC_API_BASE_URL` and `NEXT_PUBLIC_R2_URL` configured per app. Secrets live in GitHub Environments (workers) and Vercel (frontend).
 
-For the full deployment guide see [vaults/architecture/INFRASTRUCTURE.md](vaults/architecture/INFRASTRUCTURE.md) and [vaults/architecture/terraform.md](vaults/architecture/terraform.md).
+For the full deployment guide see [vaults/architecture/infrastructure.md](vaults/architecture/infrastructure.md) and [vaults/architecture/terraform.md](vaults/architecture/terraform.md).
 
 ---
 
 ## Documentation
 
-- [vaults/architecture/ARCHITECTURE.md](vaults/architecture/ARCHITECTURE.md) — Detailed architecture design & system decisions
+- [vaults/architecture/architecture.md](vaults/architecture/architecture.md) — Detailed architecture design & system decisions
 - [AGENTS.md](AGENTS.md) — Agent guide, dev commands, full RBAC, architecture rules
 - Pending work & backlog — [Linear](https://linear.app/rivas-digital) (project «Fit Stack»)
-- `vaults/business/PAYMENT_STATUSES.md` — Payment status semantics (Panel vs Console)
-- `vaults/guides/CHECKLIST-COMPROBANTES.md` — Receipt states, flow and phases
-- `vaults/business/TIMEZONE_MANAGEMENT.md` — Timezone handling
+- [vaults/business/payment-statuses.md](vaults/business/payment-statuses.md) — Payment status semantics (Panel vs Console)
+- [vaults/guides/receipt-engine.md](vaults/guides/receipt-engine.md) — How the receipt engine is built (two steps, claim-then-number, sweep)
+- [vaults/guides/release-checklist.md](vaults/guides/release-checklist.md) — Go-live checklist (cron, migrations, serial audit, DLQ, Terraform, IGTF)
+- [vaults/guides/timezone-management.md](vaults/guides/timezone-management.md) — Timezone handling
+- [docs/roadmap.md](docs/roadmap.md) — Uncommitted product ideas

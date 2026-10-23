@@ -35,7 +35,7 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 
 - **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
 - **Packages**: `auth` (sessions + shared HTTP client + org/platform hooks), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
-- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`). Backlog/pending work lives in Linear (project «Fit Stack»).
+- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `knowledge-base-rag/`, the RAG chat corpus written for gym owners). Backlog/pending work lives in Linear (project «Fit Stack»); product roadmap in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Project Context (Business Overview)
 
@@ -49,7 +49,7 @@ Multi-tenant SaaS for the Gym/Fitness industry (Latin America): multi-currency b
 
 ### 5. Business Rules Summary
 
-1. **Multi-currency** (base USD default, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** (note: `FS-0000001` is the SaaS receipt number format via `formatConsoleReceiptNumber`) → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
+1. **Multi-currency** (`primaryCurrency` derived from the organization's country at creation, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** (note: `FS-0000001` is the SaaS receipt number format via `formatConsoleReceiptNumber`) → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
 
 ## Project Rules (Technical Standards)
 
@@ -100,7 +100,7 @@ No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error
 
 ### 9. Date & Timezone Handling
 
-SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.DateTimeFormat`, `toISOString().slice(0,10)`, etc.). tz ALWAYS from the **session** (`activeOrganization.timezone`), never a client param. **Timezone is REQUIRED** — no `?? 'America/Caracas'` (`requireOrgTimezone()`; services take `timezone` without default; column `notNull`). Aggregation by local day in **SQL** (`AT TIME ZONE`). SaaS billing in **UTC**. → [`vaults/business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md).
+SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.DateTimeFormat`, `toISOString().slice(0,10)`, etc.). tz ALWAYS from the **session** (`activeOrganization.timezone`), never a client param. **Timezone is REQUIRED** — no `?? 'America/Caracas'` (`requireOrgTimezone()`; services take `timezone` without default; column `notNull`). Aggregation by local day in **SQL** (`AT TIME ZONE`). SaaS billing in **UTC**. → [`vaults/guides/timezone-management.md`](vaults/guides/timezone-management.md).
 
 ### 10. Explicit Configuration Without Silent Fallbacks
 
@@ -123,11 +123,12 @@ The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountP
 | When you touch … | Read (key invariant) |
 | --- | --- |
 | Receipts / numbering / ANULADO / fiscal gating | [`business/receipts.md`](vaults/business/receipts.md) — never fiscal invoices; validated ⇔ numbered; ANULADO sealed; never delete (void ≠ cancel) |
+| Receipt engine internals / sweep / release | [`guides/receipt-engine.md`](vaults/guides/receipt-engine.md) — claim-then-number, two steps, 5 sweep states; [`guides/release-checklist.md`](vaults/guides/release-checklist.md) |
 | SaaS billing / grace / renewal | [`business/platform-billing.md`](vaults/business/platform-billing.md) — status computed in SQL (not stored); `voided` ignored in Console; free-tier gate else `/no-subscription` |
 | Feature flags / free tier / AI credits | [`business/features-and-free-tier.md`](vaults/business/features-and-free-tier.md) — new features `defaultEnabled:false`; downgrade = hide; `403 FEATURE_NOT_AVAILABLE`/`FEATURE_LIMIT_REACHED`; `429 AI_QUOTA_EXCEEDED` |
 | Roles / permissions / anti-escalation | [`business/rbac.md`](vaults/business/rbac.md) — never trust client checks; all queries filter `organizationId`; no platform-admin bypass in CMS; uploads = two routes, one authority |
 | Subscription rules / compensation | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
-| Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
+| Timezone deep dive | [`guides/timezone-management.md`](vaults/guides/timezone-management.md) — tz from the session, `@workspace/shared/date`, SQL `AT TIME ZONE`, AI quotas in UTC |
 | API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE (immutable financial record) |
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
 | Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib`; the `FitTaskEvent` contract lives in `@workspace/shared` (`queues/fit-task-events.ts`): validated builders at every send site + `isFitTaskEvent` guard, unknown → ack + error log, never retry |
@@ -141,7 +142,7 @@ The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountP
 | Testing | [`guides/testing.md`](vaults/guides/testing.md) — unit+integration and E2E are separate layers |
 | Pending work / backlog | Linear — project «Fit Stack» (the former `vaults/backlog/` was migrated there) |
 | Technical standards (full detail) | [`architecture/technical-standards.md`](vaults/architecture/technical-standards.md) |
-| Infra & deploy | [`architecture/INFRASTRUCTURE.md`](vaults/architecture/INFRASTRUCTURE.md), [`terraform.md`](vaults/architecture/terraform.md) |
+| Infra & deploy | [`architecture/infrastructure.md`](vaults/architecture/infrastructure.md), [`terraform.md`](vaults/architecture/terraform.md) |
 
 ## Important Constraints
 
@@ -163,11 +164,11 @@ Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`
 - `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
 - `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
 - `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}`
-- `vaults/architecture/ARCHITECTURE.md` (architecture spec) · pending work: Linear (project «Fit Stack»)
+- `vaults/architecture/architecture.md` (architecture spec) · pending work: Linear (project «Fit Stack»)
 
 ## Infrastructure & Deployment
 
-> Source in `vaults/architecture/ARCHITECTURE.md` §7; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
+> Source in `vaults/architecture/architecture.md` §7; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
 
 
 ## NOTES:

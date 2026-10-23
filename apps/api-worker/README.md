@@ -312,7 +312,7 @@ Gracias a `customSessionClient` en `@workspace/auth`, estos campos fluyen tanto 
 
 ## Deploy
 
-- **Guía completa**: [vaults/architecture/INFRASTRUCTURE.md](../../vaults/architecture/INFRASTRUCTURE.md) y
+- **Guía completa**: [vaults/architecture/infrastructure.md](../../vaults/architecture/infrastructure.md) y
                      [vaults/architecture/terraform.md](../../vaults/architecture/terraform.md).
 - **Infraestructura**: gestionada con Terraform (`infrastructure/terraform/`) — workers, R2, queues y secrets. **Nunca** ejecutar `wrangler` manualmente para deploys.
 - **Ambientes**: `dev` / `staging` / `production` definidos en `wrangler.jsonc` (nombre del worker, bucket R2 y cola por ambiente).

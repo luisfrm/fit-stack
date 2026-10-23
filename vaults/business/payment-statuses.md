@@ -2,7 +2,7 @@
 
 > Documento interno de referencia. **Ningún estado de pago se elimina: se anula.**
 > Alcance: **Panel** (organización/gym → miembro, tabla `payment`) y **Console** (FitStack → organización, tabla `platform_subscription_payment`).
-> Documentos relacionados: `[[ORGANIZATION_RECEIPT_MODEL]]`, `[[FACTURATION]]`, `[[CHECKLIST-COMPROBANTES]]`.
+> Documentos relacionados: [modelo de comprobante de la organización](./organization-receipt-model.md), [documentos fiscales](./fiscal-documents.md), [motor de comprobantes](../guides/receipt-engine.md), [checklist de release](../guides/release-checklist.md).
 
 ## 0. Un enum único, dos máquinas de estados
 
@@ -135,11 +135,11 @@ El destino `processing` está **prohibido** en el PATCH (§1.1): mandar un pago 
 - **El actor queda registrado** (`issued_by` / `voided_by`) — nunca inventado por el paso 2 ni por el barrido. Al anular se persisten siempre `voided_by` / `voided_at` / `void_reason`.
 - **Anular exige motivo** (RD-163): `voided` sin un `voidReason` no vacío responde **400 `VOID_REASON_REQUIRED`** en el schema (la fila no se toca) y en el servicio (defensa en profundidad). El servidor nunca inventa "Pago anulado". En la UI el motivo lo escribe el operador en un prompt obligatorio (`ReasonPromptModal`): el campo arranca **vacío** (una sugerencia precargada solo movería el default al cliente) y el botón de confirmar queda deshabilitado mientras no haya texto; el tipo (rechazo/anulación) viaja como intención explícita, nunca se deduce del texto.
 - **El emisor queda congelado** en el snapshot al emitir: editar la organización después no cambia el comprobante ni su fila del libro.
-- **Un registro financiero no se elimina** (Panel): se anula.
+- **Un registro financiero no se elimina** (Panel): se anula — ver `AGENTS.md` → Business Rules Summary, regla 6.
 - **Anular es explícito**: `receiptVoided` (+ `receiptVoidReason: 'not_issued'`) en el body del PATCH y toast diferenciado en Panel y Console.
 - **Un solo estado de anulación**: rechazo y anulación son `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`, no se guarda.
 - **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (Linear — proyecto «Fit Stack»).
-- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` re-encola *numerado sin PDF*, *PDF listo sin notificar* y *anulado sin PDF con sello*; el email que agota reintentos y cae a la DLQ queda como recuperación manual (ver el backlog en Linear, proyecto «Fit Stack»).
+- **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` cubre **cinco** estados — reclamo vencido, numerado sin PDF, PDF listo sin notificar, anulado sin PDF con sello y anulado sin flag. Un envío que agota reintentos limpia la marca de notificado, así que el barrido re-encola el aviso; si el fallo es de otra naturaleza, la recuperación es manual (`resend` / `POST /:id/issue`).
 - **El ANULADO es un artefacto**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
 
 ## 6. Dónde vive cada cosa
@@ -159,20 +159,9 @@ El destino `processing` está **prohibido** en el PATCH (§1.1): mandar un pago 
 | Badges Panel | `apps/panel/components/payments/subscriptions-table.tsx` |
 | Badges Console | `apps/console/components/platform/platform-payment-history-modal.tsx` |
 
-## 7. Migración `0017` y notas de release
+## 7. Notas de migración y release
 
-La migración `packages/database/migrations/0017_crazy_brood.sql` (aditiva y retrocompatible) cierra la unificación:
-
-- Fija el default de `platform_subscription_payment.status` en `'processing'` (antes `'pending'`).
-- Normaliza datos históricos: `pending → processing` e `invalid → voided`, marcando `receipt_voided`/`voided_at`/`void_reason` cuando la fila tenía `receipt_number` (actor `voided_by` queda `NULL`). `cancelled_at` no se toca.
-- Se aplica **antes** del deploy del código nuevo (los valores viejos siguen siendo válidos para el código previo). CI (`database-migrations.yml`) la corre en merge a `master`. Tras el merge, ninguna fila debe llevar `pending`/`invalid`.
-
-**Cambios de comportamiento a comunicar:**
-
-1. `PAYMENT_STATUSES = processing | validated | voided | refunded`. `pending` e `invalid` **se retiran**: los PATCH que los envíen responden **400**.
-2. El rechazo y la anulación comparten `voided`; su tipo (`rejected`/`annulled`) se **deriva** con `getVoidKind`.
-3. Solo `validated | refunded` (`QUALIFYING_PAYMENT_STATUSES`) sostienen un periodo.
-4. **Console/SaaS**: un pago `voided` **se ignora** (ya no revoca servicio); una org con pago `processing` y periodo vigente pasa de `active` a **`past_due`**.
-5. **Panel**: un pago `voided` deja la suscripción **ANULADA**.
-6. `DELETE /api/subscriptions/:id` sigue **sin existir**: se anula o se cancela.
-7. `refunded` permanece reservado (sin flujo que lo produzca, Linear — proyecto «Fit Stack») y no enciende el flag ANULADO.
+- `platform_subscription_payment.status` tiene default `'processing'` (migración `0017`).
+- Datos históricos normalizados: `pending → processing` e `invalid → voided`, marcando `receipt_voided`/`voided_at`/`void_reason` cuando la fila ya tenía `receipt_number`. `cancelled_at` no se toca.
+- La migración se aplica **antes** del deploy del código nuevo; CI la corre al mergear. Tras el merge ninguna fila debe llevar `pending`/`invalid`.
+- Comunicación a clientes: los PATCH con `pending`/`invalid` responden **400**; rechazo y anulación comparten `voided`; solo `validated | refunded` sostienen un periodo; en Console un `voided` se ignora; en Panel deja la suscripción ANULADA; `DELETE /api/subscriptions/:id` no existe; `refunded` sigue reservado.

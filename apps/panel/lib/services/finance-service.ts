@@ -54,7 +54,7 @@ type RevenueRow = {
  * Service to handle financial operations: exchange rate fetching,
  * payment status mutations, and analytics/revenue aggregations.
  */
-/** Response of `PATCH /payments/:id/status` (see `vaults/business/PAYMENT_STATUSES.md`). */
+/** Response of `PATCH /payments/:id/status` (see `vaults/business/payment-statuses.md`). */
 export interface PaymentStatusResult {
   receiptVoided: boolean;
   receiptVoidReason?: "not_issued";

@@ -4,8 +4,8 @@
 > Este documento describe el **modelo antiguo por mensajes** (30 msgs/día, planes $3/$10/$35, `max_tokens: 800` suelto) y queda **archivado como referencia histórica**. La plataforma migró a **créditos** (`1 crédito = 1K tokens ×1.0`, cuota `ai_credits_monthly`).
 >
 > **Fuentes vigentes:**
-> - [`CHAT_PRICING.md`](./CHAT_PRICING.md) — unidad, fórmula, planes Básico/Standard/Premium, free tier 500cr, packs fijos, límites `AI_CHAT_LIMITS`.
-> - [`CHAT_INFRASTRUCTURE.md`](./CHAT_INFRASTRUCTURE.md) — router `openrouter ↔ workers-ai`, ledger `ai_usage.credits`, ciclo por suscripción, `include_usage` + `ctx.waitUntil(settle)`.
+> - [`chat-pricing.md`](../chat-pricing.md) — unidad, fórmula, planes Básico/Standard/Premium, free tier 500cr, packs fijos, límites `AI_CHAT_LIMITS`.
+> - [`chat-infrastructure.md`](../chat-infrastructure.md) — router `openrouter ↔ workers-ai`, ledger `ai_usage.credits`, ciclo por suscripción, `include_usage` + `ctx.waitUntil(settle)`.
 > - Código: `packages/shared/src/ai.ts` (`AI_CHAT_LIMITS`, `AI_CREDIT_CONSTANTS`, `creditsFromUsage`) y `packages/shared/src/features/catalog.ts` (`ai_chat.limits = ['ai_credits_monthly']`, `FREE_TIER_FEATURES`).
 >
 > No actualizar este archivo. Si contiene detalle útil no migrado, moverlo a los dos nuevos y proponer archivar este `.MD` en `docs/archive/`.

@@ -613,7 +613,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
      * bucket matches the KPI.
      * Note: if plans are in different currencies, sums aggregate currencies
      * just like `monthlyRevenueCents` — true multi-currency normalization
-     * is a follow-up (see `vaults/guides/FUTURE_IDEAS.md` §5).
+     * is a follow-up (see `docs/roadmap.md` §5).
      */
     async getMonthlyRevenue(months: number): Promise<
       { month: string; totalCents: number; count: number }[]

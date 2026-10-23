@@ -48,7 +48,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 ### Subscription deletion (RD-153)
 
-`DELETE /api/platform/subscriptions/:id` is a hard delete and exists only for a
+`DELETE /api/platform/subscriptions/:id` requires `console:manage` (admin/owner; `support` → 403). It is a hard delete and exists only for a
 subscription with **zero** payment rows (e.g. a misplaced record). With any
 `platform_subscription_payment` row the endpoint answers **409
 `SUBSCRIPTION_HAS_PAYMENTS`** and deletes zero rows: the record is financial
@@ -82,18 +82,8 @@ Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/sett
 
 ### Trials discontinued (RD-117)
 
-**There are no more trials.** A trial used to book a `validated` payment with `payment_method = 'trial'` and `amount_paid = 0`, but it froze the **full plan price** in `plan_snapshot_price`. When `base_amount` was dropped (`0028`) that snapshot became the booked base amount, so every trial counted in `monthlyRevenueCents`, `previousMonthRevenueCents` (both in `GET /api/platform/subscriptions/stats`) and in the `GET /api/platform/subscriptions/revenue` buckets.
+**There are no more trials.** `POST /api/platform/subscriptions` and its org-scoped mirror answer **400 `TRIAL_NOT_AVAILABLE`** when the body sends `isTrial: true`, before the first write, so no orphan row is left. The Console form no longer offers the toggle. Rule source: `AGENTS.md` §11.
 
-- **Creation rejects trials**: `POST /api/platform/subscriptions` and its org-scoped mirror `POST /api/platform/organizations/:id/subscriptions` answer **400 `TRIAL_NOT_AVAILABLE`** ("Los trials ya no están disponibles. Los descuentos se gestionarán con cupones.") when the body sends `isTrial: true`. `createSubscriptionWithPayment` throws **before the first write**, so no orphan subscription/payment is left behind. The Console form no longer offers the trial toggle and never sends the flag.
-- **The `is_trial` column is not touched**: historical subscriptions keep their flag, so their computed status stays `trial` while the period is in force (see `PAYMENT_STATUSES.md`).
-- **Data migration `0029`** (`0029_zero_historical_trial_snapshot.sql`, custom/idempotent, no-op without trial rows) zeroes the frozen snapshot of historical trials:
-
-  ```sql
-  UPDATE "platform_subscription_payment"
-  SET "plan_snapshot_price" = 0
-  WHERE "payment_method" = 'trial';
-  ```
-
-  They no longer inflate the revenue KPIs, with no receipt to void (a trial was `$0` and never burned an `FS-N` number).
-- **Free plans are NOT trials**: a plan with `price = 0` keeps the free path — `status = validated`, `payment_method = 'free'`, `amount_paid = 0` and `plan_snapshot_price = 0`, so it never books revenue and never burns a series number (`pre_system`).
-- **Future discounts = coupons**: per-customer discounts will be modeled as coupons, never as a resurrected `price_override`/`base_amount` column.
+- `payment_method = 'trial'` survives only in historical rows; `is_trial` is untouched, so an old subscription still computes `trial` while its period is in force. Migration `0029` zeroes their frozen snapshot (`plan_snapshot_price = 0`) so they stop inflating revenue, and a trial never burned an `FS-N` number.
+- **A free plan is not a trial**: `price = 0` keeps the free path (`validated`, `payment_method = 'free'`, `plan_snapshot_price = 0`, `pre_system`, no revenue, no series number).
+- **Future discounts are coupons**, never a resurrected `price_override`/`base_amount` column.

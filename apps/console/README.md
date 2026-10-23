@@ -91,8 +91,8 @@ Todas las llamadas van al `api-worker` via `/api/platform/*` (requiere rol globa
 
 ## Deploy
 
-Despliegue **manual en Vercel** (guía completa en [`vaults/architecture/INFRASTRUCTURE.md`
-                     §4](../../vaults/architecture/INFRASTRUCTURE.md)):
+Despliegue **manual en Vercel** (guía completa en [`vaults/architecture/infrastructure.md`
+                     §4](../../vaults/architecture/infrastructure.md)):
 
 ```bash
 cd apps/console

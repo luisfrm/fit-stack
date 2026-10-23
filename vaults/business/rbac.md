@@ -11,7 +11,7 @@ Platform roles for Better Auth admin plugin (`platformRoles` in `packages/shared
 
 **Console access gate**: `canPlatform(role, 'console', 'access')` — `true` for `owner`, `admin` and `support`; plain `user` is denied. The Console layout and `/unauthorized` both use it.
 
-**Console write gate**: `canPlatform(role, 'console', 'manage')` — only `owner`/`admin`. Read routes use their own module (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`); settings, branding and knowledge mutations use `setting:write`. `support` is read-only. No hardcoded role comparisons.
+**Console write gate**: `console:manage` (only `owner`/`admin`); reads use their own module and settings/branding/knowledge use `setting:write`. `support` is read-only, and no route compares roles by hand. The middleware table lives in `AGENTS.md` §6.
 
 ### Organization Roles
 
@@ -111,8 +111,6 @@ access is a one-line change in `organizationRoles`.
 
 ### Security Rules
 
-1. **Never trust client-side role checks** — Always re-verify in API
-2. **Session-based authorization** — Use `session.member.role` from Better Auth
-3. **Organization scoping** — All queries MUST filter by `organizationId`
-4. **No platform admin bypass in CMS** — Platform roles are for SaaS platform management only
+1–4 duplicate `AGENTS.md` §5 (Security & Authentication) and the isolation rule (§1 / Business Rules Summary, rule 3): never trust a client-side role check, authorize from the session, filter every query by `organizationId`, and never give a platform admin a CMS bypass. This doc does not restate them.
+
 5. **Uploads: two routes, a single authority per case** — The panel uploads via `/api/upload/*` with the org from **its own session** (`requireOrgPermission(MEMBERS, CREATE)`): `organizationId` does not exist in the contract, so no member can write to another gym's folder. The console (which does NOT have an active org) uploads via `/api/platform/organizations/:orgId/upload/*` with the org by **path** and `requirePlatformPermission('console','manage')` (admin/owner; `support` → 403) or via `/api/platform/upload/*` for branding (`setting:write`). Every written/deleted key must start with `<orgId>/` (or `platform/branding/`); public reading lives at `/api/public/files/*` and only serves `<orgId>/cms/…` and `platform/branding/…`.
