@@ -140,9 +140,10 @@ export default {
   },
 
   /**
-   * Sweep (cron in Terraform, pre-sale every 10h): re-queues renders for
-   * numbered payments without a PDF. Closes the gap "number assigned but
-   * event never reached the queue". Idempotent with step 2.
+   * Sweep (cron in Terraform, pre-sale every 10h): resumes stale claims and
+   * re-queues renders for numbered payments without a PDF. Closes the gaps
+   * "emission died after claiming" and "event never reached the queue".
+   * Idempotent with step 2.
    */
   async scheduled(
     _event: ScheduledEvent,
@@ -150,10 +151,14 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     console.log('[jobs-worker] scheduled sweep starting...');
-    const { requeued } = await sweepPendingReceiptPdfs(env);
+    const { requeued, resumed } = await sweepPendingReceiptPdfs(env);
+    if (resumed > 0) {
+      console.log(`[jobs-worker] receipt sweep: ${resumed} stale claim(s) resumed.`);
+    }
     if (requeued > 0) {
       console.log(`[jobs-worker] receipt sweep: ${requeued} render(s) re-queued.`);
-    } else {
+    }
+    if (requeued === 0 && resumed === 0) {
       console.log('[jobs-worker] receipt sweep: nothing pending.');
     }
   },

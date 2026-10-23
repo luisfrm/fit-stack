@@ -42,7 +42,13 @@ export interface ReceiptHooks {
     paymentId: number;
     timezone: string;
     actor?: string;
-  }): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }>;
+  }): Promise<{
+    /** `null` while another emission owns the claim (still not numbered). */
+    receiptNumber: string | null;
+    pdfStatus: 'pending' | 'ready';
+    /** `true` = the row is claimed by another emission; the sweep resumes it. */
+    inProgress?: boolean;
+  }>;
   markReceiptVoided(input: {
     orgId: string;
     paymentId: number;
@@ -501,9 +507,9 @@ export function createSubscriptionsService(
             { paymentCreated: true },
           );
           // `unresolved` leaves the row untouched (fail-closed). Re-throwing keeps
-          // the failure visible; the payment stays `validated` without a number and
-          // only the manual `POST /:id/issue` can repair it (the sweep does not
-          // cover that state).
+          // the failure visible; the payment stays `validated` without a number.
+          // If the row was already claimed, the claim sweep resumes it; an
+          // UNCLAIMED row is only repaired by the manual `POST /:id/issue`.
           if (outcome !== 'committed') throw emissionError;
         }
       }

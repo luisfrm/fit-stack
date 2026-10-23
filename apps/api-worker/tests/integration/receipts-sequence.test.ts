@@ -2,9 +2,9 @@
  * Receipts sequence integration tests.
  *
  * Covers: atomic sequence allocation under concurrency (including the
- * first-receipt-of-the-year race with no prior row), idempotent attach,
- * per-org uniqueness of receipt_number, NULL legacy payments coexisting,
- * and void preserving the number.
+ * first-receipt-of-the-year race with no prior row), idempotent number attach
+ * on a CLAIMED row, per-org uniqueness of receipt_number, NULL legacy payments
+ * coexisting, and void preserving the number.
  *
  * The payment fixture is created via HTTP (POST /api/subscriptions);
  * the sequence repo — which has no route — is exercised
@@ -66,6 +66,22 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     return createReceiptsRepository(createDb(TEST_DATABASE_URL));
   }
 
+  /**
+   * Marks the payment validated and CLAIMS it (the number is only attached to
+   * a claimed row). Actor `null`: no session here, never fabricated.
+   */
+  async function claimForNumbering(paymentId: number, orgId: string): Promise<void> {
+    await testQuery(`UPDATE payment SET status = 'validated' WHERE id = $1`, [paymentId]);
+    const { claimed } = await receiptsRepo().claimReceipt(paymentId, orgId, {
+      subtotal: 100,
+      taxTotal: 0,
+      taxDetails: [],
+      emitterSnapshot: null,
+      issuedBy: null,
+    });
+    expect(claimed).toBe(true);
+  }
+
   it('N concurrent calls same org/year → unique consecutive numbers 1..N', async () => {
     const { organization } = await createGymTenant();
     const repo = receiptsRepo();
@@ -90,21 +106,36 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     expect([a, b].sort()).toEqual([1, 2]);
   });
 
-  it('second attachReceipt on a numbered payment returns the existing one', async () => {
+  it('second attachReceiptNumber on a numbered payment returns the existing one', async () => {
     const { organization, paymentId } = await createPaidFixture();
     const repo = receiptsRepo();
-    const first = await repo.attachReceipt(paymentId, organization.id, {
+    await claimForNumbering(paymentId, organization.id);
+    const first = await repo.attachReceiptNumber(paymentId, organization.id, {
       receiptNumber: `${organization.slug}-2026-000001`,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),
     });
-    const second = await repo.attachReceipt(paymentId, organization.id, {
+    const second = await repo.attachReceiptNumber(paymentId, organization.id, {
       receiptNumber: `${organization.slug}-2026-000099`,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),
     });
     expect(first.receiptNumber).toBe(`${organization.slug}-2026-000001`);
     expect(second.receiptNumber).toBe(first.receiptNumber);
+  });
+
+  it('attachReceiptNumber never numbers an UNCLAIMED payment', async () => {
+    const { organization, paymentId } = await createPaidFixture();
+    const repo = receiptsRepo();
+    await testQuery(`UPDATE payment SET status = 'validated' WHERE id = $1`, [paymentId]);
+    // No claim: the UPDATE matches nothing and the re-read returns the row
+    // without a number (never numbered without a claim).
+    const row = await repo.attachReceiptNumber(paymentId, organization.id, {
+      receiptNumber: `${organization.slug}-2026-000050`,
+      documentType: 'receipt',
+      receiptIssuedAt: new Date(),
+    });
+    expect(row.receiptNumber).toBeNull();
   });
 
   it('receipt_number unique per org; NULL legacy payments coexist', async () => {
@@ -140,18 +171,20 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     const paymentA = await createPaymentInOrg();
     const paymentB = await createPaymentInOrg();
     const num = `${organization.slug}-2026-000010`;
-    await repo.attachReceipt(paymentA, organization.id, {
+    await claimForNumbering(paymentA, organization.id);
+    await repo.attachReceiptNumber(paymentA, organization.id, {
       receiptNumber: num,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),
     });
+    await claimForNumbering(paymentB, organization.id);
     // Duplicate in the SAME org must fail on the partial UNIQUE index
     // (the UPDATE itself collides; the row belongs to this org).
     // Assert the PG cause (23505 / constraint name), not just any error:
     // the Neon HTTP driver surfaces it on `error.cause`, not `message`.
     let duplicateErr: unknown;
     try {
-      await repo.attachReceipt(paymentB, organization.id, {
+      await repo.attachReceiptNumber(paymentB, organization.id, {
         receiptNumber: num,
         documentType: 'receipt',
         receiptIssuedAt: new Date(),
@@ -178,13 +211,15 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     const b = await createPaidFixture();
     const repo = receiptsRepo();
     const num = `${a.organization.slug}-2026-000030`;
-    await repo.attachReceipt(a.paymentId, a.organization.id, {
+    await claimForNumbering(a.paymentId, a.organization.id);
+    await repo.attachReceiptNumber(a.paymentId, a.organization.id, {
       receiptNumber: num,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),
     });
     // Same number string in org B inserts fine (UNIQUE is per-org).
-    const attachedB = await repo.attachReceipt(b.paymentId, b.organization.id, {
+    await claimForNumbering(b.paymentId, b.organization.id);
+    const attachedB = await repo.attachReceiptNumber(b.paymentId, b.organization.id, {
       receiptNumber: num,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),
@@ -197,12 +232,21 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     expect(foundB?.id).toBe(b.paymentId);
     // Cross-org writes are rejected: payment of org A numbered under org B.
     await expect(
-      repo.attachReceipt(a.paymentId, b.organization.id, {
+      repo.attachReceiptNumber(a.paymentId, b.organization.id, {
         receiptNumber: `${b.organization.slug}-2026-000031`,
         documentType: 'receipt',
         receiptIssuedAt: new Date(),
       }),
     ).rejects.toThrow(/no encontrado/);
+    await expect(
+      repo.claimReceipt(b.paymentId, a.organization.id, {
+        subtotal: 100,
+        taxTotal: 0,
+        taxDetails: [],
+        emitterSnapshot: null,
+        issuedBy: null,
+      }),
+    ).resolves.toEqual({ claimed: false });
     await expect(
       repo.markVoided(a.paymentId, b.organization.id, {
         by: 'user-actor-1',
@@ -211,11 +255,36 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     ).rejects.toThrow(/no encontrado/);
   });
 
+  it('claimReceipt only claims a validated payment AND only once', async () => {
+    const { organization, paymentId } = await createPaidFixture();
+    const repo = receiptsRepo();
+    const claim = {
+      subtotal: 100,
+      taxTotal: 0,
+      taxDetails: [],
+      emitterSnapshot: null,
+      issuedBy: 'user-1',
+    };
+    // Still `processing`: not claimable.
+    expect(await repo.claimReceipt(paymentId, organization.id, claim)).toEqual({
+      claimed: false,
+    });
+    await testQuery(`UPDATE payment SET status = 'validated' WHERE id = $1`, [paymentId]);
+    expect(await repo.claimReceipt(paymentId, organization.id, claim)).toEqual({
+      claimed: true,
+    });
+    // Second claim loses: the sequence is never consumed twice for one row.
+    expect(await repo.claimReceipt(paymentId, organization.id, claim)).toEqual({
+      claimed: false,
+    });
+  });
+
   it('markVoided preserves the number and sets flags', async () => {
     const { organization, paymentId } = await createPaidFixture();
     const repo = receiptsRepo();
     const num = `${organization.slug}-2026-000020`;
-    await repo.attachReceipt(paymentId, organization.id, {
+    await claimForNumbering(paymentId, organization.id);
+    await repo.attachReceiptNumber(paymentId, organization.id, {
       receiptNumber: num,
       documentType: 'receipt',
       receiptIssuedAt: new Date(),

@@ -1,7 +1,8 @@
 import type { Db } from '@workspace/database/factory';
 import {
   createPlatformReceiptsRepository,
-  type AttachPlatformReceiptInput,
+  type AttachPlatformReceiptNumberInput,
+  type ClaimPlatformReceiptInput,
 } from '@workspace/database/repositories/platform-receipts';
 import {
   buildOrgPaymentReceivedEvent,
@@ -50,10 +51,13 @@ export interface PlatformReceiptHooks {
 /**
  * Step 1 result. `skipped:true + receiptNumber:null` = no document
  * ($0 trial/free): NOTHING to wait for, not a "pending".
+ * `inProgress:true` = another emission holds the claim and has not persisted
+ * the number yet: pending, never an error.
  */
 export type PlatformAssignResult =
   | { receiptNumber: null; pdfStatus: 'pending'; skipped: true }
-  | { receiptNumber: string; pdfStatus: 'pending' | 'ready'; skipped: false };
+  | { receiptNumber: string; pdfStatus: 'pending' | 'ready'; skipped: false }
+  | { receiptNumber: null; pdfStatus: 'pending'; skipped: false; inProgress: true };
 
 /** Issuance options for `platform-subscriptions.service` (mirrors `ReceiptContext`). */
 export interface PlatformReceiptContext {
@@ -81,9 +85,13 @@ export interface PlatformIssuerRepos {
       type: ReceiptDocumentType,
       seq: number,
     ): Promise<{ released: boolean }>;
-    attachPlatformReceipt(
+    claimPlatformReceipt(
       paymentId: number,
-      input: AttachPlatformReceiptInput,
+      input: ClaimPlatformReceiptInput,
+    ): Promise<{ claimed: boolean }>;
+    attachPlatformReceiptNumber(
+      paymentId: number,
+      input: AttachPlatformReceiptNumberInput,
     ): Promise<ReceiptIssueAttached>;
     setPlatformPayerIfMissing(
       paymentId: number,
@@ -155,8 +163,7 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
 
     async buildEmitterSnapshot(payment, org, profile) {
       // Frozen emitter identity: FitStack (settings) + receptor country
-      // profile. Built BEFORE consuming the global sequence (nothing burns a
-      // correlative).
+      // profile. Built BEFORE the claim/sequence (nothing burns a correlative).
       return buildPlatformEmitterSnapshot(
         {
           receptor: org,
@@ -165,6 +172,16 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
         },
         profile,
       );
+    },
+
+    claim(_org, data, input) {
+      return platformReceiptsRepo.claimPlatformReceipt(input.paymentId, {
+        subtotal: data.subtotal,
+        taxTotal: data.taxTotal,
+        taxDetails: data.taxDetails,
+        emitterSnapshot: data.emitterSnapshot,
+        issuedBy: data.issuedBy,
+      });
     },
 
     async nextNumber() {
@@ -193,15 +210,10 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
       }
     },
 
-    attach(_org, data, input) {
-      return platformReceiptsRepo.attachPlatformReceipt(input.paymentId, {
+    attachNumber(_org, data, input) {
+      return platformReceiptsRepo.attachPlatformReceiptNumber(input.paymentId, {
         receiptNumber: data.receiptNumber,
         receiptIssuedAt: data.receiptIssuedAt,
-        subtotal: data.subtotal,
-        taxTotal: data.taxTotal,
-        taxDetails: data.taxDetails,
-        emitterSnapshot: data.emitterSnapshot,
-        issuedBy: data.issuedBy,
       });
     },
 
@@ -230,10 +242,10 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
   return {
     /**
      * Step 1 (synchronous, no external I/O except DB+queue): validates, computes
-     * tax in cents, assigns global number (atomic), persists it,
-     * and enqueues `receipt.render` with `scope:'platform'`. NEVER enqueues email
-     * (done in step 2). Trial/free $0 -> SKIP (does not burn sequence).
-     * The shared sequence lives in `receipt-issue.core.ts`.
+     * tax in cents, claims the payment, assigns global number (atomic),
+     * persists it, and enqueues `receipt.render` with `scope:'platform'`.
+     * NEVER enqueues email (done in step 2). Trial/free $0 -> SKIP (does not
+     * burn sequence). The shared sequence lives in `receipt-issue.core.ts`.
      */
     async assignPlatformReceiptNumber(
       input: AssignPlatformReceiptNumberInput,

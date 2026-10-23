@@ -35,18 +35,22 @@ export interface PlatformReceiptComposedData {
   emitter: Record<string, string>;
 }
 
-export interface AttachPlatformReceiptInput {
+export interface ClaimPlatformReceiptInput {
+  /** Integer cents. */
+  subtotal: number;
+  taxTotal: number;
+  taxDetails: unknown;
+  /** Emitter identity (FitStack) frozen upon issuance. */
+  emitterSnapshot: ReceiptEmitterSnapshot | null;
+  /** Issuing actor. Missing during sweep: remains `null`. */
+  issuedBy: string | null;
+}
+
+/** Number payload: only the global correlative and its issuance instant. */
+export interface AttachPlatformReceiptNumberInput {
   /** `FS-0000001` (Console format, validated). */
   receiptNumber: string;
   receiptIssuedAt: Date;
-  /** Integer cents; step 1 always persists them alongside the number. */
-  subtotal?: number | null;
-  taxTotal?: number | null;
-  taxDetails?: unknown;
-  /** Emitter identity (FitStack) frozen upon issuance. */
-  emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Issuing actor. Missing during sweep: remains `null`. */
-  issuedBy?: string | null;
 }
 
 export interface MarkPlatformVoidedInput {
@@ -98,7 +102,7 @@ export function createPlatformReceiptsRepository(db: Db) {
     /**
      * Global correlative compensation: rolls back the last number
      * consumed by this execution when it LOST the race in
-     * `attachPlatformReceipt` (another execution already numbered the payment).
+     * `attachPlatformReceiptNumber` (another execution already numbered the payment).
      *
      * Only reverts if we are still the latest consumer
      * (`last_number = seq`): decrementing with newer consumers would
@@ -164,18 +168,60 @@ export function createPlatformReceiptsRepository(db: Db) {
     },
 
     /**
-     * Numbers a SaaS payment idempotently: only writes if it doesn't
-     * have a number yet (`WHERE receipt_number IS NULL`). If already numbered,
-     * returns the re-read existing row (never renumbered).
+     * Claims the SaaS payment BEFORE consuming the global sequence: persists
+     * the fiscal breakdown, the frozen FitStack snapshot and the actor in a
+     * SINGLE statement guarded by `receipt_claim_at IS NULL`.
+     *
+     * `claimed: false` means another emission won the claim (or the payment is
+     * no longer `validated`): the caller re-reads the row and never consumes a
+     * number. The claim is never released: a stale one is resumed by the sweep.
      */
-    async attachPlatformReceipt(
+    async claimPlatformReceipt(
       paymentId: number,
-      input: AttachPlatformReceiptInput,
+      input: ClaimPlatformReceiptInput,
+    ): Promise<{ claimed: boolean }> {
+      assertPaymentId(paymentId, 'claimPlatformReceipt');
+
+      const [row] = await db
+        .update(platformSubscriptionPayment)
+        .set({
+          receiptClaimAt: sql`now()`,
+          subtotal: input.subtotal,
+          taxTotal: input.taxTotal,
+          taxDetails: input.taxDetails ?? null,
+          // Frozen identity + actor, persisted with the claim.
+          emitterSnapshot: input.emitterSnapshot,
+          issuedBy: input.issuedBy,
+        })
+        .where(
+          and(
+            eq(platformSubscriptionPayment.id, paymentId),
+            eq(platformSubscriptionPayment.status, 'validated'),
+            isNull(platformSubscriptionPayment.receiptNumber),
+            isNull(platformSubscriptionPayment.receiptClaimAt),
+          ),
+        )
+        .returning({ id: platformSubscriptionPayment.id });
+      return { claimed: row !== undefined };
+    },
+
+    /**
+     * Numbers an ALREADY CLAIMED SaaS payment. Never renumbers: with a number
+     * present the statement matches nothing and the existing row is returned.
+     *
+     * `status = 'validated'` is part of the WHERE on purpose (Panel mirror):
+     * the sweep reads the claim and only later attaches, so the payment may
+     * have been voided in between. The row comes back WITHOUT
+     * `receipt_number` and the caller releases the local correlative.
+     */
+    async attachPlatformReceiptNumber(
+      paymentId: number,
+      input: AttachPlatformReceiptNumberInput,
     ): Promise<DbPlatformPayment> {
-      assertPaymentId(paymentId, 'attachPlatformReceipt');
+      assertPaymentId(paymentId, 'attachPlatformReceiptNumber');
       if (typeof input.receiptNumber !== 'string' || !isValidConsoleReceiptNumber(input.receiptNumber)) {
         throw new Error(
-          `attachPlatformReceipt: receipt_number con formato inválido (${String(input.receiptNumber)}).`,
+          `attachPlatformReceiptNumber: receipt_number con formato inválido (${String(input.receiptNumber)}).`,
         );
       }
 
@@ -184,18 +230,13 @@ export function createPlatformReceiptsRepository(db: Db) {
         .set({
           receiptNumber: input.receiptNumber,
           receiptIssuedAt: input.receiptIssuedAt,
-          subtotal: input.subtotal ?? null,
-          taxTotal: input.taxTotal ?? null,
-          taxDetails: input.taxDetails ?? null,
-          // Frozen identity + actor, in the same statement as
-          // the number (receipt is reproducible upon birth).
-          emitterSnapshot: input.emitterSnapshot ?? null,
-          issuedBy: input.issuedBy ?? null,
         })
         .where(
           and(
             eq(platformSubscriptionPayment.id, paymentId),
+            eq(platformSubscriptionPayment.status, 'validated'),
             isNull(platformSubscriptionPayment.receiptNumber),
+            isNotNull(platformSubscriptionPayment.receiptClaimAt),
           ),
         )
         .returning();
@@ -207,7 +248,7 @@ export function createPlatformReceiptsRepository(db: Db) {
         .from(platformSubscriptionPayment)
         .where(eq(platformSubscriptionPayment.id, paymentId));
       if (!existing) {
-        throw new Error(`attachPlatformReceipt: pago ${paymentId} no existe.`);
+        throw new Error(`attachPlatformReceiptNumber: pago ${paymentId} no existe.`);
       }
       return existing;
     },

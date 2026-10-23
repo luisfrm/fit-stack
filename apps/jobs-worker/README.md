@@ -55,13 +55,14 @@ El motor de comprobantes está **unificado**: núcleo + perfiles de emisor (comp
 
 ## Barrido (`scheduled`)
 
-`sweepPendingReceiptPdfs` cubre **tres** estados de fallo con una única definición por tabla:
+`sweepPendingReceiptPdfs` cubre **cuatro** estados de fallo con una única definición por tabla:
 
+- **Claim viejo** (≥15 min y aún `validated`): el paso 1 reclamó la fila (`receipt_claim_at`) y murió antes de consumir el número → la reanuda con un número válido y re-encola el render. Nunca la renumera: el correlativo local se libera solo si sigue siendo el último. Un claim sobre un pago compensado a `voided` es terminal y no se numera.
 - **Numerado sin PDF** (≥15 min): el render se perdió → re-encola.
 - **PDF listo sin notificar** (≥30 min): el email del paso 2 nunca salió → re-encola.
 - **Anulado sin PDF con sello** (≥15 min): el void se persistió pero el render del artefacto ANULADO se perdió → re-encola. Mientras falte, la descarga responde `pending`: el PDF de emisión **no** se sirve para un anulado.
 
-Los tres son seguros de re-encolar porque cada artefacto tiene su propio gate idempotente (`receipt_notified_at` / `receipt_voided_pdf_key`). Una fila corrupta no aborta el resto.
+Los cuatro son seguros de re-encolar porque cada artefacto tiene su propio gate idempotente (`receipt_notified_at` / `receipt_voided_pdf_key`) y el claim se resuelve con `WHERE receipt_number IS NULL` (nunca renumera). Una fila corrupta no aborta el resto.
 
 > **Cadencia (pre-venta)**: `0 */10 * * *` (cada 10 horas) — ahorro de invocaciones sin clientes reales. Bajar a `*/10 * * * *` (cada 10 min) con clientes reales.
 

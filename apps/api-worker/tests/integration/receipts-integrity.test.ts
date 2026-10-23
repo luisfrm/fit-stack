@@ -28,7 +28,7 @@ import type { createClient } from '../helpers/client';
 import { createDb } from '@workspace/database/factory';
 import { createReceiptsRepository } from '@workspace/database/repositories/receipts';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
-import { toLocalDayString } from '@workspace/shared';
+import { toLocalDayString, formatPanelReceiptNumber } from '@workspace/shared';
 
 describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
   beforeAll(async () => {
@@ -137,7 +137,7 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
     });
   });
 
-  it('fallo fiscal NO quema correlativo: sin número, sin huecos', async () => {
+  it('fallo fiscal NO quema correlativo ni reclama el pago: sin número, sin huecos', async () => {
     const { owner, organization } = await createGymTenant('fiscal-fail');
     const paymentId = await createProcessingPayment(owner.client);
     await markValidated(paymentId);
@@ -150,13 +150,15 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
     const res = await owner.client.post(`/api/payments/${paymentId}/issue`, {});
     expect(res.status).toBeGreaterThanOrEqual(400);
 
-    // The point: not a consumed number nor a hole in the audit.
+    // The point: not a consumed number, no hole in the audit and no claim
+    // left behind (the fiscal work runs before the claim).
     expect(await sequenceState(organization.id)).toBe(0);
-    const rows = await testQuery<{ receipt_number: string | null }>(
-      `SELECT receipt_number FROM payment WHERE id = $1`,
-      [paymentId],
-    );
+    const rows = await testQuery<{
+      receipt_number: string | null;
+      receipt_claim_at: string | null;
+    }>(`SELECT receipt_number, receipt_claim_at FROM payment WHERE id = $1`, [paymentId]);
     expect(rows[0]!.receipt_number).toBeNull();
+    expect(rows[0]!.receipt_claim_at).toBeNull();
 
     const report = await owner.client.get('/api/reports/receipts', {
       query: { status: 'gaps' },
@@ -174,8 +176,11 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
       owner.client.post(`/api/payments/${paymentId}/issue`, {}),
       owner.client.post(`/api/payments/${paymentId}/issue`, {}),
     ]);
-    expect(a.status, a.text).toBe(200);
-    expect(b.status, b.text).toBe(200);
+    // The loser never gets an error: it either re-reads the persisted number
+    // (200) or reports the claim as in progress (202).
+    for (const res of [a, b]) {
+      expect([200, 202], res.text).toContain(res.status);
+    }
 
     const rows = await testQuery<{ receipt_number: string }>(
       `SELECT receipt_number FROM payment WHERE id = $1`,
@@ -185,15 +190,91 @@ describe.skipIf(skipReason !== null)('Receipts correlative integrity', () => {
     expect(persisted).toMatch(
       new RegExp(`^\\d{4}-\\d{6}$`),
     );
-    // Both report the persisted AUTHORITATIVE number, never a lost local one.
-    expect(a.body.receiptNumber).toBe(persisted);
-    expect(b.body.receiptNumber).toBe(persisted);
+    // At least the winner reports the persisted AUTHORITATIVE number.
+    const numbered = [a, b].filter((res) => res.status === 200);
+    expect(numbered.length).toBeGreaterThanOrEqual(1);
+    for (const res of numbered) {
+      expect(res.body.receiptNumber).toBe(persisted);
+    }
+    for (const res of [a, b].filter((r) => r.status === 202)) {
+      expect(res.body).toMatchObject({
+        receiptNumber: null,
+        pdfStatus: 'pending',
+        inProgress: true,
+      });
+    }
 
-    const numbered = await testQuery<{ count: string }>(
+    const numberedRows = await testQuery<{ count: string }>(
       `SELECT count(*)::text AS count FROM payment
         WHERE organization_id = $1 AND receipt_number IS NOT NULL`,
       [organization.id],
     );
-    expect(Number(numbered[0]!.count)).toBe(1);
+    expect(Number(numberedRows[0]!.count)).toBe(1);
+  });
+
+  it('attachReceiptNumber NO numera un pago reclamado que dejó de estar validado (ventana claim→attach)', async () => {
+    const { owner, organization } = await createGymTenant('attach-voided');
+    const paymentId = await createProcessingPayment(owner.client);
+    await markValidated(paymentId);
+
+    const repo = receiptsRepo();
+    const year = localYear();
+    // Claim from a (future) emission that dies before numbering.
+    expect(
+      await repo.claimReceipt(paymentId, organization.id, {
+        subtotal: 10000,
+        taxTotal: 0,
+        taxDetails: [],
+        emitterSnapshot: null,
+        issuedBy: null,
+      }),
+    ).toEqual({ claimed: true });
+
+    // The sweep read the claim; the charge is then compensated to `voided`
+    // (RD-155) before the attach. Numbering it would leave a voided document
+    // without its sealed ANULADO artifact.
+    await testQuery(`UPDATE payment SET status = 'voided' WHERE id = $1`, [paymentId]);
+
+    const seq = await repo.nextDocumentNumber(organization.id, 'receipt', year);
+    const receiptNumber = formatPanelReceiptNumber(year, seq);
+    const row = await repo.attachReceiptNumber(paymentId, organization.id, {
+      receiptNumber,
+      documentType: 'receipt',
+      receiptIssuedAt: new Date(),
+    });
+
+    // The row comes back unchanged (no number written) so the caller can
+    // compensate: nothing was persisted, the number is still the last one.
+    expect(row.status).toBe('voided');
+    expect(row.receiptNumber).toBeNull();
+    expect(
+      await repo.releaseLastNumber(organization.id, 'receipt', year, seq),
+    ).toEqual({ released: true });
+    expect(await sequenceState(organization.id)).toBe(0);
+  });
+
+  it('claim perdido sin número → 202 pending (inProgress), nunca 409/500 ni número quemado', async () => {
+    const { owner, organization } = await createGymTenant('claim-lost');
+    const paymentId = await createProcessingPayment(owner.client);
+    await markValidated(paymentId);
+
+    // Simulates a concurrent emission that already claimed the row and has
+    // not attached the number yet (a dead one is resumed by the sweep).
+    await testQuery(`UPDATE payment SET receipt_claim_at = now() WHERE id = $1`, [paymentId]);
+
+    const res = await owner.client.post(`/api/payments/${paymentId}/issue`, {});
+    expect(res.status, res.text).toBe(202);
+    expect(res.body).toMatchObject({
+      receiptNumber: null,
+      pdfStatus: 'pending',
+      inProgress: true,
+    });
+
+    expect(await sequenceState(organization.id)).toBe(0);
+    const rows = await testQuery<{ receipt_number: string | null }>(
+      `SELECT receipt_number FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(rows[0]!.receipt_number).toBeNull();
   });
 });

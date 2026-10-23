@@ -167,6 +167,11 @@ export const paymentRoutes = new Hono<AppEnv>()
     });
     // Manual emission advances sequence: invalidates report cache.
     await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);
+    // Another emission holds the claim: nothing to wait for yet beyond the
+    // sweep, so the contract is 202/pending (never an error).
+    if (result.receiptNumber === null) {
+      return c.json(result, 202);
+    }
     return c.json(result);
   })
 

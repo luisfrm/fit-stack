@@ -225,6 +225,10 @@ export const platformSubscriptionPayment = pgTable(
     paidAt: timestamp('paid_at', { withTimezone: true }),
     refundedAt: timestamp('refunded_at', { withTimezone: true }),
 
+    // Claim marker: the row is CLAIMED before consuming the sequence. A
+    // concurrent emission loses the claim instead of burning a number.
+    // NULL = unclaimed; never cleared (a stale claim is resumed by the sweep).
+    receiptClaimAt: timestamp('receipt_claim_at', { withTimezone: true }),
     // Correlative receipt. NULL = prior to system (pre_system).
     // Continuous GLOBAL sequence (single issuer: FitStack), without year.
     receiptNumber: text('receipt_number').unique(),
@@ -270,6 +274,10 @@ export const platformSubscriptionPayment = pgTable(
     index('idx_psp_voided_pending')
       .on(table.voidedAt)
       .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
+    // Sweep of stale claims: claimed without number.
+    index('idx_psp_receipt_claim_pending')
+      .on(table.receiptClaimAt)
+      .where(sql`${table.receiptClaimAt} IS NOT NULL AND ${table.receiptNumber} IS NULL`),
   ]
 );
 
@@ -520,6 +528,10 @@ export const payment = pgTable(
     paymentDate: timestamp('payment_date', { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 
+    // Claim marker: the row is CLAIMED before consuming the sequence (taxes
+    // and the emitter snapshot are persisted here). NULL = unclaimed; never
+    // cleared, a stale claim is resumed by the sweep.
+    receiptClaimAt: timestamp('receipt_claim_at', { withTimezone: true }),
     // Correlative receipt. NULL = prior to system (pre_system).
     receiptNumber: text('receipt_number'),
     documentType: text('document_type').notNull().default('receipt'),
@@ -562,6 +574,10 @@ export const payment = pgTable(
     index('idx_payment_voided_pending')
       .on(table.voidedAt)
       .where(sql`${table.receiptVoided} AND ${table.receiptVoidedPdfKey} IS NULL`),
+    // Sweep of stale claims: claimed without number.
+    index('idx_payment_receipt_claim_pending')
+      .on(table.receiptClaimAt)
+      .where(sql`${table.receiptClaimAt} IS NOT NULL AND ${table.receiptNumber} IS NULL`),
   ]
 );
 
