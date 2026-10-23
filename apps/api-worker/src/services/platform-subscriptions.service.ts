@@ -23,7 +23,7 @@ import {
   COMPENSATION_VOID_REASON,
   compensateFailedEmission,
 } from '../lib/subscription-compensation';
-import { isPostgresForeignKeyViolation } from '../lib/errors';
+import { isPostgresForeignKeyViolation, requireVoidReasonOrThrow } from '../lib/errors';
 
 /** Provider por defecto: solo moneda base === moneda de pago (sin API externa). */
 const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
@@ -615,6 +615,13 @@ export function createPlatformSubscriptionsService(
         });
       }
 
+      // RD-163: a `voided` decision must carry its reason — resolved before the
+      // first write, so a PATCH without it leaves the payment untouched.
+      const decision: { voided: true; voidReason: string } | { voided: false } =
+        data.status === PAYMENT_STATUSES.VOIDED
+          ? { voided: true, voidReason: requireVoidReasonOrThrow(data.voidReason) }
+          : { voided: false };
+
       // `wasPending` = was not validated. Re-PATCH to `validated` does not
       // re-extend or renumber (idempotency). Only a `processing` payment
       // can transition to `validated`: `voided` cannot be re-validated
@@ -663,7 +670,7 @@ export function createPlatformSubscriptionsService(
       // Void audit ALWAYS persisted in payment (whether receipt exists or not).
       await platformSubsRepo.updatePaymentStatus(paymentId, data.status, {
         voidedBy: opts?.by,
-        voidReason: data.voidReason,
+        voidReason: decision.voided ? decision.voidReason : undefined,
       });
 
       // VOIDED with issued number: preserves number + PDF and marks VOIDED.
@@ -671,12 +678,12 @@ export function createPlatformSubscriptionsService(
       // Only VOIDED: REFUNDED does not touch `receiptVoided`.
       let receiptVoided = false;
       let receiptVoidReason: 'not_issued' | undefined;
-      if (data.status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+      if (decision.voided && opts?.receipts && opts.by) {
         try {
           await opts.receipts.markPlatformReceiptVoided({
             paymentId,
             by: opts.by,
-            reason: data.voidReason ?? 'Pago anulado',
+            reason: decision.voidReason,
           });
           receiptVoided = true;
         } catch (err) {

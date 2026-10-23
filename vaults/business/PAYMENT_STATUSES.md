@@ -46,7 +46,7 @@ Al anular se persisten **siempre** `voided_by` / `voided_at` / `void_reason`, ha
 
 ## 1.1 Transiciones legales del PATCH (RD-156)
 
-El PATCH de estado —`PATCH /api/payments/:id/status` (Panel) y `PATCH /api/platform/subscriptions/payments/:id/status` (Console)— solo acepta **dos destinos**: `validated | voided` (+ `voidReason?`). Los enums de **alta**/renovación/registro manual no cambian (cada uno con su propio contrato: el alta del Panel sigue aceptando solo `processing | validated`; la del Console y el registro manual aceptan el enum completo): `processing` es un **estado de creación**, nunca un destino de PATCH.
+El PATCH de estado —`PATCH /api/payments/:id/status` (Panel) y `PATCH /api/platform/subscriptions/payments/:id/status` (Console)— solo acepta **dos destinos**: `validated | voided` (+ `voidReason`, **obligatorio con `voided`**: sin motivo no vacío → **400 `VOID_REASON_REQUIRED`**, RD-163). Los enums de **alta**/renovación/registro manual no cambian (cada uno con su propio contrato: el alta del Panel sigue aceptando solo `processing | validated`; la del Console y el registro manual aceptan el enum completo): `processing` es un **estado de creación**, nunca un destino de PATCH.
 
 | Origen (DB) | Destino | ¿Permitido? | Efecto |
 |---|---|---|---|
@@ -118,7 +118,7 @@ resto                    → active     (ACTIVA)
 4. **Anulación** — el mismo PATCH con **`voided`**: marca ANULADO si había comprobante y se **ignora** en el status computado (no cancela la suscripción). No existe `invalid`: el rechazo también es `voided`.
 5. **Registro manual** — `POST /api/platform/subscriptions/:id/payments`: alta de un pago fuera del flujo de autoservicio.
 6. **Comprobante** — `GET .../payments/:id/receipt` (contrato de 3 estados: `ready` / `pending` / `available:false`) y `/receipt/pdf`. Lectura: `subscription:list` (soporte también). Escrituras (validar, anular, reenviar): `console:manage` (soporte **403**).
-7. **Diferencia deliberada**: `DELETE /api/platform/subscriptions/:id` **sí existe** en Console (borra la suscripción SaaS y sus pagos por cascada) — es una decisión distinta de la del Panel y arrastra el histórico de la serie `FS-N` si ya había números emitidos. Ver el backlog en Linear (proyecto «Fit Stack»).
+7. **Diferencia deliberada**: `DELETE /api/platform/subscriptions/:id` **sí existe** en Console, pero **solo borra una suscripción sin pagos**. Si tiene pagos responde **409 `SUBSCRIPTION_HAS_PAYMENTS`** (la FK es `RESTRICT`) y la vía correcta es **cancelarla**, nunca borrarla: el histórico de la serie `FS-N` se conserva. En el Panel el DELETE **no existe** (ni ruta ni permiso `subscriptions.delete`): un registro equivocado se anula. Ver el backlog en Linear (proyecto «Fit Stack»).
 
 ### 4.1 Punto 7: sin doble periodo
 
@@ -131,6 +131,7 @@ El destino `processing` está **prohibido** en el PATCH (§1.1): mandar un pago 
 - **El número nunca se reutiliza**: un comprobante anulado conserva su número y su PDF; no se libera, no se renumera.
 - **El flag ANULADO lo enciende solo `voided`** (nunca `refunded`).
 - **El actor queda registrado** (`issued_by` / `voided_by`) — nunca inventado por el paso 2 ni por el barrido. Al anular se persisten siempre `voided_by` / `voided_at` / `void_reason`.
+- **Anular exige motivo** (RD-163): `voided` sin un `voidReason` no vacío responde **400 `VOID_REASON_REQUIRED`** en el schema (la fila no se toca) y en el servicio (defensa en profundidad). El servidor nunca inventa "Pago anulado". En la UI el motivo lo escribe el operador en un prompt obligatorio (`ReasonPromptModal`): el campo arranca **vacío** (una sugerencia precargada solo movería el default al cliente) y el botón de confirmar queda deshabilitado mientras no haya texto; el tipo (rechazo/anulación) viaja como intención explícita, nunca se deduce del texto.
 - **El emisor queda congelado** en el snapshot al emitir: editar la organización después no cambia el comprobante ni su fila del libro.
 - **Un registro financiero no se elimina** (Panel): se anula.
 - **Anular es explícito**: `receiptVoided` (+ `receiptVoidReason: 'not_issued'`) en el body del PATCH y toast diferenciado en Panel y Console.

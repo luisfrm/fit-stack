@@ -139,6 +139,7 @@ describe.skipIf(skipReason !== null)('Receipts report', () => {
 
     const voided = await owner.client.patch(`/api/payments/${secondId}/status`, {
       status: 'voided',
+      voidReason: 'Cobro anulado',
     });
     expect(voided.status, voided.text).toBe(200);
 
@@ -172,12 +173,13 @@ describe.skipIf(skipReason !== null)('Receipts report', () => {
 
     const anulados = body.gaps.filter((g) => g.kind === 'anulado');
     const huecos = body.gaps.filter((g) => g.kind === 'hueco');
-    // Seq 2 voided with a reason; seqs 3..7 holes; seq 8 = third payment.
+    // Seq 2 voided with a reason (the operator's, no longer a server default);
+    // seqs 3..7 holes; seq 8 = third payment.
     expect(anulados).toHaveLength(1);
     expect(anulados[0]).toMatchObject({
       seq: 2,
       receiptNumber: second.payment['receipt_number'],
-      voidReason: 'Pago anulado',
+      voidReason: 'Cobro anulado',
     });
     expect(huecos.map((g) => g.seq)).toEqual([3, 4, 5, 6, 7]);
     expect(thirdNumber).toMatch(new RegExp(`^${year}-0*8$`));

@@ -173,6 +173,13 @@ test.describe('Console — Comprobante SaaS', () => {
       'Anular',
     );
 
+    // RD-163: an annulment asks the operator for the reason (the suggestion is
+    // editable); the mutation waits for non-blank text.
+    const reasonInput = page.getByTestId('reason-prompt-input');
+    await expect(reasonInput).toBeVisible({ timeout: 10_000 });
+    await reasonInput.fill('Cobro duplicado (E2E)');
+    await page.getByTestId('reason-prompt-confirm').click();
+
     // The ANULADO flag lives in the expanded block, next to the number.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
     await expect(paymentRow.getByText(CONSOLE_RECEIPT_NUMBER_PATTERN).first()).toBeVisible({

@@ -12,6 +12,7 @@ import { createReceiptsService } from '../services/receipts.service';
 import { createFinanceService } from '../services/finance.service';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
+import { requireVoidReason, voidReasonViolationHook } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
 /**
@@ -19,11 +20,18 @@ import type { AppEnv } from '../lib/env';
  * existing charge — confirm (`validated`) or void (`voided`). `processing` is a
  * creation status: accepting it here allowed `validated → processing →
  * validated`, which numbered and extended the same charge twice.
+ *
+ * RD-163: `voided` requires a non-blank `voidReason`; `validated` ignores it.
+ * The field has no length rule of its own: `requireVoidReason` is the single
+ * authority, so a blank string arrives as the business error (with `code`),
+ * never as a generic Zod envelope.
  */
-const updateStatusSchema = z.object({
-  status: z.enum(['validated', 'voided']),
-  voidReason: z.string().min(1).optional(),
-});
+const updateStatusSchema = z
+  .object({
+    status: z.enum(['validated', 'voided']),
+    voidReason: z.string().optional(),
+  })
+  .superRefine(requireVoidReason);
 
 export const paymentRoutes = new Hono<AppEnv>()
   // GET /api/payments/analytics
@@ -52,10 +60,12 @@ export const paymentRoutes = new Hono<AppEnv>()
     return c.json(stats);
   })
   // PATCH /api/payments/:id/status
-  .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema), async (c) => {
+  .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema, voidReasonViolationHook), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
-    const { status, voidReason } = c.req.valid('json');
+    const { status, voidReason: rawVoidReason } = c.req.valid('json');
+    // Trimmed once: the persisted audit and the receipt seal share the reason.
+    const voidReason = rawVoidReason?.trim() || undefined;
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 

@@ -39,6 +39,8 @@ export { TooltipProvider, SimpleTooltip } from "./tooltip";
 export { Checkbox } from "@workspace/ui/components/checkbox";
 export { CheckboxCard } from "@workspace/ui/components/checkbox-card";
 export { ConfirmationModal } from "@workspace/ui/components/confirmation-modal";
+export { ReasonPromptModal } from "@workspace/ui/components/reason-prompt-modal";
+export type { ReasonPromptVariant } from "@workspace/ui/components/reason-prompt-modal";
 export { Label } from "@workspace/ui/components/label";
 export { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group";
 export { Skeleton } from "@workspace/ui/components/skeleton";

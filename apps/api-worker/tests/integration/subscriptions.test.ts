@@ -699,10 +699,71 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
 
       const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'voided',
+        voidReason: 'Cobro anulado',
       });
       expect(voided.status, voided.text).toBe(200);
 
       // Voided ≠ cancelled: the record is invalid, it is not a revocation.
+      expect(await readStatus(owner, subId)).toBe('voided');
+    });
+
+    it('anular sin motivo: 400 VOID_REASON_REQUIRED y la fila queda intacta', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+      });
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toMatchObject({
+        code: 'VOID_REASON_REQUIRED',
+        fields: ['voidReason'],
+      });
+
+      // Rejected at the schema layer: no status write, no audit, no cancel.
+      const rows = await testQuery<{
+        status: string;
+        voided_at: string | null;
+        void_reason: string | null;
+      }>(`SELECT status, voided_at, void_reason FROM payment WHERE id = $1`, [paymentId]);
+      expect(rows[0]!.status).toBe('validated');
+      expect(rows[0]!.voided_at).toBeNull();
+      expect(rows[0]!.void_reason).toBeNull();
+      expect(await readStatus(owner, subId)).toBe('active');
+
+      // A blank reason is not a reason either — and an empty string must answer
+      // the same business code (not the generic Zod envelope).
+      for (const voidReason of ['', '   ']) {
+        const blank = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+          status: 'voided',
+          voidReason,
+        });
+        expect(blank.status, blank.text).toBe(400);
+        expect(blank.body).toMatchObject({
+          code: 'VOID_REASON_REQUIRED',
+          fields: ['voidReason'],
+        });
+      }
+    });
+
+    it('anular con un motivo libre: 200 y el texto del operador queda en `void_reason`', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+
+      const reason = 'Cobro duplicado: se registró dos veces el mismo pago';
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: reason,
+      });
+      expect(res.status, res.text).toBe(200);
+
+      const rows = await testQuery<{ status: string; void_reason: string | null }>(
+        `SELECT status, void_reason FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      expect(rows[0]!.status).toBe('voided');
+      // Persisted verbatim: the server never replaces it with a default.
+      expect(rows[0]!.void_reason).toBe(reason);
       expect(await readStatus(owner, subId)).toBe('voided');
     });
 
@@ -826,7 +887,10 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
     it('el filtro `voided` sigue al status mostrado (anulado o rechazado)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
       const { subId, paymentId } = await seedSubscription(owner, member, plan);
-      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'voided' });
+      await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: 'Cobro anulado',
+      });
 
       const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
         query: { status: 'voided', limit: '10' },

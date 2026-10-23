@@ -32,6 +32,16 @@ import { useOrgAuth } from "@workspace/auth/org";
 import { resolveOrgCurrencyFormat } from "@/lib/org-config";
 import { NoData } from "../dashboard/no-data";
 
+/** Decisions the table can request on an existing charge. */
+export type PaymentStatusDecision = 'validated' | 'voided';
+
+/**
+ * Void intent, explicit and never derived from the reason text: a rejection is
+ * a charge that was never receipted, an annulment voids an issued receipt.
+ * Used for the copy of the reason prompt and of the toasts.
+ */
+export type PaymentVoidIntent = 'reject' | 'void';
+
 const getPaymentStatusBadge = (status?: string, receiptNumber?: string | null) => {
   switch (status) {
     case PAYMENT_STATUSES.VALIDATED: return (
@@ -92,7 +102,11 @@ const getReceiptLabel = (sub: ISubscription): string => {
 
 const getColumns = (
   onStatusChange: (id: number, status: string) => void | Promise<void>,
-  onPaymentStatusChange: (paymentId: number, status: string, voidReason?: string) => void | Promise<void>,
+  onPaymentStatusChange: (
+    paymentId: number,
+    status: PaymentStatusDecision,
+    intent?: PaymentVoidIntent,
+  ) => void | Promise<void>,
   currencyFormat: CurrencyFormat,
   onReceiptSuccess?: () => void | Promise<void>
 ): ColumnDef<ISubscription>[] => [
@@ -266,14 +280,16 @@ const getColumns = (
                     icon: <XCircle size={14} />,
                     variant: "amber",
                     show: sub.paymentStatus === 'processing',
-                    onClick: () => sub.paymentId && onPaymentStatusChange(sub.paymentId, 'voided', 'Pago rechazado')
+                    // No reason here: the caller opens a prompt and the
+                    // operator writes it (RD-163 — the server never invents one).
+                    onClick: () => sub.paymentId && onPaymentStatusChange(sub.paymentId, 'voided', 'reject')
                   },
                   {
                     label: "Anular Cobro",
                     icon: <AlertCircle size={14} />,
                     variant: "destructive",
                     show: sub.paymentStatus === 'validated',
-                    onClick: () => sub.paymentId && onPaymentStatusChange(sub.paymentId, 'voided', 'Pago anulado')
+                    onClick: () => sub.paymentId && onPaymentStatusChange(sub.paymentId, 'voided', 'void')
                   }
                 ]
               },
@@ -300,7 +316,11 @@ const getColumns = (
 interface SubscriptionsTableProps {
   readonly subscriptions: ISubscription[];
   readonly onStatusChange: (id: number, status: string) => void;
-  readonly onPaymentStatusChange: (paymentId: number, status: string, voidReason?: string) => void;
+  readonly onPaymentStatusChange: (
+    paymentId: number,
+    status: PaymentStatusDecision,
+    intent?: PaymentVoidIntent,
+  ) => void;
   readonly loading?: boolean;
   readonly pagination?: any;
   /** Refreshes the page following receipt actions (updateTag + refresh). */

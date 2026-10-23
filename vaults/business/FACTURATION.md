@@ -176,6 +176,7 @@ Cuando en el futuro se active:
 **Detalle de la venta:**
 - Nombre del plan desde el snapshot (no el plan en vivo).
 - Período cubierto (`startDate`–`endDate`).
+- **Sin precio unitario** (RD-163): el comprobante imprime una sola línea de concepto y su total. El plan + el período + `amountPaid` ya describen la venta, y una columna de "precio unitario" sugeriría una cantidad/facturación por unidades que el producto no tiene (un comprobante = una suscripción, período completo).
 
 **Desglose monetario:**
 - `subtotal`, `taxDetails`, `taxTotal`, `amountPaid`, `currencyPaid`.

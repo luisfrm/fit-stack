@@ -327,6 +327,67 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     expect(await readPeriodEnd(subId)).toBe(afterFirst);
   });
 
+  it('RD-163: anular sin motivo responde 400 VOID_REASON_REQUIRED y no toca el pago', async () => {
+    const { organization } = await createGymTenant('rd163-void-reason');
+    const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'validated' });
+    const before = await readPeriodEnd(subId);
+
+    const res = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'voided' },
+    );
+    expect(res.status, res.text).toBe(400);
+    expect(res.body).toMatchObject({
+      code: 'VOID_REASON_REQUIRED',
+      fields: ['voidReason'],
+    });
+
+    // Rejected at the schema layer: no status write, no void audit, no period move.
+    const [row] = await testQuery<{
+      status: string;
+      receipt_voided: boolean;
+      voided_at: string | null;
+      void_reason: string | null;
+    }>(
+      `SELECT status, receipt_voided, voided_at, void_reason
+         FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(row!.status).toBe('validated');
+    expect(row!.receipt_voided).toBe(false);
+    expect(row!.voided_at).toBeNull();
+    expect(row!.void_reason).toBeNull();
+    expect(await readPeriodEnd(subId)).toBe(before);
+
+    // A blank reason is rejected too — and an empty string answers the same
+    // business code, never the generic Zod envelope; a real one persists the audit.
+    for (const voidReason of ['', '   ']) {
+      const blank = await admin.client.patch(
+        `/api/platform/subscriptions/payments/${paymentId}/status`,
+        { status: 'voided', voidReason },
+      );
+      expect(blank.status, blank.text).toBe(400);
+      expect(blank.body).toMatchObject({
+        code: 'VOID_REASON_REQUIRED',
+        fields: ['voidReason'],
+      });
+    }
+
+    const valid = await admin.client.patch(
+      `/api/platform/subscriptions/payments/${paymentId}/status`,
+      { status: 'voided', voidReason: '  Cobro rechazado por soporte  ' },
+    );
+    expect(valid.status, valid.text).toBe(200);
+
+    const [after] = await testQuery<{ status: string; void_reason: string | null }>(
+      `SELECT status, void_reason FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(after!.status).toBe('voided');
+    // Trimmed: the audit never stores the operator's padding.
+    expect(after!.void_reason).toBe('Cobro rechazado por soporte');
+  });
+
   it('RD-156: `voided → validated` sigue siendo 409 PAYMENT_NOT_REVALIDATABLE', async () => {
     const { organization } = await createGymTenant('rd156-void-validate');
     const { subId, paymentId } = await createSub(organization.id, { paymentStatus: 'processing' });

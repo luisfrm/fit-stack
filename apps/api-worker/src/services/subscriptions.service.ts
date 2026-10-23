@@ -21,6 +21,7 @@ import {
   type IPaymentMethodDetails,
 } from '@workspace/shared';
 import { ReceiptError } from './receipts.service';
+import { requireVoidReasonOrThrow } from '../lib/errors';
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
@@ -459,6 +460,14 @@ export function createSubscriptionsService(
         );
       }
 
+      // RD-163: a `voided` decision must carry its reason — resolved BEFORE any
+      // write, so a PATCH without it leaves the row untouched. `validated`
+      // never persists a reason.
+      const decision: { voided: true; voidReason: string } | { voided: false } =
+        status === PAYMENT_STATUSES.VOIDED
+          ? { voided: true, voidReason: requireVoidReasonOrThrow(opts?.voidReason) }
+          : { voided: false };
+
       const previous = await paymentsRepo.findById(organizationId, paymentId);
 
       // Mirrors Console guard (validated ⇔ numbered invariant): rejected
@@ -492,7 +501,7 @@ export function createSubscriptionsService(
       // single source of truth for `voidedBy`/`voidedAt`/`voidReason`.
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
         voidedBy: opts?.by,
-        voidReason: opts?.voidReason,
+        voidReason: decision.voided ? decision.voidReason : undefined,
       });
       if (!updated) {
         throw new Error('Registro de pago no encontrado');
@@ -501,7 +510,7 @@ export function createSubscriptionsService(
       // Voiding/rejecting payment leaves subscription out-of-validity
       // (`cancelledAt`) and derived status becomes `voided` (VOIDED), which is
       // distinct from manual access revocation (`cancelled`).
-      if (status === PAYMENT_STATUSES.VOIDED && updated.subscriptionId) {
+      if (decision.voided && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
       // Void with issued number: preserves number + PDF and marks VOIDED.
@@ -509,13 +518,13 @@ export function createSubscriptionsService(
       // reported explicitly rather than swallowing internal error code.
       let receiptVoided = false;
       let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
-      if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+      if (decision.voided && opts?.receipts && opts.by) {
         try {
           await opts.receipts.markReceiptVoided({
             orgId: organizationId,
             paymentId,
             by: opts.by,
-            reason: opts.voidReason ?? 'Pago anulado',
+            reason: decision.voidReason,
           });
           receiptVoided = true;
         } catch (err) {

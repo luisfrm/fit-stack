@@ -98,9 +98,19 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
     return Number(rows[0]!.id);
   }
 
-  async function setStatus(paymentId: number, status: string, client = admin.client) {
+  /**
+   * Status PATCH. RD-163: `voided` requires a non-blank `voidReason`, so the
+   * helper supplies one unless a test passes its own.
+   */
+  async function setStatus(
+    paymentId: number,
+    status: string,
+    client = admin.client,
+    voidReason = 'Pago anulado',
+  ) {
     return client.patch(`/api/platform/subscriptions/payments/${paymentId}/status`, {
       status,
+      ...(status === 'voided' ? { voidReason } : {}),
     });
   }
 

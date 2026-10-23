@@ -24,6 +24,12 @@ export const API_ERROR_CODES = {
    * so only currencies the org can actually charge in are accepted.
    */
   PAYMENT_CURRENCY_NOT_ACTIVE: "PAYMENT_CURRENCY_NOT_ACTIVE",
+  /**
+   * `PATCH /payments/:id/status` and its Console mirror: a `voided` decision
+   * carries no reason (`400`). An annulment/rejection must explain itself — the
+   * server never invents a default like "Pago anulado".
+   */
+  VOID_REASON_REQUIRED: "VOID_REASON_REQUIRED",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

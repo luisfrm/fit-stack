@@ -120,3 +120,45 @@ describe('RD-156 payment status transitions (service guard)', () => {
     expect(repo.updatePaymentStatus).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * RD-163 — service backstop for the mandatory void reason (the route schema is
+ * the first line of defence; this proves the service never writes a `voided`
+ * with an invented reason when called from another entry point).
+ */
+describe('RD-163 payment void reason (service backstop)', () => {
+  it('Panel: `voided` without a reason or with an empty one is a 400 VOID_REASON_REQUIRED and writes nothing', async () => {
+    const { service, paymentsRepo } = buildGymService({ status: 'processing' });
+
+    for (const voidReason of [undefined, '']) {
+      const err = await service
+        .updatePaymentStatus('org-1', 7, 'voided', { by: 'user-1', voidReason })
+        .catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(HTTPException);
+      expect((err as HTTPException).status).toBe(400);
+      const body = (await (err as HTTPException).res!.json()) as {
+        code?: string;
+        fields?: string[];
+      };
+      expect(body).toMatchObject({ code: 'VOID_REASON_REQUIRED', fields: ['voidReason'] });
+    }
+    expect(paymentsRepo.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('Console: `voided` with a blank or empty reason is a 400 VOID_REASON_REQUIRED and writes nothing', async () => {
+    const { service, repo } = buildPlatformService({ status: 'processing', subscriptionId: 3 });
+
+    for (const voidReason of ['', '   ']) {
+      const err = await service
+        .updatePaymentStatus(11, { status: 'voided', voidReason }, { by: 'admin-1' })
+        .catch((e: unknown) => e);
+
+      expect(err).toBeInstanceOf(HTTPException);
+      expect((err as HTTPException).status).toBe(400);
+      const body = (await (err as HTTPException).res!.json()) as { code?: string; fields?: string[] };
+      expect(body).toMatchObject({ code: 'VOID_REASON_REQUIRED', fields: ['voidReason'] });
+    }
+    expect(repo.updatePaymentStatus).not.toHaveBeenCalled();
+  });
+});

@@ -8,6 +8,7 @@ import {
   ActionsDropdown,
   Badge,
   Skeleton,
+  ReasonPromptModal,
   toast,
 } from "@workspace/ui/components";
 import {
@@ -20,6 +21,7 @@ import type {
 } from "@workspace/shared/types";
 import { PAYMENT_STATUSES } from "@workspace/shared/constants";
 import {
+  API_ERROR_CODES,
   formatCents,
   getVoidKind,
   type CurrencyFormat,
@@ -49,6 +51,35 @@ import { PaymentDetailsList } from "./payment-details-list";
 type PlatformPaymentWithSnapshot = PlatformPayment & {
   features_snapshot?: PlanFeaturesV2 | null;
 };
+
+/**
+ * Explicit void intent: a rejection is a charge that was never receipted, an
+ * annulment voids an issued receipt. It drives the copy of the reason prompt
+ * and of the toasts — never the reason text the operator types.
+ */
+type PaymentVoidIntent = "reject" | "void";
+
+/**
+ * Copy of the mandatory-reason prompt per void intent. The field starts empty
+ * on purpose: a prefilled sentence would only move the old server default to
+ * the client.
+ */
+const VOID_REASON_PROMPT = {
+  reject: {
+    title: "Marcar como Rechazado",
+    description:
+      "El pago quedará anulado. Escribe el motivo: queda en la auditoría del comprobante.",
+    placeholder: "Ej.: el comprobante no coincide con el monto cobrado",
+    confirmText: "Rechazar",
+  },
+  void: {
+    title: "Anular pago",
+    description:
+      "El pago se anula y su comprobante conserva el número. Escribe el motivo: queda en la auditoría.",
+    placeholder: "Ej.: cobro duplicado, se registró dos veces el mismo pago",
+    confirmText: "Anular",
+  },
+} as const;
 
 interface PlatformPaymentHistoryModalProps {
   open: boolean;
@@ -113,6 +144,11 @@ export function PlatformPaymentHistoryModal({
   const [actionPaymentId, setActionPaymentId] = React.useState<number | null>(null);
   const actionLoading = actionPaymentId !== null;
   const [expandedId, setExpandedId] = React.useState<number | null>(null);
+  const [voidRequest, setVoidRequest] = React.useState<{
+    paymentId: number;
+    intent: PaymentVoidIntent;
+  } | null>(null);
+  const [voidSubmitting, setVoidSubmitting] = React.useState(false);
   const { platformRole } = usePlatformAuth();
   const canChangeStatus = canPlatform(platformRole, "console", "manage");
 
@@ -153,19 +189,32 @@ export function PlatformPaymentHistoryModal({
     paymentId: number,
     status: PaymentStatus,
     voidReason?: string,
-  ) => {
-    if (actionLoading) return;
+    intent: PaymentVoidIntent = "void",
+  ): Promise<boolean> => {
+    if (actionLoading) return false;
+    // RD-163: an annulment/rejection always carries a non-blank reason typed by
+    // the operator (the server answers 400 VOID_REASON_REQUIRED). Stopped here
+    // so the request is never sent without it.
+    const reason = status === PAYMENT_STATUSES.VOIDED ? voidReason?.trim() : undefined;
+    if (status === PAYMENT_STATUSES.VOIDED && !reason) {
+      toast.error(
+        intent === "reject"
+          ? "Indica el motivo del rechazo"
+          : "Indica el motivo de la anulación",
+      );
+      return false;
+    }
     setActionPaymentId(paymentId);
     try {
       const result = await platformSubscriptionsService.updatePaymentStatus(
         paymentId,
         status,
-        voidReason,
+        reason,
       );
       // Voiding without an issued receipt is not an error, but it is stated
       // explicitly rather than using an ambiguous "marked as voided".
       if (status === PAYMENT_STATUSES.VOIDED) {
-        const rejected = voidReason === 'Pago rechazado';
+        const rejected = intent === "reject";
         if (result?.receiptVoided === false) {
           toast.success(
             rejected
@@ -180,6 +229,7 @@ export function PlatformPaymentHistoryModal({
       }
       await loadPayments();
       onChange?.();
+      return true;
     } catch (err) {
       // UX-meaningful errors: mapped by CODE (never by server text).
       // The server only accepts `processing → validated` and rejects validating
@@ -190,16 +240,44 @@ export function PlatformPaymentHistoryModal({
           ? "Solo un pago en proceso puede validarse"
           : code === "SUBSCRIPTION_CANCELLED"
             ? "La suscripción está cancelada: no se puede validar este cobro"
-            : mutationError(
-                "PlatformPaymentHistoryModal",
-                err,
-                "No se pudo cambiar el estado del pago",
-              ),
+            : code === API_ERROR_CODES.VOID_REASON_REQUIRED
+              ? "Indica el motivo de la anulación"
+              : mutationError(
+                  "PlatformPaymentHistoryModal",
+                  err,
+                  "No se pudo cambiar el estado del pago",
+                ),
       );
+      return false;
     } finally {
       setActionPaymentId(null);
     }
   };
+
+  /** Opens the mandatory-reason prompt instead of sending a fixed sentence. */
+  const requestVoid = (paymentId: number, intent: PaymentVoidIntent) => {
+    if (actionLoading) return;
+    setVoidRequest({ paymentId, intent });
+  };
+
+  const handleVoidConfirm = async (reason: string) => {
+    if (!voidRequest) return;
+    setVoidSubmitting(true);
+    try {
+      const succeeded = await handleChangeStatus(
+        voidRequest.paymentId,
+        PAYMENT_STATUSES.VOIDED,
+        reason,
+        voidRequest.intent,
+      );
+      // Keep the prompt (and the typed reason) when the server rejects it.
+      if (succeeded) setVoidRequest(null);
+    } finally {
+      setVoidSubmitting(false);
+    }
+  };
+
+  const voidPrompt = VOID_REASON_PROMPT[voidRequest?.intent ?? "void"];
 
   const handleDownloadReceipt = async (payment: PlatformPaymentWithSnapshot) => {
     if (actionLoading || !payment.receiptNumber) return;
@@ -261,7 +339,9 @@ export function PlatformPaymentHistoryModal({
     <Modal
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!actionLoading) onOpenChange(nextOpen);
+        // The reason prompt is nested in this dialog: it must not dismiss the
+        // history (nor a request in flight).
+        if (!actionLoading && !voidRequest) onOpenChange(nextOpen);
       }}
       trigger={null}
       className={className}
@@ -418,11 +498,12 @@ export function PlatformPaymentHistoryModal({
                               label: "Marcar como Validado",
                               icon: <CheckCircle2 size={14} />,
                               variant: "default",
-                              onClick: () =>
-                                handleChangeStatus(
+                              onClick: () => {
+                                void handleChangeStatus(
                                   p.id,
                                   PAYMENT_STATUSES.VALIDATED,
-                                ),
+                                );
+                              },
                               // Only `processing → validated` is a valid transition
                               // (a `voided`/`refunded` returns 409):
                               // an action rejected by the server is not offered.
@@ -434,12 +515,8 @@ export function PlatformPaymentHistoryModal({
                               label: "Marcar como Rechazado",
                               icon: <XCircle size={14} />,
                               variant: "destructive",
-                              onClick: () =>
-                                handleChangeStatus(
-                                  p.id,
-                                  PAYMENT_STATUSES.VOIDED,
-                                  'Pago rechazado',
-                                ),
+                              // No reason here: the prompt asks the operator for it.
+                              onClick: () => requestVoid(p.id, "reject"),
                               show:
                                 canChangeStatus &&
                                 p.status !== PAYMENT_STATUSES.VOIDED,
@@ -448,12 +525,7 @@ export function PlatformPaymentHistoryModal({
                               label: "Anular",
                               icon: <Trash2 size={14} />,
                               variant: "destructive",
-                              onClick: () =>
-                                handleChangeStatus(
-                                  p.id,
-                                  PAYMENT_STATUSES.VOIDED,
-                                  'Pago anulado',
-                                ),
+                              onClick: () => requestVoid(p.id, "void"),
                               show:
                                 canChangeStatus &&
                                 p.status !== PAYMENT_STATUSES.VOIDED,
@@ -587,6 +659,24 @@ export function PlatformPaymentHistoryModal({
           </div>
         )}
       </div>
+
+      {/* RD-163: the reason is typed by the operator — never a client default.
+          Kept inside this dialog's React tree on purpose: a pointer-down on the
+          nested prompt must not read as "outside" and dismiss the history. */}
+      <ReasonPromptModal
+        open={voidRequest !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setVoidRequest(null);
+        }}
+        title={voidPrompt.title}
+        description={voidPrompt.description}
+        label="Motivo *"
+        placeholder={voidPrompt.placeholder}
+        confirmText={voidPrompt.confirmText}
+        variant="danger"
+        isLoading={voidSubmitting}
+        onConfirm={handleVoidConfirm}
+      />
     </Modal>
   );
 }

@@ -11,7 +11,12 @@ import { createPlatformReceiptsReportService } from '../services/platform-receip
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
-import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  requireVoidReason,
+  voidReasonViolationHook,
+} from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
@@ -59,10 +64,16 @@ const renewSchema = z.object({
   payment: paymentSchema,
 });
 
-const updatePaymentStatusSchema = z.object({
-  status: updatePaymentStatusEnum,
-  voidReason: z.string().min(1).optional(),
-});
+const updatePaymentStatusSchema = z
+  .object({
+    status: updatePaymentStatusEnum,
+    // No length rule: `requireVoidReason` is the single authority, so a blank
+    // reason answers `400 VOID_REASON_REQUIRED` (with `code`) instead of the
+    // generic Zod envelope.
+    voidReason: z.string().optional(),
+  })
+  // RD-163: same reason contract as the Panel PATCH (never a default reason).
+  .superRefine(requireVoidReason);
 
 const cancelSchema = z.object({
   reason: z.string().optional(),
@@ -350,9 +361,11 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // PATCH /api/platform/subscriptions/payments/:paymentId/status
-  .patch('/payments/:paymentId/status', requirePlatformPermission('console', 'manage'), zValidator('json', updatePaymentStatusSchema), async (c) => {
+  .patch('/payments/:paymentId/status', requirePlatformPermission('console', 'manage'), zValidator('json', updatePaymentStatusSchema, voidReasonViolationHook), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
-    const data = c.req.valid('json');
+    const { status, voidReason: rawVoidReason } = c.req.valid('json');
+    // Trimmed once: persisted audit + receipt seal share the same reason.
+    const data = { status, voidReason: rawVoidReason?.trim() || undefined };
     const cache = createCache(c.env);
 
     const { service } = buildService(c);

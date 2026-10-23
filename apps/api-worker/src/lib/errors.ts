@@ -3,8 +3,10 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { APIError } from 'better-auth/api';
 import { ZodError } from 'zod';
+import { API_ERROR_CODES } from '@workspace/shared';
 import type { AppEnv } from './env';
 import { ReceiptError } from '../services/receipts.service';
+import { VOID_REASON_REQUIRED_MESSAGE } from './schemas';
 
 const KNOWN_STATUS_CODES = new Set([
   400, 401, 403, 404, 405, 409, 410, 422, 429, 500, 502, 503,
@@ -78,6 +80,37 @@ export function isPostgresForeignKeyViolation(
   if (!constraint) return true;
   const name = typeof e.constraint === 'string' ? e.constraint : '';
   return name.includes(constraint);
+}
+
+/**
+ * RD-163 business error: a `voided` decision must explain itself. Single
+ * definition for both services (the route schema is the first guard; this is
+ * the backstop for any other entry point), so the `code` the UIs resolve is
+ * built once — the same one the `zValidator` hook answers.
+ */
+export function voidReasonRequiredError(): HTTPException {
+  return new HTTPException(400, {
+    message: VOID_REASON_REQUIRED_MESSAGE,
+    res: new Response(
+      JSON.stringify({
+        error: VOID_REASON_REQUIRED_MESSAGE,
+        code: API_ERROR_CODES.VOID_REASON_REQUIRED,
+        fields: ['voidReason'],
+      }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
+}
+
+/**
+ * Resolves the operator's void reason or throws `400 VOID_REASON_REQUIRED`.
+ * Blank (absent, empty or padding) is never a reason: the server stores no
+ * invented default and seals the receipt with the operator's own text.
+ */
+export function requireVoidReasonOrThrow(rawVoidReason: string | undefined): string {
+  const reason = rawVoidReason?.trim();
+  if (!reason) throw voidReasonRequiredError();
+  return reason;
 }
 
 /**
