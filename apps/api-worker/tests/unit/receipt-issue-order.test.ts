@@ -2,17 +2,24 @@
  * Step-order freeze for the shared step-1 emission core (`receipt-issue.core`).
  *
  * `issueReceipt` owns the sequence both orchestrators used to duplicate:
- * load payment → validate → idempotency → fiscal work → anti-race re-read →
- * emitter snapshot → consume sequence → attach → release (lost race) →
- * enqueue render. These tests pin the order against faked repositories so a
- * future refactor cannot silently break the invariants:
+ * load payment → validate → idempotency → fiscal work → emitter snapshot →
+ * claim → capture payer → consume sequence → attach number → release (lost
+ * race) → enqueue render. These tests pin the order against faked repositories
+ * so a future refactor cannot silently break the invariants:
  *
  * - fiscal work (profile + taxes) and the frozen emitter snapshot run BEFORE
  *   consuming the sequence: a consumed number is never reused, so a failure
  *   there must not burn a correlative;
- * - `attach` always precedes `release`;
- * - an `attach` exception is NOT compensated (the number may be persisted);
- * - the queued event always carries the number `attach` persisted;
+ * - the payment is CLAIMED before the sequence: taxes + snapshot + actor live
+ *   in the claim, the number is attached to the claimed row;
+ * - `attachNumber` always precedes `release`;
+ * - an `attachNumber` exception is NOT compensated (the number may be persisted);
+ * - an attach that returns no number (the payment stopped being `validated`
+ *   between the claim and the attach) releases the local number, never queues
+ *   the render and fails with `409 NOT_VALIDATED`;
+ * - a lost claim never consumes a number: already numbered → idempotent result,
+ *   still claimed → `inProgress` (pending), never an error;
+ * - the queued event always carries the number `attachNumber` persisted;
  * - both real issuer profiles (panel / console) run the same core against
  *   faked repositories, preserving their current order.
  */
@@ -132,6 +139,10 @@ function orderHarness(
       calls.push('buildEmitterSnapshot');
       return EMITTER_SNAPSHOT;
     },
+    claim: async () => {
+      calls.push('claim');
+      return { claimed: true };
+    },
     nextNumber: async () => {
       calls.push('nextNumber');
       return { seq: 1, receiptNumber: '2026-000001', coherent: true };
@@ -140,8 +151,8 @@ function orderHarness(
       calls.push('releaseNumber');
       return { released: true };
     },
-    attach: async () => {
-      calls.push('attach');
+    attachNumber: async () => {
+      calls.push('attachNumber');
       return { receiptNumber: '2026-000001', receiptPdfKey: null };
     },
     buildRenderEvent: (paymentId, orgId, receiptNumber): ReceiptRenderEvent => {
@@ -175,7 +186,7 @@ function orderHarness(
 const INPUT = { orgId: 'org-1', paymentId: 7, timezone: 'America/Caracas' };
 
 describe('issueReceipt — step order (faked ports)', () => {
-  it('runs fiscal work before the sequence, attaches, then queues the render', async () => {
+  it('runs fiscal work before the sequence, claims, attaches the number, then queues the render', async () => {
     const { calls, profile, deps } = orderHarness();
 
     const result = await issueReceipt(profile, deps, INPUT);
@@ -190,14 +201,14 @@ describe('issueReceipt — step order (faked ports)', () => {
       'loadPayment',
       'resolveOrgId',
       'orgsRepo.findById',
-      // Fiscal work BEFORE consuming the sequence (critical order).
+      // Fiscal work BEFORE claiming/consuming the sequence (critical order).
       'resolveFiscal',
-      // Anti-race re-read BEFORE consuming the sequence.
-      'loadPayment',
-      // Frozen emitter identity BEFORE consuming the sequence.
+      // Frozen emitter identity BEFORE the claim/sequence.
       'buildEmitterSnapshot',
+      // The row is claimed BEFORE the sequence is consumed.
+      'claim',
       'nextNumber',
-      'attach',
+      'attachNumber',
       'buildRenderEvent',
       'queue.send',
     ]);
@@ -205,7 +216,7 @@ describe('issueReceipt — step order (faked ports)', () => {
     expect(calls).not.toContain('releaseNumber');
   });
 
-  it('a fiscal failure throws before the sequence is ever consumed', async () => {
+  it('a fiscal failure throws before the claim and the sequence', async () => {
     // Real fiscal failure mode: `resolveFiscalProfile` throws on an unknown
     // country (uncoded `Error`, no silent fallback).
     const { calls, profile, deps } = orderHarness(() => ({
@@ -218,8 +229,9 @@ describe('issueReceipt — step order (faked ports)', () => {
     await expect(issueReceipt(profile, deps, INPUT)).rejects.toThrow(
       /countryCode desconocido/,
     );
+    expect(calls).not.toContain('claim');
     expect(calls).not.toContain('nextNumber');
-    expect(calls).not.toContain('attach');
+    expect(calls).not.toContain('attachNumber');
     expect(calls).not.toContain('queue.send');
   });
 
@@ -252,10 +264,10 @@ describe('issueReceipt — step order (faked ports)', () => {
     expect(calls).toEqual(['resolveYear', 'loadPayment']);
   });
 
-  it('lost race: attach persists another number → release AFTER attach, event carries the persisted one', async () => {
+  it('lost race: attachNumber persists another number → release AFTER attach, event carries the persisted one', async () => {
     const { calls, profile, deps } = orderHarness(({ calls: log }) => ({
-      attach: async () => {
-        log.push('attach');
+      attachNumber: async () => {
+        log.push('attachNumber');
         return { receiptNumber: '2026-000009', receiptPdfKey: 'org-1/2026-000009.pdf' };
       },
     }));
@@ -272,12 +284,12 @@ describe('issueReceipt — step order (faked ports)', () => {
       pdfStatus: 'ready',
       skipped: false,
     });
-    const attachIndex = calls.indexOf('attach');
+    const attachIndex = calls.indexOf('attachNumber');
     const releaseIndex = calls.indexOf('releaseNumber');
     expect(attachIndex).toBeGreaterThan(-1);
     expect(releaseIndex).toBeGreaterThan(attachIndex);
     expect(calls.at(-1)).toBe('queue.send');
-    // The event carries the number `attach` persisted, never the local one.
+    // The event carries the number `attachNumber` persisted, never the local one.
     expect(sent).toEqual([
       {
         type: RECEIPT_RENDER_EVENT_TYPE,
@@ -287,6 +299,68 @@ describe('issueReceipt — step order (faked ports)', () => {
         receiptNumber: '2026-000009',
       },
     ]);
+  });
+
+  it('lost claim (no number yet) → inProgress pending, never a consumed number', async () => {
+    let reads = 0;
+    const { calls, profile, deps } = orderHarness(() => ({
+      claim: async () => {
+        calls.push('claim');
+        return { claimed: false };
+      },
+      // First read: unclaimed payment; second read (after the lost claim):
+      // the row is claimed by the concurrent emission.
+      loadPayment: async () => {
+        reads += 1;
+        calls.push('loadPayment');
+        return reads === 1
+          ? issuePayment()
+          : issuePayment({ receiptClaimAt: new Date('2026-01-01T00:00:00Z') });
+      },
+    }));
+
+    const result = await issueReceipt(profile, deps, INPUT);
+
+    expect(result).toEqual({
+      receiptNumber: null,
+      pdfStatus: 'pending',
+      skipped: false,
+      inProgress: true,
+    });
+    expect(calls).not.toContain('nextNumber');
+    expect(calls).not.toContain('attachNumber');
+    expect(calls).not.toContain('queue.send');
+  });
+
+  it('lost claim where the number is already persisted → idempotent result, render re-queued if PDF missing', async () => {
+    let reads = 0;
+    const { calls, profile, deps } = orderHarness(() => ({
+      claim: async () => {
+        calls.push('claim');
+        return { claimed: false };
+      },
+      loadPayment: async () => {
+        reads += 1;
+        calls.push('loadPayment');
+        return reads === 1
+          ? issuePayment()
+          : issuePayment({
+            receiptNumber: '2026-000042',
+            receiptClaimAt: new Date('2026-01-01T00:00:00Z'),
+          });
+      },
+    }));
+
+    const result = await issueReceipt(profile, deps, INPUT);
+
+    expect(result).toEqual({
+      receiptNumber: '2026-000042',
+      pdfStatus: 'pending',
+      skipped: false,
+    });
+    expect(calls).not.toContain('nextNumber');
+    expect(calls).not.toContain('attachNumber');
+    expect(calls.slice(-2)).toEqual(['buildRenderEvent', 'queue.send']);
   });
 
   it('incoherent number: releases the dangling number before throwing, no attach', async () => {
@@ -307,17 +381,38 @@ describe('issueReceipt — step order (faked ports)', () => {
       'resolveOrgId',
       'orgsRepo.findById',
       'resolveFiscal',
-      'loadPayment',
       'buildEmitterSnapshot',
+      'claim',
       'nextNumber',
       'releaseNumber',
     ]);
   });
 
-  it('attach exception is NOT compensated (the number may have been persisted)', async () => {
+  it('attachNumber returns no number (payment left `validated`) → release, no render, 409 NOT_VALIDATED', async () => {
     const { calls, profile, deps } = orderHarness(({ calls: log }) => ({
-      attach: async () => {
-        log.push('attach');
+      // The repository returns the (now voided) row unchanged: its WHERE
+      // requires `status = 'validated'`.
+      attachNumber: async () => {
+        log.push('attachNumber');
+        return { receiptNumber: null, receiptPdfKey: null };
+      },
+    }));
+
+    await expect(issueReceipt(profile, deps, INPUT)).rejects.toMatchObject({
+      code: 'NOT_VALIDATED',
+      status: 409,
+    });
+    // The local correlative is compensated AFTER the attach confirmed that
+    // nothing was persisted; the render is never enqueued.
+    expect(calls.slice(-2)).toEqual(['attachNumber', 'releaseNumber']);
+    expect(calls).not.toContain('queue.send');
+    expect(calls).not.toContain('buildRenderEvent');
+  });
+
+  it('attachNumber exception is NOT compensated (the number may have been persisted)', async () => {
+    const { calls, profile, deps } = orderHarness(({ calls: log }) => ({
+      attachNumber: async () => {
+        log.push('attachNumber');
         throw new Error('response lost after commit');
       },
     }));
@@ -348,8 +443,12 @@ function panelIssuerRepos(order: string[], payment: ReceiptIssuePayment): PanelI
         order.push('receipts.releaseLastNumber');
         return { released: true };
       },
-      attachReceipt: async (_paymentId, _orgId, input) => {
-        order.push('receipts.attachReceipt');
+      claimReceipt: async () => {
+        order.push('receipts.claimReceipt');
+        return { claimed: true };
+      },
+      attachReceiptNumber: async (_paymentId, _orgId, input) => {
+        order.push('receipts.attachReceiptNumber');
         return { receiptNumber: input.receiptNumber, receiptPdfKey: null };
       },
     },
@@ -374,8 +473,12 @@ function platformIssuerRepos(order: string[], payment: ReceiptIssuePayment): Pla
         order.push('platformReceipts.releaseLastPlatformNumber');
         return { released: true };
       },
-      attachPlatformReceipt: async (_paymentId, input) => {
-        order.push('platformReceipts.attachPlatformReceipt');
+      claimPlatformReceipt: async () => {
+        order.push('platformReceipts.claimPlatformReceipt');
+        return { claimed: true };
+      },
+      attachPlatformReceiptNumber: async (_paymentId, input) => {
+        order.push('platformReceipts.attachPlatformReceiptNumber');
         return { receiptNumber: input.receiptNumber, receiptPdfKey: null };
       },
       setPlatformPayerIfMissing: async () => {
@@ -392,13 +495,20 @@ function platformIssuerRepos(order: string[], payment: ReceiptIssuePayment): Pla
 }
 
 describe('issuer profiles — real strategies against faked repositories', () => {
-  it('panel: org lookup, sequence and attach in the current order; attach carries the fiscal work', async () => {
+  it('panel: org lookup, claim then sequence and attach; the claim carries the fiscal work', async () => {
     const order: string[] = [];
     const repos = panelIssuerRepos(order, issuePayment());
-    type AttachArg = Parameters<PanelIssuerRepos['receiptsRepo']['attachReceipt']>[2];
+    type ClaimArg = Parameters<PanelIssuerRepos['receiptsRepo']['claimReceipt']>[2];
+    type AttachArg = Parameters<PanelIssuerRepos['receiptsRepo']['attachReceiptNumber']>[2];
+    let claimPayload: ClaimArg | null = null;
     let attachPayload: AttachArg | null = null;
-    const originalAttach = repos.receiptsRepo.attachReceipt;
-    repos.receiptsRepo.attachReceipt = async (paymentId, orgId, input) => {
+    const originalClaim = repos.receiptsRepo.claimReceipt;
+    repos.receiptsRepo.claimReceipt = async (paymentId, orgId, input) => {
+      claimPayload = input;
+      return originalClaim(paymentId, orgId, input);
+    };
+    const originalAttach = repos.receiptsRepo.attachReceiptNumber;
+    repos.receiptsRepo.attachReceiptNumber = async (paymentId, orgId, input) => {
       attachPayload = input;
       return originalAttach(paymentId, orgId, input);
     };
@@ -430,25 +540,28 @@ describe('issuer profiles — real strategies against faked repositories', () =>
     expect(order).toEqual([
       'payments.findById',
       'orgs.findById',
-      // Anti-race re-read before consuming the sequence.
-      'payments.findById',
+      'receipts.claimReceipt',
       'receipts.nextDocumentNumber',
-      'receipts.attachReceipt',
+      'receipts.attachReceiptNumber',
       'queue.send',
     ]);
-    // Fiscal work happened before `attach`: the payload carries it.
-    expect(attachPayload).toMatchObject({
-      receiptNumber: '2026-000001',
-      documentType: 'receipt',
+    // Fiscal work happened before the claim: the claim payload carries it.
+    expect(claimPayload).toMatchObject({
       subtotal: 1000,
       taxTotal: 0,
       taxDetails: [],
       issuedBy: 'user-1',
     });
-    expect(attachPayload?.['emitterSnapshot']).toMatchObject({ version: 1 });
+    expect(claimPayload?.['emitterSnapshot']).toMatchObject({ version: 1 });
+    // The attach persists ONLY the number: taxes/snapshot live in the claim.
+    expect(attachPayload).toMatchObject({
+      receiptNumber: '2026-000001',
+      documentType: 'receipt',
+    });
+    expect(attachPayload).not.toHaveProperty('subtotal');
   });
 
-  it('console: settings read BEFORE the sequence, payer captured, platform scope', async () => {
+  it('console: settings read BEFORE the claim, payer captured, platform scope', async () => {
     const order: string[] = [];
     const payment = issuePayment({ organizationId: 'org-2', amountPaid: 2500 });
     const profile = createPlatformIssuerProfile(platformIssuerRepos(order, payment));
@@ -481,12 +594,12 @@ describe('issuer profiles — real strategies against faked repositories', () =>
     expect(order).toEqual([
       'platformSubs.findPaymentById',
       'orgs.findById',
-      'platformSubs.findPaymentById',
-      // Frozen emitter identity (settings) BEFORE consuming the sequence.
+      // Frozen emitter identity (settings) BEFORE the claim/sequence.
       'platformSettings.getAll',
-      'platformReceipts.nextPlatformDocumentNumber',
+      'platformReceipts.claimPlatformReceipt',
       'platformReceipts.setPlatformPayerIfMissing',
-      'platformReceipts.attachPlatformReceipt',
+      'platformReceipts.nextPlatformDocumentNumber',
+      'platformReceipts.attachPlatformReceiptNumber',
       'queue.send',
     ]);
   });
@@ -520,8 +633,8 @@ describe('issuer profiles — real strategies against faked repositories', () =>
     const order: string[] = [];
     const payment = issuePayment({ organizationId: 'org-2', amountPaid: 2500 });
     const repos = platformIssuerRepos(order, payment);
-    repos.platformReceiptsRepo.attachPlatformReceipt = async () => {
-      order.push('platformReceipts.attachPlatformReceipt');
+    repos.platformReceiptsRepo.attachPlatformReceiptNumber = async () => {
+      order.push('platformReceipts.attachPlatformReceiptNumber');
       return { receiptNumber: 'FS-0000007', receiptPdfKey: null };
     };
     const profile = createPlatformIssuerProfile(repos);
@@ -548,7 +661,7 @@ describe('issuer profiles — real strategies against faked repositories', () =>
       pdfStatus: 'pending',
       skipped: false,
     });
-    const attachIndex = order.indexOf('platformReceipts.attachPlatformReceipt');
+    const attachIndex = order.indexOf('platformReceipts.attachPlatformReceiptNumber');
     const releaseIndex = order.indexOf('platformReceipts.releaseLastPlatformNumber');
     expect(attachIndex).toBeGreaterThan(-1);
     expect(releaseIndex).toBeGreaterThan(attachIndex);

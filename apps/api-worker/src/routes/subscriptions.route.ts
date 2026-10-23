@@ -9,6 +9,8 @@ import { createPlansRepository } from '../repositories/plans.repository';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createSubscriptionsService } from '../services/subscriptions.service';
 import { createReceiptsService } from '../services/receipts.service';
+import { createSettingsRepository } from '../repositories/settings.repository';
+import { createExchangeRateProvider, exchangeRateErrorResponse } from '../lib/exchange-rates';
 import { createCache, type Cache } from '../lib/cache';
 import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
@@ -39,10 +41,11 @@ const createSubSchema = z.object({
   endDate: z.string().optional(),
   endDateOverrideReason: z.string().optional(),
   payment: z.object({
-    // All money in integer cents (Money convention, see AGENTS.md).
-    amountPaid: z.number().int().positive(),
+    // RD-158: `amountPaid` and `exchangeRateApplied` are NOT in the contract.
+    // The server prices the payment from the plan and the provider rate, so a
+    // client-supplied amount is ignored instead of persisted. All money is in
+    // integer cents (Money convention, see AGENTS.md).
     currencyPaid: z.string(),
-    exchangeRateApplied: z.string().nullable().optional(),
     paymentMethod: paymentMethodSchema,
     paymentMethodDetails: paymentMethodDetailsSchema,
     // RD-113: creation only accepts `processing`/`validated` (an omitted status
@@ -111,16 +114,33 @@ export const subscriptionRoutes = new Hono<AppEnv>()
     const subsRepo = createSubscriptionsRepository(db);
     const paymentsRepo = createPaymentsRepository(db);
     const plansRepo = createPlansRepository(db);
-    const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
+    // RD-158: the service prices the payment itself — it needs the provider and
+    // the org's `active_currencies`, never a client-stated amount/rate.
+    const subsService = createSubscriptionsService(
+      subsRepo,
+      paymentsRepo,
+      plansRepo,
+      createMembersRepository(db),
+      {
+        rateProvider: createExchangeRateProvider(c.env),
+        settingsRepo: createSettingsRepository(db),
+      },
+    );
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE);
 
     let newSub;
     try {
-      newSub = await subsService.create(orgId, payload as any, timezone, {
+      newSub = await subsService.create(orgId, payload, timezone, {
         receipts: receiptsService,
         // Session actor emitting receipt (recorded in `issued_by`).
         by: c.get('user')?.id,
       });
+    } catch (err) {
+      // Rate failures are typed (`lib/exchange-rates.ts`): mapped by class
+      // (503/400), never by message text and never a generic 500.
+      const rateFailure = exchangeRateErrorResponse(err);
+      if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
+      throw err;
     } finally {
       // On a compensated failure the service re-throws after mutating (payment
       // voided / orphan cancelled): the cache is invalidated either way.

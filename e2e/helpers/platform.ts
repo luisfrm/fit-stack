@@ -198,7 +198,7 @@ export async function ensureSuiteTenant(
   };
 }
 
-// ── SaaS platform: plan + trial subscription for the org ─────────────────────
+// ── SaaS platform: free plan + subscription for the org ──────────────────────
 
 /**
  * Ensures the platform plan used by the tests.
@@ -232,12 +232,16 @@ export async function ensurePlatformPlan(cookies: string): Promise<number> {
 }
 
 /**
- * Platform plan + TRIAL subscription for an organization.
+ * Platform free plan + subscription for an organization.
  *
  * Why it exists: without a platform subscription the resolved features are the
  * default catalog ones (only `panel`), so the CMS stays blocked and the
  * tests silently depended on the free tier configuration of the environment.
  * This makes the test tenant self-sufficient and deterministic.
+ *
+ * It is a FREE plan (price 0), never a trial: trials are rejected with
+ * `400 TRIAL_NOT_AVAILABLE`. The free path books a validated `$0` payment with
+ * `payment_method = 'free'`, so it grants service without inventing revenue.
  */
 export async function seedPlatformSubscription(
   cookies: string,
@@ -250,11 +254,11 @@ export async function seedPlatformSubscription(
     body: {
       organizationId,
       planId,
-      isTrial: true,
+      isTrial: false,
       payment: {
-        amountPaidCents: 0,
+        amountPaid: 0,
         currencyPaid: TEST_PLATFORM_PLAN.currency,
-        paymentMethod: 'cash',
+        paymentMethod: 'free',
         paymentMethodDetails: [],
         status: 'validated',
         paymentDate: todayIso(TEST_ORG.timezone),

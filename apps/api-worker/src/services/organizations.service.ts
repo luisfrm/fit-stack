@@ -45,11 +45,12 @@ const unsupportedCurrencyError = (currency: string) => {
 /**
  * Explicit 400: the organization has no valid `active_currencies` row. The
  * list is the authority for which currencies the org may charge in, so an
- * absent/malformed value can never be guessed (no fallback).
+ * absent/malformed value can never be guessed (no fallback). Shared by the
+ * primary-currency update and by subscription pricing (`RD-158`).
  */
-const activeCurrenciesNotConfiguredError = () => {
+export const activeCurrenciesNotConfiguredError = () => {
   const message =
-    'La organización no tiene monedas activas válidas configuradas; define las monedas activas antes de cambiar la moneda principal.';
+    'La organización no tiene monedas activas válidas configuradas; define las monedas activas de la organización.';
   return new HTTPException(400, {
     message,
     res: new Response(

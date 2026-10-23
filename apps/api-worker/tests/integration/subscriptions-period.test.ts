@@ -52,7 +52,7 @@ describe.skipIf(skipReason !== null)('Subscriptions period', () => {
 
   function payment(extra: Record<string, unknown> = {}) {
     return {
-      amountPaid: AMOUNT_CENTS,
+      // RD-158: no `amountPaid` — the server prices the payment from the plan.
       currencyPaid: 'USD',
       paymentMethod: 'cash',
       paymentMethodDetails: [],

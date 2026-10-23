@@ -144,6 +144,7 @@ test.describe('Panel — Comprobante de pago', () => {
     expect(found?.paymentId).toBeDefined();
     await panelApi.patch(`/api/payments/${found!.paymentId}/status`, {
       status: 'voided',
+      voidReason: 'Anulación del fixture E2E',
     });
 
     await page.goto(`/payments?search=${encodeURIComponent(lastName)}`, {

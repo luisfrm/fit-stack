@@ -12,7 +12,6 @@ import {
 import { uploadService } from "@/lib/services/upload-service";
 import { membersService } from "@/lib/services/members-service";
 import { plansService } from "@/lib/services/plans-service";
-import { settingsService } from "@/lib/services/settings-service";
 import { getExchangeRateSnapshot } from "@/lib/api/exchange-rates";
 import {
   Input,
@@ -25,16 +24,15 @@ import {
 import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import {
   parseDateAsConfigTimezone,
-  exchangeRateAppliedValue,
   paymentConversionView,
   type ExchangeRateLoadStatus,
   type ExchangeRateSnapshot,
   apiCode,
   centsToUnits,
-  unitsToCents,
   previewReceiptTaxes,
   resolveFiscalProfile,
   computeSubscriptionPeriod,
+  roundCents,
   ORG_ROLES,
 } from "@workspace/shared";
 import { addDuration, toLocalDayString } from "@workspace/shared/date";
@@ -52,9 +50,7 @@ interface SubscriptionSubmitData extends Omit<ISubscription, "id" | "memberName"
   endDate?: string;
   endDateOverrideReason?: string;
   payment: {
-    amountPaid: number;
     currencyPaid: string;
-    exchangeRateApplied?: string;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetails;
     status?: string;
@@ -218,16 +214,11 @@ function SubscriptionFormContent({
   const [rateSnapshot, setRateSnapshot] = React.useState<ExchangeRateSnapshot | null>(null);
   const [rateStatus, setRateStatus] = React.useState<ExchangeRateLoadStatus>('idle');
   const [rateReloadToken, setRateReloadToken] = React.useState(0);
-  const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState<string>('');
   const [paymentDetails, setPaymentDetails] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<Record<string, any>>({});
-  const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
-
-  // Input Focus States for "Veil" effect
-  const [amountFocus, setAmountFocus] = React.useState(false);
 
   const currencyFormat = orgConfig.currencyFormat;
 
@@ -304,7 +295,6 @@ function SubscriptionFormContent({
   // Initialization
   React.useEffect(() => {
     plansService.getAll().then(setPlans);
-    settingsService.getByKey('allow_price_override').then(v => setAllowPriceOverride(v === 'true'));
   }, []);
 
   // Dynamic Lists from Settings
@@ -348,40 +338,24 @@ function SubscriptionFormContent({
     }
   }, [activeOrganization]);
 
-  // Breakdown preview using the single shared source of truth (the same
-  // function the backend uses at emission time). Nothing is editable here:
-  // rates come from `COUNTRIES`, never from the operator.
-  const taxPreview = React.useMemo(() => {
-    if (!fiscalProfile) return null;
-    try {
-      const auto = previewReceiptTaxes(unitsToCents(finalAmount), fiscalProfile, paymentCurrency);
-      return { ...auto, lines: auto.taxDetails };
-    } catch {
-      return null;
-    }
-  }, [fiscalProfile, finalAmount, paymentCurrency]);
-
   // Exchange rate and converted amount. The rate is READ-ONLY and comes from
   // the exchange-rates API: it is never editable here.
   React.useEffect(() => {
     if (!selectedPlan) {
       setRateSnapshot(null);
       setRateStatus('idle');
-      setFinalAmount(0);
       return;
     }
 
     if (paymentCurrency === selectedPlan.currency) {
       setRateSnapshot(null);
       setRateStatus('ready');
-      setFinalAmount(centsToUnits(selectedPlan.price));
       return;
     }
 
     let cancelled = false;
     setRateSnapshot(null);
     setRateStatus('loading');
-    setFinalAmount(0);
 
     getExchangeRateSnapshot(selectedPlan.currency)
       .then((snapshot) => {
@@ -396,7 +370,6 @@ function SubscriptionFormContent({
           return;
         }
         setRateStatus('ready');
-        setFinalAmount(centsToUnits(selectedPlan.price * rate));
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -419,6 +392,34 @@ function SubscriptionFormContent({
       ),
     [selectedPlan, paymentCurrency, rateSnapshot, rateStatus],
   );
+
+  // RD-158: the amount is server-authoritative — `roundCents(plan price ×
+  // provider rate)`, exactly what `POST /api/subscriptions` will persist. The
+  // cashier cannot type it (`allow_price_override` no longer grants a
+  // client-side amount), so the read-only preview and the tax breakdown both
+  // read this derived value.
+  const amountPreviewCents = React.useMemo(() => {
+    if (!selectedPlan || conversion.rate === null) return 0;
+    return roundCents(selectedPlan.price * conversion.rate);
+  }, [selectedPlan, conversion.rate]);
+
+  const amountPreview = React.useMemo(
+    () => centsToUnits(amountPreviewCents),
+    [amountPreviewCents],
+  );
+
+  // Breakdown preview using the single shared source of truth (the same
+  // function the backend uses at emission time). It reads the server-derived
+  // amount, never an operator-typed one: rates come from `COUNTRIES`.
+  const taxPreview = React.useMemo(() => {
+    if (!fiscalProfile) return null;
+    try {
+      const auto = previewReceiptTaxes(amountPreviewCents, fiscalProfile, paymentCurrency);
+      return { ...auto, lines: auto.taxDetails };
+    } catch {
+      return null;
+    }
+  }, [fiscalProfile, amountPreviewCents, paymentCurrency]);
 
   // Dynamically search members
   React.useEffect(() => {
@@ -515,9 +516,9 @@ function SubscriptionFormContent({
       planId: planId!,
       startDate,
       payment: {
-        amountPaid: unitsToCents(finalAmount),
+        // RD-158: the server prices the payment (plan price + provider rate);
+        // only the chosen currency travels. `amountPreview` is display-only.
         currencyPaid: paymentCurrency,
-        exchangeRateApplied: exchangeRateAppliedValue(conversion),
         paymentMethod,
         paymentMethodDetails: finalPaymentMethodDetails,
         status: paymentValidated ? "validated" : "processing",
@@ -671,7 +672,7 @@ function SubscriptionFormContent({
           paymentMethodId={paymentMethodId}
           activeCurrencies={activeCurrencies}
           activePaymentMethods={filteredPaymentMethods}
-          finalAmount={finalAmount}
+          finalAmount={amountPreview}
           currencyFormat={currencyFormat}
           selectedPaymentConfig={selectedPaymentConfig}
           dynamicFieldValues={dynamicFieldValues}
@@ -679,9 +680,6 @@ function SubscriptionFormContent({
           conversion={conversion}
           rateStatus={rateStatus}
           onRetryRate={() => setRateReloadToken((value) => value + 1)}
-          amountFocus={amountFocus}
-          onAmountFocus={setAmountFocus}
-          onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
@@ -691,7 +689,6 @@ function SubscriptionFormContent({
             setPaymentMethodId(v);
             setDynamicFieldValues({});
           }}
-          allowPriceOverride={allowPriceOverride}
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
           disabled={isSectionDisabled}

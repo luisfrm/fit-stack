@@ -169,7 +169,7 @@ export const UUID_PATTERN =
 
 /**
  * Forbidden placeholder in a visible field: if the data does not exist,
- * the line is OMITTED (FACTURATION.md §3: "omit line if missing, do not invent").
+ * the line is OMITTED (fiscal-documents.md §7: "omit line if missing, do not invent").
  */
 export const MISSING_VALUE_PLACEHOLDER = '---';
 

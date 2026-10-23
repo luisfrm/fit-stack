@@ -56,8 +56,6 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
     durationValue: initialData?.durationValue?.toString() || "1",
     durationUnit: initialData?.durationUnit || "month",
     isActive: initialData?.isActive ?? true,
-    isTrial: (initialData as { trialDays?: number })?.trialDays ? (initialData as { trialDays?: number }).trialDays! > 0 : false,
-    trialDays: ((initialData as { trialDays?: number })?.trialDays ?? 14).toString(),
     features: resolveFeatures(initialData?.features as PlanFeaturesV2 | null | undefined),
   });
 
@@ -94,7 +92,8 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
       durationValue: Number.parseInt(formData.durationValue, 10) || 1,
       durationUnit: formData.durationUnit,
       isActive: formData.isActive,
-      trialDays: formData.isTrial ? Math.max(1, Number.parseInt(formData.trialDays, 10) || 14) : 0,
+      // Trials are discontinued (RD-117): plans never carry trial days.
+      trialDays: 0,
       features: formData.features,
     };
 
@@ -198,51 +197,7 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
           </button>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Checkbox
-            id="isTrial"
-            checked={formData.isTrial}
-            onCheckedChange={(val) => setFormData(p => ({ ...p, isTrial: val === true }))}
-            className="mt-0.5"
-          />
-          <button
-            type="button"
-            onClick={() => setFormData(p => ({ ...p, isTrial: !p.isTrial }))}
-            className="min-w-0 flex-1 cursor-pointer select-none rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
-          >
-            <span className="block text-[13px] font-semibold text-foreground">
-              Período de prueba (trial)
-            </span>
-            <span className="block text-xs text-foreground-muted">
-              {formData.isTrial
-                ? `Inicia con ${formData.trialDays} días de trial sin cobro (trialDays).`
-                : "Los primeros días no se cobran al inicio de la suscripción."}
-            </span>
-          </button>
-        </div>
       </div>
-
-      {formData.isTrial && (
-        <div className="flex items-end gap-3 pl-1 animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="w-32">
-            <Input
-              label="Días de trial"
-              type="number"
-              min="1"
-              max="90"
-              value={formData.trialDays}
-              onChange={(e) => {
-                const processed = cleanNumericInput(formData.trialDays, e.target.value);
-                setFormData(p => ({ ...p, trialDays: processed }));
-              }}
-              placeholder="14"
-            />
-          </div>
-          <Text size="xs" variant="muted" className="pb-2.5">
-            Propiedad trialDays · 0 = sin trial · recomendado 7–14
-          </Text>
-        </div>
-      )}
 
       <div className="h-px bg-border-muted my-1" />
 

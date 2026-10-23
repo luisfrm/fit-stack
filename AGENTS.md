@@ -35,7 +35,7 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 
 - **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
 - **Packages**: `auth` (sessions + shared HTTP client + org/platform hooks), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
-- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `how/`). Backlog/pending work lives in Linear (project «Fit Stack»).
+- **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `knowledge-base-rag/`, the RAG chat corpus written for gym owners). Backlog/pending work lives in Linear (project «Fit Stack»); product roadmap in [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Project Context (Business Overview)
 
@@ -49,7 +49,7 @@ Multi-tenant SaaS for the Gym/Fitness industry (Latin America): multi-currency b
 
 ### 5. Business Rules Summary
 
-1. **Multi-currency** (base USD default, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** (note: `FS-0000001` is the SaaS receipt number format via `formatConsoleReceiptNumber`) → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
+1. **Multi-currency** (`primaryCurrency` derived from the organization's country at creation, pays in any active local currency via real-time rates). 2) **Atomic Invoicing** (subscription + payment created as one unit). 3) **Strict Isolation** (scoped to `activeOrganizationId`; the panel never uses `|| "global"`). 4–7) **Cumulative Expiration · Grace Period · Immutable financial record · Unique org slug** (note: `FS-0000001` is the SaaS receipt number format via `formatConsoleReceiptNumber`) → [`vaults/business/subscription-rules.md`](vaults/business/subscription-rules.md).
 
 ## Project Rules (Technical Standards)
 
@@ -63,7 +63,7 @@ All components from `@workspace/ui`, predefined variants (no ad-hoc Tailwind wit
 
 ### 3. Database Integrity & ORM
 
-Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`).
+Drizzle only, from `@workspace/database`; tables **singular**, repos/services **plural**. **Workflow** `generate → review → migrate`: `db:generate` free; `db:migrate` **requires approval** (CI applies on merge); `db:push` **local-prototype only** (forbidden on shared branches); **seeding requires approval**. **No `pgEnum`** — plain `text('col')` (no `.$type<…>()`), values validated only by Zod; run `pnpm db:check` before pushing. **No interactive transactions** (Neon HTTP): atomicity = a **single statement** (`INSERT … ON CONFLICT DO UPDATE … RETURNING`) or **explicit compensation** — never wrap writes in a transaction nor assume rollback. **Compensation**: decide **by re-read, never by error type**; unresolved → fail-closed; orphan → **`cancel()` never `delete()`**; a `voided` payment can't be re-validated (`409`). **Sites**: gym `create()` and gym `PATCH /api/payments/:id/status` (`updatePaymentStatus`) plus the 4 SaaS flows; the gym PATCH passes only `readPayment`/`voidPayment` — **no `revertEffect`** (it never extends the period) and **no `cancelParent`** (the void alone derives ANULADA).
 
 ### 4. Next.js Patterns & Best Practices
 
@@ -88,11 +88,11 @@ Centralized middleware — never write auth/error boilerplate manually.
 
 Console entry is `console.access`; reads use their own module (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) and mutations use `console:manage` (settings, branding and knowledge use `setting:write`). `support` is read-only.
 
-Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`, `400 DOCUMENT_TYPE_INVALID`, `409 SUBSCRIPTION_HAS_PAYMENTS`); toasts resolve by **code**, never text. Typed domain failures map through one mapper by **class**, never message (`exchangeRateErrorResponse` → `503 EXCHANGE_RATE_UNAVAILABLE`).
+Body via `zValidator('json', schema)`. Global `onError` → `{ error, details? }`; an `HTTPException` with `err.res` is returned **as-is** (business codes: `409 SLUG_TAKEN`, `403 FEATURE_NOT_AVAILABLE`, `400 DOCUMENT_TYPE_INVALID`, `409 SUBSCRIPTION_HAS_PAYMENTS`, `400 VOID_REASON_REQUIRED`); toasts resolve by **code**, never text. Typed domain failures map through one mapper by **class**, never message (`exchangeRateErrorResponse` → `503 EXCHANGE_RATE_UNAVAILABLE`).
 
 ### 7. Error Handling & Mutations
 
-No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text.
+No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error`. Toasts **NEVER** show raw API messages: use `mutationError(scope, err, "<generic>")` + `toast.error`; UX-meaningful exceptions map the **error code** (`err.data?.code`), never text. Route-level cache invalidation goes in a `try/finally` around the service call, so a compensating service that re-throws (e.g. `PATCH /api/payments/:id/status`, RD-155) still drops stale keys while the error propagates unchanged.
 
 ### 8. HTTP Client (ofetch — NOT native `fetch`)
 
@@ -100,7 +100,7 @@ No silent errors; every mutation uses `try/catch` + `toast.success`/`toast.error
 
 ### 9. Date & Timezone Handling
 
-SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.DateTimeFormat`, `toISOString().slice(0,10)`, etc.). tz ALWAYS from the **session** (`activeOrganization.timezone`), never a client param. **Timezone is REQUIRED** — no `?? 'America/Caracas'` (`requireOrgTimezone()`; services take `timezone` without default; column `notNull`). Aggregation by local day in **SQL** (`AT TIME ZONE`). SaaS billing in **UTC**. → [`vaults/business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md).
+SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.DateTimeFormat`, `toISOString().slice(0,10)`, etc.). tz ALWAYS from the **session** (`activeOrganization.timezone`), never a client param. **Timezone is REQUIRED** — no `?? 'America/Caracas'` (`requireOrgTimezone()`; services take `timezone` without default; column `notNull`). Aggregation by local day in **SQL** (`AT TIME ZONE`). SaaS billing in **UTC**. → [`vaults/guides/timezone-management.md`](vaults/guides/timezone-management.md).
 
 ### 10. Explicit Configuration Without Silent Fallbacks
 
@@ -110,18 +110,25 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ### 11. Money Convention (integer cents)
 
-ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate. Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
+ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate persisted as `numeric(20,10)` (RD-157 — a 4-decimal column rounded `0.00025` to `0.0003`). Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
+
+The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override but never accepts a client-stated base amount: the booked base is the plan price frozen in `plan_snapshot_price` (`price_override` and `base_amount` were dropped in migration `0028`).
+
+**Persisted base amount, never a division** (RD-157): the base-currency equivalent of a payment is the frozen `plan_snapshot_price`, in Panel **and** Console (there is no second column). Reports (`payments.repository.ts`) and receipts (`toBaseTotal`) use it; `amountPaid / exchangeRateApplied` survives only as the fallback for historical rows without it.
+
+**No trials** (RD-117): `POST /api/platform/subscriptions` and its org-scoped mirror answer **`400 TRIAL_NOT_AVAILABLE`** for `isTrial: true` **before any write**; a `price = 0` plan keeps the `free` path (`plan_snapshot_price = 0`, never burns an `FS-N`), and migration `0029` zeroes `plan_snapshot_price` for historical `payment_method = 'trial'` rows so they stop inflating revenue. Future discounts are coupons, never a resurrected `price_override`.
 
 ## Where to read more
 
 | When you touch … | Read (key invariant) |
 | --- | --- |
 | Receipts / numbering / ANULADO / fiscal gating | [`business/receipts.md`](vaults/business/receipts.md) — never fiscal invoices; validated ⇔ numbered; ANULADO sealed; never delete (void ≠ cancel) |
+| Receipt engine internals / sweep / release | [`guides/receipt-engine.md`](vaults/guides/receipt-engine.md) — claim-then-number, two steps, 5 sweep states; [`guides/release-checklist.md`](vaults/guides/release-checklist.md) |
 | SaaS billing / grace / renewal | [`business/platform-billing.md`](vaults/business/platform-billing.md) — status computed in SQL (not stored); `voided` ignored in Console; free-tier gate else `/no-subscription` |
 | Feature flags / free tier / AI credits | [`business/features-and-free-tier.md`](vaults/business/features-and-free-tier.md) — new features `defaultEnabled:false`; downgrade = hide; `403 FEATURE_NOT_AVAILABLE`/`FEATURE_LIMIT_REACHED`; `429 AI_QUOTA_EXCEEDED` |
 | Roles / permissions / anti-escalation | [`business/rbac.md`](vaults/business/rbac.md) — never trust client checks; all queries filter `organizationId`; no platform-admin bypass in CMS; uploads = two routes, one authority |
 | Subscription rules / compensation | [`business/subscription-rules.md`](vaults/business/subscription-rules.md) |
-| Timezone deep dive | [`business/TIMEZONE_MANAGEMENT.md`](vaults/business/TIMEZONE_MANAGEMENT.md) |
+| Timezone deep dive | [`guides/timezone-management.md`](vaults/guides/timezone-management.md) — tz from the session, `@workspace/shared/date`, SQL `AT TIME ZONE`, AI quotas in UTC |
 | API routes / CORS | [`architecture/api-routes.md`](vaults/architecture/api-routes.md) — `/api/subscriptions` has no DELETE (immutable financial record) |
 | Cache keys / TTLs | [`architecture/cache.md`](vaults/architecture/cache.md) — Redis down never blocks; invalidate on-write |
 | Emails / PDF / queues / sweep | [`architecture/jobs.md`](vaults/architecture/jobs.md) — never sync email/PDF; api-worker never depends on `pdf-lib`; the `FitTaskEvent` contract lives in `@workspace/shared` (`queues/fit-task-events.ts`): validated builders at every send site + `isFitTaskEvent` guard, unknown → ack + error log, never retry |
@@ -135,7 +142,7 @@ ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/see
 | Testing | [`guides/testing.md`](vaults/guides/testing.md) — unit+integration and E2E are separate layers |
 | Pending work / backlog | Linear — project «Fit Stack» (the former `vaults/backlog/` was migrated there) |
 | Technical standards (full detail) | [`architecture/technical-standards.md`](vaults/architecture/technical-standards.md) |
-| Infra & deploy | [`architecture/INFRASTRUCTURE.md`](vaults/architecture/INFRASTRUCTURE.md), [`terraform.md`](vaults/architecture/terraform.md) |
+| Infra & deploy | [`architecture/infrastructure.md`](vaults/architecture/infrastructure.md), [`terraform.md`](vaults/architecture/terraform.md) |
 
 ## Important Constraints
 
@@ -157,11 +164,11 @@ Use the `skill` tool: `postgresql-table-design`, `neon-postgres`, `neon-drizzle`
 - `apps/api-worker/src/{index.ts,lib/auth.ts,lib/route-handler.ts,lib/cache.ts,lib/cors.ts,lib/env.ts}` · `apps/jobs-worker/src/index.ts`
 - `packages/auth/src/` · `packages/ui/src/components/{modal.tsx,safe-image.tsx,next/image.tsx}`
 - `playwright.config.ts` · `e2e/{panel-setup.ts,console-setup.ts}`
-- `vaults/architecture/ARCHITECTURE.md` (architecture spec) · pending work: Linear (project «Fit Stack»)
+- `vaults/architecture/architecture.md` (architecture spec) · pending work: Linear (project «Fit Stack»)
 
 ## Infrastructure & Deployment
 
-> Source in `vaults/architecture/ARCHITECTURE.md` §7; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
+> Source in `vaults/architecture/architecture.md` §7; infra in `vaults/architecture/terraform.md` (Workers, R2, Queues) managed with Terraform + GitHub Actions. **Never use `wrangler` manually.**
 
 
 ## NOTES:

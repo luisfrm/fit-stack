@@ -5,7 +5,6 @@ import { formatCents, type CurrencyFormat } from "@workspace/shared";
 
 interface PriceCellProps {
   readonly isTrial: boolean;
-  readonly priceOverride?: number | null;
   readonly planPrice?: number;
   readonly planCurrency?: string | null;
   readonly currencyFormat: CurrencyFormat;
@@ -13,7 +12,6 @@ interface PriceCellProps {
 
 export function PriceCell({
   isTrial,
-  priceOverride,
   planPrice,
   planCurrency,
   currencyFormat,
@@ -34,32 +32,6 @@ export function PriceCell({
       <Text weight="bold" size="sm">
         —
       </Text>
-    );
-  }
-
-  if (priceOverride !== null && priceOverride !== undefined) {
-    const baseText =
-      planPrice !== undefined
-        ? formatAmount(planPrice, currency, currencyFormat)
-        : "";
-    const showBase = planPrice !== undefined && priceOverride !== planPrice;
-
-    return (
-      <div className="flex flex-col gap-0.5">
-        <Text weight="bold" size="sm" className="text-primary">
-          {formatAmount(priceOverride, currency, currencyFormat)}
-        </Text>
-        {showBase && (
-          <Text
-            size="xs"
-            variant="muted"
-            className="opacity-50 italic"
-            title={`Precio base: ${baseText}`}
-          >
-            Base: {baseText}
-          </Text>
-        )}
-      </div>
     );
   }
 

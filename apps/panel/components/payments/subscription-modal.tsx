@@ -74,6 +74,19 @@ export function SubscriptionModal({ trigger, onSuccess, initialMember, open, onO
         throw error;
       } else if (code === "END_DATE_BEFORE_START") {
         toast.error("La fecha final no puede ser anterior a la de inicio");
+      } else if (code === "PAYMENT_CURRENCY_NOT_ACTIVE") {
+        // RD-158: the server prices the payment and rejects a currency that is
+        // no longer active — the operator's list is stale, not the amount.
+        toast.error("La moneda de pago ya no está activa en la organización. Recarga la página.");
+      } else if (code === "ACTIVE_CURRENCIES_NOT_CONFIGURED") {
+        toast.error("La organización no tiene monedas activas configuradas. Configúralas antes de cobrar.");
+      } else if (code === "EXCHANGE_RATE_UNAVAILABLE") {
+        // RD-158: the pricing call failed at the provider — the 503 is a
+        // temporary outage, not a rejected payment (same mapping as the
+        // self-service renewal modal).
+        toast.error("El servicio de tasas de cambio no está disponible. Intenta de nuevo en unos minutos.");
+      } else if (code === "PAYMENT_CURRENCY_UNSUPPORTED") {
+        toast.error("La moneda de pago seleccionada no está soportada por el proveedor de tasas.");
       } else {
         toast.error(mutationError("SubscriptionModal", error, "Fallo al registrar la suscripción"));
       }

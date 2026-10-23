@@ -1,7 +1,8 @@
 import type { Db } from '@workspace/database/factory';
 import {
   createReceiptsRepository,
-  type AttachReceiptInput,
+  type AttachReceiptNumberInput,
+  type ClaimReceiptInput,
 } from '@workspace/database/repositories/receipts';
 import {
   buildEmitterSnapshot,
@@ -55,6 +56,14 @@ export type ReceiptState =
   | { available: true; pdfStatus: 'pending'; receiptNumber: string }
   | { available: false; reason: 'pre_system' };
 
+/**
+ * Step-1 result. `inProgress:true` = another emission holds the claim and has
+ * not persisted the number yet: the caller answers 202/pending.
+ */
+export type AssignReceiptResult =
+  | { receiptNumber: string; pdfStatus: 'pending' | 'ready' }
+  | { receiptNumber: null; pdfStatus: 'pending'; inProgress: true };
+
 function receiptYear(timezone: string): number {
   // Local year of the emitter (a payment at 11pm in VE falls in the same local day/year).
   return Number(toLocalDayString(timezone, new Date()).slice(0, 4));
@@ -100,10 +109,15 @@ export interface PanelIssuerRepos {
       year: number,
       seq: number,
     ): Promise<{ released: boolean }>;
-    attachReceipt(
+    claimReceipt(
       paymentId: number,
       orgId: string,
-      input: AttachReceiptInput,
+      input: ClaimReceiptInput,
+    ): Promise<{ claimed: boolean }>;
+    attachReceiptNumber(
+      paymentId: number,
+      orgId: string,
+      input: AttachReceiptNumberInput,
     ): Promise<ReceiptIssueAttached>;
   };
 }
@@ -154,9 +168,18 @@ export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile
     },
 
     async buildEmitterSnapshot(_payment, org, profile) {
-      // Frozen emitter identity: persisted together with the number in
-      // `attachReceipt`, so it is built BEFORE consuming the sequence.
+      // Frozen emitter identity: persisted by `claim`, before the sequence.
       return buildEmitterSnapshot(org, profile);
+    },
+
+    claim(org, data, input) {
+      return receiptsRepo.claimReceipt(input.paymentId, org.id, {
+        subtotal: data.subtotal,
+        taxTotal: data.taxTotal,
+        taxDetails: data.taxDetails,
+        emitterSnapshot: data.emitterSnapshot,
+        issuedBy: data.issuedBy,
+      });
     },
 
     async nextNumber(orgId, year) {
@@ -173,16 +196,11 @@ export function createPanelIssuerProfile(repos: PanelIssuerRepos): IssuerProfile
       return receiptsRepo.releaseLastNumber(orgId, 'receipt', year, seq);
     },
 
-    attach(org, data, input) {
-      return receiptsRepo.attachReceipt(input.paymentId, org.id, {
+    attachNumber(org, data, input) {
+      return receiptsRepo.attachReceiptNumber(input.paymentId, org.id, {
         receiptNumber: data.receiptNumber,
         documentType: 'receipt',
         receiptIssuedAt: data.receiptIssuedAt,
-        subtotal: data.subtotal,
-        taxTotal: data.taxTotal,
-        taxDetails: data.taxDetails,
-        emitterSnapshot: data.emitterSnapshot,
-        issuedBy: data.issuedBy,
       });
     },
 
@@ -205,13 +223,13 @@ export function createReceiptsService(
   return {
     /**
      * Step 1 (synchronous, no external I/O except DB+queue): validates, calculates
-     * taxes in integer cents, assigns number (atomic), persists, and
-     * enqueues `receipt.render`. NEVER enqueues email (done by step 2).
-     * Shared sequence lives in `receipt-issue.core.ts`.
+     * taxes in integer cents, claims the payment, assigns the number (atomic),
+     * persists it, and enqueues `receipt.render`. NEVER enqueues email (done by
+     * step 2). Shared sequence lives in `receipt-issue.core.ts`.
      */
     async assignReceiptNumber(
       input: AssignReceiptNumberInput,
-    ): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }> {
+    ): Promise<AssignReceiptResult> {
       const result = await issueReceipt(profile, { orgsRepo, queue: receiptQueue }, input);
       if (result.skipped) {
         // The panel profile never skips ($0 skip is console-only): reaching
@@ -221,6 +239,10 @@ export function createReceiptsService(
           'RECEIPT_INCOHERENT',
           'La emisión del panel nunca omite el número.',
         );
+      }
+      if (result.receiptNumber === null) {
+        // Another emission holds the claim: answer pending (202), never 409.
+        return { receiptNumber: null, pdfStatus: 'pending', inProgress: true };
       }
       return { receiptNumber: result.receiptNumber, pdfStatus: result.pdfStatus };
     },

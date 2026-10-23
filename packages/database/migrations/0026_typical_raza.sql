@@ -1,0 +1,4 @@
+ALTER TABLE "payment" ADD COLUMN "receipt_claim_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "platform_subscription_payment" ADD COLUMN "receipt_claim_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "idx_payment_receipt_claim_pending" ON "payment" USING btree ("receipt_claim_at") WHERE "payment"."receipt_claim_at" IS NOT NULL AND "payment"."receipt_number" IS NULL;--> statement-breakpoint
+CREATE INDEX "idx_psp_receipt_claim_pending" ON "platform_subscription_payment" USING btree ("receipt_claim_at") WHERE "platform_subscription_payment"."receipt_claim_at" IS NOT NULL AND "platform_subscription_payment"."receipt_number" IS NULL;

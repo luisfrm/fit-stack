@@ -56,9 +56,8 @@ async function createPlatformSubscription(
     startDate: isoDate(startDateOffset),
     isTrial: false,
     payment: {
-      amountPaidCents: 5000,
+      amountPaid: 5000,
       currencyPaid: 'USD',
-      baseAmountCents: 5000,
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
       status: 'validated',
@@ -162,6 +161,7 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
     beforeAll(async () => {
       await admin.client.post('/api/platform/settings', {
         active_currencies: JSON.stringify(['USD', 'VES']),
+        currency_format: 'latam',
         active_payment_methods: JSON.stringify([
           {
             id: 'binance',
@@ -189,12 +189,72 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       expect(res.body.activePaymentMethods[0].id).toBe('binance');
       expect(res.body.activePaymentMethods[0].fields[0].type).toBe('visual');
       expect(res.body.activePaymentMethods[0].fields[0].value).toContain('Binance');
-      expect(res.body.currencyFormat).toBeDefined();
+      expect(res.body.currencyFormat).toBe('latam');
     });
 
     it('rejects anonymous requests (401)', async () => {
       const res = await tenantA.owner.client.get('/api/organizations/payment-methods', { anonymous: true });
       expect(res.status, res.text).toBe(401);
+    });
+
+    /**
+     * RD-163: the platform `active_currencies` list is the authority for what
+     * the org may pay with. It used to fall back to `['USD','VES']`, which
+     * invented a currency list that support never configured.
+     */
+    it('sin `active_currencies` de plataforma: 400 ACTIVE_CURRENCIES_NOT_CONFIGURED (nunca USD/VES)', async () => {
+      await testQuery(`DELETE FROM platform_setting WHERE key = 'active_currencies'`);
+
+      try {
+        const res = await tenantA.owner.client.get('/api/organizations/payment-methods');
+        expect(res.status, res.text).toBe(400);
+        expect(res.body).toMatchObject({
+          code: 'ACTIVE_CURRENCIES_NOT_CONFIGURED',
+          fields: ['active_currencies'],
+        });
+        expect(res.body.activeCurrencies).toBeUndefined();
+      } finally {
+        await testQuery(
+          `INSERT INTO platform_setting (key, value) VALUES ('active_currencies', $1)
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+          [JSON.stringify(['USD', 'VES'])],
+        );
+      }
+    });
+
+    it('`active_currencies` corrupta: mismo error visible, sin lista inventada', async () => {
+      await testQuery(
+        `UPDATE platform_setting SET value = 'not-json' WHERE key = 'active_currencies'`,
+      );
+
+      try {
+        const res = await tenantA.owner.client.get('/api/organizations/payment-methods');
+        expect(res.status, res.text).toBe(400);
+        expect(res.body).toMatchObject({ code: 'ACTIVE_CURRENCIES_NOT_CONFIGURED' });
+      } finally {
+        await testQuery(
+          `UPDATE platform_setting SET value = $1 WHERE key = 'active_currencies'`,
+          [JSON.stringify(['USD', 'VES'])],
+        );
+      }
+    });
+
+    it('sin `currency_format` de plataforma: 500 PLATFORM_SETTING_INVALID (nunca "latam")', async () => {
+      await testQuery(`DELETE FROM platform_setting WHERE key = 'currency_format'`);
+
+      try {
+        const res = await tenantA.owner.client.get('/api/organizations/payment-methods');
+        expect(res.status, res.text).toBe(500);
+        expect(res.body).toMatchObject({
+          code: 'PLATFORM_SETTING_INVALID',
+          fields: ['currency_format'],
+        });
+      } finally {
+        await testQuery(
+          `INSERT INTO platform_setting (key, value) VALUES ('currency_format', 'latam')
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        );
+      }
     });
   });
 
@@ -230,7 +290,7 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       const res = await tenantA.owner.client.post('/api/organizations/subscription/renew', {
         paymentMethod: 'Binance',
         currencyPaid: 'USD',
-        amountPaidCents: 1,
+        amountPaid: 1,
         status: 'validated',
         exchangeRateApplied: '0.0001',
         paymentMethodDetails: [{ label: 'Email remitente', value: 'cliente@x.com', type: 'text' }],
@@ -244,9 +304,9 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       expect(payment.status).toBe('processing');
       expect(Number(payment.amount_paid)).toBe(5000);
       expect(payment.currency_paid).toBe('USD');
-      expect(Number(payment.base_amount)).toBe(5000);
       expect(Number(payment.exchange_rate_applied)).toBe(1);
       expect(payment.plan_snapshot_name).toBeDefined();
+      // The frozen plan price is the base-currency amount.
       expect(Number(payment.plan_snapshot_price)).toBe(5000);
       expect(payment.payment_method).toBe('Binance');
 
@@ -286,7 +346,8 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       expect(payment.currency_paid).toBe('VES');
       expect(Number(payment.amount_paid)).toBe(Math.round(5000 * 36.5)); // 182500
       expect(Number(payment.exchange_rate_applied)).toBe(36.5);
-      expect(Number(payment.base_amount)).toBe(5000);
+      // The base-currency amount is the frozen plan price, never the conversion.
+      expect(Number(payment.plan_snapshot_price)).toBe(5000);
     });
 
     it('approval flow: support validates the pending payment and the period extends', async () => {

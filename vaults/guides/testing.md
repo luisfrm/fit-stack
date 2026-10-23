@@ -60,16 +60,15 @@ pnpm seed:e2e           # Demo seed: fills Fit Stack/fit-stack (NOT a test, keep
 
 1. Reset (crash-safe, fixed slugs/emails): wipe `e2e-suite` + `e2e-empty` orgs + reserved users. Worst case is "suite orgs exist", never accumulation.
 2. Platform owner (`e2e-platform@e2e.test`, role promoted via SQL).
-3. Console creates the suite org via `POST /api/platform/organizations` (same path as prod) → provisions the panel owner via `POST /:id/staff` (role owner) → trial platform sub → minimal gym seed (1 plan, 3 members, 1 sub, 1 class, 1 CMS page). Same for the empty org `e2e-empty` (no gym seed, used by `empty-state.spec.ts`).
+3. Console creates the suite org via `POST /api/platform/organizations` (same path as prod) → provisions the panel owner via `POST /:id/staff` (role owner) → **free** (`price = 0`) platform sub, never a trial (`isTrial: true` → `400 TRIAL_NOT_AVAILABLE`) → minimal gym seed (1 plan, 3 members, 1 sub, 1 class, 1 CMS page). Same for the empty org `e2e-empty` (no gym seed, used by `empty-state.spec.ts`).
 4. `console-setup` / `panel-setup` do UI login only + `storageState` (+ route prewarm).
 5. Teardown wipes the suite orgs + users (best-effort; skipped with `E2E_KEEP_DATA=1` for inspection). The platform plan catalog row is shared and reused by name — never deleted (other orgs' subs reference it).
 
 **Playwright config** (`playwright.config.ts`):
 
-- `testDir: './e2e'`, `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org), `timeout: 60_000`, `retries: 1` in CI.
-- `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, `expect.timeout: 15_000`. Reporter: `html` (open: never) + `list`.
+- `fullyParallel: false`, `workers: 1` (one shared dev DB + one suite org — parallel workers would write the same org); timeouts, retries, traces and reporters live in the file, not here.
 - **Project order: console first, then panel** (`console-setup` → `console` → `panel-setup` → `panel`). `--project` filters still run isolated (each pulls only its login setup).
-- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally (CI uses `reuseExistingServer: false`), 240s startup timeout.
+- **Web servers**: `webServer` array launches api-worker (`/healthz`), panel (3001) and console (3000) in parallel; `reuseExistingServer: true` locally, `false` in CI.
 
 **Structure**:
 
@@ -116,7 +115,7 @@ e2e/
 
 **TestTenantState** (`e2e/.auth/state.json`, written by global-setup): `orgId/orgSlug` (suite), `ownerUserId`, `platformUserId`, `emptyOrgId/emptyOrgSlug/emptyOwnerEmail`, `ids` (seeded fixtures), `reusedExisting` (true when pre-existing users were reused, e.g. after `E2E_KEEP_DATA=1`), `createdAt`. Specs import `test`/`expect` from `../fixtures` (never from `@playwright/test` when they need `tenant`/`panelApi`/`consoleApi`).
 
-**Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, trial platform sub. Prints panel credentials on completion. Re-running reuses everything.
+**Seed** (`pnpm seed:e2e`, `e2e/seed.ts`): fills `Fit Stack`/`fit-stack` (create if missing, fill what's missing, never delete). Relative dates via `@workspace/shared` in org tz: 30 members in 6 monthly cohorts (backdated `created_at` via SQL — the only DB write for dates, seed-only), ~24 subs/payments spread by month + 3 `processing`, 4 plans, 3 weekly classes, 3 CMS pages, free (`price = 0`) platform sub. Prints panel credentials on completion. Re-running reuses everything.
 
 **Fixture cleanup rule**: per-test writes go through `panelApi.create()`/`track()` (auto-delete LIFO). A subscription is **not deletable** on purpose (`DELETE_ROUTES.subscription = null` in `helpers/api-client.ts`): a financial record is voided, never removed. Member (RD-120) and plan (RD-142) deletes are **soft deletes** (`deleted_at`) and the surrounding FKs are `restrict`, so nothing cascades any more: every per-test row stays inside `e2e-suite` until the suite-org wipe + global teardown removes it. That safety net — not the per-test cleanup — is what keeps the DB clean (no manual `afterAll` needed). `cleanupDisposables` is best-effort: a failing delete warns `(se ignora)` and never fails a test. `uid()`/`uniqueEmail()` are allowed only for per-test disposables inside `e2e-suite` (org-scoped, never for the shared tenant or `fit-stack`).
 
@@ -127,7 +126,8 @@ e2e/
 - `E2E_KEEP_DATA=1` — skip teardown to inspect the suite tenant (next run resets anyway).
 - `API_BASE_URL` / `PANEL_URL` / `CONSOLE_URL` — override app URLs (defaults: 8788/3001/3000).
 
-**Dev dependencies** (root): `@playwright/test@1.63.0`, `@neondatabase/serverless@1.0.2`, `tsx` (seed runner), `@workspace/shared` (date utils in e2e/seed).
+**Dev dependencies** (root): declared in `package.json` — Playwright, the Neon serverless client, `tsx` (seed runner) and `@workspace/shared` (date utils in `e2e/seed`).
 
+> **CI**: `.github/workflows/ci.yml` runs `pnpm test` (integration is skipped without `TEST_DATABASE_URL`); E2E is local-only.
 > When you add or change API behavior, the integration tests are the first line of defense: run `pnpm test` before asking for review.
 > E2E tests validate complete user flows in the UI — run with `pnpm test:e2e` (separate from `pnpm test`).

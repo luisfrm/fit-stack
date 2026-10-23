@@ -30,13 +30,10 @@ export interface OrgGymOverview {
 export interface AddSubscriptionPayload {
   planId: number;
   startDate?: string;
-  isTrial?: boolean;
-  priceOverrideCents?: number;
   payment: {
-    amountPaidCents: number;
+    amountPaid: number;
     currencyPaid: string;
     exchangeRateApplied?: string;
-    baseAmountCents?: number;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetails;
     status: PaymentStatus;
@@ -158,7 +155,7 @@ export const organizationsService = {
 
   /**
    * Adds a new platform subscription to an organization.
-   * The payload uses cents (amountPaidCents) and supports trial/free plans.
+   * Amounts are integer cents (`amountPaid`); trial/free plans are supported.
    */
   async addSubscription(
     id: string,

@@ -26,7 +26,8 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
 
     beforeAll(async () => {
       // Shared tenant: the GET tests are read-only, so one org serves them all.
-      tenant = await createGymTenant('settings-get');
+      // No seeded settings: the empty-object contract is under test.
+      tenant = await createGymTenant('settings-get', { seedSettings: false });
     });
 
     it('returns empty object for a new organization', async () => {
@@ -148,7 +149,7 @@ describe.skipIf(skipReason !== null)('Settings API', () => {
     });
 
     it('accepts empty object without error', async () => {
-      const { owner } = await createGymTenant();
+      const { owner } = await createGymTenant('settings-empty-post', { seedSettings: false });
       const res = await owner.client.post('/api/settings', {});
 
       expect(res.status, res.text).toBe(200);

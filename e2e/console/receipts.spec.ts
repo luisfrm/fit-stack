@@ -64,9 +64,8 @@ test.describe('Console — Comprobante SaaS', () => {
         startDate: today,
         isTrial: false,
         payment: {
-          amountPaidCents: 5000,
+          amountPaid: 5000,
           currencyPaid: 'USD',
-          baseAmountCents: 5000,
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
           status: 'processing',
@@ -144,9 +143,8 @@ test.describe('Console — Comprobante SaaS', () => {
         startDate: today,
         isTrial: false,
         payment: {
-          amountPaidCents: 5000,
+          amountPaid: 5000,
           currencyPaid: 'USD',
-          baseAmountCents: 5000,
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
           status: 'validated',
@@ -174,6 +172,13 @@ test.describe('Console — Comprobante SaaS', () => {
       paymentRow.getByRole('button', { name: 'Acciones de pago' }),
       'Anular',
     );
+
+    // RD-163: an annulment asks the operator for the reason (the suggestion is
+    // editable); the mutation waits for non-blank text.
+    const reasonInput = page.getByTestId('reason-prompt-input');
+    await expect(reasonInput).toBeVisible({ timeout: 10_000 });
+    await reasonInput.fill('Cobro duplicado (E2E)');
+    await page.getByTestId('reason-prompt-confirm').click();
 
     // The ANULADO flag lives in the expanded block, next to the number.
     await paymentRow.getByRole('button', { name: 'Expandir' }).click();
@@ -220,9 +225,8 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
       startDate: today,
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: method,
         paymentMethodDetails: [],
         status: 'validated',

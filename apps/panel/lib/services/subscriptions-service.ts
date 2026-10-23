@@ -39,9 +39,9 @@ export const subscriptionsService = {
     });
   },
 
-  // Sin `delete`: un registro de pago no se elimina. Se anula el cobro
-  // (`financeService.updatePaymentStatus(id, 'voided')`) o se revoca el acceso
-  // (`updateStatus(id, 'cancelled')`).
+  // No `delete`: a payment record is never removed. The charge is voided
+  // (`financeService.updatePaymentStatus(id, 'voided', reason)` — the reason is
+  // mandatory since RD-163) or access is revoked (`updateStatus(id, 'cancelled')`).
 
   async getRecent(
     limit: number = 5,

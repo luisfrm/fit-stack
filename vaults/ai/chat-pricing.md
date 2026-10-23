@@ -1,6 +1,6 @@
 # Chat — Pricing por Créditos (Fit-Stack)
 
-> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`/`TRIAL`, si no día 1 UTC. Ver también [`CHAT_INFRASTRUCTURE.md`](./CHAT_INFRASTRUCTURE.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`CHAT_IMPLEMENTATION.MD`](./archive/CHAT_IMPLEMENTATION.MD) (⏸ DEPRECATED).
+> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`/`TRIAL`, si no día 1 UTC. Ver también [`chat-infrastructure.md`](./chat-infrastructure.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`chat-implementation.md`](./archive/chat-implementation.md) (⏸ DEPRECATED).
 
 ## Unidad y fórmula
 
@@ -11,7 +11,7 @@
 
 ## Coste real (Workers AI, GLM-4.7-Flash)
 
-- Input **$0.060/M** + Output **$0.400/M**. 1 req medio (2K in + 500 out = 2.5cr) = **$0.00032 → $0.000128/crédito**. Ver `CHAT_INFRASTRUCTURE.md` § Coste y operación para neurons (5.500/M in, 36.400/M out, 10K neurons/día gratis).
+- Input **$0.060/M** + Output **$0.400/M**. 1 req medio (2K in + 500 out = 2.5cr) = **$0.00032 → $0.000128/crédito**. Ver `chat-infrastructure.md` § Coste y operación para neurons (5.500/M in, 36.400/M out, 10K neurons/día gratis).
 - `openrouter/free` cuesta $0 al proveedor pero consume créditos igual (presupuesto del free tier con control de cuota).
 
 ## Planes (configurables desde gestores, no hardcode)
@@ -33,7 +33,7 @@ Si el negocio es muy rentable, subir los créditos sin tocar precio es la palanc
 
 > **Pendiente:** constantes `CREDIT_PACKS` previstas en `shared/ai.ts` (no hardcode en rutas) + tabla `ai_credit_pack_purchase` FIFO. Ver Linear — proyecto «Fit Stack».
 
-Propuestos (sin implementar compra): **1.000cr / $1.20**, **3.000cr / $3.00**, **7.000cr / $6.50**. Consumo **FIFO**: primero créditos del plan (`ai_credits_monthly`), luego packs. El ledger actual ya soporta `ai_usage.credits` por ciclo; los packs añadirán una tabla separada y endpoint de compra Stripe (no tocar `ai_usage` existente). Ver `FUTURE_IDEAS.md` para alternativas descartadas.
+Propuestos (sin implementar compra): **1.000cr / $1.20**, **3.000cr / $3.00**, **7.000cr / $6.50**. Consumo **FIFO**: primero créditos del plan (`ai_credits_monthly`), luego packs. El ledger actual ya soporta `ai_usage.credits` por ciclo; los packs añadirán una tabla separada y endpoint de compra Stripe (no tocar `ai_usage` existente). Alternativas descartadas: [`docs/roadmap.md`](../../docs/roadmap.md) §4.
 
 ## Balance y headers
 
@@ -61,5 +61,5 @@ El route valida con Zod usando esas constantes y hace `messages.slice(-maxHistor
 
 ## Referencias
 
-- Infra/router/ledger: [`CHAT_INFRASTRUCTURE.md`](./CHAT_INFRASTRUCTURE.md)
+- Infra/router/ledger: [`chat-infrastructure.md`](./chat-infrastructure.md)
 - Código: `packages/shared/src/ai.ts`, `packages/shared/src/features/catalog.ts`, `packages/database/src/schema.ts` (`ai_usage`), `apps/api-worker/src/services/features.service.ts` (`getAiQuota`, `consumeAiCredits`, `settleAiCredits`), `apps/api-worker/src/routes/ai.route.ts`.

@@ -478,9 +478,10 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
     expect(processing.body.code).toBe('NOT_VALIDATED');
 
     const validatedId = await createWithStatus('validated');
-    // Clears the auto-assigned number to test the manual fallback.
+    // Clears the auto-assigned number (and its claim: the emission claims the
+    // row before consuming the sequence) to test the manual fallback.
     await testQuery(
-      `UPDATE payment SET receipt_number = NULL, receipt_issued_at = NULL, subtotal = NULL, tax_total = NULL, tax_details = NULL WHERE id = $1`,
+      `UPDATE payment SET receipt_number = NULL, receipt_claim_at = NULL, receipt_issued_at = NULL, subtotal = NULL, tax_total = NULL, tax_details = NULL WHERE id = $1`,
       [validatedId],
     );
     resetSpies(owner.client);
@@ -600,6 +601,7 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
 
     const patched = await owner.client.patch(`/api/payments/${paymentId}/status`, {
       status: 'voided',
+      voidReason: 'Cobro anulado',
     });
     expect(patched.status).toBe(200);
     // The receipt WAS voided and the body says so (not a mute 200).
@@ -612,6 +614,7 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
     );
     expect(rows[0]!['receipt_number']).toBe(receiptNumber);
     expect(rows[0]!['receipt_voided']).toBe(true);
+    expect(rows[0]!['void_reason']).toBe('Cobro anulado');
   });
 
   it('T8b void sin comprobante: 200 con receiptVoided false + motivo', async () => {
@@ -640,6 +643,7 @@ describe.skipIf(skipReason !== null)('Receipts emission', () => {
 
     const patched = await owner.client.patch(`/api/payments/${paymentId}/status`, {
       status: 'voided',
+      voidReason: 'Cobro registrado por error',
     });
     // The status changes anyway; what is made explicit is that there was NO receipt.
     expect(patched.status, patched.text).toBe(200);

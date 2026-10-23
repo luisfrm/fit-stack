@@ -11,7 +11,12 @@ import { createPlatformReceiptsReportService } from '../services/platform-receip
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
-import { paymentMethodDetailsSchema, paymentMethodSchema } from '../lib/schemas';
+import {
+  paymentMethodDetailsSchema,
+  paymentMethodSchema,
+  requireVoidReason,
+  voidReasonViolationHook,
+} from '../lib/schemas';
 import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import type { AppEnv } from '../lib/env';
 
@@ -26,18 +31,20 @@ const paymentStatusEnum = z.enum([
  * RD-113: `refunded` is a reserved/display-only status. No issuer may PATCH a
  * payment to it (there is no refund flow, no UI and no receipt behind it).
  * The full enum above keeps feeding create/renew/registerPayment unchanged.
+ *
+ * RD-156: `processing` is a creation status, never a PATCH target. Accepting it
+ * re-opened an already validated charge (`validated → processing → validated`),
+ * which extended `current_period_end` a second time for the same payment.
  */
 const updatePaymentStatusEnum = z.enum([
-  PAYMENT_STATUSES.PROCESSING,
   PAYMENT_STATUSES.VALIDATED,
   PAYMENT_STATUSES.VOIDED,
 ]);
 
 const paymentSchema = z.object({
-  amountPaidCents: z.number().int().nonnegative(),
+  amountPaid: z.number().int().nonnegative(),
   currencyPaid: z.string().min(1),
   exchangeRateApplied: z.string().optional(),
-  baseAmountCents: z.number().int().nonnegative().optional(),
   paymentMethod: paymentMethodSchema,
   paymentMethodDetails: paymentMethodDetailsSchema,
   status: paymentStatusEnum,
@@ -49,7 +56,6 @@ const createSubscriptionSchema = z.object({
   planId: z.number().int().positive(),
   startDate: z.string().optional(),
   isTrial: z.boolean().default(false),
-  priceOverrideCents: z.number().int().nonnegative().optional(),
   payment: paymentSchema,
 });
 
@@ -57,10 +63,16 @@ const renewSchema = z.object({
   payment: paymentSchema,
 });
 
-const updatePaymentStatusSchema = z.object({
-  status: updatePaymentStatusEnum,
-  voidReason: z.string().min(1).optional(),
-});
+const updatePaymentStatusSchema = z
+  .object({
+    status: updatePaymentStatusEnum,
+    // No length rule: `requireVoidReason` is the single authority, so a blank
+    // reason answers `400 VOID_REASON_REQUIRED` (with `code`) instead of the
+    // generic Zod envelope.
+    voidReason: z.string().optional(),
+  })
+  // RD-163: same reason contract as the Panel PATCH (never a default reason).
+  .superRefine(requireVoidReason);
 
 const cancelSchema = z.object({
   reason: z.string().optional(),
@@ -348,9 +360,11 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
   })
 
   // PATCH /api/platform/subscriptions/payments/:paymentId/status
-  .patch('/payments/:paymentId/status', requirePlatformPermission('console', 'manage'), zValidator('json', updatePaymentStatusSchema), async (c) => {
+  .patch('/payments/:paymentId/status', requirePlatformPermission('console', 'manage'), zValidator('json', updatePaymentStatusSchema, voidReasonViolationHook), async (c) => {
     const paymentId = Number(c.req.param('paymentId'));
-    const data = c.req.valid('json');
+    const { status, voidReason: rawVoidReason } = c.req.valid('json');
+    // Trimmed once: persisted audit + receipt seal share the same reason.
+    const data = { status, voidReason: rawVoidReason?.trim() || undefined };
     const cache = createCache(c.env);
 
     const { service } = buildService(c);

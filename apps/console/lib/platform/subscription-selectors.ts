@@ -15,10 +15,10 @@ export interface TopPlanRevenue {
   count: number;
 }
 
-/** Effective price of the subscription in cents (override or plan price; trial/absent = 0). */
+/** Effective price of the subscription in cents (plan price; trial/absent = 0). */
 export function effectivePriceCents(sub: SubscriptionWithDetails): number {
   if (sub.isTrial) return 0;
-  return sub.priceOverride ?? sub.planPrice ?? 0;
+  return sub.planPrice ?? 0;
 }
 
 /** Top plans by cumulative revenue, ordered descending. */
@@ -89,13 +89,14 @@ export function selectExpiringSoon(
 }
 
 /**
- * SaaS billing for an organization in current UTC month (only `validated`
- * payments, `baseAmount ?? amountPaid` — same formula as revenue).
+ * SaaS billing for an organization in the current UTC month (only `validated`
+ * payments). The base-currency amount is the frozen `planSnapshotPrice` —
+ * same formula as the revenue KPI, never a division by the rate.
  */
 export function selectOrgCurrentMonth(
   invoices: Pick<
     PlatformPayment,
-    "status" | "paymentDate" | "amountPaid" | "baseAmount"
+    "status" | "paymentDate" | "planSnapshotPrice"
   >[],
   now: Date,
 ): { totalCents: number; count: number } {
@@ -108,7 +109,7 @@ export function selectOrgCurrentMonth(
     const d = new Date(invoice.paymentDate);
     if (Number.isNaN(d.getTime())) continue;
     if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month) continue;
-    totalCents += invoice.baseAmount ?? invoice.amountPaid;
+    totalCents += invoice.planSnapshotPrice;
     count += 1;
   }
   return { totalCents, count };
@@ -116,13 +117,13 @@ export function selectOrgCurrentMonth(
 
 /** Total validated for an organization (same formula as monthly bucket). */
 export function selectOrgBilledTotal(
-  invoices: Pick<PlatformPayment, "status" | "amountPaid" | "baseAmount">[],
+  invoices: Pick<PlatformPayment, "status" | "planSnapshotPrice">[],
 ): { totalCents: number; count: number } {
   let totalCents = 0;
   let count = 0;
   for (const invoice of invoices) {
     if (invoice.status !== "validated") continue;
-    totalCents += invoice.baseAmount ?? invoice.amountPaid;
+    totalCents += invoice.planSnapshotPrice;
     count += 1;
   }
   return { totalCents, count };
@@ -157,16 +158,13 @@ export interface PaymentDisplayAmount {
 }
 
 /**
- * Displayable amount of a SaaS payment, never crossed: `baseAmount`
- * (integer cents in `baseCurrency`) when persisted, otherwise `amountPaid`
- * in `currencyPaid`. The currency always follows the amount it belongs to.
+ * Displayable amount of a SaaS payment in the platform base currency: the
+ * frozen `planSnapshotPrice`, never `amountPaid` (which belongs to
+ * `currencyPaid`) and never a division by the stored rate.
  */
 export function selectPaymentDisplayAmount(
-  payment: Pick<PlatformPayment, "amountPaid" | "currencyPaid" | "baseAmount">,
+  payment: Pick<PlatformPayment, "planSnapshotPrice">,
   baseCurrency: string,
 ): PaymentDisplayAmount {
-  if (payment.baseAmount != null) {
-    return { amountCents: payment.baseAmount, currency: baseCurrency };
-  }
-  return { amountCents: payment.amountPaid, currency: payment.currencyPaid };
+  return { amountCents: payment.planSnapshotPrice, currency: baseCurrency };
 }

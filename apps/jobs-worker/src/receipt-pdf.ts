@@ -203,7 +203,7 @@ export async function renderReceiptPdfBytes(
     data;
   const baseCurrency = amounts.baseCurrency ?? emitter.currency;
   // Conversion is displayed only if payment currency is not base currency
-  // and exchange rate was persisted (FACTURATION.md §3).
+  // and exchange rate was persisted (fiscal-documents.md §7).
   const showConversion =
     amounts.currencyPaid !== baseCurrency && Boolean(amounts.exchangeRateApplied);
 

@@ -19,7 +19,7 @@ Extension rules: every new feature is born `defaultEnabled: false` (additive); `
 
 ### Free Tier (free floor)
 
-- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
+- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; a plan with `price = 0` is a normal **free plan** (not a trial: new trials are rejected with `400 TRIAL_NOT_AVAILABLE`, RD-117). The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
 - **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
 - **Resolution rule** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).
@@ -35,7 +35,7 @@ Extension rules: every new feature is born `defaultEnabled: false` (additive); `
 
 ### AI Credits (`ai_chat`)
 
-- **Unit**: 1 credit = 1K tokens (x1.0, see `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Default provider in `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, automatic fallback to the other). Docs: `vaults/ai/CHAT_PRICING.md`, `vaults/ai/CHAT_INFRASTRUCTURE.md`.
+- **Unit**: 1 credit = 1K tokens (x1.0, see `shared/ai.ts` `AI_CREDIT_CONSTANTS`). Default provider in `platform_setting` `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`, automatic fallback to the other). Docs: `vaults/ai/chat-pricing.md`, `vaults/ai/chat-infrastructure.md`.
 - **Limits**: `ai_chat.limits.ai_credits_monthly` per plan (configurable in admins, not hardcoded) + free tier `FREE_TIER_FEATURES` (500/month). Catalog in `shared/features/catalog.ts`.
 - **Balance limits**: `AI_CHAT_LIMITS` in `shared/ai.ts` (`maxUserMessageChars: 500`, `maxHistoryMessageChars: 2_000`, `maxInputChars: 8_000`, `maxOutputTokens: 800` normal / `maxToolOutputTokens: 2_048` for tool, `maxHistoryMessages: 10`). Zod and `ai.service` clamp `max_tokens`. The system prompt is composed server-side — the client never sends role `system`.
 - **Source of truth**: `ai_usage` table — row per `(organization_id, period_type='monthly', periodStart)` with `credits`, atomic upsert. `periodStart` = subscription cycle if ACTIVE/TRIAL, otherwise calendar day 1 (lazy reset, no cron). Index `idx_ai_usage_org_period`.

@@ -12,6 +12,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from '../helpers/client';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
+import { UNREACHABLE_RATE_URL, withRateServer } from '../helpers/rates';
 import {
   createGymTenant,
   addUserToOrganization,
@@ -46,7 +47,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [
@@ -63,6 +63,210 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(res.body.planId).toBe(plan.id);
     });
 
+    it('RD-158: prices the payment from the plan and ignores client-stated money', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          // Not in the contract: a cashier cannot state the amount or the rate.
+          amountPaid: 1,
+          exchangeRateApplied: '0.0001',
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(res.status, res.text).toBe(201);
+
+      // Paying in the plan currency: amount = plan price (integer cents), rate 1.
+      const rows = await testQuery<{
+        amount_paid: string;
+        currency_paid: string;
+        exchange_rate_applied: string | null;
+      }>(
+        `SELECT amount_paid, currency_paid, exchange_rate_applied
+           FROM payment WHERE subscription_id = $1`,
+        [res.body.id],
+      );
+      expect(Number(rows[0]!.amount_paid)).toBe(plan.price);
+      expect(rows[0]!.currency_paid).toBe('USD');
+      // Same currency: the provider short-circuits to 1 (persisted as numeric).
+      expect(Number(rows[0]!.exchange_rate_applied)).toBe(1);
+    });
+
+    it('RD-158: rejects a currency outside active_currencies (400) and writes nothing', async () => {
+      const { owner, organization, member, plan } = await setupSubscriptionFixture();
+
+      // `PEN` is a supported currency but not an active one for this org.
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          currencyPaid: 'PEN',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toMatchObject({ code: 'PAYMENT_CURRENCY_NOT_ACTIVE' });
+
+      // Rejected before any write: no subscription, no payment, no receipt.
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+      const payments = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM payment WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(payments[0]!.count).toBe(0);
+    });
+
+    it('RD-158: an org without active_currencies fails visibly (400), never prices blindly', async () => {
+      // Org created without the Console-seeded settings.
+      const { owner, organization } = await createGymTenant('sub-no-currencies', {
+        seedSettings: false,
+      });
+      const member = await createGymMember(owner.client);
+      const plan = await createPlan(owner.client, { price: 100, currency: 'USD' });
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        payment: {
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toMatchObject({ code: 'ACTIVE_CURRENCIES_NOT_CONFIGURED' });
+
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE organization_id = $1',
+        [organization.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+    });
+
+    it('RD-158: an unreachable rate provider answers 503 EXCHANGE_RATE_UNAVAILABLE and writes nothing', async () => {
+      const { owner, organization, member, plan } = await setupSubscriptionFixture();
+      owner.client.env.EXCHANGE_API_URL = UNREACHABLE_RATE_URL;
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        payment: {
+          // Cross-currency: this is the only path that reaches the provider.
+          currencyPaid: 'VES',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      expect(res.status, res.text).toBe(503);
+      expect(res.body).toMatchObject({ code: 'EXCHANGE_RATE_UNAVAILABLE' });
+
+      // Priced BEFORE the first write: the failure leaves no orphan to compensate.
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+      const payments = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM payment WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(payments[0]!.count).toBe(0);
+    });
+
+    it('RD-158: a currency the provider does not quote answers 400 PAYMENT_CURRENCY_UNSUPPORTED', async () => {
+      const { owner, organization, member, plan } = await setupSubscriptionFixture();
+
+      // Provider reachable, but without a `VES` rate: never assumed.
+      await withRateServer({ EUR: 0.9 }, async (url) => {
+        owner.client.env.EXCHANGE_API_URL = url;
+
+        const res = await owner.client.post('/api/subscriptions', {
+          memberId: member.id,
+          planId: plan.id,
+          startDate: isoDate(0),
+          payment: {
+            currencyPaid: 'VES',
+            paymentMethod: 'cash',
+            paymentMethodDetails: [],
+            status: 'validated',
+            paymentDate: isoDate(0),
+          },
+        });
+
+        expect(res.status, res.text).toBe(400);
+        expect(res.body).toMatchObject({ code: 'PAYMENT_CURRENCY_UNSUPPORTED' });
+      });
+
+      const subs = await testQuery<{ count: number }>(
+        'SELECT COUNT(*)::int AS count FROM subscription WHERE member_id = $1 AND organization_id = $2',
+        [member.id, organization.id],
+      );
+      expect(subs[0]!.count).toBe(0);
+    });
+
+    it('RD-158: the pending-payment guard answers before the provider is called', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+
+      // Previous charge under review (`USD` → `USD`: the provider is bypassed).
+      const first = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        payment: {
+          currencyPaid: 'USD',
+          paymentMethod: 'transfer',
+          paymentMethodDetails: [],
+          status: 'processing',
+          paymentDate: isoDate(0),
+        },
+      });
+      expect(first.status, first.text).toBe(201);
+
+      // Provider down: pricing runs LAST, so the business 400 wins over a 503.
+      owner.client.env.EXCHANGE_API_URL = UNREACHABLE_RATE_URL;
+
+      const res = await owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        payment: {
+          currencyPaid: 'VES',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+
+      expect(res.status, res.text).toBe(400);
+      expect(res.body.error).toContain('pendiente de validación');
+    });
+
     it('rejects creating a subscription for a deleted plan (400)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
 
@@ -75,7 +279,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -99,7 +302,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -126,7 +328,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'transfer',
           paymentMethodDetails: [],
@@ -148,7 +349,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -184,7 +384,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -221,7 +420,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -247,7 +445,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         memberId: member.id,
         planId: plan.id,
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: [],
@@ -274,7 +471,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           paymentMethodDetails: { reference: 'REF-123' },
@@ -295,7 +491,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 50,
           currencyPaid: 'USD',
           paymentMethod: 'zelle',
           status: 'validated',
@@ -317,7 +512,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
         },
@@ -337,7 +531,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
         },
@@ -368,7 +561,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: 1,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       }, { anonymous: true });
 
       expect(res.status, res.text).toBe(401);
@@ -385,7 +578,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
       await owner.client.post('/api/subscriptions', {
         memberId: member.id,
@@ -393,7 +586,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(31),
         // The end is computed by the server; the client endDate
         // (isoDate(61)) contradicts the authority and would be rejected with 422.
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const res = await owner.client.get('/api/subscriptions');
@@ -410,7 +603,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const del = await owner.client.delete(`/api/plans/${plan.id}`);
@@ -436,7 +629,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const res = await owner.client.get('/api/subscriptions/recent', { query: { limit: '3' } });
@@ -455,7 +648,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const subId = created.body.id;
@@ -478,7 +671,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'cash',
           status: 'validated',
@@ -507,10 +699,71 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
 
       const voided = await owner.client.patch(`/api/payments/${paymentId}/status`, {
         status: 'voided',
+        voidReason: 'Cobro anulado',
       });
       expect(voided.status, voided.text).toBe(200);
 
       // Voided ≠ cancelled: the record is invalid, it is not a revocation.
+      expect(await readStatus(owner, subId)).toBe('voided');
+    });
+
+    it('anular sin motivo: 400 VOID_REASON_REQUIRED y la fila queda intacta', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+      });
+      expect(res.status, res.text).toBe(400);
+      expect(res.body).toMatchObject({
+        code: 'VOID_REASON_REQUIRED',
+        fields: ['voidReason'],
+      });
+
+      // Rejected at the schema layer: no status write, no audit, no cancel.
+      const rows = await testQuery<{
+        status: string;
+        voided_at: string | null;
+        void_reason: string | null;
+      }>(`SELECT status, voided_at, void_reason FROM payment WHERE id = $1`, [paymentId]);
+      expect(rows[0]!.status).toBe('validated');
+      expect(rows[0]!.voided_at).toBeNull();
+      expect(rows[0]!.void_reason).toBeNull();
+      expect(await readStatus(owner, subId)).toBe('active');
+
+      // A blank reason is not a reason either — and an empty string must answer
+      // the same business code (not the generic Zod envelope).
+      for (const voidReason of ['', '   ']) {
+        const blank = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+          status: 'voided',
+          voidReason,
+        });
+        expect(blank.status, blank.text).toBe(400);
+        expect(blank.body).toMatchObject({
+          code: 'VOID_REASON_REQUIRED',
+          fields: ['voidReason'],
+        });
+      }
+    });
+
+    it('anular con un motivo libre: 200 y el texto del operador queda en `void_reason`', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { subId, paymentId } = await seedSubscription(owner, member, plan);
+
+      const reason = 'Cobro duplicado: se registró dos veces el mismo pago';
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: reason,
+      });
+      expect(res.status, res.text).toBe(200);
+
+      const rows = await testQuery<{ status: string; void_reason: string | null }>(
+        `SELECT status, void_reason FROM payment WHERE id = $1`,
+        [paymentId],
+      );
+      expect(rows[0]!.status).toBe('voided');
+      // Persisted verbatim: the server never replaces it with a default.
+      expect(rows[0]!.void_reason).toBe(reason);
       expect(await readStatus(owner, subId)).toBe('voided');
     });
 
@@ -522,8 +775,9 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         status: 'invalid',
       });
 
-      // `invalid`/`pending` disappeared from the contract: the enum only accepts
-      // processing | validated | voided. The schema rejects before the service.
+      // `invalid`/`pending` disappeared from the contract: the PATCH enum only
+      // accepts validated | voided (RD-156 removed `processing` as a target).
+      // The schema rejects before the service.
       expect(res.status, res.text).toBe(400);
     });
 
@@ -573,7 +827,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'transfer',
           paymentMethodDetails: [],
@@ -634,7 +887,10 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
     it('el filtro `voided` sigue al status mostrado (anulado o rechazado)', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
       const { subId, paymentId } = await seedSubscription(owner, member, plan);
-      await owner.client.patch(`/api/payments/${paymentId}/status`, { status: 'voided' });
+      await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'voided',
+        voidReason: 'Cobro anulado',
+      });
 
       const res = await owner.client.get<{ data: any[] }>('/api/subscriptions', {
         query: { status: 'voided', limit: '10' },
@@ -661,7 +917,6 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         startDate: isoDate(0),
         endDate: isoDate(30),
         payment: {
-          amountPaid: 100,
           currencyPaid: 'USD',
           paymentMethod: 'transfer',
           paymentMethodDetails: [],
@@ -732,6 +987,41 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
       expect(after.receipt_number).toBeNull();
     });
 
+    it('RD-156: `processing` no es un destino del PATCH (400) y la fila queda intacta', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'validated');
+      const before = await readPayment(paymentId);
+      expect(before.status).toBe('validated');
+
+      // RD-156: sending a validated charge back to `processing` used to be
+      // accepted, and the next `validated` renumbered it (the Console period was
+      // extended twice). The enum now rejects it at the schema layer.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'processing',
+      });
+      expect(res.status, res.text).toBe(400);
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('validated');
+      expect(after.receipt_number).toBe(before.receipt_number);
+    });
+
+    it('RD-156: `processing → processing` tampoco es una transición (400)', async () => {
+      const { owner, member, plan } = await setupSubscriptionFixture();
+      const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
+
+      // `processing` is a creation status, not a PATCH target: a "no-op" PATCH
+      // here would be a silent lie about an approval that never happened.
+      const res = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+        status: 'processing',
+      });
+      expect(res.status, res.text).toBe(400);
+
+      const after = await readPayment(paymentId);
+      expect(after.status).toBe('processing');
+      expect(after.receipt_number).toBeNull();
+    });
+
     it('`processing → validated` sigue funcionando y numera una sola vez', async () => {
       const { owner, member, plan } = await setupSubscriptionFixture();
       const { paymentId } = await seedWithPaymentStatus(owner, member, plan, 'processing');
@@ -762,7 +1052,7 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const res = await owner.client.delete(`/api/subscriptions/${created.body.id}`);
@@ -791,14 +1081,14 @@ describe.skipIf(skipReason !== null)('Subscriptions API', () => {
         planId: plan1.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 100, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
       await tenant2.owner.client.post('/api/subscriptions', {
         memberId: member2.id,
         planId: plan2.id,
         startDate: isoDate(0),
         endDate: isoDate(30),
-        payment: { amountPaid: 50, currencyPaid: 'USD', paymentMethod: 'cash' },
+        payment: { currencyPaid: 'USD', paymentMethod: 'cash' },
       });
 
       const res1 = await tenant1.owner.client.get('/api/subscriptions');

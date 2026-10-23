@@ -9,7 +9,7 @@
  *      it is not deleted.
  *   2. Console user (platform owner).
  *   3. The console creates the suite org (platform endpoint, as in prod).
- *   4. The console provisions the panel owner + trial subscription + gym seed.
+ *   4. The console provisions the panel owner + free platform subscription + gym seed.
  *   5. Empty org `e2e-empty` for the empty-state specs (same mechanics).
  *
  * The demo org (`Fit Stack` / `fit-stack`) is NOT touched here: it is filled by

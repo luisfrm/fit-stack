@@ -372,12 +372,10 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
         planId: z.number().int().positive(),
         startDate: z.string().optional(),
         isTrial: z.boolean().default(false),
-        priceOverrideCents: z.number().int().nonnegative().optional(),
         payment: z.object({
-          amountPaidCents: z.number().int().nonnegative(),
+          amountPaid: z.number().int().nonnegative(),
           currencyPaid: z.string().min(1),
           exchangeRateApplied: z.string().optional(),
-          baseAmountCents: z.number().int().nonnegative().optional(),
           paymentMethod: paymentMethodSchema,
           paymentMethodDetails: paymentMethodDetailsSchema,
           status: z.enum([

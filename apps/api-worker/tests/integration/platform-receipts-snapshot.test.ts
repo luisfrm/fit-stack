@@ -79,9 +79,8 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by', ()
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'validated',

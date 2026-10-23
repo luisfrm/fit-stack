@@ -3,9 +3,10 @@
  *
  * Covers: atomic global allocation under concurrency (including the
  * first-receipt race with no prior row), `FS-0000001` formatting from
- * shared, idempotent attach (`WHERE receipt_number IS NULL`),
- * global uniqueness of receipt_number, NULL legacy payments coexisting,
- * and invalid input errors.
+ * shared, claim-first numbering (`claim_platform` then attach on a CLAIMED
+ * row), idempotent attach (`WHERE receipt_number IS NULL`), global
+ * uniqueness of receipt_number, NULL legacy payments coexisting, and
+ * invalid input errors.
  *
  * The platform payment fixture is created via HTTP
  * (POST /api/platform/subscriptions); the sequence repo — which has no
@@ -27,7 +28,10 @@ import {
   type AuthedUser,
 } from '../helpers/auth';
 import { createDb } from '@workspace/database/factory';
-import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
+import {
+  createPlatformReceiptsRepository,
+  type ClaimPlatformReceiptInput,
+} from '@workspace/database/repositories/platform-receipts';
 import { formatConsoleReceiptNumber } from '@workspace/shared';
 
 describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
@@ -46,6 +50,17 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
 
   function platformRepo() {
     return createPlatformReceiptsRepository(createDb(TEST_DATABASE_URL));
+  }
+
+  /** Fiscal breakdown frozen by the claim (actor `null`: no session here). */
+  function claimInput(): ClaimPlatformReceiptInput {
+    return {
+      subtotal: 5000,
+      taxTotal: 0,
+      taxDetails: [],
+      emitterSnapshot: null,
+      issuedBy: null,
+    };
   }
 
   async function createPlatformPlan(): Promise<{ id: number }> {
@@ -67,19 +82,17 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
     return res.body;
   }
 
-  /** Platform subscription with a `processing` payment via HTTP (the attach
-   *  repo does not require a status; `processing` avoids the automatic step 1
-   *  to test the repo in isolation). */
-  async function createPaidPlatformPayment(): Promise<number> {
+  /** Platform subscription with a `processing` payment via HTTP (`processing`
+   *  avoids the automatic step 1 so the repo can be exercised in isolation). */
+  async function createPlatformPayment(): Promise<number> {
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',
@@ -93,6 +106,16 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
     );
     expect(rows[0]?.id).toBeDefined();
     return Number(rows[0]!.id);
+  }
+
+  /** The claim requires `validated`: the fixture is created as `processing`. */
+  async function createValidatedPlatformPayment(): Promise<number> {
+    const paymentId = await createPlatformPayment();
+    await testQuery(
+      `UPDATE platform_subscription_payment SET status = 'validated' WHERE id = $1`,
+      [paymentId],
+    );
+    return paymentId;
   }
 
   it('N concurrent calls → unique consecutive numbers 1..N (no prior row)', async () => {
@@ -111,26 +134,71 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
     expect(formatConsoleReceiptNumber(42)).toBe('FS-0000042');
   });
 
-  it('attach numbers a payment and re-attach is idempotent (no renumber)', async () => {
+  it('claims then numbers a payment; re-attach is idempotent (no renumber)', async () => {
     // 101+ deliberate: outside the 1..N range of the concurrency test.
     const repo = platformRepo();
-    const paymentId = await createPaidPlatformPayment();
+    const paymentId = await createValidatedPlatformPayment();
 
-    const first = await repo.attachPlatformReceipt(paymentId, {
+    expect(await repo.claimPlatformReceipt(paymentId, claimInput())).toEqual({
+      claimed: true,
+    });
+
+    const first = await repo.attachPlatformReceiptNumber(paymentId, {
       receiptNumber: formatConsoleReceiptNumber(101),
       receiptIssuedAt: new Date(),
     });
     expect(first.receiptNumber).toBe('FS-0000101');
 
-    const second = await repo.attachPlatformReceipt(paymentId, {
+    const second = await repo.attachPlatformReceiptNumber(paymentId, {
       receiptNumber: formatConsoleReceiptNumber(102),
       receiptIssuedAt: new Date(),
     });
     expect(second.receiptNumber).toBe('FS-0000101');
   });
 
+  it('claims only a validated payment, only once, and freezes the snapshot', async () => {
+    const repo = platformRepo();
+    const paymentId = await createPlatformPayment();
+
+    // Still `processing`: not claimable.
+    expect(await repo.claimPlatformReceipt(paymentId, claimInput())).toEqual({
+      claimed: false,
+    });
+
+    await testQuery(
+      `UPDATE platform_subscription_payment SET status = 'validated' WHERE id = $1`,
+      [paymentId],
+    );
+    expect(await repo.claimPlatformReceipt(paymentId, claimInput())).toEqual({
+      claimed: true,
+    });
+
+    // Second claim loses: the sequence is never consumed twice for one row.
+    expect(await repo.claimPlatformReceipt(paymentId, claimInput())).toEqual({
+      claimed: false,
+    });
+
+    const rows = await testQuery<{ receipt_claim_at: string | null }>(
+      `SELECT receipt_claim_at FROM platform_subscription_payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(rows[0]?.receipt_claim_at).not.toBeNull();
+  });
+
+  it('never numbers an UNCLAIMED payment', async () => {
+    const repo = platformRepo();
+    // No claim: the UPDATE matches nothing and the re-read returns the row
+    // without a number (never numbered without a claim).
+    const paymentId = await createValidatedPlatformPayment();
+    const row = await repo.attachPlatformReceiptNumber(paymentId, {
+      receiptNumber: formatConsoleReceiptNumber(104),
+      receiptIssuedAt: new Date(),
+    });
+    expect(row.receiptNumber).toBeNull();
+  });
+
   it('legacy payments without number coexist (NULL = pre_system)', async () => {
-    const paymentId = await createPaidPlatformPayment();
+    const paymentId = await createPlatformPayment();
     const rows = await testQuery<{ receipt_number: string | null }>(
       `SELECT receipt_number FROM platform_subscription_payment WHERE id = $1`,
       [paymentId],
@@ -140,16 +208,18 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
 
   it('mismo FS- en dos pagos → viola el unique global (23505)', async () => {
     const repo = platformRepo();
-    const firstId = await createPaidPlatformPayment();
-    const secondId = await createPaidPlatformPayment();
-    await repo.attachPlatformReceipt(firstId, {
+    const firstId = await createValidatedPlatformPayment();
+    const secondId = await createValidatedPlatformPayment();
+    await repo.claimPlatformReceipt(firstId, claimInput());
+    await repo.claimPlatformReceipt(secondId, claimInput());
+    await repo.attachPlatformReceiptNumber(firstId, {
       receiptNumber: formatConsoleReceiptNumber(200),
       receiptIssuedAt: new Date(),
     });
 
     let duplicateErr: unknown;
     try {
-      await repo.attachPlatformReceipt(secondId, {
+      await repo.attachPlatformReceiptNumber(secondId, {
         receiptNumber: formatConsoleReceiptNumber(200),
         receiptIssuedAt: new Date(),
       });
@@ -169,18 +239,22 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
     await expect(repo.nextPlatformDocumentNumber('ticket' as never)).rejects.toThrow(
       /document_type inválido/,
     );
-    const paymentId = await createPaidPlatformPayment();
+    const paymentId = await createValidatedPlatformPayment();
+    await repo.claimPlatformReceipt(paymentId, claimInput());
     await expect(
-      repo.attachPlatformReceipt(paymentId, {
+      repo.attachPlatformReceiptNumber(paymentId, {
         receiptNumber: 'nope-1',
         receiptIssuedAt: new Date(),
       }),
     ).rejects.toThrow(/formato inválido/);
     await expect(
-      repo.attachPlatformReceipt(999999999, {
+      repo.attachPlatformReceiptNumber(999999999, {
         receiptNumber: formatConsoleReceiptNumber(103),
         receiptIssuedAt: new Date(),
       }),
     ).rejects.toThrow(/no existe/);
+    expect(await repo.claimPlatformReceipt(999999999, claimInput())).toEqual({
+      claimed: false,
+    });
   });
 });

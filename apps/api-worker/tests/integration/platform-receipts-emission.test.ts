@@ -5,7 +5,7 @@
  * scope 'platform', taxes persisted, zero emails), step 2 completion via
  * the real jobs-worker handler (R2 + pdf_key + gated email WITH
  * attachment), at-least-once idempotency, sweep covering the platform
- * table, $0 trial SKIP (no number burned), transition guard (re-PATCH
+ * table, free ($0) SKIP (no number burned), transition guard (re-PATCH
  * does not renumber), cumulative period intact, and RBAC (support 403).
  *
  * The PDF renderer is stubbed (`vi.mock` on jobs-worker's receipt-pdf):
@@ -78,10 +78,10 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
     client.r2.reset();
   }
 
-  async function createPlatformPlan(): Promise<{ id: number }> {
+  async function createPlatformPlan(price = 5000): Promise<{ id: number }> {
     const res = await admin.client.post('/api/platform/plans', {
       name: `SaaS Plan ${uid()}`,
-      price: 5000,
+      price,
       currency: 'USD',
       durationValue: 1,
       durationUnit: 'month',
@@ -107,9 +107,8 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
       startDate: isoDate(-60),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',
@@ -269,18 +268,21 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
     );
   });
 
-  it('T5 trial $0: SKIP sin quemar número (pre_system terminal)', async () => {
+  it('T5 plan gratis $0: SKIP sin quemar número (pre_system terminal)', async () => {
     resetSpies(admin.client);
+    // RD-117: a price-0 plan (free), NOT a trial: trials are rejected with
+    // `400 TRIAL_NOT_AVAILABLE`. The free path books a validated `$0` payment
+    // with `payment_method = 'free'`, which SKIPs emission like a trial did.
+    const freePlan = await createPlatformPlan(0);
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
-      planId: plan.id,
+      planId: freePlan.id,
       startDate: isoDate(0),
-      isTrial: true,
+      isTrial: false,
       payment: {
-        amountPaidCents: 0,
+        amountPaid: 0,
         currencyPaid: 'USD',
-        baseAmountCents: 0,
-        paymentMethod: 'trial',
+        paymentMethod: 'free',
         paymentMethodDetails: [],
         status: 'validated',
         paymentDate: isoDate(0),
@@ -298,6 +300,9 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
       ),
     );
     expect(payment['receipt_number']).toBeNull();
+    // Free path, never a trial; the snapshot price is 0 (no revenue booked).
+    expect(payment['payment_method']).toBe('free');
+    expect(Number(payment['plan_snapshot_price'])).toBe(0);
     expect(admin.client.receiptQueue.ofType('receipt.render')).toHaveLength(0);
     expect(admin.client.queue.ofType('email.org_payment_received')).toHaveLength(0);
   });

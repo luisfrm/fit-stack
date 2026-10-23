@@ -51,14 +51,12 @@ function receiptStatus(row: OrgReceiptRow): { label: string; variant: ReceiptBad
 }
 
 /**
- * Amount paired with the currency it belongs to (never crossed):
- * `baseAmount` is in the plan currency, `amountPaid` in the paid one.
+ * Amount paired with the currency it belongs to: the frozen plan price
+ * (`baseAmount`) is always expressed in the plan currency, never crossed with
+ * the paid currency.
  */
 function displayAmount(row: OrgReceiptRow): { cents: number; currency: string } {
-  if (row.baseAmount != null) {
-    return { cents: row.baseAmount, currency: row.planCurrency };
-  }
-  return { cents: row.amountPaid, currency: row.currencyPaid };
+  return { cents: row.baseAmount, currency: row.planCurrency };
 }
 
 export default function SettingsReceiptsPage() {

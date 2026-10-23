@@ -45,6 +45,8 @@ export interface PanelReceiptPaymentRow {
   /** Plan snapshot frozen at payment time (source of plan name/currency). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
+  /** Plan price in the plan currency (integer cents): the exact base amount. */
+  planSnapshotPrice?: number | string | null;
   /** Emitter identity frozen at issuance; `null` = legacy, live compose. */
   emitterSnapshot?: unknown;
 }
@@ -103,6 +105,8 @@ export interface PlatformReceiptPaymentRow {
   planSnapshotName?: string | null;
   /** Base currency frozen in the payment (always present in SaaS rows). */
   planSnapshotCurrency: string;
+  /** Plan price in that currency (integer cents) — the base-currency amount. */
+  planSnapshotPrice?: number | string | null;
   emitterSnapshot?: unknown;
 }
 
@@ -171,6 +175,8 @@ export function composePanelReceipt(rows: PanelReceiptComposedRows): ReceiptData
       receiptVoided: payment.receiptVoided,
       planSnapshotName: payment.planSnapshotName,
       planSnapshotCurrency: payment.planSnapshotCurrency,
+      planSnapshotPrice:
+        payment.planSnapshotPrice != null ? Number(payment.planSnapshotPrice) : null,
     },
     organization: {
       name: organization.name,
@@ -232,6 +238,8 @@ export function composePlatformReceipt(rows: PlatformReceiptComposedRows): Recei
       taxDetails: payment.taxDetails,
       planSnapshotName: payment.planSnapshotName,
       planSnapshotCurrency: payment.planSnapshotCurrency,
+      planSnapshotPrice:
+        payment.planSnapshotPrice != null ? Number(payment.planSnapshotPrice) : null,
       voided: payment.receiptVoided,
     },
     subscription: subscription

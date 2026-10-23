@@ -2,9 +2,13 @@
 
 import * as React from "react";
 import { Plus, X } from "lucide-react";
-import { Button, toast, FloatingActionButton } from "@workspace/ui/components";
+import { Button, toast, FloatingActionButton, ReasonPromptModal } from "@workspace/ui/components";
 import { useRouter } from "next/navigation";
-import { SubscriptionsTable } from "@/components/payments/subscriptions-table";
+import {
+  SubscriptionsTable,
+  type PaymentStatusDecision,
+  type PaymentVoidIntent,
+} from "@/components/payments/subscriptions-table";
 import { SubscriptionModal } from "@/components/payments/subscription-modal";
 import { PendingPaymentsList } from "@/components/payments/pending-payments-list";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -15,6 +19,7 @@ import { PaymentMethodsChart } from "@/components/payments/payment-methods-chart
 import { KpiSectionSkeleton, RevenueChartSkeleton } from "@/components/payments/dashboard-skeletons";
 import { useDebounce } from "@workspace/ui/hooks/use-debounce";
 import {
+  API_ERROR_CODES,
   PAYMENT_STATUSES,
   SUBSCRIPTION_STATUSES,
   type SubscriptionStatus,
@@ -71,7 +76,52 @@ function resolvePaymentErrorMessage(
   if (code === "SUBSCRIPTION_CANCELLED") {
     return "La suscripción está cancelada: no se puede validar este cobro";
   }
+  if (code === API_ERROR_CODES.VOID_REASON_REQUIRED) {
+    return "Indica el motivo de la anulación";
+  }
   return mutationError(context, err, defaultMessage);
+}
+
+/**
+ * RD-163: an annulment/rejection always carries a non-blank reason. The server
+ * rejects a `voided` without it (`400 VOID_REASON_REQUIRED`); the UI stops it
+ * before the request so the operator does not lose the action.
+ */
+function normalizedVoidReason(
+  status: string,
+  voidReason: string | undefined,
+): string | null {
+  if (status !== PAYMENT_STATUSES.VOIDED) return null;
+  const reason = voidReason?.trim();
+  return reason ? reason : null;
+}
+
+/**
+ * Copy of the mandatory-reason prompt per void intent. The field starts empty
+ * on purpose: a prefilled sentence would only move the old server default to
+ * the client.
+ */
+const VOID_REASON_PROMPT = {
+  reject: {
+    title: "Rechazar pago",
+    description:
+      "El cobro quedará anulado y la suscripción ANULADA. Escribe el motivo: queda en la auditoría del comprobante.",
+    placeholder: "Ej.: el comprobante no coincide con el monto cobrado",
+    confirmText: "Rechazar",
+  },
+  void: {
+    title: "Anular cobro",
+    description:
+      "El cobro se anula y su comprobante conserva el número. Escribe el motivo: queda en la auditoría.",
+    placeholder: "Ej.: cobro duplicado, se registró dos veces el mismo pago",
+    confirmText: "Anular",
+  },
+} as const;
+
+/** A void waiting for the operator's mandatory reason. */
+interface VoidRequest {
+  readonly paymentId: number;
+  readonly intent: PaymentVoidIntent;
 }
 
 export function PaymentsClient({
@@ -106,6 +156,8 @@ export function PaymentsClient({
   const [analytics, setAnalytics] = React.useState(initialAnalytics);
   const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
   const [pendingActionId, setPendingActionId] = React.useState<number | null>(null);
+  const [voidRequest, setVoidRequest] = React.useState<VoidRequest | null>(null);
+  const [voidSubmitting, setVoidSubmitting] = React.useState(false);
 
   // P2: only readily available inputs (latest bucket + active subs from KPI).
   const monthCollectedCents = React.useMemo(
@@ -171,17 +223,34 @@ export function PaymentsClient({
     }
   };
 
-  const handlePaymentStatusChange = async (
+  /**
+   * Single entry point for a payment decision. A `voided` never carries a
+   * default sentence: the operator writes the reason in `ReasonPromptModal`,
+   * and the intent (`reject` / `void`) — not the text — drives the copy.
+   * Resolves `true` only when the server confirmed the transition.
+   */
+  const executePaymentStatusChange = async (
     paymentId: number,
-    status: string,
+    status: PaymentStatusDecision,
     voidReason?: string,
-  ) => {
+    intent: PaymentVoidIntent = "void",
+  ): Promise<boolean> => {
+    const reason = normalizedVoidReason(status, voidReason);
+    if (status === PAYMENT_STATUSES.VOIDED && !reason) {
+      toast.error(
+        intent === "reject"
+          ? "Indica el motivo del rechazo"
+          : "Indica el motivo de la anulación",
+      );
+      return false;
+    }
+    setPendingActionId(paymentId);
     try {
-      const result = await financeService.updatePaymentStatus(paymentId, status, voidReason);
+      const result = await financeService.updatePaymentStatus(paymentId, status, reason ?? undefined);
       // Voiding a payment without an issued receipt is not an error, nor
       // a generic "success": cashier needs to know that nothing was voided.
       if (status === PAYMENT_STATUSES.VOIDED) {
-        const rejected = voidReason === "Pago rechazado";
+        const rejected = intent === "reject";
         if (result?.receiptVoided === false) {
           toast.success(
             rejected
@@ -192,9 +261,10 @@ export function PaymentsClient({
           toast.success(rejected ? "Pago rechazado." : "Pago anulado.");
         }
       } else {
-        toast.success("Estado de pago actualizado correctamente");
+        toast.success("Pago validado.");
       }
       refreshAll();
+      return true;
     } catch (err) {
       // UX-meaningful codes (never compare raw server error text):
       // the invariant guard validated ⇔ numbered only accepts
@@ -202,32 +272,43 @@ export function PaymentsClient({
       toast.error(
         resolvePaymentErrorMessage(err, "PaymentsClient", "Error al actualizar pago"),
       );
-    }
-  };
-
-  /** Fast validate/reject from "Needs validation" action list. */
-  const handlePendingAction = async (
-    paymentId: number,
-    status: string,
-    voidReason?: string,
-  ) => {
-    setPendingActionId(paymentId);
-    try {
-      await financeService.updatePaymentStatus(paymentId, status, voidReason);
-      toast.success(
-        status === PAYMENT_STATUSES.VALIDATED ? "Pago validado." : "Pago rechazado.",
-      );
-      refreshAll();
-    } catch (err) {
-      // Same code mapping as `handlePaymentStatusChange`: "Needs validation"
-      // item may also bring up payment for a cancelled subscription.
-      toast.error(
-        resolvePaymentErrorMessage(err, "PendingPaymentsList", "No se pudo actualizar el pago"),
-      );
+      return false;
     } finally {
       setPendingActionId(null);
     }
   };
+
+  /** Requests a decision; a void opens the mandatory-reason prompt first. */
+  const requestPaymentDecision = (
+    paymentId: number,
+    status: PaymentStatusDecision,
+    intent: PaymentVoidIntent = "void",
+  ) => {
+    if (status === PAYMENT_STATUSES.VALIDATED) {
+      void executePaymentStatusChange(paymentId, status);
+      return;
+    }
+    setVoidRequest({ paymentId, intent });
+  };
+
+  const handleVoidConfirm = async (reason: string) => {
+    if (!voidRequest) return;
+    setVoidSubmitting(true);
+    try {
+      const succeeded = await executePaymentStatusChange(
+        voidRequest.paymentId,
+        PAYMENT_STATUSES.VOIDED,
+        reason,
+        voidRequest.intent,
+      );
+      // Keep the prompt (and the typed reason) when the server rejects it.
+      if (succeeded) setVoidRequest(null);
+    } finally {
+      setVoidSubmitting(false);
+    }
+  };
+
+  const voidPrompt = VOID_REASON_PROMPT[voidRequest?.intent ?? "void"];
 
   let analyticsContent: React.ReactNode = null;
   if (analyticsLoading && !analytics) {
@@ -297,8 +378,8 @@ export function PaymentsClient({
           items={initialPending}
           currencyFormat={currencyFormat}
           actionId={pendingActionId}
-          onValidate={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VALIDATED)}
-          onReject={(paymentId) => handlePendingAction(paymentId, PAYMENT_STATUSES.VOIDED, "Pago rechazado")}
+          onValidate={(paymentId) => requestPaymentDecision(paymentId, PAYMENT_STATUSES.VALIDATED)}
+          onReject={(paymentId) => requestPaymentDecision(paymentId, PAYMENT_STATUSES.VOIDED, "reject")}
         />
 
         <FilterPanel
@@ -354,7 +435,7 @@ export function PaymentsClient({
           <SubscriptionsTable
             subscriptions={initialSubscriptions.data as ISubscription[]}
             onStatusChange={handleStatusChange}
-            onPaymentStatusChange={handlePaymentStatusChange}
+            onPaymentStatusChange={requestPaymentDecision}
             onSuccess={refreshAll}
             loading={false}
             pagination={{
@@ -386,6 +467,22 @@ export function PaymentsClient({
           onOpenChange={setIsNewPaymentModalOpen}
           onSuccess={refreshAll}
           trigger={<span />}
+        />
+
+        {/* RD-163: the reason is typed by the operator — never a client default. */}
+        <ReasonPromptModal
+          open={voidRequest !== null}
+          onOpenChange={(open) => {
+            if (!open) setVoidRequest(null);
+          }}
+          title={voidPrompt.title}
+          description={voidPrompt.description}
+          label="Motivo *"
+          placeholder={voidPrompt.placeholder}
+          confirmText={voidPrompt.confirmText}
+          variant="danger"
+          isLoading={voidSubmitting}
+          onConfirm={handleVoidConfirm}
         />
       </div>
     </div>

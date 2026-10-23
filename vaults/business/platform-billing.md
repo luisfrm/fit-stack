@@ -48,7 +48,7 @@ A `voided` payment is **ignored**: it never revokes service; grace runs from `cu
 
 ### Subscription deletion (RD-153)
 
-`DELETE /api/platform/subscriptions/:id` is a hard delete and exists only for a
+`DELETE /api/platform/subscriptions/:id` requires `console:manage` (admin/owner; `support` → 403). It is a hard delete and exists only for a
 subscription with **zero** payment rows (e.g. a misplaced record). With any
 `platform_subscription_payment` row the endpoint answers **409
 `SUBSCRIPTION_HAS_PAYMENTS`** and deletes zero rows: the record is financial
@@ -73,9 +73,17 @@ Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/sett
 - **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
   - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.
   - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, fresh cache `rates:{base}` 1h + `rates:last:{base}` 30d; `EXCHANGE_API_URL` override for tests). `rate = 1` only if currency == plan currency. Provider failure → uses the last successful response for the SAME base (logged) or, without one, fails visibly (503) — never an assumed rate. Rates are never editable in the UI.
-  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = effective price`, `exchangeRateApplied = String(rate)`.
+  - `amountPaid = round(plan.price × rate)` (or `0` for a free plan), `exchangeRateApplied = String(rate)` (`numeric(20,10)`). The booked base amount is the frozen `planSnapshotPrice` written by the same payment: there is no separate base column and no `price_override` (both dropped in migration `0028`). The request body cannot state the base amount nor a commercial override; per-customer discounts are a future coupon feature, not an override column (RD-157/RD-163).
   - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
   - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).
   - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
 - **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
 - **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).
+
+### Trials discontinued (RD-117)
+
+**There are no more trials.** `POST /api/platform/subscriptions` and its org-scoped mirror answer **400 `TRIAL_NOT_AVAILABLE`** when the body sends `isTrial: true`, before the first write, so no orphan row is left. The Console form no longer offers the toggle. Rule source: `AGENTS.md` §11.
+
+- `payment_method = 'trial'` survives only in historical rows; `is_trial` is untouched, so an old subscription still computes `trial` while its period is in force. Migration `0029` zeroes their frozen snapshot (`plan_snapshot_price = 0`) so they stop inflating revenue, and a trial never burned an `FS-N` number.
+- **A free plan is not a trial**: `price = 0` keeps the free path (`validated`, `payment_method = 'free'`, `plan_snapshot_price = 0`, `pre_system`, no revenue, no series number).
+- **Future discounts are coupons**, never a resurrected `price_override`/`base_amount` column.

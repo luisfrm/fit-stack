@@ -2,6 +2,7 @@
 description: "Revisor de solo lectura de Fit-Stack. Contrasta los cambios del working tree con los criterios de aceptación de la issue y las reglas de AGENTS.md (multi-tenant, capas, dinero, zonas horarias, migraciones). Nunca edita."
 mode: subagent
 steps: 30
+model: opencode/deepseek-v4.1-flash-free
 permissions:
   - {action: edit, resource: "*", effect: deny}
   - {action: subagent, resource: "*", effect: deny}

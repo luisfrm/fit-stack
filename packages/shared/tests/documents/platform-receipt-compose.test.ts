@@ -7,9 +7,27 @@ import {
   buildPlatformEmitterSnapshot,
   buildPlatformReceiptDataFromComposed,
   platformEmitterFromSettings,
+  resolvePlatformEmitterProfile,
   type PlatformComposeReceiptInput,
 } from '../../src/documents/receipt-compose';
 import { resolveFiscalProfile } from '../../src/documents/fiscal-profile';
+import type { ReceiptEmitterSnapshot } from '../../src/documents/receipt-data';
+
+/**
+ * Issuer snapshot of an input: RD-160 freezes the ISSUER's fiscal wording
+ * (`fitstack_country_code`) while the recipient keeps its own profile.
+ */
+function snapshotFor(input: PlatformComposeReceiptInput): ReceiptEmitterSnapshot {
+  return buildPlatformEmitterSnapshot(
+    {
+      receptor: input.receptor,
+      emitter: input.emitter,
+      currency: input.payment.planSnapshotCurrency,
+    },
+    resolvePlatformEmitterProfile(input.emitter),
+    resolveFiscalProfile(input.receptor.countryCode, undefined),
+  );
+}
 
 function baseInput(): PlatformComposeReceiptInput {
   return {
@@ -69,12 +87,14 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(data.internalPaymentId).toBe(7);
   });
 
-  it('emisor vacío → genérico FitStack con país proxy del receptor', () => {
+  it('emisor vacío → genérico FitStack (el país del receptor no decide la etiqueta)', () => {
     const input = baseInput();
     input.emitter = { legalName: '', taxId: '', address: '', countryCode: '' };
     const data = buildPlatformReceiptDataFromComposed(input);
     expect(data.emitter.name).toBe('FitStack');
+    // Informational field only: the fiscal wording stays generic (RD-160).
     expect(data.emitter.countryCode).toBe('VE');
+    expect(data.emitter.taxLabel).toBe('Tax ID');
     expect(data.document.label).toBe('Comprobante de pago');
   });
 
@@ -115,6 +135,24 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(
       buildPlatformReceiptDataFromComposed(conversion).amounts.baseTotal,
     ).toBe(200);
+  });
+
+  it('baseTotal usa el precio del plan congelado y cae a la división si falta', () => {
+    const frozen = baseInput();
+    frozen.payment.currencyPaid = 'VES';
+    frozen.payment.exchangeRateApplied = '36.5';
+    frozen.payment.amountPaid = 7300;
+    frozen.payment.planSnapshotPrice = 5000;
+    expect(buildPlatformReceiptDataFromComposed(frozen).amounts.baseTotal).toBe(5000);
+
+    // Row without the frozen plan price (pre-snapshot): documented division
+    // fallback, 7300 / 36.5 = 200.
+    const legacy = baseInput();
+    legacy.payment.currencyPaid = 'VES';
+    legacy.payment.exchangeRateApplied = '36.5';
+    legacy.payment.amountPaid = 7300;
+    legacy.payment.planSnapshotPrice = null;
+    expect(buildPlatformReceiptDataFromComposed(legacy).amounts.baseTotal).toBe(200);
   });
 
   it('trial $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {
@@ -166,18 +204,105 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(data.recipient.address).toBeNull();
   });
 
+  /* ── Etiqueta y disclaimer del emisor (RD-160) ── */
+
+  const GENERIC_DISCLAIMER = [
+    'Comprobante de pago interno. No constituye una factura fiscal.',
+    'Emitido por FitStack',
+  ];
+
+  it('emisor VE hacia receptor CO: la etiqueta y el disclaimer siguen al emisor', () => {
+    const input = baseInput();
+    input.receptor = {
+      ...input.receptor,
+      countryCode: 'CO',
+      timezone: 'America/Bogota',
+    };
+    // The receiver's country must never drive the issuer's fiscal wording.
+    input.emitter = {
+      legalName: 'FitStack C.A.',
+      taxId: 'J-123',
+      address: 'Av. Principal',
+      countryCode: 'VE',
+    };
+    const data = buildPlatformReceiptDataFromComposed(input);
+
+    expect(data.emitter.taxLabel).toBe('R.I.F.');
+    expect(data.footer.disclaimer.join(' ')).toContain('SENIAT');
+    expect(data.footer.disclaimer.join(' ')).not.toContain('DIAN');
+    // The recipient keeps the label of ITS country.
+    expect(data.recipient.docLabel).toBe('NIT');
+  });
+
+  it('emisor CO hacia receptor VE: NIT para el emisor y disclaimer de CO', () => {
+    const input = baseInput();
+    input.emitter = {
+      legalName: 'FitStack Colombia S.A.S.',
+      taxId: 'NIT-999',
+      address: 'Bogotá',
+      countryCode: 'CO',
+    };
+    const data = buildPlatformReceiptDataFromComposed(input);
+
+    expect(data.emitter.taxLabel).toBe('NIT');
+    expect(data.footer.disclaimer.join(' ')).toContain('DIAN');
+    expect(data.footer.disclaimer.join(' ')).not.toContain('SENIAT');
+    expect(data.recipient.docLabel).toBe('R.I.F.');
+  });
+
+  it('emisor sin país y con taxId: Tax ID genérico y disclaimer no fiscal', () => {
+    const input = baseInput();
+    input.receptor = {
+      ...input.receptor,
+      countryCode: 'CO',
+      timezone: 'America/Bogota',
+    };
+    input.emitter = { ...input.emitter, countryCode: '' };
+    const data = buildPlatformReceiptDataFromComposed(input);
+
+    // Never the recipient's NIT: no configured issuer country = generic.
+    expect(data.emitter.taxLabel).toBe('Tax ID');
+    expect(data.emitter.taxId).toBe('J-123');
+    expect(data.footer.disclaimer).toEqual(GENERIC_DISCLAIMER);
+    expect(data.footer.disclaimer.join(' ')).not.toMatch(/SENIAT|DIAN/);
+    expect(data.recipient.docLabel).toBe('NIT');
+  });
+
+  it('emisor sin país y sin taxId: sin línea fiscal y disclaimer genérico', () => {
+    const input = baseInput();
+    input.emitter = { legalName: '', taxId: '', address: '', countryCode: '' };
+    const data = buildPlatformReceiptDataFromComposed(input);
+
+    // No `taxId` → the PDF omits the fiscal line (never invented).
+    expect(data.emitter.taxId).toBeNull();
+    expect(data.emitter.taxLabel).toBe('Tax ID');
+    expect(data.footer.disclaimer).toEqual(GENERIC_DISCLAIMER);
+    expect(data.document.label).toBe('Comprobante de pago');
+    // The recipient keeps its own label.
+    expect(data.recipient.docLabel).toBe('R.I.F.');
+  });
+
+  it('snapshot congelado: cambiar el país del emisor después de emitir no cambia nada', () => {
+    const issued = baseInput();
+    issued.emitterSnapshot = snapshotFor(issued);
+    const asIssued = buildPlatformReceiptDataFromComposed(issued);
+    expect(asIssued.emitter.taxLabel).toBe('R.I.F.');
+
+    const later: PlatformComposeReceiptInput = {
+      ...issued,
+      emitter: { ...issued.emitter, countryCode: 'CO' },
+    };
+    const recomposed = buildPlatformReceiptDataFromComposed(later);
+    expect(recomposed.emitter.taxLabel).toBe('R.I.F.');
+    expect(recomposed.footer.disclaimer).toEqual(asIssued.footer.disclaimer);
+    expect(recomposed.footer.disclaimer.join(' ')).toContain('SENIAT');
+  });
+
   it('snapshot previo con docLabel se respeta tal cual (estado terminal, C1)', () => {
     const input = baseInput();
     // Snapshot emitted BEFORE RD-150: it froze the person-natural label.
     input.emitterSnapshot = {
-      ...buildPlatformEmitterSnapshot(
-        {
-          receptor: input.receptor,
-          emitter: input.emitter,
-          currency: input.payment.planSnapshotCurrency,
-        },
-        resolveFiscalProfile('VE', undefined),
-      ),
+      ...snapshotFor(input),
       recipientDocLabel: 'C.I.',
     };
     const data = buildPlatformReceiptDataFromComposed(input);
@@ -191,14 +316,7 @@ describe('buildPlatformReceiptDataFromComposed', () => {
 
   it('con snapshot: editar el emisor DESPUÉS no cambia el comprobante', () => {
     const issued = baseInput();
-    issued.emitterSnapshot = buildPlatformEmitterSnapshot(
-      {
-        receptor: issued.receptor,
-        emitter: issued.emitter,
-        currency: issued.payment.planSnapshotCurrency,
-      },
-      resolveFiscalProfile(issued.receptor.countryCode, undefined),
-    );
+    issued.emitterSnapshot = snapshotFor(issued);
     const asIssued = buildPlatformReceiptDataFromComposed(issued);
 
     const later: PlatformComposeReceiptInput = {
@@ -221,13 +339,11 @@ describe('buildPlatformReceiptDataFromComposed', () => {
 
   it('congela el emisor genérico cuando las keys están vacías', () => {
     const input = baseInput();
-    const emitter = platformEmitterFromSettings({});
-    const snapshot = buildPlatformEmitterSnapshot(
-      { receptor: input.receptor, emitter, currency: 'USD' },
-      resolveFiscalProfile('VE', undefined),
-    );
+    input.emitter = platformEmitterFromSettings({});
+    const snapshot = snapshotFor(input);
     expect(snapshot.emitter.name).toBe('FitStack');
     expect(snapshot.emitter.countryCode).toBe('VE');
+    expect(snapshot.emitter.taxLabel).toBe('Tax ID');
     expect(snapshot.disclaimer).toContain('Emitido por FitStack');
     // FitStack no es contribuyente formal: todos los impuestos congelados off.
     expect(snapshot.taxes).toEqual([
@@ -238,14 +354,7 @@ describe('buildPlatformReceiptDataFromComposed', () => {
 
   it('con snapshot no se lee el país del receptor (config viva irrelevante)', () => {
     const input = baseInput();
-    input.emitterSnapshot = buildPlatformEmitterSnapshot(
-      {
-        receptor: input.receptor,
-        emitter: input.emitter,
-        currency: input.payment.planSnapshotCurrency,
-      },
-      resolveFiscalProfile('VE', undefined),
-    );
+    input.emitterSnapshot = snapshotFor(input);
     // País del receptor corrupto/desconocido: el emitido sigue componiendo.
     input.receptor = { ...input.receptor, countryCode: 'XX' };
     expect(buildPlatformReceiptDataFromComposed(input).emitter.countryCode).toBe('VE');
@@ -269,6 +378,13 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     const badCountry = baseInput();
     badCountry.receptor = { ...badCountry.receptor, countryCode: 'XX' };
     expect(() => buildPlatformReceiptDataFromComposed(badCountry)).toThrow(/desconocido/);
+
+    // Unknown ISSUER country is a visible configuration error too (RD-160).
+    const badEmitterCountry = baseInput();
+    badEmitterCountry.emitter = { ...badEmitterCountry.emitter, countryCode: 'XX' };
+    expect(() => buildPlatformReceiptDataFromComposed(badEmitterCountry)).toThrow(
+      /desconocido/,
+    );
 
     const badDate = baseInput();
     badDate.issuedAt = new Date(NaN);

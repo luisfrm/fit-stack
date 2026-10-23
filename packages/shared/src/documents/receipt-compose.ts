@@ -49,6 +49,8 @@ export interface ComposePayment {
   /** Snapshot frozen upon payment registration (source of plan name). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
+  /** Plan price frozen at payment time, in the plan currency (integer cents). */
+  planSnapshotPrice?: number | null;
 }
 
 export interface ComposeOrganization {
@@ -89,18 +91,29 @@ export interface ComposeReceiptInput {
 }
 
 /**
- * Base currency equivalent total, in integer cents. Persisted rate
- * reads "1 {base} = {rate} {paid}", so it is divided.
- * `null` when there is no conversion (same currency or absent/invalid rate):
- * document does not show an invented equivalent.
+ * Base currency equivalent total, in integer cents.
+ *
+ * The frozen plan price (the base-currency amount captured at payment time)
+ * is the EXACT base total and always wins: converting back by dividing the
+ * paid amount by the stored rate accumulates rounding, and a 4-decimal rate
+ * used to lose up to ~20% on quotes like COP->USD.
+ *
+ * The division is the documented fallback for historical rows written before
+ * the plan snapshot price was captured (`baseAmount` absent) and still needs a
+ * valid rate. `null` when there is no conversion (same currency or absent
+ * base currency): the document does not show an invented equivalent.
  */
 function toBaseTotal(
   total: number,
   currencyPaid: string,
   baseCurrency: string | null | undefined,
   exchangeRateApplied: string | null | undefined,
+  baseAmount?: number | null,
 ): number | null {
   if (!baseCurrency || baseCurrency === currencyPaid) return null;
+  if (typeof baseAmount === 'number' && Number.isInteger(baseAmount) && baseAmount >= 0) {
+    return baseAmount;
+  }
   const rate = Number(exchangeRateApplied);
   if (!Number.isFinite(rate) || rate <= 0) return null;
   return roundCents(total / rate);
@@ -175,9 +188,34 @@ export function platformEmitterFromSettings(
 }
 
 /**
- * Platform issuer identity: FitStack settings + fiscal profile of
- * RECIPIENT country (org does not decide its VAT). Without configured country,
- * issuer inherits recipient's (documented proxy, PENDING §8).
+ * Generic FitStack issuer wording when the platform did not configure its own
+ * fiscal country: no country regime is claimed (least of all the recipient's)
+ * and the document stays non-fiscal.
+ */
+const GENERIC_PLATFORM_TAX_LABEL = 'Tax ID';
+const GENERIC_PLATFORM_DISCLAIMER = [
+  'Comprobante de pago interno. No constituye una factura fiscal.',
+];
+
+/**
+ * Resolves the FitStack issuer fiscal profile from its OWN configured country
+ * (`fitstack_country_code`). Empty = generic issuer (`null`): the fiscal label
+ * and disclaimer are never borrowed from the recipient. Unknown country →
+ * visible error, never a silent default.
+ */
+export function resolvePlatformEmitterProfile(
+  emitter: PlatformComposeEmitter,
+): FiscalProfile | null {
+  const countryCode = emitter.countryCode?.trim();
+  if (!countryCode) return null;
+  return resolveFiscalProfile(countryCode);
+}
+
+/**
+ * Platform issuer identity. The fiscal wording (`taxLabel`, `disclaimer`)
+ * follows the ISSUER's profile; the recipient keeps its own label from ITS
+ * profile (that is why both profiles are required). A `null` issuer profile is
+ * a generic emitter, not the recipient's regime.
  */
 function platformEmitterIdentity(
   input: {
@@ -186,17 +224,23 @@ function platformEmitterIdentity(
     /** Base currency frozen in payment (`planSnapshotCurrency`). */
     currency: string;
   },
-  profile: FiscalProfile,
+  emitterProfile: FiscalProfile | null,
+  receptorProfile: FiscalProfile,
 ): Omit<ReceiptEmitterSnapshot, 'version' | 'taxes'> {
   const emitter: ReceiptEmitter = {
     name: input.emitter.legalName?.trim() || 'FitStack',
     legalName: input.emitter.legalName?.trim() || null,
     taxId: input.emitter.taxId?.trim() || null,
-    taxLabel: profile.taxLabel,
+    // Fiscal label of the issuer's country; `Tax ID` when none is configured
+    // (the line is printed only if a `taxId` exists).
+    taxLabel: emitterProfile?.taxLabel ?? GENERIC_PLATFORM_TAX_LABEL,
     address: input.emitter.address?.trim() || null,
+    // Informational only: with no configured issuer country it never decides
+    // the fiscal wording (that stays generic). The contract keeps it non-empty.
     countryCode: input.emitter.countryCode?.trim() || input.receptor.countryCode,
     currency: input.currency,
   };
+  const disclaimer = emitterProfile?.disclaimer ?? GENERIC_PLATFORM_DISCLAIMER;
   return {
     emitter,
     // FitStack is not declared formal taxpayer: gate enforces
@@ -207,27 +251,32 @@ function platformEmitterIdentity(
     }),
     // B2B recipient (organization): the printed label is the country
     // `taxLabel` (`R.I.F.`, `NIT`), never the person-natural `docLabel`.
-    recipientDocLabel: profile.taxLabel,
-    disclaimer: profile.disclaimer.includes('Emitido por FitStack')
-      ? profile.disclaimer
-      : [...profile.disclaimer, 'Emitido por FitStack'],
+    recipientDocLabel: receptorProfile.taxLabel,
+    disclaimer: disclaimer.includes('Emitido por FitStack')
+      ? disclaimer
+      : [...disclaimer, 'Emitido por FitStack'],
     timezone: input.receptor.timezone,
   };
 }
 
-/** Platform issuer snapshot (FitStack). */
+/**
+ * Platform issuer snapshot (FitStack). `emitterProfile` freezes the issuer's
+ * fiscal wording; `receptorProfile` only provides the recipient label and the
+ * tax breakdown (FitStack taxes, always disabled).
+ */
 export function buildPlatformEmitterSnapshot(
   input: {
     receptor: PlatformComposeReceptor;
     emitter: PlatformComposeEmitter;
     currency: string;
   },
-  profile: FiscalProfile,
+  emitterProfile: FiscalProfile | null,
+  receptorProfile: FiscalProfile,
 ): ReceiptEmitterSnapshot {
   return {
     version: 1,
-    ...platformEmitterIdentity(input, profile),
-    taxes: summarizeTaxes(profile.taxes),
+    ...platformEmitterIdentity(input, emitterProfile, receptorProfile),
+    taxes: summarizeTaxes(receptorProfile.taxes),
   };
 }
 
@@ -336,6 +385,11 @@ export interface ReceiptAssemblyPayment {
   subtotal: number;
   taxTotal: number;
   taxDetails: ITaxDetail[];
+  /**
+   * Base-currency amount (the frozen plan snapshot price). Exact; when
+   * absent the assembly falls back to dividing by the persisted rate.
+   */
+  baseAmount?: number | null;
 }
 
 /** Issuer differences, already resolved by the per-issuer mapper. */
@@ -405,6 +459,7 @@ export function assembleReceiptData(input: ReceiptAssemblyInput): ReceiptData {
         payment.currencyPaid,
         input.baseCurrency,
         payment.exchangeRateApplied,
+        payment.baseAmount,
       ),
     },
     method: {
@@ -485,6 +540,11 @@ export function buildReceiptDataFromComposed(
       subtotal: payment.subtotal,
       taxTotal: payment.taxTotal,
       taxDetails,
+      // The plan price IS the base amount (the server priced the charge from
+      // it): never re-derive it by dividing the rounded rate. Guarded by
+      // `planSnapshotCurrency`: without it the base falls back to the org
+      // primary currency, where the plan price is not the base.
+      baseAmount: payment.planSnapshotCurrency ? (payment.planSnapshotPrice ?? null) : null,
     },
     baseCurrency: payment.planSnapshotCurrency ?? organization.primaryCurrency,
     voided: payment.receiptVoided ?? false,
@@ -493,9 +553,12 @@ export function buildReceiptDataFromComposed(
 
 /* ── SaaS receipt (Console) ────────────────────────────────────────
    Issuer = FitStack (`platform_setting` keys); recipient = org.
-   Fiscal profile and taxes from recipient country WITHOUT override (the
-   org does not decide its VAT); unknown country → visible error. Issuer without
-   configured country uses recipient country as proxy (PENDING §8).
+   Fiscal wording (label + disclaimer) follows the ISSUER's configured country;
+   the recipient keeps its own label from its country. Taxes come from the
+   recipient country WITHOUT override (the org does not decide its VAT) and
+   stay disabled because FitStack is not a declared formal taxpayer. Unknown
+   country → visible error; issuer without configured country → generic,
+   non-fiscal wording (never the recipient's as a proxy).
    Pure, no I/O, edge-safe. Minimal structural interface (no imports of
    `@workspace/database`: avoids circular shared→database dependency).
    ─────────────────────────────────────────────────────────────────────── */
@@ -514,6 +577,8 @@ export interface PlatformComposePayment {
   taxDetails?: unknown;
   planSnapshotName?: string | null;
   planSnapshotCurrency: string;
+  /** Plan price frozen at payment time, in that currency (integer cents). */
+  planSnapshotPrice?: number | null;
   voided: boolean;
 }
 
@@ -575,12 +640,13 @@ export function buildPlatformReceiptDataFromComposed(
     'buildPlatformReceiptDataFromComposed',
   );
 
-  // No org override: FitStack defines uniform taxes per country.
+  // No org override: FitStack taxes come from the country profile.
   // Snapshot first: if present, live configuration is NOT read.
   const identity =
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(
       { receptor, emitter, currency: payment.planSnapshotCurrency },
+      resolvePlatformEmitterProfile(emitter),
       resolveFiscalProfile(receptor.countryCode),
     );
 
@@ -620,6 +686,10 @@ export function buildPlatformReceiptDataFromComposed(
       subtotal: payment.subtotal,
       taxTotal: payment.taxTotal,
       taxDetails,
+      // Same contract as the Panel composer: the frozen plan price IS the
+      // base-currency amount. Guarded by `planSnapshotCurrency`, otherwise the
+      // base currency would not match the currency the price is expressed in.
+      baseAmount: payment.planSnapshotCurrency ? (payment.planSnapshotPrice ?? null) : null,
     },
     baseCurrency: payment.planSnapshotCurrency,
     voided: payment.voided,

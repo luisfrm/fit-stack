@@ -2,16 +2,26 @@ import type { SubscriptionsRepository, ISubscriptionDTO } from '../repositories/
 import type { PaymentsRepository, IPayment } from '../repositories/payments.repository';
 import type { PlansRepository } from '../repositories/plans.repository';
 import type { MembersRepository } from '../repositories/members.repository';
+import type { SettingsRepository } from '../repositories/settings.repository';
+import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
 import { COMPENSATION_VOID_REASON, compensateFailedEmission } from '../lib/subscription-compensation';
 import {
+  ACTIVE_CURRENCIES_SETTING,
+  activeCurrenciesNotConfiguredError,
+  parseActiveCurrencies,
+} from './organizations.service';
+import {
+  API_ERROR_CODES,
   PAYMENT_STATUSES,
   computeSubscriptionPeriod,
+  roundCents,
   toLocalDayString,
   type IPaymentMethodDetails,
 } from '@workspace/shared';
 import { ReceiptError } from './receipts.service';
+import { requireVoidReasonOrThrow } from '../lib/errors';
 
 export type { ISubscriptionDTO } from '../repositories/subscriptions.repository';
 
@@ -20,15 +30,28 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
   startDate?: string | Date;
   /** Explicit only for custom period or idempotent; shortening active requires reason. */
   endDate?: string | Date;
+  /**
+   * Payment write contract. `amountPaid` and `exchangeRateApplied` are NOT part
+   * of it: the server derives both from the plan price and the provider rate
+   * (`RD-158`), so a client can never state how much was paid.
+   */
   payment: {
-    amountPaid: number;
     currencyPaid: string;
-    exchangeRateApplied?: string | null;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetails | null;
     status?: string;
     paymentDate?: string | Date;
   };
+}
+
+/**
+ * Money dependencies of `create`: where the rate comes from and where the
+ * organization's `active_currencies` live. Narrowed to the methods actually
+ * used, so a unit test can stub them without faking a whole repository.
+ */
+export interface SubscriptionMoneyDeps {
+  rateProvider: Pick<ExchangeRateProvider, 'getRate'>;
+  settingsRepo: Pick<SettingsRepository, 'findByKey'>;
 }
 
 /**
@@ -41,7 +64,13 @@ export interface ReceiptHooks {
     paymentId: number;
     timezone: string;
     actor?: string;
-  }): Promise<{ receiptNumber: string; pdfStatus: 'pending' | 'ready' }>;
+  }): Promise<{
+    /** `null` while another emission owns the claim (still not numbered). */
+    receiptNumber: string | null;
+    pdfStatus: 'pending' | 'ready';
+    /** `true` = the row is claimed by another emission; the sweep resumes it. */
+    inProgress?: boolean;
+  }>;
   markReceiptVoided(input: {
     orgId: string;
     paymentId: number;
@@ -79,12 +108,14 @@ export interface PaymentStatusResult {
  * the `code` is the contract that apps map to toasts (never arbitrary text).
  */
 const businessError = (
-  status: 409 | 422,
+  status: 400 | 409 | 422,
   code:
     | 'END_DATE_BEFORE_START'
     | 'END_DATE_OVERRIDE_REASON_REQUIRED'
     | 'PAYMENT_NOT_REVALIDATABLE'
-    | 'SUBSCRIPTION_CANCELLED',
+    | 'SUBSCRIPTION_CANCELLED'
+    | typeof API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID
+    | typeof API_ERROR_CODES.PAYMENT_CURRENCY_NOT_ACTIVE,
   message: string,
 ) =>
   new HTTPException(status, {
@@ -140,7 +171,13 @@ export function createSubscriptionsService(
   subsRepo: SubscriptionsRepository,
   paymentsRepo: PaymentsRepository,
   plansRepo: PlansRepository,
-  membersRepo: MembersRepository
+  membersRepo: MembersRepository,
+  /**
+   * Money dependencies (`RD-158`). Optional at the factory because read-only
+   * and PATCH call sites do not price anything; `create` fails visibly when it
+   * is missing instead of persisting a client-stated amount.
+   */
+  deps?: SubscriptionMoneyDeps,
 ) {
   return {
     async getAllPaginated(organizationId: string, filters: any) {
@@ -277,6 +314,43 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'Fecha de pago inválida' });
       }
 
+      // RD-158: money is server-authoritative, and it is priced LAST — after
+      // every business validation above. A member with a pending payment or an
+      // invalid date answers with its own 400 without reaching the provider,
+      // and a provider outage never masks a validation error. The operator only
+      // chooses the payment currency; `amountPaid` and the applied rate are
+      // derived here from the plan price and the provider's rate. Anything the
+      // client states about them is ignored (the write contract no longer
+      // carries them).
+      if (!deps) {
+        throw new Error(
+          'subscriptions.create: deps { rateProvider, settingsRepo } es requerido para calcular el monto del pago.',
+        );
+      }
+      // `active_currencies` is the authority for what the org may charge in: an
+      // absent/malformed row is a visible configuration error, never an open list.
+      const storedActiveCurrencies = await deps.settingsRepo.findByKey(
+        organizationId,
+        ACTIVE_CURRENCIES_SETTING,
+      );
+      const activeCurrencies = parseActiveCurrencies(storedActiveCurrencies);
+      if (!activeCurrencies) throw activeCurrenciesNotConfiguredError();
+
+      const currencyPaid = payload.payment.currencyPaid;
+      if (!activeCurrencies.includes(currencyPaid)) {
+        throw businessError(
+          400,
+          API_ERROR_CODES.PAYMENT_CURRENCY_NOT_ACTIVE,
+          `La moneda de pago "${currencyPaid}" no está entre las monedas activas de la organización (${activeCurrencies.join(', ')}).`,
+        );
+      }
+
+      // A rate is never assumed: provider failures propagate typed and the
+      // route maps them (503/400), never a silent 1:1 conversion. Priced before
+      // the first write so a rate failure leaves nothing to compensate.
+      const exchangeRate = await deps.rateProvider.getRate(plan.currency, currencyPaid);
+      const amountPaid = roundCents(plan.price * exchangeRate);
+
       // 6. Persist with reason (column 0019) and proceed with payment + issuance
       // + compensation without changes.
       const subscription = await subsRepo.create(organizationId, {
@@ -303,9 +377,10 @@ export function createSubscriptionsService(
           planSnapshotName: plan.name,
           planSnapshotPrice: plan.price,
           planSnapshotCurrency: plan.currency,
-          amountPaid: payload.payment.amountPaid,
-          currencyPaid: payload.payment.currencyPaid,
-          exchangeRateApplied: payload.payment.exchangeRateApplied,
+          // Server-derived (RD-158): never read from the payload.
+          amountPaid,
+          currencyPaid,
+          exchangeRateApplied: String(exchangeRate),
           paymentMethod: payload.payment.paymentMethod,
           paymentMethodDetails: payload.payment.paymentMethodDetails,
           status: payload.payment.status as any,
@@ -373,13 +448,34 @@ export function createSubscriptionsService(
       status: string,
       opts?: ReceiptContext,
     ): Promise<PaymentStatusResult> {
+      // RD-156: `validated` and `voided` are the only legal targets. The route
+      // enum already rejects anything else; this is the service-level backstop
+      // for any other caller. `* → processing` is the dangerous one: the charge
+      // keeps its number and can be validated again (period / numbering twice).
+      if (status !== PAYMENT_STATUSES.VALIDATED && status !== PAYMENT_STATUSES.VOIDED) {
+        throw businessError(
+          400,
+          API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID,
+          'Solo se puede validar o anular un pago',
+        );
+      }
+
+      // RD-163: a `voided` decision must carry its reason — resolved BEFORE any
+      // write, so a PATCH without it leaves the row untouched. `validated`
+      // never persists a reason.
+      const decision: { voided: true; voidReason: string } | { voided: false } =
+        status === PAYMENT_STATUSES.VOIDED
+          ? { voided: true, voidReason: requireVoidReasonOrThrow(opts?.voidReason) }
+          : { voided: false };
+
       const previous = await paymentsRepo.findById(organizationId, paymentId);
 
       // Mirrors Console guard (validated ⇔ numbered invariant): rejected
       // BEFORE writing a `validated` payment that would lack number or
       // backing period. Only a `processing` payment can be validated —
       // a `voided` cannot be undone (its subscription is already cancelled by
-      // the void) — and never on a cancelled subscription.
+      // the void) — and never on a cancelled subscription. `validated →
+      // validated` is idempotent: it does not renumber nor extend anything.
       const wasPending = previous != null && previous.status !== PAYMENT_STATUSES.VALIDATED;
       if (status === PAYMENT_STATUSES.VALIDATED && wasPending) {
         if (previous!.status !== PAYMENT_STATUSES.PROCESSING) {
@@ -405,7 +501,7 @@ export function createSubscriptionsService(
       // single source of truth for `voidedBy`/`voidedAt`/`voidReason`.
       const updated = await paymentsRepo.updateStatus(organizationId, paymentId, status as any, {
         voidedBy: opts?.by,
-        voidReason: opts?.voidReason,
+        voidReason: decision.voided ? decision.voidReason : undefined,
       });
       if (!updated) {
         throw new Error('Registro de pago no encontrado');
@@ -414,7 +510,7 @@ export function createSubscriptionsService(
       // Voiding/rejecting payment leaves subscription out-of-validity
       // (`cancelledAt`) and derived status becomes `voided` (VOIDED), which is
       // distinct from manual access revocation (`cancelled`).
-      if (status === PAYMENT_STATUSES.VOIDED && updated.subscriptionId) {
+      if (decision.voided && updated.subscriptionId) {
         await this.cancel(organizationId, updated.subscriptionId);
       }
       // Void with issued number: preserves number + PDF and marks VOIDED.
@@ -422,13 +518,13 @@ export function createSubscriptionsService(
       // reported explicitly rather than swallowing internal error code.
       let receiptVoided = false;
       let receiptVoidReason: PaymentStatusResult['receiptVoidReason'];
-      if (status === PAYMENT_STATUSES.VOIDED && opts?.receipts && opts.by) {
+      if (decision.voided && opts?.receipts && opts.by) {
         try {
           await opts.receipts.markReceiptVoided({
             orgId: organizationId,
             paymentId,
             by: opts.by,
-            reason: opts.voidReason ?? 'Pago anulado',
+            reason: decision.voidReason,
           });
           receiptVoided = true;
         } catch (err) {
@@ -453,12 +549,44 @@ export function createSubscriptionsService(
         if (!opts.timezone) {
           throw new Error('updatePaymentStatus: timezone es obligatoria para numerar.');
         }
-        await opts.receipts.assignReceiptNumber({
-          orgId: organizationId,
-          paymentId,
-          timezone: opts.timezone,
-          actor: opts.by,
-        });
+        // RD-155: a failed emission used to leave a `validated` payment with no
+        // number, no automatic repair (the sweep does not cover it) and a receipt
+        // link answering 404. Without interactive transactions the `validated`
+        // write cannot be rolled back, so the failure is compensated by
+        // RE-READING (never by error type): numbered → `committed`, the sweep
+        // recovers the pending render and the 200 stands; not numbered → the
+        // payment is voided with audit and the original error is re-thrown.
+        //
+        // No `cancelParent`: the charge already exists and the subscription
+        // derives ANULADA from the voided payment — cancelling it would revoke
+        // service that was already paid for. No `revertEffect`: this PATCH never
+        // extends the period.
+        try {
+          await opts.receipts.assignReceiptNumber({
+            orgId: organizationId,
+            paymentId,
+            timezone: opts.timezone,
+            actor: opts.by,
+          });
+        } catch (emissionError) {
+          const outcome = await compensateFailedEmission(
+            emissionError,
+            {
+              readPayment: () => paymentsRepo.findById(organizationId, paymentId),
+              voidPayment: () =>
+                paymentsRepo.updateStatus(organizationId, paymentId, PAYMENT_STATUSES.VOIDED, {
+                  voidedBy: opts?.by,
+                  voidReason: COMPENSATION_VOID_REASON,
+                }),
+            },
+            { paymentCreated: true },
+          );
+          // `unresolved` leaves the row untouched (fail-closed). Re-throwing keeps
+          // the failure visible; the payment stays `validated` without a number.
+          // If the row was already claimed, the claim sweep resumes it; an
+          // UNCLAIMED row is only repaired by the manual `POST /:id/issue`.
+          if (outcome !== 'committed') throw emissionError;
+        }
       }
 
       return { payment: updated, receiptVoided, receiptVoidReason };

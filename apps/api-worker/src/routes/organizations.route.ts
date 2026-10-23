@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth, requireOrg, requireOrgPermission } from '../lib/route-handler';
@@ -6,6 +7,7 @@ import {
   PERMISSION_MODULES,
   PERMISSION_ACTIONS,
   buildOrgPaymentReceivedEvent,
+  type CurrencyFormat,
   type IPaymentMethodConfig,
 } from '@workspace/shared';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
@@ -24,7 +26,11 @@ import {
   paymentMethodSchema,
   documentIdTypeViolation,
 } from '../lib/schemas';
-import { createOrganizationsService } from '../services/organizations.service';
+import {
+  activeCurrenciesNotConfiguredError,
+  createOrganizationsService,
+  parseActiveCurrencies,
+} from '../services/organizations.service';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import type { NewDbOrganization } from '../repositories/organizations.repository';
@@ -143,14 +149,27 @@ function buildOrganizationPatch(body: OrgProfileInput): Partial<NewDbOrganizatio
   return patch;
 }
 
-function parseJsonArray(raw: string | undefined, fallback: string[]): string[] {
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
+/**
+ * Platform `currency_format` (seeded by `/api/init`). Required: an absent or
+ * unknown value is a visible configuration error naming the key, never the
+ * invented `latam` (AGENTS.md §10).
+ */
+function requirePlatformCurrencyFormat(settings: Record<string, string>): CurrencyFormat {
+  const raw = settings[CURRENCY_FORMAT_KEY];
+  if (raw === 'latam' || raw === 'usa') return raw;
+
+  const message = `La configuración de la plataforma no tiene "currency_format" válido (latam | usa).`;
+  throw new HTTPException(500, {
+    message,
+    res: new Response(
+      JSON.stringify({
+        error: message,
+        code: 'PLATFORM_SETTING_INVALID',
+        fields: [CURRENCY_FORMAT_KEY],
+      }),
+      { status: 500, headers: { 'content-type': 'application/json' } },
+    ),
+  });
 }
 
 export const organizationRoutes = new Hono<AppEnv>()
@@ -229,10 +248,16 @@ export const organizationRoutes = new Hono<AppEnv>()
       activePaymentMethods = [];
     }
 
+    // RD-163: the currency list is the authority for what the org may charge
+    // in (self-service renewal). An absent/malformed platform value is a
+    // visible configuration error — never `['USD','VES']`.
+    const activeCurrencies = parseActiveCurrencies(settings[ACTIVE_CURRENCIES_KEY]);
+    if (!activeCurrencies) throw activeCurrenciesNotConfiguredError();
+
     const data = {
       activePaymentMethods,
-      activeCurrencies: parseJsonArray(settings[ACTIVE_CURRENCIES_KEY], ['USD', 'VES']),
-      currencyFormat: settings[CURRENCY_FORMAT_KEY] ?? 'latam',
+      activeCurrencies,
+      currencyFormat: requirePlatformCurrencyFormat(settings),
     };
     // Low frequency data: changes only when support edits platform settings
     // (write invalidates org:*:payment-methods). TTL 1h = safety net.
@@ -264,7 +289,9 @@ export const organizationRoutes = new Hono<AppEnv>()
         planDurationUnit: p.planSnapshotDurationUnit,
         amountPaid: p.amountPaid,
         currencyPaid: p.currencyPaid,
-        baseAmount: p.baseAmount,
+        // The base-currency amount IS the frozen plan price (never a division
+        // and never a separate persisted column).
+        baseAmount: p.planSnapshotPrice,
         paymentMethod: p.paymentMethod,
         paymentDate: p.paymentDate,
       })),

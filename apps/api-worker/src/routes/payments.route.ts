@@ -12,12 +12,26 @@ import { createReceiptsService } from '../services/receipts.service';
 import { createFinanceService } from '../services/finance.service';
 import { createR2Service } from '../lib/r2';
 import { createCache } from '../lib/cache';
+import { requireVoidReason, voidReasonViolationHook } from '../lib/schemas';
 import type { AppEnv } from '../lib/env';
 
-const updateStatusSchema = z.object({
-  status: z.enum(['processing', 'validated', 'voided']),
-  voidReason: z.string().min(1).optional(),
-});
+/**
+ * RD-156: a PATCH only carries the two decisions an operator makes on an
+ * existing charge — confirm (`validated`) or void (`voided`). `processing` is a
+ * creation status: accepting it here allowed `validated → processing →
+ * validated`, which numbered and extended the same charge twice.
+ *
+ * RD-163: `voided` requires a non-blank `voidReason`; `validated` ignores it.
+ * The field has no length rule of its own: `requireVoidReason` is the single
+ * authority, so a blank string arrives as the business error (with `code`),
+ * never as a generic Zod envelope.
+ */
+const updateStatusSchema = z
+  .object({
+    status: z.enum(['validated', 'voided']),
+    voidReason: z.string().optional(),
+  })
+  .superRefine(requireVoidReason);
 
 export const paymentRoutes = new Hono<AppEnv>()
   // GET /api/payments/analytics
@@ -46,10 +60,12 @@ export const paymentRoutes = new Hono<AppEnv>()
     return c.json(stats);
   })
   // PATCH /api/payments/:id/status
-  .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema), async (c) => {
+  .patch('/:id/status', requireOrgPermission(PM.SUBSCRIPTIONS, PA.UPDATE), requireOrgTimezone(), zValidator('json', updateStatusSchema, voidReasonViolationHook), async (c) => {
     const orgId = c.get('orgId')!;
     const id = Number(c.req.param('id'));
-    const { status, voidReason } = c.req.valid('json');
+    const { status, voidReason: rawVoidReason } = c.req.valid('json');
+    // Trimmed once: the persisted audit and the receipt seal share the reason.
+    const voidReason = rawVoidReason?.trim() || undefined;
     const timezone = c.get('orgTimezone')!;
     const cache = createCache(c.env);
 
@@ -60,32 +76,38 @@ export const paymentRoutes = new Hono<AppEnv>()
     const subsService = createSubscriptionsService(subsRepo, paymentsRepo, plansRepo, createMembersRepository(db));
     const receiptsService = createReceiptsService(db, c.env.RECEIPT_QUEUE, c.env.TASK_QUEUE);
 
-    const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
-      orgId,
-      id,
-      status,
-      {
-        receipts: receiptsService,
-        timezone,
-        by: c.get('user')?.id,
-        voidReason,
-      },
-    );
-    await cache.invalidate(`org:${orgId}:subscriptions*`);
-    await cache.invalidate(`org:${orgId}:payments:analytics*`);
-    // `withoutActiveSubscription` from members:stats depends on subs/payments.
-    await cache.invalidateExact(`org:${orgId}:members:stats`);
-    await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
-    await cache.invalidate(`org:${orgId}:dashboard:action-items`);
-    await cache.invalidate(`org:${orgId}:reports:revenue*`);
-    await cache.invalidate(`org:${orgId}:reports:receipts*`);
-    // Receipt voiding attempt is reported explicitly
-    // (200 with `receiptVoided: false` + reason), never silently.
-    return c.json({
-      ...payment,
-      receiptVoided,
-      ...(receiptVoidReason ? { receiptVoidReason } : {}),
-    });
+    // RD-155: invalidation lives in `finally` so a failed emission (the service
+    // compensates the payment to `voided` and re-throws) still drops the stale
+    // dashboard/report entries instead of serving the pre-PATCH state.
+    try {
+      const { payment, receiptVoided, receiptVoidReason } = await subsService.updatePaymentStatus(
+        orgId,
+        id,
+        status,
+        {
+          receipts: receiptsService,
+          timezone,
+          by: c.get('user')?.id,
+          voidReason,
+        },
+      );
+      // Receipt voiding attempt is reported explicitly
+      // (200 with `receiptVoided: false` + reason), never silently.
+      return c.json({
+        ...payment,
+        receiptVoided,
+        ...(receiptVoidReason ? { receiptVoidReason } : {}),
+      });
+    } finally {
+      await cache.invalidate(`org:${orgId}:subscriptions*`);
+      await cache.invalidate(`org:${orgId}:payments:analytics*`);
+      // `withoutActiveSubscription` from members:stats depends on subs/payments.
+      await cache.invalidateExact(`org:${orgId}:members:stats`);
+      await cache.invalidate(`org:${orgId}:dashboard:stats:*`);
+      await cache.invalidate(`org:${orgId}:dashboard:action-items`);
+      await cache.invalidate(`org:${orgId}:reports:revenue*`);
+      await cache.invalidate(`org:${orgId}:reports:receipts*`);
+    }
   })
 
   // GET /api/payments/:id/receipt - 3-state contract, never 409.
@@ -155,6 +177,11 @@ export const paymentRoutes = new Hono<AppEnv>()
     });
     // Manual emission advances sequence: invalidates report cache.
     await createCache(c.env).invalidate(`org:${orgId}:reports:receipts*`);
+    // Another emission holds the claim: nothing to wait for yet beyond the
+    // sweep, so the contract is 202/pending (never an error).
+    if (result.receiptNumber === null) {
+      return c.json(result, 202);
+    }
     return c.json(result);
   })
 

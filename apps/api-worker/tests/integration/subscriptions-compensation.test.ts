@@ -11,7 +11,8 @@
  * All money in integer cents; the tz is injected by `requireOrgTimezone()`.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
+import { assertSchemaReady, skipReason, testQuery, truncateAll, TEST_DATABASE_URL } from '../helpers/db';
+import { withRateServer } from '../helpers/rates';
 import {
   createGymTenant,
   createGymMember,
@@ -20,6 +21,15 @@ import {
   type GymTenant,
 } from '../helpers/auth';
 import { COMPENSATION_VOID_REASON } from '../../src/lib/subscription-compensation';
+import { createDb } from '@workspace/database/factory';
+import { createSubscriptionsRepository } from '../../src/repositories/subscriptions.repository';
+import { createPaymentsRepository } from '../../src/repositories/payments.repository';
+import { createPlansRepository } from '../../src/repositories/plans.repository';
+import { createMembersRepository } from '../../src/repositories/members.repository';
+import {
+  createSubscriptionsService,
+  type ReceiptHooks,
+} from '../../src/services/subscriptions.service';
 
 const AMOUNT_CENTS = 10000;
 
@@ -48,7 +58,6 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
       startDate: isoDate(0),
       endDate: isoDate(30),
       payment: {
-        amountPaid: AMOUNT_CENTS,
         currencyPaid: 'USD',
         paymentMethod: 'cash',
         paymentMethodDetails: [],
@@ -179,13 +188,21 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
     const { owner, organization } = await createGymTenant('comp-c');
     const { member, plan } = await setupFixture({ owner, organization });
 
-    // Non-numeric rate: it passes the schema (string) but the
-    // `exchange_rate_applied` column is numeric(10,4) → the insert fails in the DB.
-    const res = await owner.client.post(
-      '/api/subscriptions',
-      subscriptionPayload(member.id, plan.id, { exchangeRateApplied: 'XX-NOT-A-RATE' }),
-    );
-    expect(res.status, res.text).not.toBe(201);
+    // RD-158: the rate is server-derived, so the insert is poisoned through the
+    // provider instead of the payload. `1e30` overflows the rate column
+    // (`numeric(20,10)` after RD-157: 10 integer digits) AND the bigint
+    // `amount_paid` (1e30 * 100 cents), so `paymentsRepo.create` fails in the
+    // DB — after the subscription was already written. Kept
+    // precision-independent on purpose: the failure is a range overflow, not
+    // a rate rounding.
+    await withRateServer({ VES: 1e30 }, async (url) => {
+      owner.client.env.EXCHANGE_API_URL = url;
+      const res = await owner.client.post(
+        '/api/subscriptions',
+        subscriptionPayload(member.id, plan.id, { currencyPaid: 'VES' }),
+      );
+      expect(res.status, res.text).not.toBe(201);
+    });
 
     const subs = await testQuery<{ id: number; cancelled_at: string | null }>(
       `SELECT id, cancelled_at FROM subscription
@@ -236,5 +253,103 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
     expect(charges).toHaveLength(1);
     expect(charges[0]!.status).toBe('validated');
     expect(charges[0]!.receipt_number).toBeTruthy();
+  });
+
+  it('(e) PATCH del gym: fallo de emisión → pago voided con auditoría, período intacto y 409 al reintentar', async () => {
+    const { owner, organization } = await createGymTenant('comp-e');
+    const { member, plan } = await setupFixture({ owner, organization });
+
+    // `processing` payment: creation does not number it, it awaits approval.
+    const created = await owner.client.post<{ id: number }>(
+      '/api/subscriptions',
+      subscriptionPayload(member.id, plan.id, { status: 'processing' }),
+    );
+    expect(created.status, created.text).toBe(201);
+
+    const seeded = await testQuery<{ id: number; end_date: string }>(
+      `SELECT p.id, s.end_date
+         FROM payment p
+         JOIN subscription s ON s.id = p.subscription_id
+        WHERE p.subscription_id = $1`,
+      [created.body.id],
+    );
+    const paymentId = Number(seeded[0]!.id);
+    const periodEnd = seeded[0]!.end_date;
+
+    // The HTTP route always wires the real receipts service, so the failing
+    // emission is injected at the service boundary (same wiring as the route).
+    const db = createDb(TEST_DATABASE_URL);
+    const service = createSubscriptionsService(
+      createSubscriptionsRepository(db),
+      createPaymentsRepository(db),
+      createPlansRepository(db),
+      createMembersRepository(db),
+    );
+    const emissionError = new Error('emission failed (test)');
+    const receipts: ReceiptHooks = {
+      assignReceiptNumber: async () => {
+        throw emissionError;
+      },
+      markReceiptVoided: async () => undefined,
+    };
+
+    // The ORIGINAL error surfaces (never the compensation one).
+    await expect(
+      service.updatePaymentStatus(organization.id, paymentId, 'validated', {
+        receipts,
+        timezone: 'America/Caracas',
+        by: owner.userId,
+      }),
+    ).rejects.toBe(emissionError);
+
+    // Compensated: `voided` with audit, no number — never `validated` without
+    // number (the state the sweep could not repair).
+    const paid = await testQuery<{
+      status: string;
+      void_reason: string | null;
+      voided_at: string | null;
+      voided_by: string | null;
+      receipt_number: string | null;
+    }>(
+      `SELECT status, void_reason, voided_at, voided_by, receipt_number
+         FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(paid[0]!.status).toBe('voided');
+    expect(paid[0]!.void_reason).toBe(COMPENSATION_VOID_REASON);
+    expect(paid[0]!.voided_by).toBe(owner.userId);
+    expect(paid[0]!.voided_at).not.toBeNull();
+    expect(paid[0]!.receipt_number).toBeNull();
+
+    // No `cancelParent` and no `revertEffect`: the subscription keeps its
+    // period and is NOT cancelled (the void alone derives ANULADA).
+    const subs = await testQuery<{ cancelled_at: string | null; end_date: string }>(
+      `SELECT cancelled_at, end_date FROM subscription WHERE id = $1`,
+      [created.body.id],
+    );
+    expect(subs[0]!.cancelled_at).toBeNull();
+    expect(subs[0]!.end_date).toBe(periodEnd);
+
+    // Receipt contract: no link to a document that does not exist.
+    const receipt = await owner.client.get(`/api/payments/${paymentId}/receipt`);
+    expect(receipt.status, receipt.text).toBe(200);
+    expect(receipt.body).toEqual({ available: false, reason: 'pre_system' });
+    const pdf = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
+    expect(pdf.status).toBe(404);
+
+    // The guard still fires: the compensated void is NOT re-validatable, and the
+    // audit trail is preserved (the 409 writes nothing).
+    const retry = await owner.client.patch(`/api/payments/${paymentId}/status`, {
+      status: 'validated',
+    });
+    expect(retry.status, retry.text).toBe(409);
+    expect(retry.body).toMatchObject({ code: 'PAYMENT_NOT_REVALIDATABLE' });
+
+    const after = await testQuery<{ status: string; void_reason: string | null }>(
+      `SELECT status, void_reason FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(after[0]!.status).toBe('voided');
+    expect(after[0]!.void_reason).toBe(COMPENSATION_VOID_REASON);
   });
 });

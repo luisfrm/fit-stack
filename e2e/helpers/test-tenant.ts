@@ -85,13 +85,20 @@ export const TEST_PLAN = {
   features: ['Acceso completo', 'Clases grupales'],
 } as const;
 
+/**
+ * Free platform plan of the test tenant (price 0), with every feature enabled.
+ * It is NOT a trial: trials are discontinued (`400 TRIAL_NOT_AVAILABLE`), so a
+ * price-0 plan is the only path that grants service without booking revenue.
+ * The name is distinct from the paid seed plan so a stale plan row can never be
+ * reused by name with a non-zero price.
+ */
 export const TEST_PLATFORM_PLAN = {
-  name: 'Plan Plataforma E2E',
-  price: 9900, // cents
+  name: 'Plan Plataforma E2E Free',
+  price: 0, // cents
   currency: 'USD',
   durationValue: 1,
   durationUnit: 'month',
-  trialDays: 14,
+  trialDays: 0,
 } as const;
 
 export const TEST_MEMBERS = {

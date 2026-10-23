@@ -43,8 +43,8 @@ Las páginas CMS creadas en `apps/panel` (módulo Contenido) se renderizan aquí
 
 ## Deploy
 
-Despliegue **manual en Vercel** (guía completa en [`vaults/architecture/INFRASTRUCTURE.md`
-                     §4](../../vaults/architecture/INFRASTRUCTURE.md)):
+Despliegue **manual en Vercel** (guía completa en [`vaults/architecture/infrastructure.md`
+                     §4](../../vaults/architecture/infrastructure.md)):
 
 ```bash
 cd apps/web

@@ -5,14 +5,17 @@ import type { OrganizationDateManager } from '../lib/date-manager';
 
 /**
  * True when a payment can be exactly normalized to the organization primary
- * currency with the persisted `exchange_rate_applied`.
+ * currency.
  *
  * `exchange_rate_applied` reads "1 {plan_snapshot_currency} = rate
- * {currency_paid}" (same semantic the receipt composer uses). Therefore the
- * only exact one-hop cases are:
+ * {currency_paid}" (same semantic the receipt composer uses). The exact base
+ * amount of a gym payment is its frozen `plan_snapshot_price` (the server
+ * priced the charge from the plan), so no division is needed when the plan
+ * currency IS the primary currency. Therefore the exact one-hop cases are:
  *   1. the payment is already in the primary currency, or
  *   2. the plan currency IS the primary currency and the payment is in another
- *      currency with a valid persisted rate.
+ *      currency, priced from the plan (`plan_snapshot_price`) or, for
+ *      historical rows without it, with a valid persisted rate.
  *
  * It is never safe to divide when the plan currency differs from the primary
  * currency: the result would be expressed in the plan currency, and the
@@ -24,19 +27,29 @@ function normalizedToPrimaryCondition(primaryCurrency: string) {
     OR (
       ${payment.planSnapshotCurrency} = ${primaryCurrency}
       AND ${payment.currencyPaid} <> ${payment.planSnapshotCurrency}
-      AND ${payment.exchangeRateApplied} IS NOT NULL
-      AND ${payment.exchangeRateApplied} > 0
+      AND (
+        ${payment.planSnapshotPrice} IS NOT NULL
+        OR (
+          ${payment.exchangeRateApplied} IS NOT NULL
+          AND ${payment.exchangeRateApplied} > 0
+        )
+      )
     )
   )`;
 }
 
-/** Exact normalized cents, rounded PER PAYMENT (receipt semantics). */
+/**
+ * Exact normalized cents. The base amount is the frozen plan price, rounded
+ * PER PAYMENT (receipt semantics); only historical rows without it fall back
+ * to dividing by the persisted rate.
+ */
 function normalizedAmountSql(primaryCurrency: string) {
   return sql<number>`COALESCE(SUM(
     CASE
       WHEN ${normalizedToPrimaryCondition(primaryCurrency)} THEN
         CASE
           WHEN ${payment.currencyPaid} = ${primaryCurrency} THEN ${payment.amountPaid}
+          WHEN ${payment.planSnapshotPrice} IS NOT NULL THEN ${payment.planSnapshotPrice}
           ELSE ROUND(${payment.amountPaid}::numeric / ${payment.exchangeRateApplied})::bigint
         END
     END

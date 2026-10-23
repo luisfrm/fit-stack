@@ -7,7 +7,7 @@
    Pure factory: receives `Db` parameter (per-request, without process.env).
    ─────────────────────────────────────────────────────────────────────── */
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../factory';
 import {
   gymMember,
@@ -38,18 +38,26 @@ export interface ReceiptComposedData {
   subscription: DbSubscription | null;
 }
 
-export interface AttachReceiptInput {
+/**
+ * Claim payload: everything persisted BEFORE the number is consumed, so the
+ * fiscal work never burns a correlative and the sweep can resume the claim.
+ */
+export interface ClaimReceiptInput {
+  /** Integer cents. */
+  subtotal: number;
+  taxTotal: number;
+  taxDetails: unknown;
+  /** Emitter identity frozen upon issuance. */
+  emitterSnapshot: ReceiptEmitterSnapshot | null;
+  /** Issuing actor. Missing during sweep: remains `null`, never fabricated. */
+  issuedBy: string | null;
+}
+
+/** Number payload: only the correlative and its issuance instant. */
+export interface AttachReceiptNumberInput {
   receiptNumber: string;
   documentType: ReceiptDocumentType;
   receiptIssuedAt: Date;
-  /** Integer cents; step 1 always persists them alongside the number. */
-  subtotal?: number | null;
-  taxTotal?: number | null;
-  taxDetails?: unknown;
-  /** Emitter identity frozen upon issuance. */
-  emitterSnapshot?: ReceiptEmitterSnapshot | null;
-  /** Issuing actor. Missing during sweep: remains `null`, never fabricated. */
-  issuedBy?: string | null;
 }
 
 export interface MarkVoidedInput {
@@ -119,8 +127,9 @@ export function createReceiptsRepository(db: Db) {
 
     /**
      * Correlative compensation: returns the last number consumed by
-     * this execution when it LOST the race in `attachReceipt` (another concurrent
-     * execution already numbered the payment, so local number was not persisted).
+     * this execution when it LOST the race in `attachReceiptNumber` (another
+     * concurrent execution already numbered the payment, so local number was
+     * not persisted).
      *
      * Only reverts if we are still the latest consumer
      * (`last_number = seq`): if another execution consumed after, decrementing the
@@ -156,21 +165,69 @@ export function createReceiptsRepository(db: Db) {
     },
 
     /**
-     * Numbers a payment idempotently: only writes if it doesn't
-     * have a number yet (`WHERE receipt_number IS NULL`). If already numbered,
-     * returns the re-read existing row (different number is ignored,
-     * never duplicated or renumbered).
+     * Claims the payment BEFORE consuming the sequence: persists the fiscal
+     * breakdown, the frozen emitter snapshot and the actor in a SINGLE
+     * statement guarded by `receipt_claim_at IS NULL`.
+     *
+     * `claimed: false` means another emission won the claim (or the payment
+     * is no longer `validated`): the caller re-reads the row and never consumes
+     * a number. The claim is never released: a stale one is resumed by the
+     * sweep with the SAME row, so no number can be burned by a slow emission.
      */
-    async attachReceipt(
+    async claimReceipt(
       paymentId: number,
       orgId: string,
-      input: AttachReceiptInput,
+      input: ClaimReceiptInput,
+    ): Promise<{ claimed: boolean }> {
+      assertOrgId(orgId, 'claimReceipt');
+
+      const [row] = await db
+        .update(payment)
+        .set({
+          receiptClaimAt: sql`now()`,
+          subtotal: input.subtotal,
+          taxTotal: input.taxTotal,
+          taxDetails: input.taxDetails ?? null,
+          // Frozen identity + actor: persisted with the claim so a resumed
+          // issuance reproduces the same document.
+          emitterSnapshot: input.emitterSnapshot,
+          issuedBy: input.issuedBy,
+        })
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            eq(payment.status, 'validated'),
+            isNull(payment.receiptNumber),
+            isNull(payment.receiptClaimAt),
+          ),
+        )
+        .returning({ id: payment.id });
+      return { claimed: row !== undefined };
+    },
+
+    /**
+     * Numbers an ALREADY CLAIMED payment (`receipt_claim_at IS NOT NULL`).
+     * Never renumbers: with a number present the statement matches nothing and
+     * the existing row is returned. If the claim is gone the row is also
+     * returned (caller decides; nothing is written).
+     *
+     * `status = 'validated'` is part of the WHERE on purpose: the sweep reads
+     * the claim and only later attaches, so the payment may have been voided in
+     * between. Numbering it would create a voided document without its sealed
+     * ANULADO artifact. The row comes back WITHOUT `receipt_number` and the
+     * caller releases the local correlative (fail-closed).
+     */
+    async attachReceiptNumber(
+      paymentId: number,
+      orgId: string,
+      input: AttachReceiptNumberInput,
     ): Promise<DbPayment> {
-      assertOrgId(orgId, 'attachReceipt');
-      assertDocumentType(input.documentType, 'attachReceipt');
+      assertOrgId(orgId, 'attachReceiptNumber');
+      assertDocumentType(input.documentType, 'attachReceiptNumber');
       if (!isValidPanelReceiptNumber(input.receiptNumber)) {
         throw new Error(
-          `attachReceipt: receipt_number con formato inválido (${input.receiptNumber}).`,
+          `attachReceiptNumber: receipt_number con formato inválido (${input.receiptNumber}).`,
         );
       }
 
@@ -180,21 +237,14 @@ export function createReceiptsRepository(db: Db) {
           receiptNumber: input.receiptNumber,
           documentType: input.documentType,
           receiptIssuedAt: input.receiptIssuedAt,
-          // `tax_override_reason` is legacy READ-ONLY: the column keeps the
-          // historical audit trail, no write path sets it anymore.
-          subtotal: input.subtotal ?? null,
-          taxTotal: input.taxTotal ?? null,
-          taxDetails: input.taxDetails ?? null,
-          // Frozen identity + actor. Written in the SAME
-          // statement as the number: receipt is reproducible upon birth.
-          emitterSnapshot: input.emitterSnapshot ?? null,
-          issuedBy: input.issuedBy ?? null,
         })
         .where(
           and(
             eq(payment.id, paymentId),
             eq(payment.organizationId, orgId),
+            eq(payment.status, 'validated'),
             isNull(payment.receiptNumber),
+            isNotNull(payment.receiptClaimAt),
           ),
         )
         .returning();
@@ -205,7 +255,9 @@ export function createReceiptsRepository(db: Db) {
         .from(payment)
         .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)));
       if (!existing) {
-        throw new Error(`attachReceipt: pago ${paymentId} no encontrado en la organización.`);
+        throw new Error(
+          `attachReceiptNumber: pago ${paymentId} no encontrado en la organización.`,
+        );
       }
       return existing;
     },
@@ -213,6 +265,11 @@ export function createReceiptsRepository(db: Db) {
     /**
      * Marks a receipt as VOIDED. Preserves number and PDF;
      * never releases or reuses the number (frozen decision).
+     *
+     * Idempotent at the STORAGE layer too (`receipt_voided = false` in the
+     * WHERE): a second delivery returns the row without rewriting the audit
+     * trail (`voided_by` / `voided_at` / `void_reason`). The service also
+     * short-circuits, this is the backstop for concurrent deliveries.
      */
     async markVoided(
       paymentId: number,
@@ -235,12 +292,58 @@ export function createReceiptsRepository(db: Db) {
           voidedAt: new Date(),
           voidReason: input.reason,
         })
-        .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)))
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            eq(payment.receiptVoided, false),
+          ),
+        )
         .returning();
-      if (!row) {
+      if (row) return row;
+
+      // Already voided → return the stored row untouched (audit preserved).
+      const [existing] = await db
+        .select()
+        .from(payment)
+        .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)));
+      if (!existing) {
         throw new Error(`markVoided: pago ${paymentId} no encontrado en la organización.`);
       }
-      return row;
+      return existing;
+    },
+
+    /**
+     * Repairs the void whose second write was lost. The void flow writes
+     * `status = 'voided'` FIRST and `markVoided` second: if the second write
+     * fails, the payment is voided with `receipt_voided = false`, so the sweep
+     * never sees it (it looks for the flag SET) and the ORIGINAL PDF keeps
+     * being served. This statement flips ONLY the flag: the audit
+     * (`voided_by` / `voided_at` / `void_reason`) is preserved verbatim — the
+     * sweep cannot invent an actor.
+     *
+     * `flagged: true` = THIS call flipped it (the caller owns the render);
+     * `false` = not repairable (no number, not voided) or another run won.
+     */
+    async flagVoidedIfMissing(
+      paymentId: number,
+      orgId: string,
+    ): Promise<{ flagged: boolean }> {
+      assertOrgId(orgId, 'flagVoidedIfMissing');
+      const [row] = await db
+        .update(payment)
+        .set({ receiptVoided: true })
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            eq(payment.status, 'voided'),
+            isNotNull(payment.receiptNumber),
+            eq(payment.receiptVoided, false),
+          ),
+        )
+        .returning({ id: payment.id });
+      return { flagged: row !== undefined };
     },
 
     /** Finds a payment by human correlative number (org-scoped). */
@@ -310,7 +413,7 @@ export function createReceiptsRepository(db: Db) {
      * (`WHERE receipt_pdf_key IS NULL RETURNING`). Email gate:
      * `completed === true` indicates THIS delivery completed the PDF
      * (enqueue email); `false` = another delivery already did (silent,
-     * no second email). Never use `attachReceipt` as gate.
+     * no second email). Never use `attachReceiptNumber` as gate.
      */
     async completeReceiptPdf(
       paymentId: number,

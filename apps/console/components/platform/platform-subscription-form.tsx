@@ -33,10 +33,9 @@ import { PaymentSection } from "./payment-section";
 import { PlatformPlanSelector } from "./platform-plan-selector";
 
 interface PaymentData {
-  amountPaidCents: number;
+  amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
-  baseAmountCents?: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;
@@ -47,8 +46,6 @@ interface PlatformSubscriptionSubmitData {
   organizationId: string;
   planId: number;
   startDate: string;
-  isTrial: boolean;
-  priceOverrideCents?: number;
   payment: PaymentData;
 }
 
@@ -60,7 +57,7 @@ interface PlatformSubscriptionFormProps {
   readonly settings: Record<string, string>;
   /** Preloaded plan (payment mode on an existing subscription). */
   readonly initialPlan?: IPlatformPlan | null;
-  /** Payment only: hides plan selector, trial, and dates; modifies submit. */
+  /** Payment only: hides plan selector and dates; modifies submit. */
   readonly paymentOnly?: boolean;
   readonly submitLabel?: string;
 }
@@ -147,7 +144,6 @@ export function PlatformSubscriptionForm({
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   const [startDate, setStartDate] = React.useState(todayStr);
-  const [isTrial, setIsTrial] = React.useState(false);
   const [paymentDate, setPaymentDate] = React.useState(todayStr);
 
   // Payment currency: the platform operating currency (`primary_currency`,
@@ -182,23 +178,19 @@ export function PlatformSubscriptionForm({
     [allPlans, planId],
   );
 
-  // Free plan (zero price) or explicit trial
+  // Free plan (zero price): validated $0 payment, no payment section.
   const isFreePlan = selectedPlan ? Number(selectedPlan.price) === 0 : false;
-  const hasTrialDays = selectedPlan ? (selectedPlan.trialDays ?? 0) > 0 : false;
-  const showPayment = selectedPlan && !isFreePlan && (!isTrial || paymentOnly);
+  const showPayment = selectedPlan && !isFreePlan;
 
   // End date preview (visual only)
   const previewEndDate = React.useMemo(() => {
     if (!selectedPlan) return "";
-    if (isTrial && hasTrialDays) {
-      return calculateEndDate(startDate, selectedPlan.trialDays!, "day");
-    }
     return calculateEndDate(
       startDate,
       selectedPlan.durationValue,
       selectedPlan.durationUnit,
     );
-  }, [selectedPlan, startDate, isTrial, hasTrialDays]);
+  }, [selectedPlan, startDate]);
 
   const planCurrency = selectedPlan?.currency ?? "";
   const {
@@ -408,17 +400,16 @@ export function PlatformSubscriptionForm({
 
     setIsProcessingUploads(true);
     try {
-      // Trial or free plan: automatic validated payment with 0
-      if (isTrial || isFreePlan) {
+      // Free plan: automatic validated payment with 0 (never a trial).
+      if (isFreePlan) {
         await onSubmit({
           organizationId,
           planId,
           startDate,
-          isTrial: isTrial,
           payment: {
-            amountPaidCents: 0,
+            amountPaid: 0,
             currencyPaid: planCurrency,
-            paymentMethod: isTrial ? "trial" : "free",
+            paymentMethod: "free",
             status: PAYMENT_STATUSES.VALIDATED,
             paymentDate: todayStr,
           },
@@ -452,9 +443,8 @@ export function PlatformSubscriptionForm({
         organizationId,
         planId,
         startDate,
-        isTrial: false,
         payment: {
-          amountPaidCents: unitsToCents(finalAmount),
+          amountPaid: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
           exchangeRateApplied: exchangeRateAppliedValue(conversion),
           paymentMethod:
@@ -522,29 +512,7 @@ export function PlatformSubscriptionForm({
         />
       )}
 
-      {/* Trial toggle si el plan lo permite */}
-      {selectedPlan && hasTrialDays && !paymentOnly && (
-        <div className="flex items-center gap-3 p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-          <input
-            id="is-trial"
-            type="checkbox"
-            checked={isTrial}
-            onChange={(e) => setIsTrial(e.target.checked)}
-            className="h-4 w-4 rounded border-white/20"
-          />
-          <label
-            htmlFor="is-trial"
-            className="flex-1 cursor-pointer"
-          >
-            <div className="text-sm font-medium">Iniciar como prueba</div>
-            <div className="text-xs text-muted-foreground font-normal">
-              {selectedPlan.trialDays} días gratis antes del primer cobro
-            </div>
-          </label>
-        </div>
-      )}
-
-      {selectedPlan && isFreePlan && !isTrial && (
+      {selectedPlan && isFreePlan && (
         <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5">
           <p className="text-sm font-medium text-emerald-400">Plan gratuito</p>
           <p className="text-xs text-muted-foreground">

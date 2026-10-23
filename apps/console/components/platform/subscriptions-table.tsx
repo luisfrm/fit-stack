@@ -215,7 +215,6 @@ function SubscriptionPriceCell({
     <div className="flex flex-col gap-0.5">
       <PriceCell
         isTrial={sub.isTrial}
-        priceOverride={sub.priceOverride}
         planPrice={sub.planPrice}
         planCurrency={sub.planCurrency}
         currencyFormat={currencyFormat}
@@ -535,7 +534,7 @@ export function SubscriptionsTable({
                   ? "Gratuito"
                   : detailModal.planCurrency
                     ? formatCents(
-                      detailModal.priceOverride ?? detailModal.planPrice ?? 0,
+                      detailModal.planPrice ?? 0,
                       detailModal.planCurrency,
                       currencyFormat,
                     )

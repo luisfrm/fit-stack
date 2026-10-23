@@ -74,9 +74,8 @@ describe.skipIf(skipReason !== null)('Platform receipts report', () => {
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'validated',
@@ -122,7 +121,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report', () => {
     const secondNumber = second['receipt_number'] as string;
     const voided = await admin.client.patch(
       `/api/platform/subscriptions/payments/${second['id']}/status`,
-      { status: 'voided' },
+      { status: 'voided', voidReason: 'Cobro anulado' },
     );
     expect(voided.status, voided.text).toBe(200);
 
@@ -248,7 +247,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report', () => {
     const payment = await createValidatedPayment();
     const denied = await support.client.patch(
       `/api/platform/subscriptions/payments/${payment['id']}/status`,
-      { status: 'voided' },
+      { status: 'voided', voidReason: 'Cobro anulado' },
     );
     expect(denied.status, denied.text).toBe(403);
   });

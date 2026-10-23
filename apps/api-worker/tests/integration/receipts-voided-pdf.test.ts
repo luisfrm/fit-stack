@@ -14,6 +14,11 @@
  * Step 2 runs for real (`handleReceiptRender` from jobs-worker, with the
  * renderer stubbed): it is the only way to assert that the sidecar is written
  * with its gate and without an email.
+ *
+ * RD-159 (T6): the void writes `status = 'voided'` first and `receipt_voided`
+ * second; when the second write is lost the payment stays voided with the flag
+ * off, so the sweep never sees it and the ORIGINAL PDF keeps being served. The
+ * sweep now repairs that flag (audit untouched) and enqueues the sealed render.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -281,5 +286,86 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF', () => {
     // And the sweep does not loosen the fail-closed rule.
     const pdf = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
     expect(pdf.status).toBe(404);
+  });
+
+  it('T6 barrido: un anulado SIN el flag (escritura perdida) se repara y encola el sello', async () => {
+    const { owner, organization, paymentId, receiptNumber } = await createReadyReceipt();
+    const voided = await voidPayment(owner, paymentId);
+    expect(voided.status, voided.text).toBe(200);
+
+    // RD-159: simulates the LOST second write. The void writes `status = 'voided'`
+    // first and `receipt_voided` second; if the second write fails the payment stays
+    // voided with the flag off, invisible to every sweep predicate.
+    await testQuery(
+      `UPDATE payment
+          SET receipt_voided = false, voided_at = now() - interval '20 minutes'
+        WHERE id = $1`,
+      [paymentId],
+    );
+    // Audit as the row is AFTER the lost write: the repair must not touch it.
+    const broken = await readPayment(paymentId);
+    expect(broken['receipt_voided']).toBe(false);
+    expect(broken['receipt_voided_pdf_key']).toBeNull();
+
+    // THE BUG: with the flag off the ORIGINAL is served again (checked before the
+    // spies are reset, because the download reads R2).
+    const leaked = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
+    expect(leaked.status, leaked.text).toBe(200);
+
+    resetSpies(owner.client);
+    const { repairedVoided } = await sweepPendingReceiptPdfs(sweepEnv(owner.client));
+    expect(repairedVoided).toBeGreaterThanOrEqual(1);
+
+    const repaired = await readPayment(paymentId);
+    expect(repaired['receipt_voided']).toBe(true);
+    // The repair flips ONLY the flag: the audit trail is preserved verbatim
+    // (the sweep cannot invent an actor or a reason).
+    expect(repaired['voided_by']).toBe(broken['voided_by']);
+    expect(repaired['void_reason']).toBe(broken['void_reason']);
+    expect(new Date(repaired['voided_at'] as string).getTime()).toBe(
+      new Date(broken['voided_at'] as string).getTime(),
+    );
+    // The sealed PDF is still missing: the fix is the flag plus a render.
+    expect(repaired['receipt_voided_pdf_key']).toBeNull();
+
+    // Exactly one render for THIS payment: the repair enqueues it and the
+    // "voided without sealed PDF" predicate does not queue it a second time.
+    const renders = owner.client.receiptQueue
+      .ofType('receipt.render')
+      .filter((m) => Number(m['paymentId']) === paymentId);
+    expect(renders).toHaveLength(1);
+    expect(renders[0]).toMatchObject({
+      scope: 'panel',
+      organizationId: organization.id,
+      receiptNumber,
+    });
+
+    // Fail-closed again: the original is not delivered while the seal is missing.
+    const blocked = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
+    expect(blocked.status).toBe(404);
+
+    // The enqueued event produces the sealed artifact and only then the download.
+    expect(
+      await handleReceiptRender(jobsEnv(owner.client), {
+        type: 'receipt.render',
+        scope: 'panel',
+        paymentId,
+        organizationId: organization.id,
+        receiptNumber,
+      }),
+    ).toBe('completed');
+    const sealed = await readPayment(paymentId);
+    expect(sealed['receipt_voided_pdf_key']).toMatch(/-anulado\.pdf$/);
+    const served = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
+    expect(served.status, served.text).toBe(200);
+
+    // Second pass: nothing left to repair nor to render for this payment.
+    resetSpies(owner.client);
+    await sweepPendingReceiptPdfs(sweepEnv(owner.client));
+    expect(
+      owner.client.receiptQueue
+        .ofType('receipt.render')
+        .filter((m) => Number(m['paymentId']) === paymentId),
+    ).toHaveLength(0);
   });
 });

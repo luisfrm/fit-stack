@@ -19,6 +19,7 @@ import {
   buildEmitterSnapshot,
   buildPlatformEmitterSnapshot,
   platformEmitterFromSettings,
+  resolvePlatformEmitterProfile,
   toReceiptMaskedDetails,
   type ComposeReceiptInput,
   type DateInput,
@@ -161,6 +162,8 @@ function legacyBuildPlatformReceiptDataFromComposed(
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(
       { receptor, emitter, currency: payment.planSnapshotCurrency },
+      // RD-160: the issuer's OWN fiscal country defines its label/disclaimer.
+      resolvePlatformEmitterProfile(emitter),
       resolveFiscalProfile(receptor.countryCode),
     );
 
@@ -431,6 +434,26 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
     expectPanelParity(rows);
   });
 
+  it('RD-157: the frozen plan price wins over the rate division (documented divergence)', () => {
+    const rows = basePanelRows();
+    rows.payment = {
+      ...rows.payment,
+      amountPaid: 10,
+      subtotal: 10,
+      taxTotal: 0,
+      taxDetails: [],
+      currencyPaid: 'USD',
+      planSnapshotCurrency: 'COP',
+      exchangeRateApplied: '0.0003',
+      planSnapshotPrice: 40000,
+    };
+    // The legacy oracle divided by the rounded rate; the plan price is exact.
+    expect(
+      legacyBuildReceiptDataFromComposed(legacyPanelRowsToInput(rows)).amounts.baseTotal,
+    ).toBe(33333);
+    expect(composePanelReceipt(rows).amounts.baseTotal).toBe(40000);
+  });
+
   it('missing member falls back to the walk-in recipient', () => {
     const rows = basePanelRows();
     rows.member = null;
@@ -625,6 +648,7 @@ describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
           emitter: platformEmitterFromSettings(rows.emitter),
           currency: rows.payment.planSnapshotCurrency,
         },
+        resolvePlatformEmitterProfile(platformEmitterFromSettings(rows.emitter)),
         resolveFiscalProfile(rows.organization.countryCode, undefined),
       ),
     };

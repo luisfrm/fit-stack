@@ -184,7 +184,7 @@ export function SubscriptionsSidePanel({
           )}
         </div>
         <Text size="xs" variant="muted" className="opacity-40 italic mt-3">
-          Pagos validados. Las sumas mezclan monedas (ver FUTURE_IDEAS §5).
+          Pagos validados. El total usa el precio del plan de cada pago.
         </Text>
       </PanelSection>
 

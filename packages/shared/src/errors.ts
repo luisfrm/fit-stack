@@ -8,6 +8,40 @@
  */
 
 /**
+ * Stable API business codes (`err.data.code`) that a screen resolves to its
+ * own message. Registered here so both apps compare the CODE, never the text.
+ */
+export const API_ERROR_CODES = {
+  /**
+   * `PATCH /payments/:id/status` and its Console mirror: the requested status
+   * is not a legal transition (`400`). Only `validated` and `voided` are
+   * accepted targets; `processing` is a creation status.
+   */
+  PAYMENT_STATUS_TRANSITION_INVALID: "PAYMENT_STATUS_TRANSITION_INVALID",
+  /**
+   * `POST /subscriptions`: the requested `currencyPaid` is outside the
+   * organization's `active_currencies` (`400`). The server prices the payment,
+   * so only currencies the org can actually charge in are accepted.
+   */
+  PAYMENT_CURRENCY_NOT_ACTIVE: "PAYMENT_CURRENCY_NOT_ACTIVE",
+  /**
+   * `PATCH /payments/:id/status` and its Console mirror: a `voided` decision
+   * carries no reason (`400`). An annulment/rejection must explain itself — the
+   * server never invents a default like "Pago anulado".
+   */
+  VOID_REASON_REQUIRED: "VOID_REASON_REQUIRED",
+  /**
+   * `POST /platform/subscriptions` (and its org-scoped mirror): trials are
+   * discontinued (`400`). A historical trial booked a `$0` payment while
+   * snapshotting the full plan price, which inflated SaaS revenue; future
+   * discounts are handled with coupons.
+   */
+  TRIAL_NOT_AVAILABLE: "TRIAL_NOT_AVAILABLE",
+} as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
+
+/**
  * Maps known schema field keys to user-friendly Spanish labels.
  * Unknown keys fall back to the field name itself.
  */

@@ -131,6 +131,12 @@ test.describe('Panel — Pago pendiente accionable', () => {
     await expect(item).toBeVisible({ timeout: 30_000 });
 
     await item.locator('.pending-reject').click();
+    // RD-163: the reason is mandatory and typed by the operator — the prompt
+    // opens on the action and the mutation is not sent while it is blank.
+    const reasonInput = page.getByTestId('reason-prompt-input');
+    await expect(reasonInput).toBeVisible({ timeout: 10_000 });
+    await reasonInput.fill('Rechazo del fixture E2E');
+    await page.getByTestId('reason-prompt-confirm').click();
     // Rejecting = `voided`: it leaves the work list (`processing`).
     await expect(item).toBeHidden({ timeout: 20_000 });
 

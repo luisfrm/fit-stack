@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 const PAGE_LIMIT = 10;
 /**
  * Tope del dataset en memoria para KPIs/filtros exactos. Si `total` lo supera,
- * los KPIs son aproximados (ver nota en FUTURE_IDEAS §5: agregados server-side).
+ * los KPIs son aproximados (ver nota en docs/roadmap.md §5: agregados server-side).
  */
 const DATASET_LIMIT = 500;
 

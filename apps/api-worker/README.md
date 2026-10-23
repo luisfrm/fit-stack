@@ -125,8 +125,8 @@ apps/api-worker/
 | DELETE | `/api/plans/:id` | `plans.delete` | Elimina plan |
 | GET | `/api/subscriptions` | `subscriptions.read` | Lista suscripciones |
 | GET | `/api/subscriptions/recent` | `subscriptions.read` | Suscripciones recientes |
-| POST | `/api/subscriptions` | `subscriptions.create` | Crea suscripción (unidad atómica con pago) |
-| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (`processing`, `validated`, `voided`) + `voidReason?`. `→ validated` solo desde `processing` (**409 `PAYMENT_NOT_REVALIDATABLE`**) y nunca sobre una suscripción cancelada (**409 `SUBSCRIPTION_CANCELLED`**) — invariante validado ⇔ numerado, espejo del console. Sin DELETE de suscripciones (registro financiero inmutable) |
+| POST | `/api/subscriptions` | `subscriptions.create` | Crea suscripción (unidad atómica con pago). El monto y la tasa los calcula el servidor desde el plan y el proveedor (**RD-158**); `currencyPaid` debe estar en `active_currencies` |
+| PATCH | `/api/payments/:id/status` | `subscriptions.update` | Actualiza estado de pago (**`validated` \| `voided`** desde RD-156) + `voidReason?`. Cualquier otro destino (p. ej. `processing`) → **400** en el schema (el backstop del servicio emite `PAYMENT_STATUS_TRANSITION_INVALID`); `→ validated` solo desde `processing` (**409 `PAYMENT_NOT_REVALIDATABLE`**) y nunca sobre una suscripción cancelada (**409 `SUBSCRIPTION_CANCELLED`**) — invariante validado ⇔ numerado, espejo del console. Sin DELETE de suscripciones (registro financiero inmutable) |
 | POST | `/api/payments/:id/send-email` | `subscriptions.read` | Envía recibo por email (vía queue) |
 | GET | `/api/classes` | `classes.read` | Lista clases (grupos) |
 | GET | `/api/classes/:id` | `classes.read` | Detalle de clase |
@@ -171,8 +171,10 @@ El periodo lo calcula el servidor (Regla 4: ningún día pagado se pierde) con `
 | `startDate` | ❌ | Ausente/vacío = hoy local (tz de la org). `'YYYY-MM-DD'` → medianoche local; ISO con `T` → instante tal cual. Inválida → 400 |
 | `endDate` | ❌ | Ausente = periodo acumulativo calculado (baseline `max(latestEndDate, startDate)` con vigencia a día local, suma tz-aware vía `addDuration`). Solo se envía para periodo a medida o idempotente |
 | `endDateOverrideReason` | ❌ | Solo se persiste al acortar un periodo vigente (columna `subscription.end_date_override_reason`, migración `0019`, nullable; resto de casos → `NULL`) |
-| `payment.amountPaid` | ✅ | Centavos enteros (convención Money) |
-| `payment.currencyPaid`, `payment.paymentMethod`, `payment.paymentMethodDetails` | ✅ | Según contrato de pagos |
+| `payment.currencyPaid` | ✅ | Debe pertenecer a `gym_setting.active_currencies`; si no → **400 `PAYMENT_CURRENCY_NOT_ACTIVE`**; sin la fila/JSON inválido → **400 `ACTIVE_CURRENCIES_NOT_CONFIGURED`** (nunca un fallback) |
+| `payment.amountPaid` | — | **Fuera del contrato (RD-158)**: lo calcula el servidor como `roundCents(plan.price * rate)` desde el precio del plan y la tasa del proveedor; si el cliente lo envía, se ignora |
+| `payment.exchangeRateApplied` | — | **Fuera del contrato (RD-158)**: lo persiste el servidor (`String(rate)` del proveedor); 503 `EXCHANGE_RATE_UNAVAILABLE` / 400 `PAYMENT_CURRENCY_UNSUPPORTED` se mapean por clase (nunca un 500) |
+| `payment.paymentMethod`, `payment.paymentMethodDetails` | ✅ | Según contrato de pagos |
 | `payment.status` | ❌ | `processing` \| `validated` \| `voided` (opcional; el repo lo normaliza a `validated`). La emisión del comprobante se decide sobre la **fila persistida**, nunca sobre este campo (invariante validado ⇔ numerado) |
 | `payment.paymentDate` | ❌ | Ausente = ahora |
 | `payment.subtotal/taxTotal/taxDetails/taxOverrideReason` | ❌ | **Eliminados del contrato (RD-145)**: el desglose siempre se calcula en el servidor desde `COUNTRIES` (`computeInclusiveTaxes`); un cliente que los envíe no los aplica |
@@ -184,12 +186,17 @@ Guards (el `code` es el contrato — los toasts del panel lo mapean, nunca texto
 | `endDate` de un **día local anterior** a `startDate` (comparación por día local en la tz de la org, no por instante) | **422 `{ code: 'END_DATE_BEFORE_START' }`** |
 | Acortar un periodo vigente sin motivo (`trim().length === 0`) | **422 `{ code: 'END_DATE_OVERRIDE_REASON_REQUIRED' }`** |
 | Mismo día local que el fin calculado | Idempotente, no es recorte (no exige motivo) |
+| `payment.currencyPaid` fuera de `active_currencies` | **400 `{ code: 'PAYMENT_CURRENCY_NOT_ACTIVE' }`** (antes de cualquier escritura) |
+| `active_currencies` ausente o con JSON inválido | **400 `{ code: 'ACTIVE_CURRENCIES_NOT_CONFIGURED' }`** |
+| Proveedor de tasas caído / moneda no soportada por el proveedor | **503 `{ code: 'EXCHANGE_RATE_UNAVAILABLE' }`** / **400 `{ code: 'PAYMENT_CURRENCY_UNSUPPORTED' }`** (mapeo por clase en `lib/exchange-rates.ts`) |
 
 Si el pago o la emisión fallan tras crear la suscripción, el service **compensa** (helper `compensateFailedEmission`): decide **por relectura** (con hasta 3 reintentos para vencer un blip de Neon HTTP) si el número quedó persistido (`committed` → el alta es válida, no se re-lanza); si la relectura no se puede resolver (`unresolved`) **no se toca nada** (fail-closed real: anular un comprobante posiblemente numerado lo serviría/enviaría sin sello) y se re-lanza el error original; en caso contrario anula el pago con motivo fijo `COMPENSATION_VOID_REASON` o cancela la huérfana con `cancel()` — nunca `delete()` (registro financiero inmutable). En el flujo gym el pago anulado ya computa `ANULADA`, así que la suscripción **no** se cancela además. En SaaS, donde el periodo se extiende antes de emitir, la compensación también **revierte el periodo** a su valor previo (`updatePeriodEnd(previousPeriodEnd)`, leído antes de extender) **solo si la anulación del pago tuvo éxito** (si no, el cobro sigue válido y no se pierden los días pagados); y un alta SaaS con el pago creado-pero-anulado **cancela también la suscripción** (un `voided` se ignora en `computePlatformSubscriptionStatus` y dejaría un periodo front-loadeado sin cobro) — solo en `compensated`, nunca en `unresolved`. Las mutaciones invalidan las cachés dependientes en un `finally`, así que el camino de fallo compensado también invalida.
 
 ### Rutas plataforma (SaaS admin — `requirePlatformPermission`, roles globales `owner`/`admin`/`support`)
 
 `support` es de solo lectura: cada GET exige el permiso de lectura de su módulo (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) y toda mutación de orgs/planes/suscripciones/staff exige `console:manage` (settings y branding, `setting:write`). No existe `requirePlatformAuth`.
+
+Los comprobantes `FS-N` congelan la identidad fiscal del emisor desde Console (`fitstack_legal_name` / `fitstack_tax_id` / `fitstack_country_code`): la etiqueta (`R.I.F.`, `NIT`) y el disclaimer salen del país del **emisor**, nunca del receptor (que conserva la etiqueta de su propio país). Sin `fitstack_country_code` el emisor es genérico (`Tax ID` + disclaimer no fiscal, solo se imprime la línea si hay `fitstack_tax_id`). Un país de emisor desconocido falla visible (`500 FISCAL_PROFILE_UNKNOWN`).
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -209,7 +216,7 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 | POST | `/api/platform/subscriptions/:id/renew` | Renueva |
 | GET | `/api/platform/subscriptions/:id/payments` | Pagos de la suscripción |
 | POST | `/api/platform/subscriptions/:id/payments` | Registra pago |
-| PATCH | `/api/platform/subscriptions/payments/:id/status` | Cambia estado del pago. `→ validated` solo desde `processing`: un pago no-`processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**; una suscripción cancelada → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (el pago queda `processing`) |
+| PATCH | `/api/platform/subscriptions/payments/:id/status` | Cambia estado del pago (**`validated` \| `voided`**). `→ validated` solo desde `processing`: un pago no-`processing` → **409 `{ code: 'PAYMENT_NOT_REVALIDATABLE' }`**; una suscripción cancelada → **409 `{ code: 'SUBSCRIPTION_CANCELLED' }`** (el pago queda `processing`); `processing` como destino → **400** en el schema (backstop del servicio: `PAYMENT_STATUS_TRANSITION_INVALID`; RD-156 evita el doble periodo) |
 | DELETE | `/api/platform/subscriptions/:id` | Elimina suscripción |
 | GET | `/api/platform/organizations` | Lista organizaciones (paginada) |
 | GET | `/api/platform/organizations/:id` | Detalle de organización |
@@ -305,7 +312,7 @@ Gracias a `customSessionClient` en `@workspace/auth`, estos campos fluyen tanto 
 
 ## Deploy
 
-- **Guía completa**: [vaults/architecture/INFRASTRUCTURE.md](../../vaults/architecture/INFRASTRUCTURE.md) y
+- **Guía completa**: [vaults/architecture/infrastructure.md](../../vaults/architecture/infrastructure.md) y
                      [vaults/architecture/terraform.md](../../vaults/architecture/terraform.md).
 - **Infraestructura**: gestionada con Terraform (`infrastructure/terraform/`) — workers, R2, queues y secrets. **Nunca** ejecutar `wrangler` manualmente para deploys.
 - **Ambientes**: `dev` / `staging` / `production` definidos en `wrangler.jsonc` (nombre del worker, bucket R2 y cola por ambiente).
