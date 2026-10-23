@@ -18,6 +18,12 @@ export const API_ERROR_CODES = {
    * accepted targets; `processing` is a creation status.
    */
   PAYMENT_STATUS_TRANSITION_INVALID: "PAYMENT_STATUS_TRANSITION_INVALID",
+  /**
+   * `POST /subscriptions`: the requested `currencyPaid` is outside the
+   * organization's `active_currencies` (`400`). The server prices the payment,
+   * so only currencies the org can actually charge in are accepted.
+   */
+  PAYMENT_CURRENCY_NOT_ACTIVE: "PAYMENT_CURRENCY_NOT_ACTIVE",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

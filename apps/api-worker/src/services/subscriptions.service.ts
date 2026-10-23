@@ -2,13 +2,21 @@ import type { SubscriptionsRepository, ISubscriptionDTO } from '../repositories/
 import type { PaymentsRepository, IPayment } from '../repositories/payments.repository';
 import type { PlansRepository } from '../repositories/plans.repository';
 import type { MembersRepository } from '../repositories/members.repository';
+import type { SettingsRepository } from '../repositories/settings.repository';
+import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import { HTTPException } from 'hono/http-exception';
 import { OrganizationDateManager } from '../lib/date-manager';
 import { COMPENSATION_VOID_REASON, compensateFailedEmission } from '../lib/subscription-compensation';
 import {
+  ACTIVE_CURRENCIES_SETTING,
+  activeCurrenciesNotConfiguredError,
+  parseActiveCurrencies,
+} from './organizations.service';
+import {
   API_ERROR_CODES,
   PAYMENT_STATUSES,
   computeSubscriptionPeriod,
+  roundCents,
   toLocalDayString,
   type IPaymentMethodDetails,
 } from '@workspace/shared';
@@ -21,15 +29,28 @@ export interface ICreateSubscriptionPayload extends Omit<ISubscriptionDTO, 'id' 
   startDate?: string | Date;
   /** Explicit only for custom period or idempotent; shortening active requires reason. */
   endDate?: string | Date;
+  /**
+   * Payment write contract. `amountPaid` and `exchangeRateApplied` are NOT part
+   * of it: the server derives both from the plan price and the provider rate
+   * (`RD-158`), so a client can never state how much was paid.
+   */
   payment: {
-    amountPaid: number;
     currencyPaid: string;
-    exchangeRateApplied?: string | null;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetails | null;
     status?: string;
     paymentDate?: string | Date;
   };
+}
+
+/**
+ * Money dependencies of `create`: where the rate comes from and where the
+ * organization's `active_currencies` live. Narrowed to the methods actually
+ * used, so a unit test can stub them without faking a whole repository.
+ */
+export interface SubscriptionMoneyDeps {
+  rateProvider: Pick<ExchangeRateProvider, 'getRate'>;
+  settingsRepo: Pick<SettingsRepository, 'findByKey'>;
 }
 
 /**
@@ -92,7 +113,8 @@ const businessError = (
     | 'END_DATE_OVERRIDE_REASON_REQUIRED'
     | 'PAYMENT_NOT_REVALIDATABLE'
     | 'SUBSCRIPTION_CANCELLED'
-    | typeof API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID,
+    | typeof API_ERROR_CODES.PAYMENT_STATUS_TRANSITION_INVALID
+    | typeof API_ERROR_CODES.PAYMENT_CURRENCY_NOT_ACTIVE,
   message: string,
 ) =>
   new HTTPException(status, {
@@ -148,7 +170,13 @@ export function createSubscriptionsService(
   subsRepo: SubscriptionsRepository,
   paymentsRepo: PaymentsRepository,
   plansRepo: PlansRepository,
-  membersRepo: MembersRepository
+  membersRepo: MembersRepository,
+  /**
+   * Money dependencies (`RD-158`). Optional at the factory because read-only
+   * and PATCH call sites do not price anything; `create` fails visibly when it
+   * is missing instead of persisting a client-stated amount.
+   */
+  deps?: SubscriptionMoneyDeps,
 ) {
   return {
     async getAllPaginated(organizationId: string, filters: any) {
@@ -285,6 +313,43 @@ export function createSubscriptionsService(
         throw new HTTPException(400, { message: 'Fecha de pago inválida' });
       }
 
+      // RD-158: money is server-authoritative, and it is priced LAST — after
+      // every business validation above. A member with a pending payment or an
+      // invalid date answers with its own 400 without reaching the provider,
+      // and a provider outage never masks a validation error. The operator only
+      // chooses the payment currency; `amountPaid` and the applied rate are
+      // derived here from the plan price and the provider's rate. Anything the
+      // client states about them is ignored (the write contract no longer
+      // carries them).
+      if (!deps) {
+        throw new Error(
+          'subscriptions.create: deps { rateProvider, settingsRepo } es requerido para calcular el monto del pago.',
+        );
+      }
+      // `active_currencies` is the authority for what the org may charge in: an
+      // absent/malformed row is a visible configuration error, never an open list.
+      const storedActiveCurrencies = await deps.settingsRepo.findByKey(
+        organizationId,
+        ACTIVE_CURRENCIES_SETTING,
+      );
+      const activeCurrencies = parseActiveCurrencies(storedActiveCurrencies);
+      if (!activeCurrencies) throw activeCurrenciesNotConfiguredError();
+
+      const currencyPaid = payload.payment.currencyPaid;
+      if (!activeCurrencies.includes(currencyPaid)) {
+        throw businessError(
+          400,
+          API_ERROR_CODES.PAYMENT_CURRENCY_NOT_ACTIVE,
+          `La moneda de pago "${currencyPaid}" no está entre las monedas activas de la organización (${activeCurrencies.join(', ')}).`,
+        );
+      }
+
+      // A rate is never assumed: provider failures propagate typed and the
+      // route maps them (503/400), never a silent 1:1 conversion. Priced before
+      // the first write so a rate failure leaves nothing to compensate.
+      const exchangeRate = await deps.rateProvider.getRate(plan.currency, currencyPaid);
+      const amountPaid = roundCents(plan.price * exchangeRate);
+
       // 6. Persist with reason (column 0019) and proceed with payment + issuance
       // + compensation without changes.
       const subscription = await subsRepo.create(organizationId, {
@@ -311,9 +376,10 @@ export function createSubscriptionsService(
           planSnapshotName: plan.name,
           planSnapshotPrice: plan.price,
           planSnapshotCurrency: plan.currency,
-          amountPaid: payload.payment.amountPaid,
-          currencyPaid: payload.payment.currencyPaid,
-          exchangeRateApplied: payload.payment.exchangeRateApplied,
+          // Server-derived (RD-158): never read from the payload.
+          amountPaid,
+          currencyPaid,
+          exchangeRateApplied: String(exchangeRate),
           paymentMethod: payload.payment.paymentMethod,
           paymentMethodDetails: payload.payment.paymentMethodDetails,
           status: payload.payment.status as any,

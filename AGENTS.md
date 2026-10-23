@@ -112,6 +112,8 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate. Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
 
+The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override.
+
 ## Where to read more
 
 | When you touch … | Read (key invariant) |

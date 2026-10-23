@@ -166,7 +166,10 @@ describe.skipIf(skipReason !== null)('Organizations primary currency', () => {
   });
 
   it('rejects a primary change when the organization has no active currencies', async () => {
-    const { organization } = await createGymTenant('currency-no-settings');
+    // Explicitly unconfigured org (the fixture seeds the Console defaults).
+    const { organization } = await createGymTenant('currency-no-settings', {
+      seedSettings: false,
+    });
 
     const res = await admin.client.patch(
       `/api/platform/organizations/${organization.id}`,

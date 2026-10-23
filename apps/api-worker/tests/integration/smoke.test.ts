@@ -35,7 +35,8 @@ describe.skipIf(skipReason !== null)('harness smoke', () => {
   });
 
   it('resolves the active organization on an org-scoped route', async () => {
-    const { owner } = await createGymTenant();
+    // No seeded settings: this asserts the org is *resolved*, not its config.
+    const { owner } = await createGymTenant('smoke-scope', { seedSettings: false });
 
     const res = await owner.client.get('/api/settings');
     expect(res.status, res.text).toBe(200);

@@ -12,6 +12,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll, TEST_DATABASE_URL } from '../helpers/db';
+import { withRateServer } from '../helpers/rates';
 import {
   createGymTenant,
   createGymMember,
@@ -57,7 +58,6 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
       startDate: isoDate(0),
       endDate: isoDate(30),
       payment: {
-        amountPaid: AMOUNT_CENTS,
         currencyPaid: 'USD',
         paymentMethod: 'cash',
         paymentMethodDetails: [],
@@ -188,13 +188,19 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
     const { owner, organization } = await createGymTenant('comp-c');
     const { member, plan } = await setupFixture({ owner, organization });
 
-    // Non-numeric rate: it passes the schema (string) but the
-    // `exchange_rate_applied` column is numeric(10,4) → the insert fails in the DB.
-    const res = await owner.client.post(
-      '/api/subscriptions',
-      subscriptionPayload(member.id, plan.id, { exchangeRateApplied: 'XX-NOT-A-RATE' }),
-    );
-    expect(res.status, res.text).not.toBe(201);
+    // RD-158: the rate is server-derived, so the insert is poisoned through the
+    // provider instead of the payload. `1e30` overflows the rate column
+    // (numeric(10,4) today, numeric(20,10) after RD-157) AND the bigint
+    // `amount_paid`, so `paymentsRepo.create` fails in the DB — after the
+    // subscription was already written. Kept precision-independent on purpose.
+    await withRateServer({ VES: 1e30 }, async (url) => {
+      owner.client.env.EXCHANGE_API_URL = url;
+      const res = await owner.client.post(
+        '/api/subscriptions',
+        subscriptionPayload(member.id, plan.id, { currencyPaid: 'VES' }),
+      );
+      expect(res.status, res.text).not.toBe(201);
+    });
 
     const subs = await testQuery<{ id: number; cancelled_at: string | null }>(
       `SELECT id, cancelled_at FROM subscription

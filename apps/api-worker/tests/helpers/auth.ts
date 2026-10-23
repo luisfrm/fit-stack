@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient, type TestClient } from './client';
 import { setUserPlatformRole, testQuery } from './db';
-import { ORG_ROLES, addLocalDays, defaultTaxDocumentType, toLocalDayString } from '@workspace/shared';
+import { ORG_ROLES, addLocalDays, buildDefaultOrgSettings, defaultTaxDocumentType, toLocalDayString } from '@workspace/shared';
 
 /** Short unique suffix so records never collide across runs. */
 export function uid(prefix = ''): string {
@@ -143,10 +143,32 @@ export interface TestOrganization {
   slug: string;
 }
 
+/**
+ * Seeds the default `active_currencies` the Console creation route writes
+ * (`buildDefaultOrgSettings`). Organizations are created here through the
+ * Better Auth plugin, which skips the platform route, so without this a
+ * fixture org would have no active currencies — the real configuration error
+ * that subscription pricing must surface (`RD-158`).
+ */
+export async function seedActiveCurrencies(
+  organizationId: string,
+  countryCode = 'VE',
+  primaryCurrency = 'VES',
+): Promise<void> {
+  const { active_currencies } = buildDefaultOrgSettings(countryCode, primaryCurrency);
+  await testQuery(
+    `INSERT INTO gym_setting (organization_id, key, value)
+     VALUES ($1, 'active_currencies', $2)
+     ON CONFLICT (organization_id, key) DO NOTHING`,
+    [organizationId, active_currencies],
+  );
+}
+
 /** Creates an organization via the Better Auth organization plugin. */
 export async function createOrganization(
   client: TestClient,
   overrides: { name?: string; slug?: string; countryCode?: string } = {},
+  options: { seedSettings?: boolean } = {},
 ): Promise<TestOrganization> {
   const slug = overrides.slug ?? `gym-${uid()}`;
   const name = overrides.name ?? `Gym ${slug}`;
@@ -167,6 +189,11 @@ export async function createOrganization(
 
   const id = res.body?.id ?? res.body?.organization?.id;
   if (!id) throw new Error(`organization create returned no id: ${res.text}`);
+
+  // Mirrors the Console creation path (default active currencies).
+  if (options.seedSettings !== false) {
+    await seedActiveCurrencies(id, countryCode);
+  }
 
   return { id, name, slug };
 }
@@ -201,9 +228,12 @@ export interface GymTenant {
  * The workhorse fixture: a signed-in user who owns a brand new organization
  * with that organization already active on the session.
  */
-export async function createGymTenant(label = 'owner'): Promise<GymTenant> {
+export async function createGymTenant(
+  label = 'owner',
+  options: { seedSettings?: boolean } = {},
+): Promise<GymTenant> {
   const owner = await registerUser({ email: uniqueEmail(label) });
-  const organization = await createOrganization(owner.client);
+  const organization = await createOrganization(owner.client, {}, options);
   await setActiveOrganization(owner.client, organization.id);
   return { owner, organization };
 }
