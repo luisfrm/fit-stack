@@ -42,7 +42,7 @@ const updatePaymentStatusEnum = z.enum([
 ]);
 
 const paymentSchema = z.object({
-  amountPaidCents: z.number().int().nonnegative(),
+  amountPaid: z.number().int().nonnegative(),
   currencyPaid: z.string().min(1),
   exchangeRateApplied: z.string().optional(),
   paymentMethod: paymentMethodSchema,
@@ -56,7 +56,6 @@ const createSubscriptionSchema = z.object({
   planId: z.number().int().positive(),
   startDate: z.string().optional(),
   isTrial: z.boolean().default(false),
-  priceOverrideCents: z.number().int().nonnegative().optional(),
   payment: paymentSchema,
 });
 

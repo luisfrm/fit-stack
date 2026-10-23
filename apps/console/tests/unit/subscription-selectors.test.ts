@@ -49,13 +49,7 @@ function makeStats(
 }
 
 describe("effectivePriceCents", () => {
-  it("prefers priceOverride over planPrice", () => {
-    expect(
-      effectivePriceCents(makeSub({ priceOverride: 4000, planPrice: 5000 })),
-    ).toBe(4000);
-  });
-
-  it("falls back to planPrice", () => {
+  it("uses the plan price", () => {
     expect(effectivePriceCents(makeSub({ planPrice: 5000 }))).toBe(5000);
   });
 
@@ -152,30 +146,26 @@ describe("selectOrgCurrentMonth", () => {
     {
       status: "validated",
       paymentDate: "2026-09-05T00:00:00Z",
-      amountPaid: 5000,
-      baseAmount: 5000,
+      planSnapshotPrice: 5000,
     },
     {
       status: "validated",
       paymentDate: "2026-09-15T00:00:00Z",
-      amountPaid: 3000,
-      baseAmount: null,
+      planSnapshotPrice: 3000,
     },
     {
       status: "processing",
       paymentDate: "2026-09-20T00:00:00Z",
-      amountPaid: 9999,
-      baseAmount: 9999,
+      planSnapshotPrice: 9999,
     },
     {
       status: "validated",
       paymentDate: "2026-08-10T00:00:00Z",
-      amountPaid: 2000,
-      baseAmount: 2000,
+      planSnapshotPrice: 2000,
     },
   ] as const;
 
-  it("sums validated payments of the current UTC month with baseAmount fallback", () => {
+  it("sums validated payments of the current UTC month with the frozen plan price", () => {
     expect(selectOrgCurrentMonth([...invoices], NOW)).toEqual({
       totalCents: 8000,
       count: 2,
@@ -187,9 +177,9 @@ describe("selectOrgBilledTotal", () => {
   it("sums validated payments only", () => {
     expect(
       selectOrgBilledTotal([
-        { status: "validated", amountPaid: 5000, baseAmount: 5000 },
-        { status: "validated", amountPaid: 3000, baseAmount: null },
-        { status: "processing", amountPaid: 9999, baseAmount: 9999 },
+        { status: "validated", planSnapshotPrice: 5000 },
+        { status: "validated", planSnapshotPrice: 3000 },
+        { status: "processing", planSnapshotPrice: 9999 },
       ]),
     ).toEqual({ totalCents: 8000, count: 2 });
   });
@@ -207,7 +197,7 @@ describe("selectOrgLatestPayment", () => {
       paymentDate: "2026-09-05T00:00:00Z",
       amountPaid: 5000,
       currencyPaid: "USD",
-      baseAmount: null,
+      planSnapshotPrice: 5000,
       ...overrides,
     }) as PlatformPayment;
 
@@ -252,21 +242,21 @@ describe("selectOrgLatestPayment", () => {
 });
 
 describe("selectPaymentDisplayAmount", () => {
-  it("formats baseAmount with the base currency, never with currencyPaid", () => {
+  it("uses the frozen plan price with the base currency, never currencyPaid", () => {
     expect(
       selectPaymentDisplayAmount(
-        { amountPaid: 730000, currencyPaid: "VES", baseAmount: 20000 },
+        { planSnapshotPrice: 20000 },
         "USD",
       ),
     ).toEqual({ amountCents: 20000, currency: "USD" });
   });
 
-  it("keeps amountPaid with currencyPaid when there is no baseAmount", () => {
+  it("keeps the base currency for same-currency payments", () => {
     expect(
       selectPaymentDisplayAmount(
-        { amountPaid: 730000, currencyPaid: "VES", baseAmount: null },
+        { planSnapshotPrice: 5000 },
         "USD",
       ),
-    ).toEqual({ amountCents: 730000, currency: "VES" });
+    ).toEqual({ amountCents: 5000, currency: "USD" });
   });
 });

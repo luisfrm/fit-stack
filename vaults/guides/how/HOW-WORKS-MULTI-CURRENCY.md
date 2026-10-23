@@ -32,7 +32,7 @@ Ejemplo: cobraste 3.000 VES con tasa 36,50 y 50.000 COP con tasa 4.100; el repor
 
 La tasa se guarda con 10 decimales (`numeric(20,10)`): una cotización como `1 COP = 0,00025 USD` no cabe en 4 decimales (se redondeaba a `0,0003`, ~20% de error).
 
-El equivalente en la moneda del plan **no** se recalcula dividiendo: es el monto base que quedó congelado en el pago — `plan_snapshot_price` (Panel) o `base_amount` (Console). La división `roundCents(amountPaid / rate)` solo sobrevive como respaldo para filas históricas sin ese monto. Con el monto base persistido, los reportes pueden llevar un cobro a la moneda primaria sin inventar datos cuando:
+El equivalente en la moneda del plan **no** se recalcula dividiendo: es el monto base que quedó congelado en el pago — el `plan_snapshot_price`, igual en Panel y Console. La división `roundCents(amountPaid / rate)` solo sobrevive como respaldo para filas históricas sin ese monto. Con el monto base persistido, los reportes pueden llevar un cobro a la moneda primaria sin inventar datos cuando:
 
 1. el pago ya está en la moneda primaria (`currency_paid = primary_currency`), o
 2. la moneda del plan **es** la moneda primaria (el monto base es exacto; no hace falta la tasa).

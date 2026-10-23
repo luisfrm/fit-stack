@@ -42,7 +42,7 @@ Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin comp
 | Identificación | `receiptNumber` (o `invoiceNumber`) | `platform_document_sequence` |
 | Detalle | `planSnapshotName`, `planSnapshotPrice`, `planSnapshotCurrency`, `planSnapshotDurationValue/Unit` | `platformSubscriptionPayment` (snapshot, no `platformPlan` en vivo) |
 | Periodo cubierto | derivar de `platformSubscription.startDate` + duración snapshot | `platformSubscription` |
-| Monto | `amountPaid`, `currencyPaid`, `exchangeRateApplied`, `baseAmount` | `platformSubscriptionPayment` |
+| Monto | `amountPaid`, `currencyPaid`, `exchangeRateApplied`, `planSnapshotPrice` | `platformSubscriptionPayment` |
 | Método de pago | `paymentMethod`, `paymentMethodDetails` (enmascarado si sensible) | `platformSubscriptionPayment` |
 | Fechas | `paymentDate` (pago) vs fecha de emisión del comprobante (pueden diferir) | `platformSubscriptionPayment` |
 | Pie legal | disclaimer país del **emisor** + "Emitido por FitStack" (genérico no fiscal sin `fitstack_country_code`) | config de país del emisor (`fitstack_country_code`) |

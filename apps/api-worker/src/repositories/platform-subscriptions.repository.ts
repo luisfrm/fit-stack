@@ -31,8 +31,6 @@ export interface SubscriptionWithDetails {
   startDate: Date;
   currentPeriodEnd: Date;
   isTrial: boolean;
-  /** precio en centavos (number) */
-  priceOverride: number | null;
   cancelledAt: Date | null;
   cancellationReason: string | null;
   createdAt: Date;
@@ -70,7 +68,6 @@ export interface NewPlatformSubscriptionData {
   /** If omitted, computed from plan duration */
   currentPeriodEnd?: Date;
   isTrial?: boolean;
-  priceOverride?: number | null;
 }
 
 export interface NewPlatformPaymentData {
@@ -87,8 +84,6 @@ export interface NewPlatformPaymentData {
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
-  /** Server-derived base amount in the platform base currency (integer cents). */
-  baseAmount: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
@@ -211,7 +206,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
           isTrial: platformSubscription.isTrial,
-          priceOverride: platformSubscription.priceOverride,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -264,7 +258,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
           isTrial: platformSubscription.isTrial,
-          priceOverride: platformSubscription.priceOverride,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -298,7 +291,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
           isTrial: platformSubscription.isTrial,
-          priceOverride: platformSubscription.priceOverride,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -332,7 +324,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
           isTrial: platformSubscription.isTrial,
-          priceOverride: platformSubscription.priceOverride,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -421,7 +412,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           startDate: data.startDate ?? new Date(),
           currentPeriodEnd: data.currentPeriodEnd ?? new Date(),
           isTrial: data.isTrial ?? false,
-          priceOverride: data.priceOverride ?? null,
         })
         .returning({ id: platformSubscription.id });
       if (!created) throw new Error('Failed to create subscription');
@@ -480,7 +470,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied ?? null,
-          baseAmount: data.baseAmount,
           paymentMethod: data.paymentMethod,
           paymentMethodDetails: (data.paymentMethodDetails ?? null) as any,
           status: data.status,
@@ -585,18 +574,20 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         })
         .from(platformSubscription);
 
-      // Compute monthly B2B revenue and previous month revenue for growth calculation
+      // Compute monthly B2B revenue and previous month revenue for growth calculation.
+      // The booked amount is the frozen plan price: it is the server-derived
+      // base-currency amount, so no `COALESCE` fallback to `amount_paid`.
       const [revenueResult] = await db
         .select({
-          monthlyRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP) THEN COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid}) ELSE 0 END), 0)::int`,
-          previousMonthRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP - INTERVAL '1 month') THEN COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid}) ELSE 0 END), 0)::int`,
+          monthlyRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP) THEN ${platformSubscriptionPayment.planSnapshotPrice} ELSE 0 END), 0)::int`,
+          previousMonthRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP - INTERVAL '1 month') THEN ${platformSubscriptionPayment.planSnapshotPrice} ELSE 0 END), 0)::int`,
         })
         .from(platformSubscriptionPayment);
 
       // Compute Monthly Recurring Revenue (MRR) from active subscriptions
       const [mrrResult] = await db
         .select({
-          mrrCents: sql<number>`COALESCE(SUM(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN COALESCE(${platformSubscription.priceOverride}, ${platformPlan.price}) ELSE 0 END), 0)::int`,
+          mrrCents: sql<number>`COALESCE(SUM(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN ${platformPlan.price} ELSE 0 END), 0)::int`,
         })
         .from(platformSubscription)
         .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id));
@@ -617,8 +608,9 @@ export function createPlatformSubscriptionsRepository(db: Db) {
 
     /**
      * Monthly SaaS revenue series in UTC (`validated` payments only).
-     * Uses same formula as `getStats().monthlyRevenueCents`
-     * (`COALESCE(baseAmount, amountPaid)`) so current month bucket matches KPI.
+     * Uses the same formula as `getStats().monthlyRevenueCents`
+     * (`plan_snapshot_price`, the frozen plan price) so the current month
+     * bucket matches the KPI.
      * Note: if plans are in different currencies, sums aggregate currencies
      * just like `monthlyRevenueCents` — true multi-currency normalization
      * is a follow-up (see `vaults/guides/FUTURE_IDEAS.md` §5).
@@ -630,7 +622,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       const rows = await db
         .select({
           month: sql<string>`TO_CHAR(m.month, 'YYYY-MM-01')`,
-          totalCents: sql<number>`COALESCE(SUM(COALESCE(${platformSubscriptionPayment.baseAmount}, ${platformSubscriptionPayment.amountPaid})), 0)::int`,
+          totalCents: sql<number>`COALESCE(SUM(${platformSubscriptionPayment.planSnapshotPrice}), 0)::int`,
           count: sql<number>`COUNT(${platformSubscriptionPayment.id})::int`,
         })
         .from(

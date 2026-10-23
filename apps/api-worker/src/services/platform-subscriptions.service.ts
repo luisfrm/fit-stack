@@ -14,7 +14,7 @@ import {
   type PaymentStatus,
 } from '@workspace/shared/constants';
 import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
-import { normalizeFeatures, addDuration, API_ERROR_CODES } from '@workspace/shared';
+import { normalizeFeatures, addDuration, API_ERROR_CODES, roundCents } from '@workspace/shared';
 import { HTTPException } from 'hono/http-exception';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
 import type { PlatformReceiptContext } from './platform-receipts.service';
@@ -32,6 +32,23 @@ const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
     throw new Error('Rate provider not configured');
   },
 };
+
+/**
+ * RD-117: trials are discontinued. A historical trial booked its payment with
+ * `amount_paid = 0` while still snapshotting the full plan price, so it counted
+ * as revenue. Future discounts are handled with coupons, never with a trial.
+ */
+const trialNotAvailableError = () =>
+  new HTTPException(400, {
+    res: new Response(
+      JSON.stringify({
+        error:
+          'Los trials ya no están disponibles. Los descuentos se gestionarán con cupones.',
+        code: API_ERROR_CODES.TRIAL_NOT_AVAILABLE,
+      }),
+      { status: 400, headers: { 'content-type': 'application/json' } },
+    ),
+  });
 
 /**
  * A SaaS subscription with payments is financial history: it is cancelled,
@@ -54,13 +71,16 @@ export interface CreatePlatformSubscriptionPayload {
   organizationId: string;
   planId: number;
   startDate?: string;
+  /**
+   * Legacy flag, accepted only to be rejected: trials are discontinued
+   * (`400 TRIAL_NOT_AVAILABLE`). A plan priced at 0 uses the free path.
+   */
   isTrial?: boolean;
-  priceOverrideCents?: number;
   payment: PlatformPaymentPayload;
 }
 
 export interface PlatformPaymentPayload {
-  amountPaidCents: number;
+  amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
   paymentMethod: string;
@@ -168,57 +188,49 @@ export function createPlatformSubscriptionsService(
 
     /**
      * Creates a new platform_subscription + initial payment (atomic transaction).
-     * Supports trial plans (isTrial=true) and free plans (price = 0).
+     * A plan priced at 0 uses the free path (validated `$0` payment with
+     * `payment_method = 'free'`). Trials are rejected before any write.
      */
     async createSubscriptionWithPayment(
       data: CreatePlatformSubscriptionPayload,
       opts?: PlatformReceiptContext
     ): Promise<{ subscriptionId: number; paymentId: number }> {
+      // Fail-closed BEFORE the first write: a rejected trial must not leave an
+      // orphan subscription or payment behind.
+      if (data.isTrial === true) throw trialNotAvailableError();
+
       const plan = await plansRepo.findById(data.planId);
       if (!plan) throw new Error('Plan no encontrado');
 
       const startDate = parseStartDate(data.startDate);
-      const isTrial = data.isTrial ?? false;
 
-      // If trial or free, force status=validated with paymentMethod='trial'|'free'
+      // A free plan (price 0) forces status=validated with paymentMethod='free'.
+      // It is not a trial: its snapshot price is already 0, so it never books revenue.
       let paymentStatus = data.payment.status;
       let paymentMethod = data.payment.paymentMethod;
-      let amountPaidCents = data.payment.amountPaidCents;
-      if (isTrial) {
-        paymentStatus = PAYMENT_STATUSES.VALIDATED;
-        paymentMethod = 'trial';
-        amountPaidCents = 0;
-      } else if (plan.price === 0) {
+      let amountPaid = data.payment.amountPaid;
+      if (plan.price === 0) {
         paymentStatus = PAYMENT_STATUSES.VALIDATED;
         paymentMethod = 'free';
-        amountPaidCents = 0;
+        amountPaid = 0;
       }
 
-      // Base amount is SERVER-derived: the plan price (or the explicit admin
-      // override) is the revenue booked in the platform base currency. The
-      // operator-stated `amountPaidCents` only drives the charge in the paid
-      // currency and is never trusted as the base. A $0 registration books 0.
-      // Booked regardless of status: revenue only sums `validated` payments.
-      const baseAmountCents =
-        isTrial || plan.price === 0 ? 0 : data.priceOverrideCents ?? plan.price;
+      // The booked base-currency amount is the frozen `plan_snapshot_price`
+      // written below: the operator-stated `amountPaid` only drives the charge
+      // in the paid currency and is never trusted as the base.
 
       // Point 7(a): period is only front-loaded if registration is born paid.
       // A registration `processing`/`voided`/`refunded` does NOT grant free time:
       // `currentPeriodEnd = startDate` until validated (where PATCH extends
-      // it using snapshot). Trial/free force `validated` above.
-      const trialDays = plan.trialDays ?? 0;
+      // it using snapshot). A free plan forces `validated` above.
       let currentPeriodEnd = startDate;
       if (paymentStatus === PAYMENT_STATUSES.VALIDATED) {
-        if (isTrial && trialDays > 0) {
-          currentPeriodEnd = addDuration(startDate, trialDays, 'day', 'UTC');
-        } else {
-          currentPeriodEnd = addDuration(
-            startDate,
-            plan.durationValue,
-            plan.durationUnit as 'day' | 'week' | 'month' | 'year',
-            'UTC'
-          );
-        }
+        currentPeriodEnd = addDuration(
+          startDate,
+          plan.durationValue,
+          plan.durationUnit as 'day' | 'week' | 'month' | 'year',
+          'UTC'
+        );
       }
 
       // 1. Create subscription
@@ -227,8 +239,8 @@ export function createPlatformSubscriptionsService(
         planId: data.planId,
         startDate,
         currentPeriodEnd,
-        isTrial,
-        priceOverride: data.priceOverrideCents ?? null,
+        // New registrations are never trials (historical rows keep their flag).
+        isTrial: false,
       };
       const { id: subscriptionId } = await platformSubsRepo.create(newSubData);
 
@@ -238,7 +250,7 @@ export function createPlatformSubscriptionsService(
       // a registration left without valid payment also cancels subscription with
       // `cancel()` - never `delete()` (rule 6): a `voided` payment is ignored in
       // SaaS compute and would leave a front-loaded period without backing payment.
-      // Trial/free $0 (`skipped:true`) = success, no compensation needed.
+      // Free $0 (`skipped:true`) = success, no compensation needed.
       let paymentCreated = false;
       let paymentId: number | null = null;
       try {
@@ -253,10 +265,9 @@ export function createPlatformSubscriptionsService(
           planSnapshotDurationValue: plan.durationValue,
           planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
           featuresSnapshot: snapshotFeatures(plan.features),
-          amountPaid: amountPaidCents,
+          amountPaid,
           currencyPaid: data.payment.currencyPaid,
           exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-          baseAmount: baseAmountCents,
           paymentMethod,
           paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
           status: paymentStatus,
@@ -268,8 +279,8 @@ export function createPlatformSubscriptionsService(
         paymentCreated = true;
         paymentId = createdPayment.id;
 
-        // Emission: step 1 numbers where payment is validated (trial/
-        // free $0 SKIP inside service). Console session != payer:
+        // Emission: step 1 numbers where payment is validated (free $0 SKIP
+        // inside service). Console session != payer:
         // no payer passed (remains NULL -> owners only + log).
         if (paymentStatus === PAYMENT_STATUSES.VALIDATED && opts?.receipts) {
           await opts.receipts.assignPlatformReceiptNumber({ paymentId, actor: opts.by });
@@ -332,10 +343,7 @@ export function createPlatformSubscriptionsService(
       const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year", 'UTC');
 
       // Create payment
-      const amountPaidCents = data.payment.amountPaidCents ?? plan.price;
-      // Server-derived base amount: the subscription override (if any) or the
-      // plan price. The payload can no longer state it.
-      const baseAmountCents = sub.priceOverride ?? plan.price;
+      const amountPaid = data.payment.amountPaid;
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -347,10 +355,9 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
         featuresSnapshot: snapshotFeatures(plan.features),
-        amountPaid: amountPaidCents,
+        amountPaid,
         currencyPaid: data.payment.currencyPaid,
         exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-        baseAmount: baseAmountCents,
         paymentMethod: data.payment.paymentMethod,
         paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
         status: data.payment.status,
@@ -420,10 +427,10 @@ export function createPlatformSubscriptionsService(
       const plan = await plansRepo.findById(sub.planId);
       if (!plan) throw new Error('Plan no encontrado');
 
-      // Effective price (plan override if applicable) and server-side conversion
-      const effectivePriceCents = sub.priceOverride ?? plan.price;
+      // Server-side conversion: the charge is priced from the plan and the rate
+      // provider; the request body never states amounts.
       const rate = await rateProvider.getRate(plan.currency, data.currencyPaid);
-      const amountPaidCents = Math.round(effectivePriceCents * rate);
+      const amountPaid = roundCents(plan.price * rate);
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -435,10 +442,9 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
         featuresSnapshot: snapshotFeatures(plan.features),
-        amountPaid: amountPaidCents,
+        amountPaid,
         currencyPaid: data.currencyPaid,
         exchangeRateApplied: String(rate),
-        baseAmount: effectivePriceCents,
         paymentMethod: data.paymentMethod,
         paymentMethodDetails: data.paymentMethodDetails ?? null,
         status: PAYMENT_STATUSES.PROCESSING,
@@ -483,11 +489,9 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: sub.planDurationValue,
         planSnapshotDurationUnit: sub.planDurationUnit,
         featuresSnapshot: snapshotFeatures(sub.planFeatures),
-        amountPaid: data.amountPaidCents,
+        amountPaid: data.amountPaid,
         currencyPaid: data.currencyPaid,
         exchangeRateApplied: data.exchangeRateApplied ?? null,
-        // Server-derived: plan price of the subscription (or its override).
-        baseAmount: sub.priceOverride ?? sub.planPrice,
         paymentMethod: data.paymentMethod,
         paymentMethodDetails: data.paymentMethodDetails ?? null,
         status: data.status,

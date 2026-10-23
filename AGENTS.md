@@ -112,9 +112,11 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate persisted as `numeric(20,10)` (RD-157 — a 4-decimal column rounded `0.00025` to `0.0003`). Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
 
-The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override but never accepts a client-stated base amount: `base_amount` is `priceOverrideCents ?? plan.price` (server-derived).
+The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override but never accepts a client-stated base amount: the booked base is the plan price frozen in `plan_snapshot_price` (`price_override` and `base_amount` were dropped in migration `0028`).
 
-**Persisted base amount, never a division** (RD-157): the base-currency equivalent of a payment is the frozen `plan_snapshot_price` (Panel) / `base_amount` (Console). Reports (`payments.repository.ts`) and receipts (`toBaseTotal`) use it; `amountPaid / exchangeRateApplied` survives only as the fallback for historical rows without it.
+**Persisted base amount, never a division** (RD-157): the base-currency equivalent of a payment is the frozen `plan_snapshot_price`, in Panel **and** Console (there is no second column). Reports (`payments.repository.ts`) and receipts (`toBaseTotal`) use it; `amountPaid / exchangeRateApplied` survives only as the fallback for historical rows without it.
+
+**No trials** (RD-117): `POST /api/platform/subscriptions` and its org-scoped mirror answer **`400 TRIAL_NOT_AVAILABLE`** for `isTrial: true` **before any write**; a `price = 0` plan keeps the `free` path (`plan_snapshot_price = 0`, never burns an `FS-N`), and migration `0029` zeroes `plan_snapshot_price` for historical `payment_method = 'trial'` rows so they stop inflating revenue. Future discounts are coupons, never a resurrected `price_override`.
 
 ## Where to read more
 

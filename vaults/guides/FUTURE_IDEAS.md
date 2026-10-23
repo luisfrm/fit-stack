@@ -87,7 +87,7 @@ Se añadirán estos scripts al `package.json` de la app correspondiente (`apps/p
 
 ## 📈 5. Analíticas SaaS (Console)
 
-> Backend listo: `GET /api/platform/subscriptions/revenue?months=12` (buckets mensuales UTC desde `platform_subscription_payment`, solo `validated`, `COALESCE(baseAmount, amountPaid)` — el bucket del mes corriente cuadra con `monthlyRevenueCents` de `/stats`). La UI queda futura.
+> Backend listo: `GET /api/platform/subscriptions/revenue?months=12` (buckets mensuales UTC desde `platform_subscription_payment`, solo `validated`, `SUM(plan_snapshot_price)` — el bucket del mes corriente cuadra con `monthlyRevenueCents` de `/stats`). La UI queda futura.
 
 - **Chart de revenue en el módulo de suscripciones**: serie 12 meses consumiendo el endpoint (mini-lista de 6M ya existe en el side panel como adelanto).
 - **Normalización multi-moneda real**: hoy las sumas mezclan monedas exactamente igual que `monthlyRevenueCents` (caveat documentado, no bloquea). A futuro: normalizar a una moneda base con tasas históricas.

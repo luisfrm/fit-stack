@@ -19,7 +19,7 @@ Extension rules: every new feature is born `defaultEnabled: false` (additive); `
 
 ### Free Tier (free floor)
 
-- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; plans with `price = 0` are normal trials. The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
+- **Explicit, NOT a plan**: configured in `platform_setting` with 2 keys — `feature_flags_free_tier` (JSON of `PlanFeaturesV2`) and `feature_flags_free_tier_enabled` (`"true"`/`"false"`, activation flag) — edited from console → Settings → **Free Plan** (`apps/console/app/(protected)/settings/free-tier/`). There is no `is_free`; a plan with `price = 0` is a normal **free plan** (not a trial: new trials are rejected with `400 TRIAL_NOT_AVAILABLE`, RD-117). The resolver ignores the setting if `feature_flags_free_tier_enabled !== 'true'`.
 - **Code defaults** (`FREE_TIER_FEATURES`): `panel` + `members_portal` (10 seats) + `ai_chat` (500 credits/month). Overridable from console.
 - **Resolution rule** (`features.service.ts → getOrgFeatures`):
   - Sub `ACTIVE`/`TRIAL` → plan features (with `planId`/`planName`).

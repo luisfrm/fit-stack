@@ -45,7 +45,7 @@ export interface SubscriptionStats {
 }
 
 export interface PlatformPaymentPayload {
-  amountPaidCents: number;
+  amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
   paymentMethod: string;
@@ -58,8 +58,6 @@ export interface CreatePlatformSubscriptionPayload {
   organizationId: string;
   planId: number;
   startDate?: string;
-  isTrial?: boolean;
-  priceOverrideCents?: number;
   payment: PlatformPaymentPayload;
 }
 
@@ -161,7 +159,8 @@ export const platformSubscriptionsService = {
 
   /**
    * Creates a new platform subscription with its first payment (atomic).
-   * Supports trial and free plans automatically.
+   * A plan priced at 0 uses the free path; trials are no longer accepted
+   * (`400 TRIAL_NOT_AVAILABLE`).
    */
   async create(
     data: CreatePlatformSubscriptionPayload,

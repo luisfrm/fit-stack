@@ -81,7 +81,7 @@ async function createPlatformSubscription(
     startDate: isoDate(-1),
     isTrial: false,
     payment: {
-      amountPaidCents: 2999,
+      amountPaid: 2999,
       currencyPaid: 'USD',
       paymentMethod: 'card',
       paymentMethodDetails: [],

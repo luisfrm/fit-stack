@@ -137,23 +137,22 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     ).toBe(200);
   });
 
-  it('baseTotal usa baseAmount persistido y cae al precio del plan si falta', () => {
-    const withBase = baseInput();
-    withBase.payment.currencyPaid = 'VES';
-    withBase.payment.exchangeRateApplied = '36.5';
-    withBase.payment.amountPaid = 7300;
-    withBase.payment.baseAmount = 5000;
-    withBase.payment.planSnapshotPrice = 4999;
-    expect(buildPlatformReceiptDataFromComposed(withBase).amounts.baseTotal).toBe(5000);
+  it('baseTotal usa el precio del plan congelado y cae a la división si falta', () => {
+    const frozen = baseInput();
+    frozen.payment.currencyPaid = 'VES';
+    frozen.payment.exchangeRateApplied = '36.5';
+    frozen.payment.amountPaid = 7300;
+    frozen.payment.planSnapshotPrice = 5000;
+    expect(buildPlatformReceiptDataFromComposed(frozen).amounts.baseTotal).toBe(5000);
 
-    // Historical row written before `base_amount` was server-derived.
+    // Row without the frozen plan price (pre-snapshot): documented division
+    // fallback, 7300 / 36.5 = 200.
     const legacy = baseInput();
     legacy.payment.currencyPaid = 'VES';
     legacy.payment.exchangeRateApplied = '36.5';
     legacy.payment.amountPaid = 7300;
-    legacy.payment.baseAmount = null;
-    legacy.payment.planSnapshotPrice = 5000;
-    expect(buildPlatformReceiptDataFromComposed(legacy).amounts.baseTotal).toBe(5000);
+    legacy.payment.planSnapshotPrice = null;
+    expect(buildPlatformReceiptDataFromComposed(legacy).amounts.baseTotal).toBe(200);
   });
 
   it('trial $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {

@@ -21,8 +21,8 @@ export interface OrgReceiptRow {
   readonly planDurationUnit: string;
   readonly amountPaid: number;
   readonly currencyPaid: string;
-  /** Integer cents in the platform base currency; `null` on legacy rows. */
-  readonly baseAmount: number | null;
+  /** Integer cents in the plan (base) currency: the frozen `plan_snapshot_price`. */
+  readonly baseAmount: number;
   readonly paymentMethod: string;
   readonly paymentDate: string;
 }

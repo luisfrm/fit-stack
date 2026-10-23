@@ -87,7 +87,7 @@ describe.skipIf(skipReason !== null)('Organization receipts (panel)', () => {
       startDate: isoDate(-30),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

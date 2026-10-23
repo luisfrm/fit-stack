@@ -82,7 +82,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       startDate: isoDate(-60),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

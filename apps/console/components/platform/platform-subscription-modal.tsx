@@ -41,10 +41,8 @@ export function PlatformSubscriptionModal({
     organizationId: string;
     planId: number;
     startDate: string;
-    isTrial: boolean;
-    priceOverrideCents?: number;
     payment: {
-      amountPaidCents: number;
+      amountPaid: number;
       currencyPaid: string;
       exchangeRateApplied?: string;
       paymentMethod: string;
@@ -57,8 +55,6 @@ export function PlatformSubscriptionModal({
       await organizationsService.addSubscription(formData.organizationId, {
         planId: formData.planId,
         startDate: formData.startDate,
-        isTrial: formData.isTrial,
-        priceOverrideCents: formData.priceOverrideCents,
         payment: formData.payment,
       });
       toast.success("Suscripción registrada exitosamente.");

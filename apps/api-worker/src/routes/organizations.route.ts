@@ -289,7 +289,9 @@ export const organizationRoutes = new Hono<AppEnv>()
         planDurationUnit: p.planSnapshotDurationUnit,
         amountPaid: p.amountPaid,
         currencyPaid: p.currencyPaid,
-        baseAmount: p.baseAmount,
+        // The base-currency amount IS the frozen plan price (never a division
+        // and never a separate persisted column).
+        baseAmount: p.planSnapshotPrice,
         paymentMethod: p.paymentMethod,
         paymentDate: p.paymentDate,
       })),

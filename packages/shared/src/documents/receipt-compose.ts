@@ -93,13 +93,13 @@ export interface ComposeReceiptInput {
 /**
  * Base currency equivalent total, in integer cents.
  *
- * The persisted `baseAmount` (the plan price frozen at payment time, in the
- * base currency) is the EXACT base total and always wins: converting back by
- * dividing the paid amount by the stored rate accumulates rounding, and a
- * 4-decimal rate used to lose up to ~20% on quotes like COP->USD.
+ * The frozen plan price (the base-currency amount captured at payment time)
+ * is the EXACT base total and always wins: converting back by dividing the
+ * paid amount by the stored rate accumulates rounding, and a 4-decimal rate
+ * used to lose up to ~20% on quotes like COP->USD.
  *
  * The division is the documented fallback for historical rows written before
- * the base amount was persisted (`baseAmount` absent) and still needs a
+ * the plan snapshot price was captured (`baseAmount` absent) and still needs a
  * valid rate. `null` when there is no conversion (same currency or absent
  * base currency): the document does not show an invented equivalent.
  */
@@ -386,7 +386,7 @@ export interface ReceiptAssemblyPayment {
   taxTotal: number;
   taxDetails: ITaxDetail[];
   /**
-   * Persisted base-currency amount (plan price / `base_amount`). Exact; when
+   * Base-currency amount (the frozen plan snapshot price). Exact; when
    * absent the assembly falls back to dividing by the persisted rate.
    */
   baseAmount?: number | null;
@@ -579,8 +579,6 @@ export interface PlatformComposePayment {
   planSnapshotCurrency: string;
   /** Plan price frozen at payment time, in that currency (integer cents). */
   planSnapshotPrice?: number | null;
-  /** Persisted base-currency amount (`base_amount`, integer cents). */
-  baseAmount?: number | null;
   voided: boolean;
 }
 
@@ -688,9 +686,10 @@ export function buildPlatformReceiptDataFromComposed(
       subtotal: payment.subtotal,
       taxTotal: payment.taxTotal,
       taxDetails,
-      // `base_amount` is server-derived in Console; the plan price is the
-      // documented fallback for rows written before it was mandatory.
-      baseAmount: payment.baseAmount ?? payment.planSnapshotPrice ?? null,
+      // Same contract as the Panel composer: the frozen plan price IS the
+      // base-currency amount. Guarded by `planSnapshotCurrency`, otherwise the
+      // base currency would not match the currency the price is expressed in.
+      baseAmount: payment.planSnapshotCurrency ? (payment.planSnapshotPrice ?? null) : null,
     },
     baseCurrency: payment.planSnapshotCurrency,
     voided: payment.voided,

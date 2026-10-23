@@ -64,7 +64,7 @@ test.describe('Console — Comprobante SaaS', () => {
         startDate: today,
         isTrial: false,
         payment: {
-          amountPaidCents: 5000,
+          amountPaid: 5000,
           currencyPaid: 'USD',
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
@@ -143,7 +143,7 @@ test.describe('Console — Comprobante SaaS', () => {
         startDate: today,
         isTrial: false,
         payment: {
-          amountPaidCents: 5000,
+          amountPaid: 5000,
           currencyPaid: 'USD',
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
@@ -225,7 +225,7 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
       startDate: today,
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: method,
         paymentMethodDetails: [],

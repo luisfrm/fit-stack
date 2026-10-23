@@ -12,8 +12,6 @@ export interface OrgSubscriptionInfo {
   startDate: string;
   currentPeriodEnd: string;
   isTrial: boolean;
-  /** price in cents or null */
-  priceOverride: number | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
   createdAt: string;

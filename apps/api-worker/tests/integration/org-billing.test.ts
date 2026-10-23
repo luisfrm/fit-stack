@@ -56,7 +56,7 @@ async function createPlatformSubscription(
     startDate: isoDate(startDateOffset),
     isTrial: false,
     payment: {
-      amountPaidCents: 5000,
+      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
@@ -290,7 +290,7 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       const res = await tenantA.owner.client.post('/api/organizations/subscription/renew', {
         paymentMethod: 'Binance',
         currencyPaid: 'USD',
-        amountPaidCents: 1,
+        amountPaid: 1,
         status: 'validated',
         exchangeRateApplied: '0.0001',
         paymentMethodDetails: [{ label: 'Email remitente', value: 'cliente@x.com', type: 'text' }],
@@ -304,9 +304,9 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       expect(payment.status).toBe('processing');
       expect(Number(payment.amount_paid)).toBe(5000);
       expect(payment.currency_paid).toBe('USD');
-      expect(Number(payment.base_amount)).toBe(5000);
       expect(Number(payment.exchange_rate_applied)).toBe(1);
       expect(payment.plan_snapshot_name).toBeDefined();
+      // The frozen plan price is the base-currency amount.
       expect(Number(payment.plan_snapshot_price)).toBe(5000);
       expect(payment.payment_method).toBe('Binance');
 
@@ -346,7 +346,8 @@ describe.skipIf(skipReason !== null)('Org billing (self-service renewal)', () =>
       expect(payment.currency_paid).toBe('VES');
       expect(Number(payment.amount_paid)).toBe(Math.round(5000 * 36.5)); // 182500
       expect(Number(payment.exchange_rate_applied)).toBe(36.5);
-      expect(Number(payment.base_amount)).toBe(5000);
+      // The base-currency amount is the frozen plan price, never the conversion.
+      expect(Number(payment.plan_snapshot_price)).toBe(5000);
     });
 
     it('approval flow: support validates the pending payment and the period extends', async () => {

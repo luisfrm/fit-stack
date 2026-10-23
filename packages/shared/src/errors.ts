@@ -30,6 +30,13 @@ export const API_ERROR_CODES = {
    * server never invents a default like "Pago anulado".
    */
   VOID_REASON_REQUIRED: "VOID_REASON_REQUIRED",
+  /**
+   * `POST /platform/subscriptions` (and its org-scoped mirror): trials are
+   * discontinued (`400`). A historical trial booked a `$0` payment while
+   * snapshotting the full plan price, which inflated SaaS revenue; future
+   * discounts are handled with coupons.
+   */
+  TRIAL_NOT_AVAILABLE: "TRIAL_NOT_AVAILABLE",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

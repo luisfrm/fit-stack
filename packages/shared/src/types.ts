@@ -592,8 +592,6 @@ export interface IPlatformSubscription {
   startDate: string | Date;
   currentPeriodEnd: string | Date;
   isTrial: boolean;
-  /** Price override (in integer cents). null = use plan price */
-  priceOverride?: number | null;
   cancelledAt?: string | Date | null;
   cancellationReason?: string | null;
   createdAt?: string | Date;
@@ -628,7 +626,6 @@ export interface IPlatformSubscriptionPayment {
   amountPaid: number; // integer cents
   currencyPaid: string;
   exchangeRateApplied?: string | null;
-  baseAmount?: number | null; // integer cents in base currency
 
   // Method
   paymentMethod: string;

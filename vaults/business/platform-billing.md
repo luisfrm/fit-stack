@@ -73,9 +73,27 @@ Flow: the org renews its SaaS subscription from `apps/panel/app/(protected)/sett
 - **`POST /api/organizations/subscription/renew`** (`requireOrgPermission('organization','update')` — owner/manager): **minimal body** `{ paymentMethod, currencyPaid, paymentMethodDetails?, paymentDate? }`. Everything financial is dictated by the backend — **the body can never hardcode amounts or rates**:
   - Snapshot (`planSnapshot*` + `featuresSnapshot`) ← from the plan in DB.
   - Rate ← `createExchangeRateProvider` (`api-worker/src/lib/exchange-rates.ts`, open.er-api.com, fresh cache `rates:{base}` 1h + `rates:last:{base}` 30d; `EXCHANGE_API_URL` override for tests). `rate = 1` only if currency == plan currency. Provider failure → uses the last successful response for the SAME base (logged) or, without one, fails visibly (503) — never an assumed rate. Rates are never editable in the UI.
-  - `amountPaid = round((priceOverride ?? plan.price) × rate)`, `baseAmount = priceOverride ?? plan.price` (server-derived; `0` for trial/free), `exchangeRateApplied = String(rate)` (`numeric(20,10)`). The request body cannot state the base amount: `baseAmountCents` is not part of any Console payload (RD-157).
+  - `amountPaid = round(plan.price × rate)` (or `0` for a free plan), `exchangeRateApplied = String(rate)` (`numeric(20,10)`). The booked base amount is the frozen `planSnapshotPrice` written by the same payment: there is no separate base column and no `price_override` (both dropped in migration `0028`). The request body cannot state the base amount nor a commercial override; per-customer discounts are a future coupon feature, not an override column (RD-157/RD-163).
   - `status = processing` (forced) — does NOT extend the period (only `PATCH status VALIDATED` does).
   - Guards: 400 without active org · 404 without sub · 400 cancelled · 409 if `hasPendingPayment` · **409 if `currentPeriodEnd > now` AND `hasValidatedPayment`** (a client with an un-paid/voided period can pay again).
   - Invalidates `platform:subscriptions*` + `org:${orgId}:subscription` / `subscription-status` / `features`.
 - **Org-scoped reads**: `GET /api/organizations/subscription` (active sub with plan, `findActiveByOrganization`), `GET /api/organizations/payment-methods` (platform methods + currencies + currencyFormat). Services in `apps/panel/lib/services/org-billing.ts`; UI in `apps/panel/components/billing/` (`SubscriptionStatusCard` + `OrgRenewalModal` + `OrgPaymentSection`).
 - **Field pre-sorting**: `visual` fields (instructions) are rendered first in all payment forms via `sortPaymentMethodFields` (`@workspace/shared`).
+
+### Trials discontinued (RD-117)
+
+**There are no more trials.** A trial used to book a `validated` payment with `payment_method = 'trial'` and `amount_paid = 0`, but it froze the **full plan price** in `plan_snapshot_price`. When `base_amount` was dropped (`0028`) that snapshot became the booked base amount, so every trial counted in `monthlyRevenueCents`, `previousMonthRevenueCents` (both in `GET /api/platform/subscriptions/stats`) and in the `GET /api/platform/subscriptions/revenue` buckets.
+
+- **Creation rejects trials**: `POST /api/platform/subscriptions` and its org-scoped mirror `POST /api/platform/organizations/:id/subscriptions` answer **400 `TRIAL_NOT_AVAILABLE`** ("Los trials ya no están disponibles. Los descuentos se gestionarán con cupones.") when the body sends `isTrial: true`. `createSubscriptionWithPayment` throws **before the first write**, so no orphan subscription/payment is left behind. The Console form no longer offers the trial toggle and never sends the flag.
+- **The `is_trial` column is not touched**: historical subscriptions keep their flag, so their computed status stays `trial` while the period is in force (see `PAYMENT_STATUSES.md`).
+- **Data migration `0029`** (`0029_zero_historical_trial_snapshot.sql`, custom/idempotent, no-op without trial rows) zeroes the frozen snapshot of historical trials:
+
+  ```sql
+  UPDATE "platform_subscription_payment"
+  SET "plan_snapshot_price" = 0
+  WHERE "payment_method" = 'trial';
+  ```
+
+  They no longer inflate the revenue KPIs, with no receipt to void (a trial was `$0` and never burned an `FS-N` number).
+- **Free plans are NOT trials**: a plan with `price = 0` keeps the free path — `status = validated`, `payment_method = 'free'`, `amount_paid = 0` and `plan_snapshot_price = 0`, so it never books revenue and never burns a series number (`pre_system`).
+- **Future discounts = coupons**: per-customer discounts will be modeled as coupons, never as a resurrected `price_override`/`base_amount` column.

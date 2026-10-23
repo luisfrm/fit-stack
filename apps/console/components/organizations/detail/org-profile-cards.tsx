@@ -103,8 +103,8 @@ export function OrgProfileCards({
   const adoption = gymOverview ? selectPortalAdoption(gymOverview) : null;
   const billed = selectOrgBilledTotal(invoices);
   const currentMonth = selectOrgCurrentMonth(invoices, new Date());
-  // Latest VALIDATED and non-voided payment; currency always matches the
-  // amount it belongs to (`baseAmount` is in the platform base currency).
+  // Latest VALIDATED and non-voided payment, expressed in the platform base
+  // currency (the frozen plan price).
   const latest = selectOrgLatestPayment(invoices);
   const latestAmount = latest
     ? selectPaymentDisplayAmount(latest, currency)
@@ -152,7 +152,7 @@ export function OrgProfileCards({
                 {activeSub.isTrial
                   ? "Gratuito"
                   : formatCents(
-                      activeSub.priceOverride ?? activeSub.planPrice ?? 0,
+                      activeSub.planPrice ?? 0,
                       activeSub.planCurrency ?? currency,
                       currencyFormat,
                     )}

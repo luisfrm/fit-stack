@@ -74,7 +74,7 @@ describe.skipIf(skipReason !== null)('Platform receipts report', () => {
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

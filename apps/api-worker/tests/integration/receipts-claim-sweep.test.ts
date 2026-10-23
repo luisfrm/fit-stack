@@ -240,7 +240,7 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       startDate: isoDate(-60),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -295,7 +295,7 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       startDate: isoDate(-60),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

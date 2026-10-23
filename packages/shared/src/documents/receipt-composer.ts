@@ -105,10 +105,8 @@ export interface PlatformReceiptPaymentRow {
   planSnapshotName?: string | null;
   /** Base currency frozen in the payment (always present in SaaS rows). */
   planSnapshotCurrency: string;
-  /** Plan price in that currency (integer cents). */
+  /** Plan price in that currency (integer cents) — the base-currency amount. */
   planSnapshotPrice?: number | string | null;
-  /** Server-derived base amount in the platform base currency (integer cents). */
-  baseAmount?: number | string | null;
   emitterSnapshot?: unknown;
 }
 
@@ -242,7 +240,6 @@ export function composePlatformReceipt(rows: PlatformReceiptComposedRows): Recei
       planSnapshotCurrency: payment.planSnapshotCurrency,
       planSnapshotPrice:
         payment.planSnapshotPrice != null ? Number(payment.planSnapshotPrice) : null,
-      baseAmount: payment.baseAmount != null ? Number(payment.baseAmount) : null,
       voided: payment.receiptVoided,
     },
     subscription: subscription

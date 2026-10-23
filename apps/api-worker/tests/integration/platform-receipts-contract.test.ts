@@ -67,10 +67,10 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
     client.r2.reset();
   }
 
-  async function createPlatformPlan(): Promise<{ id: number }> {
+  async function createPlatformPlan(price = 5000): Promise<{ id: number }> {
     const res = await admin.client.post('/api/platform/plans', {
       name: `SaaS Plan ${uid()}`,
-      price: 5000,
+      price,
       currency: 'USD',
       durationValue: 1,
       durationUnit: 'month',
@@ -90,7 +90,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       startDate: isoDate(-60),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -250,7 +250,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -306,16 +306,18 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
     expect(noAuth.status, noAuth.text).toBe(401);
   });
 
-  it('$0 trial: GET pre_system terminal (SKIP no quema serie)', async () => {
+  it('$0 free plan: GET pre_system terminal (SKIP no quema serie)', async () => {
+    // RD-117: price-0 plan (free), not a trial — trials answer `400`.
+    const freePlan = await createPlatformPlan(0);
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
-      planId: plan.id,
+      planId: freePlan.id,
       startDate: isoDate(0),
-      isTrial: true,
+      isTrial: false,
       payment: {
-        amountPaidCents: 0,
+        amountPaid: 0,
         currencyPaid: 'USD',
-        paymentMethod: 'trial',
+        paymentMethod: 'free',
         paymentMethodDetails: [],
         status: 'validated',
         paymentDate: isoDate(0),

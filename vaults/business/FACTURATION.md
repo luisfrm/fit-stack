@@ -90,7 +90,7 @@ La emisión tiene **dos pasos**: el número se asigna en la petición (síncrono
 
 Un pago se registra como `processing` (pendiente de aprobación) o `validated` (aprobado). Puede haber sido creado por el gym en el Panel o por un administrador en el Console.
 
-**Regla fija:** solo un pago `validated` emite comprobante. Única excepción: en Console un pago de **$0** (trial/free) nace `validated` pero **no** numera ni quema la serie (`pre_system`). El Panel nunca omite.
+**Regla fija:** solo un pago `validated` emite comprobante. Única excepción: en Console un pago de **$0** (plan gratuito con `price = 0`) nace `validated` pero **no** numera ni quema la serie (`pre_system`). El Panel nunca omite.
 
 ### Paso 1 — Emisión (síncrona, en `api-worker`)
 
@@ -180,7 +180,7 @@ Cuando en el futuro se active:
 
 **Desglose monetario:**
 - `subtotal`, `taxDetails`, `taxTotal`, `amountPaid`, `currencyPaid`.
-- Si `currencyPaid ≠ planSnapshotCurrency`: tasa aplicada (`numeric(20,10)`) y equivalente en la moneda del plan. La tasa se lee "1 {moneda del plan} = {tasa} {moneda pagada}", pero el equivalente **no** se obtiene dividiendo: es el monto base persistido — `plan_snapshot_price` en el Panel, `base_amount` en el Console (derivado en el servidor) — porque la división por una tasa redondeada distorsiona (RD-157). Solo las filas históricas sin ese monto base caen al fallback de división.
+- Si `currencyPaid ≠ planSnapshotCurrency`: tasa aplicada (`numeric(20,10)`) y equivalente en la moneda del plan. La tasa se lee "1 {moneda del plan} = {tasa} {moneda pagada}", pero el equivalente **no** se obtiene dividiendo: es el **precio del plan congelado** (`plan_snapshot_price`), igual en Panel y Console desde la migración `0028` (que eliminó `base_amount`) — porque la división por una tasa redondeada distorsiona (RD-157). Solo las filas históricas sin ese precio congelado caen al fallback de división.
 
 **Pago:** método y referencia enmascarada (nunca números de cuenta completos).
 

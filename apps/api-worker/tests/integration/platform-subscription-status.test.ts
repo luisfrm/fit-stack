@@ -77,7 +77,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
   /** SaaS subscription creation with an explicit payment status (the new default is not applied yet). */
   async function createSub(
     organizationId: string,
-    opts: { paymentStatus?: string; isTrial?: boolean; startDate?: string } = {},
+    opts: { paymentStatus?: string; startDate?: string } = {},
   ): Promise<{ subId: number; paymentId: number }> {
     const paymentStatus = opts.paymentStatus ?? 'validated';
     const startDate = opts.startDate ?? isoDate(0);
@@ -85,9 +85,9 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       organizationId,
       planId: plan.id,
       startDate,
-      isTrial: opts.isTrial ?? false,
+      isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -187,8 +187,13 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     for (const c of cases) {
       const { subId } = await createSub(organization.id, {
         paymentStatus: c.paymentStatus,
-        isTrial: c.isTrial,
       });
+      // RD-117: new trials are rejected (`400 TRIAL_NOT_AVAILABLE`), so the
+      // historical trial is simulated on the row itself: the computed status
+      // must keep honouring `is_trial` for subscriptions that already exist.
+      if (c.isTrial) {
+        await testQuery(`UPDATE platform_subscription SET is_trial = true WHERE id = $1`, [subId]);
+      }
       await setPeriodEndDays(subId, c.days);
       // A realistic `voided` carries audit data (the status does not depend on it).
       if (c.paymentStatus === 'voided') {
@@ -214,7 +219,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     const before = await readPeriodEnd(subId);
 
     const extra = await admin.client.post(`/api/platform/subscriptions/${subId}/payments`, {
-      amountPaidCents: 5000,
+      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
