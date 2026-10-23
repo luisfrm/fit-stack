@@ -12,6 +12,9 @@
  * exists (`receipt_voided_pdf_key`) the contract does NOT deliver the emission
  * PDF (202 + 404): a voided receipt never travels without its seal. Neither is
  * it resent by email (409 `RECEIPT_VOIDED`).
+ *
+ * RD-159: the same sweep repair of a LOST `receipt_voided` flag is mirrored
+ * here for the SaaS emitter (`flagPlatformVoidedIfMissing`).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -34,7 +37,7 @@ import {
   isoDate,
   type AuthedUser,
 } from '../helpers/auth';
-import { handlePlatformReceiptRender } from '../../../jobs-worker/src/handlers/receipt.handler';
+import { handlePlatformReceiptRender, sweepPendingReceiptPdfs } from '../../../jobs-worker/src/handlers/receipt.handler';
 
 describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', () => {
   let admin: AuthedUser;
@@ -116,6 +119,13 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       DATABASE_URL: TEST_DATABASE_URL,
       FILES_BUCKET: env['FILES_BUCKET'] as R2Bucket,
       TASK_QUEUE: env['TASK_QUEUE'] as Queue,
+    };
+  }
+
+  function sweepEnv(client: ReturnType<typeof createClient>) {
+    return {
+      DATABASE_URL: TEST_DATABASE_URL,
+      RECEIPT_QUEUE: client.env['RECEIPT_QUEUE'] as Queue,
     };
   }
 
@@ -271,5 +281,81 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
     const res = await setStatus(paymentId, 'voided', support.client);
     expect(res.status, res.text).toBe(403);
     expect((await readPayment(paymentId))['receipt_voided']).toBe(false);
+  });
+
+  it('barrido: anulado SaaS SIN el flag (escritura perdida) se repara y encola el sello', async () => {
+    const { paymentId, receiptNumber } = await approveAndComplete();
+    const voided = await setStatus(paymentId, 'voided');
+    expect(voided.status, voided.text).toBe(200);
+
+    // RD-159 mirror: the status change landed, `receipt_voided` did not.
+    await testQuery(
+      `UPDATE platform_subscription_payment
+          SET receipt_voided = false, voided_at = now() - interval '20 minutes'
+        WHERE id = $1`,
+      [paymentId],
+    );
+    // Audit as the row is AFTER the lost write: the repair must not touch it.
+    const broken = await readPayment(paymentId);
+    expect(broken['receipt_voided']).toBe(false);
+
+    // THE BUG (before the spies are reset, the download reads R2): the emission
+    // PDF of a voided payment is delivered again while the flag is off.
+    const leaked = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    );
+    expect(leaked.status, leaked.text).toBe(200);
+
+    resetSpies(admin.client);
+    const { repairedVoided } = await sweepPendingReceiptPdfs(sweepEnv(admin.client));
+    expect(repairedVoided).toBeGreaterThanOrEqual(1);
+
+    const repaired = await readPayment(paymentId);
+    expect(repaired['receipt_voided']).toBe(true);
+    // Audit preserved verbatim: the sweep never invents an actor or a reason.
+    expect(repaired['voided_by']).toBe(broken['voided_by']);
+    expect(repaired['void_reason']).toBe(broken['void_reason']);
+    expect(new Date(repaired['voided_at'] as string).getTime()).toBe(
+      new Date(broken['voided_at'] as string).getTime(),
+    );
+    expect(repaired['receipt_voided_pdf_key']).toBeNull();
+
+    // One render for THIS payment, with the platform scope.
+    const renders = admin.client.receiptQueue
+      .ofType('receipt.render')
+      .filter((m) => Number(m['paymentId']) === paymentId);
+    expect(renders).toHaveLength(1);
+    expect(renders[0]).toMatchObject({ scope: 'platform', receiptNumber });
+
+    // Fail-closed again while the seal is missing.
+    const blocked = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    );
+    expect(blocked.status).toBe(404);
+
+    // The enqueued event produces the sealed artifact and only then the download.
+    expect(
+      await handlePlatformReceiptRender(jobsEnv(admin.client), {
+        type: 'receipt.render',
+        scope: 'platform',
+        paymentId,
+        organizationId: tenant.organization.id,
+        receiptNumber,
+      }),
+    ).toBe('completed');
+    expect((await readPayment(paymentId))['receipt_voided_pdf_key']).toMatch(/-anulado\.pdf$/);
+    const served = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
+    );
+    expect(served.status, served.text).toBe(200);
+
+    // Second pass: nothing left to repair nor to render for this payment.
+    resetSpies(admin.client);
+    await sweepPendingReceiptPdfs(sweepEnv(admin.client));
+    expect(
+      admin.client.receiptQueue
+        .ofType('receipt.render')
+        .filter((m) => Number(m['paymentId']) === paymentId),
+    ).toHaveLength(0);
   });
 });

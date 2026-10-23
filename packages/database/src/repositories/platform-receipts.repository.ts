@@ -401,6 +401,10 @@ export function createPlatformReceiptsRepository(db: Db) {
     /**
      * Marks a SaaS receipt as VOIDED. Preserves number and PDF;
      * never releases or reuses the number (frozen decision, Panel mirror).
+     *
+     * Idempotent at the STORAGE layer too (`receipt_voided = false` in the
+     * WHERE): a second delivery returns the row without rewriting the audit
+     * trail (`voided_by` / `voided_at` / `void_reason`).
      */
     async markPlatformVoided(
       paymentId: number,
@@ -422,12 +426,53 @@ export function createPlatformReceiptsRepository(db: Db) {
           voidedAt: new Date(),
           voidReason: input.reason,
         })
-        .where(eq(platformSubscriptionPayment.id, paymentId))
+        .where(
+          and(
+            eq(platformSubscriptionPayment.id, paymentId),
+            eq(platformSubscriptionPayment.receiptVoided, false),
+          ),
+        )
         .returning();
-      if (!row) {
+      if (row) return row;
+
+      // Already voided → return the stored row untouched (audit preserved).
+      const [existing] = await db
+        .select()
+        .from(platformSubscriptionPayment)
+        .where(eq(platformSubscriptionPayment.id, paymentId));
+      if (!existing) {
         throw new Error(`markPlatformVoided: pago ${paymentId} no existe.`);
       }
-      return row;
+      return existing;
+    },
+
+    /**
+     * Repairs the void whose second write was lost (Panel mirror): the status
+     * change sets `status = 'voided'` first and `markPlatformVoided` second;
+     * if the second write fails the payment stays voided with
+     * `receipt_voided = false`, invisible to the sweep, and the ORIGINAL PDF
+     * keeps being served. Flips ONLY the flag: the audit (`voided_by` /
+     * `voided_at` / `void_reason`) is preserved verbatim.
+     *
+     * `flagged: true` = THIS call flipped it (the caller owns the render).
+     */
+    async flagPlatformVoidedIfMissing(
+      paymentId: number,
+    ): Promise<{ flagged: boolean }> {
+      assertPaymentId(paymentId, 'flagPlatformVoidedIfMissing');
+      const [row] = await db
+        .update(platformSubscriptionPayment)
+        .set({ receiptVoided: true })
+        .where(
+          and(
+            eq(platformSubscriptionPayment.id, paymentId),
+            eq(platformSubscriptionPayment.status, 'voided'),
+            isNotNull(platformSubscriptionPayment.receiptNumber),
+            eq(platformSubscriptionPayment.receiptVoided, false),
+          ),
+        )
+        .returning({ id: platformSubscriptionPayment.id });
+      return { flagged: row !== undefined };
     },
   };
 }

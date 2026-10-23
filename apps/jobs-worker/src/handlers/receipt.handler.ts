@@ -72,9 +72,17 @@ export async function handlePlatformReceiptRender(
  *    ANULADO render was lost. Without this predicate the payment would keep
  *    referencing a document that is no longer served (fail-closed).
  *
- * Stale CLAIMS (claimed without number) are a fourth gap with its own query
- * (`staleClaimQuery`): the emission claims the row before consuming the
- * sequence, so a dead emission leaves no number yet.
+ * Two more gaps have their own queries:
+ *
+ * - Stale CLAIMS (claimed without number, `staleClaimQuery`): the emission
+ *   claims the row before consuming the sequence, so a dead emission leaves no
+ *   number yet.
+ * - **Voided without the flag** (`voidedWithoutFlagQuery`): the void writes
+ *   `status = 'voided'` FIRST and `receipt_voided` second; if the second write
+ *   is lost the payment is voided with `receipt_voided = false`, which every
+ *   predicate below misses (they all look for the flag SET) while the ORIGINAL
+ *   PDF keeps being served. Repaired by flagging the row and enqueueing the
+ *   sealed render.
  *
  * The 30-minute delay for predicate 2 is deliberate: the original event may
  * still be retrying and we avoid parallel re-queueing. Re-queueing is safe
@@ -97,13 +105,162 @@ function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): 
     ORDER BY receipt_issued_at ASC LIMIT $1`;
 }
 
+/**
+ * Voided rows whose FLAG was never written (RD-159). The void flow writes
+ * `status = 'voided'` first and `receipt_voided` second: a failed second write
+ * leaves the payment voided with the flag off, invisible to `pendingSweepQuery`
+ * (which only sees the flag SET) and still serving the emission PDF.
+ *
+ * `void_reason` / `voided_at` are required because they are the proof that the
+ * void itself landed (their presence is what the repair preserves as audit);
+ * the 15-minute window matches the other predicates: until then the original
+ * flow may still be retrying.
+ *
+ * LOCAL query (jobs-worker only), no partial index yet: rows in this state are
+ * rare by definition (a lost write), so the scan is bounded by `LIMIT`.
+ */
+function voidedWithoutFlagQuery(
+  table: 'payment' | 'platform_subscription_payment',
+): string {
+  return `SELECT id, organization_id, receipt_number FROM ${table}
+    WHERE status = 'voided' AND receipt_number IS NOT NULL
+      AND receipt_voided = false
+      AND void_reason IS NOT NULL AND voided_at IS NOT NULL
+      AND voided_at < now() - interval '15 minutes'
+    ORDER BY voided_at ASC LIMIT $1`;
+}
+
+interface VoidedWithoutFlagRow {
+  id: number;
+  organization_id: string;
+  receipt_number: string;
+}
+
+/**
+ * Repairs "voided without the flag" for BOTH issuers: flips `receipt_voided`
+ * through the repository (single statement, audit untouched — the sweep cannot
+ * invent an actor) and, only when THIS run flipped it, enqueues the sealed
+ * render. A `flagged: false` means another run won the race and owns the
+ * render: nothing is enqueued, so an already repaired row never duplicates.
+ *
+ * `repaired` counts the flags this run flipped (not the enqueues): when the
+ * enqueue fails the flag is already persisted and the third pending predicate
+ * recovers the render on the next run.
+ */
+export async function repairVoidedFlags(
+  env: SweepEnv,
+  limit = 50,
+): Promise<{ repaired: number; repairedKeys: Set<string> }> {
+  const sql = neon(env.DATABASE_URL);
+  const db = createDb(env.DATABASE_URL);
+  const receiptsRepo = createReceiptsRepository(db);
+  const platformReceiptsRepo = createPlatformReceiptsRepository(db);
+  const repairedKeys = new Set<string>();
+  let repaired = 0;
+
+  const panelRows = (await sql.query(voidedWithoutFlagQuery('payment'), [
+    limit,
+  ])) as VoidedWithoutFlagRow[];
+
+  for (const row of panelRows) {
+    const paymentId = Number(row.id);
+    const orgId = row.organization_id;
+    let flagged = false;
+    try {
+      ({ flagged } = await receiptsRepo.flagVoidedIfMissing(paymentId, orgId));
+    } catch (err) {
+      console.error(
+        `receipt sweep: fallo al reparar el flag de anulado del pago ${paymentId}:`,
+        err,
+      );
+      continue;
+    }
+    if (!flagged) continue;
+
+    repaired += 1;
+    repairedKeys.add(`payment:${paymentId}`);
+    try {
+      await env.RECEIPT_QUEUE.send(
+        buildReceiptRenderEvent({
+          paymentId,
+          organizationId: orgId,
+          receiptNumber: row.receipt_number,
+        }),
+      );
+    } catch (err) {
+      // The flag is already repaired: the "voided without sealed PDF"
+      // predicate re-enqueues the render on the next run.
+      console.error(
+        `receipt sweep: flag de anulado reparado pero fallo el re-encolado del pago ${paymentId}:`,
+        err,
+      );
+    }
+  }
+
+  // FitStack emitter (same mechanism, no org scope on the row).
+  const platformRows = (await sql.query(
+    voidedWithoutFlagQuery('platform_subscription_payment'),
+    [limit],
+  )) as VoidedWithoutFlagRow[];
+
+  for (const row of platformRows) {
+    const paymentId = Number(row.id);
+    const orgId = row.organization_id;
+    let flagged = false;
+    try {
+      ({ flagged } = await platformReceiptsRepo.flagPlatformVoidedIfMissing(paymentId));
+    } catch (err) {
+      console.error(
+        `receipt sweep: fallo al reparar el flag de anulado del pago SaaS ${paymentId}:`,
+        err,
+      );
+      continue;
+    }
+    if (!flagged) continue;
+
+    repaired += 1;
+    repairedKeys.add(`platform_subscription_payment:${paymentId}`);
+    try {
+      await env.RECEIPT_QUEUE.send(
+        buildReceiptRenderEvent({
+          scope: 'platform',
+          paymentId,
+          organizationId: orgId,
+          receiptNumber: row.receipt_number,
+        }),
+      );
+    } catch (err) {
+      console.error(
+        `receipt sweep: flag de anulado reparado pero fallo el re-encolado del pago SaaS ${paymentId}:`,
+        err,
+      );
+    }
+  }
+
+  return { repaired, repairedKeys };
+}
+
+export interface SweepResult {
+  /** Renders re-enqueued by the three pending-PDF predicates. */
+  requeued: number;
+  /** Stale claims numbered and re-enqueued. */
+  resumed: number;
+  /** Lost `receipt_voided` flags repaired (RD-159). */
+  repairedVoided: number;
+}
+
 export async function sweepPendingReceiptPdfs(
   env: SweepEnv,
   limit = 50,
-): Promise<{ requeued: number; resumed: number }> {
+): Promise<SweepResult> {
   // Stale claims first: they have no number yet, so they are invisible to the
   // three pending-PDF predicates below.
   const { resumed } = await resumeClaimedReceipt(env, limit);
+
+  // Then the voided rows whose flag was lost. Runs BEFORE the pending queries
+  // on purpose: the repair flips the flag, so the render it enqueues renders
+  // the sealed artifact, and without it the row matches nothing at all.
+  const { repaired: repairedVoided, repairedKeys } = await repairVoidedFlags(env, limit);
 
   const sql = neon(env.DATABASE_URL);
   const rows = (await sql.query(pendingSweepQuery('payment'), [limit])) as Array<{
@@ -114,6 +271,9 @@ export async function sweepPendingReceiptPdfs(
 
   let requeued = 0;
   for (const row of rows) {
+    // Already re-enqueued by the flag repair of this same run (the row now
+    // matches the voided predicate too): never queue it twice.
+    if (repairedKeys.has(`payment:${Number(row.id)}`)) continue;
     try {
       await env.RECEIPT_QUEUE.send(
         buildReceiptRenderEvent({
@@ -137,6 +297,7 @@ export async function sweepPendingReceiptPdfs(
   )) as Array<{ id: number; organization_id: string; receipt_number: string }>;
 
   for (const row of platformRows) {
+    if (repairedKeys.has(`platform_subscription_payment:${Number(row.id)}`)) continue;
     try {
       await env.RECEIPT_QUEUE.send(
         buildReceiptRenderEvent({
@@ -151,7 +312,7 @@ export async function sweepPendingReceiptPdfs(
       console.error(`receipt sweep: fallo al re-encolar pago SaaS ${row.id}:`, err);
     }
   }
-  return { requeued, resumed };
+  return { requeued, resumed, repairedVoided };
 }
 
 /**

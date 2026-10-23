@@ -265,6 +265,11 @@ export function createReceiptsRepository(db: Db) {
     /**
      * Marks a receipt as VOIDED. Preserves number and PDF;
      * never releases or reuses the number (frozen decision).
+     *
+     * Idempotent at the STORAGE layer too (`receipt_voided = false` in the
+     * WHERE): a second delivery returns the row without rewriting the audit
+     * trail (`voided_by` / `voided_at` / `void_reason`). The service also
+     * short-circuits, this is the backstop for concurrent deliveries.
      */
     async markVoided(
       paymentId: number,
@@ -287,12 +292,58 @@ export function createReceiptsRepository(db: Db) {
           voidedAt: new Date(),
           voidReason: input.reason,
         })
-        .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)))
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            eq(payment.receiptVoided, false),
+          ),
+        )
         .returning();
-      if (!row) {
+      if (row) return row;
+
+      // Already voided → return the stored row untouched (audit preserved).
+      const [existing] = await db
+        .select()
+        .from(payment)
+        .where(and(eq(payment.id, paymentId), eq(payment.organizationId, orgId)));
+      if (!existing) {
         throw new Error(`markVoided: pago ${paymentId} no encontrado en la organización.`);
       }
-      return row;
+      return existing;
+    },
+
+    /**
+     * Repairs the void whose second write was lost. The void flow writes
+     * `status = 'voided'` FIRST and `markVoided` second: if the second write
+     * fails, the payment is voided with `receipt_voided = false`, so the sweep
+     * never sees it (it looks for the flag SET) and the ORIGINAL PDF keeps
+     * being served. This statement flips ONLY the flag: the audit
+     * (`voided_by` / `voided_at` / `void_reason`) is preserved verbatim — the
+     * sweep cannot invent an actor.
+     *
+     * `flagged: true` = THIS call flipped it (the caller owns the render);
+     * `false` = not repairable (no number, not voided) or another run won.
+     */
+    async flagVoidedIfMissing(
+      paymentId: number,
+      orgId: string,
+    ): Promise<{ flagged: boolean }> {
+      assertOrgId(orgId, 'flagVoidedIfMissing');
+      const [row] = await db
+        .update(payment)
+        .set({ receiptVoided: true })
+        .where(
+          and(
+            eq(payment.id, paymentId),
+            eq(payment.organizationId, orgId),
+            eq(payment.status, 'voided'),
+            isNotNull(payment.receiptNumber),
+            eq(payment.receiptVoided, false),
+          ),
+        )
+        .returning({ id: payment.id });
+      return { flagged: row !== undefined };
     },
 
     /** Finds a payment by human correlative number (org-scoped). */

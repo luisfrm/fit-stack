@@ -298,4 +298,85 @@ describe.skipIf(skipReason !== null)('Receipts sequence', () => {
     const found = await repo.findByReceiptNumber(organization.id, num);
     expect(found?.id).toBe(paymentId);
   });
+
+  it('markVoided is idempotent at the storage layer (audit never rewritten)', async () => {
+    const { organization, paymentId } = await createPaidFixture();
+    const repo = receiptsRepo();
+    await claimForNumbering(paymentId, organization.id);
+    await repo.attachReceiptNumber(paymentId, organization.id, {
+      receiptNumber: `${organization.slug}-2026-000021`,
+      documentType: 'receipt',
+      receiptIssuedAt: new Date(),
+    });
+
+    const first = await repo.markVoided(paymentId, organization.id, {
+      by: 'user-actor-1',
+      reason: 'primera anulación',
+    });
+    // A second delivery (retry / concurrent) returns the stored row: the WHERE
+    // requires `receipt_voided = false`, so the audit is never rewritten.
+    const second = await repo.markVoided(paymentId, organization.id, {
+      by: 'user-actor-2',
+      reason: 'segunda anulación',
+    });
+    expect(second.voidedBy).toBe(first.voidedBy);
+    expect(second.voidReason).toBe(first.voidReason);
+    expect(second.voidedAt?.getTime()).toBe(first.voidedAt?.getTime());
+  });
+
+  it('flagVoidedIfMissing repairs a lost flag once, preserving the audit', async () => {
+    const { organization, paymentId } = await createPaidFixture();
+    const repo = receiptsRepo();
+    await claimForNumbering(paymentId, organization.id);
+    await repo.attachReceiptNumber(paymentId, organization.id, {
+      receiptNumber: `${organization.slug}-2026-000022`,
+      documentType: 'receipt',
+      receiptIssuedAt: new Date(),
+    });
+
+    // The void flow: the status change writes the audit first, the receipt
+    // flag second. Here the second write is lost (injected failure).
+    await testQuery(
+      `UPDATE payment
+          SET status = 'voided', voided_by = $1, voided_at = now(), void_reason = $2,
+              receipt_voided = false
+        WHERE id = $3`,
+      ['user-actor-1', 'cobro duplicado', paymentId],
+    );
+    const before = await testQuery<Record<string, unknown>>(
+      `SELECT * FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+
+    expect(await repo.flagVoidedIfMissing(paymentId, organization.id)).toEqual({
+      flagged: true,
+    });
+    const repaired = await testQuery<Record<string, unknown>>(
+      `SELECT * FROM payment WHERE id = $1`,
+      [paymentId],
+    );
+    expect(repaired[0]!['receipt_voided']).toBe(true);
+    // The repair flips ONLY the flag: actor, reason and instant are untouched.
+    expect(repaired[0]!['voided_by']).toBe(before[0]!['voided_by']);
+    expect(repaired[0]!['void_reason']).toBe(before[0]!['void_reason']);
+    expect(new Date(repaired[0]!['voided_at'] as string).getTime()).toBe(
+      new Date(before[0]!['voided_at'] as string).getTime(),
+    );
+
+    // Second run: nothing to repair, so nothing to render either.
+    expect(await repo.flagVoidedIfMissing(paymentId, organization.id)).toEqual({
+      flagged: false,
+    });
+
+    // A voided payment with NO number is terminal: never flagged (there is no
+    // document to seal).
+    const bare = await createPaidFixture();
+    await testQuery(
+      `UPDATE payment SET status = 'voided', voided_at = now(), void_reason = 'sin comprobante' WHERE id = $1`,
+      [bare.paymentId],
+    );
+    expect(await repo.flagVoidedIfMissing(bare.paymentId, bare.organization.id)).toEqual({
+      flagged: false,
+    });
+  });
 });
