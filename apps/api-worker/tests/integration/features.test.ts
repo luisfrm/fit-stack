@@ -83,7 +83,6 @@ async function createPlatformSubscription(
     payment: {
       amountPaidCents: 2999,
       currencyPaid: 'USD',
-      baseAmountCents: 2999,
       paymentMethod: 'card',
       paymentMethodDetails: [],
       status: 'validated',

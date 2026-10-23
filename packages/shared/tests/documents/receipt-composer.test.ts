@@ -431,6 +431,26 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
     expectPanelParity(rows);
   });
 
+  it('RD-157: the frozen plan price wins over the rate division (documented divergence)', () => {
+    const rows = basePanelRows();
+    rows.payment = {
+      ...rows.payment,
+      amountPaid: 10,
+      subtotal: 10,
+      taxTotal: 0,
+      taxDetails: [],
+      currencyPaid: 'USD',
+      planSnapshotCurrency: 'COP',
+      exchangeRateApplied: '0.0003',
+      planSnapshotPrice: 40000,
+    };
+    // The legacy oracle divided by the rounded rate; the plan price is exact.
+    expect(
+      legacyBuildReceiptDataFromComposed(legacyPanelRowsToInput(rows)).amounts.baseTotal,
+    ).toBe(33333);
+    expect(composePanelReceipt(rows).amounts.baseTotal).toBe(40000);
+  });
+
   it('missing member falls back to the walk-in recipient', () => {
     const rows = basePanelRows();
     rows.member = null;

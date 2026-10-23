@@ -177,7 +177,7 @@ Cuando en el futuro se active:
 
 **Desglose monetario:**
 - `subtotal`, `taxDetails`, `taxTotal`, `amountPaid`, `currencyPaid`.
-- Si `currencyPaid ≠ planSnapshotCurrency`: tasa aplicada y equivalente en la moneda del plan. La tasa se lee "1 {moneda del plan} = {tasa} {moneda pagada}", así que el equivalente se obtiene dividiendo.
+- Si `currencyPaid ≠ planSnapshotCurrency`: tasa aplicada (`numeric(20,10)`) y equivalente en la moneda del plan. La tasa se lee "1 {moneda del plan} = {tasa} {moneda pagada}", pero el equivalente **no** se obtiene dividiendo: es el monto base persistido — `plan_snapshot_price` en el Panel, `base_amount` en el Console (derivado en el servidor) — porque la división por una tasa redondeada distorsiona (RD-157). Solo las filas históricas sin ese monto base caen al fallback de división.
 
 **Pago:** método y referencia enmascarada (nunca números de cuenta completos).
 

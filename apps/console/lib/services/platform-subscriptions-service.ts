@@ -48,7 +48,6 @@ export interface PlatformPaymentPayload {
   amountPaidCents: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
-  baseAmountCents?: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;

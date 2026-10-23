@@ -63,7 +63,6 @@ export interface PlatformPaymentPayload {
   amountPaidCents: number;
   currencyPaid: string;
   exchangeRateApplied?: string;
-  baseAmountCents?: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
@@ -195,6 +194,14 @@ export function createPlatformSubscriptionsService(
         amountPaidCents = 0;
       }
 
+      // Base amount is SERVER-derived: the plan price (or the explicit admin
+      // override) is the revenue booked in the platform base currency. The
+      // operator-stated `amountPaidCents` only drives the charge in the paid
+      // currency and is never trusted as the base. A $0 registration books 0.
+      // Booked regardless of status: revenue only sums `validated` payments.
+      const baseAmountCents =
+        isTrial || plan.price === 0 ? 0 : data.priceOverrideCents ?? plan.price;
+
       // Point 7(a): period is only front-loaded if registration is born paid.
       // A registration `processing`/`voided`/`refunded` does NOT grant free time:
       // `currentPeriodEnd = startDate` until validated (where PATCH extends
@@ -249,7 +256,7 @@ export function createPlatformSubscriptionsService(
           amountPaid: amountPaidCents,
           currencyPaid: data.payment.currencyPaid,
           exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-          baseAmount: data.payment.baseAmountCents ?? null,
+          baseAmount: baseAmountCents,
           paymentMethod,
           paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
           status: paymentStatus,
@@ -326,6 +333,9 @@ export function createPlatformSubscriptionsService(
 
       // Create payment
       const amountPaidCents = data.payment.amountPaidCents ?? plan.price;
+      // Server-derived base amount: the subscription override (if any) or the
+      // plan price. The payload can no longer state it.
+      const baseAmountCents = sub.priceOverride ?? plan.price;
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -340,7 +350,7 @@ export function createPlatformSubscriptionsService(
         amountPaid: amountPaidCents,
         currencyPaid: data.payment.currencyPaid,
         exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-        baseAmount: data.payment.baseAmountCents ?? null,
+        baseAmount: baseAmountCents,
         paymentMethod: data.payment.paymentMethod,
         paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
         status: data.payment.status,
@@ -476,7 +486,8 @@ export function createPlatformSubscriptionsService(
         amountPaid: data.amountPaidCents,
         currencyPaid: data.currencyPaid,
         exchangeRateApplied: data.exchangeRateApplied ?? null,
-        baseAmount: data.baseAmountCents ?? null,
+        // Server-derived: plan price of the subscription (or its override).
+        baseAmount: sub.priceOverride ?? sub.planPrice,
         paymentMethod: data.paymentMethod,
         paymentMethodDetails: data.paymentMethodDetails ?? null,
         status: data.status,

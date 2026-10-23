@@ -117,6 +117,25 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     ).toBe(200);
   });
 
+  it('baseTotal usa baseAmount persistido y cae al precio del plan si falta', () => {
+    const withBase = baseInput();
+    withBase.payment.currencyPaid = 'VES';
+    withBase.payment.exchangeRateApplied = '36.5';
+    withBase.payment.amountPaid = 7300;
+    withBase.payment.baseAmount = 5000;
+    withBase.payment.planSnapshotPrice = 4999;
+    expect(buildPlatformReceiptDataFromComposed(withBase).amounts.baseTotal).toBe(5000);
+
+    // Historical row written before `base_amount` was server-derived.
+    const legacy = baseInput();
+    legacy.payment.currencyPaid = 'VES';
+    legacy.payment.exchangeRateApplied = '36.5';
+    legacy.payment.amountPaid = 7300;
+    legacy.payment.baseAmount = null;
+    legacy.payment.planSnapshotPrice = 5000;
+    expect(buildPlatformReceiptDataFromComposed(legacy).amounts.baseTotal).toBe(5000);
+  });
+
   it('trial $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {
     const input = baseInput();
     input.payment = {

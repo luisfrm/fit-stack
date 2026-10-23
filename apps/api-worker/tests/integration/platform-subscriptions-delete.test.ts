@@ -69,7 +69,6 @@ describe.skipIf(skipReason !== null)('Platform subscription deletion', () => {
       payment: {
         amountPaidCents: PRICE_CENTS,
         currencyPaid: 'USD',
-        baseAmountCents: PRICE_CENTS,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         // `processing`: no receipt emission, no `FS-N` sequence dependency.

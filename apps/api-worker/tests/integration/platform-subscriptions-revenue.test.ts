@@ -3,7 +3,8 @@
  *
  * - 401 without session; 403 for support/plain users
  * - `months` default 12, clamped to 1–24, zero-filled buckets
- * - only `validated` payments count, `COALESCE(baseAmount, amountPaid)`
+ * - only `validated` payments count; `base_amount` is server-derived and
+ *   `COALESCE(base_amount, amount_paid)` survives as the legacy fallback
  * - UTC month bucketing (a payment on the 15th of last month lands there)
  * - current-month bucket matches `GET /stats → monthlyRevenueCents`
  * - writes invalidate the cached series
@@ -12,6 +13,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   assertSchemaReady,
   skipReason,
+  testQuery,
   truncateAll,
 } from '../helpers/db';
 import {
@@ -95,25 +97,38 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     const plan = await createPlatformPlan(admin);
     const tenant = await createGymTenant('revenue-owner');
 
-    // Current month: validated, explicit baseAmount (5000).
+    // Current month: validated. The base amount is SERVER-derived from the
+    // plan price, whatever the operator states as `amountPaidCents`.
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
       amountPaidCents: 5000,
-      baseAmountCents: 5000,
       status: 'validated',
       paymentDate: isoDate(0),
     });
 
-    // Previous month: validated WITHOUT baseAmount → falls back to amountPaid (3000).
+    // Previous month: validated renewal. The base amount is the plan price
+    // (5000) even though the operator charged 3000 in the paid currency.
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
       amountPaidCents: 3000,
       status: 'validated',
       paymentDate: prevMonthDate(),
     });
 
+    // Previous month: legacy row written BEFORE `base_amount` was
+    // server-derived (NULL) → the KPI falls back to `amount_paid`.
+    await testQuery(
+      `INSERT INTO platform_subscription_payment
+         (organization_id, plan_id, plan_snapshot_name, plan_snapshot_price,
+          plan_snapshot_currency, plan_snapshot_duration_value,
+          plan_snapshot_duration_unit, amount_paid, currency_paid, base_amount,
+          payment_method, payment_date, due_date, status)
+       VALUES ($1, $2, 'Plan legacy', 3000, 'USD', 1, 'month', 3000, 'USD',
+          NULL, 'zelle', $3::timestamptz, $3::timestamptz, 'validated')`,
+      [tenant.organization.id, plan.id, prevMonthDate()],
+    );
+
     // Current month: processing → must be excluded.
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
       amountPaidCents: 9999,
-      baseAmountCents: 9999,
       status: 'processing',
       paymentDate: isoDate(0),
     });
@@ -148,7 +163,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     expect([...months].sort()).toEqual(months);
   });
 
-  it('buckets validated payments by UTC month with baseAmount fallback', async () => {
+  it('buckets validated payments by UTC month with the server-derived base amount', async () => {
     const res = await admin.client.get('/api/platform/subscriptions/revenue');
     expect(res.status, res.text).toBe(200);
 
@@ -162,9 +177,10 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     // Current month: only the validated 5000 (processing 9999 excluded).
     expect(current.totalCents).toBe(5000);
     expect(current.count).toBe(1);
-    // Previous month: amountPaid fallback (3000, no baseAmount).
-    expect(prev.totalCents).toBe(3000);
-    expect(prev.count).toBe(1);
+    // Previous month: the plan price (5000, NOT the stated 3000) + the
+    // legacy row without `base_amount`, which falls back to 3000.
+    expect(prev.totalCents).toBe(8000);
+    expect(prev.count).toBe(2);
   });
 
   it('matches the current-month bucket with GET /stats monthlyRevenueCents', async () => {
@@ -205,7 +221,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     const freshPlan = await createPlatformPlan(admin);
     await createPlatformSubscription(admin, tenant.organization.id, freshPlan.id, {
       amountPaidCents: 1000,
-      baseAmountCents: 1000,
       status: 'validated',
       paymentDate: isoDate(0),
     });
@@ -214,6 +229,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
       query: { months: '1' },
     });
     expect(second.status, second.text).toBe(200);
-    expect(second.body[0].totalCents).toBe(before + 1000);
+    // The booked base amount is the plan price, not the stated 1000.
+    expect(second.body[0].totalCents).toBe(before + 5000);
   });
 });

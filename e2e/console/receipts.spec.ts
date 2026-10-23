@@ -66,7 +66,6 @@ test.describe('Console — Comprobante SaaS', () => {
         payment: {
           amountPaidCents: 5000,
           currencyPaid: 'USD',
-          baseAmountCents: 5000,
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
           status: 'processing',
@@ -146,7 +145,6 @@ test.describe('Console — Comprobante SaaS', () => {
         payment: {
           amountPaidCents: 5000,
           currencyPaid: 'USD',
-          baseAmountCents: 5000,
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
           status: 'validated',
@@ -222,7 +220,6 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: method,
         paymentMethodDetails: [],
         status: 'validated',

@@ -40,7 +40,6 @@ const paymentSchema = z.object({
   amountPaidCents: z.number().int().nonnegative(),
   currencyPaid: z.string().min(1),
   exchangeRateApplied: z.string().optional(),
-  baseAmountCents: z.number().int().nonnegative().optional(),
   paymentMethod: paymentMethodSchema,
   paymentMethodDetails: paymentMethodDetailsSchema,
   status: paymentStatusEnum,

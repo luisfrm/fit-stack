@@ -92,7 +92,6 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',
@@ -253,7 +252,6 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',
@@ -317,7 +315,6 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       payment: {
         amountPaidCents: 0,
         currencyPaid: 'USD',
-        baseAmountCents: 0,
         paymentMethod: 'trial',
         paymentMethodDetails: [],
         status: 'validated',

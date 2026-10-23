@@ -60,7 +60,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation', () =
     return {
       amountPaidCents: PRICE_CENTS,
       currencyPaid: 'USD',
-      baseAmountCents: PRICE_CENTS,
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
       status: 'validated',

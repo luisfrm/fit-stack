@@ -190,9 +190,11 @@ describe.skipIf(skipReason !== null)('Subscriptions compensation', () => {
 
     // RD-158: the rate is server-derived, so the insert is poisoned through the
     // provider instead of the payload. `1e30` overflows the rate column
-    // (numeric(10,4) today, numeric(20,10) after RD-157) AND the bigint
-    // `amount_paid`, so `paymentsRepo.create` fails in the DB — after the
-    // subscription was already written. Kept precision-independent on purpose.
+    // (`numeric(20,10)` after RD-157: 10 integer digits) AND the bigint
+    // `amount_paid` (1e30 * 100 cents), so `paymentsRepo.create` fails in the
+    // DB — after the subscription was already written. Kept
+    // precision-independent on purpose: the failure is a range overflow, not
+    // a rate rounding.
     await withRateServer({ VES: 1e30 }, async (url) => {
       owner.client.env.EXCHANGE_API_URL = url;
       const res = await owner.client.post(

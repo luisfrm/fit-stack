@@ -86,10 +86,25 @@ describe('buildReceiptDataFromComposed', () => {
     input.payment.currencyPaid = 'VES';
     input.payment.planSnapshotCurrency = 'VES';
     input.payment.exchangeRateApplied = '36.5';
+    input.payment.planSnapshotPrice = 10000;
     expect(buildReceiptDataFromComposed(input).amounts.baseTotal).toBeNull();
   });
 
-  it('baseTotal convierte con la tasa persistida (redondeo al centavo)', () => {
+  it('baseTotal usa el precio del plan persistido, sin dividir la tasa', () => {
+    const input = validInput();
+    // A COP plan paid in USD: a 4-decimal rate would round 0.00025 to 0.0003
+    // and the division would inflate the base total by ~20%.
+    input.payment.amountPaid = 10;
+    input.payment.currencyPaid = 'USD';
+    input.payment.planSnapshotCurrency = 'COP';
+    input.payment.exchangeRateApplied = '0.0003';
+    input.payment.planSnapshotPrice = 40000;
+    const data = buildReceiptDataFromComposed(input);
+    expect(data.amounts.baseCurrency).toBe('COP');
+    expect(data.amounts.baseTotal).toBe(40000);
+  });
+
+  it('baseTotal histórico convierte con la tasa persistida (redondeo al centavo)', () => {
     const input = validInput();
     input.payment.amountPaid = 7300;
     input.payment.currencyPaid = 'VES';

@@ -87,7 +87,8 @@ export interface NewPlatformPaymentData {
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
-  baseAmount?: number | null;
+  /** Server-derived base amount in the platform base currency (integer cents). */
+  baseAmount: number;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
@@ -479,7 +480,7 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied ?? null,
-          baseAmount: data.baseAmount ?? null,
+          baseAmount: data.baseAmount,
           paymentMethod: data.paymentMethod,
           paymentMethodDetails: (data.paymentMethodDetails ?? null) as any,
           status: data.status,

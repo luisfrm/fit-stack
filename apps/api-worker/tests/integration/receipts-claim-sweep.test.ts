@@ -242,7 +242,6 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',
@@ -298,7 +297,6 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',

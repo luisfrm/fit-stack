@@ -89,7 +89,6 @@ describe.skipIf(skipReason !== null)('Organization receipts (panel)', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',

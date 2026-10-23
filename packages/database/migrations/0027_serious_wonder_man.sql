@@ -1,0 +1,2 @@
+ALTER TABLE "payment" ALTER COLUMN "exchange_rate_applied" SET DATA TYPE numeric(20, 10);--> statement-breakpoint
+ALTER TABLE "platform_subscription_payment" ALTER COLUMN "exchange_rate_applied" SET DATA TYPE numeric(20, 10);

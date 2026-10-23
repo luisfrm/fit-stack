@@ -49,6 +49,8 @@ export interface ComposePayment {
   /** Snapshot frozen upon payment registration (source of plan name). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
+  /** Plan price frozen at payment time, in the plan currency (integer cents). */
+  planSnapshotPrice?: number | null;
 }
 
 export interface ComposeOrganization {
@@ -89,18 +91,29 @@ export interface ComposeReceiptInput {
 }
 
 /**
- * Base currency equivalent total, in integer cents. Persisted rate
- * reads "1 {base} = {rate} {paid}", so it is divided.
- * `null` when there is no conversion (same currency or absent/invalid rate):
- * document does not show an invented equivalent.
+ * Base currency equivalent total, in integer cents.
+ *
+ * The persisted `baseAmount` (the plan price frozen at payment time, in the
+ * base currency) is the EXACT base total and always wins: converting back by
+ * dividing the paid amount by the stored rate accumulates rounding, and a
+ * 4-decimal rate used to lose up to ~20% on quotes like COP->USD.
+ *
+ * The division is the documented fallback for historical rows written before
+ * the base amount was persisted (`baseAmount` absent) and still needs a
+ * valid rate. `null` when there is no conversion (same currency or absent
+ * base currency): the document does not show an invented equivalent.
  */
 function toBaseTotal(
   total: number,
   currencyPaid: string,
   baseCurrency: string | null | undefined,
   exchangeRateApplied: string | null | undefined,
+  baseAmount?: number | null,
 ): number | null {
   if (!baseCurrency || baseCurrency === currencyPaid) return null;
+  if (typeof baseAmount === 'number' && Number.isInteger(baseAmount) && baseAmount >= 0) {
+    return baseAmount;
+  }
   const rate = Number(exchangeRateApplied);
   if (!Number.isFinite(rate) || rate <= 0) return null;
   return roundCents(total / rate);
@@ -336,6 +349,11 @@ export interface ReceiptAssemblyPayment {
   subtotal: number;
   taxTotal: number;
   taxDetails: ITaxDetail[];
+  /**
+   * Persisted base-currency amount (plan price / `base_amount`). Exact; when
+   * absent the assembly falls back to dividing by the persisted rate.
+   */
+  baseAmount?: number | null;
 }
 
 /** Issuer differences, already resolved by the per-issuer mapper. */
@@ -405,6 +423,7 @@ export function assembleReceiptData(input: ReceiptAssemblyInput): ReceiptData {
         payment.currencyPaid,
         input.baseCurrency,
         payment.exchangeRateApplied,
+        payment.baseAmount,
       ),
     },
     method: {
@@ -485,6 +504,11 @@ export function buildReceiptDataFromComposed(
       subtotal: payment.subtotal,
       taxTotal: payment.taxTotal,
       taxDetails,
+      // The plan price IS the base amount (the server priced the charge from
+      // it): never re-derive it by dividing the rounded rate. Guarded by
+      // `planSnapshotCurrency`: without it the base falls back to the org
+      // primary currency, where the plan price is not the base.
+      baseAmount: payment.planSnapshotCurrency ? (payment.planSnapshotPrice ?? null) : null,
     },
     baseCurrency: payment.planSnapshotCurrency ?? organization.primaryCurrency,
     voided: payment.receiptVoided ?? false,
@@ -514,6 +538,10 @@ export interface PlatformComposePayment {
   taxDetails?: unknown;
   planSnapshotName?: string | null;
   planSnapshotCurrency: string;
+  /** Plan price frozen at payment time, in that currency (integer cents). */
+  planSnapshotPrice?: number | null;
+  /** Persisted base-currency amount (`base_amount`, integer cents). */
+  baseAmount?: number | null;
   voided: boolean;
 }
 
@@ -620,6 +648,9 @@ export function buildPlatformReceiptDataFromComposed(
       subtotal: payment.subtotal,
       taxTotal: payment.taxTotal,
       taxDetails,
+      // `base_amount` is server-derived in Console; the plan price is the
+      // documented fallback for rows written before it was mandatory.
+      baseAmount: payment.baseAmount ?? payment.planSnapshotPrice ?? null,
     },
     baseCurrency: payment.planSnapshotCurrency,
     voided: payment.voided,

@@ -93,7 +93,6 @@ describe.skipIf(skipReason !== null)('Platform receipts sequence', () => {
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: 'processing',

@@ -211,7 +211,9 @@ export const platformSubscriptionPayment = pgTable(
     // Payment details
     amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // cents
     currencyPaid: text('currency_paid').notNull(),
-    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
+    // Wide precision on purpose (RD-157): a 4-decimal rate rounds a COP->USD
+    // quote (0.00025) to 0.0003, a ~20% error that leaks into every division.
+    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 20, scale: 10 }),
     baseAmount: bigint('base_amount', { mode: 'number' }), // cents in base currency
 
     // Method and metadata
@@ -514,7 +516,8 @@ export const payment = pgTable(
 
     amountPaid: bigint('amount_paid', { mode: 'number' }).notNull(), // cents
     currencyPaid: text('currency_paid').notNull(),
-    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 10, scale: 4 }),
+    // Wide precision on purpose (RD-157): same rationale as `payment`.
+    exchangeRateApplied: numeric('exchange_rate_applied', { precision: 20, scale: 10 }),
 
     status: text('status').default('validated').notNull(),
     paymentMethod: text('payment_method').notNull(),

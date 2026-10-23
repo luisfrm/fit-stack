@@ -89,7 +89,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       payment: {
         amountPaidCents: 5000,
         currencyPaid: 'USD',
-        baseAmountCents: 5000,
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
         status: paymentStatus,
@@ -217,7 +216,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     const extra = await admin.client.post(`/api/platform/subscriptions/${subId}/payments`, {
       amountPaidCents: 5000,
       currencyPaid: 'USD',
-      baseAmountCents: 5000,
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
       status: 'voided',

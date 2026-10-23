@@ -150,6 +150,6 @@ The Hono API uses centralized middleware — never write auth/error boilerplate 
 
 ### 11. Money Convention (integer cents)
 
-- **Golden rule**: ALL money travels and stores as **integer cents** — DB (`bigint`), API contracts (`z.number().int()`), services, tests, seeds, E2E fixtures. `exchangeRateApplied` is a rate, not money — it stays `numeric(10,4)`.
+- **Golden rule**: ALL money travels and stores as **integer cents** — DB (`bigint`), API contracts (`z.number().int()`), services, tests, seeds, E2E fixtures. `exchangeRateApplied` is a rate, not money — `numeric(20,10)` (RD-157: 4 decimals rounded `0.00025` to `0.0003`). The base-currency equivalent is the persisted base amount (`plan_snapshot_price` / `base_amount`), never a division by that rate.
 - **Display**: ONLY via `formatCents(cents, currency, format)` from `@workspace/shared` (single source; `ValueConverter` lives there too). Inline `/ 100` for money display is PROHIBITED.
 - **Unit inputs** (forms editing "50.00"): convert at the boundary with `centsToUnits` / `unitsToCents` from `@workspace/shared`. Fiscal math (`tax-math`, `receipt-data`) operates in integer cents and rounds with `roundCents` — the only place that rounds money.

@@ -110,9 +110,11 @@ SSOT `packages/shared/src/date.ts`; **NEVER** manual date arithmetic (`Intl.Date
 
 ### 11. Money Convention (integer cents)
 
-ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate. Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
+ALL money is **integer cents** (`bigint`, `z.number().int()`, services/tests/seeds); `exchangeRateApplied` is a rate persisted as `numeric(20,10)` (RD-157 — a 4-decimal column rounded `0.00025` to `0.0003`). Display **only** via `formatCents`; inline `/ 100` **PROHIBITED**; convert with `centsToUnits`/`unitsToCents`, round only with `roundCents`.
 
-The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override.
+The **server** prices gym payments (`POST /api/subscriptions`, RD-158): `amountPaid = roundCents(plan.price * rate)` and `exchangeRateApplied = String(rate)` come from the plan and the rate provider — never from the request body — and `currencyPaid` must belong to `gym_setting.active_currencies` (`400 PAYMENT_CURRENCY_NOT_ACTIVE`). The Console keeps its manual rate override but never accepts a client-stated base amount: `base_amount` is `priceOverrideCents ?? plan.price` (server-derived).
+
+**Persisted base amount, never a division** (RD-157): the base-currency equivalent of a payment is the frozen `plan_snapshot_price` (Panel) / `base_amount` (Console). Reports (`payments.repository.ts`) and receipts (`toBaseTotal`) use it; `amountPaid / exchangeRateApplied` survives only as the fallback for historical rows without it.
 
 ## Where to read more
 
