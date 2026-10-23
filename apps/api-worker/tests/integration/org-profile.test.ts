@@ -68,7 +68,7 @@ async function createPlatformSubscription(
     startDate: isoDate(0),
     isTrial: false,
     payment: {
-      amountPaidCents: 5000,
+      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
@@ -137,11 +137,13 @@ describe.skipIf(skipReason !== null)('Org profile endpoints', () => {
       expect(res.status, res.text).toBe(401);
     });
 
-    it('rejects support and plain users (403)', async () => {
+    it('allows support to read and rejects plain users (403)', async () => {
+      // `support` holds `subscription:list` in the platform RBAC matrix.
       const resSupport = await support.client.get(
         `/api/platform/subscriptions/by-organization/${tenant.organization.id}/invoices`,
       );
-      expect(resSupport.status, resSupport.text).toBe(403);
+      expect(resSupport.status, resSupport.text).toBe(200);
+      expect(resSupport.body.length).toBeGreaterThanOrEqual(1);
 
       const resPlain = await plain.client.get(
         `/api/platform/subscriptions/by-organization/${tenant.organization.id}/invoices`,
@@ -170,11 +172,13 @@ describe.skipIf(skipReason !== null)('Org profile endpoints', () => {
       expect(res.status, res.text).toBe(401);
     });
 
-    it('rejects support and plain users (403)', async () => {
+    it('allows support to read and rejects plain users (403)', async () => {
+      // `support` holds `organization:list` in the platform RBAC matrix.
       const resSupport = await support.client.get(
         `/api/platform/organizations/${tenant.organization.id}/gym-overview`,
       );
-      expect(resSupport.status, resSupport.text).toBe(403);
+      expect(resSupport.status, resSupport.text).toBe(200);
+      expect(resSupport.body).toHaveProperty('totalMembers');
 
       const resPlain = await plain.client.get(
         `/api/platform/organizations/${tenant.organization.id}/gym-overview`,

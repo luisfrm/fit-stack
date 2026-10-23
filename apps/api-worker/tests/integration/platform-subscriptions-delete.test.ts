@@ -8,10 +8,10 @@
  * Uses a `processing` payment so receipt emission (and the `FS-N` sequence)
  * is not involved.
  *
- * NOTE: the last case asserts the DB-level `RESTRICT` rule, so it requires
- * migration `0024` to be applied. Until then the FK is still `CASCADE` on the
- * shared Neon test branch and that single case fails on purpose (the API-level
- * cases are independent of the migration).
+ * NOTE: the last case asserts the DB-level `RESTRICT` rule, so the test branch
+ * must have migration `0025` applied (it validates the FK `0024` added as
+ * `NOT VALID`); without it the test branch may still carry a drifted `CASCADE`
+ * FK and that single case fails.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import { assertSchemaReady, skipReason, testQuery, truncateAll } from '../helpers/db';
@@ -67,7 +67,7 @@ describe.skipIf(skipReason !== null)('Platform subscription deletion', () => {
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: PRICE_CENTS,
+        amountPaid: PRICE_CENTS,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

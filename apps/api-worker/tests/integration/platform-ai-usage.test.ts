@@ -1,7 +1,7 @@
 /**
  * Platform AI usage read — GET /api/platform/organizations/:id/ai-usage:
  *
- * - 401 without session; 403 for support/plain users; 404 for unknown org
+ * - 401 without session; support reads (200); plain users 403; 404 for unknown org
  * - returns the same quota shape as POST /:id/ai-credits
  * - the grant endpoint invalidates the cached quota
  */
@@ -60,7 +60,7 @@ describe.skipIf(skipReason !== null)('Platform AI usage read', () => {
       startDate: isoDate(0),
       isTrial: false,
       payment: {
-        amountPaidCents: 5000,
+        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -78,9 +78,11 @@ describe.skipIf(skipReason !== null)('Platform AI usage read', () => {
     expect(res.status, res.text).toBe(401);
   });
 
-  it('rejects support and plain users (403)', async () => {
+  it('allows support to read and rejects plain users (403)', async () => {
+    // `support` holds `organization:list` in the platform RBAC matrix.
     const resSupport = await support.client.get(`/api/platform/organizations/${orgId}/ai-usage`);
-    expect(resSupport.status, resSupport.text).toBe(403);
+    expect(resSupport.status, resSupport.text).toBe(200);
+    expect(resSupport.body).toHaveProperty('monthly');
 
     const resPlain = await plain.client.get(`/api/platform/organizations/${orgId}/ai-usage`);
     expect(resPlain.status, resPlain.text).toBe(403);
