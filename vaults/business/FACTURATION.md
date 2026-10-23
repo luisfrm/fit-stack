@@ -56,6 +56,8 @@ Hoy: (1) puede ser `true`, (2) puede estar cargado, (3) **siempre es `false`**. 
 
 > La condición 3 no es un olvido ni un bug: no existe integración con máquinas fiscales y no hay plan de tenerla. El código la deja como una constante explícita, el gate **no acepta ningún override**, así que la etiqueta "Factura" es **inalcanzable por construcción**.
 
+**Estas tres condiciones se evalúan sobre el emisor**, nunca sobre el receptor. Y su marco fiscal viene del **país del emisor**: la etiqueta del `taxId` (`R.I.F.`, `NIT`, `RFC`…) y el disclaimer legal son los del país del emisor. Cada receptor conserva la etiqueta de **su** país (un emisor venezolano facturando a una organización colombiana imprime `R.I.F.` para sí mismo y `NIT` para el receptor, con el disclaimer del SENIAT y no el de la DIAN). En Console el país del emisor es `fitstack_country_code`; vacío = emisor genérico (`Tax ID` + disclaimer no fiscal), nunca el país del receptor como proxy.
+
 ## 4. Cómo se decide la etiqueta (el gate)
 
 La decisión vive en una sola función pura:
@@ -159,7 +161,7 @@ Cuando en el futuro se active:
 
 **Encabezado (identidad del emisor):**
 - `legalName` (si no existe, `name`)
-- `taxId` con su etiqueta del país (`R.I.F.`, `NIT`, `RFC`…). Si no hay `taxId`, la línea se omite: nunca se inventa ni se rellena con `---`.
+- `taxId` con su etiqueta del país **del emisor** (`R.I.F.`, `NIT`, `RFC`…). En Console ese país es `fitstack_country_code`; sin configurar, la etiqueta es genérica (`Tax ID`) y el documento no reclama ningún régimen fiscal. Si no hay `taxId`, la línea se omite: nunca se inventa ni se rellena con `---`.
 - Dirección si está configurada.
 
 **Identificación del documento:**
@@ -169,7 +171,7 @@ Cuando en el futuro se active:
 
 **Receptor:**
 - Panel: miembro (nombre y documento con `docLabel` del país: `C.I.`, `C.C.`…).
-- Console: organización (nombre y `taxLabel` del país: `R.I.F.`, `NIT`…).
+- Console: organización (nombre y `taxLabel` del país **del receptor**: `R.I.F.`, `NIT`…). La etiqueta del receptor nunca se toma del emisor.
 
 **Detalle de la venta:**
 - Nombre del plan desde el snapshot (no el plan en vivo).
@@ -181,7 +183,7 @@ Cuando en el futuro se active:
 
 **Pago:** método y referencia enmascarada (nunca números de cuenta completos).
 
-**Pie legal:** disclaimer del país (`COUNTRIES.legalDisclaimer`) + "Generado con FitStack". Los disclaimers actuales aclaran que el documento **no** constituye una factura fiscal (el de US lo indica en inglés como *non-tax document*).
+**Pie legal:** disclaimer del país **del emisor** (`COUNTRIES.legalDisclaimer`) + "Generado con FitStack". Los disclaimers actuales aclaran que el documento **no** constituye una factura fiscal (el de US lo indica en inglés como *non-tax document*). Sin país de emisor configurado (Console) el pie es genérico y no fiscal: "Comprobante de pago interno. No constituye una factura fiscal." + "Emitido por FitStack", sin nombrar SENIAT/DIAN ni ninguna autoridad.
 
 ### Dónde vive cada pieza
 
@@ -231,6 +233,7 @@ Se persiste como un solo string `"<tipo>-<número>"` (por ejemplo `V-12345678`, 
 Nada de esto está hecho. Es la lista completa de lo que haría falta:
 
 - [ ] Entidad legal constituida con tax ID propio (FitStack) o del gym (Panel).
+- [ ] País fiscal del emisor configurado en Console (`fitstack_country_code`). Define la etiqueta y el disclaimer del emisor; sin él el comprobante usa el marco genérico (`Tax ID` + disclaimer no fiscal), nunca el del receptor.
 - [ ] Proveedor homologado de facturación electrónica integrado.
 - [ ] Numeración fiscal oficial conectada (no generada internamente).
 - [ ] Máquina fiscal o servicio autorizado por país (SENIAT, DIAN, SAT…).

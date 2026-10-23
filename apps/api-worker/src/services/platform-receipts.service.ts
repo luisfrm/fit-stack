@@ -14,6 +14,7 @@ import {
   parseConsoleReceiptNumber,
   platformEmitterFromSettings,
   resolveFiscalProfile,
+  resolvePlatformEmitterProfile,
   type FiscalProfile,
   type ReceiptData,
   type ReceiptDocumentType,
@@ -162,14 +163,28 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
     },
 
     async buildEmitterSnapshot(payment, org, profile) {
-      // Frozen emitter identity: FitStack (settings) + receptor country
-      // profile. Built BEFORE the claim/sequence (nothing burns a correlative).
+      // Frozen emitter identity: FitStack (settings) + the emitter's OWN
+      // fiscal country. The recipient profile only keeps its label and the
+      // tax breakdown. Built BEFORE the claim/sequence (nothing burns a
+      // correlative).
+      const emitter = platformEmitterFromSettings(await platformSettingsRepo.getAll());
+      let emitterProfile: FiscalProfile | null;
+      try {
+        emitterProfile = resolvePlatformEmitterProfile(emitter);
+      } catch {
+        throw new ReceiptError(
+          500,
+          'FISCAL_PROFILE_UNKNOWN',
+          `País fiscal del emisor desconocido (${emitter.countryCode}).`,
+        );
+      }
       return buildPlatformEmitterSnapshot(
         {
           receptor: org,
-          emitter: platformEmitterFromSettings(await platformSettingsRepo.getAll()),
+          emitter,
           currency: payment.planSnapshotCurrency,
         },
+        emitterProfile,
         profile,
       );
     },

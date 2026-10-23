@@ -188,9 +188,34 @@ export function platformEmitterFromSettings(
 }
 
 /**
- * Platform issuer identity: FitStack settings + fiscal profile of
- * RECIPIENT country (org does not decide its VAT). Without configured country,
- * issuer inherits recipient's (documented proxy, PENDING §8).
+ * Generic FitStack issuer wording when the platform did not configure its own
+ * fiscal country: no country regime is claimed (least of all the recipient's)
+ * and the document stays non-fiscal.
+ */
+const GENERIC_PLATFORM_TAX_LABEL = 'Tax ID';
+const GENERIC_PLATFORM_DISCLAIMER = [
+  'Comprobante de pago interno. No constituye una factura fiscal.',
+];
+
+/**
+ * Resolves the FitStack issuer fiscal profile from its OWN configured country
+ * (`fitstack_country_code`). Empty = generic issuer (`null`): the fiscal label
+ * and disclaimer are never borrowed from the recipient. Unknown country →
+ * visible error, never a silent default.
+ */
+export function resolvePlatformEmitterProfile(
+  emitter: PlatformComposeEmitter,
+): FiscalProfile | null {
+  const countryCode = emitter.countryCode?.trim();
+  if (!countryCode) return null;
+  return resolveFiscalProfile(countryCode);
+}
+
+/**
+ * Platform issuer identity. The fiscal wording (`taxLabel`, `disclaimer`)
+ * follows the ISSUER's profile; the recipient keeps its own label from ITS
+ * profile (that is why both profiles are required). A `null` issuer profile is
+ * a generic emitter, not the recipient's regime.
  */
 function platformEmitterIdentity(
   input: {
@@ -199,17 +224,23 @@ function platformEmitterIdentity(
     /** Base currency frozen in payment (`planSnapshotCurrency`). */
     currency: string;
   },
-  profile: FiscalProfile,
+  emitterProfile: FiscalProfile | null,
+  receptorProfile: FiscalProfile,
 ): Omit<ReceiptEmitterSnapshot, 'version' | 'taxes'> {
   const emitter: ReceiptEmitter = {
     name: input.emitter.legalName?.trim() || 'FitStack',
     legalName: input.emitter.legalName?.trim() || null,
     taxId: input.emitter.taxId?.trim() || null,
-    taxLabel: profile.taxLabel,
+    // Fiscal label of the issuer's country; `Tax ID` when none is configured
+    // (the line is printed only if a `taxId` exists).
+    taxLabel: emitterProfile?.taxLabel ?? GENERIC_PLATFORM_TAX_LABEL,
     address: input.emitter.address?.trim() || null,
+    // Informational only: with no configured issuer country it never decides
+    // the fiscal wording (that stays generic). The contract keeps it non-empty.
     countryCode: input.emitter.countryCode?.trim() || input.receptor.countryCode,
     currency: input.currency,
   };
+  const disclaimer = emitterProfile?.disclaimer ?? GENERIC_PLATFORM_DISCLAIMER;
   return {
     emitter,
     // FitStack is not declared formal taxpayer: gate enforces
@@ -220,27 +251,32 @@ function platformEmitterIdentity(
     }),
     // B2B recipient (organization): the printed label is the country
     // `taxLabel` (`R.I.F.`, `NIT`), never the person-natural `docLabel`.
-    recipientDocLabel: profile.taxLabel,
-    disclaimer: profile.disclaimer.includes('Emitido por FitStack')
-      ? profile.disclaimer
-      : [...profile.disclaimer, 'Emitido por FitStack'],
+    recipientDocLabel: receptorProfile.taxLabel,
+    disclaimer: disclaimer.includes('Emitido por FitStack')
+      ? disclaimer
+      : [...disclaimer, 'Emitido por FitStack'],
     timezone: input.receptor.timezone,
   };
 }
 
-/** Platform issuer snapshot (FitStack). */
+/**
+ * Platform issuer snapshot (FitStack). `emitterProfile` freezes the issuer's
+ * fiscal wording; `receptorProfile` only provides the recipient label and the
+ * tax breakdown (FitStack taxes, always disabled).
+ */
 export function buildPlatformEmitterSnapshot(
   input: {
     receptor: PlatformComposeReceptor;
     emitter: PlatformComposeEmitter;
     currency: string;
   },
-  profile: FiscalProfile,
+  emitterProfile: FiscalProfile | null,
+  receptorProfile: FiscalProfile,
 ): ReceiptEmitterSnapshot {
   return {
     version: 1,
-    ...platformEmitterIdentity(input, profile),
-    taxes: summarizeTaxes(profile.taxes),
+    ...platformEmitterIdentity(input, emitterProfile, receptorProfile),
+    taxes: summarizeTaxes(receptorProfile.taxes),
   };
 }
 
@@ -517,9 +553,12 @@ export function buildReceiptDataFromComposed(
 
 /* ── SaaS receipt (Console) ────────────────────────────────────────
    Issuer = FitStack (`platform_setting` keys); recipient = org.
-   Fiscal profile and taxes from recipient country WITHOUT override (the
-   org does not decide its VAT); unknown country → visible error. Issuer without
-   configured country uses recipient country as proxy (PENDING §8).
+   Fiscal wording (label + disclaimer) follows the ISSUER's configured country;
+   the recipient keeps its own label from its country. Taxes come from the
+   recipient country WITHOUT override (the org does not decide its VAT) and
+   stay disabled because FitStack is not a declared formal taxpayer. Unknown
+   country → visible error; issuer without configured country → generic,
+   non-fiscal wording (never the recipient's as a proxy).
    Pure, no I/O, edge-safe. Minimal structural interface (no imports of
    `@workspace/database`: avoids circular shared→database dependency).
    ─────────────────────────────────────────────────────────────────────── */
@@ -603,12 +642,13 @@ export function buildPlatformReceiptDataFromComposed(
     'buildPlatformReceiptDataFromComposed',
   );
 
-  // No org override: FitStack defines uniform taxes per country.
+  // No org override: FitStack taxes come from the country profile.
   // Snapshot first: if present, live configuration is NOT read.
   const identity =
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(
       { receptor, emitter, currency: payment.planSnapshotCurrency },
+      resolvePlatformEmitterProfile(emitter),
       resolveFiscalProfile(receptor.countryCode),
     );
 

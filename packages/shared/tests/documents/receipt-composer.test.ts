@@ -19,6 +19,7 @@ import {
   buildEmitterSnapshot,
   buildPlatformEmitterSnapshot,
   platformEmitterFromSettings,
+  resolvePlatformEmitterProfile,
   toReceiptMaskedDetails,
   type ComposeReceiptInput,
   type DateInput,
@@ -161,6 +162,8 @@ function legacyBuildPlatformReceiptDataFromComposed(
     assertEmitterSnapshot(input.emitterSnapshot, 'buildPlatformReceiptDataFromComposed') ??
     buildPlatformEmitterSnapshot(
       { receptor, emitter, currency: payment.planSnapshotCurrency },
+      // RD-160: the issuer's OWN fiscal country defines its label/disclaimer.
+      resolvePlatformEmitterProfile(emitter),
       resolveFiscalProfile(receptor.countryCode),
     );
 
@@ -645,6 +648,7 @@ describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
           emitter: platformEmitterFromSettings(rows.emitter),
           currency: rows.payment.planSnapshotCurrency,
         },
+        resolvePlatformEmitterProfile(platformEmitterFromSettings(rows.emitter)),
         resolveFiscalProfile(rows.organization.countryCode, undefined),
       ),
     };

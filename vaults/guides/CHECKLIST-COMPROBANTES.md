@@ -56,7 +56,7 @@ Se computan en SQL (`subscriptions.repository.ts`). El orden importa:
 - [ ] **§9 → RD-138** Tasa y base del IGTF a confirmar con contador (hoy `COUNTRIES` fija 3% con base `gross_first`) + declaración fiscal del emisor plataforma (los `FS-N` no detallan impuestos).
 - [ ] **§11** Los comprobantes emitidos antes de C1 recomponen en vivo (limitación documentada, sin backfill inventado).
 - [ ] **§10 → RD-139** Universo de `gaps[]` a escala (disparador de performance).
-- [ ] **§8** Disclaimer de Console con país proxy hasta configurar `fitstack_country_code`.
+- [x] **§8 → RD-160** La etiqueta y el disclaimer de Console salen del país del emisor (`fitstack_country_code`); sin él son genéricos, nunca el país del receptor como proxy.
 - [ ] **§16 → RD-140** Claim-then-number para cerrar la carrera de correlativo (disparador: hueco no explicado en `gaps[]`).
 - [ ] **RD-141** Mostrar `receiptVoided` en el estado `pending` del diálogo.
 

@@ -196,6 +196,8 @@ Si el pago o la emisión fallan tras crear la suscripción, el service **compens
 
 `support` es de solo lectura: cada GET exige el permiso de lectura de su módulo (`organization:list`, `plan:list`, `subscription:list`, `user:list`, `setting:read`) y toda mutación de orgs/planes/suscripciones/staff exige `console:manage` (settings y branding, `setting:write`). No existe `requirePlatformAuth`.
 
+Los comprobantes `FS-N` congelan la identidad fiscal del emisor desde Console (`fitstack_legal_name` / `fitstack_tax_id` / `fitstack_country_code`): la etiqueta (`R.I.F.`, `NIT`) y el disclaimer salen del país del **emisor**, nunca del receptor (que conserva la etiqueta de su propio país). Sin `fitstack_country_code` el emisor es genérico (`Tax ID` + disclaimer no fiscal, solo se imprime la línea si hay `fitstack_tax_id`). Un país de emisor desconocido falla visible (`500 FISCAL_PROFILE_UNKNOWN`).
+
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | GET | `/api/platform/plans` | Catálogo de planes Fit-Stack |

@@ -37,7 +37,7 @@ Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin comp
 
 | Sección | Campo | Origen |
 |---|---|---|
-| Emisor | Nombre legal, RIF | Config fija de FitStack (cuando exista) |
+| Emisor | Nombre legal, RIF | Config fija de FitStack (`fitstack_legal_name`, `fitstack_tax_id`); etiqueta y disclaimer del país del **emisor** (`fitstack_country_code`), genéricos (`Tax ID`) si no está configurado |
 | Receptor | `organization.legalName` / `name`, `organization.taxId` (con `taxLabel` del país: `R.I.F.`, `NIT`), `organization.address` | tabla `organization` |
 | Identificación | `receiptNumber` (o `invoiceNumber`) | `platform_document_sequence` |
 | Detalle | `planSnapshotName`, `planSnapshotPrice`, `planSnapshotCurrency`, `planSnapshotDurationValue/Unit` | `platformSubscriptionPayment` (snapshot, no `platformPlan` en vivo) |
@@ -45,7 +45,7 @@ Formato sugerido: `FS-0000001` (prefijo fijo de FitStack + correlativo, sin comp
 | Monto | `amountPaid`, `currencyPaid`, `exchangeRateApplied`, `baseAmount` | `platformSubscriptionPayment` |
 | Método de pago | `paymentMethod`, `paymentMethodDetails` (enmascarado si sensible) | `platformSubscriptionPayment` |
 | Fechas | `paymentDate` (pago) vs fecha de emisión del comprobante (pueden diferir) | `platformSubscriptionPayment` |
-| Pie legal | disclaimer país + "Emitido por FitStack" | config de país del `organization.countryCode` del Org receptor |
+| Pie legal | disclaimer país del **emisor** + "Emitido por FitStack" (genérico no fiscal sin `fitstack_country_code`) | config de país del emisor (`fitstack_country_code`) |
 
 ### Nota sobre features
 
