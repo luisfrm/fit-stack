@@ -15,6 +15,9 @@ describe.skipIf(skipReason !== null)('Platform init (first owner)', () => {
   beforeAll(async () => {
     await assertSchemaReady();
     await truncateAll();
+    // This suite asserts the bootstrap: start from a platform WITHOUT settings
+    // (`truncateAll` restores the baseline every other suite relies on).
+    await testQuery('DELETE FROM platform_setting');
   });
 
   it('creates the first user with the owner platform role and seeds settings', async () => {

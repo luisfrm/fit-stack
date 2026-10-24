@@ -21,11 +21,9 @@ import {
 } from "@/lib/config/platform-settings";
 import { useExchangeRates } from "@/lib/hooks/use-exchange-rates";
 import {
-  exchangeRateAppliedValue,
   paymentConversionView,
   type ExchangeRateLoadStatus,
   centsToUnits,
-  unitsToCents,
 } from "@workspace/shared";
 
 import { OrganizationSelector } from "./organization-selector";
@@ -33,9 +31,7 @@ import { PaymentSection } from "./payment-section";
 import { PlatformPlanSelector } from "./platform-plan-selector";
 
 interface PaymentData {
-  amountPaid: number;
   currencyPaid: string;
-  exchangeRateApplied?: string;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;
@@ -152,17 +148,15 @@ export function PlatformSubscriptionForm({
   const [paymentCurrency, setPaymentCurrency] = React.useState(
     requirePlatformCurrency(platformSettings),
   );
+  // Preview only: the server prices the payment from the plan and the rate.
   const [finalAmount, setFinalAmount] = React.useState(0);
   const [paymentMethodId, setPaymentMethodId] = React.useState("");
   const [paymentDetails, setPaymentDetails] = React.useState("");
   const [dynamicFieldValues, setDynamicFieldValues] = React.useState<
     Record<string, any>
   >({});
-  const [allowPriceOverride, setAllowPriceOverride] = React.useState(false);
   const [isProcessingUploads, setIsProcessingUploads] = React.useState(false);
   const [paymentValidated, setPaymentValidated] = React.useState(true);
-
-  const [amountFocus, setAmountFocus] = React.useState(false);
 
   const currencyFormat = requirePlatformCurrencyFormat(platformSettings);
 
@@ -238,10 +232,6 @@ export function PlatformSubscriptionForm({
   React.useEffect(() => {
     loadPlans();
   }, [loadPlans]);
-
-  React.useEffect(() => {
-    setAllowPriceOverride(platformSettings["allow_price_override"] === "true");
-  }, [platformSettings]);
 
   React.useEffect(() => {
     if (!debouncedOrgSearch) {
@@ -400,14 +390,13 @@ export function PlatformSubscriptionForm({
 
     setIsProcessingUploads(true);
     try {
-      // Free plan: automatic validated payment with 0 (never a trial).
+      // Free plan: automatic validated payment with zero amounts and no rates.
       if (isFreePlan) {
         await onSubmit({
           organizationId,
           planId,
           startDate,
           payment: {
-            amountPaid: 0,
             currencyPaid: planCurrency,
             paymentMethod: "free",
             status: PAYMENT_STATUSES.VALIDATED,
@@ -444,9 +433,7 @@ export function PlatformSubscriptionForm({
         planId,
         startDate,
         payment: {
-          amountPaid: unitsToCents(finalAmount),
           currencyPaid: paymentCurrency,
-          exchangeRateApplied: exchangeRateAppliedValue(conversion),
           paymentMethod:
             paymentMethodId === "other"
               ? paymentDetails.trim()
@@ -558,9 +545,6 @@ export function PlatformSubscriptionForm({
           conversion={conversion}
           rateStatus={rateStatus}
           onRetryRate={reloadRates}
-          amountFocus={amountFocus}
-          onAmountFocus={setAmountFocus}
-          onAmountChange={setFinalAmount}
           onCurrencyChange={handleCurrencyChange}
           onPaymentValidatedChange={setPaymentValidated}
           paymentValidated={paymentValidated}
@@ -570,7 +554,6 @@ export function PlatformSubscriptionForm({
             setPaymentMethodId(v);
             setDynamicFieldValues({});
           }}
-          allowPriceOverride={allowPriceOverride}
           paymentDetails={paymentDetails}
           onPaymentDetailsChange={setPaymentDetails}
         />

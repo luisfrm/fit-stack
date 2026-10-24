@@ -5,8 +5,10 @@ import { requirePlatformPermission } from '../lib/route-handler';
 import { createSettingsRepository } from '../repositories/settings.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createSettingsService } from '../services/settings.service';
+import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createCache } from '../lib/cache';
 import { documentIdTypeViolation } from '../lib/schemas';
+import { API_ERROR_CODES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const settingsSchema = z.record(z.string(), z.string());
@@ -18,6 +20,8 @@ const settingsSchema = z.record(z.string(), z.string());
  */
 const EMITTER_TAX_ID_KEY = 'fitstack_tax_id';
 const EMITTER_COUNTRY_CODE_KEY = 'fitstack_country_code';
+/** Normalization currency of every SaaS amount. */
+const PRIMARY_CURRENCY_KEY = 'primary_currency';
 
 export const platformSettingsRoutes = new Hono<AppEnv>()
   // GET /api/platform/settings
@@ -47,6 +51,7 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
     const settingsRepo = createSettingsRepository(c.get('db'));
     const platformSettingsRepo = createPlatformSettingsRepository(c.get('db'));
     const settingsService = createSettingsService(settingsRepo, platformSettingsRepo);
+    const subsRepo = createPlatformSubscriptionsRepository(c.get('db'));
 
     // RD-148: the emitter identity issues the SaaS receipts, so its tax id
     // prefix must belong to the emitter country. A partial write may omit the
@@ -61,6 +66,24 @@ export const platformSettingsRoutes = new Hono<AppEnv>()
         persisted[EMITTER_TAX_ID_KEY] ?? null,
       );
       if (violation) return c.json(violation, 400);
+    }
+
+    // The platform primary currency is the normalization currency of EVERY SaaS
+    // amount (`platform_amount`): changing it once payments exist would silently
+    // reinterpret historical revenue, so it freezes with the first payment.
+    const nextPrimaryCurrency = body[PRIMARY_CURRENCY_KEY];
+    if (nextPrimaryCurrency) {
+      const persisted = await platformSettingsRepo.findByKey(PRIMARY_CURRENCY_KEY);
+      if (persisted !== nextPrimaryCurrency && (await subsRepo.hasAnyPayment())) {
+        return c.json(
+          {
+            error:
+              'La moneda primaria de la plataforma no se puede cambiar porque ya existen pagos SaaS registrados.',
+            code: API_ERROR_CODES.PRIMARY_CURRENCY_IMMUTABLE,
+          },
+          409,
+        );
+      }
     }
 
     await settingsService.updateAll(null, body);

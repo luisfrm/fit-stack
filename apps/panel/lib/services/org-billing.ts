@@ -11,7 +11,6 @@ export interface OrgSubscriptionInfo {
   planId: number;
   startDate: string;
   currentPeriodEnd: string;
-  isTrial: boolean;
   cancelledAt: string | null;
   cancellationReason: string | null;
   createdAt: string;

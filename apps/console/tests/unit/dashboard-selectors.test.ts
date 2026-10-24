@@ -3,7 +3,6 @@ import {
   selectNewOrgsThisMonth,
   selectPaymentsReview,
   selectRenewals,
-  selectTrials,
 } from "../../lib/dashboard/selectors";
 import type {
   IPlatformOrganization,
@@ -23,7 +22,6 @@ function makeSub(
     status: "active",
     startDate: "2026-08-09T12:00:00Z",
     currentPeriodEnd: "2026-10-09T12:00:00Z",
-    isTrial: false,
     cancelledAt: null,
     createdAt: "2026-08-09T12:00:00Z",
     ...overrides,
@@ -98,15 +96,8 @@ describe("selectRenewals", () => {
     expect(result[2]?.urgency).toBe("expiring");
   });
 
-  it("excludes trials, cancelled and orgs without subscription", () => {
+  it("excludes cancelled and orgs without a billable subscription", () => {
     const orgs = [
-      makeOrg("trial", {
-        latestSubscription: makeSub({
-          status: "trial",
-          isTrial: true,
-          currentPeriodEnd: "2026-09-10T12:00:00Z",
-        }),
-      }),
       makeOrg("cancelled", {
         latestSubscription: makeSub({
           status: "cancelled",
@@ -127,44 +118,6 @@ describe("selectRenewals", () => {
   });
 });
 
-describe("selectTrials", () => {
-  it("splits expiring trials from all trials", () => {
-    const orgs = [
-      makeOrg("trial-soon", {
-        latestSubscription: makeSub({
-          status: "trial",
-          isTrial: true,
-          currentPeriodEnd: "2026-09-12T12:00:00Z",
-        }),
-      }),
-      makeOrg("trial-late", {
-        latestSubscription: makeSub({
-          status: "trial",
-          isTrial: true,
-          currentPeriodEnd: "2026-10-20T12:00:00Z",
-        }),
-      }),
-      makeOrg("trial-cancelled", {
-        latestSubscription: makeSub({
-          status: "cancelled",
-          isTrial: true,
-          cancelledAt: "2026-09-01T12:00:00Z",
-          currentPeriodEnd: "2026-09-12T12:00:00Z",
-        }),
-      }),
-      makeOrg("paid", {
-        latestSubscription: makeSub({
-          status: "active",
-          currentPeriodEnd: "2026-09-12T12:00:00Z",
-        }),
-      }),
-    ];
-    const { expiring, all } = selectTrials(orgs, NOW);
-    expect(expiring.map((t) => t.org.id)).toEqual(["trial-soon"]);
-    expect(all.map((t) => t.org.id)).toEqual(["trial-soon", "trial-late"]);
-  });
-});
-
 describe("selectPaymentsReview", () => {
   it("keeps only processing payments, most recent first", () => {
     const base: SubscriptionWithDetails = {
@@ -181,7 +134,6 @@ describe("selectPaymentsReview", () => {
       status: "past_due",
       startDate: "2026-08-09T12:00:00Z",
       currentPeriodEnd: "2026-09-09T12:00:00Z",
-      isTrial: false,
       cancelledAt: null,
       cancellationReason: null,
       createdAt: "2026-08-09T12:00:00Z",

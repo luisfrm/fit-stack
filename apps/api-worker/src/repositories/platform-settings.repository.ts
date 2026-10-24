@@ -27,6 +27,21 @@ export function createPlatformSettingsRepository(db: Db) {
         return acc;
       }, {} as Record<string, string>);
     },
+
+    /**
+     * Reference currency of the platform (`platform_setting.primary_currency`,
+     * seeded by `/api/init`). Every SaaS amount is normalized to it, so a
+     * missing value is a visible error: it is never defaulted.
+     */
+    async getPrimaryCurrency(): Promise<string> {
+      const value = await this.findByKey('primary_currency');
+      if (!value) {
+        throw new Error(
+          'platform_setting.primary_currency is missing: SaaS amounts cannot be normalized without it.',
+        );
+      }
+      return value;
+    },
   };
 }
 

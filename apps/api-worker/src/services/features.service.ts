@@ -92,9 +92,7 @@ export function createFeaturesService(
     const sub = await subsRepo.findActiveByOrganization(orgId);
     if (sub) {
       const status = sub.status;
-      const isActiveBilling =
-        status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
-        status === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
+      const isActiveBilling = status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE;
       if (isActiveBilling) {
         const plan = await plansRepo.findById(sub.planId);
         // If plan not found, fallback to calendar month
@@ -128,8 +126,7 @@ export function createFeaturesService(
     if (sub) {
       subscriptionStatus = sub.status;
       const isActiveBilling =
-        subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
-        subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
+        subscriptionStatus === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE;
 
       if (isActiveBilling) {
         const plan = await plansRepo.findById(sub.planId);

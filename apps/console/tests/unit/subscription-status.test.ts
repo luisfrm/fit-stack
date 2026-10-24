@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { hasActiveSubscription } from "@/lib/platform/subscription-status";
 
 describe("hasActiveSubscription", () => {
-  it.each(["active", "trial"])("accepts %s without cancelledAt", (status) => {
-    expect(hasActiveSubscription({ status, cancelledAt: null })).toBe(true);
+  it("accepts active without cancelledAt", () => {
+    expect(hasActiveSubscription({ status: "active", cancelledAt: null })).toBe(
+      true,
+    );
   });
 
-  it.each(["past_due", "read_only", "suspended", "cancelled", "pending"])(
+  it.each(["past_due", "read_only", "suspended", "cancelled", "trial", "pending"])(
     "rejects %s",
     (status) => {
       expect(hasActiveSubscription({ status, cancelledAt: null })).toBe(false);

@@ -31,9 +31,7 @@ export interface AddSubscriptionPayload {
   planId: number;
   startDate?: string;
   payment: {
-    amountPaid: number;
     currencyPaid: string;
-    exchangeRateApplied?: string;
     paymentMethod: string;
     paymentMethodDetails?: IPaymentMethodDetails;
     status: PaymentStatus;
@@ -155,7 +153,8 @@ export const organizationsService = {
 
   /**
    * Adds a new platform subscription to an organization.
-   * Amounts are integer cents (`amountPaid`); trial/free plans are supported.
+   * The server prices the payment from the plan and the exchange rate; a
+   * price-0 plan is the free plan.
    */
   async addSubscription(
     id: string,

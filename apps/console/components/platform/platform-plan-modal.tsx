@@ -6,6 +6,7 @@ import { PlatformPlanForm } from "./platform-plan-form";
 import { type IPlatformPlan } from "@workspace/shared/types";
 import { platformPlansService } from "@/lib/services/platform-plans-service";
 import type { FeatureCatalog } from "@workspace/shared";
+import { apiCode, mutationError } from "@workspace/shared";
 
 interface PlatformPlanModalProps {
   readonly planData?: IPlatformPlan;
@@ -34,8 +35,13 @@ export function PlatformPlanModal({ planData, trigger, onSuccess, settings, cata
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Error saving plan:", error);
-      toast.error("Error al guardar el plan");
+      // The plan currency freezes the rate of its payments: resolved by CODE,
+      // never by the server text (AGENTS.md §7).
+      toast.error(
+        apiCode(error) === "PLAN_CURRENCY_IMMUTABLE"
+          ? "La moneda del plan no se puede cambiar porque ya tiene pagos registrados."
+          : mutationError("PlatformPlanModal", error, "Error al guardar el plan"),
+      );
     } finally {
       setIsLoading(false);
     }

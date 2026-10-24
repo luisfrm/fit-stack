@@ -41,7 +41,6 @@ function makeSub(
     status: "active",
     startDate: "2026-08-01",
     currentPeriodEnd: "2026-10-01T00:00:00Z",
-    isTrial: false,
     cancelledAt: null,
     ...overrides,
   };
@@ -122,7 +121,7 @@ describe("selectOrgHealth", () => {
     ).toBe("warn");
   });
 
-  it.each(["active", "trial"] as PlatformSubscriptionStatus[])(
+  it.each(["active"] as PlatformSubscriptionStatus[])(
     "returns ok for healthy %s",
     (status) => {
       expect(
@@ -138,6 +137,19 @@ describe("selectOrgHealth", () => {
       ).toBe("ok");
     },
   );
+  it("a former trial status is not healthy anymore", () => {
+    expect(
+      selectOrgHealth(
+        makeOrg({
+          latestSubscription: makeSub({
+            status: "past_due",
+            currentPeriodEnd: "2026-12-01T00:00:00Z",
+          }),
+        }),
+        NOW,
+      ),
+    ).toBe("warn");
+  });
 });
 
 describe("selectPortalAdoption", () => {

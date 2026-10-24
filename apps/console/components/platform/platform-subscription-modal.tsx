@@ -5,6 +5,7 @@ import { Modal, toast } from "@workspace/ui/components";
 import { type IPlatformOrganization, type PaymentStatus, type IPaymentMethodDetails } from "@workspace/shared/types";
 import { PlatformSubscriptionForm } from "./platform-subscription-form";
 import { organizationsService } from "@/lib/services/organizations-service";
+import { mutationError } from "@workspace/shared";
 
 interface PlatformSubscriptionModalProps {
   readonly trigger?: React.ReactNode;
@@ -42,9 +43,7 @@ export function PlatformSubscriptionModal({
     planId: number;
     startDate: string;
     payment: {
-      amountPaid: number;
       currencyPaid: string;
-      exchangeRateApplied?: string;
       paymentMethod: string;
       paymentMethodDetails?: IPaymentMethodDetails;
       status: PaymentStatus;
@@ -61,8 +60,13 @@ export function PlatformSubscriptionModal({
       onSuccess?.();
       setIsOpen(false);
     } catch (error: any) {
-      console.error("Error registering subscription:", error);
-      toast.error("Error al registrar la suscripción");
+      toast.error(
+        mutationError(
+          "PlatformSubscriptionModal",
+          error,
+          "Error al registrar la suscripción",
+        ),
+      );
     }
   };
 

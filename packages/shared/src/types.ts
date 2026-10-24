@@ -577,7 +577,6 @@ export interface IPlatformPlan {
   durationUnit: DurationUnit;
   features: PlanFeaturesV2 | null;
   isActive: boolean;
-  trialDays: number; // 0 = no trial
   createdAt?: string | Date;
   organizationCount?: number;
 }
@@ -591,7 +590,6 @@ export interface IPlatformSubscription {
   status: PlatformSubscriptionStatus;
   startDate: string | Date;
   currentPeriodEnd: string | Date;
-  isTrial: boolean;
   cancelledAt?: string | Date | null;
   cancellationReason?: string | null;
   createdAt?: string | Date;
@@ -626,6 +624,15 @@ export interface IPlatformSubscriptionPayment {
   amountPaid: number; // integer cents
   currencyPaid: string;
   exchangeRateApplied?: string | null;
+  /**
+   * Amount normalized to `platform_setting.primary_currency` (integer cents),
+   * computed by the server from the plan price and the applied rate.
+   * `NULL` on historical rows whose currency was not the primary one and had
+   * no reproducible rate — never invented.
+   */
+  platformAmount: number | null;
+  /** Rate applied plan → primary currency (rate persisted as `numeric(20,10)`). */
+  platformRateApplied: string | null;
 
   // Method
   paymentMethod: string;

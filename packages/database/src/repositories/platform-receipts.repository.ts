@@ -324,6 +324,11 @@ export function createPlatformReceiptsRepository(db: Db) {
      * Completes VOIDED PDF (Panel mirror): sets `receipt_voided_pdf_key`
      * ONLY if not already present. No effect on email (`receipt_notified_at`
      * is untouched). The issued PDF remains intact.
+     *
+     * NOT gated on `receipt_voided` on purpose (RD-159): the render path treats
+     * `status = 'voided'` as voided too and the composer stamps the artifact,
+     * so requiring the flag would drop the key in the lost-flag window and
+     * force a re-render on every sweep delivery.
      */
     async completePlatformVoidedReceiptPdf(
       paymentId: number,

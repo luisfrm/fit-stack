@@ -10,6 +10,7 @@ import {
   toLocalDayString,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import {
   createPanelRenderProfile,
   createPlatformRenderProfile,
@@ -78,11 +79,12 @@ export async function handlePlatformReceiptRender(
  *   claims the row before consuming the sequence, so a dead emission leaves no
  *   number yet.
  * - **Voided without the flag** (`voidedWithoutFlagQuery`): the void writes
- *   `status = 'voided'` FIRST and `receipt_voided` second; if the second write
- *   is lost the payment is voided with `receipt_voided = false`, which every
- *   predicate below misses (they all look for the flag SET) while the ORIGINAL
- *   PDF keeps being served. Repaired by flagging the row and enqueueing the
- *   sealed render.
+ *   `status = PAYMENT_STATUSES.VOIDED` FIRST and `receipt_voided` second; if
+ *   the second write is lost the payment is voided with `receipt_voided =
+ *   false`, which every predicate below misses (they all look for the flag
+ *   SET) while the panel/console contract still must not serve the emission
+ *   PDF (RD-159 reads the status too). Repaired by flagging the row and
+ *   enqueueing the sealed render.
  *
  * The 30-minute delay for predicate 2 is deliberate: the original event may
  * still be retrying and we avoid parallel re-queueing. Re-queueing is safe
@@ -107,9 +109,11 @@ function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): 
 
 /**
  * Voided rows whose FLAG was never written (RD-159). The void flow writes
- * `status = 'voided'` first and `receipt_voided` second: a failed second write
+ * `status = voided` first and `receipt_voided` second: a failed second write
  * leaves the payment voided with the flag off, invisible to `pendingSweepQuery`
- * (which only sees the flag SET) and still serving the emission PDF.
+ * (which only sees the flag SET). The read contract already refuses the
+ * emission PDF in that window; the sweep repairs the flag so the sealed
+ * artifact is rendered and becomes the only deliverable.
  *
  * `void_reason` / `voided_at` are required because they are the proof that the
  * void itself landed (their presence is what the repair preserves as audit);
@@ -118,12 +122,13 @@ function pendingSweepQuery(table: 'payment' | 'platform_subscription_payment'): 
  *
  * LOCAL query (jobs-worker only), no partial index yet: rows in this state are
  * rare by definition (a lost write), so the scan is bounded by `LIMIT`.
+ * `$2` is the voided status from `PAYMENT_STATUSES` (never a literal).
  */
 function voidedWithoutFlagQuery(
   table: 'payment' | 'platform_subscription_payment',
 ): string {
   return `SELECT id, organization_id, receipt_number FROM ${table}
-    WHERE status = 'voided' AND receipt_number IS NOT NULL
+    WHERE status = $2 AND receipt_number IS NOT NULL
       AND receipt_voided = false
       AND void_reason IS NOT NULL AND voided_at IS NOT NULL
       AND voided_at < now() - interval '15 minutes'
@@ -160,6 +165,7 @@ export async function repairVoidedFlags(
 
   const panelRows = (await sql.query(voidedWithoutFlagQuery('payment'), [
     limit,
+    PAYMENT_STATUSES.VOIDED,
   ])) as VoidedWithoutFlagRow[];
 
   for (const row of panelRows) {
@@ -200,7 +206,7 @@ export async function repairVoidedFlags(
   // FitStack emitter (same mechanism, no org scope on the row).
   const platformRows = (await sql.query(
     voidedWithoutFlagQuery('platform_subscription_payment'),
-    [limit],
+    [limit, PAYMENT_STATUSES.VOIDED],
   )) as VoidedWithoutFlagRow[];
 
   for (const row of platformRows) {
@@ -321,10 +327,11 @@ export async function sweepPendingReceiptPdfs(
  * `receipt_claim_at` and no number. After 15 minutes it is resumed with the
  * SAME row: the number is consumed only now, never renumbered.
  *
- * `status = 'validated'` is mandatory: an emission that failed before
- * numbering compensates the charge to `voided` (RD-155), leaving the claim
- * behind. Numbering it would create a numbered VOIDED payment, which is not a
- * legal state; that row is terminal (no number, no PDF, no email).
+ * `status = PAYMENT_STATUSES.VALIDATED` (passed as `$2`) is mandatory: an
+ * emission that failed before numbering compensates the charge to `voided`
+ * (RD-155), leaving the claim behind. Numbering it would create a numbered
+ * VOIDED payment, which is not a legal state; that row is terminal (no number,
+ * no PDF, no email).
  *
  * LOCAL query (jobs-worker only): the partial index
  * `idx_payment_receipt_claim_pending` / `idx_psp_receipt_claim_pending` covers
@@ -336,14 +343,14 @@ function staleClaimQuery(table: 'payment' | 'platform_subscription_payment'): st
       FROM payment p
       JOIN organization o ON o.id = p.organization_id
       WHERE p.receipt_claim_at IS NOT NULL AND p.receipt_number IS NULL
-        AND p.status = 'validated'
+        AND p.status = $2
         AND p.receipt_claim_at < now() - interval '15 minutes'
       ORDER BY p.receipt_claim_at ASC LIMIT $1`;
   }
   return `SELECT id, organization_id, receipt_claim_at
     FROM platform_subscription_payment
     WHERE receipt_claim_at IS NOT NULL AND receipt_number IS NULL
-      AND status = 'validated'
+      AND status = $2
       AND receipt_claim_at < now() - interval '15 minutes'
     ORDER BY receipt_claim_at ASC LIMIT $1`;
 }
@@ -380,7 +387,7 @@ export async function resumeClaimedReceipt(
 
   const panelRows = (await sql.query(
     staleClaimQuery('payment'),
-    [limit],
+    [limit, PAYMENT_STATUSES.VALIDATED],
   )) as StalePanelClaimRow[];
 
   for (const row of panelRows) {
@@ -448,7 +455,7 @@ export async function resumeClaimedReceipt(
   // FitStack emitter: continuous global sequence, no year.
   const platformRows = (await sql.query(
     staleClaimQuery('platform_subscription_payment'),
-    [limit],
+    [limit, PAYMENT_STATUSES.VALIDATED],
   )) as StaleClaimRow[];
 
   for (const row of platformRows) {

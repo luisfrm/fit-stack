@@ -28,14 +28,11 @@ test.describe("Console — Dashboard", () => {
     });
   });
 
-  test("shows the four dashboard widgets", async ({ page }) => {
+  test("shows the dashboard widgets", async ({ page }) => {
     await expect(page.locator("#dashboard-renewals")).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.locator("#dashboard-payments-review")).toBeVisible({
-      timeout: 10_000,
-    });
-    await expect(page.locator("#dashboard-trials")).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.locator("#dashboard-new-orgs")).toBeVisible({
@@ -47,12 +44,7 @@ test.describe("Console — Dashboard", () => {
     await expect(page.locator("#dashboard-renewals")).toBeVisible({
       timeout: 20_000,
     });
-    for (const widget of [
-      "renewals",
-      "payments-review",
-      "trials",
-      "new-orgs",
-    ]) {
+    for (const widget of ["renewals", "payments-review", "new-orgs"]) {
       await expect(
         page.locator(`#dashboard-${widget}-pagination`),
       ).toBeVisible();
@@ -60,22 +52,6 @@ test.describe("Console — Dashboard", () => {
         page.locator(`#dashboard-${widget}-pagination-label`),
       ).toContainText(/Página \d+ de \d+/);
     }
-  });
-
-  test("trials widget can switch between expiring and all", async ({
-    page,
-  }) => {
-    await expect(page.locator("#dashboard-trials")).toBeVisible({
-      timeout: 20_000,
-    });
-    await page.locator("#dashboard-trials-filter-all").click();
-    await expect(
-      page.locator("#dashboard-trials-pagination-label"),
-    ).toContainText(/Página 1 de \d+/);
-    await page.locator("#dashboard-trials-filter-expiring").click();
-    await expect(
-      page.locator("#dashboard-trials-pagination-label"),
-    ).toContainText(/Página 1 de \d+/);
   });
 
   test("has working sidebar navigation", async ({ page }) => {

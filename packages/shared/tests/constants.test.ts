@@ -42,24 +42,15 @@ describe('computePlatformSubscriptionStatus', () => {
     expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED);
   });
 
-  it('returns "trial" while the trial period is still active', () => {
-    const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-06-30',
-      isTrial: true,
-      hasValidatedPayment: false,
-      now,
-    });
-    expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL);
-  });
-
-  it('expired trial falls into the standard grace ladder (not "trial")', () => {
-    const result = computePlatformSubscriptionStatus({
-      currentPeriodEnd: '2026-06-14', // 1 day overdue
-      isTrial: true,
-      hasValidatedPayment: false,
-      now,
-    });
-    expect(result).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
+  it('has no "trial" status: a period in the future without a qualifying payment is "past_due"', () => {
+    expect(Object.values(PLATFORM_SUBSCRIPTION_STATUSES)).not.toContain('trial');
+    expect(
+      computePlatformSubscriptionStatus({
+        currentPeriodEnd: '2026-06-30',
+        hasValidatedPayment: false,
+        now,
+      })
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
   });
 
   it('returns "past_due" when 1-7 days overdue', () => {
@@ -142,21 +133,19 @@ describe('computePlatformSubscriptionStatus', () => {
     ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED);
   });
 
-  it('trial only holds while its period has not elapsed', () => {
+  it('an extended period without a qualifying payment lands in the grace ladder', () => {
     // Mismo instante = todavía vigente (el chequeo es `end >= now`).
     expect(
       computePlatformSubscriptionStatus({
         currentPeriodEnd: '2026-06-15T12:00:00.000Z',
-        isTrial: true,
         hasValidatedPayment: false,
         now,
       })
-    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL);
-    // Un día vencido ya cae en la escalera de gracia, no en trial.
+    ).toBe(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE);
+    // Un día vencido sigue en la escalera de gracia.
     expect(
       computePlatformSubscriptionStatus({
         currentPeriodEnd: '2026-06-14T12:00:00.000Z',
-        isTrial: true,
         hasValidatedPayment: false,
         now,
       })
@@ -200,10 +189,6 @@ describe('isPlatformSubscriptionActive', () => {
     expect(isPlatformSubscriptionActive(PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE)).toBe(true);
   });
 
-  it('returns true for trial', () => {
-    expect(isPlatformSubscriptionActive(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL)).toBe(true);
-  });
-
   it('returns false for past_due', () => {
     expect(isPlatformSubscriptionActive(PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE)).toBe(false);
   });
@@ -228,10 +213,6 @@ describe('isPlatformSubscriptionExpired', () => {
 
   it('returns false for active', () => {
     expect(isPlatformSubscriptionExpired(PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE)).toBe(false);
-  });
-
-  it('returns false for trial', () => {
-    expect(isPlatformSubscriptionExpired(PLATFORM_SUBSCRIPTION_STATUSES.TRIAL)).toBe(false);
   });
 });
 

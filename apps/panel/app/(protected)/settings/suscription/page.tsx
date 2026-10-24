@@ -67,7 +67,7 @@ export default async function BillingSettingsPage() {
 
   const statusBadge = () => {
     if (isFreeTier) return <Badge variant="info" size="md" className="uppercase tracking-widest">Free Tier</Badge>;
-    if (effectiveStatus === "active" || effectiveStatus === "trial") return <Badge variant="success" size="md" className="uppercase tracking-widest">{effectiveStatus}</Badge>;
+    if (effectiveStatus === "active") return <Badge variant="success" size="md" className="uppercase tracking-widest">{effectiveStatus}</Badge>;
     if (effectiveStatus === "past_due") return <Badge variant="warning" size="md" className="uppercase tracking-widest">Past Due</Badge>;
     if (effectiveStatus === "read_only") return <Badge variant="warning" size="md" className="uppercase tracking-widest">Solo lectura</Badge>;
     return <Badge variant="destructive" size="md" className="uppercase tracking-widest">{String(effectiveStatus)}</Badge>;

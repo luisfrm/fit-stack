@@ -20,6 +20,23 @@ La cadencia de 10 h es un ahorro de pre-venta, no un SLA: sin ella un PDF perdid
   ```
 
 - [ ] Revisar que los comprobantes históricos sin snapshot siguen componiéndose (es el comportamiento previsto) y que ningún pago validado quedó sin número.
+- [ ] `0030` — trials retirados. Ninguna suscripción debe conservar `is_trial` (la columna ya no existe) y ningún pago debe quedar con método `trial`:
+
+  ```sql
+  SELECT payment_method, count(*) FROM "platform_subscription_payment" GROUP BY payment_method;
+  SELECT count(*) FROM "platform_subscription" WHERE cancellation_reason = 'trials_removed';
+  ```
+
+  Los históricos deben estar cerrados (`current_period_end <= now()`, `cancelled_at` no nulo) y sus pagos convertidos a `free`. La clave `allow_price_override` ya no debe existir en `platform_setting`.
+- [ ] `0031` — normalización SaaS: las columnas `platform_rate_applied`/`platform_amount` existen y el backfill solo tocó filas reproducibles. Las que quedan en `NULL` son históricas sin tasa reproducible (se reportan como `unconvertedCount`), no un fallo:
+
+  ```sql
+  SELECT count(*) FILTER (WHERE "platform_amount" IS NULL) AS unconverted,
+         count(*) AS total
+    FROM "platform_subscription_payment" WHERE status = 'validated';
+  ```
+
+- [ ] Confirmar que `platform_setting.primary_currency` sigue siendo la moneda con la que se reporta (el endpoint de settings responde **409 `PRIMARY_CURRENCY_IMMUTABLE`** si se intenta cambiar con pagos SaaS existentes; un plan con pagos responde **409 `PLAN_CURRENCY_IMMUTABLE`**).
 
 ## 3. Auditoría de la serie
 

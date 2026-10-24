@@ -34,11 +34,6 @@ const FILTER_OPTIONS = [
     className: "text-emerald-500 border-emerald-500/20 bg-emerald-500/5",
   },
   {
-    id: "trial",
-    label: "Trial",
-    className: "text-blue-500 border-blue-500/20 bg-blue-500/5",
-  },
-  {
     id: "expiring",
     label: "Por Vencer",
     className: "text-orange-500 border-orange-500/20 bg-orange-500/5",

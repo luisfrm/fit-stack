@@ -8,7 +8,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createMemoryExchangeRatesStore,
-  exchangeRateAppliedValue,
   exchangeRatesFreshKey,
   exchangeRatesLastKnownKey,
   loadExchangeRates,
@@ -263,20 +262,3 @@ describe('paymentConversionView', () => {
   });
 });
 
-describe('exchangeRateAppliedValue', () => {
-  it('persists the exact API rate for a cross-currency payment', () => {
-    expect(exchangeRateAppliedValue(paymentConversionView('USD', 'VES', snapshot, 'ready'))).toBe(
-      '36.5',
-    );
-  });
-
-  it('does not persist a rate when both currencies are the same', () => {
-    expect(exchangeRateAppliedValue(paymentConversionView('USD', 'USD', null, 'idle'))).toBeUndefined();
-  });
-
-  it('refuses to build a converted payment without a rate', () => {
-    expect(() =>
-      exchangeRateAppliedValue(paymentConversionView('USD', 'VES', null, 'error')),
-    ).toThrow('without an exchange rate');
-  });
-});

@@ -10,6 +10,7 @@
  * clear message instead of silently passing.
  */
 import { neon } from '@neondatabase/serverless';
+import { DEFAULT_PLATFORM_SETTINGS } from '@workspace/shared';
 import { drainAllPending } from './pending';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
@@ -113,8 +114,15 @@ const TABLES_TO_TRUNCATE = [
 ] as const;
 
 /**
- * Wipes all application data from the test database.
+ * Wipes all application data from the test database and restores the platform
+ * baseline.
  * `RESTART IDENTITY` keeps serial ids predictable across runs.
+ *
+ * `platform_setting` is required configuration, not data: `primary_currency`
+ * normalizes every SaaS amount and the settings resolvers fail VISIBLY when it
+ * is missing (no default). The rows `/api/init` seeds are restored after the
+ * truncate so tests run against a bootstrapped platform; a suite that asserts
+ * the bootstrap itself (`init.test.ts`) deletes them again.
  */
 export async function truncateAll(): Promise<void> {
   if (!sql) return;
@@ -125,6 +133,20 @@ export async function truncateAll(): Promise<void> {
 
   const quoted = TABLES_TO_TRUNCATE.map((t) => `"${t}"`).join(', ');
   await query(`TRUNCATE TABLE ${quoted} RESTART IDENTITY CASCADE`);
+
+  await seedPlatformSettings();
+}
+
+/** Restores the platform settings `/api/init` seeds (idempotent). */
+export async function seedPlatformSettings(): Promise<void> {
+  if (!sql) return;
+  for (const [key, value] of Object.entries(DEFAULT_PLATFORM_SETTINGS)) {
+    await query(
+      `INSERT INTO platform_setting ("key", "value") VALUES ($1, $2)
+       ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`,
+      [key, value],
+    );
+  }
 }
 
 /**

@@ -12,6 +12,11 @@ import type {
 
 export type SubscriptionWithDetails = IPlatformSubscription;
 export type PaginatedSubscriptions = IPaginatedResult<IPlatformSubscription>;
+/**
+ * SaaS invoice row. Carries the persisted `platformAmount` (integer cents in
+ * `platform_setting.primary_currency`) and `platformRateApplied`, the only
+ * amount the Console displays for platform billing.
+ */
 export type PlatformPayment = IPlatformSubscriptionPayment;
 export type PaginatedPayments = IPaginatedResult<IPlatformSubscriptionPayment>;
 
@@ -19,13 +24,16 @@ export interface RevenuePoint {
   month: string;
   totalCents: number;
   count: number;
+  /** Validated payments the bucket could not normalize to the primary currency. */
+  unconvertedCount: number;
+  /** Currency every `totalCents` is expressed in (`platform_setting.primary_currency`). */
+  primaryCurrency: string;
 }
 
 export interface SubscriptionFilters {
   status?: PlatformSubscriptionStatus | "all" | "expiring";
   planId?: number;
   organizationId?: string;
-  isTrial?: boolean;
   search?: string;
   page?: number;
   limit?: number;
@@ -33,7 +41,6 @@ export interface SubscriptionFilters {
 
 export interface SubscriptionStats {
   active: number;
-  trial: number;
   pastDue: number;
   readOnly: number;
   suspended: number;
@@ -42,12 +49,18 @@ export interface SubscriptionStats {
   monthlyRevenueCents: number;
   previousMonthRevenueCents: number;
   mrrCents: number;
+  /** Validated payments that could not be normalized (excluded from the sums). */
+  unconvertedCount: number;
+  /** Currency every amount above is expressed in. */
+  primaryCurrency: string;
 }
 
+/**
+ * Payment inputs accepted by the API. The server prices the payment from the
+ * plan and the exchange rate provider: amounts and rates are NOT sent.
+ */
 export interface PlatformPaymentPayload {
-  amountPaid: number;
   currencyPaid: string;
-  exchangeRateApplied?: string;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails;
   status: PaymentStatus;
@@ -81,7 +94,6 @@ function buildQuery(filters: SubscriptionFilters) {
   if (filters.status && filters.status !== "all") q.status = filters.status;
   if (filters.planId) q.planId = filters.planId;
   if (filters.organizationId) q.organizationId = filters.organizationId;
-  if (filters.isTrial !== undefined) q.isTrial = filters.isTrial;
   if (filters.search) q.search = filters.search;
   return q;
 }
@@ -159,8 +171,7 @@ export const platformSubscriptionsService = {
 
   /**
    * Creates a new platform subscription with its first payment (atomic).
-   * A plan priced at 0 uses the free path; trials are no longer accepted
-   * (`400 TRIAL_NOT_AVAILABLE`).
+   * A plan priced at 0 uses the free path; the server prices every amount.
    */
   async create(
     data: CreatePlatformSubscriptionPayload,

@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { COUNTRIES } from '../constants';
+import type { taxCondition } from '../constants';
 import type { ITaxDetail } from '../types';
 import { computeInclusiveTaxes } from './tax-math';
 
@@ -84,7 +85,7 @@ export interface ResolvedTax {
   rate: number;
   enabled: boolean;
   /** Unevaluated condition (e.g. `"payment_currency !== 'VES'"`). */
-  condition?: string;
+  condition?: taxCondition;
   /**
    * `'gross_first'` = EXTRACTED from total charged before decomposing the
    * rest (`computeInclusiveTaxes`). Applies to conditional taxes (VE IGTF).

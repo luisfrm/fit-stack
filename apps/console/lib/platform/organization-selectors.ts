@@ -53,7 +53,7 @@ const EXPIRING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * Health indicator for the org:
  * - `down`: no subscription or `suspended`/`cancelled`.
  * - `warn`: `past_due`/`read_only` or expires in ≤7 days.
- * - `ok`: `active`/`trial` for other cases.
+ * - `ok`: `active` for other cases.
  */
 export function selectOrgHealth(
   org: IPlatformOrganization,

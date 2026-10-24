@@ -11,6 +11,8 @@
    ─────────────────────────────────────────────────────────────────────── */
 
 import type { ITaxDetail } from '../types';
+import { PAYMENT_CURRENCY_NOT_VES } from '../constants';
+import type { taxCondition } from '../constants';
 
 /** Candidate tax (as emitted by `resolveFiscalProfile`). */
 export interface TaxInput {
@@ -19,7 +21,7 @@ export interface TaxInput {
   rate: number;
   enabled: boolean;
   /** Unevaluated condition (e.g. `"payment_currency !== 'VES'"`). */
-  condition?: string;
+  condition?: taxCondition;
   /**
    * `'gross_first'` = EXTRACTED from the total charged and the remainder
    * is decomposed tax-inclusive (IGTF VE). Omitted = standard tax-inclusive.
@@ -58,18 +60,22 @@ function assertValidBase(base: number): void {
 
 export function isTaxApplicable(tax: TaxInput, currencyPaid?: string): boolean {
   if (!tax.enabled) return false;
-  if (tax.condition === undefined) return true;
-  if (tax.condition === "payment_currency !== 'VES'") {
-    return currencyPaid !== undefined && currencyPaid !== 'VES';
+  switch (tax.condition) {
+    case undefined:
+      return true;
+    case PAYMENT_CURRENCY_NOT_VES:
+      return currencyPaid !== undefined && currencyPaid !== 'VES';
+    default:
+      // Unknown condition: a fiscal rule the code cannot evaluate is a bug,
+      // never a silently skipped (or silently applied) tax.
+      throw new Error(`Unknown tax condition: ${String(tax.condition)}`);
   }
-  // Unknown condition: fail-closed, never assume it applies.
-  return false;
 }
 
 /**
  * Automatic calculation: applies each enabled tax over the base
  * (subtotal in integer cents) in the payment currency.
- * Zero base (trial/free) → no breakdown (`taxDetails: []`, `taxTotal: 0`).
+ * Zero base (free plan) → no breakdown (`taxDetails: []`, `taxTotal: 0`).
  */
 export function computeTaxes(
   base: number,

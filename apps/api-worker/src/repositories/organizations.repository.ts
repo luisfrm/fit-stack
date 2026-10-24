@@ -111,7 +111,6 @@ export function createOrganizationsRepository(db: Db) {
               planId: platformSubscription.planId,
               startDate: platformSubscription.startDate,
               currentPeriodEnd: platformSubscription.currentPeriodEnd,
-              isTrial: platformSubscription.isTrial,
               cancelledAt: platformSubscription.cancelledAt,
               createdAt: platformSubscription.createdAt,
               planName: platformPlan.name,
@@ -138,7 +137,6 @@ export function createOrganizationsRepository(db: Db) {
             ? computePlatformSubscriptionStatus({
                 currentPeriodEnd: latestSub.currentPeriodEnd,
                 cancelledAt: latestSub.cancelledAt,
-                isTrial: latestSub.isTrial,
                 hasValidatedPayment: latestSub.hasValidatedPayment,
               })
             : PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
@@ -160,7 +158,6 @@ export function createOrganizationsRepository(db: Db) {
               planId: latestSub.planId,
               startDate: latestSub.startDate.toISOString(),
               currentPeriodEnd: latestSub.currentPeriodEnd.toISOString(),
-              isTrial: latestSub.isTrial,
               cancelledAt: latestSub.cancelledAt?.toISOString() ?? null,
               createdAt: latestSub.createdAt.toISOString(),
               status: computedStatus,

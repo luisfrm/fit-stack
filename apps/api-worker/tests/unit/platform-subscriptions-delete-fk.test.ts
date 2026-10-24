@@ -30,6 +30,7 @@ function buildService(repo: PlatformSubscriptionsRepository) {
   return createPlatformSubscriptionsService(
     repo,
     {} as ReturnType<typeof createPlatformPlansRepository>,
+    {} as never,
   );
 }
 

@@ -20,6 +20,7 @@ import {
 } from '@workspace/shared';
 import { createPaymentsRepository } from '../repositories/payments.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import {
   issueReceipt,
   ReceiptError,
@@ -254,6 +255,13 @@ export function createReceiptsService(
      * The deliverable for a VOIDED receipt is its stamped PDF: until that
      * render exists, status is `pending` and the original is **not** served
      * (fail-closed: a voided document never travels without its stamp).
+     *
+     * RD-159: the payment STATUS is authoritative, not only the
+     * `receipt_voided` flag. The void writes `status = 'voided'` first and the
+     * flag second; when that second write is lost the flag is off while the
+     * payment is voided, and serving `receiptPdfKey` would hand out the
+     * emission PDF of a voided charge. With the status read, that window
+     * answers `pending` until the sweep repairs the flag and renders the seal.
      */
     async getReceiptState(orgId: string, paymentId: number): Promise<ReceiptState> {
       const composed = await receiptsRepo.getReceiptComposedData(orgId, paymentId);
@@ -263,7 +271,8 @@ export function createReceiptsService(
       if (!composed.payment.receiptNumber) {
         return { available: false, reason: 'pre_system' };
       }
-      const deliverableKey = composed.payment.receiptVoided
+      const isVoided = composed.payment.status === PAYMENT_STATUSES.VOIDED;
+      const deliverableKey = isVoided
         ? composed.payment.receiptVoidedPdfKey
         : composed.payment.receiptPdfKey;
       if (!deliverableKey) {
@@ -359,8 +368,12 @@ export function createReceiptsService(
       // A voided receipt is never resent: email would go out with emission
       // PDF (without stamp) or without attachment, and recipient would have
       // no way of knowing payment was voided. Its deliverable is downloading
-      // the VOIDED PDF.
-      if (composed.payment.receiptVoided) {
+      // the VOIDED PDF. RD-159: the payment STATUS is authoritative too — a
+      // void whose `receipt_voided` write was lost must not email the original.
+      if (
+        composed.payment.receiptVoided ||
+        composed.payment.status === PAYMENT_STATUSES.VOIDED
+      ) {
         throw new ReceiptError(
           409,
           'RECEIPT_VOIDED',

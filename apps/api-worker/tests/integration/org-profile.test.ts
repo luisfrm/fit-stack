@@ -57,7 +57,6 @@ async function createPlatformSubscription(
     durationValue: 1,
     durationUnit: 'month',
     isActive: true,
-    trialDays: 0,
     features: { panel: { enabled: true } },
   });
   if (planRes.status !== 201) throw new Error(`create platform plan failed (${planRes.status}): ${planRes.text}`);
@@ -66,9 +65,7 @@ async function createPlatformSubscription(
     organizationId,
     planId: planRes.body.id,
     startDate: isoDate(0),
-    isTrial: false,
     payment: {
-      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],

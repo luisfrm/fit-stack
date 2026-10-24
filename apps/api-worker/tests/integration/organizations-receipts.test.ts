@@ -60,7 +60,6 @@ describe.skipIf(skipReason !== null)('Organization receipts (panel)', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
     });
     expect(res.status, res.text).toBe(201);
     plan = res.body;
@@ -85,9 +84,7 @@ describe.skipIf(skipReason !== null)('Organization receipts (panel)', () => {
       organizationId,
       planId: plan.id,
       startDate: isoDate(-30),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

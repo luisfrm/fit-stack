@@ -45,7 +45,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation', () =
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -58,7 +57,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation', () =
 
   function validatedPayment() {
     return {
-      amountPaid: PRICE_CENTS,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
@@ -72,7 +70,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions compensation', () =
       organizationId,
       planId,
       startDate,
-      isTrial: false,
       payment: validatedPayment(),
     };
   }

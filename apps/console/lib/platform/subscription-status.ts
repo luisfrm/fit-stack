@@ -1,7 +1,7 @@
 /**
  * Subscription period operations (cancel, extend, renew, register payment) are
  * only allowed while the subscription is not cancelled and its status is
- * `active` or `trial`.
+ * `active` (there is no trial status anymore).
  */
 interface SubscriptionStatusLike {
   readonly cancelledAt?: unknown;
@@ -10,5 +10,5 @@ interface SubscriptionStatusLike {
 
 export function hasActiveSubscription(sub: SubscriptionStatusLike): boolean {
   if (sub.cancelledAt !== null && sub.cancelledAt !== undefined) return false;
-  return sub.status === "active" || sub.status === "trial";
+  return sub.status === "active";
 }

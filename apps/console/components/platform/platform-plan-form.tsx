@@ -92,8 +92,6 @@ export function PlatformPlanForm({ initialData, onSubmit, isLoading, settings, c
       durationValue: Number.parseInt(formData.durationValue, 10) || 1,
       durationUnit: formData.durationUnit,
       isActive: formData.isActive,
-      // Trials are discontinued (RD-117): plans never carry trial days.
-      trialDays: 0,
       features: formData.features,
     };
 

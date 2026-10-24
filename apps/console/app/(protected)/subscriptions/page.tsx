@@ -59,13 +59,11 @@ export default async function PlatformSubscriptionsPage({
         page,
         limit: PAGE_LIMIT,
         search: search || undefined,
-        isTrial: statusFilter === "trial" ? true : undefined,
-        status:
-          statusFilter && statusFilter !== "trial"
-            ? (FILTER_TO_STATUS[statusFilter] as
-                | PlatformSubscriptionStatus
-                | undefined)
-            : undefined,
+        status: statusFilter
+          ? (FILTER_TO_STATUS[statusFilter] as
+              | PlatformSubscriptionStatus
+              | undefined)
+          : undefined,
         planId,
       },
       { next: { revalidate: 60, tags: ["console:subs"] } },

@@ -3,8 +3,8 @@
  *
  * Covers the SaaS contract of computed (not stored) status:
  * a. SQL ↔ helper `computePlatformSubscriptionStatus` parity across the whole
- *    matrix (trial in force, validated/processing/voided in force, grace 3/7/8/
- *    14/15).
+ *    matrix (validated/processing/voided in force, grace 3/7/8/14/15). There is
+ *    no `trial` status anymore: a `price = 0` plan is a plain free plan.
  * b. A `voided` payment is IGNORED: it neither revokes service nor moves the period.
  * c. `processing` without a qualifying payment and a period in force → `past_due`.
  * d. Staggered grace 3/10/20.
@@ -23,7 +23,7 @@
  *
  * Standard pattern: real HTTP + Neon branch (`TEST_DATABASE_URL`), graceful
  * skip without the variable, `truncateAll` per file. The raw facts
- * (`current_period_end`, `is_trial`, `cancelled_at`, EXISTS of a qualifying payment)
+ * (`current_period_end`, `cancelled_at`, EXISTS of a qualifying payment)
  * are read via SQL to feed the helper with the same truth as the SQL.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -63,7 +63,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 14,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -85,9 +84,7 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       organizationId,
       planId: plan.id,
       startDate,
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -133,11 +130,10 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
   async function assertParity(subId: number): Promise<PlatformSubscriptionStatus> {
     const [row] = await testQuery<{
       current_period_end: string;
-      is_trial: boolean;
       cancelled_at: string | null;
       has_validated_payment: boolean;
     }>(
-      `SELECT s.current_period_end, s.is_trial, s.cancelled_at,
+      `SELECT s.current_period_end, s.cancelled_at,
               EXISTS (
                 SELECT 1 FROM platform_subscription_payment p
                 WHERE p.subscription_id = s.id
@@ -150,7 +146,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     const apiStatus = await getStatus(subId);
     const helperStatus = computePlatformSubscriptionStatus({
       currentPeriodEnd: new Date(row!.current_period_end),
-      isTrial: row!.is_trial,
       cancelledAt: row!.cancelled_at ? new Date(row!.cancelled_at) : null,
       hasValidatedPayment: row!.has_validated_payment,
       now: new Date(),
@@ -167,10 +162,8 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       name: string;
       expected: PlatformSubscriptionStatus;
       paymentStatus?: string;
-      isTrial?: boolean;
       days: number;
     }> = [
-      { name: 'trial vigente', expected: STATUS.TRIAL, isTrial: true, paymentStatus: 'validated', days: 10 },
       { name: 'validado + periodo futuro', expected: STATUS.ACTIVE, paymentStatus: 'validated', days: 10 },
       { name: 'processing + periodo futuro', expected: STATUS.PAST_DUE, paymentStatus: 'processing', days: 10 },
       { name: 'voided + periodo futuro', expected: STATUS.PAST_DUE, paymentStatus: 'voided', days: 10 },
@@ -188,12 +181,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
       const { subId } = await createSub(organization.id, {
         paymentStatus: c.paymentStatus,
       });
-      // RD-117: new trials are rejected (`400 TRIAL_NOT_AVAILABLE`), so the
-      // historical trial is simulated on the row itself: the computed status
-      // must keep honouring `is_trial` for subscriptions that already exist.
-      if (c.isTrial) {
-        await testQuery(`UPDATE platform_subscription SET is_trial = true WHERE id = $1`, [subId]);
-      }
       await setPeriodEndDays(subId, c.days);
       // A realistic `voided` carries audit data (the status does not depend on it).
       if (c.paymentStatus === 'voided') {
@@ -219,7 +206,6 @@ describe.skipIf(skipReason !== null)('Platform subscription status (SaaS)', () =
     const before = await readPeriodEnd(subId);
 
     const extra = await admin.client.post(`/api/platform/subscriptions/${subId}/payments`, {
-      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],

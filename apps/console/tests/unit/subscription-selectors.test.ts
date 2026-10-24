@@ -25,7 +25,6 @@ function makeSub(
     status: "active",
     startDate: "2026-01-01",
     currentPeriodEnd: "2026-02-01",
-    isTrial: false,
     ...overrides,
   } as SubscriptionWithDetails;
 }
@@ -35,7 +34,6 @@ function makeStats(
 ): SubscriptionStats {
   return {
     active: 0,
-    trial: 0,
     pastDue: 0,
     readOnly: 0,
     suspended: 0,
@@ -44,6 +42,8 @@ function makeStats(
     monthlyRevenueCents: 0,
     previousMonthRevenueCents: 0,
     mrrCents: 0,
+    unconvertedCount: 0,
+    primaryCurrency: "USD",
     ...overrides,
   };
 }
@@ -53,10 +53,7 @@ describe("effectivePriceCents", () => {
     expect(effectivePriceCents(makeSub({ planPrice: 5000 }))).toBe(5000);
   });
 
-  it("is zero for trials and missing prices", () => {
-    expect(
-      effectivePriceCents(makeSub({ isTrial: true, planPrice: 5000 })),
-    ).toBe(0);
+  it("is zero for missing prices", () => {
     expect(effectivePriceCents(makeSub({}))).toBe(0);
   });
 });
@@ -146,26 +143,32 @@ describe("selectOrgCurrentMonth", () => {
     {
       status: "validated",
       paymentDate: "2026-09-05T00:00:00Z",
-      planSnapshotPrice: 5000,
+      platformAmount: 5000,
     },
     {
       status: "validated",
       paymentDate: "2026-09-15T00:00:00Z",
-      planSnapshotPrice: 3000,
+      platformAmount: 3000,
     },
     {
       status: "processing",
       paymentDate: "2026-09-20T00:00:00Z",
-      planSnapshotPrice: 9999,
+      platformAmount: 9999,
     },
     {
       status: "validated",
       paymentDate: "2026-08-10T00:00:00Z",
-      planSnapshotPrice: 2000,
+      platformAmount: 2000,
+    },
+    // Unconverted historical row: no normalized amount, never assumed 1:1.
+    {
+      status: "validated",
+      paymentDate: "2026-09-06T00:00:00Z",
+      platformAmount: null,
     },
   ] as const;
 
-  it("sums validated payments of the current UTC month with the frozen plan price", () => {
+  it("sums validated payments of the current UTC month with the platform amount", () => {
     expect(selectOrgCurrentMonth([...invoices], NOW)).toEqual({
       totalCents: 8000,
       count: 2,
@@ -174,12 +177,13 @@ describe("selectOrgCurrentMonth", () => {
 });
 
 describe("selectOrgBilledTotal", () => {
-  it("sums validated payments only", () => {
+  it("sums validated payments only, skipping unconverted rows", () => {
     expect(
       selectOrgBilledTotal([
-        { status: "validated", planSnapshotPrice: 5000 },
-        { status: "validated", planSnapshotPrice: 3000 },
-        { status: "processing", planSnapshotPrice: 9999 },
+        { status: "validated", platformAmount: 5000 },
+        { status: "validated", platformAmount: 3000 },
+        { status: "processing", platformAmount: 9999 },
+        { status: "validated", platformAmount: null },
       ]),
     ).toEqual({ totalCents: 8000, count: 2 });
   });
@@ -242,21 +246,21 @@ describe("selectOrgLatestPayment", () => {
 });
 
 describe("selectPaymentDisplayAmount", () => {
-  it("uses the frozen plan price with the base currency, never currencyPaid", () => {
+  it("uses the persisted platform amount with the primary currency, never currencyPaid", () => {
     expect(
       selectPaymentDisplayAmount(
-        { planSnapshotPrice: 20000 },
+        { platformAmount: 20000 },
         "USD",
       ),
     ).toEqual({ amountCents: 20000, currency: "USD" });
   });
 
-  it("keeps the base currency for same-currency payments", () => {
+  it("renders an unconverted payment as zero without inventing an amount", () => {
     expect(
       selectPaymentDisplayAmount(
-        { planSnapshotPrice: 5000 },
+        { platformAmount: null },
         "USD",
       ),
-    ).toEqual({ amountCents: 5000, currency: "USD" });
+    ).toEqual({ amountCents: 0, currency: "USD" });
   });
 });

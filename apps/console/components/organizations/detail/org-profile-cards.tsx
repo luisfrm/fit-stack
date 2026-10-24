@@ -149,13 +149,11 @@ export function OrgProfileCards({
                 weight="bold"
                 className="tabular-nums text-primary"
               >
-                {activeSub.isTrial
-                  ? "Gratuito"
-                  : formatCents(
-                      activeSub.planPrice ?? 0,
-                      activeSub.planCurrency ?? currency,
-                      currencyFormat,
-                    )}
+                {formatCents(
+                  activeSub.planPrice ?? 0,
+                  activeSub.planCurrency ?? currency,
+                  currencyFormat,
+                )}
               </Text>
               <Text
                 size="xs"

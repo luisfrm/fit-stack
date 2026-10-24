@@ -224,7 +224,6 @@ export async function ensurePlatformPlan(cookies: string): Promise<number> {
       durationValue: TEST_PLATFORM_PLAN.durationValue,
       durationUnit: TEST_PLATFORM_PLAN.durationUnit,
       isActive: true,
-      trialDays: TEST_PLATFORM_PLAN.trialDays,
       features: ALL_FEATURES,
     },
   });
@@ -239,9 +238,9 @@ export async function ensurePlatformPlan(cookies: string): Promise<number> {
  * tests silently depended on the free tier configuration of the environment.
  * This makes the test tenant self-sufficient and deterministic.
  *
- * It is a FREE plan (price 0), never a trial: trials are rejected with
- * `400 TRIAL_NOT_AVAILABLE`. The free path books a validated `$0` payment with
- * `payment_method = 'free'`, so it grants service without inventing revenue.
+ * It is a FREE plan (price 0). The free path books a validated `$0` payment
+ * with `payment_method = 'free'`, so it grants service without inventing
+ * revenue (the server prices the payment; no amount is sent).
  */
 export async function seedPlatformSubscription(
   cookies: string,
@@ -254,9 +253,7 @@ export async function seedPlatformSubscription(
     body: {
       organizationId,
       planId,
-      isTrial: false,
       payment: {
-        amountPaid: 0,
         currencyPaid: TEST_PLATFORM_PLAN.currency,
         paymentMethod: 'free',
         paymentMethodDetails: [],

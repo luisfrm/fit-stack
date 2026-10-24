@@ -14,7 +14,7 @@ import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { api } from "@/lib/api/client";
 import { Title, toast } from "@workspace/ui";
 import { cn } from "@workspace/ui/lib/utils";
-import { COUNTRY_INDEX, canPlatform } from "@workspace/shared";
+import { COUNTRY_INDEX, canPlatform, apiCode, mutationError } from "@workspace/shared";
 import { usePlatformAuth } from "@workspace/auth/platform";
 
 interface PlatformCurrenciesSettingsProps {
@@ -60,8 +60,17 @@ export function PlatformCurrenciesSettings({
       toast.success("Configuración actualizada correctamente");
       await onSaved?.();
     } catch (error) {
-      console.error("Error saving currency settings:", error);
-      toast.error("Error al guardar la configuración de monedas");
+      // `primary_currency` normalizes every SaaS amount, so the API freezes it
+      // once payments exist. The code decides the message, never the text.
+      toast.error(
+        apiCode(error) === "PRIMARY_CURRENCY_IMMUTABLE"
+          ? "La moneda principal no se puede cambiar porque ya existen pagos SaaS registrados."
+          : mutationError(
+              "PlatformCurrenciesSettings",
+              error,
+              "Error al guardar la configuración de monedas",
+            ),
+      );
     } finally {
       setIsUpdating(false);
     }

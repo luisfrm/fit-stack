@@ -78,7 +78,7 @@ export function RenewalsWidget({ items }: { readonly items: RenewalItem[] }) {
       isEmpty={items.length === 0}
       title="Pendientes de renovar"
       count={items.length}
-      description="Vencidas y por vencer en 7 días (sin trials ni free tier)."
+      description="Vencidas y por vencer en 7 días (sin free tier)."
       viewAllHref=""
       footer={
         <WidgetPagination

@@ -290,6 +290,59 @@ describe.skipIf(skipReason !== null)('Revenue normalization', () => {
     expect(amounts.baseTotal).not.toBe(33333);
   });
 
+  it('VES plan paid in USD books the frozen VES plan price as base (RD-157)', async () => {
+    // The default tenant is a VES gym: the plan currency and the primary
+    // currency match, so the base amount is the plan price even though the
+    // member pays in USD.
+    const { owner } = await createGymTenant('rev-ves-usd');
+
+    const member = await createGymMember(owner.client);
+    const plan = await createPlan(owner.client, { price: 40000, currency: 'VES' });
+
+    const subscription = await withRateServer({ USD: 0.0025 }, async (url) => {
+      owner.client.env.EXCHANGE_API_URL = url;
+      return owner.client.post('/api/subscriptions', {
+        memberId: member.id,
+        planId: plan.id,
+        startDate: isoDate(0),
+        endDate: isoDate(30),
+        payment: {
+          currencyPaid: 'USD',
+          paymentMethod: 'cash',
+          paymentMethodDetails: [],
+          status: 'validated',
+          paymentDate: isoDate(0),
+        },
+      });
+    });
+    expect(subscription.status, subscription.text).toBe(201);
+
+    const [payment] = await testQuery<{
+      amount_paid: string;
+      exchange_rate_applied: string;
+    }>(
+      `SELECT amount_paid, exchange_rate_applied::text AS exchange_rate_applied
+         FROM payment WHERE subscription_id = $1`,
+      [subscription.body.id],
+    );
+
+    // 40000 VES cents * 0.0025 = 100 USD cents; the rate keeps every decimal.
+    expect(Number(payment!.amount_paid)).toBe(100);
+    expect(payment!.exchange_rate_applied).toBe('0.0025000000');
+
+    // Report: the base amount is the frozen VES plan price, never 100 / 0.0025.
+    // The tenant is fresh, so its only payment is the one just booked.
+    const analytics = await owner.client.get('/api/payments/analytics');
+    expect(analytics.status, analytics.text).toBe(200);
+    const usd = (analytics.body.chartData as Array<{
+      currency: string;
+      normalizedAmount: number;
+      unconvertedAmount: number;
+    }>).find((row) => row.currency === 'USD');
+    expect(usd?.normalizedAmount).toBe(40000);
+    expect(usd?.unconvertedAmount).toBe(0);
+  });
+
   it('keeps today revenue consistent with the chart and flags incomplete totals', async () => {
     const { owner, organization } = await createGymTenant('rev-today');
     await testQuery(

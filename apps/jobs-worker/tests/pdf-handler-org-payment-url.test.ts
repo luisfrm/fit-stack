@@ -8,6 +8,7 @@
  * wiring is under test here (URL resolution itself: `email-config.test.ts`).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
 const selectMock = vi.hoisted(() => vi.fn());
 const sendEmailMock = vi.hoisted(() => vi.fn());
@@ -108,5 +109,32 @@ describe('handleOrgPaymentReceived — PANEL_URL resolution', () => {
     expect(message.html).toContain('href="https://panel.example.com"');
     expect(message.html).not.toContain('  https://panel.example.com');
     expect(message.html).not.toContain('localhost');
+  });
+
+  /**
+   * RD-159: the payment STATUS is authoritative, not only `receipt_voided`.
+   * A void whose second write was lost must not email the emission PDF, so the
+   * check runs before the CTA (a missing PANEL_URL cannot surface here).
+   */
+  it('skips delivery for a voided payment whose flag was lost', async () => {
+    selectMock
+      .mockReset()
+      .mockReturnValueOnce(
+        queryBuilder([
+          {
+            ...paymentRow,
+            payment: {
+              ...paymentRow.payment,
+              status: PAYMENT_STATUSES.VOIDED,
+              receiptVoided: false,
+            },
+          },
+        ]),
+      )
+      .mockReturnValueOnce(queryBuilder([{ email: 'owner@example.com' }]));
+
+    await handleOrgPaymentReceived(env(), payload);
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

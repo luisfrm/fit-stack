@@ -144,15 +144,6 @@ function SubscriptionPlanCell({
         >
           {sub.planName ?? "—"}
         </Text>
-        {sub.isTrial && (
-          <Badge
-            variant="info"
-            size="sm"
-            className="uppercase font-bold tracking-widest"
-          >
-            Trial
-          </Badge>
-        )}
       </div>
       {sub.planPrice !== undefined && sub.planCurrency && (
         <Text size="xs" variant="muted" className="opacity-60 tabular-nums">
@@ -214,7 +205,6 @@ function SubscriptionPriceCell({
   return (
     <div className="flex flex-col gap-0.5">
       <PriceCell
-        isTrial={sub.isTrial}
         planPrice={sub.planPrice}
         planCurrency={sub.planCurrency}
         currencyFormat={currencyFormat}
@@ -508,15 +498,6 @@ export function SubscriptionsTable({
             <DetailRow label="Plan">
               <div className="flex items-center justify-end gap-2">
                 <Text weight="bold">{detailModal.planName ?? "—"}</Text>
-                {detailModal.isTrial && (
-                  <Badge
-                    variant="info"
-                    size="sm"
-                    className="uppercase font-bold tracking-widest"
-                  >
-                    Trial
-                  </Badge>
-                )}
               </div>
             </DetailRow>
             <DetailRow label="Status">
@@ -530,15 +511,13 @@ export function SubscriptionsTable({
             </DetailRow>
             <DetailRow label="Precio">
               <Text weight="bold">
-                {detailModal.isTrial
-                  ? "Gratuito"
-                  : detailModal.planCurrency
-                    ? formatCents(
-                      detailModal.planPrice ?? 0,
-                      detailModal.planCurrency,
-                      currencyFormat,
-                    )
-                    : "—"}
+                {detailModal.planCurrency
+                  ? formatCents(
+                    detailModal.planPrice ?? 0,
+                    detailModal.planCurrency,
+                    currencyFormat,
+                  )
+                  : "—"}
               </Text>
             </DetailRow>
             <DetailRow label="Pagos">

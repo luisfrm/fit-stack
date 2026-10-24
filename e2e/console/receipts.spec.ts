@@ -48,7 +48,6 @@ test.describe('Console — Comprobante SaaS', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -62,9 +61,7 @@ test.describe('Console — Comprobante SaaS', () => {
         organizationId: org.id,
         planId: plan.id,
         startDate: today,
-        isTrial: false,
         payment: {
-          amountPaid: 5000,
           currencyPaid: 'USD',
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
@@ -132,7 +129,6 @@ test.describe('Console — Comprobante SaaS', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
     });
     const sub = await consoleApi.create<any>(
       'platformSubscription',
@@ -141,9 +137,7 @@ test.describe('Console — Comprobante SaaS', () => {
         organizationId: org.id,
         planId: plan.id,
         startDate: today,
-        isTrial: false,
         payment: {
-          amountPaid: 5000,
           currencyPaid: 'USD',
           paymentMethod: 'zelle',
           paymentMethodDetails: [],
@@ -217,15 +211,12 @@ test.describe('Console — Reporte de comprobantes FS-N', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
     });
     await consoleApi.create<any>('platformSubscription', '/api/platform/subscriptions', {
       organizationId: org.id,
       planId: plan.id,
       startDate: today,
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: method,
         paymentMethodDetails: [],
