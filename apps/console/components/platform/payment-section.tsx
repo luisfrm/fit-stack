@@ -40,14 +40,10 @@ interface PaymentSectionProps {
   readonly conversion: PaymentConversionView;
   readonly rateStatus: ExchangeRateLoadStatus;
   readonly onRetryRate: () => void;
-  readonly amountFocus: boolean;
-  readonly onAmountFocus: (focused: boolean) => void;
-  readonly onAmountChange: (value: number) => void;
   readonly onCurrencyChange: (value: string) => void;
   readonly onMethodChange: (value: string) => void;
   readonly paymentValidated: boolean;
   readonly onPaymentValidatedChange: (value: boolean) => void;
-  readonly allowPriceOverride: boolean;
   readonly paymentDetails: string;
   readonly onPaymentDetailsChange: (value: string) => void;
   readonly paymentDate: string;
@@ -69,14 +65,10 @@ export function PaymentSection({
   conversion,
   rateStatus,
   onRetryRate,
-  amountFocus,
-  onAmountFocus,
-  onAmountChange,
   onCurrencyChange,
   onMethodChange,
   paymentValidated,
   onPaymentValidatedChange,
-  allowPriceOverride,
   paymentDetails,
   onPaymentDetailsChange,
   paymentDate,
@@ -184,23 +176,22 @@ export function PaymentSection({
             {conversion.rate !== null && (
               <div className="space-y-2">
                 <Label htmlFor="final-amount" className="text-xs font-semibold text-muted-foreground uppercase">Monto Total a Recibir</Label>
+                {/* Preview only: the server prices the payment from the plan
+                    and the exchange rate (`amountPaid`/`exchangeRateApplied`
+                    are not part of the write contract). */}
                 <Input
                   id="final-amount"
-                  type={amountFocus ? "number" : "text"}
-                  step="0.01"
-                  value={amountFocus ? finalAmount : ValueConverter.format(finalAmount, "", currencyFormat)}
-                  onFocus={() => onAmountFocus(true)}
-                  onBlur={() => onAmountFocus(false)}
-                  onChange={(e) => onAmountChange(ValueConverter.parse(e.target.value, currencyFormat))}
-                  readOnly={!allowPriceOverride}
+                  value={ValueConverter.format(finalAmount, "", currencyFormat)}
+                  readOnly
                   variant="default"
-                  className={allowPriceOverride ? "" : "opacity-70"}
+                  className="opacity-70"
                   leftIcon={<CreditCard size={16} />}
                   disabled={disabled}
+                  aria-describedby="final-amount-hint"
                 />
-                {!allowPriceOverride && (
-                  <p className="text-[10px] text-muted-foreground italic">Basado en la tasa oficial. No editable.</p>
-                )}
+                <p id="final-amount-hint" className="text-[10px] text-muted-foreground italic">
+                  Calculado por el servidor con la tasa oficial. No editable.
+                </p>
               </div>
             )}
           </div>

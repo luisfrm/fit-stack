@@ -155,7 +155,7 @@ describe('buildPlatformReceiptDataFromComposed', () => {
     expect(buildPlatformReceiptDataFromComposed(legacy).amounts.baseTotal).toBe(200);
   });
 
-  it('trial $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {
+  it('free $0 sin desglose compone (SKIP lo deja sin número, no el compose)', () => {
     const input = baseInput();
     input.payment = {
       ...input.payment,
@@ -163,7 +163,7 @@ describe('buildPlatformReceiptDataFromComposed', () => {
       subtotal: 0,
       taxTotal: 0,
       taxDetails: [],
-      paymentMethod: 'trial',
+      paymentMethod: 'free',
     };
     const data = buildPlatformReceiptDataFromComposed(input);
     expect(data.amounts.total).toBe(0);

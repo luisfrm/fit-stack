@@ -20,6 +20,8 @@ Los cupos exactos del Portal de Miembros por plan pueden ajustarse aparte del pr
 
 Existe un plan con **precio 0** que se asigna como cortesía operativa (por ejemplo, mientras decides tu plan definitivo). No se cobra, no genera comprobante y da acceso a lo que ese plan tenga habilitado. Un plan de precio 0 no es una prueba con fecha de vencimiento: se comporta como cualquier plan mientras está asignado.
 
+No manejamos pruebas gratuitas por tiempo limitado. Si en el futuro hay una promoción o un descuento, llegará como **cupón** sobre tu suscripción (puede cubrir desde una parte hasta el 100 % del precio); nunca como un periodo de prueba que se convierta solo en cobro.
+
 ## Estados de tu suscripción
 
 El estado se calcula automáticamente cada día a partir de tu fecha de vencimiento y de si tienes un pago válido:
@@ -32,7 +34,7 @@ El estado se calcula automáticamente cada día a partir de tu fecha de vencimie
 | **Suspendida** | 15 días o más de retraso | Acceso bloqueado hasta regularizar |
 | **Cancelada** | Cancelación explícita | Acceso bloqueado |
 
-No necesitas pedir el cambio de estado: el sistema lo hace solo. Las cuentas antiguas que se dieron de alta con una prueba gratuita pueden seguir mostrando el estado **Prueba** mientras su periodo siga vigente; hoy ya no se ofrecen pruebas nuevas.
+No necesitas pedir el cambio de estado: el sistema lo hace solo. **No existen periodos de prueba**: la suscripción empieza a contar con el primer pago. Un plan de precio 0 es un plan gratuito (ver arriba), no una prueba, y no vence solo.
 
 ## Durante la mora y la suspensión
 

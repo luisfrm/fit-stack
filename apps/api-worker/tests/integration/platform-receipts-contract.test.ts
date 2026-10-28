@@ -75,7 +75,6 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
     });
     expect(res.status, res.text).toBe(201);
     return res.body;
@@ -88,9 +87,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(-60),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -248,9 +245,7 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
       organizationId: lonely.organization.id,
       planId: plan.id,
       startDate: isoDate(0),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -307,15 +302,13 @@ describe.skipIf(skipReason !== null)('Platform receipts contract', () => {
   });
 
   it('$0 free plan: GET pre_system terminal (SKIP no quema serie)', async () => {
-    // RD-117: price-0 plan (free), not a trial — trials answer `400`.
+    // A price-0 plan is the free path (trials no longer exist).
     const freePlan = await createPlatformPlan(0);
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
       planId: freePlan.id,
       startDate: isoDate(0),
-      isTrial: false,
       payment: {
-        amountPaid: 0,
         currencyPaid: 'USD',
         paymentMethod: 'free',
         paymentMethodDetails: [],

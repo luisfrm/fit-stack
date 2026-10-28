@@ -3,11 +3,12 @@
  *
  * - 401 without session; support reads (200); plain users 403
  * - `months` default 12, clamped to 1–24, zero-filled buckets
- * - only `validated` payments count; the booked amount is the frozen
- *   `plan_snapshot_price` (the server-derived base-currency amount)
+ * - only `validated` payments count; the booked amount is the PERSISTED
+ *   `platform_amount` (server-priced in `platform_setting.primary_currency`)
  * - UTC month bucketing (a payment on the 15th of last month lands there)
  * - current-month bucket matches `GET /stats → monthlyRevenueCents`
- * - a historical trial row (snapshot zeroed by migration 0029) adds 0
+ * - a row without `platform_amount` (unconverted) adds 0 and is counted in
+ *   `unconvertedCount`, never assumed 1:1
  * - writes invalidate the cached series
  */
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -35,7 +36,6 @@ async function createPlatformPlan(admin: AuthedUser): Promise<any> {
     durationValue: 1,
     durationUnit: 'month',
     isActive: true,
-    trialDays: 0,
     features: {
       panel: { enabled: true },
       members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -56,9 +56,7 @@ async function createPlatformSubscription(
     organizationId,
     planId,
     startDate: payment.paymentDate,
-    isTrial: false,
     payment: {
-      amountPaid: 5000,
       currencyPaid: 'USD',
       paymentMethod: 'zelle',
       paymentMethodDetails: [],
@@ -98,25 +96,22 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     const plan = await createPlatformPlan(admin);
     const tenant = await createGymTenant('revenue-owner');
 
-    // Current month: validated. The booked amount is the frozen plan price,
-    // whatever the operator states as `amountPaid`.
+    // Current month: validated. The booked amount is the SERVER-priced
+    // `platform_amount` (plan price in the platform primary currency).
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
-      amountPaid: 5000,
       status: 'validated',
       paymentDate: isoDate(0),
     });
 
     // Previous month: validated renewal. The booked amount is the plan price
-    // (5000) even though the operator charged 3000 in the paid currency.
+    // (5000) whatever the operator could have stated.
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
-      amountPaid: 3000,
       status: 'validated',
       paymentDate: prevMonthDate(),
     });
 
     // Current month: processing → must be excluded.
     await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
-      amountPaid: 9999,
       status: 'processing',
       paymentDate: isoDate(0),
     });
@@ -152,7 +147,7 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     expect([...months].sort()).toEqual(months);
   });
 
-  it('buckets validated payments by UTC month with the frozen plan price', async () => {
+  it('buckets validated payments by UTC month with the persisted platform amount', async () => {
     const res = await admin.client.get('/api/platform/subscriptions/revenue');
     expect(res.status, res.text).toBe(200);
 
@@ -163,10 +158,12 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     const current = res.body.find((b: { month: string }) => b.month === currentKey);
     const prev = res.body.find((b: { month: string }) => b.month === prevKey);
 
-    // Current month: only the validated 5000 (processing 9999 excluded).
+    // Current month: only the validated 5000 (processing excluded).
     expect(current.totalCents).toBe(5000);
     expect(current.count).toBe(1);
-    // Previous month: the plan price (5000), never the stated 3000.
+    expect(current.unconvertedCount).toBe(0);
+    expect(current.primaryCurrency).toBe('USD');
+    // Previous month: the plan price booked by the server.
     expect(prev.totalCents).toBe(5000);
     expect(prev.count).toBe(1);
   });
@@ -208,7 +205,6 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     const tenant = await createGymTenant('revenue-invalidate');
     const freshPlan = await createPlatformPlan(admin);
     await createPlatformSubscription(admin, tenant.organization.id, freshPlan.id, {
-      amountPaid: 1000,
       status: 'validated',
       paymentDate: isoDate(0),
     });
@@ -217,18 +213,17 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
       query: { months: '1' },
     });
     expect(second.status, second.text).toBe(200);
-    // The booked base amount is the plan price, not the stated 1000.
+    // The booked amount is the server-priced plan price, not a stated one.
     expect(second.body[0].totalCents).toBe(before + 5000);
   });
 
   /**
-   * RD-117: a trial booked `amount_paid = 0` but froze the full plan price in
-   * `plan_snapshot_price`, so it counted as revenue. Migration 0029 zeroes that
-   * snapshot for historical trial rows; this case proves the KPI (and its
-   * `/stats` mirror) ignores a `validated` trial dated in the current month.
+   * RD-161: revenue reads the PERSISTED `platform_amount`. A validated payment
+   * that could not be normalized (no rate to the primary currency) must not
+   * inflate the KPI: it is excluded from the sum and reported as unconverted.
    */
-  it('a historical trial payment does not inflate the KPI (snapshot zeroed by 0029)', async () => {
-    const tenant = await createGymTenant('revenue-trial');
+  it('a validated payment without platform_amount does not inflate the KPI', async () => {
+    const tenant = await createGymTenant('revenue-unconverted');
     const plan = await createPlatformPlan(admin);
 
     const base = await admin.client.get('/api/platform/subscriptions/revenue', {
@@ -237,9 +232,8 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     expect(base.status, base.text).toBe(200);
     const baseline = base.body[0].totalCents as number;
 
-    // A paid registration books the frozen plan price.
+    // A priced registration books the platform amount.
     const sub = await createPlatformSubscription(admin, tenant.organization.id, plan.id, {
-      amountPaid: 5000,
       status: 'validated',
       paymentDate: isoDate(0),
     });
@@ -248,12 +242,11 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
     });
     expect(paid.body[0].totalCents).toBe(baseline + 5000);
 
-    // Historical trial: `payment_method = 'trial'`, no charge and a zeroed
-    // snapshot (the state 0029 leaves behind; before it the snapshot was the
-    // full plan price and the trial added 5000 to the month).
+    // Historical row whose normalization is unknown (backfill leaf NULL): the
+    // amount must not be guessed from the plan price nor from the paid amount.
     await testQuery(
       `UPDATE platform_subscription_payment
-          SET payment_method = 'trial', amount_paid = 0, plan_snapshot_price = 0
+          SET platform_rate_applied = NULL, platform_amount = NULL
         WHERE subscription_id = $1`,
       [sub.id],
     );
@@ -262,19 +255,14 @@ describe.skipIf(skipReason !== null)('Platform subscriptions revenue', () => {
       query: { months: '1' },
     });
     expect(after.body[0].totalCents).toBe(baseline);
+    expect(after.body[0].unconvertedCount).toBe(1);
 
     const stats = await admin.client.get('/api/platform/subscriptions/stats');
     expect(stats.status, stats.text).toBe(200);
     expect(stats.body.monthlyRevenueCents).toBe(baseline);
-
-    // The data migration is idempotent: re-running it leaves the row at 0.
-    await testQuery(
-      `UPDATE platform_subscription_payment SET plan_snapshot_price = 0 WHERE payment_method = 'trial'`,
-    );
-    const [row] = await testQuery<{ plan_snapshot_price: number }>(
-      `SELECT plan_snapshot_price FROM platform_subscription_payment WHERE subscription_id = $1`,
-      [sub.id],
-    );
-    expect(Number(row!.plan_snapshot_price)).toBe(0);
+    // Two gaps, both reported: the validated payment without a normalized
+    // amount AND its active priced subscription (no frozen rate => no MRR).
+    expect(stats.body.unconvertedCount).toBe(2);
+    expect(stats.body.primaryCurrency).toBe('USD');
   });
 });

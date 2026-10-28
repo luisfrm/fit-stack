@@ -18,7 +18,6 @@ export interface SubscriptionFilters {
   status?: PlatformSubscriptionStatus | 'all';
   planId?: number;
   organizationId?: string;
-  isTrial?: boolean;
   search?: string;
   page?: number;
   limit?: number;
@@ -30,7 +29,6 @@ export interface SubscriptionWithDetails {
   planId: number;
   startDate: Date;
   currentPeriodEnd: Date;
-  isTrial: boolean;
   cancelledAt: Date | null;
   cancellationReason: string | null;
   createdAt: Date;
@@ -67,7 +65,6 @@ export interface NewPlatformSubscriptionData {
   startDate?: Date;
   /** If omitted, computed from plan duration */
   currentPeriodEnd?: Date;
-  isTrial?: boolean;
 }
 
 export interface NewPlatformPaymentData {
@@ -84,6 +81,10 @@ export interface NewPlatformPaymentData {
   amountPaid: number;
   currencyPaid: string;
   exchangeRateApplied?: string | null;
+  /** Rate plan currency -> `platform_setting.primary_currency` (frozen). */
+  platformRateApplied?: string | null;
+  /** Amount in the platform primary currency, integer cents. */
+  platformAmount?: number | null;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
@@ -113,7 +114,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
      * SQL CASE computing SaaS status. Exact parity with
      * `computePlatformSubscriptionStatus` (`@workspace/shared`):
      * - cancelledAt IS NOT NULL => cancelled
-     * - isTrial and active period => trial
      * - active period + EXISTS(validated|refunded) => active
      * - active period without qualifying payment => past_due
      * - expired <= 7 days => past_due
@@ -128,7 +128,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
 
       return sql<PlatformSubscriptionStatus>`CASE
         WHEN ${platformSubscription.cancelledAt} IS NOT NULL THEN ${PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED}::text
-        WHEN ${platformSubscription.isTrial} = true AND ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.TRIAL}::text
         WHEN ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP AND ${hasValidatedPayment} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE}::text
         WHEN ${platformSubscription.currentPeriodEnd} >= CURRENT_TIMESTAMP THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
         WHEN FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - ${platformSubscription.currentPeriodEnd})) / 86400) <= ${PLATFORM_GRACE_PERIODS.PAST_DUE_DAYS} THEN ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE}::text
@@ -171,9 +170,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       if (filters.planId) {
         conditions.push(eq(platformSubscription.planId, filters.planId));
       }
-      if (filters.isTrial !== undefined) {
-        conditions.push(eq(platformSubscription.isTrial, filters.isTrial));
-      }
       if (filters.search) {
         conditions.push(
           or(
@@ -205,7 +201,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planId: platformSubscription.planId,
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
-          isTrial: platformSubscription.isTrial,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -257,7 +252,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planId: platformSubscription.planId,
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
-          isTrial: platformSubscription.isTrial,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -290,7 +284,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planId: platformSubscription.planId,
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
-          isTrial: platformSubscription.isTrial,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -323,7 +316,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planId: platformSubscription.planId,
           startDate: platformSubscription.startDate,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
-          isTrial: platformSubscription.isTrial,
           cancelledAt: platformSubscription.cancelledAt,
           cancellationReason: platformSubscription.cancellationReason,
           createdAt: platformSubscription.createdAt,
@@ -360,7 +352,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       status: PlatformSubscriptionStatus;
       subscriptionId: number | null;
       currentPeriodEnd: Date | null;
-      isTrial: boolean;
       cancelledAt: Date | null;
       hasValidatedPayment: boolean;
       latestPaymentStatus: PaymentStatus | null;
@@ -369,7 +360,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         .select({
           id: platformSubscription.id,
           currentPeriodEnd: platformSubscription.currentPeriodEnd,
-          isTrial: platformSubscription.isTrial,
           cancelledAt: platformSubscription.cancelledAt,
           status: this.getSubscriptionStatusSql(),
           hasValidatedPayment: this.hasValidatedPaymentSql(),
@@ -385,7 +375,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           status: PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED,
           subscriptionId: null,
           currentPeriodEnd: null,
-          isTrial: false,
           cancelledAt: null,
           hasValidatedPayment: false,
           latestPaymentStatus: null,
@@ -396,7 +385,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         status: record.status,
         subscriptionId: record.id,
         currentPeriodEnd: record.currentPeriodEnd,
-        isTrial: record.isTrial,
         cancelledAt: record.cancelledAt,
         hasValidatedPayment: record.hasValidatedPayment,
         latestPaymentStatus: record.latestPaymentStatus,
@@ -411,7 +399,6 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           planId: data.planId,
           startDate: data.startDate ?? new Date(),
           currentPeriodEnd: data.currentPeriodEnd ?? new Date(),
-          isTrial: data.isTrial ?? false,
         })
         .returning({ id: platformSubscription.id });
       if (!created) throw new Error('Failed to create subscription');
@@ -470,6 +457,8 @@ export function createPlatformSubscriptionsRepository(db: Db) {
           amountPaid: data.amountPaid,
           currencyPaid: data.currencyPaid,
           exchangeRateApplied: data.exchangeRateApplied ?? null,
+          platformRateApplied: data.platformRateApplied ?? null,
+          platformAmount: data.platformAmount ?? null,
           paymentMethod: data.paymentMethod,
           paymentMethodDetails: (data.paymentMethodDetails ?? null) as any,
           status: data.status,
@@ -548,24 +537,50 @@ export function createPlatformSubscriptionsRepository(db: Db) {
       return !!record;
     },
 
-    async getStats(): Promise<{
+    /**
+     * Whether ANY SaaS payment exists (any status, `voided` included). This is
+     * the fail-closed guard of `primary_currency`: an annulled payment is still
+     * financial history whose normalized amount was booked in that currency, so
+     * it freezes the setting too.
+     */
+    async hasAnyPayment(): Promise<boolean> {
+      const [record] = await db
+        .select({ id: platformSubscriptionPayment.id })
+        .from(platformSubscriptionPayment)
+        .limit(1);
+      return !!record;
+    },
+
+    /**
+     * SaaS KPIs, normalized to `primaryCurrency`.
+     *
+     * Revenue uses the PERSISTED `platform_amount` (server-priced cents), never
+     * a division at read time. MRR is the current plan price converted with the
+     * rate frozen in the LATEST validated payment of that subscription
+     * (correlated subquery, no extra column): a plan whose price changed is
+     * restated at today's price while keeping the rate that was applied.
+     * `unconvertedCount` surfaces validated payments that could not be
+     * normalized (no `platform_amount`): they are excluded from the sums and
+     * reported instead of being assumed 1:1.
+     */
+    async getStats(primaryCurrency: string): Promise<{
       active: number;
-      trial: number;
       pastDue: number;
       readOnly: number;
       suspended: number;
       cancelled: number;
       total: number;
+      primaryCurrency: string;
       monthlyRevenueCents: number;
       previousMonthRevenueCents: number;
       mrrCents: number;
+      unconvertedCount: number;
     }> {
       const computedStatus = this.getSubscriptionStatusSql();
 
       const [result] = await db
         .select({
           active: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN 1 END)::int`,
-          trial: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.TRIAL} THEN 1 END)::int`,
           pastDue: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.PAST_DUE} THEN 1 END)::int`,
           readOnly: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.READ_ONLY} THEN 1 END)::int`,
           suspended: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.SUSPENDED} THEN 1 END)::int`,
@@ -574,56 +589,78 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         })
         .from(platformSubscription);
 
-      // Compute monthly B2B revenue and previous month revenue for growth calculation.
-      // The booked amount is the frozen plan price: it is the server-derived
-      // base-currency amount, so no `COALESCE` fallback to `amount_paid`.
+      // Monthly revenue: SUM(platform_amount) of validated payments. A row
+      // without the persisted amount is counted as unconverted, never summed.
       const [revenueResult] = await db
         .select({
-          monthlyRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP) THEN ${platformSubscriptionPayment.planSnapshotPrice} ELSE 0 END), 0)::int`,
-          previousMonthRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP - INTERVAL '1 month') THEN ${platformSubscriptionPayment.planSnapshotPrice} ELSE 0 END), 0)::int`,
+          monthlyRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP) THEN ${platformSubscriptionPayment.platformAmount} ELSE 0 END), 0)::int`,
+          previousMonthRevenueCents: sql<number>`COALESCE(SUM(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND DATE_TRUNC('month', ${platformSubscriptionPayment.paymentDate}) = DATE_TRUNC('month', CURRENT_TIMESTAMP - INTERVAL '1 month') THEN ${platformSubscriptionPayment.platformAmount} ELSE 0 END), 0)::int`,
+          unconvertedCount: sql<number>`COUNT(CASE WHEN ${platformSubscriptionPayment.status} = ${PAYMENT_STATUSES.VALIDATED} AND ${platformSubscriptionPayment.platformAmount} IS NULL THEN 1 END)::int`,
         })
         .from(platformSubscriptionPayment);
 
-      // Compute Monthly Recurring Revenue (MRR) from active subscriptions
+      // MRR: current plan price x the rate frozen in the LATEST validated
+      // payment of each active subscription. Only `validated` qualifies (a
+      // `refunded` row is not a billing anchor anymore). No rate => unconverted:
+      // the subscription contributes 0 and is counted as `unconvertedCount`
+      // instead of silently disappearing from the KPI.
+      const latestRate = sql`(
+        SELECT psp.platform_rate_applied
+          FROM platform_subscription_payment psp
+         WHERE psp.subscription_id = ${platformSubscription.id}
+           AND psp.status = ${PAYMENT_STATUSES.VALIDATED}
+         ORDER BY psp.payment_date DESC, psp.created_at DESC
+         LIMIT 1
+      )`;
       const [mrrResult] = await db
         .select({
-          mrrCents: sql<number>`COALESCE(SUM(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN ${platformPlan.price} ELSE 0 END), 0)::int`,
+          mrrCents: sql<number>`COALESCE(SUM(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} THEN ROUND(${platformPlan.price} * ${latestRate}) ELSE 0 END), 0)::int`,
+          // Active, priced subscription whose MRR cannot be expressed in the
+          // primary currency (its latest validated payment has no frozen rate).
+          unconvertedActiveSubs: sql<number>`COUNT(CASE WHEN ${computedStatus} = ${PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE} AND ${platformPlan.price} > 0 AND ${latestRate} IS NULL THEN 1 END)::int`,
         })
         .from(platformSubscription)
         .leftJoin(platformPlan, eq(platformSubscription.planId, platformPlan.id));
 
       return {
         active: Number(result?.active ?? 0),
-        trial: Number(result?.trial ?? 0),
         pastDue: Number(result?.pastDue ?? 0),
         readOnly: Number(result?.readOnly ?? 0),
         suspended: Number(result?.suspended ?? 0),
         cancelled: Number(result?.cancelled ?? 0),
         total: Number(result?.total ?? 0),
+        primaryCurrency,
         monthlyRevenueCents: Number(revenueResult?.monthlyRevenueCents ?? 0),
         previousMonthRevenueCents: Number(revenueResult?.previousMonthRevenueCents ?? 0),
         mrrCents: Number(mrrResult?.mrrCents ?? 0),
+        // Both sources of non-normalizable revenue: validated payments without
+        // a persisted amount, and active priced subscriptions without a rate.
+        unconvertedCount:
+          Number(revenueResult?.unconvertedCount ?? 0) +
+          Number(mrrResult?.unconvertedActiveSubs ?? 0),
       };
     },
 
     /**
-     * Monthly SaaS revenue series in UTC (`validated` payments only).
-     * Uses the same formula as `getStats().monthlyRevenueCents`
-     * (`plan_snapshot_price`, the frozen plan price) so the current month
-     * bucket matches the KPI.
-     * Note: if plans are in different currencies, sums aggregate currencies
-     * just like `monthlyRevenueCents` — true multi-currency normalization
-     * is a follow-up (see `docs/roadmap.md` §5).
+     * Monthly SaaS revenue series in UTC (`validated` payments only), summed
+     * from the persisted `platform_amount` so every bucket is expressed in
+     * `primaryCurrency`. `count` is the number of validated payments in the
+     * bucket and `unconvertedCount` the ones excluded because they have no
+     * normalized amount (reported, never assumed 1:1).
      */
-    async getMonthlyRevenue(months: number): Promise<
-      { month: string; totalCents: number; count: number }[]
+    async getMonthlyRevenue(
+      primaryCurrency: string,
+      months: number,
+    ): Promise<
+      { month: string; totalCents: number; count: number; unconvertedCount: number; primaryCurrency: string }[]
     > {
       const safeMonths = Math.min(24, Math.max(1, Math.floor(months)));
       const rows = await db
         .select({
           month: sql<string>`TO_CHAR(m.month, 'YYYY-MM-01')`,
-          totalCents: sql<number>`COALESCE(SUM(${platformSubscriptionPayment.planSnapshotPrice}), 0)::int`,
+          totalCents: sql<number>`COALESCE(SUM(${platformSubscriptionPayment.platformAmount}), 0)::int`,
           count: sql<number>`COUNT(${platformSubscriptionPayment.id})::int`,
+          unconvertedCount: sql<number>`COUNT(CASE WHEN ${platformSubscriptionPayment.id} IS NOT NULL AND ${platformSubscriptionPayment.platformAmount} IS NULL THEN 1 END)::int`,
         })
         .from(
           sql`(SELECT DATE_TRUNC('month', CURRENT_TIMESTAMP) - (GENERATE_SERIES(0, ${safeMonths} - 1)) * INTERVAL '1 month' AS month) m`,
@@ -642,9 +679,16 @@ export function createPlatformSubscriptionsRepository(db: Db) {
         month: r.month,
         totalCents: Number(r.totalCents ?? 0),
         count: Number(r.count ?? 0),
+        unconvertedCount: Number(r.unconvertedCount ?? 0),
+        primaryCurrency,
       }));
     },
 
+    /**
+     * SaaS invoice history of an organization. Selects every column, so
+     * `platformAmount`/`platformRateApplied` travel to the Console without a
+     * second projection (the normalized amount is what the UI displays).
+     */
     async getOrganizationInvoices(organizationId: string) {
       return db
         .select()

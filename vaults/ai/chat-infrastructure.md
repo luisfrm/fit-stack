@@ -29,7 +29,7 @@ POST /api/ai/chat (SSE)
 
 - **Unidad:** `1 crédito = 1K tokens ×1.0` (`AI_CREDIT_CONSTANTS` en `shared/ai.ts`; helpers `creditsFromUsage` y `estimateCreditsFromMessages`).
 - **Tabla** `ai_usage` (`organization_id`, `period_type='monthly'`, `period_start` date, `credits integer` + `count integer` legacy, `uniqueIndex idx_ai_usage_org_period`). Reset **perezoso** por ciclo (sin cron):
-  - Con sub `ACTIVE`/`TRIAL`: `periodStart = startOfSubscriptionPeriod(currentPeriodEnd, duration)` (`features.repository.ts`)
+  - Con sub `ACTIVE`: `periodStart = startOfSubscriptionPeriod(currentPeriodEnd, duration)` (`features.repository.ts`). No hay estado `trial` (retirado en RD-117); un plan `price = 0` es un plan free y sigue esta misma regla.
   - Sin sub o sub no activa: `startOfMonthUtc(now)` (día 1 00:00 **UTC**, ver [`../guides/timezone-management.md`](../guides/timezone-management.md) — no usa timezone de la org)
 - `features.service.getCreditPeriodStart(orgId)` computa el inicio; `getAiQuota(orgId)` lee `credits` vs `ai_credits_monthly` (`0 = ilimitado`).
 - **Evaluación:** `consumeAiCredits(estimated)` (pre-flight, solo valida) + `settleAiCredits(periodStart, actualCredits)` post-stream vía `ctx.waitUntil` — upsert atómico `INSERT … ON CONFLICT (organization_id, period_type, period_start) DO UPDATE SET credits = credits + actual`. La DB es fuente de verdad; `cache.increment` existe pero no se usa.

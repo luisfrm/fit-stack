@@ -395,9 +395,8 @@ function SubscriptionFormContent({
 
   // RD-158: the amount is server-authoritative — `roundCents(plan price ×
   // provider rate)`, exactly what `POST /api/subscriptions` will persist. The
-  // cashier cannot type it (`allow_price_override` no longer grants a
-  // client-side amount), so the read-only preview and the tax breakdown both
-  // read this derived value.
+  // cashier cannot type it, so the read-only preview and the tax breakdown
+  // both read this derived value.
   const amountPreviewCents = React.useMemo(() => {
     if (!selectedPlan || conversion.rate === null) return 0;
     return roundCents(selectedPlan.price * conversion.rate);

@@ -22,6 +22,7 @@ import {
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createOrganizationsRepository } from '../repositories/organizations.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import {
   issueReceipt,
   ReceiptError,
@@ -51,7 +52,7 @@ export interface PlatformReceiptHooks {
 
 /**
  * Step 1 result. `skipped:true + receiptNumber:null` = no document
- * ($0 trial/free): NOTHING to wait for, not a "pending".
+ * ($0 free plan): NOTHING to wait for, not a "pending".
  * `inProgress:true` = another emission holds the claim and has not persisted
  * the number yet: pending, never an error.
  */
@@ -107,7 +108,7 @@ export interface PlatformIssuerRepos {
 
 /**
  * Platform issuer profile (FitStack, SaaS): global continuous sequence, no
- * year, $0 trial/free skip, no tax override, payer capture, `platform` event
+ * year, $0 free-plan skip, no tax override, payer capture, `platform` event
  * scope. Exported for the step-order unit test; routes only see
  * `createPlatformReceiptsService`.
  */
@@ -133,7 +134,7 @@ export function createPlatformIssuerProfile(repos: PlatformIssuerRepos): IssuerP
     },
 
     shouldSkip(payment) {
-      // Trial/free $0: no document (never burns the global continuous series).
+      // Free plan $0: no document (never burns the global continuous series).
       return Number(payment.amountPaid) === 0;
     },
 
@@ -259,7 +260,7 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
      * Step 1 (synchronous, no external I/O except DB+queue): validates, computes
      * tax in cents, claims the payment, assigns global number (atomic),
      * persists it, and enqueues `receipt.render` with `scope:'platform'`.
-     * NEVER enqueues email (done in step 2). Trial/free $0 -> SKIP (does not
+     * NEVER enqueues email (done in step 2). Free plan $0 -> SKIP (does not
      * burn sequence). The shared sequence lives in `receipt-issue.core.ts`.
      */
     async assignPlatformReceiptNumber(
@@ -354,7 +355,10 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         return { available: false, reason: 'pre_system' };
       }
       // Panel mirror: a voided receipt delivers ONLY its void-stamped PDF.
-      const deliverableKey = composed.payment.receiptVoided
+      // RD-159: the payment STATUS is authoritative (the flag can be lost
+      // between the two writes), so a voided row never serves the emission PDF.
+      const isVoided = composed.payment.status === PAYMENT_STATUSES.VOIDED;
+      const deliverableKey = isVoided
         ? composed.payment.receiptVoidedPdfKey
         : composed.payment.receiptPdfKey;
       if (!deliverableKey) {
@@ -412,8 +416,13 @@ export function createPlatformReceiptsService(db: Db, receiptQueue: Queue, taskQ
         return { kind: 'presystem' };
       }
       // Panel mirror: a voided receipt is not resent by email (would be sent
-      // with the emission PDF or without attachment, without showing the void seal).
-      if (composed.payment.receiptVoided) {
+      // with the emission PDF or without attachment, without showing the void
+      // seal). RD-159: the payment STATUS counts too, so a void whose
+      // `receipt_voided` write was lost does not email the original.
+      if (
+        composed.payment.receiptVoided ||
+        composed.payment.status === PAYMENT_STATUSES.VOIDED
+      ) {
         throw new ReceiptError(
           409,
           'RECEIPT_VOIDED',

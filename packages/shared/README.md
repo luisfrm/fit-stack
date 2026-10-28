@@ -23,8 +23,8 @@ import type { IUser, IOrganization } from '@workspace/shared/types'
 - `QUALIFYING_PAYMENT_STATUSES` — `[validated, refunded]`: pagos que sostienen un periodo (`processing` y `voided` no califican)
 - `getVoidKind(payment)` — deriva `rejected` (sin `receiptNumber`) vs `annulled` (con número); el rechazo y la anulación comparten el estado `voided`
 - `SUBSCRIPTION_STATUSES` — `active`, `cancelled`, `voided`, `expired`, `expiring`
-- `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `trial`, `past_due`, `read_only`, `suspended`, `cancelled`
-- `PLATFORM_GRACE_PERIODS` + `computePlatformSubscriptionStatus()` + `isPlatformSubscriptionActive()/Expired()` — helpers puros para el status de la suscripción SaaS (`hasValidatedPayment: boolean` es obligatorio; `trial` solo mientras `currentPeriodEnd >= now`)
+- `PLATFORM_SUBSCRIPTION_STATUSES` — `active`, `past_due`, `read_only`, `suspended`, `cancelled`
+- `PLATFORM_GRACE_PERIODS` + `computePlatformSubscriptionStatus()` + `isPlatformSubscriptionActive()/Expired()` — helpers puros para el status de la suscripción SaaS (`hasValidatedPayment: boolean` es obligatorio; sin trials: un plan `price = 0` es un plan free)
 - `COUNTRIES` — 9 países preconfigurados: VE, CO, MX, AR, CL, PE, ES, US, PA + interfaz `ICountryConfig`
 
 ### `types.ts`

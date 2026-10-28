@@ -29,16 +29,6 @@ export interface RenewalItem {
   readonly periodEnd: Date;
 }
 
-export interface TrialItem {
-  readonly org: IPlatformOrganization;
-  readonly periodEnd: Date;
-}
-
-export interface TrialsSelection {
-  readonly expiring: TrialItem[];
-  readonly all: TrialItem[];
-}
-
 function toDate(value: string | Date | undefined | null): Date | null {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -72,7 +62,7 @@ export function selectNewOrgsThisMonth(
 /**
  * Gyms pending renewal: overdue first (`past_due`/`read_only`/
  * `suspended`, most overdue at the top) followed by expiring (active with end
- * within 7 days, soonest at the top). Excludes trials, cancelled, and
+ * within 7 days, soonest at the top). Excludes cancelled and
  * organizations without active subscription (free tier / no plan).
  */
 export function selectRenewals(
@@ -90,7 +80,7 @@ export function selectRenewals(
 
   for (const org of orgs) {
     const sub = org.latestSubscription;
-    if (!sub || sub.isTrial || sub.cancelledAt) continue;
+    if (!sub || sub.cancelledAt) continue;
     const periodEnd = toDate(sub.currentPeriodEnd);
     if (!periodEnd) continue;
 
@@ -112,46 +102,6 @@ export function selectRenewals(
   overdue.sort((a, b) => a.periodEnd.getTime() - b.periodEnd.getTime());
   expiring.sort((a, b) => a.periodEnd.getTime() - b.periodEnd.getTime());
   return [...overdue, ...expiring].slice(0, DASHBOARD_WIDGET_LIMIT);
-}
-
-/**
- * Trials: `expiring` (end within 7 days, non-cancelled) and `all`
- * (all non-cancelled trials). Both sorted by period end.
- */
-export function selectTrials(
-  orgs: IPlatformOrganization[],
-  now: Date = new Date(),
-): TrialsSelection {
-  const windowEnd = addDuration(
-    now,
-    EXPIRING_WINDOW_DAYS,
-    "day",
-    PLATFORM_TIMEZONE,
-  );
-  const expiring: TrialItem[] = [];
-  const all: TrialItem[] = [];
-
-  for (const org of orgs) {
-    const sub = org.latestSubscription;
-    if (!sub || !sub.isTrial || sub.cancelledAt) continue;
-    const periodEnd = toDate(sub.currentPeriodEnd);
-    if (!periodEnd) continue;
-
-    all.push({ org, periodEnd });
-    if (
-      periodEnd.getTime() > now.getTime() &&
-      periodEnd.getTime() <= windowEnd.getTime()
-    ) {
-      expiring.push({ org, periodEnd });
-    }
-  }
-
-  all.sort((a, b) => a.periodEnd.getTime() - b.periodEnd.getTime());
-  expiring.sort((a, b) => a.periodEnd.getTime() - b.periodEnd.getTime());
-  return {
-    expiring: expiring.slice(0, DASHBOARD_WIDGET_LIMIT),
-    all: all.slice(0, DASHBOARD_WIDGET_LIMIT),
-  };
 }
 
 /**

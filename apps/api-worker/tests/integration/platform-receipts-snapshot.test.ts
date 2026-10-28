@@ -51,7 +51,6 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by', ()
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -77,9 +76,7 @@ describe.skipIf(skipReason !== null)('Platform receipt snapshot + issued_by', ()
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(0),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

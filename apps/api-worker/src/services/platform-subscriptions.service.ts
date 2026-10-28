@@ -17,6 +17,7 @@ import type { IPaymentMethodDetails, PlanFeaturesV2 } from '@workspace/shared';
 import { normalizeFeatures, addDuration, API_ERROR_CODES, roundCents } from '@workspace/shared';
 import { HTTPException } from 'hono/http-exception';
 import type { ExchangeRateProvider } from '../lib/exchange-rates';
+import type { PlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import type { PlatformReceiptContext } from './platform-receipts.service';
 import { ReceiptError } from './receipts.service';
 import {
@@ -32,23 +33,6 @@ const SAME_CURRENCY_ONLY_RATE_PROVIDER: ExchangeRateProvider = {
     throw new Error('Rate provider not configured');
   },
 };
-
-/**
- * RD-117: trials are discontinued. A historical trial booked its payment with
- * `amount_paid = 0` while still snapshotting the full plan price, so it counted
- * as revenue. Future discounts are handled with coupons, never with a trial.
- */
-const trialNotAvailableError = () =>
-  new HTTPException(400, {
-    res: new Response(
-      JSON.stringify({
-        error:
-          'Los trials ya no están disponibles. Los descuentos se gestionarán con cupones.',
-        code: API_ERROR_CODES.TRIAL_NOT_AVAILABLE,
-      }),
-      { status: 400, headers: { 'content-type': 'application/json' } },
-    ),
-  });
 
 /**
  * A SaaS subscription with payments is financial history: it is cancelled,
@@ -71,18 +55,15 @@ export interface CreatePlatformSubscriptionPayload {
   organizationId: string;
   planId: number;
   startDate?: string;
-  /**
-   * Legacy flag, accepted only to be rejected: trials are discontinued
-   * (`400 TRIAL_NOT_AVAILABLE`). A plan priced at 0 uses the free path.
-   */
-  isTrial?: boolean;
   payment: PlatformPaymentPayload;
 }
 
+/**
+ * Payment inputs accepted from the operator. Amounts and rates are NOT part of
+ * the contract: the server prices every SaaS payment (`pricePlatformPayment`).
+ */
 export interface PlatformPaymentPayload {
-  amountPaid: number;
   currencyPaid: string;
-  exchangeRateApplied?: string;
   paymentMethod: string;
   paymentMethodDetails?: IPaymentMethodDetails | Record<string, any> | null;
   status: PaymentStatus;
@@ -132,8 +113,77 @@ function snapshotFeatures(features: PlanFeaturesV2 | null | undefined): PlanFeat
 export function createPlatformSubscriptionsService(
   platformSubsRepo: PlatformSubscriptionsRepository,
   plansRepo: ReturnType<typeof createPlatformPlansRepository>,
+  platformSettingsRepo: PlatformSettingsRepository,
   rateProvider: ExchangeRateProvider = SAME_CURRENCY_ONLY_RATE_PROVIDER
 ) {
+  /**
+   * Reference currency of the platform (`platform_setting.primary_currency`).
+   * Resolved per call: a missing setting is a visible error, never a default.
+   */
+  const primaryCurrency = () => platformSettingsRepo.getPrimaryCurrency();
+
+  /**
+   * Server-side pricing of a SaaS payment — SINGLE place for the amounts.
+   *
+   * - `amountPaid` = plan price converted to the paid currency.
+   * - `platformAmount` = plan price converted to
+   *   `platform_setting.primary_currency`, the currency every SaaS report/
+   *   receipt reads. Both rates are persisted, so no read-time division.
+   * - A `price = 0` plan is the free path: zero amounts, no rates, `free`
+   *   method (decided by the caller).
+   *
+   * Request bodies never state an amount or a rate: they are derived from the
+   * plan and the rate provider (typed failures map to 503/400 by the route).
+   */
+  async function pricePlatformPayment(input: {
+    planPrice: number;
+    planCurrency: string;
+    currencyPaid: string;
+    primaryCurrency: string;
+  }): Promise<{
+    amountPaid: number;
+    exchangeRateApplied: string | null;
+    platformRateApplied: string | null;
+    platformAmount: number;
+    isFreePlan: boolean;
+  }> {
+    if (input.planPrice === 0) {
+      return {
+        amountPaid: 0,
+        exchangeRateApplied: null,
+        platformRateApplied: null,
+        platformAmount: 0,
+        isFreePlan: true,
+      };
+    }
+    // The payment is already in the primary currency: both hops are the SAME
+    // rate, so it is quoted once (the plan->primary conversion is an identity).
+    if (input.currencyPaid === input.primaryCurrency) {
+      const rate = await rateProvider.getRate(
+        input.planCurrency,
+        input.currencyPaid,
+      );
+      return {
+        amountPaid: roundCents(input.planPrice * rate),
+        exchangeRateApplied: String(rate),
+        platformRateApplied: String(rate),
+        platformAmount: roundCents(input.planPrice * rate),
+        isFreePlan: false,
+      };
+    }
+    const [planToPaid, planToPrimary] = await Promise.all([
+      rateProvider.getRate(input.planCurrency, input.currencyPaid),
+      rateProvider.getRate(input.planCurrency, input.primaryCurrency),
+    ]);
+    return {
+      amountPaid: roundCents(input.planPrice * planToPaid),
+      exchangeRateApplied: String(planToPaid),
+      platformRateApplied: String(planToPrimary),
+      platformAmount: roundCents(input.planPrice * planToPrimary),
+      isFreePlan: false,
+    };
+  }
+
   /**
    * Shared compensatory void closure: all 4 emission sites
    * must void with the same reason and audit trail. If there is no
@@ -171,11 +221,11 @@ export function createPlatformSubscriptionsService(
     },
 
     async getStats() {
-      return platformSubsRepo.getStats();
+      return platformSubsRepo.getStats(await primaryCurrency());
     },
 
     async getRevenue(months: number) {
-      return platformSubsRepo.getMonthlyRevenue(months);
+      return platformSubsRepo.getMonthlyRevenue(await primaryCurrency(), months);
     },
 
     async getOrganizationStatus(organizationId: string): Promise<PlatformSubscriptionStatus> {
@@ -189,35 +239,34 @@ export function createPlatformSubscriptionsService(
     /**
      * Creates a new platform_subscription + initial payment (atomic transaction).
      * A plan priced at 0 uses the free path (validated `$0` payment with
-     * `payment_method = 'free'`). Trials are rejected before any write.
+     * `payment_method = 'free'`). Every amount is priced by the server.
      */
     async createSubscriptionWithPayment(
       data: CreatePlatformSubscriptionPayload,
       opts?: PlatformReceiptContext
     ): Promise<{ subscriptionId: number; paymentId: number }> {
-      // Fail-closed BEFORE the first write: a rejected trial must not leave an
-      // orphan subscription or payment behind.
-      if (data.isTrial === true) throw trialNotAvailableError();
-
       const plan = await plansRepo.findById(data.planId);
       if (!plan) throw new Error('Plan no encontrado');
 
       const startDate = parseStartDate(data.startDate);
 
+      // Server-priced payment: plan -> paid currency and plan -> platform
+      // primary currency. A free plan (price 0) books zeros and no rates.
+      const priced = await pricePlatformPayment({
+        planPrice: plan.price,
+        planCurrency: plan.currency,
+        currencyPaid: data.payment.currencyPaid,
+        primaryCurrency: await primaryCurrency(),
+      });
+
       // A free plan (price 0) forces status=validated with paymentMethod='free'.
-      // It is not a trial: its snapshot price is already 0, so it never books revenue.
+      // Its snapshot price is already 0, so it never books revenue.
       let paymentStatus = data.payment.status;
       let paymentMethod = data.payment.paymentMethod;
-      let amountPaid = data.payment.amountPaid;
-      if (plan.price === 0) {
+      if (priced.isFreePlan) {
         paymentStatus = PAYMENT_STATUSES.VALIDATED;
         paymentMethod = 'free';
-        amountPaid = 0;
       }
-
-      // The booked base-currency amount is the frozen `plan_snapshot_price`
-      // written below: the operator-stated `amountPaid` only drives the charge
-      // in the paid currency and is never trusted as the base.
 
       // Point 7(a): period is only front-loaded if registration is born paid.
       // A registration `processing`/`voided`/`refunded` does NOT grant free time:
@@ -239,8 +288,6 @@ export function createPlatformSubscriptionsService(
         planId: data.planId,
         startDate,
         currentPeriodEnd,
-        // New registrations are never trials (historical rows keep their flag).
-        isTrial: false,
       };
       const { id: subscriptionId } = await platformSubsRepo.create(newSubData);
 
@@ -265,9 +312,11 @@ export function createPlatformSubscriptionsService(
           planSnapshotDurationValue: plan.durationValue,
           planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
           featuresSnapshot: snapshotFeatures(plan.features),
-          amountPaid,
+          amountPaid: priced.amountPaid,
           currencyPaid: data.payment.currencyPaid,
-          exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
+          exchangeRateApplied: priced.exchangeRateApplied,
+          platformRateApplied: priced.platformRateApplied,
+          platformAmount: priced.platformAmount,
           paymentMethod,
           paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
           status: paymentStatus,
@@ -342,8 +391,13 @@ export function createPlatformSubscriptionsService(
         sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
       const newPeriodEnd = addDuration(baseDate, plan.durationValue, plan.durationUnit as "day" | "week" | "month" | "year", 'UTC');
 
-      // Create payment
-      const amountPaid = data.payment.amountPaid;
+      // Server-priced payment (plan -> paid currency and -> primary currency).
+      const priced = await pricePlatformPayment({
+        planPrice: plan.price,
+        planCurrency: plan.currency,
+        currencyPaid: data.payment.currencyPaid,
+        primaryCurrency: await primaryCurrency(),
+      });
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -355,10 +409,12 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
         featuresSnapshot: snapshotFeatures(plan.features),
-        amountPaid,
+        amountPaid: priced.amountPaid,
         currencyPaid: data.payment.currencyPaid,
-        exchangeRateApplied: data.payment.exchangeRateApplied ?? null,
-        paymentMethod: data.payment.paymentMethod,
+        exchangeRateApplied: priced.exchangeRateApplied,
+        platformRateApplied: priced.platformRateApplied,
+        platformAmount: priced.platformAmount,
+        paymentMethod: priced.isFreePlan ? 'free' : data.payment.paymentMethod,
         paymentMethodDetails: data.payment.paymentMethodDetails ?? null,
         status: data.payment.status,
         paymentDate: data.payment.paymentDate
@@ -429,8 +485,12 @@ export function createPlatformSubscriptionsService(
 
       // Server-side conversion: the charge is priced from the plan and the rate
       // provider; the request body never states amounts.
-      const rate = await rateProvider.getRate(plan.currency, data.currencyPaid);
-      const amountPaid = roundCents(plan.price * rate);
+      const priced = await pricePlatformPayment({
+        planPrice: plan.price,
+        planCurrency: plan.currency,
+        currencyPaid: data.currencyPaid,
+        primaryCurrency: await primaryCurrency(),
+      });
 
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
@@ -442,10 +502,12 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: plan.durationValue,
         planSnapshotDurationUnit: plan.durationUnit as "day" | "week" | "month" | "year",
         featuresSnapshot: snapshotFeatures(plan.features),
-        amountPaid,
+        amountPaid: priced.amountPaid,
         currencyPaid: data.currencyPaid,
-        exchangeRateApplied: String(rate),
-        paymentMethod: data.paymentMethod,
+        exchangeRateApplied: priced.exchangeRateApplied,
+        platformRateApplied: priced.platformRateApplied,
+        platformAmount: priced.platformAmount,
+        paymentMethod: priced.isFreePlan ? 'free' : data.paymentMethod,
         paymentMethodDetails: data.paymentMethodDetails ?? null,
         status: PAYMENT_STATUSES.PROCESSING,
         paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
@@ -479,6 +541,14 @@ export function createPlatformSubscriptionsService(
         throw new Error('Ya existe un pago pendiente o en proceso para esta suscripción');
       }
 
+      // Server-priced payment from the live plan (the snapshot below freezes it).
+      const priced = await pricePlatformPayment({
+        planPrice: sub.planPrice,
+        planCurrency: sub.planCurrency,
+        currencyPaid: data.currencyPaid,
+        primaryCurrency: await primaryCurrency(),
+      });
+
       const paymentData: NewPlatformPaymentData = {
         subscriptionId,
         organizationId: sub.organizationId,
@@ -489,10 +559,12 @@ export function createPlatformSubscriptionsService(
         planSnapshotDurationValue: sub.planDurationValue,
         planSnapshotDurationUnit: sub.planDurationUnit,
         featuresSnapshot: snapshotFeatures(sub.planFeatures),
-        amountPaid: data.amountPaid,
+        amountPaid: priced.amountPaid,
         currencyPaid: data.currencyPaid,
-        exchangeRateApplied: data.exchangeRateApplied ?? null,
-        paymentMethod: data.paymentMethod,
+        exchangeRateApplied: priced.exchangeRateApplied,
+        platformRateApplied: priced.platformRateApplied,
+        platformAmount: priced.platformAmount,
+        paymentMethod: priced.isFreePlan ? 'free' : data.paymentMethod,
         paymentMethodDetails: data.paymentMethodDetails ?? null,
         status: data.status,
         paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),

@@ -246,16 +246,3 @@ export function paymentConversionView(
   };
 }
 
-/**
- * Value persisted as `exchangeRateApplied` (a rate, as a string).
- * A cross-currency payment always carries the exact API rate — even `1`.
- */
-export function exchangeRateAppliedValue(
-  conversion: PaymentConversionView,
-): string | undefined {
-  if (!conversion.required) return undefined;
-  if (conversion.rate === null) {
-    throw new Error("Cannot build a payment without an exchange rate");
-  }
-  return String(conversion.rate);
-}

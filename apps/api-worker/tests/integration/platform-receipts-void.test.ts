@@ -67,7 +67,6 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
     });
     expect(res.status, res.text).toBe(201);
     return res.body;
@@ -80,9 +79,7 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(-60),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -308,12 +305,23 @@ describe.skipIf(skipReason !== null)('Platform receipts void (ANULADO SaaS)', ()
     const broken = await readPayment(paymentId);
     expect(broken['receipt_voided']).toBe(false);
 
-    // THE BUG (before the spies are reset, the download reads R2): the emission
-    // PDF of a voided payment is delivered again while the flag is off.
+    // THE BUG (before the spies are reset, the download reads R2): with the flag
+    // off the emission PDF used to be delivered again. RD-159 reads the payment
+    // status too, so the contract stays fail-closed (`pending` + 404) while the
+    // sweep repairs the flag.
+    const pending = await admin.client.get(
+      `/api/platform/subscriptions/payments/${paymentId}/receipt`,
+    );
+    expect(pending.status, pending.text).toBe(202);
+    expect(pending.body).toMatchObject({
+      available: true,
+      pdfStatus: 'pending',
+      receiptNumber,
+    });
     const leaked = await admin.client.get(
       `/api/platform/subscriptions/payments/${paymentId}/receipt/pdf`,
     );
-    expect(leaked.status, leaked.text).toBe(200);
+    expect(leaked.status, leaked.text).toBe(404);
 
     resetSpies(admin.client);
     const { repairedVoided } = await sweepPendingReceiptPdfs(sweepEnv(admin.client));

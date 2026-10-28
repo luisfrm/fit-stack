@@ -57,7 +57,6 @@ async function createPlatformPlan(
     durationValue: 1,
     durationUnit: 'month',
     isActive: true,
-    trialDays: 0,
     features: {
       panel: { enabled: true },
       members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -79,9 +78,7 @@ async function createPlatformSubscription(
     organizationId,
     planId,
     startDate: isoDate(-1),
-    isTrial: false,
     payment: {
-      amountPaid: 2999,
       currencyPaid: 'USD',
       paymentMethod: 'card',
       paymentMethodDetails: [],

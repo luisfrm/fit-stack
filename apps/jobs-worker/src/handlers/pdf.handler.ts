@@ -11,6 +11,7 @@ import { type EmailConfigEnv, resolveBaseUrl } from './email-config';
 import { renderPaymentReceiptShort } from '../templates/payment-receipt-short';
 import { renderOrgPaymentReceived } from '../templates/org-payment-received';
 import { formatCents, type CurrencyFormat, type PaymentReceiptEvent } from '@workspace/shared';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 import { and, eq } from 'drizzle-orm';
 
 export interface PdfHandlerEnv extends EmailConfigEnv {
@@ -104,7 +105,13 @@ export async function handlePaymentReceipt(
   // Voided (defensive): an in-flight event of a voided receipt is never sent —
   // it would carry the emission PDF, without the stamp. The deliverable of a
   // voided receipt is its sealed download (`receipt_voided_pdf_key`).
-  if (paymentRow.receiptVoided) {
+  // RD-159: the payment STATUS is authoritative too — the void writes
+  // `status = 'voided'` first and `receipt_voided` second, so an event already
+  // in flight while that second write is lost must not email the emission PDF.
+  if (
+    paymentRow.receiptVoided ||
+    paymentRow.status === PAYMENT_STATUSES.VOIDED
+  ) {
     console.warn(
       `Payment ${payload.paymentId}: receipt ${receiptNumber ?? '—'} VOIDED; send omitted (deliverable is stamped PDF).`,
     );
@@ -253,8 +260,12 @@ export async function handleOrgPaymentReceived(
   const receiptPdfKey = paymentData.payment.receiptPdfKey;
 
   // Voided (defensive, mirrors Panel): never send issuance PDF of voided
-  // receipt; deliverable is stamped PDF.
-  if (paymentData.payment.receiptVoided) {
+  // receipt; deliverable is stamped PDF. RD-159: the payment STATUS counts too
+  // (the `receipt_voided` write may have been lost), never only the flag.
+  if (
+    paymentData.payment.receiptVoided ||
+    paymentData.payment.status === PAYMENT_STATUSES.VOIDED
+  ) {
     console.warn(
       `Platform payment ${payload.paymentId}: receipt ${receiptNumber ?? '—'} VOIDED; delivery skipped (deliverable is stamped PDF).`,
     );

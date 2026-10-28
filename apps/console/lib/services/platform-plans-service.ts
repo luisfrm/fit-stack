@@ -13,7 +13,6 @@ export interface PlatformPlansSummary {
   totalSubscriptions: number;
   activeSubscriptions: number;
   monthlyRevenue: Record<string, number>;
-  trialPlans: number;
 }
 
 /**

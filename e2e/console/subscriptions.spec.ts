@@ -27,9 +27,6 @@ test.describe("Console — Subscriptions", () => {
       page.getByRole("button", { name: "Activas", exact: true }),
     ).toBeVisible({ timeout: 20_000 });
     await expect(
-      page.getByRole("button", { name: "Trial", exact: true }),
-    ).toBeVisible({ timeout: 10_000 });
-    await expect(
       page.getByRole("button", { name: "Por Vencer", exact: true }),
     ).toBeVisible({ timeout: 10_000 });
     await expect(

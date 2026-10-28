@@ -55,13 +55,14 @@ Un cron de `jobs-worker` re-encola lo que quedó a medias. Cada pieza tiene su p
 | 4 | Anulado sin PDF sellado | `receipt_voided` y falta el PDF con sello hace ≥15 min | Re-encola el render del sello |
 | 5 | Anulado sin flag | el pago dice `voided` y `receipt_voided` está en falso hace ≥15 min | Enciende **solo** el flag y encola el sello si esta corrida lo encendió |
 
-El caso 5 existe porque los demás predicados buscan el flag **encendido**: sin él la fila era invisible y se seguía sirviendo el PDF original. `flag*VoidedIfMissing` conserva `voided_by`/`voided_at`/`void_reason` tal cual y nunca inventa un actor.
+El caso 5 existe porque los demás predicados buscan el flag **encendido**: sin él la fila quedaba invisible para el barrido. Desde RD-159 la ventana ya no expone el PDF original (el contrato de entrega lee el **estado** del pago, no el flag), y el barrido solo repara el flag y encola el sello. `flag*VoidedIfMissing` conserva `voided_by`/`voided_at`/`void_reason` tal cual y nunca inventa un actor.
 
 ## 6. ANULADO es un artefacto
 
 - El número y el PDF de emisión quedan **intactos** (write-once).
 - Se genera un **segundo** PDF con el sello: `<n>-anulado.pdf`, guardado en `receipt_voided_pdf_key`.
-- Mientras ese sello no exista, el contrato responde `pending` y `/receipt/pdf` da 404: **fail-closed**. Un comprobante anulado nunca viaja sin su sello.
+- **RD-159 — la fuente de verdad es el estado, no el flag**: la entrega se decide con `status === PAYMENT_STATUSES.VOIDED`, no con `receipt_voided`. La anulación escribe `status` primero y el flag después; si la segunda escritura se pierde, el flag queda en `false` pero el pago ya está anulado, así que servir `receipt_pdf_key` entregaría el PDF de emisión de un cobro anulado. Por eso `getReceiptState` (Panel y Console) y el reenvío leen el estado; el flag `receipt_voided` es la **reparación del barrido** (estado 5), que lo enciende sin tocar el estado del pago.
+- Mientras ese sello no exista, el contrato responde `pending` y `/receipt/pdf` da 404: **fail-closed**. Un comprobante anulado nunca viaja sin su sello, haya o no flag.
 - Anular encola el render del sello (paso 1-bis) y el barrido es la red de seguridad.
 - El reenvío por correo responde **409 `RECEIPT_VOIDED`** y un evento ya en vuelo también se descarta en el handler.
 

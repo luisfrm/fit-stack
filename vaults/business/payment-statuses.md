@@ -74,7 +74,6 @@ Por qué: con `validated → processing → validated` el segundo PATCH volvía 
 El status SaaS (`platform-subscriptions.repository.ts`, espejo puro `computePlatformSubscriptionStatus`) usa `EXISTS(validated|refunded)` sobre **los pagos de la suscripción** (`QUALIFYING_PAYMENT_STATUSES`), nunca "el último pago":
 
 - `cancelledAt IS NOT NULL` → `cancelled`.
-- `isTrial` y periodo vigente → `trial` (solo suscripciones históricas: los trials nuevos se rechazan).
 - `currentPeriodEnd >= now` y **hay** pago calificado → `active`.
 - `currentPeriodEnd >= now` y **no** hay pago calificado → `past_due`.
 - Vencida: ≤7 días → `past_due`; ≤14 → `read_only`; más → `suspended`.
@@ -91,7 +90,9 @@ Cuando el status SaaS no otorga acceso, decide el **free tier** (`features.servi
 
 Un plan `price = 0` **fuerza** `status = validated` con `paymentMethod = 'free'`: es un pago válido pero **`pre_system`** para el comprobante (`available:false`, `reason:'pre_system'`) y **no** quema un número de la serie `FS-N`. Su `plan_snapshot_price` es 0, así que nunca suma a los KPIs de ingresos.
 
-**Los trials están discontinuados (RD-117)**: `POST /api/platform/subscriptions` (y su espejo por organización) responde **400 `TRIAL_NOT_AVAILABLE`** si el body envía `isTrial: true`, antes de escribir nada. El `paymentMethod = 'trial'` queda **solo** en filas históricas: la migración `0029` pone su `plan_snapshot_price` a 0 y la columna `is_trial` se conserva, así que una suscripción antigua sigue computando `trial` mientras su periodo esté vigente. Los descuentos futuros serán cupones, no `price_override`.
+**Los trials ya no existen (RD-117)**: `isTrial`, `trial_days` y el estado `trial` se retiraron del modelo (migración `0030` cierra los trials históricos con motivo `trials_removed` y convierte sus pagos a `payment_method = 'free'`). No hay estado `trial` que computar y no hay campo que rechazar. Los descuentos futuros serán **cupones** (hasta 100 %), no un plan a precio cero ni un `price_override`.
+
+**El pago SaaS también lo cotiza el servidor (RD-161)**: ni el alta, ni la renovación, ni el registro manual aceptan `amountPaid`/`exchangeRateApplied` en el body. El servicio deriva monto y tasa del plan, y además persiste `platform_rate_applied` (plan → moneda primaria) y `platform_amount` (centavos en la primaria) para que el revenue nunca sume monedas distintas. Ver [`platform-billing.md`](./platform-billing.md).
 
 ## 3. Flujo Panel (gym)
 
@@ -114,7 +115,7 @@ resto                    → active     (ACTIVA)
 
 ## 4. Flujo Console (SaaS)
 
-1. **Alta** — `POST /api/platform/subscriptions` (admin/owner): puede nacer `validated` o `processing`. **No acepta trials**: `isTrial: true` → **400 `TRIAL_NOT_AVAILABLE`** (RD-117); un plan `price = 0` usa el camino `free`.
+1. **Alta** — `POST /api/platform/subscriptions` (admin/owner): puede nacer `validated` o `processing`. Un plan `price = 0` usa el camino `free` (pago `validated` con montos cero); el monto y la tasa de cualquier otro plan los calcula el servidor (RD-161).
 2. **Autoservicio del gym** — `POST /api/organizations/subscription/renew` (owner/manager del gym): el pago nace **`processing`** y queda "en revisión". Todo lo financiero lo dicta el backend (snapshot del plan, tasa, importe).
 3. **Aprobación** — `PATCH /api/platform/subscriptions/payments/:id/status` con `validated` (el PATCH solo acepta `validated | voided`, ver §1.1): extiende el periodo (solo en la transición `processing → validated`, con la duración del **snapshot** del pago) y numera el `FS-N`.
 4. **Anulación** — el mismo PATCH con **`voided`**: marca ANULADO si había comprobante y se **ignora** en el status computado (no cancela la suscripción). No existe `invalid`: el rechazo también es `voided`.
@@ -141,6 +142,7 @@ El destino `processing` está **prohibido** en el PATCH (§1.1): mandar un pago 
 - **`refunded` reservado**: no toca el flag ANULADO; su flujo de devolución está pendiente (Linear — proyecto «Fit Stack»).
 - **Nada pendiente se pierde en silencio**: el barrido de `jobs-worker` cubre **cinco** estados — reclamo vencido, numerado sin PDF, PDF listo sin notificar, anulado sin PDF con sello y anulado sin flag. Un envío que agota reintentos limpia la marca de notificado, así que el barrido re-encola el aviso; si el fallo es de otra naturaleza, la recuperación es manual (`resend` / `POST /:id/issue`).
 - **El ANULADO es un artefacto**: anular conserva el PDF de emisión intacto y genera uno nuevo con el sello (`<numero>-anulado.pdf` en `receipt_voided_pdf_key`). Mientras ese render no exista, el contrato responde `pending` y **el original no se descarga**: un comprobante anulado nunca viaja sin su sello. Tampoco se reenvía por email (`409 RECEIPT_VOIDED`).
+- **RD-159 — manda el estado de pago, no el flag**: la entrega se decide con `status === PAYMENT_STATUSES.VOIDED`, no con `receipt_voided`. El flujo de anulación escribe `status = 'voided'` primero y el flag después; si la segunda escritura se pierde, el flag queda en `false` y recibir el `receipt_pdf_key` entregaría el PDF de emisión de un cobro anulado. Por eso `getReceiptState` (Panel y Console, `receipts.service.ts` / `platform-receipts.service.ts`) y el reenvío leen el **estado**: sin sello → `pending` (202) y `/receipt/pdf` → 404, y el reenvío → `409 RECEIPT_VOIDED`. `receipt_voided` es la **reparación del barrido** (estado 5): enciende solo el flag y encola el render del sello; el estado del pago nunca se toca.
 
 ## 6. Dónde vive cada cosa
 

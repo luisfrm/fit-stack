@@ -18,6 +18,7 @@ import {
   type DateInput,
 } from './receipt-compose';
 import type { ReceiptData } from './receipt-data';
+import { PAYMENT_STATUSES } from '../constants';
 
 /* ── Structural row types (Panel issuer: the gym organization) ────────── */
 
@@ -42,6 +43,12 @@ export interface PanelReceiptPaymentRow {
   documentType?: string | null;
   receiptIssuedAt?: DateInput | null;
   receiptVoided: boolean;
+  /**
+   * Payment status. With `receiptVoided` it decides `voided` (RD-159): the void
+   * writes the status first and the flag second, so a lost flag must still
+   * produce the stamped artifact, never an unstamped `…-anulado.pdf`.
+   */
+  status: string;
   /** Plan snapshot frozen at payment time (source of plan name/currency). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
@@ -102,6 +109,8 @@ export interface PlatformReceiptPaymentRow {
   receiptNumber: string | null;
   receiptIssuedAt?: DateInput | null;
   receiptVoided: boolean;
+  /** Payment status; with the flag it decides `voided` (RD-159). */
+  status: string;
   planSnapshotName?: string | null;
   /** Base currency frozen in the payment (always present in SaaS rows). */
   planSnapshotCurrency: string;
@@ -173,6 +182,8 @@ export function composePanelReceipt(rows: PanelReceiptComposedRows): ReceiptData
       taxDetails: payment.taxDetails,
       receiptNumber,
       receiptVoided: payment.receiptVoided,
+      // RD-159: forwarded so the mapper derives `voided` from status + flag.
+      status: payment.status,
       planSnapshotName: payment.planSnapshotName,
       planSnapshotCurrency: payment.planSnapshotCurrency,
       planSnapshotPrice:
@@ -240,7 +251,12 @@ export function composePlatformReceipt(rows: PlatformReceiptComposedRows): Recei
       planSnapshotCurrency: payment.planSnapshotCurrency,
       planSnapshotPrice:
         payment.planSnapshotPrice != null ? Number(payment.planSnapshotPrice) : null,
-      voided: payment.receiptVoided,
+      // RD-159: the status is authoritative too — a void whose flag write was
+      // lost must still produce the STAMPED artifact (never an unstamped
+      // "…-anulado.pdf" whose key is persisted and never regenerated).
+      voided:
+        payment.receiptVoided === true ||
+        payment.status === PAYMENT_STATUSES.VOIDED,
     },
     subscription: subscription
       ? {

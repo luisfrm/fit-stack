@@ -115,7 +115,6 @@ export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSC
  */
 export const PLATFORM_SUBSCRIPTION_STATUSES = {
   ACTIVE: "active", // periodEnd >= now and valid payment
-  TRIAL: "trial", // isTrial = true
   PAST_DUE: "past_due", // 1-7 days overdue
   READ_ONLY: "read_only", // 8-14 days overdue
   SUSPENDED: "suspended", // 15+ days overdue
@@ -144,7 +143,6 @@ export const PLATFORM_GRACE_PERIODS = {
 export interface IPlatformSubscriptionStatusInput {
   currentPeriodEnd: Date | string;
   cancelledAt?: Date | string | null;
-  isTrial?: boolean;
   /**
    * `EXISTS(validated|refunded)` over subscription payments. `processing`
    * and `voided` do NOT qualify. NEVER use "the latest payment".
@@ -163,8 +161,6 @@ export function computePlatformSubscriptionStatus(
       : new Date(input.currentPeriodEnd);
 
   if (input.cancelledAt) return PLATFORM_SUBSCRIPTION_STATUSES.CANCELLED;
-  // Trial only maintains active status while its period is valid.
-  if (input.isTrial && end >= now) return PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
 
   if (end >= now) {
     return input.hasValidatedPayment
@@ -185,8 +181,7 @@ export function computePlatformSubscriptionStatus(
 }
 
 export function isPlatformSubscriptionActive(status: PlatformSubscriptionStatus): boolean {
-  return status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE ||
-    status === PLATFORM_SUBSCRIPTION_STATUSES.TRIAL;
+  return status === PLATFORM_SUBSCRIPTION_STATUSES.ACTIVE;
 }
 
 export function isPlatformSubscriptionExpired(status: PlatformSubscriptionStatus): boolean {
@@ -240,7 +235,15 @@ export type countryTax = {
 
 
 export type taxType = "number" | "conditional";
+/**
+ * Unevaluated tax conditions, evaluated at calculation time
+ * (`isTaxApplicable` in `documents/tax-math.ts`). Adding a condition means
+ * adding a case there: an unknown value throws, never fails silently.
+ */
 export type taxCondition = "payment_currency !== 'VES'";
+
+/** Applies when the payment is made in any currency other than VES (VE IGTF). */
+export const PAYMENT_CURRENCY_NOT_VES: taxCondition = "payment_currency !== 'VES'";
 
 export interface ICountryTax {
   name: string;
@@ -288,7 +291,7 @@ export const COUNTRIES: Record<string, ICountryConfig> = {
       { name: "IVA", type: "number", value: "16%" }
     ],
     conditionalTaxes: [
-      { name: "IGTF", type: "conditional", condition: "payment_currency !== 'VES'", value: "3%" }
+      { name: "IGTF", type: "conditional", condition: PAYMENT_CURRENCY_NOT_VES, value: "3%" }
     ]
   },
   CO: {

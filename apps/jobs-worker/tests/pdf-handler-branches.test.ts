@@ -8,6 +8,7 @@
  * - Scope-org: el handler pasa el organizationId del evento al repo.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
 const getComposedMock = vi.hoisted(() => vi.fn());
 const sendEmailMock = vi.hoisted(() => vi.fn());
@@ -140,6 +141,29 @@ describe('handlePaymentReceipt', () => {
 
     // El entregable de un anulado es su PDF con sello (descarga autenticada):
     // ni siquiera se lee R2 para no adjuntar el documento vigente.
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(r2GetMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * RD-159: the void writes `status = 'voided'` first and `receipt_voided`
+   * second. An event already in flight when that second write is lost must not
+   * email the emission PDF: the STATUS alone is enough to skip the send.
+   */
+  it('status voided con receipt_voided=false (escritura perdida) → sin enviar', async () => {
+    r2GetMock.mockResolvedValue({ arrayBuffer: async () => pdfBytes.buffer as ArrayBuffer });
+    getComposedMock.mockResolvedValue(
+      composed({
+        payment: {
+          status: PAYMENT_STATUSES.VOIDED,
+          receiptVoided: false,
+          receiptVoidedPdfKey: null,
+        },
+      }),
+    );
+
+    await handlePaymentReceipt(env(), { paymentId: 987654, organizationId: 'org-1' });
+
     expect(sendEmailMock).not.toHaveBeenCalled();
     expect(r2GetMock).not.toHaveBeenCalled();
   });

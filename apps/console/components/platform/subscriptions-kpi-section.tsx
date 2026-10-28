@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Text, Skeleton } from "@workspace/ui/components";
+import { Text, Skeleton, Badge } from "@workspace/ui/components";
 import {
   Users,
-  CalendarCheck,
   AlertTriangle,
   ShieldOff,
   Wallet,
@@ -133,7 +132,6 @@ export function SubscriptionsKpiSection({
 }: KpiSectionProps) {
   const defaultStats: SubscriptionStats = {
     active: 0,
-    trial: 0,
     pastDue: 0,
     readOnly: 0,
     suspended: 0,
@@ -142,6 +140,8 @@ export function SubscriptionsKpiSection({
     monthlyRevenueCents: 0,
     previousMonthRevenueCents: 0,
     mrrCents: 0,
+    unconvertedCount: 0,
+    primaryCurrency: "",
   };
   const displayStats = stats ?? defaultStats;
   const growth = selectRevenueGrowth(displayStats);
@@ -177,7 +177,23 @@ export function SubscriptionsKpiSection({
           testId="subs-kpi-prev"
         />
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+      {/* Amounts are normalized to the platform primary currency by the API.
+          A payment the backfill could not convert has no amount: it is excluded
+          from the KPI and counted here, never assumed 1:1. */}
+      {displayStats.unconvertedCount > 0 && (
+        <div className="flex items-center gap-2">
+          <Badge variant="warning" size="sm" id="subs-kpi-unconverted">
+            {displayStats.unconvertedCount} sin convertir
+          </Badge>
+          <Text size="sm" variant="muted" as="span">
+            Pagos sin tasa hacia {displayStats.primaryCurrency || currency}: quedan
+            fuera de los totales.
+          </Text>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard
           label="Activas"
           value={displayStats.active}
@@ -186,17 +202,6 @@ export function SubscriptionsKpiSection({
           isLoading={isLoading}
           onClick={() =>
             onFilterChange(activeFilter === "active" ? null : "active")
-          }
-        />
-
-        <StatCard
-          label="En Trial"
-          value={displayStats.trial}
-          icon={<CalendarCheck className="w-4 h-4 text-blue-400" />}
-          isActive={activeFilter === "trial"}
-          isLoading={isLoading}
-          onClick={() =>
-            onFilterChange(activeFilter === "trial" ? null : "trial")
           }
         />
 

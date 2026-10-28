@@ -6,7 +6,6 @@ import { sessionService } from "@workspace/auth/service";
 import { canPlatform } from "@workspace/shared";
 import { RenewalsWidget } from "@/components/dashboard/dashboard-renewals-widget";
 import { PaymentsReviewWidget } from "@/components/dashboard/dashboard-payments-review-widget";
-import { TrialsWidget } from "@/components/dashboard/dashboard-trials-widget";
 import { NewOrgsWidget } from "@/components/dashboard/dashboard-new-orgs-widget";
 import { organizationsService } from "@/lib/services/organizations-service";
 import { platformSubscriptionsService } from "@/lib/services/platform-subscriptions-service";
@@ -14,7 +13,6 @@ import {
   selectNewOrgsThisMonth,
   selectPaymentsReview,
   selectRenewals,
-  selectTrials,
 } from "@/lib/dashboard/selectors";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
@@ -40,7 +38,6 @@ export default async function DashboardPage() {
       })
       .catch(() => ({
         active: 0,
-        trial: 0,
         pastDue: 0,
         readOnly: 0,
         suspended: 0,
@@ -49,6 +46,8 @@ export default async function DashboardPage() {
         monthlyRevenueCents: 0,
         previousMonthRevenueCents: 0,
         mrrCents: 0,
+        unconvertedCount: 0,
+        primaryCurrency: "",
       })),
     api<Record<string, string>>("/platform/settings", {
       next: { revalidate: 600, tags: ["console:settings"] },
@@ -96,7 +95,6 @@ export default async function DashboardPage() {
   // Widget datasets (derivados sin endpoints nuevos)
   const newOrgs = selectNewOrgsThisMonth(orgs);
   const renewals = selectRenewals(orgs);
-  const trials = selectTrials(orgs);
   const paymentsReview = selectPaymentsReview(recentSubs.data);
 
   const refreshOrgs = async () => {
@@ -153,7 +151,6 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
         <RenewalsWidget items={renewals} />
         <PaymentsReviewWidget subs={paymentsReview} />
-        <TrialsWidget trials={trials} />
         <NewOrgsWidget orgs={newOrgs} />
       </div>
     </>

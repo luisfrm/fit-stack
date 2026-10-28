@@ -307,10 +307,19 @@ describe.skipIf(skipReason !== null)('Receipts voided PDF', () => {
     expect(broken['receipt_voided']).toBe(false);
     expect(broken['receipt_voided_pdf_key']).toBeNull();
 
-    // THE BUG: with the flag off the ORIGINAL is served again (checked before the
+    // RD-159: the payment STATUS is authoritative, so the lost flag no longer
+    // re-exposes the original. Before the sweep repairs the flag, the contract
+    // answers `pending` and the emission PDF is NOT served (checked before the
     // spies are reset, because the download reads R2).
+    const state = await owner.client.get(`/api/payments/${paymentId}/receipt`);
+    expect(state.status, state.text).toBe(202);
+    expect(state.body).toMatchObject({
+      available: true,
+      pdfStatus: 'pending',
+      receiptNumber,
+    });
     const leaked = await owner.client.get(`/api/payments/${paymentId}/receipt/pdf`);
-    expect(leaked.status, leaked.text).toBe(200);
+    expect(leaked.status, leaked.text).toBe(404);
 
     resetSpies(owner.client);
     const { repairedVoided } = await sweepPendingReceiptPdfs(sweepEnv(owner.client));

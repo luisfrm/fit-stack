@@ -64,7 +64,7 @@ describe('buildReceiptDataFromComposed', () => {
     expect(() => buildReceiptDataFromComposed(input)).toThrow(/no persistidos/);
   });
 
-  it('trial $0 sin desglose: amounts en cero', () => {
+  it('free $0 sin desglose: amounts en cero', () => {
     const input = validInput();
     input.payment.amountPaid = 0;
     input.payment.subtotal = 0;
@@ -79,6 +79,26 @@ describe('buildReceiptDataFromComposed', () => {
     const input = validInput();
     input.member = null;
     expect(buildReceiptDataFromComposed(input).recipient.name).toBe('Miembro');
+  });
+
+  /**
+   * RD-159: the void writes `status = 'voided'` first and `receipt_voided`
+   * second. A lost second write must still compose a VOIDED document: the PDF
+   * renderer reads this flag to stamp it, and a stamped-less artifact would be
+   * persisted under the `-anulado.pdf` key forever.
+   */
+  it('status voided con receiptVoided=false compone voided: true (RD-159)', () => {
+    const input = validInput();
+    input.payment.status = 'voided';
+    input.payment.receiptVoided = false;
+    expect(buildReceiptDataFromComposed(input).voided).toBe(true);
+  });
+
+  it('receiptVoided=true sigue componiendo voided: true', () => {
+    const input = validInput();
+    input.payment.status = 'validated';
+    input.payment.receiptVoided = true;
+    expect(buildReceiptDataFromComposed(input).voided).toBe(true);
   });
 
   it('baseTotal = null cuando el pago ya está en la moneda base', () => {

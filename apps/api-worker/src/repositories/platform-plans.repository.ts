@@ -26,7 +26,6 @@ export interface PlatformPlansSummary {
   totalSubscriptions: number;
   activeSubscriptions: number;
   monthlyRevenue: Record<string, number>;
-  trialPlans: number;
 }
 
 export function createPlatformPlansRepository(db: Db) {
@@ -111,19 +110,28 @@ export function createPlatformPlansRepository(db: Db) {
         }
       });
 
-      const trialPlansResult = await db
-        .select({ count: count() })
-        .from(platformPlan)
-        .where(sql`${platformPlan.trialDays} > 0`);
-
       return {
         totalPlans: Number(plansResult?.count ?? 0),
         activePlans: Number(activePlansResult?.count ?? 0),
         totalSubscriptions: Number(subscriptionsResult?.count ?? 0),
         activeSubscriptions: Number(activeSubscriptionsResult?.count ?? 0),
         monthlyRevenue,
-        trialPlans: Number(trialPlansResult[0]?.count ?? 0),
       };
+    },
+
+    /**
+     * Number of SaaS payments booked against a plan (any status, `voided`
+     * included). A plan with payments is financial history: its currency
+     * freezes the rate of every payment priced from it, so the currency
+     * becomes immutable (409). Fail-closed: an annulled payment still carries
+     * a rate priced from this plan, so it freezes the currency too.
+     */
+    async countPaymentsByPlan(planId: number): Promise<number> {
+      const [row] = await db
+        .select({ total: count() })
+        .from(platformSubscriptionPayment)
+        .where(eq(platformSubscriptionPayment.planId, planId));
+      return Number(row?.total ?? 0);
     },
   };
 }

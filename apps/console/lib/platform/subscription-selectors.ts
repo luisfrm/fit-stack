@@ -15,9 +15,8 @@ export interface TopPlanRevenue {
   count: number;
 }
 
-/** Effective price of the subscription in cents (plan price; trial/absent = 0). */
+/** Effective price of the subscription in cents (plan price; absent = 0). */
 export function effectivePriceCents(sub: SubscriptionWithDetails): number {
-  if (sub.isTrial) return 0;
   return sub.planPrice ?? 0;
 }
 
@@ -62,8 +61,8 @@ export interface ExpiringSoon {
 
 /**
  * Subscriptions expiring in `days` days (including today), sorted by
- * ascending expiration and capped at `limit`. Includes trials and periods
- * with pending payments: everything needing commercial attention.
+ * ascending expiration and capped at `limit`. Includes periods with pending
+ * payments: everything needing commercial attention.
  */
 export function selectExpiringSoon(
   subs: SubscriptionWithDetails[],
@@ -90,13 +89,18 @@ export function selectExpiringSoon(
 
 /**
  * SaaS billing for an organization in the current UTC month (only `validated`
- * payments). The base-currency amount is the frozen `planSnapshotPrice` —
- * same formula as the revenue KPI, never a division by the rate.
+ * payments), in the platform primary currency.
+ *
+ * The amount is the PERSISTED `platformAmount` (server-priced and normalized by
+ * the API), never `planSnapshotPrice` (which is quoted in the plan currency) and
+ * never a division by the stored rate. A payment without `platformAmount` could
+ * not be normalized, so it adds nothing and is not counted — the platform-wide
+ * `unconvertedCount` surfaces that gap instead of inventing an amount.
  */
 export function selectOrgCurrentMonth(
   invoices: Pick<
     PlatformPayment,
-    "status" | "paymentDate" | "planSnapshotPrice"
+    "status" | "paymentDate" | "platformAmount"
   >[],
   now: Date,
 ): { totalCents: number; count: number } {
@@ -109,7 +113,8 @@ export function selectOrgCurrentMonth(
     const d = new Date(invoice.paymentDate);
     if (Number.isNaN(d.getTime())) continue;
     if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month) continue;
-    totalCents += invoice.planSnapshotPrice;
+    if (invoice.platformAmount == null) continue;
+    totalCents += invoice.platformAmount;
     count += 1;
   }
   return { totalCents, count };
@@ -117,13 +122,14 @@ export function selectOrgCurrentMonth(
 
 /** Total validated for an organization (same formula as monthly bucket). */
 export function selectOrgBilledTotal(
-  invoices: Pick<PlatformPayment, "status" | "planSnapshotPrice">[],
+  invoices: Pick<PlatformPayment, "status" | "platformAmount">[],
 ): { totalCents: number; count: number } {
   let totalCents = 0;
   let count = 0;
   for (const invoice of invoices) {
     if (invoice.status !== "validated") continue;
-    totalCents += invoice.planSnapshotPrice;
+    if (invoice.platformAmount == null) continue;
+    totalCents += invoice.platformAmount;
     count += 1;
   }
   return { totalCents, count };
@@ -158,13 +164,15 @@ export interface PaymentDisplayAmount {
 }
 
 /**
- * Displayable amount of a SaaS payment in the platform base currency: the
- * frozen `planSnapshotPrice`, never `amountPaid` (which belongs to
- * `currencyPaid`) and never a division by the stored rate.
+ * Displayable amount of a SaaS payment in the platform primary currency: the
+ * PERSISTED `platformAmount`, never `amountPaid` (which belongs to
+ * `currencyPaid`) and never `planSnapshotPrice` (quoted in the plan currency).
+ * `platformAmount` is `null` for historical rows the backfill could not
+ * normalize; they render as `0` here and are reported as unconverted instead.
  */
 export function selectPaymentDisplayAmount(
-  payment: Pick<PlatformPayment, "planSnapshotPrice">,
+  payment: Pick<PlatformPayment, "platformAmount">,
   baseCurrency: string,
 ): PaymentDisplayAmount {
-  return { amountCents: payment.planSnapshotPrice, currency: baseCurrency };
+  return { amountCents: payment.platformAmount ?? 0, currency: baseCurrency };
 }

@@ -18,6 +18,7 @@ import { createFeaturesRepository } from '../repositories/features.repository';
 import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
+import { exchangeRateErrorResponse, createExchangeRateProvider } from '../lib/exchange-rates';
 import { constructStorageKey, orgStorageListPrefix } from '../lib/storage-keys';
 import {
   paymentMethodDetailsSchema,
@@ -356,7 +357,11 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
     const id = c.req.param('id');
     const repo = createPlatformSubscriptionsRepository(c.get('db'));
     const plansRepo = createPlatformPlansRepository(c.get('db'));
-    const service = createPlatformSubscriptionsService(repo, plansRepo);
+    const service = createPlatformSubscriptionsService(
+      repo,
+      plansRepo,
+      createPlatformSettingsRepository(c.get('db')),
+    );
 
     const subscriptions = await service.getSubscriptionsByOrganization(id);
     return c.json(subscriptions);
@@ -371,11 +376,8 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
       z.object({
         planId: z.number().int().positive(),
         startDate: z.string().optional(),
-        isTrial: z.boolean().default(false),
         payment: z.object({
-          amountPaid: z.number().int().nonnegative(),
           currencyPaid: z.string().min(1),
-          exchangeRateApplied: z.string().optional(),
           paymentMethod: paymentMethodSchema,
           paymentMethodDetails: paymentMethodDetailsSchema,
           status: z.enum([
@@ -395,12 +397,25 @@ export const platformOrganizationRoutes = new Hono<AppEnv>()
 
       const repo = createPlatformSubscriptionsRepository(c.get('db'));
       const plansRepo = createPlatformPlansRepository(c.get('db'));
-      const service = createPlatformSubscriptionsService(repo, plansRepo);
+      const service = createPlatformSubscriptionsService(
+        repo,
+        plansRepo,
+        createPlatformSettingsRepository(c.get('db')),
+        createExchangeRateProvider(c.env),
+      );
 
-      const result = await service.createSubscriptionWithPayment({
-        organizationId: id,
-        ...data,
-      });
+      let result;
+      try {
+        result = await service.createSubscriptionWithPayment({
+          organizationId: id,
+          ...data,
+        });
+      } catch (err) {
+        // Typed rate failures -> 503/400 by class, never a leaked 500.
+        const rateFailure = exchangeRateErrorResponse(err);
+        if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
+        throw err;
+      }
 
       await cache.invalidate('platform:subscriptions*');
       await cache.invalidateExact(`org:${id}:subscription-status`);

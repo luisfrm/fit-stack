@@ -143,7 +143,6 @@ export const platformPlan = pgTable('platform_plan', {
   durationUnit: text('duration_unit').default('month').notNull(),
   features: jsonb('features').$type<PlanFeaturesV2 | null>(), // PlanFeaturesV2 from shared/features
   isActive: boolean('is_active').default(true).notNull(),
-  trialDays: integer('trial_days').default(0).notNull(), // 0 = no trial
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -166,7 +165,6 @@ export const platformSubscription = pgTable(
     status: text('status').notNull().default('active'),
     startDate: timestamp('start_date', { withTimezone: true }).notNull().defaultNow(),
     currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
-    isTrial: boolean('is_trial').default(false).notNull(),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancellationReason: text('cancellation_reason'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -213,9 +211,17 @@ export const platformSubscriptionPayment = pgTable(
     // Wide precision on purpose (RD-157): a 4-decimal rate rounds a COP->USD
     // quote (0.00025) to 0.0003, a ~20% error that leaks into every division.
     exchangeRateApplied: numeric('exchange_rate_applied', { precision: 20, scale: 10 }),
+    /**
+     * Normalized amount in `platform_setting.primary_currency` (integer cents).
+     * The SaaS layer bills in multiple currencies: the server prices the
+     * payment and freezes the plan -> primary currency rate. NULL on
+     * historical rows whose rate cannot be reproduced (never invented).
+     */
+    platformRateApplied: numeric('platform_rate_applied', { precision: 20, scale: 10 }),
+    platformAmount: bigint('platform_amount', { mode: 'number' }),
 
     // Method and metadata
-    paymentMethod: text('payment_method').notNull(), // includes 'trial' | 'free' | 'manual' | etc
+    paymentMethod: text('payment_method').notNull(), // includes 'free' | 'manual' | etc
     paymentMethodDetails: jsonb('payment_method_details'),
     paymentDate: timestamp('payment_date', { withTimezone: true }).notNull().defaultNow(),
 

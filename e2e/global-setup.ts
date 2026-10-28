@@ -47,7 +47,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   // 2) Console: platform owner (role promotion via SQL).
   const platform = await ensurePlatformTenant();
 
-  // 3-4) Suite: org created by the console + owner + trial + minimal seed.
+  // 3-4) Suite: org created by the console + owner + free platform plan + minimal seed.
   const suite = await ensureSuiteTenant(platform, TEST_ORG, TEST_OWNER);
   const platformBilling = await seedPlatformSubscription(platform.cookies, suite.organization.id);
   const gym = await seedGymData(suite.cookies);

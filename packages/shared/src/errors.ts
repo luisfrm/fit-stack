@@ -31,12 +31,17 @@ export const API_ERROR_CODES = {
    */
   VOID_REASON_REQUIRED: "VOID_REASON_REQUIRED",
   /**
-   * `POST /platform/subscriptions` (and its org-scoped mirror): trials are
-   * discontinued (`400`). A historical trial booked a `$0` payment while
-   * snapshotting the full plan price, which inflated SaaS revenue; future
-   * discounts are handled with coupons.
+   * `POST /platform/settings`: `primary_currency` is the normalization
+   * currency of every SaaS payment, so it cannot change once payments exist
+   * (`409`). Changing it would silently reinterpret historical revenue.
    */
-  TRIAL_NOT_AVAILABLE: "TRIAL_NOT_AVAILABLE",
+  PRIMARY_CURRENCY_IMMUTABLE: "PRIMARY_CURRENCY_IMMUTABLE",
+  /**
+   * `PUT /platform/plans/:id`: the plan currency freezes the rate used to
+   * price every payment, so it cannot change once the plan has payments
+   * (`409`). Historical snapshots keep their own currency.
+   */
+  PLAN_CURRENCY_IMMUTABLE: "PLAN_CURRENCY_IMMUTABLE",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];

@@ -14,6 +14,7 @@ import { resolveDocumentLabel } from './document-label-gate';
 import { maskPaymentDetails } from './masking';
 import { roundCents } from './tax-math';
 import type { ITaxDetail, IPaymentMethodDetails } from '../types';
+import { PAYMENT_STATUSES } from '../constants';
 import type {
   ReceiptData,
   ReceiptDocumentType,
@@ -46,6 +47,13 @@ export interface ComposePayment {
   documentType?: string | null;
   receiptIssuedAt?: NullableDate;
   receiptVoided?: boolean | null;
+  /**
+   * Payment status. Together with `receiptVoided` it decides `voided` (RD-159):
+   * the void writes `status = 'voided'` first and the flag second, so a lost
+   * flag still means a voided document — and a voided document must never be
+   * rendered without its stamp.
+   */
+  status?: string | null;
   /** Snapshot frozen upon payment registration (source of plan name). */
   planSnapshotName?: string | null;
   planSnapshotCurrency?: string | null;
@@ -547,7 +555,13 @@ export function buildReceiptDataFromComposed(
       baseAmount: payment.planSnapshotCurrency ? (payment.planSnapshotPrice ?? null) : null,
     },
     baseCurrency: payment.planSnapshotCurrency ?? organization.primaryCurrency,
-    voided: payment.receiptVoided ?? false,
+    // RD-159: the payment STATUS is authoritative too. The flag can be lost
+    // (void writes status first, flag second); deriving `voided` from the flag
+    // alone would render an "…-anulado.pdf" WITHOUT the stamp, persist its key
+    // and never regenerate it.
+    voided:
+      payment.receiptVoided === true ||
+      payment.status === PAYMENT_STATUSES.VOIDED,
   });
 }
 

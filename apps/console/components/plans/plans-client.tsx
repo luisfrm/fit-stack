@@ -165,8 +165,9 @@ export function PlansClient({
     );
   };
 
-  const hasTrialPlan = plans.some(p => Number(p.price) === 0);
-  const trialPlanStatus = hasTrialPlan ? "Habilitado" : "No detectado";
+  const freePlanStatus = plans.some((p) => Number(p.price) === 0)
+    ? "Habilitado"
+    : "No detectado";
 
   return (
     <div className="flex flex-col gap-6">
@@ -208,8 +209,8 @@ export function PlansClient({
           />
         )}
         <StatCard
-          title="Esquema Trial"
-          value={trialPlanStatus}
+          title="Esquema Free"
+          value={freePlanStatus}
           icon={<TrendingUp className="text-blue-400 size-5" />}
         />
       </div>

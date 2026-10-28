@@ -129,7 +129,7 @@ export interface ReceiptIssueAttached {
 
 /**
  * Result of one emission. `skipped:true + receiptNumber:null` = no document
- * ($0 trial/free, console only): there is nothing to wait for, it is not a
+ * ($0 free plan, console only): there is nothing to wait for, it is not a
  * "pending" state. `inProgress:true` = another emission owns the claim and
  * has not persisted the number yet: the caller answers "pending", never an
  * error (the sweep resumes the claim if the owner died).
@@ -171,7 +171,7 @@ export interface IssuerProfile<TYear> {
   loadPayment(input: ReceiptIssueInput): Promise<ReceiptIssuePayment | null | undefined>;
   /** Organization that owns the sequence: panel input scoping / payment org. */
   resolveOrgId(payment: ReceiptIssuePayment, input: ReceiptIssueInput): string;
-  /** $0 payments without document (console trial/free; panel never skips). */
+  /** $0 payments without document (console free plan; panel never skips). */
   shouldSkip?(payment: ReceiptIssuePayment): boolean;
   /** Fiscal profile + tax breakdown, BEFORE claiming the row. */
   resolveFiscal(
@@ -312,7 +312,7 @@ export async function issueReceipt<TYear>(
     );
   }
 
-  // Trial/free $0 (console): no document, the series is not burned.
+  // Free plan $0 (console): no document, the series is not burned.
   if (profile.shouldSkip?.(payment)) {
     return { receiptNumber: null, pdfStatus: 'pending', skipped: true };
   }

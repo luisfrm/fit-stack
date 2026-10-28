@@ -5,12 +5,14 @@ import { requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformSubscriptionsRepository } from '../repositories/platform-subscriptions.repository';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformReceiptsReportRepository } from '../repositories/platform-receipts-report.repository';
+import { createPlatformSettingsRepository } from '../repositories/platform-settings.repository';
 import { createPlatformSubscriptionsService } from '../services/platform-subscriptions.service';
 import { createPlatformReceiptsService } from '../services/platform-receipts.service';
 import { createPlatformReceiptsReportService } from '../services/platform-receipts-report.service';
 import { createPlatformReceiptsRepository } from '@workspace/database/repositories/platform-receipts';
 import { createCache } from '../lib/cache';
 import { createR2Service } from '../lib/r2';
+import { exchangeRateErrorResponse, createExchangeRateProvider } from '../lib/exchange-rates';
 import {
   paymentMethodDetailsSchema,
   paymentMethodSchema,
@@ -42,9 +44,7 @@ const updatePaymentStatusEnum = z.enum([
 ]);
 
 const paymentSchema = z.object({
-  amountPaid: z.number().int().nonnegative(),
   currencyPaid: z.string().min(1),
-  exchangeRateApplied: z.string().optional(),
   paymentMethod: paymentMethodSchema,
   paymentMethodDetails: paymentMethodDetailsSchema,
   status: paymentStatusEnum,
@@ -55,7 +55,6 @@ const createSubscriptionSchema = z.object({
   organizationId: z.string().min(1),
   planId: z.number().int().positive(),
   startDate: z.string().optional(),
-  isTrial: z.boolean().default(false),
   payment: paymentSchema,
 });
 
@@ -103,7 +102,18 @@ const receiptsReportQuerySchema = z.object({
 function buildService(c: any) {
   const repo = createPlatformSubscriptionsRepository(c.get('db'));
   const plansRepo = createPlatformPlansRepository(c.get('db'));
-  return { repo, plansRepo, service: createPlatformSubscriptionsService(repo, plansRepo) };
+  return {
+    repo,
+    plansRepo,
+    // The server prices every SaaS payment (plan -> paid and -> primary
+    // currency), so the provider is always wired here.
+    service: createPlatformSubscriptionsService(
+      repo,
+      plansRepo,
+      createPlatformSettingsRepository(c.get('db')),
+      createExchangeRateProvider(c.env),
+    ),
+  };
 }
 
 /** Emission: step 1 where payment is validated (no I/O except DB+queue). */
@@ -133,7 +143,6 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
     const planId = c.req.query('planId') ? Number(c.req.query('planId')) : undefined;
     const organizationId = c.req.query('organizationId');
     const search = c.req.query('search');
-    const isTrial = c.req.query('isTrial') !== undefined ? c.req.query('isTrial') === 'true' : undefined;
     const page = Number(c.req.query('page') || '1');
     const limit = Number(c.req.query('limit') || '20');
 
@@ -148,7 +157,6 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
       status,
       planId,
       organizationId,
-      isTrial,
       search,
       page,
       limit,
@@ -279,6 +287,12 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
         // Session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
+    } catch (err) {
+      // Rate failures are typed (`lib/exchange-rates.ts`): mapped by class
+      // (503), never a leaked 500. Everything else propagates unchanged.
+      const rateFailure = exchangeRateErrorResponse(err);
+      if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
+      throw err;
     } finally {
       await cache.invalidate('platform:subscriptions*');
       await invalidateReceiptsReportCache(cache);
@@ -347,6 +361,10 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
         // Session actor emitting (`issued_by`).
         by: c.get('user')?.id,
       });
+    } catch (err) {
+      const rateFailure = exchangeRateErrorResponse(err);
+      if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
+      throw err;
     } finally {
       await cache.invalidate('platform:subscriptions*');
       await invalidateReceiptsReportCache(cache);
@@ -498,6 +516,10 @@ export const platformSubscriptionRoutes = new Hono<AppEnv>()
         // Actor de sesión que emite (`issued_by`).
         by: c.get('user')?.id,
       });
+    } catch (err) {
+      const rateFailure = exchangeRateErrorResponse(err);
+      if (rateFailure) return c.json(rateFailure.body, rateFailure.status);
+      throw err;
     } finally {
       await cache.invalidate('platform:subscriptions*');
       await invalidateReceiptsReportCache(cache);

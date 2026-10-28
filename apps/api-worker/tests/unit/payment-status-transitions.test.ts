@@ -52,6 +52,7 @@ function buildPlatformService(payment: { status: string; subscriptionId?: number
   const service = createPlatformSubscriptionsService(
     repo as unknown as PlatformSubscriptionsRepository,
     {} as ReturnType<typeof createPlatformPlansRepository>,
+    {} as never,
   );
   const receipts: PlatformReceiptHooks = {
     assignPlatformReceiptNumber: vi.fn(async () => ({

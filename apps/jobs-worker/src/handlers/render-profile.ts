@@ -41,6 +41,7 @@ import {
   type ReceiptData,
   type ReceiptRenderEvent,
 } from '@workspace/shared';
+import { PAYMENT_STATUSES } from '@workspace/shared/constants';
 
 /**
  * Bindings the shared core needs. The database is injected per profile (the
@@ -71,6 +72,12 @@ export interface RenderPaymentRow {
   receiptVoidedPdfKey: string | null;
   receiptNotifiedAt: Date | null;
   receiptIssuedAt: Date | null;
+  /**
+   * Payment status (`validated` | `voided` | …). The void writes the status
+   * first and `receipt_voided` second, so step 2 must read BOTH: a lost flag
+   * still means a voided receipt whose emission PDF is not deliverable.
+   */
+  status: string;
 }
 
 /** Minimal composed shape the core needs from both issuers' rows. */
@@ -208,10 +215,16 @@ export async function renderReceipt<TRows extends RenderRows>(
     return 'already-done';
   }
   const { payment } = composed;
+  // RD-159: the payment STATUS is the source of truth, not only the flag (the
+  // void writes `status = 'voided'` first and `receipt_voided` second). With
+  // either signal the receipt is voided: its deliverable is the sealed PDF,
+  // never the emission one.
+  const isVoided =
+    payment.receiptVoided || payment.status === PAYMENT_STATUSES.VOIDED;
   // A voided receipt is normally already notified, so the mark cannot close
   // the step: what is missing is the sealed PDF — real pending work, not a
   // duplicate.
-  const voidedPdfPending = payment.receiptVoided && !payment.receiptVoidedPdfKey;
+  const voidedPdfPending = isVoided && !payment.receiptVoidedPdfKey;
   // Already notified: work finished (avoids re-render and re-send).
   if (payment.receiptNotifiedAt && !voidedPdfPending) {
     return 'already-done';
@@ -232,8 +245,10 @@ export async function renderReceipt<TRows extends RenderRows>(
   let didWork = false;
 
   // ANULADO: own artifact and terminal. It never notifies (the valid receipt
-  // was already sent) and its only deliverable is this PDF.
-  if (payment.receiptVoided) {
+  // was already sent) and its only deliverable is this PDF. `isVoided` also
+  // covers the void whose `receipt_voided` write was lost: rendering the
+  // emission PDF for it would serve an unstamped document of a voided charge.
+  if (isVoided) {
     if (!payment.receiptVoidedPdfKey) {
       const rendered = await renderAndStore(profile, env, composed, persistedNumber, 'voided');
       didWork = rendered || didWork;

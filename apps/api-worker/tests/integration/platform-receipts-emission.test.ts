@@ -86,7 +86,6 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -105,9 +104,7 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(-60),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -270,17 +267,14 @@ describe.skipIf(skipReason !== null)('Platform receipts emission', () => {
 
   it('T5 plan gratis $0: SKIP sin quemar número (pre_system terminal)', async () => {
     resetSpies(admin.client);
-    // RD-117: a price-0 plan (free), NOT a trial: trials are rejected with
-    // `400 TRIAL_NOT_AVAILABLE`. The free path books a validated `$0` payment
-    // with `payment_method = 'free'`, which SKIPs emission like a trial did.
+    // A price-0 plan is the free path: it books a validated `$0` payment with
+    // `payment_method = 'free'`, which SKIPs emission (never burns a number).
     const freePlan = await createPlatformPlan(0);
     const res = await admin.client.post('/api/platform/subscriptions', {
       organizationId: tenant.organization.id,
       planId: freePlan.id,
       startDate: isoDate(0),
-      isTrial: false,
       payment: {
-        amountPaid: 0,
         currencyPaid: 'USD',
         paymentMethod: 'free',
         paymentMethodDetails: [],

@@ -446,6 +446,12 @@ export function createReceiptsRepository(db: Db) {
      *
      * Original (`receipt_pdf_key`) remains intact: voiding creates a
      * NEW artifact, never overwriting the issued one.
+     *
+     * NOT gated on `receipt_voided`: the render path (RD-159) treats
+     * `status = 'voided'` as voided too, and in the lost-flag window the
+     * composer already stamps the artifact. Requiring the flag here would match
+     * 0 rows in that window, never persist the key and re-render on every
+     * sweep delivery while the read contract kept answering `pending`.
      */
     async completeVoidedReceiptPdf(
       paymentId: number,

@@ -1,13 +1,13 @@
 # Chat — Pricing por Créditos (Fit-Stack)
 
-> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`/`TRIAL`, si no día 1 UTC. Ver también [`chat-infrastructure.md`](./chat-infrastructure.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`chat-implementation.md`](./archive/chat-implementation.md) (⏸ DEPRECATED).
+> **Fuente vigente (21 ago 2026).** 1 crédito = 1K tokens ×1.0 para `@cf/zai-org/glm-4.7-flash` y `openrouter/free`. Reseteo mensual **por ciclo de suscripción** si `ACTIVE`, si no día 1 UTC (`price = 0` = plan free con ciclo propio; no hay trials). Ver también [`chat-infrastructure.md`](./chat-infrastructure.md) (router/ledger) y `AGENTS.md` § Features & Free Tier. Reemplaza a [`chat-implementation.md`](./archive/chat-implementation.md) (⏸ DEPRECATED).
 
 ## Unidad y fórmula
 
 - `1 crédito = ceil(tokens / 1000)` con `creditsFromUsage({ prompt_tokens, completion_tokens })` y `estimateCreditsFromMessages(messages, maxTokens)` — ambos en `packages/shared/src/ai.ts` (`AI_CREDIT_CONSTANTS.tokensPerCredit = 1_000`, `creditMultiplier = 1.0`).
 - Estimado pre-flight: `ceil((chars/4 + maxTokens)/1000)` (mínimo 1). `chars/4` ≈ tokens de entrada; `maxTokens` es el `max_output_tokens` solicitado (clamp ver § Límites).
 - Multiplicador por modelo = 1.0 para los dos modelos iniciales. Si se habilita otro modelo, se añade entrada `pricing` en `shared/ai.ts` sin tocar el ledger (`ai_usage`).
-- Ciclo: `features.service.getCreditPeriodStart(orgId)` → si hay sub `ACTIVE`/`TRIAL` usa `startOfSubscriptionPeriod(currentPeriodEnd, duration)`; si no, `startOfMonthUtc(now)` (día 1 00:00 UTC, reset perezoso sin cron). La DB es la fuente de verdad, no Redis.
+- Ciclo: `features.service.getCreditPeriodStart(orgId)` → si hay sub `ACTIVE` usa `startOfSubscriptionPeriod(currentPeriodEnd, duration)`; si no (sin sub, o sub fuera de acceso; el free tier sin suscripción no tiene ciclo), `startOfMonthUtc(now)` (día 1 00:00 UTC, reset perezoso sin cron). No existe estado `trial`. La DB es la fuente de verdad, no Redis.
 
 ## Coste real (Workers AI, GLM-4.7-Flash)
 

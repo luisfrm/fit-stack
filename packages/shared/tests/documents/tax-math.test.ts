@@ -7,9 +7,12 @@ import { describe, expect, it } from 'vitest';
 import {
   computeInclusiveTaxes,
   computeTaxes,
+  isTaxApplicable,
   roundCents,
 } from '../../src/documents/tax-math';
 import { resolveFiscalProfile } from '../../src/documents/fiscal-profile';
+import { PAYMENT_CURRENCY_NOT_VES } from '../../src/constants';
+import type { taxCondition } from '../../src/constants';
 
 /** Impuestos VE explícitos (el perfil ya los apaga sin declaración formal). */
 const VE_TAXES = [
@@ -22,6 +25,46 @@ describe('roundCents', () => {
     expect(roundCents(533.28)).toBe(533);
     expect(roundCents(533.5)).toBe(534);
     expect(roundCents(800)).toBe(800);
+  });
+});
+
+describe('isTaxApplicable', () => {
+  it('IGTF uses the shared condition constant: foreign currency applies, VES does not', () => {
+    const igft = {
+      name: 'IGTF',
+      rate: 0.03,
+      enabled: true,
+      condition: PAYMENT_CURRENCY_NOT_VES,
+    };
+    expect(isTaxApplicable(igft, 'USD')).toBe(true);
+    expect(isTaxApplicable(igft, 'VES')).toBe(false);
+    // Sin moneda informada el condicional no aplica (fail-closed).
+    expect(isTaxApplicable(igft)).toBe(false);
+  });
+
+  it('unconditional taxes always apply while enabled', () => {
+    expect(isTaxApplicable({ name: 'IVA', rate: 0.16, enabled: true }, 'VES')).toBe(true);
+    expect(isTaxApplicable({ name: 'IVA', rate: 0.16, enabled: false }, 'VES')).toBe(false);
+  });
+
+  it('an unknown condition throws instead of silently skipping or applying the tax', () => {
+    const unknown = {
+      name: 'X',
+      rate: 0.1,
+      enabled: true,
+      condition: 'payment_currency !== "EUR"' as unknown as taxCondition,
+    };
+    expect(() => isTaxApplicable(unknown, 'USD')).toThrow('Unknown tax condition');
+  });
+
+  it('a disabled tax is never applicable, even with an unknown condition', () => {
+    const unknown = {
+      name: 'X',
+      rate: 0.1,
+      enabled: false,
+      condition: 'payment_currency !== "EUR"' as unknown as taxCondition,
+    };
+    expect(isTaxApplicable(unknown, 'USD')).toBe(false);
   });
 });
 
@@ -70,7 +113,7 @@ describe('computeTaxes', () => {
     expect(computeTaxes(100, taxes, { currencyPaid: 'USD' }).taxDetails).toEqual([]);
   });
 
-  it('trial/free de $0: sin desglose sin sentido', () => {
+  it('plan free de $0: sin desglose sin sentido', () => {
     const taxes = VE_TAXES;
     expect(computeTaxes(0, taxes, { currencyPaid: 'USD' })).toEqual({
       subtotal: 0,

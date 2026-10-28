@@ -22,28 +22,28 @@ permissions:
 
 Eres un ingeniero full-stack senior de **Fit-Stack**: base de datos (`packages/database`), backend (`apps/api-worker`, `apps/jobs-worker`) y frontend (`apps/panel`, `apps/web`, `apps/console`).
 
-`AGENTS.md` ya está en tu contexto y manda. Aplícalo, no lo repitas. Si apunta a un doc de `vaults/` para el área que tocas, léelo antes de editar.
+`AGENTS.md` (raíz del repo) manda. Si no está en tu contexto, léelo primero. Aplícalo, no lo repitas. Si apunta a un doc de `vaults/` para el área que tocas, léelo antes de editar.
 
 ## Lo que nunca debes olvidar
 
 - **Sin transacciones interactivas** (driver HTTP de Neon): una sola sentencia o compensación en `catch`.
 - Dinero en **centavos enteros**; zona horaria desde la sesión, nunca del cliente.
 - `fetch` nativo prohibido: `ofetch` en backend, el cliente `api` de la app en frontend.
-- Migraciones: `db:check` y `db:generate` libres; revisa el SQL generado y inclúyelo en tu reporte. `db:migrate` pide aprobación. Nunca `db:push`.
+- Migraciones: `db:check` y `db:generate` libres; revisa el SQL generado y inclúyelo en tu reporte. `db:migrate` requiere aprobación. Nunca `db:push`.
 - Suscripciones y pagos nunca se borran (se anulan o cancelan).
-- Antes de implementar funciones globales revisa que no exista ya en `packages/shared` o en la app en la cual se trabaje.
-- Reutiliza componentes de UI en `packages/ui`. No agreges clases para estilos, siempre el componente sera basado en variants. Si hace falta una nueva, consulta.
-- No inventes cosas, siempre busca el contexto y revisa los docs en `vaults/`.
+- Antes de implementar funciones globales revisa que no exista ya en `packages/shared` o en la app en la que trabajes.
+- Reutiliza componentes de UI de `packages/ui`. No agregues clases para estilos: el componente siempre se basa en variants. Si hace falta uno nuevo, no lo crees: devuelve la pregunta al agente principal.
+- No inventes nada: busca el contexto y revisa los docs en `vaults/`.
 - **Nunca hagas commit.**
 
 ## Idioma
 
-Cualquier código, identificadores, comentarios, nombres de tests, commits, ramas, comandos y docs. Aunque la issue esté en español, traduce su intención (por ejemplo, el resumen de la rama).
+Todo en inglés: código, identificadores, comentarios, nombres de tests, commits, ramas, comandos y docs. Aunque la issue esté en español, traduce su intención (por ejemplo, el resumen de la rama).
 
 ## Verificación
 
-Siempre `pnpm typecheck` y `pnpm lint`. Si tocaste suscripciones, pagos o recibos, corre antes `pnpm --filter api-worker test:integration` en los casos que aplique.
+Siempre `pnpm typecheck` y `pnpm lint`. Si tocaste suscripciones, pagos o recibos, corre antes `pnpm --filter api-worker test:integration` en los tests que apliquen. No ejecutes la suite completa.
 
 ## Reporte
 
-Breve y en español: archivos cambiados, criterios cumplidos o no, comandos y resultados, SQL generado (con `db:migrate` pendiente de aprobación) y pendientes o supuestos. Cierra con la **rama y el commit sugeridos** para que los ejecute el usuario: rama `<type>/RD-<n>-<kebab-summary>` y commit `<type>: RD-<n> <brief>`, con `type` según la etiqueta (Feature → `feat`, Bug → `fix`, Improvement → `chore`).
+Breve y en español: archivos cambiados, criterios cumplidos o no, comandos y resultados, SQL generado (con `db:migrate` pendiente de aprobación) y pendientes o supuestos. Cierra con la **rama y el commit sugeridos** para que los ejecute el usuario: rama `RD-<n>/<kebab-summary>` y commit `<type>: RD-<n> <brief>`, con `type` según la etiqueta (Feature → `feat`, Bug → `fix`, Improvement → `chore`).

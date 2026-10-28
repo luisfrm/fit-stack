@@ -31,6 +31,6 @@ Que el control de acceso de recepción registre entradas aunque el servidor no r
 ## 5. Analíticas SaaS (Console)
 
 - **Gráfico de ingresos**: serie de 12 meses sobre el endpoint de revenue ya existente (hoy solo hay una mini-lista de 6 meses en el panel lateral).
-- **Normalización multi-moneda real**: si algún día hay planes SaaS en monedas distintas, llevar todo a una moneda base con tasas históricas. Hoy los planes están en USD y el revenue suma el precio del plan.
+- **Cupones y descuentos**: aplicar un descuento (hasta el 100 %) sobre el precio del plan sin tocar el catálogo ni inventar un importe por cliente. Requiere una entidad de cupón, su consumo por pago y su reflejo en `platform_amount`; nunca un override de precio en el body.
 - **Agregados en el servidor**: mover KPIs y filtros de la página de organizaciones al backend cuando el volumen lo pida.
 - **Alertas de créditos** al 80 % y 100 % por correo.

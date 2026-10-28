@@ -46,7 +46,6 @@ describe.skipIf(skipReason !== null)('Platform AI usage read', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         ai_chat: { enabled: true, limits: { ai_credits_monthly: 1500 } },
@@ -58,9 +57,7 @@ describe.skipIf(skipReason !== null)('Platform AI usage read', () => {
       organizationId: orgId,
       planId: planRes.body.id,
       startDate: isoDate(0),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

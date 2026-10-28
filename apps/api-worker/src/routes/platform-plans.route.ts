@@ -5,7 +5,7 @@ import { requirePlatformPermission } from '../lib/route-handler';
 import { createPlatformPlansRepository } from '../repositories/platform-plans.repository';
 import { createPlatformPlansService } from '../services/platform-plans.service';
 import { createCache } from '../lib/cache';
-import { FEATURE_CATALOG } from '@workspace/shared';
+import { FEATURE_CATALOG, API_ERROR_CODES } from '@workspace/shared';
 import type { AppEnv } from '../lib/env';
 
 const featureLimitsSchema = z.record(z.string(), z.number().int().min(0));
@@ -33,9 +33,33 @@ const platformPlanSchema = z.object({
   durationValue: z.number().int().min(1).optional(),
   durationUnit: z.enum(['day', 'week', 'month', 'year']).optional(),
   isActive: z.boolean().default(true),
-  trialDays: z.number().int().min(0).optional(),
   features: featuresSchema.nullable().optional(),
 });
+
+/**
+ * The plan currency freezes the rate used to price every payment of the plan,
+ * so it cannot change once a payment exists: historical snapshots keep their
+ * own currency but the plan would start quoting a different one silently.
+ * Answers `409 PLAN_CURRENCY_IMMUTABLE` by `code`, never a generic 400.
+ */
+async function planCurrencyError(
+  repo: ReturnType<typeof createPlatformPlansRepository>,
+  planId: number,
+  currency: string | undefined,
+): Promise<Response | null> {
+  if (!currency) return null;
+  const plan = await repo.findById(planId);
+  if (!plan || plan.currency === currency) return null;
+  const payments = await repo.countPaymentsByPlan(planId);
+  if (payments === 0) return null;
+  return new Response(
+    JSON.stringify({
+      error: 'La moneda del plan no se puede cambiar porque ya tiene pagos registrados.',
+      code: API_ERROR_CODES.PLAN_CURRENCY_IMMUTABLE,
+    }),
+    { status: 409, headers: { 'content-type': 'application/json' } },
+  );
+}
 
 export const platformPlanRoutes = new Hono<AppEnv>()
   // GET /api/platform/plans
@@ -107,6 +131,9 @@ export const platformPlanRoutes = new Hono<AppEnv>()
     const repo = createPlatformPlansRepository(c.get('db'));
     const service = createPlatformPlansService(repo);
 
+    const currencyError = await planCurrencyError(repo, id, data.currency);
+    if (currencyError) return currencyError;
+
     const updatedPlan = await service.updatePlan(id, data as any);
     await cache.invalidate('platform:plans*');
     await cache.invalidate('org:*:features');
@@ -121,6 +148,10 @@ export const platformPlanRoutes = new Hono<AppEnv>()
 
     const repo = createPlatformPlansRepository(c.get('db'));
     const service = createPlatformPlansService(repo);
+
+    // Same guard as PUT: the PATCH alias must not bypass it.
+    const currencyError = await planCurrencyError(repo, id, data.currency);
+    if (currencyError) return currencyError;
 
     const updatedPlan = await service.updatePlan(id, data as any);
     await cache.invalidate('platform:plans*');

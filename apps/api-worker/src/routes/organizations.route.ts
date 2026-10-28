@@ -198,7 +198,11 @@ export const organizationRoutes = new Hono<AppEnv>()
 
     const platformSubsRepo = createPlatformSubscriptionsRepository(c.get('db'));
     const platformPlansRepo = createPlatformPlansRepository(c.get('db'));
-    const platformSubsService = createPlatformSubscriptionsService(platformSubsRepo, platformPlansRepo);
+    const platformSubsService = createPlatformSubscriptionsService(
+      platformSubsRepo,
+      platformPlansRepo,
+      createPlatformSettingsRepository(c.get('db')),
+    );
 
     const status = await platformSubsService.getOrganizationStatus(activeOrganizationId);
     const data = { status };
@@ -382,7 +386,12 @@ export const organizationRoutes = new Hono<AppEnv>()
       const repo = createPlatformSubscriptionsRepository(c.get('db'));
       const plansRepo = createPlatformPlansRepository(c.get('db'));
       const rateProvider = createExchangeRateProvider(c.env);
-      const service = createPlatformSubscriptionsService(repo, plansRepo, rateProvider);
+      const service = createPlatformSubscriptionsService(
+        repo,
+        plansRepo,
+        createPlatformSettingsRepository(c.get('db')),
+        rateProvider,
+      );
 
       const sub = await repo.findActiveByOrganization(activeOrganizationId);
       if (!sub) return c.json({ error: 'Suscripción no encontrada' }, 404);

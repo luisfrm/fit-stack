@@ -169,7 +169,7 @@ export function PlatformPlanCard({ plan, onUpdate, organizationCount, settings, 
         <div className="flex flex-col items-end gap-1.5">
           {isZeroPrice && (
             <Badge variant="info" size="sm" className="uppercase tracking-widest">
-              Precio 0 / Trial
+              Precio 0 / Free
             </Badge>
           )}
           <div className={cn(

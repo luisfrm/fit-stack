@@ -76,7 +76,6 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       durationValue: 1,
       durationUnit: 'month',
       isActive: true,
-      trialDays: 0,
       features: {
         panel: { enabled: true },
         members_portal: { enabled: true, limits: { member_seats: 5 } },
@@ -238,9 +237,7 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       organizationId: organization.id,
       planId: plan.id,
       startDate: isoDate(-60),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],
@@ -293,9 +290,7 @@ describe.skipIf(skipReason !== null)('Receipt claim sweep', () => {
       organizationId: tenant.organization.id,
       planId: plan.id,
       startDate: isoDate(-60),
-      isTrial: false,
       payment: {
-        amountPaid: 5000,
         currencyPaid: 'USD',
         paymentMethod: 'zelle',
         paymentMethodDetails: [],

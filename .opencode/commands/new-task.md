@@ -1,7 +1,7 @@
 ---
 description: Crea una nueva tarea en Linear.
 agent: build
-subagent: planner
+subagent: pm
 model: opencode-go/deepseek-v4.1-flash
 ---
 

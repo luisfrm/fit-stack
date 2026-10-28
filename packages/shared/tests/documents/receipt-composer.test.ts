@@ -338,6 +338,7 @@ function basePanelRows(): PanelReceiptComposedRows {
       documentType: 'receipt',
       receiptIssuedAt: new Date('2026-09-11T10:00:00.000Z'),
       receiptVoided: false,
+      status: 'validated',
       planSnapshotName: 'Plan Mensual',
       planSnapshotCurrency: 'VES',
       emitterSnapshot: null,
@@ -379,6 +380,7 @@ function basePlatformRows(): PlatformReceiptComposedRows {
       receiptNumber: 'FS-0000042',
       receiptIssuedAt: new Date('2026-09-15T12:00:00.000Z'),
       receiptVoided: false,
+      status: 'validated',
       planSnapshotName: 'Plan SaaS',
       planSnapshotCurrency: 'USD',
       emitterSnapshot: null,
@@ -472,6 +474,21 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
     expectPanelParity(rows);
   });
 
+  /**
+   * RD-159: the void writes `status = 'voided'` first and `receipt_voided`
+   * second. If the second write is lost, deriving `voided` from the flag alone
+   * would render an "…-anulado.pdf" WITHOUT the stamp and persist its key
+   * (never regenerated). The status is authoritative too.
+   */
+  it('status voided with a lost flag still marks the receipt as voided', () => {
+    const rows = basePanelRows();
+    rows.payment = { ...rows.payment, status: 'voided', receiptVoided: false };
+
+    const receipt = composePanelReceipt(rows);
+
+    expect(receipt.voided).toBe(true);
+  });
+
   it('frozen emitter snapshot wins over the edited live organization', () => {
     const rows = basePanelRows();
     rows.payment = {
@@ -513,7 +530,7 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
     expectPanelParity(rows);
   });
 
-  it('trial $0 without breakdown composes zero amounts', () => {
+  it('free $0 without breakdown composes zero amounts', () => {
     const rows = basePanelRows();
     rows.payment = {
       ...rows.payment,
@@ -521,7 +538,7 @@ describe('composePanelReceipt (parity with the frozen legacy path)', () => {
       subtotal: 0,
       taxTotal: 0,
       taxDetails: [],
-      paymentMethod: 'trial',
+      paymentMethod: 'free',
       paymentMethodDetails: undefined,
     };
     expectPanelParity(rows);
@@ -638,6 +655,16 @@ describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
     expectPlatformParity(rows);
   });
 
+  /** RD-159: same rule for the SaaS issuer (`status` + flag, not flag alone). */
+  it('status voided with a lost flag still marks the SaaS receipt as voided', () => {
+    const rows = basePlatformRows();
+    rows.payment = { ...rows.payment, status: 'voided', receiptVoided: false };
+
+    const receipt = composePlatformReceipt(rows);
+
+    expect(receipt.voided).toBe(true);
+  });
+
   it('frozen emitter snapshot wins over the edited live receptor', () => {
     const rows = basePlatformRows();
     rows.payment = {
@@ -662,7 +689,7 @@ describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
     expectPlatformParity(rows);
   });
 
-  it('trial $0 without breakdown composes zero amounts', () => {
+  it('free $0 without breakdown composes zero amounts', () => {
     const rows = basePlatformRows();
     rows.payment = {
       ...rows.payment,
@@ -670,7 +697,7 @@ describe('composePlatformReceipt (parity with the frozen legacy path)', () => {
       subtotal: 0,
       taxTotal: 0,
       taxDetails: [],
-      paymentMethod: 'trial',
+      paymentMethod: 'free',
       paymentMethodDetails: undefined,
     };
     expectPlatformParity(rows);

@@ -7,7 +7,6 @@ import { es } from "date-fns/locale";
 interface ISubscriptionLite {
   status: string;
   planName?: string | null;
-  isTrial?: boolean;
   currentPeriodEnd: string | Date;
 }
 
@@ -21,7 +20,6 @@ const STATUS_VARIANTS: Record<
   "success" | "warning" | "destructive" | "info" | "default"
 > = {
   active: "success",
-  trial: "info",
   past_due: "warning",
   read_only: "default",
   suspended: "destructive",
@@ -62,11 +60,6 @@ export function SubscriptionCell({ subscription, isLoading }: SubscriptionCellPr
         >
           {subscription.planName || "Plan Personalizado"}
         </Badge>
-        {subscription.isTrial && (
-          <Badge variant="info" className="uppercase text-[9px] font-black tracking-tighter h-5">
-            Prueba
-          </Badge>
-        )}
       </div>
       <Text size="xs" className="text-slate-500 font-medium">
         {isExpired ? "Expiró: " : "Expira: "}
