@@ -5,7 +5,9 @@ import { requireAuth, requireOrgPermission, requireOrgTimezone } from '../lib/ro
 import {
   PERMISSION_MODULES as PM,
   PERMISSION_ACTIONS as PA,
-  DEFAULT_MEMBER_VALUES
+  DEFAULT_MEMBER_VALUES,
+  canAssignRole,
+  type OrgRole,
 } from '@workspace/shared';
 import { createMembersRepository } from '../repositories/members.repository';
 import { createUsersRepository } from '../repositories/users.repository';
@@ -33,6 +35,25 @@ const memberSchema = z.object({
   isActive: z.boolean().optional(),
   sendInvite: z.boolean().optional(),
 });
+
+/**
+ * Anti-escalation for the role field (single source: `canAssignRole`).
+ *
+ * The actor's org role comes from `c.get('orgRole')` (set from the
+ * `customSession` payload), never from the request. Without this guard a
+ * cashier could invite an existing user as `owner`, because the invited role
+ * is taken from the body.
+ */
+function roleAssignmentViolation(
+  actorRole: string | null | undefined,
+  targetRole: OrgRole | undefined,
+): { error: string; code: string } | null {
+  if (!targetRole) return null;
+  if (!actorRole || !canAssignRole(actorRole as OrgRole, targetRole)) {
+    return { error: 'No puedes asignar ese rol', code: 'ROLE_ASSIGNMENT_NOT_ALLOWED' };
+  }
+  return null;
+}
 
 export const memberRoutes = new Hono<AppEnv>()
   // GET /api/members
@@ -244,6 +265,9 @@ export const memberRoutes = new Hono<AppEnv>()
     );
     if (violation) return c.json(violation, 400);
 
+    const roleViolation = roleAssignmentViolation(c.get('orgRole'), data.role);
+    if (roleViolation) return c.json(roleViolation, 403);
+
     // Portal seat guard: only client invitations (role member)
     if (sendInvite && data.role === 'member') {
       const featuresService = createFeaturesService(
@@ -299,6 +323,9 @@ export const memberRoutes = new Hono<AppEnv>()
     if (!existing) {
       return c.json({ error: 'Miembro no encontrado' }, 404);
     }
+
+    const roleViolation = roleAssignmentViolation(c.get('orgRole'), data.role);
+    if (roleViolation) return c.json(roleViolation, 403);
 
     // RD-148: the identification prefix must belong to the org country.
     const violation = documentIdTypeViolation(

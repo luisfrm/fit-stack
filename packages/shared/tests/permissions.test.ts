@@ -28,6 +28,10 @@ describe('can(role, module, action)', () => {
       expect(can(ORG_ROLES.OWNER, 'members', 'delete')).toBe(true);
     });
 
+    it('can invite an existing user', () => {
+      expect(can(ORG_ROLES.OWNER, 'invitation', 'create')).toBe(true);
+    });
+
     it('can CRUD plans', () => {
       expect(can(ORG_ROLES.OWNER, 'plans', 'create')).toBe(true);
       expect(can(ORG_ROLES.OWNER, 'plans', 'delete')).toBe(true);
@@ -62,6 +66,10 @@ describe('can(role, module, action)', () => {
       expect(can(ORG_ROLES.MANAGER, 'staff', 'delete')).toBe(false);
     });
 
+    it('can invite an existing user into the organization', () => {
+      expect(can(ORG_ROLES.MANAGER, 'invitation', 'create')).toBe(true);
+    });
+
     it('can access settings', () => {
       expect(can(ORG_ROLES.MANAGER, 'settings', 'read')).toBe(true);
       expect(can(ORG_ROLES.MANAGER, 'settings', 'update')).toBe(true);
@@ -83,6 +91,10 @@ describe('can(role, module, action)', () => {
     it('CANNOT access staff module', () => {
       expect(can(ORG_ROLES.CASHIER, 'staff', 'read')).toBe(false);
       expect(can(ORG_ROLES.CASHIER, 'staff', 'create')).toBe(false);
+    });
+
+    it('can invite an existing user (mirrors members:create)', () => {
+      expect(can(ORG_ROLES.CASHIER, 'invitation', 'create')).toBe(true);
     });
 
     it('can read settings but NOT update', () => {
@@ -118,6 +130,10 @@ describe('can(role, module, action)', () => {
     it('CANNOT access settings', () => {
       expect(can(ORG_ROLES.COACH, 'settings', 'read')).toBe(false);
     });
+
+    it('CANNOT invite users', () => {
+      expect(can(ORG_ROLES.COACH, 'invitation', 'create')).toBe(false);
+    });
   });
 
   describe('Member — minimal access', () => {
@@ -139,6 +155,10 @@ describe('can(role, module, action)', () => {
 
     it('CANNOT access settings', () => {
       expect(can(ORG_ROLES.MEMBER, 'settings', 'read')).toBe(false);
+    });
+
+    it('CANNOT invite users', () => {
+      expect(can(ORG_ROLES.MEMBER, 'invitation', 'create')).toBe(false);
     });
   });
 });

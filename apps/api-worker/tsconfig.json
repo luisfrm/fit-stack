@@ -6,6 +6,11 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types"],
+    // Bundled by the Workers runtime: no declarations are consumed. Required
+    // because better-auth 1.7 infers its `Auth` type through zod v4, which
+    // cannot be named portably in a declaration file (TS2742).
+    "declaration": false,
+    "declarationMap": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
