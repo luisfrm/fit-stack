@@ -109,7 +109,7 @@ errores de validación.
 
 ## Dependencias
 
-- `better-auth` ^1.5.5
+- `better-auth` ^1.7.14
 - `ofetch` (cliente HTTP)
 - `@workspace/shared` (tipos, constantes y matriz de permisos)
 - `next` (peer dependency: `next/headers`)
