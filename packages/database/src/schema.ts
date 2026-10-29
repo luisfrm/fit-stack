@@ -42,6 +42,9 @@ export const session = pgTable('session', {
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
   activeOrganizationId: text('active_organization_id'),
+  // Written by the better-auth `admin` plugin when a platform admin impersonates
+  // a user. Required by the plugin's session model (better-auth >= 1.7).
+  impersonatedBy: text('impersonated_by'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -126,6 +129,9 @@ export const invitation = pgTable('invitation', {
   inviterId: text('inviter_id')
     .notNull()
     .references(() => user.id, { onDelete: 'cascade' }),
+  // Set by the better-auth `organization` plugin on every invitation
+  // (required by its invitation model since better-auth 1.7).
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ── B2B PLATFORM BILLING ──
