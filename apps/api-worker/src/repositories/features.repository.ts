@@ -82,7 +82,6 @@ export function createFeaturesRepository(db: Db) {
           periodStart,
           credits: 0,
           bonusCredits: delta,
-          count: 0,
         })
         .onConflictDoUpdate({
           target: [aiUsage.organizationId, aiUsage.periodType, aiUsage.periodStart],
@@ -114,7 +113,6 @@ export function createFeaturesRepository(db: Db) {
             periodType: 'monthly',
             periodStart,
             credits: delta,
-            count: 0,
           })
           .onConflictDoUpdate({
             target: [aiUsage.organizationId, aiUsage.periodType, aiUsage.periodStart],
@@ -150,7 +148,6 @@ export function createFeaturesRepository(db: Db) {
           periodType: 'monthly',
           periodStart,
           credits: delta,
-          count: 0,
         })
         .onConflictDoUpdate({
           target: [aiUsage.organizationId, aiUsage.periodType, aiUsage.periodStart],
@@ -172,7 +169,6 @@ export function createFeaturesRepository(db: Db) {
           periodType: 'monthly',
           periodStart,
           credits: delta,
-          count: 0,
         })
         .onConflictDoUpdate({
           target: [aiUsage.organizationId, aiUsage.periodType, aiUsage.periodStart],
@@ -183,21 +179,6 @@ export function createFeaturesRepository(db: Db) {
         })
         .returning({ credits: aiUsage.credits });
       return row?.credits ?? delta;
-    },
-
-    // Legacy: maintain compatibility with older tests reading count (not used in production)
-    async getLegacyCounts(orgId: string, periodStart: Date): Promise<number> {
-      const [row] = await db
-        .select({ count: aiUsage.count })
-        .from(aiUsage)
-        .where(
-          and(
-            eq(aiUsage.organizationId, orgId),
-            eq(aiUsage.periodType, 'monthly'),
-            eq(aiUsage.periodStart, periodStart),
-          ),
-        );
-      return row?.count ?? 0;
     },
 
     /**

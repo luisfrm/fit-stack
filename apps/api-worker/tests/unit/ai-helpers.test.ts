@@ -22,7 +22,6 @@ function mockCache(store: Record<string, unknown> = {}) {
     set: vi.fn(async () => {}),
     invalidate: vi.fn(async () => {}),
     invalidateExact: vi.fn(async () => {}),
-    increment: vi.fn(async () => null),
   };
 }
 

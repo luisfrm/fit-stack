@@ -232,6 +232,13 @@
       "when": 1793250468526,
       "tag": "0032_dry_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793313045076,
+      "tag": "0033_nosy_pixie",
+      "breakpoints": true
     }
   ]
 }

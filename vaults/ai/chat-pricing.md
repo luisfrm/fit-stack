@@ -39,7 +39,7 @@ Propuestos (sin implementar compra): **1.000cr / $1.20**, **3.000cr / $3.00**, *
 
 - Pre-flight: `getAiQuota(orgId)` → `{ monthly: { used, limit }, remaining, disabled, periodStart }`. `estimated = estimateCreditsFromMessages(messages, maxTokens)`. Si `remaining < estimated` → **429 `{ code: 'AI_QUOTA_EXCEEDED', limits }`**.
 - Post-flight: `ctx.waitUntil(settleAiCredits(periodStart, actualCredits))` descuenta el uso **real** reportado por el provider vía `stream_options: { include_usage: true }` (`creditsFromUsage(usage)`). `consumeAiCredits` solo valida, `settleAiCredits` hace `INSERT … ON CONFLICT DO UPDATE credits += actual` atómico.
-- Compat: `consumeAiMessage` (3cr) solo para tests; `cache.increment` existe pero no se usa — la DB es fuente de verdad.
+- Sin contador en cache: la DB es la única fuente de verdad y el ledger completo.
 - Headers: `X-Ai-Credits-Used` / `X-Ai-Credits-Limit` / `X-Ai-Credits-Remaining` (vacío si `limit 0`). `GET /api/ai/usage` retorna `{ monthly: { used, limit }, remaining: number|null, disabled, periodStart }` sin alias. `limit 0` = ilimitado.
 - Gating: `requireFeature('ai_chat')` antes de `ai_chat` → 403 `FEATURE_NOT_AVAILABLE` si la feature está deshabilitada; luego valida cuota.
 

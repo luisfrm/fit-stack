@@ -324,7 +324,6 @@ export const aiUsage = pgTable(
     periodStart: date('period_start', { mode: 'date' }).notNull(),
     credits: integer('credits').notNull().default(0),
     bonusCredits: integer('bonus_credits').notNull().default(0),
-    count: integer('count').notNull().default(0), // @deprecated legacy messages (kept for compatibility)
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
