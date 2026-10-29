@@ -63,6 +63,12 @@ app.use('*', async (c, next) => {
     // The complete active org object (timezone, branding, etc.) is a sibling
     // field on the session record, NOT inside `session.session`.
     c.set('org', (session as any)?.activeOrganization ?? null);
+    // `member` comes from the `customSession` plugin; it never lives inside
+    // `session.session`, so anti-escalation reads it here.
+    c.set(
+      'orgRole',
+      (session as { member?: { role?: string } | null }).member?.role ?? null,
+    );
   }
 
   await next();
