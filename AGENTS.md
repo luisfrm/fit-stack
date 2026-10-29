@@ -37,6 +37,10 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 - **Packages**: `auth` (sessions + shared HTTP client + org/platform hooks), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
 - **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `knowledge-base-rag/`, the RAG chat corpus written for gym owners). Backlog/pending work lives in Linear (project «Fit Stack»); product roadmap in [`docs/roadmap.md`](docs/roadmap.md).
 
+### EVERY TIME WE CREATE A FUNCTION THAT CAN BE REUSED, IT MUST BE ADDED TO A PACKAGE, IT COULD BE SHARED OR IN THE CURRENT APP.
+
+### WE MUST PREVENT DUPLICATION OF CODE AT ALL COST AND TRY TO KEEP CODE CLEAN AND ORGANIZED. 
+
 ## Project Context (Business Overview)
 
 ### 1. Vision
