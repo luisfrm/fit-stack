@@ -55,24 +55,6 @@ export function createCache(env: Partial<Env>) {
         console.error(`[CACHE INVALIDATE EXACT ERROR] key: ${key}`, error);
       }
     },
-
-    /**
-     * Atomic INCR with TTL (only if key is new). Used by AI rate-limiting:
-     * DB (ai_usage) is the single source of truth; Redis acts as cache.
-     */
-    async increment(key: string, ttlSeconds?: number): Promise<number | null> {
-      if (!redis) return null;
-      try {
-        const value = await redis.incr(key);
-        if (value === 1 && ttlSeconds) {
-          await redis.expire(key, ttlSeconds);
-        }
-        return value;
-      } catch (error) {
-        console.error(`[CACHE INCREMENT ERROR] key: ${key}`, error);
-        return null;
-      }
-    },
   };
 }
 

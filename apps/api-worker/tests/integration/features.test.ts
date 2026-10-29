@@ -350,8 +350,8 @@ describe.skipIf(skipReason !== null)('Features & Free tier', () => {
       const periodStart = (quotaBefore.body as any).periodStart ?? new Date().toISOString().slice(0, 10);
 
       await testQuery(
-        `INSERT INTO ai_usage (organization_id, period_type, period_start, credits, count)
-         VALUES ($1, 'monthly', $2::date, 500, 0)
+        `INSERT INTO ai_usage (organization_id, period_type, period_start, credits)
+         VALUES ($1, 'monthly', $2::date, 500)
          ON CONFLICT (organization_id, period_type, period_start) DO UPDATE SET credits = 500`,
         [organization.id, periodStart],
       );
