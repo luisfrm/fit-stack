@@ -140,6 +140,51 @@ describe.skipIf(skipReason !== null)('Members API', () => {
       expect(res.status, res.text).toBe(401);
     });
 
+    // Anti-escalation: the invited/created role comes from the body, so the
+    // server (never the client) must bound it by the actor's own role.
+    it('rejects a role the actor cannot assign', async () => {
+      const manager = await addUserToOrganization(
+        tenant.organization.id,
+        ORG_ROLES.MANAGER,
+        'mem-role-manager',
+      );
+
+      const res = await manager.client.post('/api/members', {
+        firstName: 'Escalated',
+        lastName: 'Owner',
+        email: uniqueEmail('escalated-owner'),
+        role: ORG_ROLES.OWNER,
+      });
+
+      expect(res.status, res.text).toBe(403);
+      expect(res.body).toMatchObject({ code: 'ROLE_ASSIGNMENT_NOT_ALLOWED' });
+    });
+
+    it('lets a cashier create only member-role rows', async () => {
+      const cashier = await addUserToOrganization(
+        tenant.organization.id,
+        ORG_ROLES.CASHIER,
+        'mem-role-cashier',
+      );
+
+      const forbidden = await cashier.client.post('/api/members', {
+        firstName: 'Not',
+        lastName: 'Manager',
+        email: uniqueEmail('cashier-manager'),
+        role: ORG_ROLES.MANAGER,
+      });
+      expect(forbidden.status, forbidden.text).toBe(403);
+      expect(forbidden.body).toMatchObject({ code: 'ROLE_ASSIGNMENT_NOT_ALLOWED' });
+
+      const allowed = await cashier.client.post('/api/members', {
+        firstName: 'Gym',
+        lastName: 'Client',
+        email: uniqueEmail('cashier-member'),
+        role: ORG_ROLES.MEMBER,
+      });
+      expect(allowed.status, allowed.text).toBe(201);
+    });
+
     it('rejects creation by member without MEMBERS.CREATE', async () => {
       const { organization } = await createGymTenant();
       const member = await addUserToOrganization(organization.id, ORG_ROLES.MEMBER, 'mem-create-member');
