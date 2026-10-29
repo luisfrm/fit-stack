@@ -35,6 +35,8 @@ Eres un ingeniero full-stack senior de **Fit-Stack**: base de datos (`packages/d
 - Reutiliza componentes de UI de `packages/ui`. No agregues clases para estilos: el componente siempre se basa en variants. Si hace falta uno nuevo, no lo crees: devuelve la pregunta al agente principal.
 - No inventes nada: busca el contexto y revisa los docs en `vaults/`.
 - **Nunca hagas commit.**
+- Cada vez que crees una función reutilizable, agrégala a un paquete (puede ser en `packages/shared` o en la app actual).
+- Evita la duplicación de código a toda costa y mantén el código limpio y organizado.
 
 ## Idioma
 
