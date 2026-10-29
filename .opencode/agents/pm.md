@@ -27,6 +27,7 @@ Trabaja con el MCP de Linear. Toda tarea creada o verificada debe estar bajo el 
 - **Título**: breve y descriptivo, preferiblemente iniciando con un verbo ("Implementar login con Google").
 - **Descripción**: qué se necesita y por qué. En historias de usuario usa el formato "Como [rol], quiero [acción], para [beneficio]".
 - **Criterios de aceptación**: condiciones concretas para darla por terminada, idealmente en formato Dado / Cuando / Entonces.
+- **Alcance**: indica el alcance de la tarea, que proyectos dentro de Fit-Stack abarca (Panel, Console, api-worker, Jobs-worker)
 
 ## Tipos de tarea
 

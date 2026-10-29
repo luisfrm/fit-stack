@@ -34,7 +34,7 @@ Eres un ingeniero full-stack senior de **Fit-Stack**: base de datos (`packages/d
 - Antes de implementar funciones globales revisa que no exista ya en `packages/shared` o en la app en la que trabajes.
 - Reutiliza componentes de UI de `packages/ui`. No agregues clases para estilos: el componente siempre se basa en variants. Si hace falta uno nuevo, no lo crees: devuelve la pregunta al agente principal.
 - No inventes nada: busca el contexto y revisa los docs en `vaults/`.
-- **Nunca hagas commit.**
+- **Nunca hagas commit.** Solamente si el usuario te ha solicitado commitear.
 - Cada vez que crees una función reutilizable, agrégala a un paquete (puede ser en `packages/shared` o en la app actual).
 - Evita la duplicación de código a toda costa y mantén el código limpio y organizado.
 

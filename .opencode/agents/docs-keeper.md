@@ -1,7 +1,7 @@
 ---
 description: "Mantiene AGENTS.md y los docs de vaults/ al día tras cambios estructurales (endpoints, RBAC, claves de caché, colas, patrones, flujo). Solo edita AGENTS.md y vaults/**; nunca código. También reestructura o adelgaza AGENTS.md."
 mode: subagent
-model: opencode/deepseek-v4.1-flash-free
+model: opencode-go/deepseek-v4.1-flash
 permissions:
   - {action: edit, resource: "*", effect: deny}
   - {action: edit, resource: "AGENTS.md", effect: allow}

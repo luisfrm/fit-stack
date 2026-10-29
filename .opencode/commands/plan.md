@@ -1,7 +1,7 @@
 ---
 description: Diseña un plan de implementación claro delegando en PM y File Explorer, explicando el por qué y para qué en palabras simples y evitando sobre-ingeniería.
 agent: plan
-model: opencode-go/deepseek-v4.1-flash
+model: opencode-go/glm-5.2
 ---
 
 Genera un plan de implementación técnico, pragmático y en lenguaje natural para la tarea o requerimiento indicado en `$ARGUMENTS`.
@@ -16,7 +16,7 @@ Sigue rigurosamente estos pasos en orden:
 
 ### Paso 1: Obtener Contexto de la Tarea (Delegar a `@pm`)
 Delega en el subagente `pm` pasándole `$ARGUMENTS`:
-- Si contiene un ID de Linear (ej. `RD-117`), pídele que consulte la issue principal, sus sub-issues asociadas, criterios de aceptación, dependencias y estado actual.
+- Si contiene un ID de Linear (ej. `RD-{task-id}`), pídele que consulte la issue principal, sus sub-issues asociadas, criterios de aceptación, dependencias y estado actual.
 - Si es una descripción libre, pídele que analice el alcance, apps afectadas y criterios de aceptación.
 
 ### Paso 2: Obtener Contexto del Proyecto (Delegar a `@file-explorer`)
