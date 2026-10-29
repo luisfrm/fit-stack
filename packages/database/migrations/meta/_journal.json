@@ -225,6 +225,13 @@
       "when": 1792799623288,
       "tag": "0031_workable_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793250468526,
+      "tag": "0032_dry_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

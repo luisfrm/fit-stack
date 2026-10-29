@@ -36,6 +36,7 @@ ORG_ROLES = {
 | **Reports**       |   ✅    |       ✅       |       ✅       |          ❌           |   ❌    |
 | **Members**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Staff**         | ✅ CRUD | ✅ (no delete) |       ❌       |          ❌           |   ❌    |
+| **Invitation**    | ✅ create | ✅ create | ✅ create | ❌ | ❌ |
 | **Subscriptions** | ✅ (no delete) | ✅ (no delete) | ✅ (no delete) |          ❌           |   ❌    |
 | **Plans**         | ✅ CRUD | ✅ (no delete) |    ✅ read     |        ✅ read        | ✅ read |
 | **Classes**       | ✅ CRUD | ✅ (no delete) | ✅ (no delete) | ✅ (no create/delete) | ✅ read |
@@ -85,6 +86,8 @@ Use `canAssignRole(actor, target)` from `@workspace/shared` (`packages/shared/sr
 - `OWNER` → can assign any role
 - `MANAGER` → cannot assign `OWNER`
 - `CASHIER` → can only assign `MEMBER`
+
+> Organization anti-escalation is validated **server-side** in `/api/members` (POST and PUT) against the caller's role from the session (`c.get('orgRole')`), never from the body: the role field of a member also decides the role of the Better Auth invitation sent to an existing user (`invitation: ["create"]`). The UI only filters options.
 
 **Platform anti-escalation** (`canAssignPlatformRole(actor, target)`):
 

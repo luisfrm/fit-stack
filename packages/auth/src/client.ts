@@ -10,12 +10,6 @@ export const authClient = createAuthClient({
   fetchOptions: {
     credentials: 'include',
   },
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
-    },
-  },
   plugins: [
     customSessionClient(),
     organizationClient({

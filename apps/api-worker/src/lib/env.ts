@@ -58,6 +58,12 @@ export type AppVariables = {
   orgId?: string;
   /** Active org object (set in global middleware; registration-only session does not have it). */
   org?: IOrganization | null;
+  /**
+   * Caller's role inside the active org (set in global middleware from the
+   * `customSession` payload). Authorization for RBAC uses the matrix, but
+   * anti-escalation rules (`canAssignRole`) need the actor's own role.
+   */
+  orgRole?: string | null;
   /** Active org timezone (set by `requireOrgTimezone`). */
   orgTimezone?: string;
   /** Active org primary currency (set by `requireOrgCurrency`). */

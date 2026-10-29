@@ -16,8 +16,10 @@ import { staffService } from "@/lib/services/staff-service";
 import { authClient, useSession } from "@workspace/auth/client";
 
 /**
- * Forces a fresh session fetch (bypasses the 5-min cookieCache) so the
- * dashboard layout sees the newly assigned platform role right away.
+ * Forces a fresh session fetch so the dashboard layout sees the newly
+ * assigned platform role right away instead of the session it cached at
+ * mount. The server does not enable `cookieCache`, so this only skips the
+ * client-side session store.
  */
 async function refreshSessionRole() {
   await authClient.getSession({ query: { disableCookieCache: "true" } });

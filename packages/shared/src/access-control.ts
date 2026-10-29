@@ -68,6 +68,10 @@ const organizationStatement = {
   reports: ["read"],
   members: ["read", "create", "update", "delete"],
   staff: ["read", "create", "update", "delete"],
+  // Better Auth's organization plugin authorizes `createInvitation` with this
+  // resource (`{ invitation: ["create"] }`). Whoever can create a member or a
+  // staff row can therefore invite an EXISTING user into the organization.
+  invitation: ["create"],
   // A financial record (subscription + payment) is NEVER deleted: it is voided.
   // Therefore `subscriptions` does not expose `delete` to any role.
   subscriptions: ["read", "create", "update"],
@@ -89,6 +93,7 @@ export const organizationRoles = {
     reports: [],
     members: [],
     staff: [],
+    invitation: [],
     subscriptions: [],
     plans: ["read"],
     classes: ["read"],
@@ -103,6 +108,7 @@ export const organizationRoles = {
     reports: [],
     members: [],
     staff: [],
+    invitation: [],
     subscriptions: [],
     plans: ["read"],
     classes: ["read", "update"],
@@ -117,6 +123,7 @@ export const organizationRoles = {
     reports: ["read"],
     members: ["read", "create", "update"],
     staff: [],
+    invitation: ["create"],
     subscriptions: ["read", "create", "update"],
     plans: ["read"],
     classes: ["read", "create", "update"],
@@ -131,6 +138,7 @@ export const organizationRoles = {
     reports: ["read"],
     members: ["read", "create", "update"],
     staff: ["read", "create", "update"],
+    invitation: ["create"],
     subscriptions: ["read", "create", "update"],
     plans: ["read", "create", "update"],
     classes: ["read", "create", "update"],
@@ -145,6 +153,7 @@ export const organizationRoles = {
     reports: ["read"],
     members: ["read", "create", "update", "delete"],
     staff: ["read", "create", "update", "delete"],
+    invitation: ["create"],
     subscriptions: ["read", "create", "update"],
     plans: ["read", "create", "update", "delete"],
     classes: ["read", "create", "update", "delete"],
