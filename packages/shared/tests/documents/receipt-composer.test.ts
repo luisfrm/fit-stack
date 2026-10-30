@@ -353,7 +353,12 @@ function basePanelRows(): PanelReceiptComposedRows {
       timezone: 'America/Caracas',
       fiscalConfig: undefined,
     },
-    member: { firstName: 'Juan', lastName: 'Pérez', documentId: 'V-12345678' },
+    member: {
+      firstName: 'Juan',
+      lastName: 'Pérez',
+      documentId: 'V-12345678',
+      address: 'Av. Libertador 123, Caracas',
+    },
     subscription: {
       startDate: new Date('2026-09-01T00:00:00.000Z'),
       endDate: new Date('2026-09-30T23:59:59.000Z'),
@@ -409,16 +414,39 @@ function basePlatformRows(): PlatformReceiptComposedRows {
 /* ── Panel issuer ──────────────────────────────────────────────────────── */
 
 describe('composePanelReceipt (parity with the frozen legacy path)', () => {
+  /**
+   * Expected `ReceiptData` of the panel issuer: the frozen legacy oracle
+   * plus the RD-106 contract evolution — the member's fiscal address. The
+   * legacy oracle itself stays untouched.
+   */
+  function panelExpected(rows: PanelReceiptComposedRows): ReceiptData {
+    const legacy = legacyBuildReceiptDataFromComposed(legacyPanelRowsToInput(rows));
+    return {
+      ...legacy,
+      recipient: {
+        ...legacy.recipient,
+        address: rows.member?.address?.trim() || null,
+      },
+    };
+  }
+
   function expectPanelParity(rows: PanelReceiptComposedRows): void {
-    expect(composePanelReceipt(rows)).toEqual(
-      legacyBuildReceiptDataFromComposed(legacyPanelRowsToInput(rows)),
-    );
+    expect(composePanelReceipt(rows)).toEqual(panelExpected(rows));
   }
 
   it('happy path: member, subscription, taxes, text details', () => {
     const rows = basePanelRows();
     expectPanelParity(rows);
     expect(composePanelReceipt(rows).document.number).toBe('fit-stack-2026-000045');
+    // RD-106: the member fiscal address reaches the recipient block.
+    expect(composePanelReceipt(rows).recipient.address).toBe('Av. Libertador 123, Caracas');
+  });
+
+  it('RD-106: blank member address composes null (line omitted, no placeholder)', () => {
+    const rows = basePanelRows();
+    rows.member = { ...rows.member!, address: '   ' };
+    expectPanelParity(rows);
+    expect(composePanelReceipt(rows).recipient.address).toBeNull();
   });
 
   it('currency conversion: baseTotal from the persisted rate', () => {

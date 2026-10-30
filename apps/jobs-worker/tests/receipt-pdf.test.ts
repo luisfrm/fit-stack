@@ -166,6 +166,18 @@ describe('renderReceiptPdfBytes', () => {
     expect(text).not.toContain('DIRECCIÓN FISCAL');
   }, 60000);
 
+  it('RD-106: el comprobante del gym imprime la dirección del socio cuando existe', async () => {
+    const data = sampleReceipt();
+    data.recipient = {
+      ...data.recipient,
+      address: 'Av. Libertador 123, Caracas',
+    };
+
+    const text = extractPdfText(await renderReceiptPdfBytes(data, 'latam'));
+    expect(text).toContain('DIRECCIÓN FISCAL');
+    expect(text).toContain('Av. Libertador 123, Caracas');
+  }, 60000);
+
   it('estampa ANULADO cuando el comprobante está anulado', async () => {
     const data = sampleReceipt();
     data.voided = true;

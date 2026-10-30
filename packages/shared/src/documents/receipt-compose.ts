@@ -76,6 +76,8 @@ export interface ComposeMember {
   firstName?: string | null;
   lastName?: string | null;
   documentId?: string | null;
+  /** Fiscal address; the document omits the line when absent (RD-106). */
+  address?: string | null;
 }
 
 export interface ComposeSubscription {
@@ -524,6 +526,9 @@ export function buildReceiptDataFromComposed(
       name: memberName,
       documentId: member?.documentId ?? null,
       docLabel: identity.recipientDocLabel,
+      // RD-106: the member's fiscal address is printed when registered and
+      // the line is omitted when absent (trim → empty becomes null).
+      address: member?.address?.trim() || null,
     },
     document: {
       number: input.receiptNumber,
