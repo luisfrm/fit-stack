@@ -27,8 +27,11 @@ Built on `date-fns` + `@date-fns/tz` (both edge-safe). The only place to do date
 Aggregation by local day/month happens in **SQL** (`AT TIME ZONE`), one atomic operation over thousands of rows:
 
 ```ts
-sql`(${table.createdAt} AT TIME ZONE 'UTC' AT TIME ZONE ${timezone})::date`
+// Columns are `timestamp with time zone`: a SINGLE shift returns local wall time.
+sql`(${table.createdAt} AT TIME ZONE ${timezone})::date`
 ```
+
+Never chain `AT TIME ZONE 'UTC' AT TIME ZONE ${timezone}` on a `timestamptz` column: the second shift yields a `timestamptz`, and `TO_CHAR`/`::date` format it in the session timezone (GMT on Neon), silently bucketing by UTC. The fixed pattern lives in `OrganizationDateManager.toLocalSql` (`apps/api-worker/src/lib/date-manager.ts`).
 
 The JS utilities resolve the **inputs** (UTC instants of local day bounds) and the **display**; they do not replace Postgres aggregation.
 

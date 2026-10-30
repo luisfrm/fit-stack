@@ -21,9 +21,14 @@ export class OrganizationDateManager {
 
   /**
    * Returns a SQL snippet that shifts a UTC database column to the organization's local timezone.
+   *
+   * Columns are `timestamp with time zone`, so a SINGLE `AT TIME ZONE` already
+   * returns the local wall-clock timestamp. Chaining a second `AT TIME ZONE`
+   * yields a `timestamptz` that `TO_CHAR`/`::date` formats in the session
+   * timezone (GMT on Neon), silently bucketing by UTC instead of the local day.
    */
   toLocalSql(column: AnyColumn | SQL): SQL {
-    return sql`${column} AT TIME ZONE 'UTC' AT TIME ZONE ${this.timezone}`;
+    return sql`${column} AT TIME ZONE ${this.timezone}`;
   }
 
   /**
