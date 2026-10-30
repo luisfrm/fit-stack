@@ -41,6 +41,15 @@ cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 
 ### WE MUST PREVENT DUPLICATION OF CODE AT ALL COST AND TRY TO KEEP CODE CLEAN AND ORGANIZED. 
 
+## Code is the Source of Truth (Code > Docs)
+
+1. **System of Record**: The running codebase, schemas, and passing tests represent reality. If documentation (`vaults/`, comments, roadmap, or guides) contradicts actual code behavior, **the code takes precedence**. Never break or refactor working code merely to satisfy outdated documentation.
+2. **No Silent Patches**: Discrepancies between code and documentation must **never be ignored, bypassed, or silently patched**.
+3. **Incident Protocol**:
+   - If a mismatch is detected, notify the user immediately with concrete evidence (`file:line` vs `doc_path`).
+   - If the code is correct and the doc is stale: update the doc (or delegate to `docs-keeper` / open a Linear issue in «Fit Stack» if out of scope).
+   - If the code violates a documented business invariant: stop and confirm with the user before altering core domain logic.
+
 ## Project Context (Business Overview)
 
 ### 1. Vision
