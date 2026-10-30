@@ -164,6 +164,7 @@ The **server** prices every payment — gym (`POST /api/subscriptions`, RD-158) 
 ## Important Constraints
 
 - **Never auto-commit**; the user owns their git history.
+- **PR titles**: `task-id: description` (e.g. `RD-106: print the member fiscal address on the gym receipt`) — no brackets and never Conventional Commits. Commit messages keep Conventional Commits.
 - **Tests**: run `pnpm test` before asking for review. Integration tests hit real HTTP against a Neon branch (`TEST_DATABASE_URL`; skipped without it; never against prod). Touch subscriptions/payments/receipts → run the financial invariant tests first.
 - **Database changes** require explicit approval; `db:push` forbidden on shared branches.
 

@@ -48,4 +48,4 @@ Siempre `pnpm typecheck` y `pnpm lint`. Si tocaste suscripciones, pagos o recibo
 
 ## Reporte
 
-Breve y en español: archivos cambiados, criterios cumplidos o no, comandos y resultados, SQL generado (con `db:migrate` pendiente de aprobación) y pendientes o supuestos. Cierra con la **rama y el commit sugeridos** para que los ejecute el usuario: rama `RD-<n>/<kebab-summary>` y commit `<type>: RD-<n> <brief>`, con `type` según la etiqueta (Feature → `feat`, Bug → `fix`, Improvement → `chore`).
+Breve y en español: archivos cambiados, criterios cumplidos o no, comandos y resultados, SQL generado (con `db:migrate` pendiente de aprobación) y pendientes o supuestos. Cierra con la **rama y el commit sugeridos** para que los ejecute el usuario: rama `RD-<n>/<kebab-summary>` y commit `<type>: RD-<n> <brief>`, con `type` según la etiqueta (Feature → `feat`, Bug → `fix`, Improvement → `chore`). Si se va a abrir PR, sugiere también el **PR title** con formato `RD-<n>: <description>` (sin llaves; nunca Conventional Commits).

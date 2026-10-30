@@ -24,4 +24,4 @@ No uses `amend` ni `force-push`.
 
 Luego haz `git push`.
 
-Indica PR Title y PR description para los cambios registrados.
+Indica el PR Title con el formato `task-id: description` (ej. `RD-106: print the member fiscal address on the gym receipt`, sin llaves y sin Conventional Commits) y la PR description para los cambios registrados.
