@@ -78,7 +78,34 @@ describe('buildReceiptDataFromComposed', () => {
   it('miembro ausente no rompe (mostrador)', () => {
     const input = validInput();
     input.member = null;
-    expect(buildReceiptDataFromComposed(input).recipient.name).toBe('Miembro');
+    const data = buildReceiptDataFromComposed(input);
+    expect(data.recipient.name).toBe('Miembro');
+    // RD-106: no member = no address, the line is omitted (null, no placeholder).
+    expect(data.recipient.address).toBeNull();
+  });
+
+  it('la dirección fiscal del miembro viaja al receptor (RD-106)', () => {
+    const input = validInput();
+    input.member = {
+      firstName: 'Juan',
+      lastName: 'Pérez',
+      documentId: 'V-12345678',
+      address: '  Av. Libertador 123, Caracas  ',
+    };
+    expect(buildReceiptDataFromComposed(input).recipient.address).toBe(
+      'Av. Libertador 123, Caracas',
+    );
+  });
+
+  it('dirección en blanco se omite (null, nunca placeholder)', () => {
+    const input = validInput();
+    input.member = {
+      firstName: 'Juan',
+      lastName: 'Pérez',
+      documentId: 'V-12345678',
+      address: '   ',
+    };
+    expect(buildReceiptDataFromComposed(input).recipient.address).toBeNull();
   });
 
   /**

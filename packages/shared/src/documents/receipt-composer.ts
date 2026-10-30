@@ -75,6 +75,8 @@ export interface PanelReceiptMemberRow {
   firstName?: string | null;
   lastName?: string | null;
   documentId?: string | null;
+  /** Fiscal address of the member; absent = the document omits the line. */
+  address?: string | null;
 }
 
 /** `subscription` row fields the compose consumes (the billed period). */
@@ -204,6 +206,8 @@ export function composePanelReceipt(rows: PanelReceiptComposedRows): ReceiptData
           firstName: member.firstName,
           lastName: member.lastName,
           documentId: member.documentId,
+          // RD-106: forward the fiscal address to the receipt recipient.
+          address: member.address,
         }
       : null,
     subscription: subscription
