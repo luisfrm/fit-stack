@@ -9,6 +9,7 @@
     "start:api": "pnpm --filter api-worker dev",
     "start:jobs": "pnpm --filter jobs-worker dev",
     "start:panel": "pnpm --filter panel dev",
+    "start:portal": "pnpm --filter portal dev",
     "start:console": "pnpm --filter console dev",
     "start:commercial": "pnpm --filter commercial dev",
     "lint": "turbo lint",

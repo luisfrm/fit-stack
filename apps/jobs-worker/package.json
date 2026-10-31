@@ -16,7 +16,7 @@
     "drizzle-orm": "^0.45.4",
     "nodemailer": "^6.10.0",
     "pdf-lib": "^1.17.1",
-    "react": "^19.0.0",
+    "react": "19.2.9",
     "resend": "^4.1.2"
   },
   "devDependencies": {

@@ -14,7 +14,8 @@
         ".next/**",
         "!.next/cache/**",
         "dist/**",
-        ".astro/**"
+        ".astro/**",
+        "build/**"
       ],
       "env": [
         "DATABASE_URL",
