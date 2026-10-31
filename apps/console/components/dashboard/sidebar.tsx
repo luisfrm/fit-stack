@@ -2,11 +2,8 @@
 
 import * as React from "react";
 import { Building2 } from "lucide-react";
-import {
-  AppSidebar as UISidebar,
-  MobileNav as UIMobileNav,
-  Logotipo,
-} from "@workspace/ui/components";
+import { Logotipo } from "@workspace/ui/components";
+import { AppSidebar as UISidebar, MobileNav as UIMobileNav } from "@workspace/ui/next";
 import { canPlatform, formatPlatformRole } from "@workspace/shared";
 import { useTheme } from "@workspace/ui/hooks/use-theme";
 import { usePlatformAuth } from "@workspace/auth/platform";
@@ -16,7 +13,7 @@ import type {
   SidebarUser,
   SidebarBranding,
   SidebarNavItem,
-} from "@workspace/ui/components";
+} from "@workspace/ui/next";
 
 interface ConsoleSidebarProps {
   user: SidebarUser;

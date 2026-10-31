@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip, NextImage } from "@workspace/ui/components";
+import { Table, ColumnDef, Button, Badge, toast, Text, SimpleTooltip } from "@workspace/ui/components";
+import { NextImage } from "@workspace/ui/next";
 import { type IMember } from "@/types/dashboard";
 import { Edit2, Trash2, Mail, Loader2, User, CreditCard, Plus } from "lucide-react";
 import { MemberModal } from "./member-modal";

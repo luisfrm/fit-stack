@@ -28,10 +28,8 @@ import {
   MobileNav as UIMobileNav,
   type SidebarUser,
   type SidebarNavItem,
-  Button,
-  Modal,
-  Badge,
-} from "@workspace/ui/components";
+} from "@workspace/ui/next";
+import { Button, Modal, Badge } from "@workspace/ui/components";
 import { uploadService } from "@/lib/services/upload-service";
 import { useOrgAuth } from "@workspace/auth/org";
 import { useOrgPermissions } from "@workspace/auth/org";
