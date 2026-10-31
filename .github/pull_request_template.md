@@ -8,7 +8,7 @@
 
 ## Affected apps / packages
 
-<!-- api-worker · jobs-worker · panel · console · web · shared · database · auth · ui · infra -->
+<!-- api-worker · jobs-worker · panel · console · commercial · shared · database · auth · ui · infra -->
 
 ## How to test
 

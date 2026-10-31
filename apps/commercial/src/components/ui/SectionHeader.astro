@@ -1,0 +1,58 @@
+---
+import { cva } from "class-variance-authority";
+
+import Accent from "./Accent.astro";
+import Eyebrow from "./Eyebrow.astro";
+import Heading from "./Heading.astro";
+import Text from "./Text.astro";
+
+const wrap = cva("flex flex-col", {
+  variants: {
+    align: {
+      left: "items-start text-left",
+      center: "items-center text-center",
+    },
+    width: {
+      narrow: "max-w-xl",
+      default: "max-w-2xl",
+      wide: "max-w-3xl",
+      none: "",
+    },
+  },
+  defaultVariants: {
+    align: "left",
+    width: "default",
+  },
+});
+
+interface Props {
+  eyebrow?: string;
+  title: string;
+  /** Word or phrase appended after `title` in the brand accent colour. */
+  accent?: string;
+  description?: string;
+  align?: "left" | "center";
+  width?: "narrow" | "default" | "wide" | "none";
+  as?: "h1" | "h2";
+  id?: string;
+}
+
+const {
+  eyebrow,
+  title,
+  accent,
+  description,
+  align,
+  width,
+  as: Tag = "h2",
+  id,
+} = Astro.props;
+---
+
+<header class={wrap({ align, width })}>
+  {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+  <Heading as={Tag} size={Tag === "h1" ? "hero" : "section"} id={id} flush={!description}>
+    {title}{accent && <>&nbsp;<Accent>{accent}</Accent></>}
+  </Heading>
+  {description && <Text size="lead" tone="muted">{description}</Text>}
+</header>

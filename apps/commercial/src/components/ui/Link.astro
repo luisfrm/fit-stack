@@ -1,0 +1,29 @@
+---
+import { cva } from "class-variance-authority";
+
+const link = cva("underline underline-offset-4 transition-colors", {
+  variants: {
+    tone: {
+      inline: "text-primary-ink hover:text-foreground",
+      muted: "text-foreground-muted hover:text-foreground",
+      plain: "text-foreground hover:text-primary-ink",
+    },
+  },
+  defaultVariants: { tone: "inline" },
+});
+
+interface Props {
+  href: string;
+  tone?: "inline" | "muted" | "plain";
+  external?: boolean;
+}
+
+const { href, tone, external = false } = Astro.props;
+---
+
+<a
+  href={href}
+  class={link({ tone })}
+  target={external ? "_blank" : undefined}
+  rel={external ? "noreferrer noopener" : undefined}
+><slot /></a>

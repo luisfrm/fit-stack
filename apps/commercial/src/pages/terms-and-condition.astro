@@ -1,0 +1,183 @@
+---
+import { CONTACT, SITE } from "@/config/site";
+import { GOVERNING_LAW, JURISDICTION, LEGAL_ENTITY } from "@/config/legal";
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import Link from "@/components/ui/Link.astro";
+---
+
+<LegalLayout
+  title="Términos y condiciones"
+  description="Condiciones de uso de Fit-Stack: qué es el servicio, cómo funciona la suscripción, qué pasa si hay un atraso en el pago y cuáles son las responsabilidades de cada parte."
+  otherHref="/privacy-policy"
+  otherLabel="Política de privacidad"
+>
+  <p>
+    Estos términos regulan el uso de {SITE.name}, la plataforma de gestión para gimnasios y centros
+    deportivos operada por {LEGAL_ENTITY}. Al crear una cuenta, contratar una suscripción o usar el
+    servicio, aceptas este documento en nombre propio y, si corresponde, en nombre del gimnasio que
+    representas.
+  </p>
+
+  <h2>1. Quiénes somos</h2>
+  <p>
+    {SITE.name} ofrece software como servicio (SaaS) para administrar gimnasios: miembros, planes,
+    membresías, pagos, clases, personal, sitio web y reportes. Para cualquier consulta sobre este
+    documento puedes escribir a <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>.
+  </p>
+
+  <h2>2. Aceptación de los términos</h2>
+  <p>
+    Debes ser mayor de edad y tener capacidad para obligarte contractualmente. Si aceptas en nombre
+    de un gimnasio, declaras tener facultades para hacerlo. Si no estás de acuerdo con estos
+    términos, no uses el servicio.
+  </p>
+
+  <h2>3. El servicio</h2>
+  <p>El servicio incluye, según el plan contratado:</p>
+  <ul>
+    <li>
+      <strong>Panel administrativo:</strong> miembros, planes, membresías, pagos, clases,
+      entrenadores, personal, reportes y configuración.
+    </li>
+    <li>
+      <strong>Portal de Miembros:</strong> tus clientes consultan su membresía vigente, sus clases y
+      su progreso.
+    </li>
+    <li><strong>Página web y blog:</strong> un sitio público editable desde el panel.</li>
+    <li>
+      <strong>Asistente IA:</strong> responde preguntas sobre Fit-Stack y sobre los datos de tu
+      organización, con un consumo mensual de créditos.
+    </li>
+  </ul>
+  <p>
+    La validación de acceso en recepción por código QR o biometría <strong>está en desarrollo</strong>
+    y todavía no se usa en operación. Mientras tanto, el estado de cada membresía se calcula
+    automáticamente y está a la vista en el panel.
+  </p>
+
+  <h2>4. Tu cuenta, el acceso y los roles</h2>
+  <ul>
+    <li>Cada gimnasio es una organización independiente, con sus datos separados del resto.</li>
+    <li>
+      El dueño de la organización administra los usuarios y sus roles: propietario, gerente, cajero,
+      entrenador y miembro.
+    </li>
+    <li>
+      Eres responsable de las credenciales que entregas a tu equipo y de las acciones que se realicen
+      con ellas.
+    </li>
+    <li>
+      Debes avisarnos de inmediato si detectas un acceso no autorizado a
+      <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>.
+    </li>
+  </ul>
+
+  <h2>5. Planes, precios y facturación</h2>
+  <ul>
+    <li>
+      La suscripción es mensual, en dólares estadounidenses (USD) y por gimnasio. Los precios de
+      referencia publicados en el sitio son los vigentes al momento de la contratación y pueden
+      cambiar; el valor aplicable es el que el equipo confirme al activar el plan.
+    </li>
+    <li>
+      <strong>No existen periodos de prueba.</strong> La suscripción empieza a contar con el primer
+      pago. Un plan de precio 0 es un plan gratuito: se asigna como cortesía operativa, no se cobra,
+      no genera comprobante y no vence solo.
+    </li>
+    <li>
+      Las promociones o descuentos futuros se aplican como cupón sobre la suscripción y nunca como un
+      periodo que se convierta automáticamente en un cobro.
+    </li>
+    <li>
+      Los cupos del Portal de Miembros por plan se confirman con el equipo. El personal interno nunca
+      consume cupos: solo tus clientes.
+    </li>
+  </ul>
+
+  <h2>6. Pagos y estados de la suscripción</h2>
+  <p>
+    El estado se calcula automáticamente cada día a partir de la fecha de vencimiento y de si existe
+    un pago válido:
+  </p>
+  <ul>
+    <li><strong>Activa:</strong> ciclo vigente y pago válido. Todo funciona con normalidad.</li>
+    <li><strong>En mora:</strong> de 1 a 7 días de retraso. El servicio sigue funcionando con un aviso en el panel.</li>
+    <li><strong>Solo lectura:</strong> de 8 a 14 días de retraso. Puedes consultar tus datos, pero no crear ni cobrar.</li>
+    <li><strong>Suspendida:</strong> 15 días o más de retraso. El acceso queda bloqueado hasta regularizar.</li>
+    <li><strong>Cancelada:</strong> cancelación explícita. El acceso queda bloqueado.</li>
+  </ul>
+  <p>
+    <strong>Nunca se borran tus datos por un atraso.</strong> Al regularizar el pago vuelves a
+    Activa y recuperas el acceso completo sin reconfigurar nada.
+  </p>
+
+  <h2>7. Los datos de tus clientes</h2>
+  <p>
+    Tú, como gimnasio, eres responsable de los datos de tus miembros que cargas en la plataforma y de
+    contar con la base legal para tratarlos. {SITE.name} los trata por tu cuenta y bajo tus
+    instrucciones, solo para prestarte el servicio, y los mantiene separados por organización. El
+    detalle está en la <Link href="/privacy-policy">política de privacidad</Link>.
+  </p>
+
+  <h2>8. Uso aceptable</h2>
+  <p>No está permitido:</p>
+  <ul>
+    <li>Usar el servicio para actividades ilícitas o para cargar datos que no puedes tratar.</li>
+    <li>Intentar acceder a información de otra organización o eludir los controles de acceso.</li>
+    <li>Revender, sublicenciar o replicar el servicio sin autorización escrita.</li>
+    <li>Interferir con la operación del servicio, sobrecargarlo o intentar vulnerar su seguridad.</li>
+    <li>Usar el asistente IA para generar contenido ilegal o para extraer datos de terceros.</li>
+  </ul>
+
+  <h2>9. Propiedad intelectual</h2>
+  <p>
+    El software, la marca, los textos y el diseño de {SITE.name} son de {LEGAL_ENTITY}. La información
+    que cargas en tu organización es tuya: no la usamos para otros fines que los descritos en la
+    política de privacidad. Nos concedes únicamente el permiso necesario para alojarla y procesarla
+    mientras dure tu suscripción.
+  </p>
+
+  <h2>10. Disponibilidad y soporte</h2>
+  <p>
+    Trabajamos para que el servicio esté disponible de forma continua y realizamos mantenimientos
+    programados cuando son necesarios, avisando con antelación razonable cuando el impacto pueda ser
+    relevante. El soporte se presta por correo electrónico en horario laboral. Este documento no
+    establece un acuerdo de nivel de servicio (SLA) con porcentajes garantizados.
+  </p>
+
+  <h2>11. Límite de responsabilidad</h2>
+  <p>
+    El servicio se presta «tal como está» y según disponibilidad. En la medida en que la ley lo
+    permita, {LEGAL_ENTITY} no responde por lucro cesante, pérdida de oportunidades ni daños
+    indirectos derivados del uso o de la imposibilidad de uso del servicio. Nada en este documento
+    limita responsabilidades que no puedan limitarse por ley.
+  </p>
+
+  <h2>12. Suspensión y terminación</h2>
+  <p>
+    Podemos suspender el acceso por falta de pago según los estados descritos en la sección 6, o por
+    un uso que viole la sección 8. Puedes cancelar tu suscripción cuando quieras escribiendo a
+    <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>. Antes de una eliminación
+    definitiva te informamos cómo exportar tu información.
+  </p>
+
+  <h2>13. Cambios en el servicio y en estos términos</h2>
+  <p>
+    Podemos modificar funcionalidades para mejorarlas o por razones técnicas, y actualizar este
+    documento cuando cambien las condiciones. Los cambios relevantes se comunican por correo o en el
+    panel. Si no estás de acuerdo con una modificación sustancial, puedes cancelar antes de que entre
+    en vigor.
+  </p>
+
+  <h2>14. Ley aplicable y controversias</h2>
+  <p>
+    Estos términos se rigen por las leyes de {GOVERNING_LAW}. Cualquier controversia se somete a
+    {JURISDICTION}, sin perjuicio de los derechos que la ley reconozca al consumidor.
+  </p>
+
+  <h2>15. Contacto</h2>
+  <p>
+    Para consultas sobre estos términos, facturación o el servicio en general, escríbenos a
+    <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>.
+  </p>
+</LegalLayout>

@@ -1,0 +1,149 @@
+---
+import { cva } from "class-variance-authority";
+import Icon from "@/components/ui/Icon.astro";
+
+/**
+ * Field wrapper for a native input or select.
+ *
+ * Owns the label, hint, error and the `aria-describedby` wiring so pages never
+ * have to think about ids or accessibility attributes.
+ */
+const wrapper = cva("flex flex-col gap-1.5");
+const label = cva("text-sm font-semibold text-foreground");
+const requiredMark = cva("text-primary-ink");
+const optionalMark = cva("text-xs font-normal text-foreground-dim");
+const control = cva(
+  [
+    "w-full rounded-md border bg-input px-3 text-sm text-foreground",
+    "transition-colors duration-200",
+    "placeholder:text-foreground-dim",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+    "disabled:opacity-50",
+  ],
+  {
+    variants: {
+      control: {
+        input: "h-11",
+        select: "h-11 appearance-none pr-10",
+      },
+      invalid: {
+        true: "border-destructive focus-visible:border-destructive",
+        false: "border-input-border focus-visible:border-primary/60",
+      },
+    },
+    defaultVariants: {
+      control: "input",
+      invalid: false,
+    },
+  }
+);
+const selectWrap = cva("relative");
+const selectIcon = cva("pointer-events-none absolute right-3 top-1/2 -translate-y-1/2");
+const message = cva("text-xs leading-relaxed", {
+  variants: {
+    tone: {
+      hint: "text-foreground-dim",
+      error: "text-destructive",
+    },
+  },
+  defaultVariants: { tone: "hint" },
+});
+
+interface Option {
+  readonly value: string;
+  readonly label: string;
+}
+
+interface Props {
+  id: string;
+  label: string;
+  /** `select` renders a native dropdown from `options`. */
+  control?: "input" | "select";
+  type?: "text" | "email" | "tel";
+  name: string;
+  value?: string;
+  placeholder?: string;
+  options?: readonly Option[];
+  autoComplete?: string;
+  inputMode?: "text" | "email" | "tel" | "numeric";
+  required?: boolean;
+  optional?: boolean;
+  hint?: string;
+  error?: string;
+}
+
+const {
+  id,
+  label: labelText,
+  control: controlType = "input",
+  type = "text",
+  name,
+  value,
+  placeholder,
+  options = [],
+  autoComplete,
+  inputMode,
+  required = false,
+  optional = false,
+  hint,
+  error,
+} = Astro.props;
+
+const hintId = hint ? `${id}-hint` : undefined;
+const errorId = error ? `${id}-error` : undefined;
+const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+const invalid = Boolean(error);
+
+const shared = {
+  id,
+  name,
+  required,
+  "aria-invalid": invalid || undefined,
+  "aria-describedby": describedBy,
+};
+---
+
+<div class={wrapper()}>
+  <label for={id} class={label()}>
+    {labelText}
+    {required && <span class={requiredMark()} aria-hidden="true">*</span>}
+    {optional && <span class={optionalMark()}>(opcional)</span>}
+  </label>
+
+  {
+    controlType === "select" ? (
+      <div class={selectWrap()}>
+        <select class={control({ control: "select", invalid })} {...shared}>
+          <option value="">Selecciona una opción</option>
+          {options.map((option) => (
+            <option value={option.value} selected={option.value === value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <span class={selectIcon()}>
+          <Icon name="lucide:chevron-down" size="sm" tone="dim" />
+        </span>
+      </div>
+    ) : (
+      <input
+        class={control({ control: "input", invalid })}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        autocomplete={autoComplete}
+        inputmode={inputMode}
+        {...shared}
+      />
+    )
+  }
+
+  {hint && <p id={hintId} class={message({ tone: "hint" })}>{hint}</p>}
+  {
+    error && (
+      <p id={errorId} class={message({ tone: "error" })} role="alert">
+        {error}
+      </p>
+    )
+  }
+</div>

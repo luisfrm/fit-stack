@@ -1,0 +1,52 @@
+---
+import { cva } from "class-variance-authority";
+
+const heading = cva(
+  ["font-display font-black italic uppercase tracking-tighter text-balance", "leading-[0.95]"],
+  {
+    variants: {
+      size: {
+        hero: "text-[clamp(2.75rem,7vw,4.75rem)]",
+        section: "text-[clamp(2rem,4.5vw,3.25rem)]",
+        lg: "text-[clamp(1.625rem,3vw,2.25rem)]",
+        card: "text-2xl",
+        sm: "text-xl",
+      },
+      accent: {
+        none: "text-foreground-strong",
+        primary: "text-primary-ink",
+        muted: "text-foreground-muted",
+      },
+      flush: {
+        true: "",
+        false: "mb-5",
+      },
+      align: {
+        left: "text-left",
+        center: "text-center",
+      },
+    },
+    defaultVariants: {
+      size: "section",
+      accent: "none",
+      flush: false,
+      align: "left",
+    },
+  }
+);
+
+interface Props {
+  as?: "h1" | "h2" | "h3" | "h4";
+  size?: "hero" | "section" | "lg" | "card" | "sm";
+  accent?: "none" | "primary" | "muted";
+  flush?: boolean;
+  align?: "left" | "center";
+  id?: string;
+}
+
+const { as: Tag = "h2", size, accent, flush, align, id } = Astro.props;
+---
+
+<Tag id={id} class={heading({ size, accent, flush, align })}>
+  <slot />
+</Tag>

@@ -1,0 +1,29 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Accent — the highlighted words inside a heading.
+ *
+ * `ink` is the accessible text colour for light mode; `highlight` paints the
+ * brand yellow behind black text, which keeps the brand punchy at display sizes.
+ */
+const accent = cva("", {
+  variants: {
+    variant: {
+      ink: "text-primary-ink",
+      highlight: "box-decoration-clone bg-primary px-2 text-primary-foreground",
+    },
+  },
+  defaultVariants: {
+    variant: "ink",
+  },
+});
+
+interface Props {
+  variant?: "ink" | "highlight";
+}
+
+const { variant } = Astro.props;
+---
+
+<span class={accent({ variant })}><slot /></span>

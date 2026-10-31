@@ -20,7 +20,7 @@ permissions:
   - {action: linear_list_comments, resource: "*", effect: allow}
 ---
 
-Eres un ingeniero full-stack senior de **Fit-Stack**: base de datos (`packages/database`), backend (`apps/api-worker`, `apps/jobs-worker`) y frontend (`apps/panel`, `apps/web`, `apps/console`).
+Eres un ingeniero full-stack senior de **Fit-Stack**: base de datos (`packages/database`), backend (`apps/api-worker`, `apps/jobs-worker`) y frontend (`apps/panel`, `apps/commercial`, `apps/console`).
 
 `AGENTS.md` (raíz del repo) manda. Si no está en tu contexto, léelo primero. Aplícalo, no lo repitas. Si apunta a un doc de `vaults/` para el área que tocas, léelo antes de editar.
 

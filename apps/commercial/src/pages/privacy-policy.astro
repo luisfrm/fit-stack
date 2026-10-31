@@ -1,0 +1,144 @@
+---
+import { CONTACT, SITE } from "@/config/site";
+import { LEGAL_ENTITY } from "@/config/legal";
+import LegalLayout from "@/layouts/LegalLayout.astro";
+import Link from "@/components/ui/Link.astro";
+---
+
+<LegalLayout
+  title="Política de privacidad"
+  description="Qué datos trata Fit-Stack, para qué los usa, con quién los comparte y cómo puedes ejercer tus derechos. Escrita para gimnasios y para sus miembros."
+  otherHref="/terms-and-condition"
+  otherLabel="Términos y condiciones"
+>
+  <p>
+    Esta política explica cómo {LEGAL_ENTITY} trata los datos personales en {SITE.name}. Se aplica al
+    sitio comercial, al panel administrativo, al Portal de Miembros y al asistente IA.
+  </p>
+
+  <h2>1. Responsable del tratamiento</h2>
+  <p>
+    El responsable es {LEGAL_ENTITY}. Para cualquier consulta, solicitud o reclamo sobre datos
+    personales puedes escribir a <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>.
+  </p>
+
+  <h2>2. Qué datos tratamos</h2>
+  <ul>
+    <li>
+      <strong>Datos de la cuenta del gimnasio:</strong> nombre del gimnasio, país, moneda principal,
+      zona horaria, datos fiscales y de contacto que decidas registrar.
+    </li>
+    <li>
+      <strong>Datos del personal:</strong> nombre, correo electrónico, rol y actividad dentro del
+      panel.
+    </li>
+    <li>
+      <strong>Datos de tus miembros:</strong> los que el gimnasio carga para operar: identificación,
+      contacto, membresías, pagos y asistencia. El gimnasio decide qué cargar y es responsable de
+      contar con la base legal para hacerlo.
+    </li>
+    <li>
+      <strong>Datos de uso:</strong> registros técnicos necesarios para operar y asegurar el
+      servicio, como errores, fecha y hora de las operaciones y dirección IP.
+    </li>
+    <li>
+      <strong>Conversaciones con el asistente IA:</strong> el contenido de tus consultas y las
+      respuestas generadas, asociadas a tu organización, para poder mostrarte el historial.
+    </li>
+  </ul>
+
+  <h2>3. Para qué usamos los datos</h2>
+  <ul>
+    <li>Prestar el servicio: registrar miembros, membresías, pagos, clases y reportes.</li>
+    <li>Emitir y enviar comprobantes por correo cuando validas un pago.</li>
+    <li>Calcular el estado de tu suscripción y avisarte de vencimientos.</li>
+    <li>Prestar soporte y responder tus solicitudes.</li>
+    <li>Detectar y prevenir fraudes, abusos y problemas de seguridad.</li>
+    <li>Cumplir obligaciones legales y contables aplicables.</li>
+  </ul>
+  <p>No usamos tus datos para publicidad ni los vendemos.</p>
+
+  <h2>4. Base legal</h2>
+  <p>
+    Tratamos los datos para ejecutar el contrato de suscripción, para cumplir obligaciones legales y,
+    cuando corresponde, con tu consentimiento. Los datos de tus miembros se tratan por tu cuenta y
+    bajo tus instrucciones como gimnasio responsable de esa información.
+  </p>
+
+  <h2>5. Cookies y almacenamiento local</h2>
+  <p>Este sitio es deliberadamente simple:</p>
+  <ul>
+    <li>
+      Usa <strong>almacenamiento local</strong> del navegador para recordar tu preferencia de tema
+      (claro, oscuro o del sistema) bajo la clave <code>fitstack-theme</code>.
+    </li>
+    <li>
+      Las aplicaciones de la plataforma usan <strong>cookies de sesión</strong> estrictamente
+      necesarias para mantener tu inicio de sesión.
+    </li>
+    <li>
+      <strong>No hay analítica, píxeles publicitarios ni rastreadores de terceros</strong> en este
+      sitio.
+    </li>
+  </ul>
+
+  <h2>6. Con quién compartimos</h2>
+  <p>
+    Solo con proveedores que nos permiten operar el servicio, como encargados del tratamiento y bajo
+    obligaciones de confidencialidad: infraestructura y entrega de contenido (Cloudflare), base de
+    datos (Neon), envío de correo transaccional y el proveedor de tasas de cambio usado para
+    convertir pagos. También podemos compartir información si la ley lo exige o para proteger
+    derechos ante una autoridad competente.
+  </p>
+
+  <h2>7. Cuánto tiempo conservamos los datos</h2>
+  <p>
+    Mientras tu suscripción esté activa y durante el plazo necesario para cumplir obligaciones
+    legales, contables y de defensa ante reclamos. Los registros de pagos y comprobantes se conservan
+    por el plazo que exija la normativa aplicable y no se eliminan por un atraso en el pago.
+  </p>
+
+  <h2>8. Tus derechos</h2>
+  <p>
+    Puedes solicitar acceso, rectificación, actualización, supresión u oposición al tratamiento, y
+    pedir la portabilidad de la información que cargaste. Escríbenos a
+    <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link> indicando tu gimnasio y el derecho
+    que deseas ejercer; respondemos en un plazo razonable. Si eres miembro de un gimnasio, tu primera
+    vía es el propio gimnasio, que administra tus datos; también puedes escribirnos y canalizaremos
+    la solicitud.
+  </p>
+
+  <h2>9. Seguridad</h2>
+  <p>
+    Cada gimnasio es una organización independiente y sus datos se guardan separados del resto. El
+    acceso interno se controla por roles: propietario, gerente, cajero, entrenador y miembro. La
+    transmisión viaja cifrada con TLS y las contraseñas se almacenan con funciones de hash. Ningún
+    sistema es infalible: si detectamos un incidente que afecte tus datos, te informamos.
+  </p>
+
+  <h2>10. Menores de edad</h2>
+  <p>
+    El servicio está dirigido a gimnasios y a personas mayores de edad. Si un gimnasio registra
+    información de menores, es responsable de contar con la autorización de sus representantes
+    legales.
+  </p>
+
+  <h2>11. Transferencias internacionales</h2>
+  <p>
+    Nuestros proveedores de infraestructura pueden procesar y almacenar información fuera de tu país.
+    Cuando eso ocurre, exigimos garantías contractuales de confidencialidad y seguridad compatibles
+    con esta política.
+  </p>
+
+  <h2>12. Cambios a esta política</h2>
+  <p>
+    Si cambiamos esta política, actualizamos la fecha del encabezado y, cuando el cambio sea
+    relevante, lo comunicamos por correo o en el panel antes de que entre en vigor.
+  </p>
+
+  <h2>13. Contacto</h2>
+  <p>
+    Para ejercer tus derechos o resolver cualquier duda sobre privacidad, escríbenos a
+    <Link href={`mailto:${CONTACT.email}`}>{CONTACT.email}</Link>.
+  </p>
+</LegalLayout>

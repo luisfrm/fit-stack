@@ -1,0 +1,34 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Responsive visibility. Keeps breakpoint decisions in one place instead of
+ * sprinkling `hidden sm:block` through the markup.
+ */
+const visibility = cva("", {
+  variants: {
+    from: {
+      sm: "hidden sm:block",
+      md: "hidden md:block",
+      lg: "hidden lg:block",
+    },
+    below: {
+      sm: "block sm:hidden",
+      md: "block md:hidden",
+      lg: "block lg:hidden",
+    },
+  },
+});
+
+interface Props {
+  from?: "sm" | "md" | "lg";
+  below?: "sm" | "md" | "lg";
+  as?: "div" | "span" | "li";
+}
+
+const { from, below, as: Tag = "div" } = Astro.props;
+---
+
+<Tag class={visibility({ from, below })}>
+  <slot />
+</Tag>

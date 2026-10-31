@@ -1,0 +1,243 @@
+---
+import { CONTACT, SITE } from "@/config/site";
+import { SUPPORTED_COUNTRIES } from "@/data/countries";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+import Button from "@/components/ui/Button.astro";
+import Card from "@/components/ui/Card.astro";
+import CheckList from "@/components/ui/CheckList.astro";
+import FormCheckbox from "@/components/ui/FormCheckbox.astro";
+import FormField from "@/components/ui/FormField.astro";
+import FormNotice from "@/components/ui/FormNotice.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Link from "@/components/ui/Link.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+const COUNTRY_OPTIONS = SUPPORTED_COUNTRIES.map((country) => ({
+  value: country.code,
+  label: `${country.flag} ${country.name}`,
+}));
+
+const SIZE_OPTIONS = [
+  { value: "hasta-100", label: "Hasta 100 miembros" },
+  { value: "100-300", label: "De 100 a 300 miembros" },
+  { value: "300-800", label: "De 300 a 800 miembros" },
+  { value: "mas-800", label: "Más de 800 miembros" },
+] as const;
+
+const NEXT_STEPS = [
+  { label: "Revisamos tu solicitud y te escribimos al correo que dejes aquí." },
+  { label: "Coordinamos una llamada corta para conocer tu operación." },
+  { label: "Creamos tu gimnasio, tu usuario de dueño y cargamos tu moneda y zona horaria." },
+  { label: "Empiezas a registrar miembros y planes. Sin tarjeta y sin periodos de prueba." },
+] as const;
+---
+
+<BaseLayout
+  title={`Probar demo gratuita — ${SITE.name}`}
+  description="Solicita una demo de Fit-Stack. Te ayudamos a configurar tu gimnasio con su país, moneda principal y zona horaria."
+  noindex
+>
+  <Section spacing="loose">
+    <Grid cols={2} split gap="lg" align="start">
+      <Stack gap="lg">
+        <SectionHeader
+          as="h1"
+          eyebrow="Demo gratuita"
+          title="Cuéntanos de tu gimnasio y te damos"
+          accent="acceso"
+          description="Son cuatro datos obligatorios; el resto es opcional. Con eso podemos crear tu organización y el usuario del dueño, sin que tengas que configurar nada desde cero."
+          width="none"
+        />
+
+        <Card padding="lg">
+          <form
+            data-demo-form
+            action={`mailto:${CONTACT.email}`}
+            method="post"
+            enctype="text/plain"
+          >
+            <Stack gap="md">
+              <FormField
+                id="gym-name"
+                name="gimnasio"
+                label="Nombre del gimnasio"
+                placeholder="Ej. Iron Fitness"
+                autoComplete="organization"
+                required
+              />
+
+              <FormField
+                id="gym-country"
+                name="pais"
+                label="País"
+                control="select"
+                options={COUNTRY_OPTIONS}
+                required
+                hint="El país define el formato de moneda y la zona horaria sugerida."
+              />
+
+              <FormField
+                id="owner-name"
+                name="dueno"
+                label="Nombre completo del dueño"
+                placeholder="Ej. Carolina Reyes"
+                autoComplete="name"
+                required
+              />
+
+              <FormField
+                id="owner-email"
+                name="correo"
+                label="Correo electrónico"
+                type="email"
+                inputMode="email"
+                placeholder="tu@gimnasio.com"
+                autoComplete="email"
+                required
+                hint="Ahí te enviamos el acceso y el recibo de tu suscripción."
+              />
+
+              <FormField
+                id="owner-phone"
+                name="telefono"
+                label="Teléfono"
+                type="tel"
+                inputMode="tel"
+                placeholder="+58 412 000 0000"
+                autoComplete="tel"
+                optional
+              />
+
+              <FormField
+                id="gym-size"
+                name="tamano"
+                label="Tamaño del gimnasio"
+                control="select"
+                options={SIZE_OPTIONS}
+                optional
+              />
+
+              <FormCheckbox id="demo-consent" name="consentimiento" required>
+                Acepto los <Link href="/terms-and-condition">términos y condiciones</Link> y la{" "}
+                <Link href="/privacy-policy">política de privacidad</Link>.
+              </FormCheckbox>
+
+              <Button type="submit" size="lg" fullWidth>
+                Solicitar demo
+                <Icon name="lucide:arrow-right" size="sm" />
+              </Button>
+
+              <Text size="xs" tone="subtle" align="center">
+                No pedimos datos de pago ni contraseñas en este formulario.
+              </Text>
+            </Stack>
+          </form>
+        </Card>
+      </Stack>
+
+      <Stack gap="md">
+        <Card padding="lg">
+          <Stack gap="md">
+            <Heading as="h2" size="card" flush>Qué pasa después</Heading>
+            <CheckList items={NEXT_STEPS} gap="md" size="sm" />
+          </Stack>
+        </Card>
+
+        <Card tone="flat" padding="md">
+          <Stack gap="sm">
+            <Text size="xs" tone="subtle" weight="bold" uppercase>
+              ¿Prefieres escribirnos?
+            </Text>
+            <Text size="sm" tone="muted">
+              Responde a {CONTACT.email} y te contesta una persona del equipo.
+            </Text>
+            <Button href={`mailto:${CONTACT.email}`} variant="outlined" size="sm">
+              Abrir correo
+              <Icon name="lucide:mail" size="sm" />
+            </Button>
+          </Stack>
+        </Card>
+
+        <div
+          data-demo-confirmation
+          hidden
+          tabindex="-1"
+          aria-live="polite"
+        >
+          <FormNotice tone="success" live>
+            <Stack gap="sm">
+              <Text size="sm" weight="semibold">Preparamos tu solicitud.</Text>
+              <Text size="sm" tone="muted">
+                Se abrió tu cliente de correo con los datos del formulario. Envíalo y te respondemos
+                con el acceso. Si no se abrió, escríbenos a {CONTACT.email} y lo vemos desde ahí.
+              </Text>
+              <Stack direction="horizontal" gap="sm" wrap>
+                <Button id="copy-email" variant="outlined" size="sm">
+                  Copiar correo
+                  <Icon name="lucide:copy" size="sm" />
+                </Button>
+                <Link href={`mailto:${CONTACT.email}`} tone="inline">Abrir correo</Link>
+              </Stack>
+            </Stack>
+          </FormNotice>
+        </div>
+      </Stack>
+    </Grid>
+  </Section>
+</BaseLayout>
+
+<script>
+  import { CONTACT } from "@/config/site";
+
+  const form = document.querySelector<HTMLFormElement>("[data-demo-form]");
+  const confirmation = document.querySelector<HTMLElement>("[data-demo-confirmation]");
+
+  const readValue = (data: FormData, key: string) => String(data.get(key) ?? "").trim();
+
+  form?.addEventListener("submit", (event) => {
+    if (!form.checkValidity()) return;
+    event.preventDefault();
+
+    const data = new FormData(form);
+    const gym = readValue(data, "gimnasio");
+    const rows = [
+      ["Gimnasio", gym],
+      ["País", readValue(data, "pais")],
+      ["Dueño", readValue(data, "dueno")],
+      ["Correo", readValue(data, "correo")],
+      ["Teléfono", readValue(data, "telefono") || "No indicado"],
+      ["Tamaño", readValue(data, "tamano") || "No indicado"],
+    ];
+
+    const subject = `Solicitud de demo — ${gym}`;
+    const body = rows.map(([label, value]) => `${label}: ${value}`).join("\n");
+    const href = `mailto:${CONTACT.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.location.href = href;
+
+    if (confirmation) {
+      confirmation.hidden = false;
+      confirmation.focus();
+    }
+  });
+
+  document.getElementById("copy-email")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const original = button.textContent ?? "";
+    try {
+      await navigator.clipboard.writeText(CONTACT.email);
+      button.textContent = "Correo copiado";
+    } catch {
+      button.textContent = CONTACT.email;
+    }
+    setTimeout(() => {
+      button.textContent = original;
+    }, 3000);
+  });
+</script>

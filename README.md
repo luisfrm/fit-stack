@@ -17,7 +17,7 @@ Fit-Stack is composed of **applications** + **shared packages** in a single pnpm
 | `api-worker` | Hono + Cloudflare Workers | 8788 | Primary REST API (Better Auth + Drizzle ORM + Hono) |
 | `jobs-worker` | Cloudflare Queues | 8787 | Background jobs processor (Emails via Resend, PDFs, Notifications) |
 | `panel` | Next.js 16 (App) | 3001 | Gym admin panel (Owner/Manager/Cashier) |
-| `web` | Next.js 16 (App) | 3002 | Public marketing + CMS pages & Member portal |
+| `commercial` | Astro 7 (static) | 3002 | Public marketing site (Spanish, SEO, light/dark) |
 | `console` | Next.js 16 (App) | 3000 | SaaS super-admin (organizations, plans, subscriptions) |
 
 ### Packages
@@ -55,7 +55,6 @@ pnpm install
 ```bash
 cp apps/panel/.env.example apps/panel/.env
 cp apps/console/.env.example apps/console/.env
-cp apps/web/.env.example apps/web/.env
 cp packages/database/.env.example packages/database/.env
 ```
 
@@ -79,7 +78,7 @@ pnpm dev            # Run all apps via Turbo
 cd apps/api-worker && pnpm dev
 cd apps/panel && pnpm dev
 cd apps/console && pnpm dev
-cd apps/web && pnpm dev
+cd apps/commercial && pnpm dev
 ```
 
 ### Lint & Typecheck
@@ -113,8 +112,8 @@ pnpm format
 
 | Component | Hosting | Strategy |
 |-----------|---------|----------|
-| `api-worker`, `jobs-worker` | Cloudflare Workers | Automated via GitHub Actions (`deploy-api-worker.yml` / `deploy-jobs-worker.yml`) + Terraform provisioning |
-| `panel`, `web`, `console` | Vercel | Manual (`vercel --prod` or Vercel Dashboard) |
+| `api-worker`, `jobs-worker`, `commercial` | Cloudflare Workers | Automated via GitHub Actions (`deploy-api-worker.yml` / `deploy-jobs-worker.yml` / `deploy-commercial.yml`); infra via Terraform |
+| `panel`, `console` | Vercel | Manual (`vercel --prod` or Vercel Dashboard) |
 | Database (Neon) | Neon Postgres | Migrations via `database-migrations.yml` (Drizzle) |
 | Cloudflare infra (R2, Queues, Secrets) | Cloudflare | Terraform (`terraform.yml` — plan/apply per environment) |
 
@@ -124,6 +123,7 @@ pnpm format
 |----------|---------|---------|
 | `ci.yml` | Pull requests to `master`/`develop` | Lint + typecheck of affected apps (Turbo) |
 | `deploy-api-worker.yml` | Push to `master`/`develop` or `workflow_dispatch` | Deploys the API worker (production / dev) |
+| `deploy-commercial.yml` | Push to `master`/`develop` (commercial/ui/shared) or `workflow_dispatch` | Builds and deploys the Astro marketing site to Cloudflare Workers |
 | `deploy-jobs-worker.yml` | Push to `master`/`develop` or `workflow_dispatch` | Deploys the jobs worker |
 | `database-migrations.yml` | Schema changes or `workflow_dispatch` | Applies Neon migrations (`pnpm db:migrate`) |
 | `terraform.yml` | `workflow_dispatch` (`plan` / `apply`) | Provisions Cloudflare resources per environment |

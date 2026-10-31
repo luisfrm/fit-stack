@@ -1,0 +1,47 @@
+name: Deploy Commercial Site
+
+on:
+  push:
+    branches: [master, develop]
+    paths:
+      - 'apps/commercial/**'
+      - 'packages/ui/**'
+      - 'packages/shared/**'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: deploy-commercial-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy commercial site
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build static site
+        run: pnpm --filter commercial build
+
+      - name: Deploy
+        working-directory: apps/commercial
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy

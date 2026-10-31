@@ -1,0 +1,93 @@
+---
+import { CONTACT, SITE } from "@/config/site";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+import CountriesSection from "@/components/sections/CountriesSection.astro";
+import FaqSection from "@/components/sections/FaqSection.astro";
+import FeaturesSection from "@/components/sections/FeaturesSection.astro";
+import FinalCta from "@/components/sections/FinalCta.astro";
+import Hero from "@/components/sections/Hero.astro";
+import HowItWorks from "@/components/sections/HowItWorks.astro";
+import MultiCurrency from "@/components/sections/MultiCurrency.astro";
+import PricingSection from "@/components/sections/PricingSection.astro";
+import ProblemsSection from "@/components/sections/ProblemsSection.astro";
+
+import { SUPPORTED_COUNTRIES } from "@/data/countries";
+import { CURRENCY_EXAMPLE_PRIMARY, CURRENCY_EXAMPLE_TOTAL_CENTS } from "@/data/currency-example";
+import { FAQ } from "@/data/faq";
+import { PRIMARY_FEATURES, SECONDARY_FEATURES } from "@/data/features";
+import { PLAN_CURRENCY, PLANS, planPriceUnits } from "@/data/pricing";
+import { PROBLEMS } from "@/data/problems";
+import { STEPS } from "@/data/steps";
+
+/** Three facts from the product, not marketing claims. */
+const TRUST_POINTS = [
+  "Cada gimnasio es una organización aislada",
+  "Cada pago guarda su tasa del día",
+  "Recibo en PDF enviado al validar el cobro",
+] as const;
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE.name,
+    url: SITE.url,
+    logo: `${SITE.url}/brand/og-image.jpg`,
+    description: SITE.description,
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer support",
+      email: CONTACT.email,
+      availableLanguage: ["es"],
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: SITE.name,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    url: SITE.url,
+    description: SITE.description,
+    offers: PLANS.map((plan) => ({
+      "@type": "Offer",
+      name: plan.name,
+      price: planPriceUnits(plan.priceCents),
+      priceCurrency: PLAN_CURRENCY,
+      description: plan.tagline,
+    })),
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: { "@type": "Answer", text: item.answer },
+    })),
+  },
+];
+---
+
+<BaseLayout title={SITE.title} description={SITE.description}>
+  <script
+    slot="head"
+    type="application/ld+json"
+    set:html={JSON.stringify(structuredData)}
+  />
+
+  <Hero
+    trustPoints={TRUST_POINTS}
+    example={CURRENCY_EXAMPLE_PRIMARY}
+    totalCents={CURRENCY_EXAMPLE_TOTAL_CENTS}
+  />
+  <CountriesSection countries={SUPPORTED_COUNTRIES} />
+  <ProblemsSection problems={PROBLEMS} />
+  <FeaturesSection features={PRIMARY_FEATURES} extraFeatures={SECONDARY_FEATURES} />
+  <HowItWorks steps={STEPS} />
+  <MultiCurrency />
+  <PricingSection plans={PLANS} />
+  <FaqSection items={FAQ} />
+  <FinalCta />
+</BaseLayout>

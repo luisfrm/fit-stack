@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /probar-demo
+
+Sitemap: https://commercial.luisrivas.site/sitemap-index.xml

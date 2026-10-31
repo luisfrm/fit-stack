@@ -1,0 +1,81 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Button — the only way to render an action in this app.
+ *
+ * Styling lives in the variant map below. Consumers never pass Tailwind
+ * classes: pick a `variant` and a `size`.
+ */
+const button = cva(
+  [
+    "inline-flex items-center justify-center gap-2",
+    "font-bold uppercase tracking-wider",
+    "rounded-md",
+    "transition-colors duration-200",
+    "cursor-pointer select-none",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    "disabled:pointer-events-none disabled:opacity-40",
+  ],
+  {
+    variants: {
+      variant: {
+        primary:
+          "border border-transparent bg-primary text-primary-foreground shadow-[0_0_0_1px_var(--color-border-primary)] hover:bg-primary-hover",
+        outlined:
+          "border border-border bg-transparent text-foreground hover:border-primary/60 hover:bg-primary/5",
+        ghost: "border border-transparent bg-transparent text-foreground hover:bg-foreground/5",
+        secondary:
+          "border border-input-border bg-input text-foreground hover:bg-input-hover",
+        glass:
+          "border border-border bg-foreground/5 text-foreground hover:bg-foreground/10",
+        white: "border border-transparent bg-white text-black hover:bg-white/90",
+        link: "h-auto border-0 bg-transparent p-0 text-primary-ink underline underline-offset-4 hover:text-foreground",
+      },
+      size: {
+        xs: "h-8 px-3 text-[10px] tracking-[0.15em]",
+        sm: "h-10 px-5 text-xs",
+        md: "h-11 px-6 text-sm",
+        lg: "h-12 px-8 text-sm",
+        xl: "h-14 px-10 text-base",
+      },
+      fullWidth: {
+        true: "w-full",
+        false: "",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "md",
+      fullWidth: false,
+    },
+  }
+);
+
+interface Props {
+  variant?: "primary" | "outlined" | "ghost" | "secondary" | "glass" | "white" | "link";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  fullWidth?: boolean;
+  href?: string;
+  type?: "button" | "submit";
+  id?: string;
+  target?: string;
+  rel?: string;
+  "aria-label"?: string;
+}
+
+const { variant, size, fullWidth, href, type = "button", id, target, rel } = Astro.props;
+const classes = button({ variant, size, fullWidth });
+---
+
+{
+  href ? (
+    <a href={href} class={classes} id={id} target={target} rel={rel}>
+      <slot />
+    </a>
+  ) : (
+    <button type={type} class={classes} id={id} aria-label={Astro.props["aria-label"]}>
+      <slot />
+    </button>
+  )
+}

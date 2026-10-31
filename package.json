@@ -10,7 +10,7 @@
     "start:jobs": "pnpm --filter jobs-worker dev",
     "start:panel": "pnpm --filter panel dev",
     "start:console": "pnpm --filter console dev",
-    "start:web": "pnpm --filter web dev",
+    "start:commercial": "pnpm --filter commercial dev",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:generate": "pnpm --filter @workspace/database db:generate",

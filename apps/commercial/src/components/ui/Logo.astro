@@ -1,0 +1,56 @@
+---
+import { cva } from "class-variance-authority";
+import { SITE } from "@/config/site";
+
+const logo = cva("inline-flex items-baseline gap-0.5 leading-none", {
+  variants: {
+    size: {
+      sm: "text-lg",
+      md: "text-[1.375rem]",
+      lg: "text-2xl",
+    },
+  },
+  defaultVariants: {
+    size: "md",
+  },
+});
+
+const wordmark = cva("font-black leading-none", {
+  variants: {
+    kind: {
+      brand: "font-display italic uppercase tracking-tighter text-primary-ink",
+      name: "font-sans uppercase tracking-tight text-foreground",
+    },
+  },
+  defaultVariants: {
+    kind: "brand",
+  },
+});
+
+const link = cva(
+  "inline-flex rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+);
+
+interface Props {
+  size?: "sm" | "md" | "lg";
+  href?: string;
+}
+
+const { size, href } = Astro.props;
+---
+
+{
+  href ? (
+    <a href={href} class={link()} aria-label={`${SITE.name}, ir al inicio`}>
+      <span class={logo({ size })} aria-hidden="true">
+        <span class={wordmark({ kind: "brand" })}>Fit</span>
+        <span class={wordmark({ kind: "name" })}>Stack</span>
+      </span>
+    </a>
+  ) : (
+    <span class={logo({ size })}>
+      <span class={wordmark({ kind: "brand" })}>Fit</span>
+      <span class={wordmark({ kind: "name" })}>Stack</span>
+    </span>
+  )
+}

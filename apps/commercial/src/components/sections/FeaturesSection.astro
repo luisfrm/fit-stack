@@ -1,0 +1,91 @@
+---
+import { cva } from "class-variance-authority";
+
+import type { Feature } from "@/data/features";
+import Badge from "@/components/ui/Badge.astro";
+import Card from "@/components/ui/Card.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  features: readonly Feature[];
+  /** Capabilities that ship below the main grid. */
+  extraFeatures?: readonly Feature[];
+}
+
+const { features, extraFeatures = [] } = Astro.props;
+
+const iconBox = cva(
+  "inline-flex size-10 items-center justify-center rounded-md border border-border bg-primary-soft text-primary-ink"
+);
+const extraItem = cva("flex items-start gap-2");
+---
+
+<Section id="funciones" labelledBy="funciones-title">
+  <Stack gap="xl">
+    <SectionHeader
+      eyebrow="Funciones"
+      title="Todo lo que tu gimnasio necesita, en un solo"
+      accent="panel"
+      description="Cada módulo trabaja sobre la misma base de datos por organización: sin exportar hojas de cálculo ni duplicar clientes."
+      id="funciones-title"
+    />
+
+    <Grid as="ul" cols={3} gap="md">
+      {
+        features.map((feature) => (
+          <Card as="li" padding="lg" interactive>
+            <Stack gap="sm">
+              <span class={iconBox()}>
+                <Icon name={feature.icon} size="lg" />
+              </span>
+              <Heading as="h3" size="card" flush>
+                {feature.title}
+              </Heading>
+              <Text size="sm" tone="muted">
+                {feature.description}
+              </Text>
+              {feature.detail && (
+                <Text size="xs" tone="subtle">
+                  {feature.detail}
+                </Text>
+              )}
+            </Stack>
+          </Card>
+        ))
+      }
+    </Grid>
+
+    {
+      extraFeatures.length > 0 && (
+        <Card tone="flat" padding="lg">
+          <Stack gap="md">
+            <Badge tone="primary" size="sm">
+              También incluido
+            </Badge>
+            <Grid as="ul" cols="threeUp" gap="md">
+              {extraFeatures.map((feature) => (
+                <Stack as="li" gap="xs">
+                  <div class={extraItem()}>
+                    <Icon name={feature.icon} size="sm" tone="primary" shrink />
+                    <Text as="span" size="sm" weight="semibold">
+                      {feature.title}
+                    </Text>
+                  </div>
+                  <Text size="xs" tone="muted">
+                    {feature.description}
+                  </Text>
+                </Stack>
+              ))}
+            </Grid>
+          </Stack>
+        </Card>
+      )
+    }
+  </Stack>
+</Section>

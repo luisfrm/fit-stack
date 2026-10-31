@@ -1,0 +1,85 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Key/value list rendered as a real <dl>.
+ * Used by the product illustration panels so the markup stays semantic.
+ */
+const list = cva("flex flex-col", {
+  variants: {
+    gap: {
+      tight: "gap-2",
+      default: "gap-2.5",
+    },
+    size: {
+      sm: "text-sm",
+      base: "text-base",
+    },
+  },
+  defaultVariants: {
+    gap: "default",
+    size: "sm",
+  },
+});
+
+const row = cva("flex items-baseline justify-between gap-3", {
+  variants: {
+    divided: {
+      true: "border-t border-border-muted pt-2.5",
+      false: "",
+    },
+  },
+  defaultVariants: { divided: false },
+});
+
+const term = cva("shrink-0 text-foreground-muted");
+const hint = cva("ml-1 text-xs font-normal text-foreground-muted");
+const value = cva("text-right text-foreground-strong", {
+  variants: {
+    emphasis: {
+      true: "font-bold",
+      false: "font-medium",
+    },
+    numeric: {
+      true: "tabular-nums",
+      false: "",
+    },
+  },
+  defaultVariants: {
+    emphasis: false,
+    numeric: false,
+  },
+});
+
+interface Item {
+  readonly label: string;
+  readonly value: string;
+  /** Renders a decorative suffix next to the value (e.g. "solo lectura"). */
+  readonly hint?: string;
+  readonly emphasis?: boolean;
+  readonly numeric?: boolean;
+  readonly divided?: boolean;
+}
+
+interface Props {
+  items: readonly Item[];
+  gap?: "tight" | "default";
+  size?: "sm" | "base";
+}
+
+const { items, gap, size } = Astro.props;
+---
+
+<dl class={list({ gap, size })}>
+  {
+    items.map((item) => (
+      <div class={row({ divided: item.divided })}>
+        <dt class={term()}>{item.label}</dt>
+        <dd class={value({ emphasis: item.emphasis, numeric: item.numeric })}>
+          {item.value}
+          {item.hint && <span class={hint()}>{item.hint}</span>}
+        </dd>
+      </div>
+    ))
+  }
+</dl>

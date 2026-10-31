@@ -1,0 +1,95 @@
+---
+import { cva } from "class-variance-authority";
+
+import {
+  CURRENCY_EXAMPLE_ROWS,
+  CURRENCY_EXAMPLE_TOTAL_CENTS,
+  formatExampleAmount,
+  formatExampleRate,
+} from "@/data/currency-example";
+import Badge from "@/components/ui/Badge.astro";
+import Card from "@/components/ui/Card.astro";
+import CheckList from "@/components/ui/CheckList.astro";
+import DataTable from "@/components/ui/DataTable.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+const POINTS = [
+  "Cobras en cualquiera de las monedas que actives, no solo en la del plan.",
+  "La tasa del día la consulta el sistema y se guarda con el pago; nunca se escribe a mano.",
+  "El equivalente en tu moneda principal queda registrado, así los reportes no recalculan con tasas que ya cambiaron.",
+  "Los ingresos se consolidan en una sola cifra, aunque hayas cobrado en tres monedas distintas.",
+] as const;
+
+const rows = CURRENCY_EXAMPLE_ROWS.map((row) => ({
+  concept: row.label,
+  currency: row.currencyLabel,
+  amount: formatExampleAmount(row.amountCents, row.currency),
+  rate: formatExampleRate(row.rate),
+  base: formatExampleAmount(row.baseCents, "USD"),
+}));
+
+rows.push({
+  concept: "Consolidado",
+  currency: "Moneda principal",
+  amount: "—",
+  rate: "—",
+  base: formatExampleAmount(CURRENCY_EXAMPLE_TOTAL_CENTS, "USD"),
+});
+
+const tableHeader = cva("flex flex-wrap items-center justify-between gap-3");
+const noteRow = cva("flex items-start gap-2");
+---
+
+<Section labelledBy="multimoneda-title" tone="muted">
+  <Grid cols={2} split gap="lg" align="center">
+    <Stack gap="md">
+      <SectionHeader
+        eyebrow="Multi-moneda"
+        title="Cobra en la moneda del cliente y reporta en la"
+        accent="tuya"
+        description="Cada gimnasio tiene una moneda principal para reportes y puede cobrar en cualquier moneda activa. El sistema cruza las dos con la tasa del día y deja el resultado guardado."
+        id="multimoneda-title"
+        width="none"
+      />
+
+      <CheckList items={POINTS.map((label) => ({ label }))} gap="md" size="sm" />
+    </Stack>
+
+    <Card padding="md">
+      <Stack gap="md">
+        <div class={tableHeader()}>
+          <Text size="xs" tone="subtle" weight="bold" uppercase>
+            Ejemplo ilustrativo
+          </Text>
+          <Badge tone="primary">Tasa guardada</Badge>
+        </div>
+
+        <DataTable
+          caption="Ejemplo de dos cobros en monedas distintas consolidados en la moneda principal"
+          columns={[
+            { key: "concept", label: "Concepto" },
+            { key: "currency", label: "Moneda" },
+            { key: "amount", label: "Cobrado", align: "right" },
+            { key: "rate", label: "Tasa", align: "right" },
+            { key: "base", label: "Equivalente", align: "right" },
+          ]}
+          rows={rows}
+          emphasizeLastRow
+        />
+
+        <div class={noteRow()}>
+          <Icon name="lucide:shield-check" size="sm" tone="primary" shrink />
+          <Text size="xs" tone="subtle">
+            El equivalente en moneda principal se guarda junto al pago: los reportes leen ese valor y
+            nunca vuelven a convertir con una tasa distinta.
+          </Text>
+        </div>
+      </Stack>
+    </Card>
+  </Grid>
+</Section>

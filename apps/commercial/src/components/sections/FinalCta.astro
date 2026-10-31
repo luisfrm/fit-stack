@@ -1,0 +1,46 @@
+---
+import { cva } from "class-variance-authority";
+
+import { CONTACT } from "@/config/site";
+import Badge from "@/components/ui/Badge.astro";
+import Button from "@/components/ui/Button.astro";
+import Card from "@/components/ui/Card.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import Text from "@/components/ui/Text.astro";
+
+const content = cva("flex flex-col items-center gap-5 text-center");
+const actions = cva("flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center");
+---
+
+<Section tone="gradient" backdrop="radial" spacing="loose">
+  <Card tone="glass" padding="lg">
+    <div class={content()}>
+      <Badge tone="primary">Alta asistida</Badge>
+
+      <Heading as="h2" size="section" flush align="center">
+        Cuéntanos de tu gimnasio y lo dejamos listo
+      </Heading>
+
+      <Text size="lead" tone="muted" align="center">
+        Cargamos tu país, tu moneda principal y tu zona horaria, y creamos el usuario del dueño. Después
+        solo queda registrar miembros y planes.
+      </Text>
+
+      <div class={actions()}>
+        <Button href={CONTACT.demoPath} size="lg">
+          Probar demo gratuita
+          <Icon name="lucide:arrow-right" size="sm" />
+        </Button>
+        <Button href={`mailto:${CONTACT.email}`} variant="outlined" size="lg">
+          Hablar con el equipo
+        </Button>
+      </div>
+
+      <Text size="xs" tone="subtle" align="center">
+        Sin tarjeta. La demo se coordina con el equipo y no genera cobros.
+      </Text>
+    </div>
+  </Card>
+</Section>

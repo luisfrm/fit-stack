@@ -1,0 +1,29 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Long-form readable content (legal documents). Typographic rules live in
+ * `styles/global.css` under `.legal-prose`; this component only owns layout.
+ */
+const prose = cva("legal-prose", {
+  variants: {
+    width: {
+      narrow: "max-w-[62ch]",
+      default: "",
+    },
+  },
+  defaultVariants: {
+    width: "default",
+  },
+});
+
+interface Props {
+  width?: "narrow" | "default";
+}
+
+const { width } = Astro.props;
+---
+
+<div class={prose({ width })}>
+  <slot />
+</div>

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fitstack-commercial",
+  "compatibility_date": "2026-10-01",
+  // Static site delivered by Cloudflare Workers Assets.
+  // There is no worker script: `wrangler deploy` uploads `dist/` and creates
+  // the Worker, the assets bucket and the deployment on first run.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
