@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fit-stack-portal",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "upload_source_maps": true,
+  "services": [
+    {
+      "binding": "API",
+      "service": "fit-stack-api"
+    }
+  ],
+  "env": {
+    "dev": {
+      "name": "fit-stack-portal-dev",
+      "services": [
+        {
+          "binding": "API",
+          "service": "fit-stack-api-dev"
+        }
+      ]
+    },
+    "staging": {
+      "name": "fit-stack-portal-staging",
+      "services": [
+        {
+          "binding": "API",
+          "service": "fit-stack-api-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "fit-stack-portal",
+      "services": [
+        {
+          "binding": "API",
+          "service": "fit-stack-api"
+        }
+      ]
+    }
+  }
+}

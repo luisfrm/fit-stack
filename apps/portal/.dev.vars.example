@@ -1,0 +1,10 @@
+# Development-only configuration for `apps/portal`.
+#
+# Copy to `.dev.vars` (never committed). Deployed environments get their config
+# from `wrangler.jsonc` / Terraform instead.
+#
+# `@cloudflare/vite-plugin` runs its own Miniflare instance and does not share
+# the `wrangler dev` service registry, so the `API` service binding may not
+# resolve locally. Point this at the locally running api-worker; without it the
+# binding is used and a failure surfaces as an error instead of a fallback.
+API_DEV_URL=http://localhost:8788

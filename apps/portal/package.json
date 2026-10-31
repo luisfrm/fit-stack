@@ -1,0 +1,47 @@
+{
+  "name": "portal",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "dev": "react-router dev --port 3003",
+    "build": "react-router build",
+    "preview": "vite preview",
+    "typecheck": "react-router typegen && tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@workspace/auth": "workspace:*",
+    "@workspace/shared": "workspace:*",
+    "@workspace/ui": "workspace:*",
+    "better-auth": "^1.7.14",
+    "lucide-react": "^0.563.0",
+    "ofetch": "^1.5.1",
+    "react": "19.2.9",
+    "react-dom": "19.2.9",
+    "react-router": "^8.5.1",
+    "zod": "^3.25.76",
+    "isbot": "^5"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.66.0",
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "@react-router/dev": "^8.5.1",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^25.1.0",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "@workspace/eslint-config": "workspace:*",
+    "eslint": "^9.39.2",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3",
+    "wrangler": "^4.154.0"
+  }
+}
