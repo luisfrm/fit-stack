@@ -1,15 +1,19 @@
 "use client"
 
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
+/**
+ * Toaster.
+ *
+ * The theme is a prop instead of a `next-themes` read: this package must stay
+ * framework-agnostic. `"system"` matches the previous behaviour when no theme
+ * provider was mounted, so Next.js consumers keep working without changes.
+ */
+const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       className="toaster group"
       icons={{
         success: (

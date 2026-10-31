@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { sessionService } from "@workspace/auth/service";
 import { canPlatform } from "@workspace/shared";
 import { AppSidebar, MobileNav } from "@/components/dashboard/sidebar";
-import type { SidebarUser } from "@workspace/ui/components";
+import type { SidebarUser } from "@workspace/ui/next";
 import { api } from "@/lib/api/client";
 import { PLATFORM_SETTINGS_KEYS } from "@/lib/config/platform-settings";
 import { uploadService } from "@/lib/services/upload-service";

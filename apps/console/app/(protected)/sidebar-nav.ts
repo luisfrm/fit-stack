@@ -1,5 +1,5 @@
 import * as Icons from "lucide-react";
-import type { SidebarNavItem } from "@workspace/ui/components";
+import type { SidebarNavItem } from "@workspace/ui/next";
 import type { PlatformStatement } from "@workspace/shared";
 
 export type PlatformNavItem = SidebarNavItem & {

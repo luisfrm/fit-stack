@@ -4,7 +4,7 @@
 
 ## Modelos y provider
 
-- **Allowlist** en `shared/ai.ts` (`ALL_CHAT_MODEL_IDS`): `@cf/zai-org/glm-4.7-flash` (Workers AI) + cadena OpenRouter fija de 3 (`z-ai/glm-5.2:free`, `poolside/laguna-s-2.1:free`, `nvidia/nemotron-3.5-lightning:free`). Single source para `api-worker` (validación/ruteo) y `panel` (selector vía RSC).
+- **Allowlist** en `shared/ai.ts` (`ALL_CHAT_MODEL_IDS`): `@cf/zai-org/glm-4.7-flash` (Workers AI) + cadena OpenRouter fija de 3 (`nvidia/nemotron-3-ultra-550b-a55b:free`, `nvidia/nemotron-3.5-super-vl:free`, `dots-studio/dots-3-note-preview:free`). Single source para `api-worker` (validación/ruteo) y `panel` (selector vía RSC).
 - **Provider por defecto** en `platform_setting` key `ai_provider_default` (`openrouter` | `workers-ai`, default `openrouter`) — Console → Settings → IA Provider. El otro es **fallback automático** (ver § Router). Helper `resolveAiProviders()` en `shared/ai.ts` (`AI_DEFAULT_PROVIDER`).
 - **Workers AI**: **10K neurons/día gratis** (reset 00:00 UTC, **5.500 neurons/M in**, **36.400/M out** para GLM-4.7-flash). Excedente **$0.011/1K neurons**, requiere **Workers Paid $5/mes**. Coste en $: **$0.060/M in + $0.400/M out** (`chat-pricing.md` § Coste real). `openrouter/free` es $0 al proveedor pero consume créditos igual.
 - **OpenRouter free**: 50/día sin saldo, 1.000/día con $10 de crédito, 20 RPM — el circuit breaker evita cascada.

@@ -1,3 +1,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Vite accepts `^0.27.0 || ^0.28.0`. esbuild 0.28.x cannot delete its temporary
+# output file on Windows (`remove …: Access is denied`), which breaks
+# `vite:esbuild-transpile` on large chunks (apps/portal). Pin the last working
+# 0.27 for Vite only: `tsx`/`drizzle-kit` keep their own copies.
+overrides:
+  vite>esbuild: 0.27.2

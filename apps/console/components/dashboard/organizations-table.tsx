@@ -5,10 +5,10 @@ import {
   Table,
   ColumnDef,
   Badge,
-  NextImage,
   Text,
   Skeleton,
 } from "@workspace/ui/components";
+import { NextImage } from "@workspace/ui/next";
 import { OrganizationActions } from "./organization-actions";
 import { SubscriptionCell } from "./subscription-cell";
 import { Building2, Users } from "lucide-react";

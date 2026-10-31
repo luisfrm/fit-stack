@@ -86,7 +86,7 @@ export function AiProviderSettings({ initialSettings, onSaved }: AiProviderSetti
               options={[
                 {
                   value: "openrouter",
-                  label: "OpenRouter — z-ai/glm-5.2 · laguna-s-2.1 · nemotron-3.5 (free chain)",
+                  label: "OpenRouter — nemotron-3-ultra · nemotron-3.5-super-vl · dots-3-note-preview (free chain)",
                 },
                 {
                   value: "workers-ai",
@@ -97,8 +97,8 @@ export function AiProviderSettings({ initialSettings, onSaved }: AiProviderSetti
             <div className="flex flex-col gap-1 text-[9px] text-white/40 leading-relaxed">
               <span className="flex gap-2 italic">
                 <Info className="w-3.5 h-3.5 text-white/20 shrink-0" />
-                Cadena OpenRouter: z-ai/glm-5.2:free → poolside/laguna-s-2.1:free →
-                nvidia/nemotron-3.5-lightning:free.
+                Cadena OpenRouter: nvidia/nemotron-3-ultra-550b-a55b:free →
+                nvidia/nemotron-3.5-super-vl:free → dots-studio/dots-3-note-preview:free.
               </span>
               <span className="italic pl-5">
                 Workers AI text: @cf/zai-org/glm-4.7-flash · Embedding:

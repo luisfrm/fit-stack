@@ -1,42 +1,27 @@
 import { createAuthClient } from 'better-auth/react';
-import { customSessionClient, organizationClient } from "better-auth/client/plugins";
-import { organizationAc, organizationRoles, IUser, ISession, IOrganization, IAuthMember } from '@workspace/shared';
+import { AUTH_CLIENT_DEFAULTS } from './client-config';
 import { requireApiBaseUrl } from './env';
 
+/**
+ * Next.js auth client. The browser talks to the API on a different origin, so
+ * the base URL is required: a missing value throws instead of falling back to
+ * an invented port (AGENTS.md §10).
+ */
 export const authClient = createAuthClient({
-  // Required configuration: a missing base URL throws instead of falling back
-  // to an invented port (AGENTS.md §10).
+  ...AUTH_CLIENT_DEFAULTS,
   baseURL: requireApiBaseUrl(),
-  fetchOptions: {
-    credentials: 'include',
-  },
-  plugins: [
-    customSessionClient(),
-    organizationClient({
-      ac: organizationAc,
-      roles: organizationRoles,
-    })
-  ]
 });
-
-export interface SignInParams {
-  email: string;
-  password: string;
-}
-
-export interface SignUpParams {
-  email: string;
-  password: string;
-  name: string;
-}
 
 export const {
   useSession,
   organization,
 } = authClient;
 
-export type User = IUser;
-export interface Session extends ISession {
-  member?: IAuthMember | null;
-  activeOrganization?: IOrganization | null;
-}
+/**
+ * Precise type of a configured client (plugins included). The framework-free
+ * factories in `./org-hooks` and `./session-actions` are typed against it, so a
+ * client built from the same defaults stays interchangeable.
+ */
+export type AuthClient = typeof authClient;
+
+export type { User, Session, SignInParams, SignUpParams } from './client-config';

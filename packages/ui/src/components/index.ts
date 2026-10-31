@@ -68,11 +68,8 @@ export type { ActionDropdownItem, ActionDropdownSection } from "@workspace/ui/co
 export { FloatingActionButton, DEFAULT_FAB_ITEMS } from "@workspace/ui/components/floating-action-button";
 export type { FabItem, FabConfig } from "@workspace/ui/components/floating-action-button";
 
-// Next.js specific components
-export { AppSidebar, MobileNav, SettingsSidebar } from "@workspace/ui/components/next/sidebar";
-export type { SidebarUser, SidebarNavItem, SidebarBranding } from "@workspace/ui/components/next/sidebar";
-export { NavTabs } from "@workspace/ui/components/next/nav-tabs";
-export { NextImage } from "@workspace/ui/components/next/image";
+// Framework-specific components live behind their own entry: import them from
+// `@workspace/ui/next` (Next.js) instead of this barrel.
 
 // Special UI
 export { SplashScreen } from "@workspace/ui/components/splash-screen";

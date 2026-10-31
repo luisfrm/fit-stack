@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.cloudflare.json" }
+  ],
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true
+  }
+}
