@@ -7,9 +7,9 @@
 export const WORKERS_AI_TEXT_MODEL = "@cf/zai-org/glm-4.7-flash" as const;
 
 export const OPENROUTER_TEXT_MODEL_CHAIN = [
-  "z-ai/glm-5.2:free",
-  "poolside/laguna-s-2.1:free",
-  "nvidia/nemotron-3.5-lightning:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3.5-super-vl:free",
+  "dots-studio/dots-3-note-preview:free",
 ] as const;
 
 export const WORKERS_AI_EMBEDDING_MODEL = "@cf/baai/bge-m3" as const;
@@ -43,32 +43,40 @@ export interface AiModelInfo {
   provider: AiProvider;
 }
 
+/**
+ * Display metadata per OpenRouter model. `satisfies Record<OpenRouterChatModelId, …>`
+ * makes the catalog EXHAUSTIVE: editing `OPENROUTER_TEXT_MODEL_CHAIN` without
+ * updating this map is a compile error, never a silent drift.
+ */
+const OPENROUTER_MODEL_META = {
+  "nvidia/nemotron-3-ultra-550b-a55b:free": {
+    label: "Nemotron 3 Ultra 550B Free",
+    description: "OpenRouter · NVIDIA — primary chain",
+  },
+  "nvidia/nemotron-3.5-super-vl:free": {
+    label: "Nemotron 3.5 Super VL Free",
+    description: "OpenRouter · NVIDIA — fallback #1",
+  },
+  "dots-studio/dots-3-note-preview:free": {
+    label: "Dots 3 Note Preview Free",
+    description: "OpenRouter · Dots Studio — fallback #2",
+  },
+} as const satisfies Record<OpenRouterChatModelId, { label: string; description: string }>;
+
 export const AI_MODELS: AiModelInfo[] = [
+  // Order follows the chain: the catalog can never disagree with the routing.
+  ...OPENROUTER_TEXT_MODEL_CHAIN.map((id) => ({
+    id,
+    ...OPENROUTER_MODEL_META[id],
+    provider: "openrouter" as const,
+  })),
   {
-    id: "z-ai/glm-5.2:free",
-    label: "GLM 5.2 Free",
-    description: "OpenRouter · z-ai — primary chain",
-    provider: "openrouter",
-  },
-  {
-    id: "poolside/laguna-s-2.1:free",
-    label: "Laguna S 2.1 Free",
-    description: "OpenRouter · Poolside — fallback #1",
-    provider: "openrouter",
-  },
-  {
-    id: "nvidia/nemotron-3.5-lightning:free",
-    label: "Nemotron 3.5 Lightning Free",
-    description: "OpenRouter · NVIDIA — fallback #2",
-    provider: "openrouter",
-  },
-  {
-    id: "@cf/zai-org/glm-4.7-flash",
+    id: WORKERS_AI_TEXT_MODEL,
     label: "GLM 4.7 Flash",
     description: "Workers AI · fast and lightweight",
     provider: "workers-ai",
   },
-] as const;
+];
 
 // ── Provider default (platform_setting ai_provider_default) ──
 export const AI_PROVIDER_IDS = ["openrouter", "workers-ai"] as const;
