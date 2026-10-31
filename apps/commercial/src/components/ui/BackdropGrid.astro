@@ -1,0 +1,23 @@
+---
+import { cva } from "class-variance-authority";
+
+/** Decorative gridded backdrop. Never carries meaning. */
+const grid = cva("pointer-events-none absolute inset-0", {
+  variants: {
+    fade: {
+      bottom: "bg-grid mask-fade-bottom",
+      none: "bg-grid",
+      radial: "bg-grid [mask-image:radial-gradient(60%_60%_at_50%_40%,black,transparent)]",
+    },
+  },
+  defaultVariants: { fade: "bottom" },
+});
+
+interface Props {
+  fade?: "bottom" | "none" | "radial";
+}
+
+const { fade } = Astro.props;
+---
+
+<div class={grid({ fade })} aria-hidden="true"></div>

@@ -1,0 +1,91 @@
+---
+import { cva } from "class-variance-authority";
+
+import { CONTACT, FOOTER_LINKS, SITE } from "@/config/site";
+import Badge from "@/components/ui/Badge.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Logo from "@/components/ui/Logo.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+const footer = cva("border-t border-border bg-surface-2/40");
+const inner = cva("section-container py-14 lg:py-16");
+const columns = cva("grid gap-10 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.1fr]");
+const columnTitle = cva("text-xs font-bold uppercase tracking-[0.2em] text-foreground-dim");
+const columnList = cva("mt-4 flex flex-col gap-3");
+const columnLink = cva("text-sm text-foreground-muted transition-colors hover:text-foreground");
+const contactLink = cva(
+  "inline-flex items-center gap-2 text-sm text-foreground-muted transition-colors hover:text-foreground"
+);
+const themeLabel = cva("block text-xs font-bold uppercase tracking-[0.2em] text-foreground-dim");
+const bottomBar = cva(
+  "mt-12 flex flex-col gap-3 border-t border-border-muted pt-6 text-xs text-foreground-dim sm:flex-row sm:items-center sm:justify-between"
+);
+
+const year = new Date().getFullYear();
+---
+
+<footer class={footer()}>
+  <div class={inner()}>
+    <div class={columns()}>
+      <Stack gap="sm">
+        <Logo href="/" size="sm" />
+        <Text size="sm" tone="muted">
+          Software de gestión para gimnasios y centros deportivos de Latinoamérica. Miembros,
+          cobros, clases y recibos en un solo lugar.
+        </Text>
+        <Badge tone="outline" size="sm">Hecho en Latinoamérica</Badge>
+      </Stack>
+
+      <nav aria-label="Producto">
+        <p class={columnTitle()}>Producto</p>
+        <ul class={columnList()}>
+          {
+            FOOTER_LINKS.producto.map((link) => (
+              <li>
+                <a href={link.href} class={columnLink()}>
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+
+      <nav aria-label="Legal">
+        <p class={columnTitle()}>Legal</p>
+        <ul class={columnList()}>
+          {
+            FOOTER_LINKS.legal.map((link) => (
+              <li>
+                <a href={link.href} class={columnLink()}>
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+
+      <div>
+        <p class={columnTitle()}>Contacto</p>
+        <Stack gap="md">
+          <a href={`mailto:${CONTACT.email}`} class={contactLink()}>
+            <Icon name="lucide:mail" size="sm" />
+            {CONTACT.email}
+          </a>
+          <Stack gap="xs">
+            <span class={themeLabel()}>Tema</span>
+            <ThemeToggle />
+          </Stack>
+        </Stack>
+      </div>
+    </div>
+
+    <div class={bottomBar()}>
+      <p>© {year} {SITE.name}. Todos los derechos reservados.</p>
+      <p>Precios en dólares estadounidenses (USD).</p>
+    </div>
+  </div>
+</footer>

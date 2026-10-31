@@ -16,7 +16,7 @@ import { Card, Modal, toast, Toaster } from "@workspace/ui/components"
 ## Cómo agregar componentes
 
 ```bash
-pnpm dlx shadcn@latest add <component> -c apps/web
+pnpm dlx shadcn@latest add <component> -c apps/panel
 # El componente se coloca en packages/ui/src/components/
 ```
 

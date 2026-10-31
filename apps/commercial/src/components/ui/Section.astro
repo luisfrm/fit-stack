@@ -1,0 +1,71 @@
+---
+import { cva } from "class-variance-authority";
+
+import BackdropGrid from "./BackdropGrid.astro";
+
+const section = cva("", {
+  variants: {
+    spacing: {
+      tight: "py-12 lg:py-16",
+      default: "py-16 lg:py-[--spacing-section]",
+      loose: "py-20 lg:py-32",
+      none: "",
+    },
+    tone: {
+      default: "",
+      muted: "border-y border-border-muted bg-surface-2/40",
+      gradient: "bg-page-gradient",
+    },
+    backdrop: {
+      none: "",
+      grid: "relative overflow-hidden",
+      radial: "relative overflow-hidden",
+    },
+  },
+  defaultVariants: {
+    spacing: "default",
+    tone: "default",
+    backdrop: "none",
+  },
+});
+
+const inner = cva("section-container relative");
+
+interface Props {
+  id?: string;
+  spacing?: "tight" | "default" | "loose" | "none";
+  tone?: "default" | "muted" | "gradient";
+  backdrop?: "none" | "grid" | "radial";
+  container?: boolean;
+  labelledBy?: string;
+  ariaLabel?: string;
+}
+
+const {
+  id,
+  spacing,
+  tone,
+  backdrop = "none",
+  container = true,
+  labelledBy,
+  ariaLabel,
+} = Astro.props;
+---
+
+<section
+  id={id}
+  class={section({ spacing, tone, backdrop })}
+  aria-labelledby={labelledBy}
+  aria-label={ariaLabel}
+>
+  {backdrop !== "none" && <BackdropGrid fade={backdrop === "radial" ? "radial" : "bottom"} />}
+  {
+    container ? (
+      <div class={inner()}>
+        <slot />
+      </div>
+    ) : (
+      <slot />
+    )
+  }
+</section>

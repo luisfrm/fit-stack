@@ -23,7 +23,7 @@ fit-stack/
 │   ├── api-worker/       # [ACTIVA] Backend API principal (Hono + Cloudflare Workers)
 │   ├── jobs-worker/      # Consumidor de Cloudflare Queues (Emails via Resend, PDFs, Notificaciones)
 │   ├── panel/            # Next.js 16 - Panel de administración para gimnasios (Staff/Owners/Cashiers)
-│   ├── web/              # Next.js 16 - Portal público y app web de socios/miembros
+│   ├── commercial/       # Astro 7 - Sitio comercial público (estático, SEO, light/dark)
 │   └── console/          # Next.js 16 - Panel interno Super-Admin de la Plataforma SaaS
 └── packages/
     ├── database/         # Drizzle ORM + cliente Neon Postgres Serverless

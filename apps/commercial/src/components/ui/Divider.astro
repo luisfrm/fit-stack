@@ -1,0 +1,31 @@
+---
+import { cva } from "class-variance-authority";
+
+const divider = cva("border-0 border-t", {
+  variants: {
+    tone: {
+      default: "border-border",
+      muted: "border-border-muted",
+    },
+    spacing: {
+      none: "",
+      sm: "my-4",
+      md: "my-8",
+      lg: "my-12",
+    },
+  },
+  defaultVariants: {
+    tone: "default",
+    spacing: "none",
+  },
+});
+
+interface Props {
+  tone?: "default" | "muted";
+  spacing?: "none" | "sm" | "md" | "lg";
+}
+
+const { tone, spacing } = Astro.props;
+---
+
+<hr class={divider({ tone, spacing })} />

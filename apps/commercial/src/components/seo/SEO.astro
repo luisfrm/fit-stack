@@ -1,0 +1,52 @@
+---
+import { SITE } from "@/config/site";
+
+interface Props {
+  title: string;
+  description: string;
+  /** Page path, used to build the canonical URL. */
+  path: string;
+  image?: string;
+  noindex?: boolean;
+  type?: "website" | "article";
+}
+
+const { title, description, path, image, noindex = false, type = "website" } = Astro.props;
+
+const canonical = new URL(path, SITE.url).toString();
+const imageUrl = new URL(image ?? SITE.ogImage, SITE.url).toString();
+---
+
+<title>{title}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+
+{
+  noindex ? (
+    <meta name="robots" content="noindex, nofollow" />
+  ) : (
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  )
+}
+
+<meta name="theme-color" content={SITE.themeColor.light} media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content={SITE.themeColor.dark} media="(prefers-color-scheme: dark)" />
+
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={SITE.name} />
+<meta property="og:locale" content={SITE.locale} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={imageUrl} />
+<meta property="og:image:alt" content={`${SITE.name} — ${SITE.description}`} />
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={imageUrl} />
+
+<link rel="icon" href="/favicon.ico" sizes="32x32" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />

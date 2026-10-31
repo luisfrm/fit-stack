@@ -1,0 +1,56 @@
+---
+import { cva } from "class-variance-authority";
+
+import { CONTACT } from "@/config/site";
+import type { FaqItem } from "@/data/faq";
+import Accordion from "@/components/ui/Accordion.astro";
+import Button from "@/components/ui/Button.astro";
+import Card from "@/components/ui/Card.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  items: readonly FaqItem[];
+}
+
+const { items } = Astro.props;
+
+const supportRow = cva("flex items-start gap-2");
+---
+
+<Section id="preguntas" labelledBy="preguntas-title">
+  <Stack gap="xl">
+    <SectionHeader
+      eyebrow="Preguntas frecuentes"
+      title="Lo que suelen preguntar antes de"
+      accent="empezar"
+      description="Si tu duda no está aquí, escríbenos y te responde una persona del equipo."
+      id="preguntas-title"
+    />
+
+    <Accordion items={items} />
+
+    <Card tone="flat" padding="md">
+      <Stack direction="responsive" gap="md" justify="between" align="center">
+        <div class={supportRow()}>
+          <Icon name="lucide:mail" size="md" tone="primary" shrink />
+          <Stack gap="none">
+            <Text size="sm" weight="semibold">
+              ¿Otra duda sobre tu operación?
+            </Text>
+            <Text size="sm" tone="muted">
+              Escríbenos a {CONTACT.email}
+            </Text>
+          </Stack>
+        </div>
+        <Button href={`mailto:${CONTACT.email}`} variant="outlined" size="sm">
+          Escribir al equipo
+          <Icon name="lucide:arrow-up-right" size="sm" />
+        </Button>
+      </Stack>
+    </Card>
+  </Stack>
+</Section>

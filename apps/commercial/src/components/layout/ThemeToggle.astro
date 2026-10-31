@@ -1,0 +1,129 @@
+---
+import { cva } from "class-variance-authority";
+import Icon from "@/components/ui/Icon.astro";
+import SrOnly from "@/components/ui/SrOnly.astro";
+
+const toggle = cva("inline-flex items-center gap-0.5 rounded-md border border-border bg-surface-2/60 p-0.5", {
+  variants: {
+    fullWidth: {
+      true: "w-full justify-between",
+      false: "",
+    },
+    responsive: {
+      /** Hidden on small screens; the mobile menu carries its own copy. */
+      desktopOnly: "hidden sm:inline-flex",
+      always: "inline-flex",
+    },
+  },
+  defaultVariants: {
+    fullWidth: false,
+    responsive: "always",
+  },
+});
+
+const option = cva("theme-option", {
+  variants: {
+    grow: {
+      true: "flex-1",
+      false: "",
+    },
+  },
+  defaultVariants: {
+    grow: false,
+  },
+});
+
+interface Props {
+  fullWidth?: boolean;
+  responsive?: "desktopOnly" | "always";
+}
+
+const { fullWidth, responsive } = Astro.props;
+
+const options = [
+  { value: "light", label: "Tema claro", icon: "lucide:sun" },
+  { value: "system", label: "Tema del sistema", icon: "lucide:laptop" },
+  { value: "dark", label: "Tema oscuro", icon: "lucide:moon" },
+] as const;
+---
+
+<div
+  class={toggle({ fullWidth, responsive })}
+  role="group"
+  aria-label="Tema de la interfaz"
+  data-theme-toggle
+>
+  {
+    options.map((item) => (
+      <button
+        type="button"
+        class={option({ grow: fullWidth })}
+        data-theme-value={item.value}
+        aria-pressed="false"
+        title={item.label}
+      >
+        <Icon name={item.icon} size="sm" />
+        <SrOnly>{item.label}</SrOnly>
+      </button>
+    ))
+  }
+</div>
+
+<script>
+  const THEME_KEY = "fitstack-theme";
+  type ThemeMode = "light" | "dark" | "system";
+
+  const root = document.documentElement;
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+
+  const isThemeMode = (value: string | null): value is ThemeMode =>
+    value === "light" || value === "dark" || value === "system";
+
+  const readMode = (): ThemeMode => {
+    try {
+      const stored = localStorage.getItem(THEME_KEY);
+      return isThemeMode(stored) ? stored : "light";
+    } catch {
+      return "light";
+    }
+  };
+
+  const syncControls = (mode: ThemeMode) => {
+    document.querySelectorAll<HTMLElement>("[data-theme-toggle]").forEach((group) => {
+      group.querySelectorAll<HTMLButtonElement>("[data-theme-value]").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.themeValue === mode));
+      });
+    });
+  };
+
+  const applyTheme = (mode: ThemeMode) => {
+    const isDark = mode === "dark" || (mode === "system" && media.matches);
+    root.classList.toggle("dark", isDark);
+    root.dataset.theme = mode;
+    root.style.colorScheme = isDark ? "dark" : "light";
+    syncControls(mode);
+  };
+
+  const saveTheme = (mode: ThemeMode) => {
+    try {
+      localStorage.setItem(THEME_KEY, mode);
+    } catch {
+      /* Private mode: the choice still applies for this session. */
+    }
+    applyTheme(mode);
+  };
+
+  document.querySelectorAll<HTMLElement>("[data-theme-toggle]").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-theme-value]");
+      const value = button?.dataset.themeValue ?? null;
+      if (isThemeMode(value)) saveTheme(value);
+    });
+  });
+
+  media.addEventListener("change", () => {
+    if (readMode() === "system") applyTheme("system");
+  });
+
+  applyTheme(readMode());
+</script>

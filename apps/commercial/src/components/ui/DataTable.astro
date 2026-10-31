@@ -1,0 +1,90 @@
+---
+import { cva } from "class-variance-authority";
+import SrOnly from "./SrOnly.astro";
+
+/**
+ * Accessible data table. Every table on the site goes through this component
+ * so header scope, captions and responsive overflow stay consistent.
+ */
+const wrap = cva("w-full overflow-x-auto rounded-xl border border-border bg-card");
+
+const table = cva("w-full border-collapse", {
+  variants: {
+    size: {
+      sm: "text-sm",
+      base: "text-base",
+    },
+  },
+  defaultVariants: { size: "sm" },
+});
+
+const align = cva("", {
+  variants: {
+    align: {
+      left: "text-left",
+      right: "text-right",
+    },
+  },
+  defaultVariants: { align: "left" },
+});
+
+const headCell = cva(
+  "border-b border-border bg-table-header px-4 py-3 text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-foreground-muted"
+);
+
+const bodyCell = cva("border-b border-border-muted px-4 py-3 text-foreground");
+
+const totalCell = cva("px-4 py-3 font-bold text-foreground-strong");
+
+interface Column {
+  readonly key: string;
+  readonly label: string;
+  readonly align?: "left" | "right";
+}
+
+interface Props {
+  caption: string;
+  columns: readonly Column[];
+  rows: readonly Readonly<Record<string, string>>[];
+  /** Emphasises the closing row (totals). */
+  emphasizeLastRow?: boolean;
+}
+
+const { caption, columns, rows, emphasizeLastRow = false } = Astro.props;
+---
+
+<div class={wrap()}>
+  <table class={table()}>
+    <caption>
+      <SrOnly>{caption}</SrOnly>
+    </caption>
+    <thead>
+      <tr>
+        {
+          columns.map((column) => (
+            <th scope="col" class:list={[headCell(), align({ align: column.align ?? "left" })]}>
+              {column.label}
+            </th>
+          ))
+        }
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row, index) => {
+          const isLast = index === rows.length - 1;
+          const cell = emphasizeLastRow && isLast ? totalCell() : bodyCell();
+          return (
+            <tr>
+              {columns.map((column) => (
+                <td class:list={[cell, align({ align: column.align ?? "left" })]}>
+                  {row[column.key] ?? ""}
+                </td>
+              ))}
+            </tr>
+          );
+        })
+      }
+    </tbody>
+  </table>
+</div>

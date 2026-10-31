@@ -1,0 +1,61 @@
+---
+import { cva } from "class-variance-authority";
+
+const stack = cva("flex", {
+  variants: {
+    direction: {
+      vertical: "flex-col",
+      horizontal: "flex-row",
+      /** Stacks on mobile, row from `sm` up. */
+      responsive: "flex-col items-stretch sm:flex-row sm:items-center",
+    },
+    gap: {
+      none: "gap-0",
+      xs: "gap-1.5",
+      sm: "gap-3",
+      md: "gap-5",
+      lg: "gap-8",
+      xl: "gap-12",
+    },
+    align: {
+      start: "items-start",
+      center: "items-center",
+      end: "items-end",
+      stretch: "items-stretch",
+      baseline: "items-baseline",
+    },
+    justify: {
+      start: "justify-start",
+      center: "justify-center",
+      between: "justify-between",
+      end: "justify-end",
+    },
+    wrap: {
+      true: "flex-wrap",
+      false: "flex-nowrap",
+    },
+  },
+  defaultVariants: {
+    direction: "vertical",
+    gap: "md",
+    align: "stretch",
+    justify: "start",
+    wrap: false,
+  },
+});
+
+interface Props {
+  as?: "div" | "ul" | "ol" | "nav" | "header" | "footer" | "li";
+  direction?: "vertical" | "horizontal" | "responsive";
+  gap?: "none" | "xs" | "sm" | "md" | "lg" | "xl";
+  align?: "start" | "center" | "end" | "stretch" | "baseline";
+  justify?: "start" | "center" | "between" | "end";
+  wrap?: boolean;
+}
+
+const { as: Tag = "div", direction, gap, align, justify, wrap } = Astro.props;
+---
+
+<Tag class={stack({ direction, gap, align, justify, wrap })}>
+  <slot />
+</Tag>

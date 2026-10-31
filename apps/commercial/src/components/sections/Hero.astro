@@ -1,0 +1,127 @@
+---
+import { cva } from "class-variance-authority";
+
+import { CONTACT } from "@/config/site";
+import { formatExampleAmount, formatExampleRate, type CurrencyExampleRow } from "@/data/currency-example";
+import Accent from "@/components/ui/Accent.astro";
+import Badge from "@/components/ui/Badge.astro";
+import Button from "@/components/ui/Button.astro";
+import Card from "@/components/ui/Card.astro";
+import Eyebrow from "@/components/ui/Eyebrow.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import MiniBars from "@/components/ui/MiniBars.astro";
+import Section from "@/components/ui/Section.astro";
+import SpecList from "@/components/ui/SpecList.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  /** Three factual differentiators, one line each. */
+  trustPoints: readonly string[];
+  /** Payment shown in the illustration. */
+  example: CurrencyExampleRow;
+  /** Consolidated total shown under the illustration. */
+  totalCents: number;
+}
+
+const { trustPoints, example, totalCents } = Astro.props;
+
+const totalLabel = formatExampleAmount(totalCents, "USD");
+const amountLabel = formatExampleAmount(example.amountCents, example.currency);
+const rateLabel = formatExampleRate(example.rate);
+const baseLabel = formatExampleAmount(example.baseCents, "USD");
+
+/** Decorative heights (percent) for the illustration bar strip. */
+const MONTH_BARS = [26, 38, 32, 48, 44, 58, 72] as const;
+
+const cardHeader = cva("flex items-center justify-between gap-3");
+const cardTitle = cva(
+  "font-display text-sm font-black italic uppercase tracking-tight text-foreground-strong"
+);
+const revenueLabel = cva("text-[0.6875rem] font-bold uppercase tracking-[0.18em] text-foreground-muted");
+const revenueValue = cva(
+  "font-display text-base font-black italic tracking-tighter text-foreground-strong"
+);
+---
+
+<Section tone="gradient" backdrop="grid" spacing="loose" labelledBy="hero-title">
+  <Grid cols={1} split gap="lg" align="center">
+    <Stack gap="md">
+      <Eyebrow>Software para gimnasios en Latinoamérica</Eyebrow>
+
+      <Heading as="h1" size="hero" flush id="hero-title">
+        El sistema operativo de tu <Accent variant="highlight">gimnasio</Accent>
+      </Heading>
+
+      <Text size="lead" tone="muted">
+        Miembros, membresías que no pierden días, pagos en varias monedas, clases y recibos en PDF en
+        un solo panel. Cada gimnasio es una organización independiente y cada cobro guarda la tasa
+        exacta del día en que se registró.
+      </Text>
+
+      <Stack direction="responsive" gap="sm">
+        <Button href={CONTACT.demoPath} size="lg" fullWidth>
+          Probar la demo
+          <Icon name="lucide:arrow-right" size="sm" />
+        </Button>
+        <Button href="/#precios" variant="outlined" size="lg" fullWidth>
+          Ver precios
+        </Button>
+      </Stack>
+
+      <Grid as="ul" cols="threeUp" gap="sm">
+        {
+          trustPoints.map((point) => (
+            <Stack as="li" direction="horizontal" gap="xs" align="start">
+              <Icon name="lucide:circle-check" size="sm" tone="primary" shrink />
+              <Text as="span" size="sm" tone="muted">
+                {point}
+              </Text>
+            </Stack>
+          ))
+        }
+      </Grid>
+    </Stack>
+
+    <div aria-hidden="true">
+      <Stack gap="sm">
+        <Card padding="sm">
+          <Stack gap="md">
+            <div class={cardHeader()}>
+              <p class={cardTitle()}>Registrar pago</p>
+              <Badge tone="primary">Tasa del día</Badge>
+            </div>
+
+            <SpecList
+              items={[
+                { label: "Plan", value: "Mensual · 30 días" },
+                { label: "Cobrado", value: amountLabel, numeric: true },
+                { label: "Tasa aplicada", value: rateLabel, numeric: true, hint: "solo lectura" },
+                { label: "Equivalente", value: baseLabel, numeric: true, emphasis: true, divided: true },
+              ]}
+            />
+
+            <Stack direction="horizontal" gap="xs" align="center">
+              <Icon name="lucide:circle-check" size="sm" tone="primary" shrink />
+              <Text as="span" size="xs" tone="primary" weight="semibold">
+                Recibo en PDF enviado por correo
+              </Text>
+            </Stack>
+          </Stack>
+        </Card>
+
+        <Card padding="sm">
+          <Stack gap="sm">
+            <div class={cardHeader()}>
+              <p class={revenueLabel()}>Ingresos del mes</p>
+              <p class={revenueValue()}>{totalLabel}</p>
+            </div>
+            <MiniBars values={MONTH_BARS} height="md" />
+          </Stack>
+        </Card>
+      </Stack>
+    </div>
+  </Grid>
+</Section>

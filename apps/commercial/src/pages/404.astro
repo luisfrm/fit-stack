@@ -1,0 +1,35 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import Button from "@/components/ui/Button.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+---
+
+<BaseLayout
+  title="Página no encontrada — Fit-Stack"
+  description="La página que buscas no existe o cambió de dirección."
+  noindex
+>
+  <Section spacing="loose">
+    <Stack gap="lg">
+      <Stack gap="sm">
+        <Text size="xs" tone="primary" weight="bold" uppercase>Error 404</Text>
+        <Heading as="h1" size="section">Esta página no existe</Heading>
+        <Text tone="muted">
+          Puede que el enlace esté roto o que la página haya cambiado de dirección. Vuelve al inicio
+          para seguir explorando Fit-Stack.
+        </Text>
+      </Stack>
+      <Stack direction="horizontal" gap="sm" wrap>
+        <Button href="/">
+          Volver al inicio
+          <Icon name="lucide:arrow-right" size="sm" />
+        </Button>
+        <Button href="/#precios" variant="outlined">Ver precios</Button>
+      </Stack>
+    </Stack>
+  </Section>
+</BaseLayout>

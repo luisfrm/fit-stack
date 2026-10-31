@@ -1,0 +1,38 @@
+---
+import { cva } from "class-variance-authority";
+
+import type { SupportedCountry } from "@/data/countries";
+import Badge from "@/components/ui/Badge.astro";
+import Section from "@/components/ui/Section.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  countries: readonly SupportedCountry[];
+}
+
+const { countries } = Astro.props;
+
+const row = cva("flex flex-wrap items-center gap-2");
+const flag = cva("text-base leading-none");
+---
+
+<Section spacing="tight" tone="muted" aria-label="Países disponibles">
+  <Stack gap="sm">
+    <Text size="xs" tone="subtle" weight="bold" uppercase>
+      Disponible en {countries.length} países
+    </Text>
+    <div class={row()}>
+      {
+        countries.map((country) => (
+          <Badge tone="outline" size="md">
+            <span class={flag()} aria-hidden="true">
+              {country.flag}
+            </span>
+            {country.name}
+          </Badge>
+        ))
+      }
+    </div>
+  </Stack>
+</Section>

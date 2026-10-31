@@ -27,13 +27,13 @@ pnpm db:studio    # Open Drizzle Studio
 cd apps/api-worker  && pnpm dev  # Cloudflare Workers API (Active) — port 8788
 cd apps/jobs-worker # Cloudflare Queues Worker — port 8787
 cd apps/panel       && pnpm dev  # Port 3001 (Gym Admin / Staff)
-cd apps/web         && pnpm dev  # Port 3002 (Member Portal)
+cd apps/commercial  && pnpm dev  # Port 3002 (Sitio comercial, Astro)
 cd apps/console     && pnpm dev  # Port 3000 (Platform SaaS Admin)
 ```
 
 ## Monorepo Structure
 
-- **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `panel`/`web`/`console` (Next 16, ports 3001/3002/3000).
+- **Apps**: `api-worker` (Hono / Workers — **Active**), `jobs-worker` (Queues — email + PDF receipts), `commercial` (Astro 7 static marketing site, port 3002), `panel`/`console` (Next 16, ports 3001/3000).
 - **Packages**: `auth` (sessions + shared HTTP client + org/platform hooks), `ui`, `shared` (DTOs/types/constants/RBAC), `database` (Drizzle + Neon), `eslint-config`, `typescript-config`.
 - **Docs** (`vaults/`, Obsidian): `architecture/`, `business/`, `ai/`, `guides/` (+ `knowledge-base-rag/`, the RAG chat corpus written for gym owners). Backlog/pending work lives in Linear (project «Fit Stack»); product roadmap in [`docs/roadmap.md`](docs/roadmap.md).
 
@@ -134,6 +134,18 @@ The **server** prices every payment — gym (`POST /api/subscriptions`, RD-158) 
 **No trials** (RD-117): there is no `isTrial`, `trial_days` or `trial` status (migration `0030` closes historical trials, marks them `trials_removed` and turns their payments into `free`). A `price = 0` plan is a **free plan** (`plan_snapshot_price = 0`, `payment_method = 'free'`, never burns an `FS-N`); future discounts are coupons (up to 100%), never a resurrected `price_override`.
 
 **Voided receipts deliver only the seal** (RD-159): `status === PAYMENT_STATUSES.VOIDED` is the source of truth, not `receipt_voided`. A voided payment never serves or emails the emission PDF while the flag is still off; without a stamped PDF the contract answers `pending`/404, and the sweep repairs the flag and the sealed render.
+
+### 12. Commercial Site (`apps/commercial`, Astro)
+
+The public marketing site is **static Astro with no UI framework on the client**: no React/Vue/Svelte integration, no `next/*` imports, interaction only through small vanilla `<script>` modules. It deploys as a Cloudflare Worker serving assets (`wrangler.jsonc` → `assets.directory: ./dist`); it is **not** managed by Terraform and is **not** on Vercel.
+
+- **Design tokens come from `@workspace/ui/globals.css`** (Tailwind v4, CSS-first). The app only adds marketing-only tokens (`--primary-ink`, `--primary-soft`, page gradient) in `src/styles/global.css`; it never declares a parallel palette.
+- **Styling is variant-only.** Every primitive in `src/components/ui/*.astro` exposes typed variants built with `cva`; **no component accepts a `class` prop** and pages/sections must not contain `class`, `class:list` or `style` attributes. A new visual need = a new named variant, not an inline utility.
+- `@workspace/ui` components are React and cannot render in Astro: the `.astro` primitives reproduce that visual language over the shared tokens. Do not add a React integration to reuse them.
+- **Theme**: light by default, `dark` and `system` by user choice. A blocking inline script applies the stored `fitstack-theme` class before first paint; the class contract is the same as the panel/console (`dark` on `<html>`).
+- **Content is data**: prices (`src/data/pricing.ts`, integer cents + `formatCents`), features, FAQ, problems and steps are typed modules consumed by sections and by the JSON-LD, so the visible copy and the structured data cannot drift.
+- **No invented claims**: copy must be traceable to `vaults/guides/knowledge-base-rag/`; prices published there are reference values and must be updated when the Console catalogue changes.
+- Routes: `/` (home), `/probar-demo` (lead form, not indexed), `/terms-and-condition`, `/privacy-policy`, `404`. SEO: canonical + OG/Twitter + JSON-LD (Organization, SoftwareApplication, FAQPage), `@astrojs/sitemap`, `public/robots.txt`.
 
 ## Where to read more
 

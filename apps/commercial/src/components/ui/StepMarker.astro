@@ -1,0 +1,35 @@
+---
+import { cva } from "class-variance-authority";
+
+/** Numbered marker for ordered steps. */
+const marker = cva(
+  "inline-flex shrink-0 items-center justify-center rounded-md font-display font-black italic",
+  {
+    variants: {
+      size: {
+        sm: "size-8 text-sm",
+        md: "size-10 text-base",
+        lg: "size-12 text-lg",
+      },
+      tone: {
+        primary: "bg-primary text-primary-foreground",
+        outline: "border border-border bg-card text-foreground-strong",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+      tone: "primary",
+    },
+  }
+);
+
+interface Props {
+  step: number;
+  size?: "sm" | "md" | "lg";
+  tone?: "primary" | "outline";
+}
+
+const { step, size, tone } = Astro.props;
+---
+
+<span class={marker({ size, tone })} aria-hidden="true">{step}</span>

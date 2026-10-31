@@ -1,0 +1,50 @@
+---
+import { cva } from "class-variance-authority";
+import Icon from "./Icon.astro";
+
+const notice = cva("flex items-start gap-3 rounded-xl border p-4 text-sm", {
+  variants: {
+    tone: {
+      info: "border-border bg-surface-2/50 text-foreground-muted",
+      success: "border-success/30 bg-success/10 text-foreground",
+      warning: "border-warning/40 bg-warning/10 text-foreground",
+      error: "border-destructive/40 bg-destructive/10 text-foreground",
+    },
+  },
+  defaultVariants: { tone: "info" },
+});
+
+const icon = cva("mt-0.5", {
+  variants: {
+    tone: {
+      info: "text-primary-ink",
+      success: "text-success",
+      warning: "text-warning",
+      error: "text-destructive",
+    },
+  },
+  defaultVariants: { tone: "info" },
+});
+
+const icons = {
+  info: "lucide:circle-check",
+  success: "lucide:badge-check",
+  warning: "lucide:bell-ring",
+  error: "lucide:shield-check",
+} as const;
+
+interface Props {
+  tone?: "info" | "success" | "warning" | "error";
+  /** Announce the message to assistive technology when it appears. */
+  live?: boolean;
+}
+
+const { tone = "info", live = false } = Astro.props;
+---
+
+<div class={notice({ tone })} role={live ? "status" : undefined} aria-live={live ? "polite" : undefined}>
+  <span class={icon({ tone })}>
+    <Icon name={icons[tone]} size="md" />
+  </span>
+  <div><slot /></div>
+</div>

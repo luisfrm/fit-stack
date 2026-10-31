@@ -1,0 +1,32 @@
+---
+import { cva } from "class-variance-authority";
+
+const eyebrow = cva("mb-2 block font-bold uppercase", {
+  variants: {
+    size: {
+      sm: "text-xs tracking-[0.25em]",
+      md: "text-sm tracking-[0.2em]",
+    },
+    tone: {
+      primary: "text-primary-ink",
+      muted: "text-foreground-dim",
+    },
+  },
+  defaultVariants: {
+    size: "sm",
+    tone: "primary",
+  },
+});
+
+interface Props {
+  as?: "span" | "p" | "h2";
+  size?: "sm" | "md";
+  tone?: "primary" | "muted";
+}
+
+const { as: Tag = "span", size, tone } = Astro.props;
+---
+
+<Tag class={eyebrow({ size, tone })}>
+  <slot />
+</Tag>

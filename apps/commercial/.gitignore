@@ -1,0 +1,5 @@
+.astro/
+.turbo/
+dist/
+wrangler.jsonc.bak
+.dev.vars

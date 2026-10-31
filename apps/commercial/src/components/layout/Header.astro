@@ -1,0 +1,142 @@
+---
+import { cva } from "class-variance-authority";
+
+import { CONTACT, NAV_LINKS } from "@/config/site";
+import Button from "@/components/ui/Button.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Logo from "@/components/ui/Logo.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Visibility from "@/components/ui/Visibility.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+
+const root = cva("site-header sticky top-0 z-50 border-b border-transparent transition-colors duration-300");
+const bar = cva("section-container flex h-16 items-center justify-between gap-4 lg:h-20");
+const navList = cva("flex items-center gap-8");
+const navLink = cva(
+  "text-sm font-medium text-foreground-muted transition-colors hover:text-foreground"
+);
+const menuButton = cva(
+  "inline-flex size-11 cursor-pointer items-center justify-center rounded-md border border-border text-foreground transition-colors hover:bg-foreground/5 lg:hidden"
+);
+const menuPanel = cva("border-t border-border bg-background lg:hidden");
+const desktopNav = cva("hidden lg:block");
+const menuBody = cva("section-container flex flex-col gap-2 py-4");
+const mobileLink = cva(
+  "flex min-h-12 items-center rounded-md px-1 text-base font-medium text-foreground-muted transition-colors hover:text-foreground"
+);
+const mobileThemeRow = cva(
+  "mt-3 flex items-center justify-between border-t border-border-muted pt-4"
+);
+const mobileThemeLabel = cva("text-xs font-bold uppercase tracking-[0.18em] text-foreground-dim");
+---
+
+<header data-site-header class={root()}>
+  <div class={bar()}>
+    <Logo href="/" size="md" />
+
+    <nav aria-label="Navegación principal" class={desktopNav()}>
+      <ul class={navList()}>
+        {
+          NAV_LINKS.map((link) => (
+            <li>
+              <a href={link.href} class={navLink()}>
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <Stack direction="horizontal" gap="sm" align="center">
+      <Visibility from="sm" as="div">
+        <ThemeToggle responsive="always" />
+      </Visibility>
+      <Visibility from="sm" as="div">
+        <Button href={CONTACT.demoPath} size="sm">
+          Probar demo
+          <Icon name="lucide:arrow-right" size="sm" />
+        </Button>
+      </Visibility>
+      <button
+        type="button"
+        data-menu-toggle
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label="Abrir menú"
+        class={menuButton()}
+      >
+        <Icon name="lucide:menu" size="md" />
+      </button>
+    </Stack>
+  </div>
+
+  <div id="mobile-menu" data-menu-panel hidden class={menuPanel()}>
+    <div class={menuBody()}>
+      <nav aria-label="Navegación móvil">
+        <ul>
+          {
+            NAV_LINKS.map((link) => (
+              <li>
+                <a href={link.href} class={mobileLink()}>
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+      <Button href={CONTACT.demoPath} size="md" fullWidth>
+        Probar demo gratuita
+        <Icon name="lucide:arrow-right" size="sm" />
+      </Button>
+      <div class={mobileThemeRow()}>
+        <span class={mobileThemeLabel()}>Tema</span>
+        <ThemeToggle />
+      </div>
+    </div>
+  </div>
+</header>
+
+<script>
+  const SCROLL_THRESHOLD = 8;
+
+  const header = document.querySelector<HTMLElement>("[data-site-header]");
+  if (header) {
+    const syncHeader = () =>
+      header.classList.toggle("is-scrolled", window.scrollY > SCROLL_THRESHOLD);
+    syncHeader();
+    window.addEventListener("scroll", syncHeader, { passive: true });
+  }
+
+  const toggle = document.querySelector<HTMLButtonElement>("[data-menu-toggle]");
+  const panel = document.querySelector<HTMLElement>("[data-menu-panel]");
+
+  if (toggle && panel) {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+
+    const setOpen = (open: boolean) => {
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Cerrar menú" : "Abrir menú");
+      panel.hidden = !open;
+    };
+
+    toggle.addEventListener("click", () => setOpen(panel.hidden));
+    panel.addEventListener("click", (event) => {
+      if ((event.target as HTMLElement).closest("a")) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    document.addEventListener("click", (event) => {
+      const target = event.target as Node;
+      if (!panel.hidden && !panel.contains(target) && !toggle.contains(target)) setOpen(false);
+    });
+    desktop.addEventListener("change", (event) => {
+      if (event.matches) setOpen(false);
+    });
+  }
+</script>

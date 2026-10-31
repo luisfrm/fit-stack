@@ -1,0 +1,17 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Content available to assistive technology but not visible on screen.
+ * Centralised so the utility never gets inlined across components.
+ */
+const srOnly = cva("sr-only");
+
+interface Props {
+  as?: "span" | "p" | "div";
+}
+
+const { as: Tag = "span" } = Astro.props;
+---
+
+<Tag class={srOnly()}><slot /></Tag>

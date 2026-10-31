@@ -1,0 +1,63 @@
+---
+import { cva } from "class-variance-authority";
+
+const text = cva("leading-relaxed", {
+  variants: {
+    size: {
+      xs: "text-xs",
+      sm: "text-sm",
+      base: "text-base",
+      lg: "text-lg",
+      lead: "text-lg md:text-xl",
+      /** Large numeric emphasis (prices, totals). */
+      price: "font-display text-4xl font-black italic tracking-tighter",
+      display: "font-display text-lg font-black italic tracking-tight",
+    },
+    tone: {
+      default: "text-foreground",
+      muted: "text-foreground-muted",
+      subtle: "text-foreground-dim",
+      strong: "text-foreground-strong",
+      primary: "text-primary-ink",
+      success: "text-success",
+    },
+    weight: {
+      normal: "font-normal",
+      medium: "font-medium",
+      semibold: "font-semibold",
+      bold: "font-bold",
+    },
+    uppercase: {
+      true: "uppercase tracking-[0.18em]",
+      false: "",
+    },
+    align: {
+      left: "text-left",
+      center: "text-center",
+    },
+  },
+  defaultVariants: {
+    size: "base",
+    tone: "default",
+    weight: "normal",
+    uppercase: false,
+    align: "left",
+  },
+});
+
+interface Props {
+  as?: "p" | "span" | "div" | "small" | "li";
+  size?: "xs" | "sm" | "base" | "lg" | "lead" | "price" | "display";
+  tone?: "default" | "muted" | "subtle" | "strong" | "primary" | "success";
+  weight?: "normal" | "medium" | "semibold" | "bold";
+  uppercase?: boolean;
+  align?: "left" | "center";
+  id?: string;
+}
+
+const { as: Tag = "p", size, tone, weight, uppercase, align, id } = Astro.props;
+---
+
+<Tag id={id} class={text({ size, tone, weight, uppercase, align })}>
+  <slot />
+</Tag>

@@ -1,0 +1,22 @@
+{
+  "name": "Fit-Stack",
+  "short_name": "Fit-Stack",
+  "description": "Software de gestión para gimnasios y centros deportivos de Latinoamérica.",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FCD303",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

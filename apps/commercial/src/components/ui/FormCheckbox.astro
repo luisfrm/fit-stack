@@ -1,0 +1,49 @@
+---
+import { cva } from "class-variance-authority";
+
+const wrapper = cva("flex items-start gap-3");
+const input = cva(
+  [
+    "mt-0.5 size-4 shrink-0 cursor-pointer rounded-sm border border-input-border bg-input",
+    "accent-[var(--primary)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+  ],
+  {
+    variants: {
+      invalid: {
+        true: "border-destructive",
+        false: "",
+      },
+    },
+    defaultVariants: { invalid: false },
+  }
+);
+const label = cva("text-sm leading-relaxed text-foreground-muted");
+const error = cva("mt-1 block text-xs text-destructive");
+
+interface Props {
+  id: string;
+  name: string;
+  required?: boolean;
+  error?: string;
+}
+
+const { id, name, required = false, error: errorText } = Astro.props;
+const errorId = errorText ? `${id}-error` : undefined;
+---
+
+<div class={wrapper()}>
+  <input
+    id={id}
+    name={name}
+    type="checkbox"
+    required={required}
+    class={input({ invalid: Boolean(errorText) })}
+    aria-invalid={errorText ? "true" : undefined}
+    aria-describedby={errorId}
+  />
+  <div>
+    <label for={id} class={label()}><slot /></label>
+    {errorText && <span id={errorId} class={error()} role="alert">{errorText}</span>}
+  </div>
+</div>

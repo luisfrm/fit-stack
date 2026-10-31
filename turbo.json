@@ -12,7 +12,9 @@
       ],
       "outputs": [
         ".next/**",
-        "!.next/cache/**"
+        "!.next/cache/**",
+        "dist/**",
+        ".astro/**"
       ],
       "env": [
         "DATABASE_URL",

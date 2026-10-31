@@ -1,0 +1,55 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * FAQ accordion built on native <details>: works without JavaScript and keeps
+ * keyboard behaviour for free.
+ */
+const list = cva("flex flex-col gap-3");
+const details = cva(
+  "group rounded-xl border border-border bg-card transition-colors [&_summary::-webkit-details-marker]:hidden open:border-primary/40"
+);
+const summary = cva(
+  "flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-foreground"
+);
+const chevron = cva(
+  "size-5 shrink-0 text-foreground-muted transition-transform group-open:rotate-180"
+);
+const answer = cva("px-5 pb-5 pt-0 text-sm leading-relaxed text-foreground-muted");
+
+interface Item {
+  readonly question: string;
+  readonly answer: string;
+}
+
+interface Props {
+  items: readonly Item[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class={list()}>
+  {
+    items.map((entry) => (
+      <details class={details()}>
+        <summary class={summary()}>
+          <span>{entry.question}</span>
+          <svg
+            class={chevron()}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </summary>
+        <p class={answer()}>{entry.answer}</p>
+      </details>
+    ))
+  }
+</div>

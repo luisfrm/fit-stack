@@ -1,0 +1,47 @@
+---
+import { cva } from "class-variance-authority";
+
+/**
+ * Decorative bar strip used in product illustrations.
+ * Purely visual: the parent wrapper must be aria-hidden.
+ */
+const track = cva("flex items-end gap-1.5", {
+  variants: {
+    height: {
+      sm: "h-8",
+      md: "h-10",
+      lg: "h-16",
+    },
+  },
+  defaultVariants: { height: "md" },
+});
+
+const bar = cva("w-full rounded-sm", {
+  variants: {
+    tone: {
+      muted: "bg-primary/35",
+      accent: "bg-primary",
+    },
+  },
+  defaultVariants: { tone: "muted" },
+});
+
+interface Props {
+  /** Relative heights in percent (0-100). */
+  values: readonly number[];
+  height?: "sm" | "md" | "lg";
+}
+
+const { values, height } = Astro.props;
+---
+
+<div class={track({ height })} aria-hidden="true">
+  {
+    values.map((value, index) => (
+      <span
+        class={bar({ tone: index === values.length - 1 ? "accent" : "muted" })}
+        style={`height:${Math.max(8, Math.min(100, value))}%`}
+      />
+    ))
+  }
+</div>

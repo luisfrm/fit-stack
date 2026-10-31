@@ -1,0 +1,69 @@
+---
+import { cva } from "class-variance-authority";
+
+import type { Problem } from "@/data/problems";
+import Card from "@/components/ui/Card.astro";
+import Divider from "@/components/ui/Divider.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  problems: readonly Problem[];
+}
+
+const { problems } = Astro.props;
+
+const iconBox = cva(
+  "inline-flex size-10 items-center justify-center rounded-md border border-border bg-surface-2/70 text-primary-ink"
+);
+const solutionRow = cva("flex items-start gap-2");
+---
+
+<Section id="producto" labelledBy="producto-title">
+  <Stack gap="xl">
+    <SectionHeader
+      eyebrow="Por qué existe Fit-Stack"
+      title="Tres problemas que se resuelven en el mismo"
+      accent="panel"
+      description="Cobrar en moneda local, retener clientes y saber quién está al día no deberían vivir en tres herramientas distintas."
+      id="producto-title"
+    />
+
+    <Grid as="ul" cols={3} gap="md">
+      {
+        problems.map((problem) => (
+          <Card as="li" padding="lg">
+            <Stack gap="md">
+              <span class={iconBox()}>
+                <Icon name={problem.icon} size="lg" />
+              </span>
+
+              <Stack gap="sm">
+                <Heading as="h3" size="card" flush>
+                  {problem.problem}
+                </Heading>
+                <Text size="sm" tone="muted">
+                  {problem.problemDetail}
+                </Text>
+              </Stack>
+
+              <Divider spacing="sm" />
+
+              <div class={solutionRow()}>
+                <Icon name="lucide:arrow-right" size="sm" tone="primary" shrink />
+                <Text as="span" size="sm">
+                  {problem.solution}
+                </Text>
+              </div>
+            </Stack>
+          </Card>
+        ))
+      }
+    </Grid>
+  </Stack>
+</Section>

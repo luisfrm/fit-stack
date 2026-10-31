@@ -1,0 +1,58 @@
+---
+import { cva } from "class-variance-authority";
+
+import type { Step } from "@/data/steps";
+import Card from "@/components/ui/Card.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import StepMarker from "@/components/ui/StepMarker.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  steps: readonly Step[];
+}
+
+const { steps } = Astro.props;
+
+const row = cva("flex items-center justify-between gap-3");
+---
+
+<Section labelledBy="como-funciona-title">
+  <Stack gap="xl">
+    <SectionHeader
+      eyebrow="Cómo funciona"
+      title="De cero a cobrar en tres"
+      accent="pasos"
+      description="No necesitas migrar nada ni instalar software: entras al panel, configuras tu gimnasio y empiezas a registrar clientes."
+      id="como-funciona-title"
+    />
+
+    <Grid as="ol" cols={3} gap="md">
+      {
+        steps.map((step, index) => (
+          <Card as="li" padding="lg">
+            <Stack gap="sm">
+              <div class={row()}>
+                <StepMarker step={index + 1} />
+                <Icon name={step.icon} size="lg" tone="dim" />
+              </div>
+              <Heading as="h3" size="card" flush>
+                {step.title}
+              </Heading>
+              <Text size="sm" tone="muted">
+                {step.description}
+              </Text>
+              <Text size="xs" tone="subtle">
+                {step.detail}
+              </Text>
+            </Stack>
+          </Card>
+        ))
+      }
+    </Grid>
+  </Stack>
+</Section>

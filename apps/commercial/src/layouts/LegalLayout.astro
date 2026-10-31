@@ -1,0 +1,64 @@
+---
+import { CONTACT, LEGAL_LAST_UPDATED, SITE } from "@/config/site";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+import Badge from "@/components/ui/Badge.astro";
+import Card from "@/components/ui/Card.astro";
+import Grid from "@/components/ui/Grid.astro";
+import Heading from "@/components/ui/Heading.astro";
+import Icon from "@/components/ui/Icon.astro";
+import Link from "@/components/ui/Link.astro";
+import Prose from "@/components/ui/Prose.astro";
+import Section from "@/components/ui/Section.astro";
+import SectionHeader from "@/components/ui/SectionHeader.astro";
+import Stack from "@/components/ui/Stack.astro";
+import Text from "@/components/ui/Text.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  /** The sibling legal document, linked from the sidebar. */
+  otherHref: string;
+  otherLabel: string;
+}
+
+const { title, description, otherHref, otherLabel } = Astro.props;
+---
+
+<BaseLayout title={`${title} — ${SITE.name}`} description={description}>
+  <Section spacing="loose">
+    <Grid cols={2} split gap="lg" align="start">
+      <Stack gap="md">
+        <SectionHeader as="h1" eyebrow="Legal" title={title} width="none" />
+        <Stack direction="horizontal">
+          <Badge tone="outline" size="sm">Última actualización: {LEGAL_LAST_UPDATED}</Badge>
+        </Stack>
+        <Prose>
+          <slot />
+        </Prose>
+      </Stack>
+
+      <Stack gap="md">
+        <Card padding="md">
+          <Stack gap="sm">
+            <Heading as="h2" size="sm" flush>¿Dudas sobre este documento?</Heading>
+            <Text size="sm" tone="muted">
+              Escríbenos y te responde una persona del equipo.
+            </Text>
+            <Link href={`mailto:${CONTACT.email}`} tone="inline">{CONTACT.email}</Link>
+          </Stack>
+        </Card>
+
+        <Card tone="flat" padding="md">
+          <Stack gap="sm">
+            <Text size="xs" tone="subtle" weight="bold" uppercase>También te puede interesar</Text>
+            <Stack direction="horizontal" gap="xs" align="center">
+              <Icon name="lucide:file-text" size="sm" tone="muted" shrink />
+              <Link href={otherHref} tone="plain">{otherLabel}</Link>
+            </Stack>
+          </Stack>
+        </Card>
+      </Stack>
+    </Grid>
+  </Section>
+</BaseLayout>
