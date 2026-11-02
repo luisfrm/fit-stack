@@ -3,8 +3,8 @@
  * commercial site. Change it here, never inline in a component.
  */
 export const SITE = {
-  /** Canonical origin. Must match the Cloudflare route in production. */
-  url: "https://commercial.luisrivas.site",
+  /** Canonical origin. Must match the custom domain attached to the Worker. */
+  url: "https://fitstack-commercial.luisrivas.site",
   name: "Fit-Stack",
   legalName: "Fit-Stack",
   lang: "es",
@@ -12,8 +12,18 @@ export const SITE = {
   title: "Fit-Stack — El sistema operativo de tu gimnasio",
   description:
     "Miembros, membresías acumulativas, pagos en varias monedas, clases y recibos en PDF. Una sola plataforma para administrar tu gimnasio en Latinoamérica.",
-  /** Used as the social preview image (square brand mark). */
-  ogImage: "/brand/og-image.jpg",
+  /**
+   * Social preview image. Keep `width`/`height` in sync with the real file:
+   * scrapers that need explicit dimensions drop the preview otherwise.
+   */
+  ogImage: {
+    path: "/brand/og-image.jpg",
+    width: 1024,
+    height: 1024,
+    type: "image/jpeg",
+    /** Short alt describing the image itself, not the page copy. */
+    alt: "Fit-Stack: logotipo de la plataforma de gestión para gimnasios",
+  },
   themeColor: {
     light: "#f9f9fb",
     dark: "#000000",
@@ -33,6 +43,10 @@ export const NAV_LINKS = [
   { label: "Preguntas", href: "/#preguntas" },
 ] as const;
 
+/**
+ * Footer links. Internal pages are written with the trailing slash that the
+ * canonical URL uses, so no redirect hop is needed when following a link.
+ */
 export const FOOTER_LINKS = {
   producto: [
     { label: "Qué es Fit-Stack", href: "/#producto" },
@@ -41,8 +55,8 @@ export const FOOTER_LINKS = {
     { label: "Preguntas frecuentes", href: "/#preguntas" },
   ],
   legal: [
-    { label: "Términos y condiciones", href: "/terms-and-condition" },
-    { label: "Política de privacidad", href: "/privacy-policy" },
+    { label: "Términos y condiciones", href: "/terms-and-condition/" },
+    { label: "Política de privacidad", href: "/privacy-policy/" },
   ],
 } as const;
 

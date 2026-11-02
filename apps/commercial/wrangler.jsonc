@@ -10,6 +10,10 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash"
   },
+  // The canonical origin is the custom domain (attached to this Worker in the
+  // Cloudflare dashboard). Leaving the workers.dev hostname out of the index
+  // avoids a second, duplicate origin for the same content.
+  "workers_dev": false,
   "observability": {
     "enabled": true
   }
