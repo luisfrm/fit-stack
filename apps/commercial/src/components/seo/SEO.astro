@@ -14,7 +14,8 @@ interface Props {
 const { title, description, path, image, noindex = false, type = "website" } = Astro.props;
 
 const canonical = new URL(path, SITE.url).toString();
-const imageUrl = new URL(image ?? SITE.ogImage, SITE.url).toString();
+const preview = SITE.ogImage;
+const imageUrl = new URL(image ?? preview.path, SITE.url).toString();
 ---
 
 <title>{title}</title>
@@ -39,12 +40,16 @@ const imageUrl = new URL(image ?? SITE.ogImage, SITE.url).toString();
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
 <meta property="og:image" content={imageUrl} />
-<meta property="og:image:alt" content={`${SITE.name} — ${SITE.description}`} />
+<meta property="og:image:type" content={preview.type} />
+<meta property="og:image:width" content={String(preview.width)} />
+<meta property="og:image:height" content={String(preview.height)} />
+<meta property="og:image:alt" content={preview.alt} />
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={imageUrl} />
+<meta name="twitter:image:alt" content={preview.alt} />
 
 <link rel="icon" href="/favicon.ico" sizes="32x32" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

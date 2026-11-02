@@ -53,3 +53,6 @@ primera vez; no se gestiona con Terraform. Las cabeceras de seguridad y caché v
 - Los precios publicados viven en `src/data/pricing.ts` y deben reflejar el catálogo de
   planes que administra la consola. Si cambian allí, se actualizan aquí.
 - El formulario de demo es una captación: todavía no crea organizaciones.
+- La imagen para compartir enlaces está en `public/brand/og-image.png` (1200×630). Sus
+  dimensiones y tipo se declaran en `SITE.ogImage` (`src/config/site.ts`); si se reemplaza
+  por otra de distinto tamaño, hay que actualizar esos valores o la preview se rompe.

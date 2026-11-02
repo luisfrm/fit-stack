@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /probar-demo
 
-Sitemap: https://commercial.luisrivas.site/sitemap-index.xml
+Sitemap: https://fitstack-commercial.luisrivas.site/sitemap-index.xml

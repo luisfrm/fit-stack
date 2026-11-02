@@ -154,7 +154,7 @@ Las dos aplicaciones **Next.js 16** (`apps/panel` y `apps/console`) se despliega
 
 1. **`apps/panel`**: Panel de Administración para Gimnasios (`panel.luisrivas.site`).
 2. **`apps/console`**: Panel SaaS Super-Admin (`console.luisrivas.site`).
-3. **`apps/commercial`**: Sitio comercial público (`commercial.luisrivas.site`) — ver §4.1.
+3. **`apps/commercial`**: Sitio comercial público (`fitstack-commercial.luisrivas.site`) — ver §4.1.
 
 ### 4.1 Sitio comercial (`apps/commercial`)
 
@@ -162,7 +162,7 @@ Las dos aplicaciones **Next.js 16** (`apps/panel` y `apps/console`) se despliega
 - **Destino**: Cloudflare Workers Assets. `apps/commercial/wrangler.jsonc` declara únicamente `assets.directory: ./dist` (sin `main`).
 - **Aprovisionamiento**: `wrangler deploy` crea el Worker y su bucket de assets la primera vez. **No se gestiona con Terraform** (a diferencia de `api-worker`/`jobs-worker`).
 - **CI/CD**: [`deploy-commercial.yml`](file:///c:/Users/LAPTOP/Documents/PROJECTS/fit-stack/.github/workflows/deploy-commercial.yml) construye el sitio y ejecuta `wrangler deploy` en push a `master`/`develop` cuando cambian `apps/commercial/**`, `packages/ui/**` o `packages/shared/**`.
-- **Dominio**: `commercial.luisrivas.site` (el `site` de Astro y los canonical salen de `src/config/site.ts`).
+- **Dominio**: `fitstack-commercial.luisrivas.site` (el `site` de Astro y los canonical salen de `src/config/site.ts`).
 - **Manual**:
   ```bash
   pnpm --filter commercial build && pnpm --filter commercial deploy

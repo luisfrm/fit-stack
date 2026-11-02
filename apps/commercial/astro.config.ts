@@ -17,29 +17,28 @@ export default defineConfig({
   },
   integrations: [
     sitemap({
+      // `/probar-demo` is noindex: it must not appear in the sitemap either.
       filter: (page) => !page.includes("/probar-demo"),
+      lastmod: new Date(),
     }),
     icon({
       include: {
+        // Exactly the icons the site renders; keep it alphabetical.
         lucide: [
           "arrow-right",
           "arrow-up-right",
           "badge-check",
           "banknote",
           "bell-ring",
-          "brain",
           "calendar-days",
           "check",
           "chevron-down",
           "circle-check",
           "clock",
           "copy",
-          "copy",
-          "credit-card",
           "dumbbell",
           "file-text",
           "globe",
-          "info",
           "laptop",
           "layout-dashboard",
           "line-chart",
@@ -52,10 +51,7 @@ export default defineConfig({
           "smartphone",
           "sparkles",
           "sun",
-          "triangle-alert",
           "users",
-          "x",
-          "zap",
         ],
       },
     }),
