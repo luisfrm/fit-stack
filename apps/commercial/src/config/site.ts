@@ -13,16 +13,16 @@ export const SITE = {
   description:
     "Miembros, membresías acumulativas, pagos en varias monedas, clases y recibos en PDF. Una sola plataforma para administrar tu gimnasio en Latinoamérica.",
   /**
-   * Social preview image. Keep `width`/`height` in sync with the real file:
-   * scrapers that need explicit dimensions drop the preview otherwise.
+   * Social preview image (1200×630). Keep `width`/`height` in sync with the
+   * real file: scrapers that need explicit dimensions drop the preview.
    */
   ogImage: {
-    path: "/brand/og-image.jpg",
-    width: 1024,
-    height: 1024,
-    type: "image/jpeg",
+    path: "/brand/og-image.png",
+    width: 1200,
+    height: 630,
+    type: "image/png",
     /** Short alt describing the image itself, not the page copy. */
-    alt: "Fit-Stack: logotipo de la plataforma de gestión para gimnasios",
+    alt: "Fit-Stack: registro de un pago en varias monedas y envío del recibo en PDF",
   },
   themeColor: {
     light: "#f9f9fb",
